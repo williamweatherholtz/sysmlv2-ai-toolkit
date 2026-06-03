@@ -19,3 +19,34 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# ----------------------------------------------------------------------
+# sysmlv2-ai-toolkit additions
+# ----------------------------------------------------------------------
+
+# Derived indexes (rebuilt from .sysml files — never source of truth)
+.index/
+*.kuzu/
+
+# SysMLv2 pilot implementation cache (if used)
+.sysml-cache/
+
+# Environment
+.env
+.env.local
+
+# Editor
+.vscode/settings.json
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node tooling (for the eventual GUI)
+node_modules/
+.next/
+.turbo/
+
+# Logs
+*.log
