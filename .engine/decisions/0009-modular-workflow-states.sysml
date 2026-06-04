@@ -1,0 +1,18 @@
+package Engine { package Decisions {
+    private import Engine::Core::*;
+
+    part d0009 : Decision {
+        :>> title = "Workflow states are data, not a hardcoded enum";
+        :>> status = "accepted";
+        :>> context = "Hardcoding backlog/ready/in_progress prevents adding a "
+            + "deployment or ai-review state without code changes.";
+        :>> decision = "WorkflowState is an instance type; a tracked element "
+            + "references its currentState BY NAME. A project defines the "
+            + "states and transitions it needs (a WorkflowDefinition). "
+            + "Processes drive transitions; the engine only records state. "
+            + "DoD/staleness reference states by name, never by literal.";
+        :>> consequences = "Pros: workflow is extensible per project without "
+            + "engine changes. Cons: state validity must be checked against the "
+            + "WorkflowDefinition by the validator.";
+    }
+}}

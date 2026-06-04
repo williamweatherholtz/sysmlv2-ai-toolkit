@@ -1,69 +1,70 @@
 # sysmlv2-ai-toolkit
 
-A SysMLv2-based work-tracking toolkit and template repository. The toolkit itself
-is being built **using its own workflow** — eating the dog food from day one.
+A reusable, AI-complemented **work-tracking engine** built on SysMLv2 text
+files, with strict-yet-flexible discipline. It tracks the work of building
+anything — and is being built using its own workflow.
 
 ## What this is
 
-- A **template** for project repositories that use SysMLv2 as the typed,
-  text-file work-and-architecture spine.
-- A **toolkit** of tools (parser bindings, query CLI, indexer, API service,
-  browser GUI) that operate on a project's `.sysml` files.
+The engine is a SysMLv2 **schema** + disciplined **processes** + a
+**computed-state contract** that track *work being done* with full
+traceability and live suspicion detection: change an upstream item and every
+downstream item that may now be stale is found by a graph query, not a manual
+hunt.
 
-The same repository serves both purposes. The directories under `conventions/`,
-`processes/`, and `tools/` (once built) lift cleanly into any new project. The
-contents of `requirements/`, `architecture/`, `decisions/`, and `work/` are
-specific to *this* project (building the toolkit) and would be replaced when
-seeding a new repo.
+**Two models, never conflated:**
+1. **The engine model** tracks the *work* (this repo).
+2. **The deliverable** is what the work produces — software, or a future
+   SysMLv2 org/HR model. A separate artifact; its domain vocabulary never
+   enters the engine.
 
-## Repository layout
+## Where things live
 
 ```
-conventions/      Frozen base types — WorkItem, AISkill, Decision, etc.
-                  Lifts into any project. Treat changes here as architectural.
+.engine/        THE ENGINE — infrastructure (like .git/). See .engine/README.md.
+  schema/core/    Always imported: requirements, work, tests, decisions,
+                  risk, process, workflow, skills + the Element/relationship base.
+  schema/safety/  Optional: STPA (HARA/ASIL intentionally out of scope).
+  contracts/      The computed-state spec (satisfaction/coverage/suspicion).
+  processes/      Agile-for-solo+AI, Definition of Ready (Standup), Definition of Done.
+  skills/         Default AI skill registrations + write policies.
+  decisions/      0001–0010: the architecture decisions behind the engine.
+  docs/           Usage guide.
 
-processes/        The agile workflow modeled as SysMLv2 processes. Lifts.
-
-requirements/     What the toolkit must do. Project-specific.
-
-architecture/     How the toolkit is structured. Project-specific.
-
-decisions/        ADRs in SysMLv2 form. Project-specific (the decisions are),
-                  but the convention lifts.
-
-work/             Epics, stories, tasks. Status lives here. Project-specific.
-
-skills/           AISkill / Agent registrations pointing to skill prompts on
-                  disk. Lifts the convention; the specific skills are
-                  project-specific.
-
-docs/             Human-readable guides on using the workflow.
-
-tools/            (To be built.) Parser, indexer, query CLI, API, GUI.
+(top level)     PROJECT INSTANCE — created next phase, using the engine:
+                requirements/, work/, architecture/, decisions/ for the tools,
+                then the tool source itself.
 ```
 
-## The discipline
+## The discipline (engine invariants)
 
-1. **Files are truth.** No parallel work tracking in GitHub Issues, Linear,
-   Jira, or a kanban board. If it isn't in a `.sysml` file, it isn't tracked.
-2. **Typed relationships only.** Use `satisfy`, `verify`, `refine`,
-   `dependency` — not English prose pointing at other items.
-3. **`conventions/` is frozen.** Changes are themselves architectural decisions.
-4. **State, not events.** The model records *what we decided to build* and
-   *what state items are in*. Runtime events (CI runs, image digests,
-   telemetry) live in their native systems and are referenced by URI when
-   relevant.
-5. **AI agents are first-class.** The API surface and the GUI are the same
-   API surface AI agents use. No private channels.
+1. **Text is truth; computed values are views.** Authored facts live in
+   `.sysml`; satisfaction/coverage/suspicion are recomputed, never stored.
+2. **Atomic items.** Tests, decisions, requirements are first-class and
+   independently queryable — never checklist lines inside other items.
+3. **Typed edges only:** `:>`, `satisfy`, `verify`, `allocate`, `dependency`,
+   `supersede`.
+4. **State, not events.** Runtime events (CI, images, telemetry) stay in their
+   native systems.
+5. **AI is first-class** and uses the same API as the GUI, gated by an enforced
+   per-skill write policy.
+6. **`schema/core` is frozen**; `schema/safety` is optional; changes go through
+   a Decision.
 
-## Status
+## Build order
 
-Phase 0 — bootstrap. See `work/phase-0-bootstrap.sysml`.
+- **Phase 0 (done):** the `.engine/` SysMLv2 infrastructure — authored by hand
+  (it can't track its own bootstrap).
+- **Next:** validate all `.sysml` against the SysMLv2 pilot implementation
+  (syntax is currently *unproven*), then use the engine to track building the
+  tools (parser, indexer, validator, query CLI, API, browser GUI).
 
-## SysMLv2 syntax note
+## Caveat
 
-SysMLv2's textual notation is still maturing (OMG specification finalized
-2023+, pilot implementation ongoing). The `.sysml` files in this repo aim for
-current syntax but may need adjustment against the pilot implementation's
-parser. Validate with the pilot impl before relying on the syntax in any new
-file.
+SysMLv2 textual syntax in `.engine/` is **pending validation** against the
+pilot implementation. The conceptual schema is settled; exact keyword spelling
+may shift. Don't treat the syntax as proven.
+
+## License
+
+MIT — see `LICENSE`.
