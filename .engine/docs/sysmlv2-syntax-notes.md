@@ -25,6 +25,18 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
   between files (the standard-library idiom).
 - Reopening a nested package within ONE submission *adds* members.
 
+### Confirmed by the workflow meta-model (2026-06-09; `spike_metamodel.py`, `validate_workflows.py`)
+
+- `:>` specialization from an **`abstract part def`** base (e.g. `part def Workflow :> MetaElement`).
+- **Ordered multiplicity** feature: `ref phases : Phase[*] ordered;`.
+- **Instance population of a `[*]` feature with a sequence:** `:>> phases = (a, b, c);`
+  (and a single value also works: `:>> exitGate = gateA;`).
+- Instances via `part x : T { :>> attr = v; :>> ref = other; }` (the `:>>` redefines
+  inherited features; `ref` features take element references).
+- Closed sets (`kind`, `nature`, `critic`, `cadence`) kept as `String` with documented
+  vocab — avoids reserved-keyword enum-literal failures.
+- `Boolean` attributes parse (via `private import ScalarValues::*;`).
+
 ## Fails / avoid ❌
 
 - **Bare `import X::*;`** (no `private`/`public`).
