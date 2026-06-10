@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Skill(systems-engineering)",
+      "Skill(software-engineering)",
+      "Skill(se)",
+      "Skill(sw)",
+      "Skill(phase-orchestrator)",
+      "Skill(arbiter)",
+      "Skill(critic-devils-advocate)",
+      "Skill(critic-premortem)",
+      "Skill(critic-stakeholder)",
+      "Skill(critic-traceability)"
+    ]
+  }
+}
