@@ -50,9 +50,12 @@ workflow meta-model + all six workflows as a computed DAG (produces/consumes),
 12/12 green; Forge apparatus disabled here; validators fixed (clean exit, no leak).
 
 Next, in order:
-1. **Pilot JSON probe** — can the installed kernel emit the standard SysML v2
-   API JSON (for `whats-next` to read + SysON/tool interop), or is the
-   API-&-Services server needed? Decides how `whats-next` reads the model.
+1. **Pilot read-path — RESOLVED (2026-06-09).** `%export` (standard SysML v2 JSON
+   file) is a silent no-op in this kernel build. `%show <FQN>` reliably dumps the
+   full typed AST over iopub — element types, UUIDs, attribute `FeatureValue`s, and
+   `produces`/`consumes` reference edges (the whole DAG). So `whats-next` reads via
+   `%show` (parse the indented AST). Standard-JSON / SysON interop is deferred to a
+   future API-&-Services path; not blocking.
 2. **`whats-next` resolver** (Python) — reads the workflows + `.tracking/`
    instance data, computes the dependency DAG (from `consumes`/`produces` + the
    typed edges), and returns ordered, parallel-grouped, self-contained task
