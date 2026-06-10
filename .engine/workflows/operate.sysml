@@ -1,6 +1,6 @@
 // =====================================================================
-// OperateWorkflow — field support; incidents feed back as new Needs or
-// Hazards through Change Request. Continuous. Spec §9.
+// OperateWorkflow — field support; incidents feed back as new Needs/Hazards
+// through Change Request. Continuous. See spec §9.
 // =====================================================================
 package OperateWorkflow {
     private import ScalarValues::*;
@@ -8,9 +8,13 @@ package OperateWorkflow {
 
     part issueType : ArtifactType { :>> title = "Field Issue"; :>> schemaType = "Issue"; :>> nature = "real"; }
 
-    part support : Phase { :>> title = "Support"; :>> order = 1; :>> produces = issueType; }
+    part support : Phase {
+        :>> title = "Support";
+        :>> produces = issueType;
+    }
     part triage : Phase {
-        :>> title = "Triage to change"; :>> order = 2;
+        :>> title = "Triage to change";
+        :>> consumes = issueType;
         :>> procedureRef = "ChangeRequestWorkflow::changeRequest";
     }
 

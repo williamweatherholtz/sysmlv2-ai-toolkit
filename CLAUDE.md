@@ -40,24 +40,70 @@ Authoritative reading order: this file → `.engine/README.md` → the design sp
    `Decision` that `supersede`s the need. Scope = superseding Decisions, not a separate type.
 5. **`schema/core` is frozen.** Changes to schema or process definitions are architectural and
    go through the Change Request path (§4).
+6. **Reference procedure; don't embed it.** Record what *is* — facts, conditions, typed edges;
+   let the referenced, modular process decide what to *do*. Anything that names an action,
+   verdict, or sequence — `ready`, `blocked`, `done`, `needs-review`, execution order — is a
+   *computed view* or a *reference*, never an authored field. (A phase's gate/DoD = its
+   `verify`-linked Tests passing; execution order/parallelism = the dependency DAG, computed
+   from `consumes`/`produces` + typed edges. "Test" is the universal verifiable condition,
+   distinguished by `method` and `verify` target — so gate-checks and critics are Tests too.)
 
 ---
 
 ## 3. The interaction loop ("main")
 
-There is no executable "main" yet; **this is the main.** To do *any* work in this repo:
+There is no executable "main" yet; **this is the main.** Do **not** assume a request
+means "do work in the current phase." **Classify every request first** — by *what it
+changes* — then follow that route:
 
-1. **Orient.** Read the active workflow + phase from the workflow state in `.tracking/`
-   (the runtime cursor). If none exists, you are in the Business workflow at its first phase.
-2. **Act within the active phase only.** Produce the phase's defined typed artifact(s) as
-   items + edges. Do **not** freelance work that belongs to another phase, and do **not**
-   invent artifacts the phase doesn't call for.
-3. **Record back.** Write the items/edges and a recorded judgment (what you did, why) with
-   authorship + timestamp into `.tracking/`. You are a *task tool* serving the engine — you
-   execute the defined phase; you do not redefine the workflow.
-4. **Gate.** A phase exits through its gate: trace is complete, verification criteria present,
-   critics clear, a decision is recorded. Don't promote work that hasn't passed its gate.
-5. **Change the process only via Change Request (§4).**
+```
+request
+  ├─ changes a workflow / phase / gate / schema definition ........ CHANGE    → §3a
+  ├─ produces the active phase's typed artifact (tracked work) ..... EXECUTE   → §3b
+  ├─ records ONE atomic fact (decision / test result / issue) ...... RECORD    → §3c
+  ├─ asks for a computed answer (status, trace, stale set, a doc) .. VIEW      → §3d
+  ├─ builds or fixes the engine's OWN runtime / tooling ........... BOOTSTRAP → §3e
+  └─ asks where things stand / what is next ..................... ORIENT    → §3f
+```
+
+If a request spans categories, **split it** and route each part. If you can't tell
+EXECUTE from BOOTSTRAP, ask: *am I building the engine (which tracks the work) or the
+deliverable (what the work produces)?* — engine ⇒ BOOTSTRAP, deliverable ⇒ EXECUTE.
+When unsure of the category, say so and ask rather than defaulting to EXECUTE.
+
+**§3a — CHANGE.** Never freelance an edit to a workflow / phase / gate / schema. Route
+through **Change Request** (§4): state the change + rationale, research alternatives if
+non-trivial, get **explicit human acceptance**, then apply (create / `supersede` items),
+validate green (§5), record a `Decision`, and commit `CR:`. `schema/core` is frozen
+(human sign-off required); the Change Request workflow itself is frozen during bootstrap
+(out-of-band Decision only — §4).
+
+**§3b — EXECUTE.** The core loop:
+1. **Orient** on the active workflow + phase from the state cursor in `.tracking/`. (None
+   yet ⇒ Business workflow, first phase.)
+2. **Act within the active phase only** — produce its defined artifact(s) as items + edges;
+   don't invent artifacts the phase doesn't call for. If the request targets a *different*
+   phase than the cursor, **surface the mismatch** — don't silently jump; switching phases
+   is itself a recorded `Decision`.
+3. **Record back** the items/edges + a recorded judgment (what, why) with authorship +
+   timestamp into `.tracking/`. You are a task tool: you execute the phase, you don't
+   redefine it.
+4. **Gate** — exit only when the phase's gate passes (trace complete, verification criteria
+   present, critics clear, decision recorded).
+
+**§3c — RECORD.** Author one atomic item (`Decision` / `TestResult` / `Issue`) + a
+judgment. A "won't do / reduce scope" is a `Decision` that `supersede`s the Need — capture
+it even though it produces no action. Never a document blob.
+
+**§3d — VIEW.** Compute the answer from authored facts + git and present it. **Never store
+it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
+baseline are all views (§2.1).
+
+**§3e — BOOTSTRAP.** Building the engine's own runtime / tooling is exempt from the full
+workflow (it can't yet track its own construction). Do the work, track it in `RESUME.md`,
+and still validate green + commit `CR:` for any schema/process touch (§4, §5).
+
+**§3f — ORIENT.** Read the state cursor and report; no mutation.
 
 The six workflows (see the spec for detail):
 **Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →
@@ -76,6 +122,11 @@ The six workflows (see the spec for detail):
   2. **validate green** before commit (§5).
 - **Commit convention:** prefix commits that change process/schema with `CR: <short rationale>`
   so the audit trail exists before the engine can enforce it.
+- **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while
+  implementing *accepted* work needs no separate permission. But green-lighting an
+  *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE
+  (process / schema / decision, §3a) needs human acceptance before commit; when unsure, treat it
+  as needing acceptance. (Don't merge to `main` until told.)
 - **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
 - **Bootstrap exemption:** building the engine's own tooling is tracked in `RESUME.md` (the

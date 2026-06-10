@@ -1,9 +1,8 @@
 // =====================================================================
 // DeliveryWorkflow — build and verify, one item at a time (continuous).
-// Mirrors the existing agile loop (processes/agile-workflow.sysml); each
-// phase's procedure is an Engine Process referenced by name for now
-// (procedureRef becomes a typed ref once the core schema parses).
-// DoR is the entry gate at Standup; DoD is the exit gate at Done. Spec §7.
+// Mirrors the agile loop; phase procedure referenced by name (procedureRef).
+// DoR/DoD are verify-linked Tests (pre/post conditions), not authored gates.
+// See spec §7.
 // =====================================================================
 package DeliveryWorkflow {
     private import ScalarValues::*;
@@ -13,31 +12,30 @@ package DeliveryWorkflow {
     part testType : ArtifactType { :>> title = "Test"; :>> schemaType = "Test"; :>> nature = "real"; }
     part testResultType : ArtifactType { :>> title = "Test Result"; :>> schemaType = "TestResult"; :>> nature = "real"; }
 
-    // ---- DoR entry gate / DoD exit gate ----
-    part chkDoR : GateCheck {
-        :>> title = "Definition of Ready"; :>> criterion = "acceptance criteria as verify-linked Tests; sized; linked";
-    }
-    part dorGate : Gate { :>> title = "Definition of Ready"; :>> kind = "entry"; :>> checks = chkDoR; }
-    part chkDoD : GateCheck {
-        :>> title = "Definition of Done"; :>> criterion = "satisfaction == verified";
-    }
-    part dodGate : Gate { :>> title = "Definition of Done"; :>> kind = "exit"; :>> checks = chkDoD; }
-
-    // ---- Phases: refine -> standup -> implement -> review -> done ----
     part refine : Phase {
-        :>> title = "Refine"; :>> order = 1; :>> produces = (storyType, testType);
-        :>> procedureRef = "EngineProcesses::refinement";
+        :>> title = "Refine";
+        :>> produces = (storyType, testType);
+        :>> procedureRef = "EngineProcess::refinement";
     }
     part standup : Phase {
-        :>> title = "Standup"; :>> order = 2; :>> entryGate = dorGate;
-        :>> procedureRef = "EngineProcesses::standup";
+        :>> title = "Standup";
+        :>> consumes = storyType;
+        :>> procedureRef = "EngineProcess::standup";
     }
     part implement : Phase {
-        :>> title = "Implement"; :>> order = 3; :>> produces = testResultType;
-        :>> procedureRef = "EngineProcesses::implementation";
+        :>> title = "Implement";
+        :>> consumes = storyType;
+        :>> produces = testResultType;
+        :>> procedureRef = "EngineProcess::implementation";
     }
-    part review : Phase { :>> title = "Review"; :>> order = 4; }
-    part done : Phase { :>> title = "Done"; :>> order = 5; :>> exitGate = dodGate; }
+    part review : Phase {
+        :>> title = "Review";
+        :>> consumes = testResultType;
+    }
+    part done : Phase {
+        :>> title = "Done";
+        :>> consumes = testResultType;
+    }
 
     part delivery : Workflow {
         :>> title = "Delivery";

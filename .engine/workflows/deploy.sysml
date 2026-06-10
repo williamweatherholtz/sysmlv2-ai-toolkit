@@ -1,7 +1,7 @@
 // =====================================================================
-// DeployWorkflow — release, configuration management, deployment, and
-// release-level V&V. The Release is authored (a declaration + membership
-// rule); the baseline, release notes, and safety case are VIEWS. Spec §8.
+// DeployWorkflow — release, configuration management, deployment, release-level
+// V&V. Release is authored; baseline / release notes / safety case are VIEWS.
+// See spec §8.
 // =====================================================================
 package DeployWorkflow {
     private import ScalarValues::*;
@@ -21,25 +21,23 @@ package DeployWorkflow {
         :>> derivation = "from loss->hazard->goal->req->V&V graph";
     }
 
-    part chkVnV : GateCheck {
-        :>> title = "System V&V passed"; :>> criterion = "release-level verification + validation complete";
-    }
-    part chkSafety : GateCheck {
-        :>> title = "Safety-case validation"; :>> criterion = "safety goals validated; ASIL/SIL confirmed";
-    }
-    part releaseGate : Gate { :>> title = "Release approved"; :>> kind = "exit"; :>> checks = (chkVnV, chkSafety); }
-
-    part cTrace : CriticBinding { :>> critic = "traceability"; :>> severityThreshold = "medium"; }
-
-    // ---- Phases ----
     part declare : Phase {
-        :>> title = "Declare release"; :>> order = 1; :>> produces = (releaseType, baselineType);
+        :>> title = "Declare release";
+        :>> produces = (releaseType, baselineType);
     }
-    part systemVnV : Phase { :>> title = "System V&V"; :>> order = 2; }
-    part safetyValidation : Phase { :>> title = "Safety-case validation"; :>> order = 3; :>> produces = safetyCaseType; }
+    part systemVnV : Phase {
+        :>> title = "System V&V";
+        :>> consumes = releaseType;
+    }
+    part safetyValidation : Phase {
+        :>> title = "Safety-case validation";
+        :>> consumes = releaseType;
+        :>> produces = safetyCaseType;
+    }
     part deployPhase : Phase {
-        :>> title = "Deploy"; :>> order = 4; :>> produces = releaseNotesType;
-        :>> exitGate = releaseGate; :>> critics = cTrace;
+        :>> title = "Deploy";
+        :>> consumes = (releaseType, safetyCaseType);
+        :>> produces = releaseNotesType;
     }
 
     part deploy : Workflow {
