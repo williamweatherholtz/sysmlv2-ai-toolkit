@@ -56,11 +56,19 @@ Next, in order:
    `produces`/`consumes` reference edges (the whole DAG). So `whats-next` reads via
    `%show` (parse the indented AST). Standard-JSON / SysON interop is deferred to a
    future API-&-Services path; not blocking.
-2. **`whats-next` resolver** (Python) — reads the workflows + `.tracking/`
-   instance data, computes the dependency DAG (from `consumes`/`produces` + the
-   typed edges), and returns ordered, parallel-grouped, self-contained task
-   packets as JSON. Build it by DOGFOODING: run Business → Architecture →
-   Delivery on it, authoring the first real work-items in `.tracking/` (our system).
+2. **`whats-next` resolver** (Python) — v1 built (`.engine/tools/whats_next.py`
+   + shared `_kernel.py`); reads via `%show`. **Workflows were re-grounded on
+   native SysML actions** (commit 3560097): a workflow is an `action def`, phases
+   are `action`s, order is `succession`, handoff is item `flow`. So the parser must
+   be **rewritten** to read `ActionUsage` + `SuccessionAsUsage` (the DAG edges) +
+   `flow` — succession renders as a discrete, parseable element, so the old
+   multi-valued-feature blocker is gone. Then dogfood: author real work-items in
+   `.tracking/`.
+2b. **Native schema-type audit** — align schema with native SysML where we
+   reinvented it: `Need`→`requirement def` (+ `satisfy`/`verify`), `UseCase`→
+   `use case def`, `Test`/`TestResult`→verification, views→`view def`, and native
+   `elementId` instead of an authored `id`. Keep only the genuinely-novel engine
+   concepts (real/view policy, git-ancestry suspicion, AI `writePolicy`) as metadata.
 3. **Instance-file migration** — rewrite `processes/*.sysml`, `decisions/*.sysml`,
    `skills/skills-registry.sysml` to import the new packages; retire `validate_sysml.py`.
 4. **Parked critique findings** — curated-view + frozen Baseline/Signoff for the
