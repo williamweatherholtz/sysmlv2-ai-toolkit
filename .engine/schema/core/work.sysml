@@ -1,65 +1,51 @@
 // =====================================================================
-// Engine::Core::Work
-// Work item hierarchy. The "things you do" — distinct from the SE
-// artifacts (requirements, tests) they derive from.
-// SYNTAX PENDING PILOT VALIDATION.
+// EngineWork — the "things you do" + the decision/change/release/issue types.
+// All :> Element, so id/title/timestamps/authoredBy/currentState are inherited.
 // =====================================================================
-package Engine {
-package Core {
+package EngineWork {
+    private import ScalarValues::*;
+    private import EngineElement::*;
 
-    // -----------------------------------------------------------------
-    // WorkItem. All @Tracked, so id/timestamps/authoredBy/currentState
-    // come from the Tracked metadata. `currentState` references a
-    // WorkflowState by name (workflow is modular — see workflow.sysml).
-    //
-    // `kind` classifies HOW the work gets done. It applies ONLY to
-    // work items — a requirement has no kind, it is a requirement.
-    //   "code"          programmatic implementation
-    //   "research"      investigation; output is a finding (subsumes spike)
-    //   "documentation" prose deliverable
-    //   "refactor"      behavior-preserving change
-    //   "decision"      producing a Decision record
-    //   "modeling"      producing SysMLv2 model content (a deliverable model)
-    // -----------------------------------------------------------------
-    part def WorkItem {
-        // @Tracked
-        attribute title : String;
-        attribute kind : String;
-        attribute priority : String;      // "p0" | "p1" | "p2" | "p3"
+    part def WorkItem :> Element {
+        attribute kind : String;          // code|research|documentation|refactor|decision|modeling
+        attribute priority : String;      // p0|p1|p2|p3
         attribute owner : String;         // Actor id
     }
-
     part def Epic :> WorkItem {
-        doc /* A large body of work decomposed into Stories.
-               Aggregate progress is COMPUTED from children, not set. */
-        attribute themeArea : String;
+        attribute themeArea : String;     // aggregate progress is COMPUTED from children
     }
-
     part def Story :> WorkItem {
-        doc /* A sized unit of value. Acceptance criteria are NOT a
-               text blob here — each criterion is an atomic Test linked
-               by `verify` (see decision 0004, verification.sysml). */
-        attribute estimatedPoints : Integer;
-        attribute actualPoints : Integer;
+        // Acceptance criteria are NOT a text blob — each is an atomic Test
+        // linked by `verify` (EngineVerification + EngineRelationships).
+        attribute estimatedPoints : Integer[0..1];
+        attribute actualPoints : Integer[0..1];
     }
-
     part def Task :> WorkItem {
-        doc /* A subtask of a Story. */
-        attribute estimatedHours : Real;
+        attribute estimatedHours : Real[0..1];
     }
 
-    // -----------------------------------------------------------------
-    // Decision (ADR). Immutable once accepted; replaced via the
-    // `supersede` edge, not by editing. The back-reference is computed.
-    // -----------------------------------------------------------------
-    part def Decision {
-        // @Tracked
-        attribute title : String;
-        attribute status : String;        // "proposed" | "accepted" | "superseded"
+    // Decision (ADR). Immutable once accepted; replaced via the `supersede`
+    // edge, not by editing. Scope decisions supersede Needs (see the spec §5).
+    part def Decision :> Element {
+        attribute status : String;        // proposed|accepted|superseded
         attribute context : String;
-        attribute decision : String;
+        attribute decisionText : String;
         attribute consequences : String;
     }
 
-}
+    part def ChangeRequest :> Element {
+        attribute reasonForChange : String;
+        attribute impact : String[0..1];
+    }
+
+    part def Issue :> Element {
+        attribute description : String;
+        attribute discoveredInField : Boolean;
+    }
+
+    // A Release is a declaration + a membership rule. The baseline, release
+    // notes, and pack are VIEWS computed from this + commit match (spec §8).
+    part def Release :> Element {
+        attribute membershipRule : String;   // "items matching X at commit Y"
+    }
 }

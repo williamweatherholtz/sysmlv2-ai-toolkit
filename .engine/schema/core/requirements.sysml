@@ -1,78 +1,40 @@
 // =====================================================================
-// Engine::Core::Requirements
-// Requirement taxonomy via specialization, plus Constraint & Assumption.
-// SYNTAX PENDING PILOT VALIDATION.
+// EngineRequirements — the technical requirement cascade (Architecture layer).
+// System -> Subsystem -> Component. See the design spec §6.
+//
+// Modeled as parts :> Element (uniform identity + engine-owned edges) rather
+// than native `requirement def`: a requirement def is a different metaclass
+// that cannot specialize part def Element, and the engine owns satisfy/verify
+// as its own typed edges (EngineRelationships) anyway.
+//
+// NOTE vs the old taxonomy: "MarketRequirement" is gone (collapsed into
+// EngineNeeds::Need, distinguished by source). "Constraint" is gone (scope is
+// a Decision that supersedes a Need; technical givens are architecture
+// Decisions). `kind` carries functional/non-functional/safety/etc.
 // =====================================================================
-package Engine {
-package Core {
+package EngineRequirements {
+    private import ScalarValues::*;
+    private import EngineElement::*;
 
-    // -----------------------------------------------------------------
-    // Requirement base. Native SysMLv2 `requirement def`. All @Tracked.
-    // Subtypes are specializations (`:>`). Instance-level derivation
-    // ALSO uses `:>` (a child requirement specializes its parent) —
-    // this is the idiomatic v2 replacement for v1 deriveReqt.
-    // -----------------------------------------------------------------
-    requirement def Requirement {
-        // @Tracked
-        doc /* A required condition or capability. */
+    abstract part def Requirement :> Element {
+        attribute statement : String;               // EARS-formatted
         attribute rationale : String;
+        attribute kind : String[0..1];               // functional|non-functional|safety|security|interface
+        attribute safetyLevel : String[0..1];        // PLr / SIL / ASIL when safety-related
+        attribute verificationMethod : String[*];    // test | analysis | inspection | demonstration
+        attribute priority : String;                // MoSCoW
     }
 
-    // Intent layer ----------------------------------------------------
-    requirement def MarketRequirement :> Requirement {
-        doc /* Top-level intent: how we differentiate in the market /
-               why this project exists. Validated (verify against)
-               rather than satisfied. The root of derivation chains. */
-    }
+    part def SystemRequirement :> Requirement;
+    part def SubsystemRequirement :> Requirement;
+    part def ComponentRequirement :> Requirement;
 
-    // Behavioral / quality layer --------------------------------------
-    requirement def FunctionalRequirement :> Requirement {
-        doc /* What the system must DO. */
-    }
-
-    requirement def NonFunctionalRequirement :> Requirement {
-        doc /* Quality attribute: performance, reliability, usability,
-               etc. Often carries a measure (the verifying Test holds
-               the threshold). */
-        attribute measure : String;       // e.g. "p95 latency < 200ms"
-    }
-
-    requirement def SafetyRequirement :> Requirement {
-        doc /* Derived from STPA safety constraints (system-level or
-               controller-level). NO asil attribute — HARA/ASIL are
-               intentionally out of scope (see decision 0008). */
-    }
-
-    requirement def SecurityRequirement :> Requirement {
-        doc /* Resistance to adversarial compromise. Distinct from
-               safety (accident) and from functional. */
-    }
-
-    requirement def InterfaceRequirement :> Requirement {
-        doc /* How the system talks to another system. Backbone of
-               surgical dependency-swap analysis. */
-    }
-
-    // -----------------------------------------------------------------
-    // Constraint — a restriction on the SOLUTION SPACE, not a behavior.
-    // (e.g. "must run on Windows", "must use Rust", budget caps.)
-    // Different from a requirement: it bounds HOW you may satisfy one.
-    // -----------------------------------------------------------------
-    requirement def Constraint :> Requirement {
-        attribute category : String;      // "platform" | "technology" | "budget" | "regulatory" | "schedule"
-    }
-
-    // -----------------------------------------------------------------
-    // Assumption — taken as true without proof. First-class because
-    // when an assumption BREAKS, everything derived from it goes
-    // suspect. Highest-value input to the suspicion engine.
-    // -----------------------------------------------------------------
-    part def Assumption {
-        // @Tracked
+    // Assumption — taken as true without proof. First-class because when an
+    // assumption BREAKS, everything derived from it goes suspect (a high-value
+    // input to the suspicion engine).
+    part def Assumption :> Element {
         attribute statement : String;
-        attribute confidence : String;    // "high" | "medium" | "low"
-        attribute validUntil : String;    // optional review date
+        attribute confidence : String;              // high | medium | low
+        attribute validUntil : String[0..1];         // optional review date
     }
-
-}
 }
