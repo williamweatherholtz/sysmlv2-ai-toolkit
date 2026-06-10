@@ -1,2 +1,3 @@
-# Git hooks are shell scripts — keep LF so the shebang works under git-for-windows.
+# Shell scripts must stay LF so the shebang works under git-for-windows.
+*.sh text eol=lf
 .githooks/post-commit text eol=lf

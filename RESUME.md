@@ -49,6 +49,11 @@ workflow meta-model + all six workflows as a computed DAG (produces/consumes),
 7/7 green; schema/core + safety rewritten to flat `Engine<Concern>` packages,
 12/12 green; Forge apparatus disabled here; validators fixed (clean exit, no leak).
 
+Infra: per-clone setup is captured in `bootstrap.sh` (run `sh ./bootstrap.sh` once;
+sets `core.hooksPath` so `.githooks/post-commit` auto-pushes every commit). When the
+runtime exists, fold bootstrap into the engine's onboarding workflow and track it as a
+real work-item (it's currently captured executably, not as a tracked item).
+
 Next, in order:
 1. **Pilot read-path — RESOLVED (2026-06-09).** `%export` (standard SysML v2 JSON
    file) is a silent no-op in this kernel build. `%show <FQN>` reliably dumps the

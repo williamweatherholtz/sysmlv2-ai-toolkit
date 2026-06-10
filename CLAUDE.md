@@ -129,7 +129,8 @@ The six workflows (see the spec for detail):
   as needing acceptance. (Don't merge to `main` until told.)
 - **Commit → push is automatic.** A `post-commit` git hook (`.githooks/post-commit`) pushes the
   current branch to `origin` after *every* commit — if a commit happens, a push happens
-  (change-agnostic: code, docs, schema). One-time per clone: `git config core.hooksPath .githooks`.
+  (change-agnostic: code, docs, schema). One-time per clone: run **`sh ./bootstrap.sh`**
+  (sets `core.hooksPath`; the captured per-clone setup — don't hand-configure from memory).
   Commits stay deliberate + validated (§5); only the push is automated — never auto-commit on every
   file change (that commits broken WIP).
 - **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
