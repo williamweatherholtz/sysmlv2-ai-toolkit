@@ -30,10 +30,16 @@ separate deliverable. Full rationale: `.engine/decisions/0001`–`0010`.
 - Research synthesized (INCOSE GtWR + EARS; STPA Handbook SOP; INVEST/Gherkin/
   Conventional Commits) — captured inside the relevant skills' references.
 
-### Broken / pending
-- **The `.engine/schema/*.sysml` files do NOT parse yet** (4/34 cells passed on
-  first validation). Root causes are known and mechanical — see the rewrite plan
-  below. This is the #1 next task.
+### Schema now parses GREEN (was the #1 blocker)
+- **`.engine/schema/` validates 12/12** after the `engine-restructure` rewrite to
+  flat `Engine<Concern>` packages (EngineElement/Needs/Requirements/Verification/
+  Work/Architecture/Relationships/State/Process/Skills/Risk + EngineSafety). Run
+  `.engine/tools/validate/validate_schema.py`. The process-as-data workflows
+  (`.engine/workflows/`, 7/7) parse via `validate_workflows.py`.
+- **Remaining migration:** the instance files `processes/*.sysml`,
+  `decisions/*.sysml`, and `skills/skills-registry.sysml` still use the old nested
+  `Engine::Core` structure and must be rewritten to import the new packages; retire
+  the legacy `validate_sysml.py` in favor of `validate_schema.py`/`validate_workflows.py`.
 
 ## NEXT TASKS (in order — decided: schema first, then skills)
 

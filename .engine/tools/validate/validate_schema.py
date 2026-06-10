@@ -23,6 +23,11 @@ ORDER = [
     "schema/core/work.sysml",
     "schema/core/architecture.sysml",
     "schema/core/relationships.sysml",
+    "schema/core/workflow.sysml",
+    "schema/core/process.sysml",
+    "schema/core/skills.sysml",
+    "schema/core/risk.sysml",
+    "schema/safety/stpa.sysml",
 ]
 
 ERR = re.compile(
@@ -98,8 +103,14 @@ def main():
         print(f"  {'PASS' if p else 'FAIL'}  {n}")
     print(f"  {sum(1 for _, p in results if p)}/{len(results)} files passed")
 
-    kc.stop_channels()
-    km.shutdown_kernel(now=True)
+    try:
+        kc.stop_channels()
+        km.shutdown_kernel(now=True)
+    except Exception:
+        pass
+    # The SysML kernel's JVM child + jupyter_client threads can keep this
+    # process alive on Windows; force a clean exit so the shell actually finishes.
+    os._exit(0 if all(p for _, p in results) else 1)
 
 
 if __name__ == "__main__":

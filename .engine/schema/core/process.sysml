@@ -1,32 +1,24 @@
 // =====================================================================
-// Engine::Core::Process
-// The ability to MODEL a process. Specific processes (agile, DoD) are
-// content under processes/ — this defines the vocabulary.
-// SYNTAX PENDING PILOT VALIDATION.
+// EngineProcess — the ability to MODEL a procedure (a Process of ordered
+// ProcessSteps). This is the procedure INSIDE a workflow Phase (esp. the
+// Delivery loop). Specific processes are content under processes/.
+// (Reserved words renamed: action -> actionText, output -> producedArtifact,
+//  trigger -> triggerCondition.)
 // =====================================================================
-package Engine {
-package Core {
+package EngineProcess {
+    private import ScalarValues::*;
+    private import EngineElement::*;
 
-    // -----------------------------------------------------------------
-    // Process — a named procedure made of ordered ProcessSteps.
-    // `cadence` is intentionally a free string: "continuous",
-    // "event-driven", "per-story", "per-sprint", "ad-hoc".
-    // -----------------------------------------------------------------
-    part def Process {
-        // @Tracked
-        attribute name : String;
+    part def Process :> Element {
         attribute purpose : String;
-        attribute cadence : String;
+        attribute cadence : String;        // continuous | event-driven | per-item | per-sprint | ad-hoc
     }
 
-    part def ProcessStep {
-        attribute name : String;
+    part def ProcessStep :> Element {
         attribute order : Integer;
-        attribute trigger : String;       // when this step fires
-        attribute action : String;        // what is done
-        attribute output : String;        // the tracked artifact change produced
-        attribute owner : String;         // "human" | "ai" | "either"
+        attribute triggerCondition : String;   // when this step fires
+        attribute actionText : String;         // what is done
+        attribute producedArtifact : String;   // the tracked artifact change produced
+        attribute owner : String;              // human | ai | either
     }
-
-}
 }

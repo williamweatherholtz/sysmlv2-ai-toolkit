@@ -1,127 +1,56 @@
 // =====================================================================
-// Engine::Safety::Stpa
-// STPA (System-Theoretic Process Analysis) element types.
+// EngineSafety — STPA (System-Theoretic Process Analysis) element types.
 // OPTIONAL MODULE — import only for safety-relevant projects.
-// HARA and ASIL are intentionally OUT OF SCOPE (decision 0008).
-// STPA/HARA artifacts are FIRST-CLASS (decision 0007): they have
-// workflow state, participate in suspicion propagation, and their
-// "verification" is computed analysis-completeness (see Gate rules).
-// SYNTAX PENDING PILOT VALIDATION.
+// HARA/ASIL scoring intentionally lightweight (decision 0008). STPA artifacts
+// are first-class :> Element (decision 0007): they carry workflow state and
+// participate in suspicion. A Safety Goal is NOT here — it is an
+// EngineNeeds::Need with source = "safety" (design spec §11).
 // =====================================================================
-package Engine {
-package Safety {
-    private import Engine::Core::*;
+package EngineSafety {
+    private import ScalarValues::*;
+    private import EngineElement::*;
 
-    // ---- Purpose layer ----------------------------------------------
-    part def Loss {
-        // @Tracked
-        doc /* An unacceptable outcome: loss of life, injury, damage,
-               mission failure. The top of the safety chain. */
-        attribute statement : String;
+    // ---- Purpose layer (STPA Step 1) --------------------------------
+    part def Loss :> Element {
+        attribute statement : String;          // an unacceptable outcome (top of the chain)
+    }
+    part def Hazard :> Element {
+        attribute statement : String;          // system state that, worst-case, leads to a Loss
+    }
+    part def SystemSafetyConstraint :> Element {
+        attribute statement : String;          // inverse of a Hazard; derives a SafetyRequirement
     }
 
-    part def Hazard {
-        // @Tracked
-        doc /* A system state/condition that, with worst-case
-               environment, can lead to a Loss. Single shared concept
-               (HARA dropped, so no STPA/HARA split needed). Links to
-               Loss(es) via `dependency`; inverts to a
-               SystemSafetyConstraint. */
-        attribute statement : String;
-    }
+    // ---- Control structure (STPA Step 2) ----------------------------
+    part def Controller :> Element { attribute name : String; }
+    part def ProcessModel :> Element { attribute beliefs : String; }
+    part def ControlAction :> Element { attribute name : String; }
+    part def Feedback :> Element { attribute name : String; }
+    part def ControlledProcess :> Element { attribute name : String; }
+    part def Sensor :> Element { attribute name : String; }
+    part def Actuator :> Element { attribute name : String; }
 
-    part def SystemSafetyConstraint {
-        // @Tracked
-        doc /* The inverse of a Hazard — what the system must (not) do.
-               Derives a SafetyRequirement (Core) via `:>`/`satisfy`. */
-        attribute statement : String;
-    }
-
-    // ---- Control structure ------------------------------------------
-    part def Controller {
-        // @Tracked
-        doc /* A decision-making entity issuing control actions from a
-               process model + feedback. */
-        attribute name : String;
-    }
-
-    part def ProcessModel {
-        doc /* A Controller's internal belief about the controlled
-               process state. An INADEQUATE process model is the most
-               common UCA cause — hence first-class, not an attribute. */
-        attribute beliefs : String;
-    }
-
-    part def ControlAction {
-        // @Tracked
-        doc /* A command a Controller issues (via an Actuator) to
-               influence the ControlledProcess. */
-        attribute name : String;
-    }
-
-    part def Feedback {
-        doc /* Information returning to a Controller (via a Sensor)
-               about process state. */
-        attribute name : String;
-    }
-
-    part def ControlledProcess {
-        // @Tracked
-        attribute name : String;
-    }
-
-    part def Sensor {
-        doc /* Conveys Feedback to a Controller. A distinct failure
-               point (can report wrongly / late / not at all). */
-        attribute name : String;
-    }
-
-    part def Actuator {
-        doc /* Executes a ControlAction on the ControlledProcess. A
-               distinct failure point. */
-        attribute name : String;
-    }
-
-    // ---- Analytical outputs (the point of STPA) ---------------------
-    part def UnsafeControlAction {
-        // @Tracked
-        doc /* A ControlAction unsafe in a given context. Four guideword
-               classes via `ucaType`. Links to its ControlAction and to
-               the Hazard(s) it can lead to. Derives a
-               ControllerConstraint. */
-        attribute ucaType : String;       // "provided" | "not-provided" | "wrong-timing-order" | "stopped-too-soon-applied-too-long"
+    // ---- Analytical outputs (STPA Steps 3-4) ------------------------
+    part def UnsafeControlAction :> Element {
+        attribute ucaType : String;            // provided | not-provided | wrong-timing-order | stopped-too-soon-applied-too-long
         attribute context : String;
         attribute statement : String;
     }
-
-    part def ControllerConstraint {
-        // @Tracked
-        doc /* A constraint on a Controller's behavior, derived from a
-               UCA. Feeds a SafetyRequirement (Core). */
+    part def ControllerConstraint :> Element {
+        attribute statement : String;          // constraint on a Controller, derived from a UCA
+    }
+    part def LossScenario :> Element {
         attribute statement : String;
+        attribute causalFactor : String;       // process-model | feedback | control-path | execution | ...
     }
 
-    part def LossScenario {
-        // @Tracked
-        doc /* The causal story of HOW a UCA occurs (flawed process
-               model, missing/delayed feedback, controller/actuator
-               failure). Where mitigations & requirements come from. */
+    // ---- Safety requirement (allocated to the architecture) ---------
+    part def SafetyRequirement :> Element {
         attribute statement : String;
-        attribute causalFactor : String;  // "process-model" | "feedback" | "control-path" | "execution" | ...
+        attribute safeState : String;
+        attribute safetyFunction : String;
+        attribute triggeringEvent : String;
+        attribute responseTimeTarget : String[0..1];
+        attribute safetyLevel : String[0..1];   // PLr / SIL / ASIL
     }
-
-    // -----------------------------------------------------------------
-    // Completeness gate rules (evaluated by the query layer; this is
-    // how an analysis artifact is "verified" — decision 0007). Examples:
-    //   - every ControlAction has >=1 UCA assessment OR an
-    //     explicit assessed-safe record (all four ucaTypes considered)
-    //   - every UCA traces to >=1 Hazard
-    //   - every Hazard traces to >=1 Loss
-    //   - every UCA has >=1 LossScenario
-    //   - every SystemSafetyConstraint/ControllerConstraint derives
-    //     >=1 SafetyRequirement
-    // These are authored as GateChecks in a safety Gate (processes/).
-    // -----------------------------------------------------------------
-
-}
 }
