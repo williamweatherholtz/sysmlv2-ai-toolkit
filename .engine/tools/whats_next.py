@@ -1,19 +1,15 @@
-"""whats-next (v1): resolve each workflow's phase dependency-DAG into ordered,
-parallel-grouped waves, emitted as JSON.
+"""whats-next (v2): resolve each workflow's action DAG into ordered, parallel-
+grouped waves, as JSON.
 
-Reads the model via the pilot kernel's `%show` (the standard-JSON `%export` is a
-no-op in this kernel build; `%show` dumps the full typed AST over iopub). v1
-resolves the workflow DEFINITIONS (the process *shape*): order + parallelism are
-COMPUTED from each phase's consumes/produces (the DAG). Instance-aware
-"what's next to DO" (reading .tracking/ work-items + done-state) is v2.
+Workflows are native SysML `action def`s. This reads the model via the pilot
+kernel's `%show <Pkg>::<ActionDef>` and parses the typed AST:
+  * phases        = `ActionUsage` members (with the item types they touch)
+  * dependencies  = `SuccessionAsUsage` (earlierOccurrence -> laterOccurrence)
+The DAG is the successions; Kahn layering gives the parallel waves. (Order +
+parallelism are native SysML, not a custom produces/consumes attribute.)
 
-STALE (2026-06-09): the workflows were re-grounded onto native SysML `action def`s
-(phases = `action`s, order = `succession`, handoff = item `flow`), so the
-produces/consumes part-def structure this parser reads no longer exists. REWRITE
-NEEDED: parse the native `%show` AST — `ActionUsage` (phases), `SuccessionAsUsage`
-(earlierOccurrence/laterOccurrence = the DAG edges), and item `flow` (artifacts).
-This dissolves the old multi-valued-feature problem (succession renders as a
-discrete, parseable element). See .engine/workflows/_meta.sysml.
+v2 resolves the workflow DEFINITIONS (process shape). Instance-aware "what's next
+to DO" (reading .tracking/ work-items + done-state) is the next step.
 
 Run (sandbox disabled; kernel calls bare java -> go through conda run):
   conda run -n sysml --no-capture-output python .engine/tools/whats_next.py
@@ -31,8 +27,10 @@ WF_DIR = os.path.join(ENGINE, "workflows")
 
 LOAD = ["_meta.sysml", "business.sysml", "architecture.sysml", "delivery.sysml",
         "deploy.sysml", "operate.sysml", "change-request.sysml"]
-WORKFLOW_PKGS = ["BusinessWorkflow", "ArchitectureWorkflow", "DeliveryWorkflow",
-                 "DeployWorkflow", "OperateWorkflow", "ChangeRequestWorkflow"]
+# (package, action def) per workflow
+WORKFLOWS = [("BusinessWorkflow", "Business"), ("ArchitectureWorkflow", "Architecture"),
+             ("DeliveryWorkflow", "Delivery"), ("DeployWorkflow", "Deploy"),
+             ("OperateWorkflow", "Operate"), ("ChangeRequestWorkflow", "ChangeMgmt")]
 
 _UUID = re.compile(r'^(.*?)\s*\([0-9a-fA-F-]{36}\)\s*$')
 
@@ -57,71 +55,55 @@ def parse_show(text):
                 'name': bits[1].strip() if len(bits) > 1 else '', 'children': []}
         while stack and stack[-1][0] >= indent:
             stack.pop()
-        (stack[-1][1]['children'].append(node) if stack else None)
-        if not stack:
+        if stack:
+            stack[-1][1]['children'].append(node)
+        else:
             root = node
         stack.append((indent, node))
     return root
 
 
-def _member(node, fname):
-    for c in node['children']:
-        if c['rel'] == 'FeatureMembership' and c['name'] == fname:
-            return c
-    return None
-
-
-def _collect(node, etype):
+def phases(root):
+    """ActionUsage members of the action def -> [{name, artifacts:[item types]}]."""
     out = []
-    def walk(n):
-        if n['type'] == etype:
-            out.append(n['name'])
-        for ch in n['children']:
-            walk(ch)
-    walk(node)
+    for c in root['children']:
+        if c['rel'] == 'FeatureMembership' and c['type'] == 'ActionUsage':
+            arts = []
+            for p in c['children']:
+                if p['rel'] == 'FeatureMembership' and p['type'] == 'ReferenceUsage':
+                    it = next((g['name'] for g in p['children'] if g['type'] == 'ItemDefinition'), None)
+                    if it:
+                        arts.append(it)
+            out.append({'name': c['name'], 'artifacts': sorted(set(arts))})
     return out
 
 
-def _literal(node, fname):
-    fm = _member(node, fname)
-    vals = _collect(fm, 'LiteralString') if fm else []
-    return vals[0] if vals else None
-
-
-def _refs(node, fname):
-    fm = _member(node, fname)
-    return _collect(fm, 'FeatureReferenceExpression') if fm else []
-
-
-def extract(root):
-    """Workflow package node -> list of phase dicts."""
-    phases = []
+def succession_edges(root):
+    """SuccessionAsUsage members -> [(earlier, later)] action-name pairs."""
+    edges = []
     for c in root['children']:
-        if c['type'] != 'PartUsage':
-            continue
-        typed = next((x['name'] for x in c['children'] if x['rel'] == 'FeatureTyping'), None)
-        if typed == 'Phase':
-            phases.append({'name': c['name'], 'title': _literal(c, 'title'),
-                           'produces': _refs(c, 'produces'), 'consumes': _refs(c, 'consumes')})
-    return phases
+        if c['type'] == 'SuccessionAsUsage':
+            ends = {}
+            for e in c['children']:
+                if e['rel'] == 'EndFeatureMembership':
+                    act = next((g['name'] for g in e['children']
+                                if g['rel'] == 'ReferenceSubsetting' and g['type'] == 'ActionUsage'), None)
+                    ends[e['name']] = act
+            a, b = ends.get('earlierOccurrence'), ends.get('laterOccurrence')
+            if a and b:
+                edges.append((a, b))
+    return edges
 
 
-def waves(phases):
-    """Kahn waves. Phase B depends on phase A iff B.consumes ∩ A.produces != {}
-    (matched by ArtifactType name). Returns (waves, cycle_remainder)."""
-    produced_by = {}
-    for p in phases:
-        for a in p['produces']:
-            produced_by.setdefault(a, set()).add(p['name'])
-    deps = {}
-    for p in phases:
-        d = set()
-        for a in p['consumes']:
-            d |= produced_by.get(a, set())
-        d.discard(p['name'])
-        deps[p['name']] = d
-    by_name = {p['name']: p for p in phases}
-    out, done, remaining = [], set(), set(by_name)
+def waves(ph, edges):
+    """Kahn layering. Action Y depends on X iff there is a succession X -> Y."""
+    names = [p['name'] for p in ph]
+    deps = {n: set() for n in names}
+    for a, b in edges:
+        if a in deps and b in deps:
+            deps[b].add(a)
+    by_name = {p['name']: p for p in ph}
+    out, done, remaining = [], set(), set(names)
     while remaining:
         ready = sorted(n for n in remaining if deps[n] <= done)
         if not ready:
@@ -137,18 +119,18 @@ def main():
     for fn in LOAD:
         with open(os.path.join(WF_DIR, fn), encoding="utf-8") as fh:
             _kernel.run_cell(kc, fh.read())
-    result = {"schema": "whats-next.v1", "workflows": []}
-    for pkg in WORKFLOW_PKGS:
-        _, text = _kernel.run_cell(kc, f"%show {pkg}")
-        phases = extract(parse_show(text))
-        w, cycle = waves(phases)
-        wf = {"workflow": pkg, "phaseCount": len(phases)}
+    result = {"schema": "whats-next.v2", "workflows": []}
+    for pkg, act in WORKFLOWS:
+        _, text = _kernel.run_cell(kc, f"%show {pkg}::{act}")
+        root = parse_show(text)
+        ph = phases(root)
+        w, cycle = waves(ph, succession_edges(root))
+        wf = {"workflow": act, "package": pkg, "phaseCount": len(ph)}
         if cycle:
             wf["error"], wf["cycle"] = "dependency cycle", cycle
         else:
-            wf["waves"] = [[{"phase": p['name'], "title": p['title'],
-                             "consumes": p['consumes'], "produces": p['produces']}
-                            for p in wave] for wave in w]
+            wf["waves"] = [[{"action": p['name'], "artifacts": p['artifacts']} for p in wave]
+                           for wave in w]
         result["workflows"].append(wf)
     print(json.dumps(result, indent=2))
     _kernel.teardown_and_exit(km, 0)

@@ -64,11 +64,13 @@ Next, in order:
 2. **`whats-next` resolver** (Python) — v1 built (`.engine/tools/whats_next.py`
    + shared `_kernel.py`); reads via `%show`. **Workflows were re-grounded on
    native SysML actions** (commit 3560097): a workflow is an `action def`, phases
-   are `action`s, order is `succession`, handoff is item `flow`. So the parser must
-   be **rewritten** to read `ActionUsage` + `SuccessionAsUsage` (the DAG edges) +
-   `flow` — succession renders as a discrete, parseable element, so the old
-   multi-valued-feature blocker is gone. Then dogfood: author real work-items in
-   `.tracking/`.
+   are `action`s, order is `succession`, handoff is item `flow`. **DONE (v2):** the
+   parser reads `ActionUsage` + `SuccessionAsUsage` (earlier/laterOccurrence); Kahn
+   layering yields parallel waves. Resolves all six workflows incl. parallelism
+   (Architecture: appArch|dataArch|techArch -> allocIface; Deploy: safetyValidation|
+   systemVnV), clean exit. **NEXT: instance-aware resolution** — read `.tracking/`
+   work-items + done-state to compute "what to DO next" (then author the first real
+   work-items = the dogfood).
 2b. **Native schema-type audit** — align schema with native SysML where we
    reinvented it: `Need`→`requirement def` (+ `satisfy`/`verify`), `UseCase`→
    `use case def`, `Test`/`TestResult`→verification, views→`view def`, and native
