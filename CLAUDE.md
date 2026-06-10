@@ -71,6 +71,13 @@ EXECUTE from BOOTSTRAP, ask: *am I building the engine (which tracks the work) o
 deliverable (what the work produces)?* — engine ⇒ BOOTSTRAP, deliverable ⇒ EXECUTE.
 When unsure of the category, say so and ask rather than defaulting to EXECUTE.
 
+**Classification is a visible, mandatory first move.** Open every substantive response by
+naming the category and route — e.g. *"RECORD → §3c"* — *before* acting. Never
+infer-and-act silently: a silent mis-route is exactly how an action slips past the
+discipline (e.g. recording a confirmation that was never explicitly given). The
+`engine-triage` skill encodes this checklist; invoke it at the start of a request when in
+doubt.
+
 **§3a — CHANGE.** Never freelance an edit to a workflow / phase / gate / schema. Route
 through **Change Request** (§4): state the change + rationale, research alternatives if
 non-trivial, get **explicit human acceptance**, then apply (create / `supersede` items),
@@ -94,6 +101,17 @@ validate green (§5), record a `Decision`, and commit `CR:`. `schema/core` is fr
 **§3c — RECORD.** Author one atomic item (`Decision` / `TestResult` / `Issue`) + a
 judgment. A "won't do / reduce scope" is a `Decision` that `supersede`s the Need — capture
 it even though it produces no action. Never a document blob.
+
+- **Confirmation results require explicit human sign-off.** A `method=confirmation`
+  verification *is* a recorded human attestation — its evidence is the human's word.
+  Record it only on the human's explicit confirmation of that *specific* claim; never infer
+  it from an instruction to "do the sign-offs," from the underlying work being done, or from
+  your own judgment. (test / analysis / inspection / demonstration are recorded from their
+  own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
+- **Every recorded fact carries provenance:** *who* (`authoredBy` / `verifiedBy`), *when*
+  (an authored ISO-8601 `*At` timestamp — the attestation time is its own irreducible fact,
+  distinct from the commit date), and the commit it was made against (`verifiedAtCommit`,
+  which also drives suspicion).
 
 **§3d — VIEW.** Compute the answer from authored facts + git and present it. **Never store
 it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,

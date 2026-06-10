@@ -41,23 +41,23 @@ package EngineBacklog {
 
         // ---- acceptance (DoD) per task: method + recorded result (verifiedAtCommit) ----
         // DONE (verified at 2f762a6):
-        requirement claudeMdDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "interaction discipline + triage accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "user"; }
+        requirement claudeMdDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "interaction discipline + triage accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy claudeMdDoD by claudeMd;
-        requirement processSpecDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "process-model spec reviewed + accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "user"; }
+        requirement processSpecDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "process-model spec reviewed + accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy processSpecDoD by processSpec;
-        requirement schemaRewriteDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_schema 12/12 green"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "validate_schema"; }
+        requirement schemaRewriteDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_schema 12/12 green"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_schema"; }
         satisfy schemaRewriteDoD by schemaRewrite;
-        requirement workflowsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_workflows 7/7 green"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "validate_workflows"; }
+        requirement workflowsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_workflows 7/7 green"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_workflows"; }
         satisfy workflowsDoD by workflows;
-        requirement validatorFixDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "validator returns cleanly; zero orphaned JVMs"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "demo"; }
+        requirement validatorFixDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "validator returns cleanly; zero orphaned JVMs"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "demo"; }
         satisfy validatorFixDoD by validatorFix;
-        requirement autoPushDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "a commit triggers an automatic push"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "demo"; }
+        requirement autoPushDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "a commit triggers an automatic push"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "demo"; }
         satisfy autoPushDoD by autoPush;
-        requirement whatsNextV2DoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "resolver lays out all workflows incl. parallelism; clean exit"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedBy = "whats_next"; }
+        requirement whatsNextV2DoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "resolver lays out all workflows incl. parallelism; clean exit"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "whats_next"; }
         satisfy whatsNextV2DoD by whatsNextV2;
 
         // OUTSTANDING (no verifiedAtCommit yet):
-        requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; :>> verifiedAtCommit = "0f5c7d1"; :>> verifiedBy = "user"; }
+        requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; :>> verifiedAtCommit = "0f5c7d1"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy testModelDoD by testModel;
         requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query emits OUTSTANDING + SUSPECT from .tracking work-items"; }
         satisfy instanceAwareDoD by instanceAware;

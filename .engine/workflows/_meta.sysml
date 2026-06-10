@@ -51,5 +51,6 @@ package EngineArtifacts {
         // (enables git-ancestry suspicion). Absent => outstanding.
         attribute verifiedAtCommit : String[0..1];
         attribute verifiedBy : String[0..1];
+        attribute verifiedAt : String[0..1];        // ISO-8601 attestation time (own fact, not the commit date)
     }
 }

@@ -59,7 +59,8 @@ def read_dods(path):
             dods[task] = {'method': attrs.get('method'),
                           'statement': attrs.get('statement'),
                           'verifiedAtCommit': attrs.get('verifiedAtCommit'),
-                          'verifiedBy': attrs.get('verifiedBy')}
+                          'verifiedBy': attrs.get('verifiedBy'),
+                          'verifiedAt': attrs.get('verifiedAt')}
     return dods
 
 
