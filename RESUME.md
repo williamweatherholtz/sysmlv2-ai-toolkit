@@ -68,9 +68,18 @@ Next, in order:
    parser reads `ActionUsage` + `SuccessionAsUsage` (earlier/laterOccurrence); Kahn
    layering yields parallel waves. Resolves all six workflows incl. parallelism
    (Architecture: appArch|dataArch|techArch -> allocIface; Deploy: safetyValidation|
-   systemVnV), clean exit. **NEXT: instance-aware resolution** — read `.tracking/`
-   work-items + done-state to compute "what to DO next" (then author the first real
-   work-items = the dogfood).
+   systemVnV), clean exit. **Backlog authored + resolving:** `.tracking/backlog.sysml`
+   (EngineBuild, 12 tasks) resolves via whats-next into dependency waves.
+   **NEXT (v3): instance-aware + suspicion** — read `.tracking/` work-items + their
+   verification results and emit OUTSTANDING (never done) AND SUSPECT (done, but an
+   upstream item changed since — git-ancestry over suspicion-carrying edges, D0005).
+   **Verification model (DECIDED — option A):** each task `verify`'d by a native
+   verification carrying a `method` (test|analysis|inspection|demonstration|**confirmation**);
+   human confirmation is the first-class lightweight path; done = a recorded pass result
+   + commit SHA. Automated unit/integration/gherkin tests are the *procedure* for
+   `method=test` inside Delivery — NOT the universal workflow. git-ancestry is a property
+   of every result (enables suspicion). **Step 1:** validate the native verification
+   grammar in the pilot (the earlier probe had it wrong).
 2b. **Native schema-type audit** — align schema with native SysML where we
    reinvented it: `Need`→`requirement def` (+ `satisfy`/`verify`), `UseCase`→
    `use case def`, `Test`/`TestResult`→verification, views→`view def`, and native

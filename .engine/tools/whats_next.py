@@ -23,7 +23,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _kernel  # noqa: E402
 
 ENGINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .engine
+REPO = os.path.dirname(ENGINE)
 WF_DIR = os.path.join(ENGINE, "workflows")
+BACKLOG = os.path.join(REPO, ".tracking", "backlog.sysml")  # self-build plan (dogfood)
 
 LOAD = ["_meta.sysml", "business.sysml", "architecture.sysml", "delivery.sysml",
         "deploy.sysml", "operate.sysml", "change-request.sysml"]
@@ -119,8 +121,13 @@ def main():
     for fn in LOAD:
         with open(os.path.join(WF_DIR, fn), encoding="utf-8") as fh:
             _kernel.run_cell(kc, fh.read())
+    resolve = list(WORKFLOWS)
+    if os.path.exists(BACKLOG):
+        with open(BACKLOG, encoding="utf-8") as fh:
+            _kernel.run_cell(kc, fh.read())
+        resolve.append(("EngineBacklog", "EngineBuild"))
     result = {"schema": "whats-next.v2", "workflows": []}
-    for pkg, act in WORKFLOWS:
+    for pkg, act in resolve:
         _, text = _kernel.run_cell(kc, f"%show {pkg}::{act}")
         root = parse_show(text)
         ph = phases(root)
