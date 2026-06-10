@@ -41,7 +41,30 @@ separate deliverable. Full rationale: `.engine/decisions/0001`–`0010`.
   `Engine::Core` structure and must be rewritten to import the new packages; retire
   the legacy `validate_sysml.py` in favor of `validate_schema.py`/`validate_workflows.py`.
 
-## NEXT TASKS (in order — decided: schema first, then skills)
+## CURRENT WORKLIST (2026-06-09 — our tracker; the CLI task list was retired)
+
+Done this session: process-model design spec + CLAUDE.md interaction discipline
+(request-triage state machine §3, "reference procedure, don't embed" §2.6); the
+workflow meta-model + all six workflows as a computed DAG (produces/consumes),
+7/7 green; schema/core + safety rewritten to flat `Engine<Concern>` packages,
+12/12 green; Forge apparatus disabled here; validators fixed (clean exit, no leak).
+
+Next, in order:
+1. **Pilot JSON probe** — can the installed kernel emit the standard SysML v2
+   API JSON (for `whats-next` to read + SysON/tool interop), or is the
+   API-&-Services server needed? Decides how `whats-next` reads the model.
+2. **`whats-next` resolver** (Python) — reads the workflows + `.tracking/`
+   instance data, computes the dependency DAG (from `consumes`/`produces` + the
+   typed edges), and returns ordered, parallel-grouped, self-contained task
+   packets as JSON. Build it by DOGFOODING: run Business → Architecture →
+   Delivery on it, authoring the first real work-items in `.tracking/` (our system).
+3. **Instance-file migration** — rewrite `processes/*.sysml`, `decisions/*.sysml`,
+   `skills/skills-registry.sysml` to import the new packages; retire `validate_sysml.py`.
+4. **Parked critique findings** — curated-view + frozen Baseline/Signoff for the
+   safety case; `Need` `layer` discriminator; the queryable-constraint question
+   (now: Requirement + verifying Test); CR self-modification versioning.
+
+## NEXT TASKS (historical — superseded by the Current Worklist above)
 
 ### 1. Schema rewrite → validate green
 Apply, using `.engine/docs/sysmlv2-syntax-notes.md` as ground truth:
