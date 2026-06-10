@@ -1,0 +1,2 @@
+# Git hooks are shell scripts — keep LF so the shebang works under git-for-windows.
+.githooks/post-commit text eol=lf

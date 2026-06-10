@@ -1,0 +1,8 @@
+#!/bin/sh
+# Engine process (CLAUDE.md §4): if a commit happens, a push happens.
+# Pushes the current branch to origin after every commit. Change-agnostic
+# (code, docs, schema — any commit) and non-fatal on failure (the commit
+# already succeeded; just push manually later if offline).
+branch="$(git rev-parse --abbrev-ref HEAD)"
+echo "post-commit: pushing $branch -> origin"
+git push origin "$branch" || echo "post-commit: push failed; run 'git push' when able."
