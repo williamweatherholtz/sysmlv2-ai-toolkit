@@ -127,12 +127,6 @@ The six workflows (see the spec for detail):
   *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE
   (process / schema / decision, §3a) needs human acceptance before commit; when unsure, treat it
   as needing acceptance. (Don't merge to `main` until told.)
-- **Commit → push is automatic.** A `post-commit` git hook (`.githooks/post-commit`) pushes the
-  current branch to `origin` after *every* commit — if a commit happens, a push happens
-  (change-agnostic: code, docs, schema). One-time per clone: run **`sh ./bootstrap.sh`**
-  (sets `core.hooksPath`; the captured per-clone setup — don't hand-configure from memory).
-  Commits stay deliberate + validated (§5); only the push is automated — never auto-commit on every
-  file change (that commits broken WIP).
 - **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
 - **Bootstrap exemption:** building the engine's own tooling is tracked in `RESUME.md` (the
