@@ -57,7 +57,7 @@ package EngineBacklog {
         satisfy whatsNextV2DoD by whatsNextV2;
 
         // OUTSTANDING (no verifiedAtCommit yet):
-        requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; }
+        requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; :>> verifiedAtCommit = "0f5c7d1"; :>> verifiedBy = "user"; }
         satisfy testModelDoD by testModel;
         requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query emits OUTSTANDING + SUSPECT from .tracking work-items"; }
         satisfy instanceAwareDoD by instanceAware;
