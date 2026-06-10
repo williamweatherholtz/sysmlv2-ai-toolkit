@@ -3,32 +3,29 @@
 // (the self-build dogfood). Transitioned from RESUME's prose backlog.
 //
 // A project plan IS a behavior, so it's an `action def`: tasks are `action`s,
-// dependencies are `succession` (first/then). whats-next resolves this exactly
-// like a workflow (ordered, parallel-grouped waves).
-//
-// Each task's `doc` is its acceptance criterion ("the test"). NOTE: done-state
-// is NOT yet here — per the engine principle, "done" must be COMPUTED from a
-// passing test, not asserted by a flag. Attaching a real verify-linked Test +
-// result (so whats-next shows OUTSTANDING = not-done) is the next increment,
-// pending the test/verification-model decision.
+// dependencies are `succession` (first/then). Each task `satisfy`s a method-
+// tagged `AcceptanceCriterion` (its DoD / "test"): test | analysis | inspection
+// | demonstration | confirmation (confirmation = human sign-off). whats-next
+// resolves the DAG; v3 will compute "done" from recorded pass results (+ commit
+// SHA) and surface OUTSTANDING + SUSPECT.
 // =====================================================================
 package EngineBacklog {
-    action def EngineBuild {
-        // ---- done this session (acceptance = the validation/commit noted) ----
-        action claudeMd { doc /* interaction discipline + §3 request-triage state machine; CLAUDE.md committed */ }
-        action processSpec { doc /* process-model design spec committed (docs/superpowers/specs/) */ }
-        action schemaRewrite { doc /* schema/core + safety -> flat Engine<Concern> packages; validate_schema 12/12 */ }
-        action workflows { doc /* six workflows as native action defs; validate_workflows 7/7 */ }
-        action validatorFix { doc /* validators exit cleanly: DEVNULL + os.kill(provisioner); no hung shell / JVM leak */ }
-        action autoPush { doc /* post-commit hook auto-pushes; bootstrap.sh captures per-clone setup */ }
-        action whatsNextV2 { doc /* resolver reads native action/succession DAG incl. parallelism; clean exit */ }
+    private import EngineArtifacts::*;
 
-        // ---- outstanding ----
-        action testModel { doc /* decide + validate the test/verification model: done computed from a passing test (git-SHA) */ }
-        action instanceAware { doc /* whats-next reads .tracking work-items + done-state -> OUTSTANDING tasks, not just the plan */ }
-        action schemaAudit { doc /* align schema types with natives: Need->requirement def (+satisfy/verify), UseCase->use case def, Test->verification, native elementId */ }
-        action instanceMigration { doc /* migrate processes/*.sysml, decisions/*.sysml, skills-registry to the new packages; retire validate_sysml.py */ }
-        action queryTools { doc /* the deliverable tools: parser, indexer, query CLI (whats-downstream/whats-stale-since), API, browser GUI */ }
+    action def EngineBuild {
+        // ---- tasks (done this session + outstanding) ----
+        action claudeMd;
+        action processSpec;
+        action schemaRewrite;
+        action workflows;
+        action validatorFix;
+        action autoPush;
+        action whatsNextV2;
+        action testModel;
+        action instanceAware;
+        action schemaAudit;
+        action instanceMigration;
+        action queryTools;
 
         // ---- dependencies (succession: earlier then later) ----
         first claudeMd then processSpec;
@@ -42,5 +39,31 @@ package EngineBacklog {
         first whatsNextV2 then instanceAware;
         first schemaAudit then instanceMigration;
         first instanceAware then queryTools;
+
+        // ---- acceptance criterion (DoD) per task, with verification method ----
+        requirement claudeMdDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "interaction discipline + triage are clear and accepted"; }
+        satisfy claudeMdDoD by claudeMd;
+        requirement processSpecDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "process-model spec reviewed + accepted"; }
+        satisfy processSpecDoD by processSpec;
+        requirement schemaRewriteDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_schema returns 12/12 green"; }
+        satisfy schemaRewriteDoD by schemaRewrite;
+        requirement workflowsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "validate_workflows returns 7/7 green"; }
+        satisfy workflowsDoD by workflows;
+        requirement validatorFixDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "validator returns cleanly; zero orphaned JVMs"; }
+        satisfy validatorFixDoD by validatorFix;
+        requirement autoPushDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "a commit triggers an automatic push to origin"; }
+        satisfy autoPushDoD by autoPush;
+        requirement whatsNextV2DoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "resolver lays out all workflows incl. parallelism; clean exit"; }
+        satisfy whatsNextV2DoD by whatsNextV2;
+        requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; }
+        satisfy testModelDoD by testModel;
+        requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "whats-next emits OUTSTANDING + SUSPECT from .tracking work-items"; }
+        satisfy instanceAwareDoD by instanceAware;
+        requirement schemaAuditDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "schema types aligned with natives (requirement/use-case/verification defs)"; }
+        satisfy schemaAuditDoD by schemaAudit;
+        requirement instanceMigrationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "processes/decisions/skills-registry parse green under the new packages"; }
+        satisfy instanceMigrationDoD by instanceMigration;
+        requirement queryToolsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "general query layer answers item/downstream/trace/suspect/outstanding"; }
+        satisfy queryToolsDoD by queryTools;
     }
 }

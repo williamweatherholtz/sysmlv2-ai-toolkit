@@ -15,6 +15,8 @@
 // computed (never-authored) artifact.
 // =====================================================================
 package EngineArtifacts {
+    private import ScalarValues::*;
+
     item def Brief;
     item def Persona;
     item def Need;
@@ -37,4 +39,13 @@ package EngineArtifacts {
     item def ChangeRequest;
 
     metadata def View;            // marks an artifact whose nature is computed, not authored
+
+    // Acceptance criterion / Definition of Done for a task (verification model, option A).
+    // `method`: test | analysis | inspection | demonstration | confirmation
+    // (confirmation = a human sign-off — the common, lightweight path). A task
+    // `satisfy`s its AcceptanceCriterion; "done" = a recorded pass result (commit SHA).
+    requirement def AcceptanceCriterion {
+        attribute method : String;
+        attribute statement : String;
+    }
 }
