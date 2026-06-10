@@ -9,6 +9,7 @@ Run (sandbox disabled; kernel calls bare `java`, so go through conda run):
 import os
 import sys
 import re
+import subprocess
 from queue import Empty
 
 # .engine/tools/validate/validate_schema.py -> .engine
@@ -82,7 +83,11 @@ def main():
         sys.exit(2)
 
     print("Starting kernel (JVM startup ~20s)...")
-    km, kc = start_new_kernel(kernel_name="sysml")
+    # Send the kernel's stdout/stderr to DEVNULL: results come over ZMQ (iopub),
+    # so we lose nothing — but the JVM no longer inherits our stdout pipe, which
+    # is what made the shell hang after Python exited (and it kills the noise).
+    km, kc = start_new_kernel(kernel_name="sysml",
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print("Kernel up.\n")
 
     results = []
@@ -103,14 +108,20 @@ def main():
         print(f"  {'PASS' if p else 'FAIL'}  {n}")
     print(f"  {sum(1 for _, p in results if p)}/{len(results)} files passed")
 
+    sys.stdout.flush()
+    code = 0 if all(p for _, p in results) else 1
+    # Kill the kernel's JVM so it releases the stdout pipe — otherwise conda run
+    # (and the shell) never sees EOF and hangs, even after Python exits. In
+    # jupyter_client 8.x the process lives under km.provisioner (km.kernel was
+    # removed); km.provisioner.pid is the JVM pid; os.kill is synchronous
+    # (TerminateProcess on Windows). km.shutdown_kernel() is avoided — it BLOCKS.
+    # Then hard-exit (bypasses lingering non-daemon threads).
     try:
-        kc.stop_channels()
-        km.shutdown_kernel(now=True)
+        import signal
+        os.kill(km.provisioner.pid, signal.SIGTERM)
     except Exception:
         pass
-    # The SysML kernel's JVM child + jupyter_client threads can keep this
-    # process alive on Windows; force a clean exit so the shell actually finishes.
-    os._exit(0 if all(p for _, p in results) else 1)
+    os._exit(code)
 
 
 if __name__ == "__main__":
