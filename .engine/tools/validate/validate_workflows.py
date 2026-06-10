@@ -16,7 +16,15 @@ ENGINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 WF = os.path.join(ENGINE, "workflows")
 
 # Dependency order: meta-model first, then workflows that import it.
-ORDER = ["_meta.sysml", "business.sysml"]
+ORDER = [
+    "_meta.sysml",
+    "business.sysml",
+    "architecture.sysml",
+    "delivery.sysml",
+    "deploy.sysml",
+    "operate.sysml",
+    "change-request.sysml",
+]
 
 ERR = re.compile(
     r"(error|couldn't|could not|wasn't expected|mismatched|no viable|"

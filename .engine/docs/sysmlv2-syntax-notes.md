@@ -36,6 +36,9 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
 - Closed sets (`kind`, `nature`, `critic`, `cadence`) kept as `String` with documented
   vocab — avoids reserved-keyword enum-literal failures.
 - `Boolean` attributes parse (via `private import ScalarValues::*;`).
+- **Part/usage NAMES also collide with reserved keywords** (not just attribute names):
+  `allocation`/`allocate`, `decide`, and `interface` all FAIL as a `part` name
+  ("no viable alternative at input ..."). Rename (e.g. `allocPhase`, `decidePhase`).
 
 ## Fails / avoid ❌
 
