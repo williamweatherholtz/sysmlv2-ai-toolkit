@@ -1,53 +1,40 @@
 // =====================================================================
-// EngineWorkflow — the process-as-data meta-model (simplified).
+// EngineArtifacts — the item types that flow through the workflows.
 //
-// Workflows and phases are DATA the engine reads to drive itself (CLAUDE.md;
-// design spec §14). Concrete workflows (Business, Architecture, ...) are
-// INSTANCES of these types under .engine/workflows/.
+// RE-GROUNDED on native SysML v2 (2026-06-09): a workflow IS a behavior, so a
+// workflow is a native `action def`; phases are nested `action`s; order is
+// `succession` (first/then); artifact handoff is item `flow`; parallelism is
+// convergent successions. There is NO custom Workflow/Phase/produces/consumes
+// meta-model — that reinvented SysML's native activity model (which is more
+// comprehensive and `%show`-readable: succession renders as a discrete
+// earlier/laterOccurrence element, not an opaque tuple).
 //
-// DELIBERATELY MINIMAL (see the 2026-06-09 design pass):
-//   * A Phase declares only what it PRODUCES and CONSUMES, plus a reference
-//     to its inner procedure. Sequence and parallelism are NOT authored —
-//     they are COMPUTED from the consumes/produces flow + the standard typed
-//     edges (satisfy/verify/allocate/:>/dependency): the dependency DAG.
-//   * There is no Gate / GateCheck / CriticBinding type. A phase's "gate"
-//     (its Definition of Done) is COMPUTED: the verify-linked Tests on its
-//     output must pass. Critics are just Tests with method = "inspection".
-//     (Test is the universal verifiable condition — EngineVerification +
-//     decisions D0004/D0006.)
-//   * ready / blocked / done / needs-review are COMPUTED views, never authored.
-//
-// Self-contained during bootstrap (local MetaElement base; procedureRef as a
-// String). SYNTAX confirmed via .engine/tools/validate/validate_workflows.py.
+// These `item def`s are the artifacts produced/consumed. They are intermediate:
+// they will later align with the real schema types (Need -> requirement def,
+// UseCase -> use case def, TestResult -> verification, ...). `#View` marks a
+// computed (never-authored) artifact.
 // =====================================================================
-package EngineWorkflow {
-    private import ScalarValues::*;
+package EngineArtifacts {
+    item def Brief;
+    item def Persona;
+    item def Need;
+    item def UseCase;
+    item def SystemRequirement;
+    item def SubsystemRequirement;
+    item def ComponentRequirement;
+    item def Component;
+    item def DesignElement;
+    item def Decision;
+    item def ICD;                 // view
+    item def AllocationMatrix;    // view
+    item def Story;
+    item def TestResult;
+    item def Release;
+    item def Baseline;            // view
+    item def SafetyCase;          // view
+    item def ReleaseNotes;        // view
+    item def Issue;
+    item def ChangeRequest;
 
-    abstract part def MetaElement {
-        attribute id : String;        // UUID — immutable identity (names never collide)
-        attribute title : String;     // authored human label
-    }
-
-    // The kind of item a phase produces/consumes, and whether it is authored
-    // or computed.
-    part def ArtifactType :> MetaElement {
-        attribute schemaType : String;            // schema type, e.g. "Need", "Persona"
-        attribute nature : String;                // "real" | "view"
-        attribute derivation : String[0..1];      // set iff nature == "view"
-    }
-
-    // One step of a workflow. Order/parallelism and DoD are computed (see header).
-    part def Phase :> MetaElement {
-        ref produces : ArtifactType[*];
-        ref consumes : ArtifactType[*];            // drives the dependency DAG
-        attribute procedureRef : String[0..1];     // qualified name of an Engine Process
-    }
-
-    // A named workflow: a set of phases with a cadence. Phases are an
-    // unordered membership set — execution order is computed from the DAG.
-    part def Workflow :> MetaElement {
-        attribute purpose : String;
-        attribute cadence : String;                // "once"|"continuous"|"event-driven"|"per-item"|"per-release"
-        ref phases : Phase[*];
-    }
+    metadata def View;            // marks an artifact whose nature is computed, not authored
 }

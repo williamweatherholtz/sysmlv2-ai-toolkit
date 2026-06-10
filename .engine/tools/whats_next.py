@@ -7,11 +7,13 @@ resolves the workflow DEFINITIONS (the process *shape*): order + parallelism are
 COMPUTED from each phase's consumes/produces (the DAG). Instance-aware
 "what's next to DO" (reading .tracking/ work-items + done-state) is v2.
 
-KNOWN LIMITATION (v1): a multi-valued feature value `(a, b, c)` is rendered by
-`%show` as an opaque `OperatorExpression ","` whose operands are NOT printed, so
-phases with multiple produces/consumes currently parse as empty (Architecture,
-Delivery, Deploy under-resolve). Fix pending: model produces/consumes as discrete
-typed edges (one per phase<->artifact) so `%show` renders each parseably.
+STALE (2026-06-09): the workflows were re-grounded onto native SysML `action def`s
+(phases = `action`s, order = `succession`, handoff = item `flow`), so the
+produces/consumes part-def structure this parser reads no longer exists. REWRITE
+NEEDED: parse the native `%show` AST — `ActionUsage` (phases), `SuccessionAsUsage`
+(earlierOccurrence/laterOccurrence = the DAG edges), and item `flow` (artifacts).
+This dissolves the old multi-valued-feature problem (succession renders as a
+discrete, parseable element). See .engine/workflows/_meta.sysml.
 
 Run (sandbox disabled; kernel calls bare java -> go through conda run):
   conda run -n sysml --no-capture-output python .engine/tools/whats_next.py

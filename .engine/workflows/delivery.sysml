@@ -1,46 +1,25 @@
 // =====================================================================
-// DeliveryWorkflow — build and verify, one item at a time (continuous).
-// Mirrors the agile loop; phase procedure referenced by name (procedureRef).
-// DoR/DoD are verify-linked Tests (pre/post conditions), not authored gates.
-// See spec §7.
+// DeliveryWorkflow — build/verify loop, as a native action behavior.
+// refine -> standup -> implement -> review -> done. See spec §7.
 // =====================================================================
 package DeliveryWorkflow {
-    private import ScalarValues::*;
-    private import EngineWorkflow::*;
+    private import EngineArtifacts::*;
 
-    part storyType : ArtifactType { :>> title = "Story"; :>> schemaType = "Story"; :>> nature = "real"; }
-    part testType : ArtifactType { :>> title = "Test"; :>> schemaType = "Test"; :>> nature = "real"; }
-    part testResultType : ArtifactType { :>> title = "Test Result"; :>> schemaType = "TestResult"; :>> nature = "real"; }
+    action def Delivery {
+        action refine { out s : Story; }
+        action standup { in s : Story; }
+        action implement { in s : Story; out tr : TestResult; }
+        action review { in tr : TestResult; }
+        action closeOut { in tr : TestResult; }
 
-    part refine : Phase {
-        :>> title = "Refine";
-        :>> produces = (storyType, testType);
-        :>> procedureRef = "EngineProcess::refinement";
-    }
-    part standup : Phase {
-        :>> title = "Standup";
-        :>> consumes = storyType;
-        :>> procedureRef = "EngineProcess::standup";
-    }
-    part implement : Phase {
-        :>> title = "Implement";
-        :>> consumes = storyType;
-        :>> produces = testResultType;
-        :>> procedureRef = "EngineProcess::implementation";
-    }
-    part review : Phase {
-        :>> title = "Review";
-        :>> consumes = testResultType;
-    }
-    part done : Phase {
-        :>> title = "Done";
-        :>> consumes = testResultType;
-    }
+        first refine then standup;
+        first standup then implement;
+        first implement then review;
+        first review then closeOut;
 
-    part delivery : Workflow {
-        :>> title = "Delivery";
-        :>> purpose = "Build and verify, one item at a time.";
-        :>> cadence = "per-item";
-        :>> phases = (refine, standup, implement, review, done);
+        flow from refine.s to standup.s;
+        flow from refine.s to implement.s;
+        flow from implement.tr to review.tr;
+        flow from implement.tr to closeOut.tr;
     }
 }

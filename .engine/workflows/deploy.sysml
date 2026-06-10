@@ -1,49 +1,25 @@
 // =====================================================================
-// DeployWorkflow — release, configuration management, deployment, release-level
-// V&V. Release is authored; baseline / release notes / safety case are VIEWS.
-// See spec §8.
+// DeployWorkflow — release/config/deploy + release-level V&V, as a native action
+// behavior. System V&V and Safety-case validation run in PARALLEL after declare,
+// then converge into deliver. Baseline/notes/safety-case are views. See spec §8.
 // =====================================================================
 package DeployWorkflow {
-    private import ScalarValues::*;
-    private import EngineWorkflow::*;
+    private import EngineArtifacts::*;
 
-    part releaseType : ArtifactType { :>> title = "Release"; :>> schemaType = "Release"; :>> nature = "real"; }
-    part baselineType : ArtifactType {
-        :>> title = "Baseline"; :>> schemaType = "Baseline"; :>> nature = "view";
-        :>> derivation = "from Release + commit match";
-    }
-    part releaseNotesType : ArtifactType {
-        :>> title = "Release notes"; :>> schemaType = "ReleaseNotes"; :>> nature = "view";
-        :>> derivation = "from release membership + commit diffs";
-    }
-    part safetyCaseType : ArtifactType {
-        :>> title = "Safety case"; :>> schemaType = "SafetyCase"; :>> nature = "view";
-        :>> derivation = "from loss->hazard->goal->req->V&V graph";
-    }
+    action def Deploy {
+        action declare { out r : Release; }
+        action systemVnV { in r : Release; }
+        action safetyValidation { in r : Release; out sc : SafetyCase; }
+        action deliver { in r : Release; in sc : SafetyCase; out rn : ReleaseNotes; }
 
-    part declare : Phase {
-        :>> title = "Declare release";
-        :>> produces = (releaseType, baselineType);
-    }
-    part systemVnV : Phase {
-        :>> title = "System V&V";
-        :>> consumes = releaseType;
-    }
-    part safetyValidation : Phase {
-        :>> title = "Safety-case validation";
-        :>> consumes = releaseType;
-        :>> produces = safetyCaseType;
-    }
-    part deployPhase : Phase {
-        :>> title = "Deploy";
-        :>> consumes = (releaseType, safetyCaseType);
-        :>> produces = releaseNotesType;
-    }
+        first declare then systemVnV;
+        first declare then safetyValidation;
+        first systemVnV then deliver;
+        first safetyValidation then deliver;
 
-    part deploy : Workflow {
-        :>> title = "Deploy";
-        :>> purpose = "Release, configuration management, deployment, and release-level V&V.";
-        :>> cadence = "per-release";
-        :>> phases = (declare, systemVnV, safetyValidation, deployPhase);
+        flow from declare.r to systemVnV.r;
+        flow from declare.r to safetyValidation.r;
+        flow from declare.r to deliver.r;
+        flow from safetyValidation.sc to deliver.sc;
     }
 }

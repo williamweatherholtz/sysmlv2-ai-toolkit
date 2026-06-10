@@ -1,53 +1,29 @@
 // =====================================================================
-// ArchitectureWorkflow — technical "how" that satisfies the Needs.
-// Three TOGAF domains (Data / Application / Technology) run in PARALLEL
-// (no consumes between them); Allocation & Interfaces consumes their
-// outputs (a fan-in). ICDs + allocation matrix are VIEWS. See spec §6.
-// DoD/critics are verify-linked Tests (added during dogfood), not authored here.
+// ArchitectureWorkflow — technical "how", as a native action behavior.
+// Three TOGAF domains run in PARALLEL (no succession between them) and converge
+// into Allocation & Interfaces (three successions into it). See spec §6.
 // =====================================================================
 package ArchitectureWorkflow {
-    private import ScalarValues::*;
-    private import EngineWorkflow::*;
+    private import EngineArtifacts::*;
 
-    // ---- Artifact types ----
-    part systemReqType : ArtifactType { :>> title = "System Requirement"; :>> schemaType = "SystemRequirement"; :>> nature = "real"; }
-    part subsystemReqType : ArtifactType { :>> title = "Subsystem Requirement"; :>> schemaType = "SubsystemRequirement"; :>> nature = "real"; }
-    part componentReqType : ArtifactType { :>> title = "Component Requirement"; :>> schemaType = "ComponentRequirement"; :>> nature = "real"; }
-    part componentType : ArtifactType { :>> title = "Component"; :>> schemaType = "Component"; :>> nature = "real"; }
-    part designElementType : ArtifactType { :>> title = "Design Element"; :>> schemaType = "DesignElement"; :>> nature = "real"; }
-    part decisionType : ArtifactType { :>> title = "Architecture Decision"; :>> schemaType = "Decision"; :>> nature = "real"; }
-    part icdType : ArtifactType {
-        :>> title = "Interface (ICD)"; :>> schemaType = "ICD"; :>> nature = "view";
-        :>> derivation = "from Component port defs + connections";
-    }
-    part allocType : ArtifactType {
-        :>> title = "Allocation matrix"; :>> schemaType = "AllocationMatrix"; :>> nature = "view";
-        :>> derivation = "from allocate edges";
-    }
+    action def Architecture {
+        action dataArch { out sysReq : SystemRequirement; }
+        action appArch { out comp : Component; }
+        action techArch { out subReq : SubsystemRequirement; }
+        action allocIface {
+            in sr : SystemRequirement;
+            in c : Component;
+            in br : SubsystemRequirement;
+            out icd : ICD;
+        }
 
-    // ---- Phases: 3 parallel domains + a fan-in Allocation phase ----
-    part dataArch : Phase {
-        :>> title = "Data Architecture";
-        :>> produces = (systemReqType, designElementType);
-    }
-    part appArch : Phase {
-        :>> title = "Application Architecture";
-        :>> produces = (componentType, componentReqType, designElementType);
-    }
-    part techArch : Phase {
-        :>> title = "Technology Architecture";
-        :>> produces = (subsystemReqType, decisionType);
-    }
-    part allocPhase : Phase {
-        :>> title = "Allocation & Interfaces";
-        :>> consumes = (systemReqType, componentType, subsystemReqType);
-        :>> produces = (icdType, allocType);
-    }
+        // dataArch | appArch | techArch are independent (parallel); all precede allocIface
+        first dataArch then allocIface;
+        first appArch then allocIface;
+        first techArch then allocIface;
 
-    part architecture : Workflow {
-        :>> title = "Architecture";
-        :>> purpose = "Set the technical direction that satisfies the Needs (Data / Application / Technology).";
-        :>> cadence = "once";
-        :>> phases = (dataArch, appArch, techArch, allocPhase);
+        flow from dataArch.sysReq to allocIface.sr;
+        flow from appArch.comp to allocIface.c;
+        flow from techArch.subReq to allocIface.br;
     }
 }

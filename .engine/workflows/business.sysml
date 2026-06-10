@@ -1,44 +1,23 @@
 // =====================================================================
-// BusinessWorkflow — the onboarding / "what-why" workflow, as DATA.
-// Brief -> Personas -> Needs -> Use Cases (chain expressed via consumes).
-// Gates/critics are NOT authored here: a phase's DoD is the verify-linked
-// Tests on its output (added as instance Tests during dogfood). See spec §5.
+// BusinessWorkflow — onboarding / "what-why", as a native action behavior.
+// Brief -> Personas -> Needs -> Use Cases (sequential succession + item flow).
+// Each action's in/out is the artifact it consumes/produces. See spec §5.
 // =====================================================================
 package BusinessWorkflow {
-    private import ScalarValues::*;
-    private import EngineWorkflow::*;
+    private import EngineArtifacts::*;
 
-    // ---- Artifact types this workflow produces (all authored / real) ----
-    part briefType : ArtifactType { :>> title = "Brief / Opportunity"; :>> schemaType = "Brief"; :>> nature = "real"; }
-    part personaType : ArtifactType { :>> title = "Persona"; :>> schemaType = "Persona"; :>> nature = "real"; }
-    part needType : ArtifactType { :>> title = "Need"; :>> schemaType = "Need"; :>> nature = "real"; }
-    part useCaseType : ArtifactType { :>> title = "Use Case"; :>> schemaType = "UseCase"; :>> nature = "real"; }
+    action def Business {
+        action brief { out o : Brief; }
+        action personas { in i : Brief; out o : Persona; }
+        action needs { in i : Persona; out o : Need; }
+        action useCases { in i : Need; out o : UseCase; }
 
-    // ---- Phases: dependency chain via consumes/produces ----
-    part briefPhase : Phase {
-        :>> title = "Brief";
-        :>> produces = briefType;
-    }
-    part personasPhase : Phase {
-        :>> title = "Personas";
-        :>> consumes = briefType;
-        :>> produces = personaType;
-    }
-    part needsPhase : Phase {
-        :>> title = "Needs";
-        :>> consumes = personaType;
-        :>> produces = needType;
-    }
-    part useCasesPhase : Phase {
-        :>> title = "Use Cases";
-        :>> consumes = needType;
-        :>> produces = useCaseType;
-    }
+        first brief then personas;
+        first personas then needs;
+        first needs then useCases;
 
-    part business : Workflow {
-        :>> title = "Business";
-        :>> purpose = "Capture subjective needs and how the system is used (what / why).";
-        :>> cadence = "once";
-        :>> phases = (briefPhase, personasPhase, needsPhase, useCasesPhase);
+        flow from brief.o to personas.i;
+        flow from personas.o to needs.i;
+        flow from needs.o to useCases.i;
     }
 }
