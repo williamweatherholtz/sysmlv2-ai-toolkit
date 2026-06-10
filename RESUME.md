@@ -70,16 +70,30 @@ Next, in order:
    (Architecture: appArch|dataArch|techArch -> allocIface; Deploy: safetyValidation|
    systemVnV), clean exit. **Backlog authored + resolving:** `.tracking/backlog.sysml`
    (EngineBuild, 12 tasks) resolves via whats-next into dependency waves.
-   **NEXT (v3): instance-aware + suspicion** — read `.tracking/` work-items + their
-   verification results and emit OUTSTANDING (never done) AND SUSPECT (done, but an
-   upstream item changed since — git-ancestry over suspicion-carrying edges, D0005).
+   **Query core — DONE (2026-06-10):** `.engine/tools/query.py` is the general query
+   layer (whats-next is one VIEW over it). Subcommands: `whats-next` (ready/done/
+   blocked/suspect), `suspect`, `item <name>`. Over EngineBuild it emits
+   ready=[schemaAudit], done=[7], blocked=[4], suspect=[] (all done at one commit).
+   Suspicion logic unit-tested (`_test_suspect.py`, stubbed git-ancestry — fires when
+   an upstream is re-verified at a descendant commit).
+   **`%show` requirement-value elision (D0006).** This kernel build renders a
+   `RequirementUsage` as a BARE LEAF — it will NOT surface a requirement usage's
+   attribute values (`method`/`verifiedAtCommit`), even when %show'd directly.
+   (PartUsage + ActionDefinition DO render attribute FeatureValues, redefined or
+   direct.) So the query tool is HYBRID: graph (tasks + `SuccessionAsUsage` deps) from
+   the validated kernel %show; DoD scalar values from the `.sysml` TEXT (`read_dods`,
+   the values the eventual Rust/text parser reads directly anyway). Kernel stays the
+   validator + graph authority. Model is correct + green; this is purely a %show
+   reader limit.
    **Verification model (DECIDED — option A):** each task `verify`'d by a native
    verification carrying a `method` (test|analysis|inspection|demonstration|**confirmation**);
    human confirmation is the first-class lightweight path; done = a recorded pass result
    + commit SHA. Automated unit/integration/gherkin tests are the *procedure* for
    `method=test` inside Delivery — NOT the universal workflow. git-ancestry is a property
-   of every result (enables suspicion). **Step 1:** validate the native verification
-   grammar in the pilot (the earlier probe had it wrong).
+   of every result (enables suspicion).
+   **NEXT (v3): instance-aware** — generalize beyond EngineBuild to read arbitrary
+   `.tracking/` work-items + their verification results; fold into the schema-type
+   audit (verification → native `verification`).
 2b. **Native schema-type audit** — align schema with native SysML where we
    reinvented it: `Need`→`requirement def` (+ `satisfy`/`verify`), `UseCase`→
    `use case def`, `Test`/`TestResult`→verification, views→`view def`, and native

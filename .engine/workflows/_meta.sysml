@@ -47,5 +47,9 @@ package EngineArtifacts {
     requirement def AcceptanceCriterion {
         attribute method : String;
         attribute statement : String;
+        // The recorded pass RESULT. Present => done; the commit it passed against
+        // (enables git-ancestry suspicion). Absent => outstanding.
+        attribute verifiedAtCommit : String[0..1];
+        attribute verifiedBy : String[0..1];
     }
 }
