@@ -178,3 +178,13 @@ core) → CR-10 → CR-11 → CR-12.
 
 Each CR above awaits explicit accept / reject / defer. Accepted CRs enter the normal
 CHANGE path (§3a) as backlog work items; rejections are recorded Decisions.
+
+---
+
+## Postscript (2026-06-11, same day)
+
+All 13 CRs were **accepted by the user** (Decision 0017) and **implemented the same
+day** (crWritePath..crNativeWins in the backlog, each with an appended pass result).
+Follow-on: Decision 0018 (model-only state — RESUME.md deleted) extended CR-9 after
+the prose-handoff pattern recurred. This document is the immutable findings record;
+current state is computed (`query.py orient`), never read from here.

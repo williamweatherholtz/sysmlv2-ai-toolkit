@@ -1,69 +1,60 @@
 # sysmlv2-ai-toolkit
 
-A reusable, AI-complemented **work-tracking engine** built on SysMLv2 text
-files, with strict-yet-flexible discipline. It tracks the work of building
-anything — and is being built using its own workflow.
+A reusable, AI-complemented **work-tracking engine** built on SysML v2 text files,
+with strict discipline. It tracks the work of building anything — and is built
+using its own workflow (every task, decision, and verification in this repo is
+tracked by the engine itself).
+
+## Orient (state is computed, never prose — Decision 0018)
+
+```
+conda run -n sysml --no-capture-output python .engine/tools/query.py orient
+```
+
+Returns the state cursor + the ready/suspect frontier. There is no status page,
+roadmap doc, or handoff file: **the backlog (`.tracking/backlog.sysml`) is the only
+tracker**, and views over it are computed by `query.py`
+(`whats-next | outstanding | suspect | item | downstream | trace`).
 
 ## What this is
 
-The engine is a SysMLv2 **schema** + disciplined **processes** + a
-**computed-state contract** that track *work being done* with full
-traceability and live suspicion detection: change an upstream item and every
-downstream item that may now be stale is found by a graph query, not a manual
-hunt.
+A SysML v2 **schema** (native metaclasses: `requirement def`, `use case def`,
+`verification def`, enums, value types) + **processes-as-data** (six workflows as
+native `action def`s; agile/DoR/DoD/critique/doc-sync as `Process` instances) +
+a **computed-state engine** (done = the latest appended `TestResult` is a pass;
+git-ancestry **suspicion** flags work whose upstream definition changed after it
+was verified).
 
-**Two models, never conflated:**
-1. **The engine model** tracks the *work* (this repo).
-2. **The deliverable** is what the work produces — software, or a future
-   SysMLv2 org/HR model. A separate artifact; its domain vocabulary never
-   enters the engine.
+**Two models, never conflated:** the engine model tracks the *work*; the
+deliverable is what the work produces. Deliverable vocabulary never enters the
+engine.
 
 ## Where things live
 
 ```
-.engine/        THE ENGINE — infrastructure (like .git/). See .engine/README.md.
-  schema/core/    Always imported: requirements, work, tests, decisions,
-                  risk, process, workflow, skills + the Element/relationship base.
-  schema/safety/  Optional: STPA (HARA/ASIL intentionally out of scope).
-  contracts/      The computed-state spec (satisfaction/coverage/suspicion).
-  processes/      Agile-for-solo+AI, Definition of Ready (Standup), Definition of Done.
-  skills/         Default AI skill registrations + write policies.
-  decisions/      0001–0010: the architecture decisions behind the engine.
-  docs/           Usage guide.
-
-(top level)     PROJECT INSTANCE — created next phase, using the engine:
-                requirements/, work/, architecture/, decisions/ for the tools,
-                then the tool source itself.
+CLAUDE.md         The interaction contract (request triage, invariants, validation). READ FIRST.
+.engine/          The engine (like .git/): schema/, workflows/, processes/, skills/,
+                  decisions/ (0001–0018), contracts/, tools/ (query, validators), docs/.
+.tracking/        THIS project's instance data: backlog (the tracker), actors, state cursor.
+docs/             Design history (critiques; the original — now historical — design spec).
 ```
 
-## The discipline (engine invariants)
+## The discipline (CLAUDE.md §2 is normative)
 
-1. **Text is truth; computed values are views.** Authored facts live in
-   `.sysml`; satisfaction/coverage/suspicion are recomputed, never stored.
-2. **Atomic items.** Tests, decisions, requirements are first-class and
-   independently queryable — never checklist lines inside other items.
-3. **Typed edges only:** `:>`, `satisfy`, `verify`, `allocate`, `dependency`,
-   `supersede`.
-4. **State, not events.** Runtime events (CI, images, telemetry) stay in their
-   native systems.
-5. **AI is first-class** and uses the same API as the GUI, gated by an enforced
-   per-skill write policy.
-6. **`schema/core` is frozen**; `schema/safety` is optional; changes go through
-   a Decision.
+Text is truth; everything derivable is a computed view. Atomic items, typed edges
+(native `satisfy`/`verify`/`allocate`/`:>` plus `#DependsOn`/`#Supersede`/
+`#OrderingOnly` markers). Every item carries an immutable UUID `id`. Verification
+results are appended, never overwritten. Every schema/process change = recorded
+`Decision` + acceptance + green validation (a pre-commit hook enforces it; the
+post-commit hook pushes to `main` — the only branch).
 
-## Build order
+## Toolchain
 
-- **Phase 0 (done):** the `.engine/` SysMLv2 infrastructure — authored by hand
-  (it can't track its own bootstrap).
-- **Next:** validate all `.sysml` against the SysMLv2 pilot implementation
-  (syntax is currently *unproven*), then use the engine to track building the
-  tools (parser, indexer, validator, query CLI, API, browser GUI).
-
-## Caveat
-
-SysMLv2 textual syntax in `.engine/` is **pending validation** against the
-pilot implementation. The conceptual schema is settled; exact keyword spelling
-may shift. Don't treat the syntax as proven.
+The OMG pilot Jupyter SysML kernel (conda env `sysml`) drives validation and the
+typed graph; scalar values are read from text (the kernel won't render them — see
+`.engine/docs/sysmlv2-syntax-notes.md` for pilot-verified do's/don'ts). All 47
+model files validate green. A standalone parser/runtime is queued work
+(`runtimeParser` in the backlog).
 
 ## License
 

@@ -1,3 +1,11 @@
+> **IMPLEMENTATION STATUS (2026-06-11).** Partially implemented; this contract is the
+> TARGET. Implemented today (query.py): done-from-appended-results, ready/blocked,
+> D0005 suspicion (material-change trigger over semantic deps, transitive, #OrderingOnly
+> excluded), evidence validation. NOT yet implemented: coverageState()/satisfaction()
+> over verify edges, whats-stale-since, coverageGaps. STALE REFERENCE: `currentState`
+> was deleted (CR-7) — "marked done" is now itself computed. Alignment is tracked as
+> the `contractAlign` backlog task — keep code, contract, and backlog converging there.
+
 # Computed-State Contract
 
 This is the engine's defining mechanism. Read it before building any tool.

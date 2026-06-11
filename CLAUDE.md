@@ -208,4 +208,7 @@ See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts befo
 ## 6. Environment notes
 
 - Windows + PowerShell. Use PowerShell syntax (`$null`, `$env:VAR`, backtick line-continuation).
+- **NEVER pipe `conda run` output into a live cmdlet or redirect** (`| Select-String`,
+  `| Out-Null`, `> $null`) — the kernel JVM holds the pipe and the shell HANGS. Run plain.
+- Interrupted kernel runs can orphan JVMs: `python .engine/tools/kill_stale_kernels.py`.
 - SysML validation requires the `sysml` conda env (Jupyter SysML kernel, OpenJDK).

@@ -11,7 +11,7 @@
 // Computed fields (satisfaction, coverage, suspicion) are likewise views.
 // =====================================================================
 package EngineElement {
-    doc /* Universal tracked-element base (Element + per-metaclass Tracked bases), shared enums and value types, and the minimal actor model. Identity = authored id (native elementId is parse-ephemeral). NOTE: attributed metadata (@Tracked with values) SPIKED GREEN 2026-06-11 - a future refactor may collapse the Tracked* bases into one annotation. */
+    doc /* Universal tracked-element base (Element + per-metaclass Tracked bases), shared enums and value types, and the minimal actor model. Identity = authored id (native elementId is parse-ephemeral). NOTE: attributed metadata (@Tracked with values) SPIKED GREEN 2026-06-11 - the `trackedMetadata` backlog task will collapse the Tracked* bases into one annotation. */
 
     private import ScalarValues::*;
 
@@ -37,7 +37,7 @@ package EngineElement {
         attribute id : Uuid;              // immutable identity
         attribute title : String;         // authored human label (may duplicate)
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;    // actor id (typed ref to the registry comes with userCapture)
+        attribute authoredBy : String;    // actor id (a ProjectActors part name; typed refs = `authoredByRefs` task)
     }
 
     // Native metaclasses (requirement / use case / verification def) CANNOT

@@ -224,6 +224,8 @@ package EngineBacklog {
         action writeApi;            // the write API: enforces writePolicy, ids, append-only results (D0003 becomes real)
         action toolchainWatch;      // adopt expose/render, verify-by, derive/refine/trace when a newer SysML v2 toolchain supports them
 
+        action foldWhatsNext;       // UC6 leftover: merge whats_next.py's workflow-DAG resolution into query.py (a `workflows` subcommand); retire whats_next.py — one tool, one answer
+        action contractAlign;       // computed-state contract vs query.py: implement coverageState/satisfaction over verify edges or amend the contract; remove its stale currentState reference
         action specRefresh;         // rewrite/retire the historical design spec so no doc contradicts decisions (was RESUME 'known debt' prose)
         action modelOnlyState;      // D0018: RESUME.md deleted; orient computed; CLAUDE.md bans prose state docs
 
@@ -233,6 +235,8 @@ package EngineBacklog {
         first dogfoodDelivery then runtimeParser;
         first runtimeParser then writeApi;
 
+        verification foldWhatsNextDoD : Test { :>> id = "4338695c-eb93-4d73-b904-c9c4c1469840"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs (parity with whats_next.py); whats_next.py retired; single query tool"; }
+        verification contractAlignDoD : Test { :>> id = "cda3ab15-159b-4e2d-850c-405237a85dc9"; :>> method = VerificationMethod::inspect; :>> procedureText = "computed-state contract and query.py agree clause-by-clause: each view implemented, amended, or explicitly queued; no stale references"; }
         verification specRefreshDoD : Test { :>> id = "3d2823ec-9cd9-4449-bc35-3db8a5f9773d"; :>> method = VerificationMethod::inspect; :>> procedureText = "the 2026-06-04 spec is rewritten to match decisions 0001-0018 or formally retired to design-history; no doc contradicts the model"; }
         verification modelOnlyStateDoD : Test { :>> id = "2dc52776-7c18-425f-9413-57ac62aabeec"; :>> method = VerificationMethod::inspect; :>> procedureText = "RESUME.md deleted; CLAUDE.md sec4 bans prose state docs + sec1 routes orientation to query.py orient; no file shadow-tracks the backlog"; }
         part modelOnlyStateR1 : TestResult { :>> id = "2c4dfc07-6c91-4bba-869f-829578959ad6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f1f65d9"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "inspect"; }

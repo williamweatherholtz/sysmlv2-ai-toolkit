@@ -84,3 +84,16 @@ The kernelspec calls bare `java`, so it MUST run through `conda run -n sysml`
 (running the env python directly fails with WinError 2). Needs sandbox disabled
 (subprocess + the kernel). A cell FAILS iff the kernel emits a line containing
 `ERROR:`.
+
+## `%show` read-path limits (pilot 0.59.0 — D0006)
+
+- `%show <FQN>` is a reliable STRUCTURE dumper, an unreliable VALUE dumper.
+- Renders attribute values (FeatureValue children) for `PartUsage` and
+  `ActionDefinition` — both redefined (`:>> a = "x"`) and direct defaults.
+- Renders `RequirementUsage` / verification usages as BARE LEAVES — attribute
+  values are NOT surfaced even when `%show`-ing the usage directly. Tooling
+  therefore reads scalar values from the `.sysml` TEXT (the one-line dialect).
+- `%export` is a silent no-op; multi-valued sequences render as opaque
+  `OperatorExpression`; `succession` renders readably (earlier/laterOccurrence).
+- Native `elementId` REGENERATES every parse — never use it as durable identity.
+

@@ -4,7 +4,6 @@
 // Ceremonies are kept as problem-solving PROCESSES, not team rituals:
 // they give AI strong short-term clarity and put a human gate on
 // medium/long-term direction.
-// SYNTAX PENDING PILOT VALIDATION.
 // =====================================================================
 package EngineAgileProcess {
     private import EngineElement::*;     // Cadence / Owner enums

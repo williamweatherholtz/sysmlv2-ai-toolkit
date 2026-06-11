@@ -38,7 +38,7 @@ package EngineSkillRegistry {
     part agileRefinement : AISkill {
         :>> id = "8e31bad5-37de-4b1b-9524-3c70c3f0c333";
         :>> title = "agile-refinement";
-        :>> purpose = "Run backlog refinement: criteria as verification DoDs, sizing, dependency links (rename to backlog-refinement pending).";
+        :>> purpose = "Run backlog refinement: criteria as verification DoDs, sizing, dependency links (rename to backlog-refinement = `skillsRefresh` task).";
         :>> location = ".engine/skills/agile-refinement/SKILL.md";
         :>> triggerCondition = "New backlog items need refinement to ready.";
         :>> writePolicy = WritePolicy::prOnly;
