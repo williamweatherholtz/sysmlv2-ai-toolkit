@@ -61,7 +61,7 @@ package EngineBacklog {
         // OUTSTANDING (no verifiedAtCommit yet):
         requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; :>> verifiedAtCommit = "0f5c7d1"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy testModelDoD by testModel;
-        requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query emits OUTSTANDING + SUSPECT from .tracking work-items"; }
+        requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query DISCOVERS work-item backlogs from .tracking/*.sysml (action defs) and emits OUTSTANDING + SUSPECT; no hardcoded target; --target focuses one; item + override verified"; :>> verifiedAtCommit = "adc35ab"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "demo"; }
         satisfy instanceAwareDoD by instanceAware;
         requirement schemaAuditDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "schema types aligned with natives"; :>> verifiedAtCommit = "72bb02b"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy schemaAuditDoD by schemaAudit;
