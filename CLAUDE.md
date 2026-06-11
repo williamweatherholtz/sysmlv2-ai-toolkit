@@ -25,8 +25,11 @@ building things — and is being built using its own discipline. Read this befor
 - **Two models, never conflated:** the *engine model* tracks the work; the *deliverable* is
   what the work produces. The deliverable's domain vocabulary never enters the engine.
 
-Authoritative reading order: this file → `.engine/README.md` → the design spec
-`docs/superpowers/specs/2026-06-04-process-model-design.md` → `.engine/decisions/`.
+Authoritative reading order: this file → `.engine/README.md` → `.engine/decisions/`
+(0001–0018) → the critiques in `docs/design-history/`. (The original design spec in
+`docs/superpowers/specs/` is HISTORICAL — superseded in places; decisions win.)
+**Orient** (where things stand / what's next) is never read from prose — compute it:
+`conda run -n sysml --no-capture-output python .engine/tools/query.py orient`
 
 ---
 
@@ -170,10 +173,17 @@ The six workflows (see the spec for detail):
   first" default — per explicit standing instruction, 2026-06-11.)
 - **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
-- **Bootstrap exemption:** building the engine's own tooling is tracked in `RESUME.md` (the
-  sanctioned bootstrap tracker), not through the full workflow — the engine can't yet track its
-  own construction. The first *real* dogfood is a downstream feature *after* the schema parses
-  and one view computes.
+- **Bootstrap exemption:** building the engine's own tooling is tracked **in the backlog**
+  (`.tracking/backlog.sysml`), not through the full workflow. The first *real* dogfood is a
+  downstream feature *after* the schema parses and one view computes (both true since
+  2026-06-10 — `dogfoodBusiness` is the queued next step).
+- **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
+  `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
+  reproduced once even after the critique). Where things stand is COMPUTED
+  (`python .engine/tools/query.py orient`); what's next is the backlog's ready frontier;
+  how to work here is THIS file; mechanics live in `.tracking/README.md`,
+  `.engine/docs/` and `.engine/decisions/`. Never author a status/worklist/handoff doc —
+  if resuming requires knowledge, it belongs in the model, a Decision, or these docs.
 
 ---
 

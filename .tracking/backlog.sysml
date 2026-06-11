@@ -224,12 +224,17 @@ package EngineBacklog {
         action writeApi;            // the write API: enforces writePolicy, ids, append-only results (D0003 becomes real)
         action toolchainWatch;      // adopt expose/render, verify-by, derive/refine/trace when a newer SysML v2 toolchain supports them
 
+        action specRefresh;         // rewrite/retire the historical design spec so no doc contradicts decisions (was RESUME 'known debt' prose)
+        action modelOnlyState;      // D0018: RESUME.md deleted; orient computed; CLAUDE.md bans prose state docs
+
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
         first traceNeeds then baselineView;
         first dogfoodDelivery then runtimeParser;
         first runtimeParser then writeApi;
 
+        verification specRefreshDoD : Test { :>> id = "3d2823ec-9cd9-4449-bc35-3db8a5f9773d"; :>> method = VerificationMethod::inspect; :>> procedureText = "the 2026-06-04 spec is rewritten to match decisions 0001-0018 or formally retired to design-history; no doc contradicts the model"; }
+        verification modelOnlyStateDoD : Test { :>> id = "2dc52776-7c18-425f-9413-57ac62aabeec"; :>> method = VerificationMethod::inspect; :>> procedureText = "RESUME.md deleted; CLAUDE.md sec4 bans prose state docs + sec1 routes orientation to query.py orient; no file shadow-tracks the backlog"; }
         verification dogfoodBusinessDoD : Test { :>> id = "dec73f98-f883-4f0c-b50a-ff8dd24e0e27"; :>> method = VerificationMethod::confirmation; :>> procedureText = "a real Brief/Personas/Needs/UseCases authored in .tracking, phase gates as verification instances, cursor moved, all green; user accepts the Business run"; }
         verification dogfoodArchitectureDoD : Test { :>> id = "1ddedbcd-ced1-4537-ace3-ae82759ee1bf"; :>> method = VerificationMethod::confirmation; :>> procedureText = "SystemRequirements satisfy-linked to Needs, allocated to Components; trace queryable; user accepts"; }
         verification dogfoodDeliveryDoD : Test { :>> id = "50c631b3-5396-4f3c-84f0-054da815afd3"; :>> method = VerificationMethod::confirmation; :>> procedureText = "one item through DoR->implement->appended results->DoD with gates computed; user accepts"; }
