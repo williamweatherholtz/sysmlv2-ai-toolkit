@@ -105,7 +105,7 @@ package EngineBacklog {
         satisfy analysisCalcDoD by analysisCalc;
         requirement nativeAllocDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "architecture function->component via native allocate + interface def parses green"; }
         satisfy nativeAllocDoD by nativeAlloc;
-        requirement temporalModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "decided: adopt native occurrence/snapshot/timeslice or stay git-only for ancestry"; }
+        requirement temporalModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "DECIDED stay git-only (merge-base ancestry) for the engine timeline; native occurrence/snapshot/timeslice noted as available for deliverable/subject-version modeling, not the engine clock"; :>> verifiedAtCommit = "0e8b24c"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "user"; }
         satisfy temporalModelDoD by temporalModel;
         requirement sec26MaterializeDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "CLAUDE.md §2.6 gains a sanctioned marked-materialized-view clause"; :>> verifiedAtCommit = "062b97f"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy sec26MaterializeDoD by sec26Materialize;
