@@ -215,8 +215,11 @@ def read_ordering_only():
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
-      - suspicion triggers: upstream re-verified at a DESCENDANT commit, OR upstream's
-        criterion text MATERIALLY CHANGED since this task's judgment commit;
+      - suspicion trigger: upstream's criterion text MATERIALLY CHANGED since this
+        task's judgment commit (compared via git at the judgedAgainst revision).
+        NOTE: mere re-attestation of an unchanged upstream does NOT flag — a
+        re-verified-later trigger oscillates (every re-verification re-flags all
+        downstreams) and is not what the contract demands;
       - suspicion travels only over SEMANTIC deps (ordering-only excluded);
       - suspicion is TRANSITIVE downstream."""
     for info in tasks.values():
@@ -234,10 +237,6 @@ def classify(tasks, ordering_only=frozenset()):
             for d in info['deps']:
                 if (d, name) in ordering_only or d not in tasks:
                     continue
-                cd = tasks[d].get('verifiedAtCommit')
-                if tasks[d].get('done') and cd and ct and cd != ct and _is_ancestor(ct, cd):
-                    suspect = True           # upstream re-verified after this judgment
-                    break
                 old = _criterion_at(ct, d) if ct else None
                 cur = tasks[d].get('dod', {}).get('statement')
                 if old is not None and cur is not None and old != cur:

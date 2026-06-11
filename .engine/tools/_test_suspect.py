@@ -19,26 +19,27 @@ def t(name, deps, done, commit, stmt="s"):
 
 
 tasks = {
-    # A re-verified at c2 AFTER B was judged at c1 -> B suspect (trigger 1)
+    # A merely RE-ATTESTED at c2 after B was judged at c1, criterion unchanged
+    # -> B NOT suspect (re-attestation must not oscillate)
     "A": t("A", [], True, "c2"),
     "B": t("B", ["A"], True, "c1"),
-    # C depends on A only via an ORDERING-ONLY edge -> NOT suspect
-    "C": t("C", ["A"], True, "c1"),
-    # D depends on B (suspect) -> transitively suspect
-    "D": t("D", ["B"], True, "c1"),
+    # C depends on M only via an ORDERING-ONLY edge -> NOT suspect despite M's change
+    "C": t("C", ["M"], True, "c1"),
+    # D depends on N (suspect via material change) -> transitively suspect
+    "D": t("D", ["N"], True, "c1"),
     # M's criterion text changed since N's judgment commit -> N suspect (trigger 2)
     "M": t("M", [], True, "c1", stmt="new definition"),
     "N": t("N", ["M"], True, "c1"),
     # E claims a commit that doesn't resolve -> invalid evidence, demoted from done
     "E": t("E", [], True, "BOGUS"),
 }
-query.classify(tasks, ordering_only={("A", "C")})
+query.classify(tasks, ordering_only={("M", "C")})
 
-assert tasks["B"]["suspect"], "B: upstream re-verified later must fire"
+assert not tasks["B"]["suspect"], "B: mere re-attestation of unchanged upstream must NOT fire"
 assert not tasks["C"]["suspect"], "C: ordering-only edge must NOT carry suspicion"
 assert tasks["D"]["suspect"], "D: suspicion must propagate transitively"
 assert tasks["N"]["suspect"], "N: upstream material change must fire"
 assert not tasks["M"]["suspect"] and not tasks["A"]["suspect"], "roots clean"
 assert tasks["E"]["invalidEvidence"] and not tasks["E"]["done"], "E: bogus SHA demoted"
-print("OK: re-verified-later, material-change, ordering-only exclusion, "
-      "transitivity, invalid-evidence all behave per D0005.")
+print("OK: material-change fires; re-attestation does not; ordering-only excluded; "
+      "transitive; invalid-evidence demoted - per D0005.")

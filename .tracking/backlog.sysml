@@ -52,6 +52,7 @@ package EngineBacklog {
         part claudeMdR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
         verification processSpecDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "process-model spec reviewed + accepted"; }
         part processSpecR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
+        part processSpecR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9837c17"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
         verification schemaRewriteDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "validate_schema 12/12 green"; }
         part schemaRewriteR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_schema"; }
         part schemaRewriteR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
@@ -68,11 +69,13 @@ package EngineBacklog {
 
         verification testModelDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "verification model decided + native grammar validated"; }
         part testModelR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0f5c7d1"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
+        part testModelR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9837c17"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
         verification instanceAwareDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "query DISCOVERS work-item backlogs from .tracking/*.sysml (action defs) and emits OUTSTANDING + SUSPECT; no hardcoded target; --target focuses one; item + override verified"; }
         part instanceAwareR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "adc35ab"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         part instanceAwareR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         verification schemaAuditDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "schema types aligned with natives"; }
         part schemaAuditR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "72bb02b"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
+        part schemaAuditR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9837c17"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
         verification instanceMigrationDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "all 14 instance files (10 decisions + 3 processes + skills-registry) migrated to flat Engine<Concern> packages; parse green via validate_instances (14/14); Gate/GateCheck reconceived as Process/ProcessStep; legacy validate_sysml.py retired"; }
         part instanceMigrationR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e39a49e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_instances"; }
         part instanceMigrationR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_instances"; }
@@ -123,6 +126,7 @@ package EngineBacklog {
         part nativeAllocR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification temporalModelDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "DECIDED stay git-only (merge-base ancestry) for the engine timeline; native occurrence/snapshot/timeslice noted as available for deliverable/subject-version modeling, not the engine clock"; }
         part temporalModelR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0e8b24c"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
+        part temporalModelR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9837c17"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
         // ---- 2026-06-11 architectural critique: 13 CRs, ALL ACCEPTED BY USER ----
         // (docs/design-history/2026-06-11-architectural-critique.md §4; suggested order = chain below)
         action crWritePath;        // CR-1  validate_tracking preloads schema; recursive globs; .tracking template
