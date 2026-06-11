@@ -1,31 +1,27 @@
 // =====================================================================
-// EngineRelationships — the engine edge algebra as metadata markers.
+// EngineRelationships — the engine edge algebra. NATIVE where the pilot
+// supports it (nativeTrace 2026-06-10, user-agreed rescope); metadata markers
+// only where it does not. Spiked: _spike_trace.py / _spike_verify.py.
 //
-// The engine's tracked items are now MIXED metaclasses (native requirement /
-// use case / verification def + part def). Edges are realized as uniform
-// metadata markers applied to a `dependency` at instance time (there is no
-// `dependency def`), independent of the target's metaclass — so one edge
-// algebra spans natives and parts alike (native satisfy/verify also exist for
-// the native types, but the markers keep the engine layer uniform). Markers:
-//   #Satisfy   design element fulfills a requirement / Need
-//   #Verify    evidence checks an element (validation is the SAME marker
-//              pointing at a Need/UseCase — distinguished by target type)
-//   #Allocate  abstract cross-hierarchy association (function -> component)
-//   #Supersede replacement / obsolescence (back-reference is COMPUTED)
-//   #DependsOn semantic dependence
+//   satisfy   -> NATIVE `satisfy <req> by <element>` (renders SatisfyRequirementUsage)
+//   verify    -> NATIVE, STRUCTURAL: a requirement-verification must be in the
+//                `objective` of a verification case — `verification def V {
+//                subject s; objective r; }`. (`verify X by Y` is NOT valid.)
+//   derive/   -> use `:>` (specialization). The v1 keywords derive/refine/trace
+//   refine/      are ABSENT from the v2 pilot grammar; revisit on a newer toolchain.
+//   trace
+//   allocate / dependsOn / supersede -> metadata markers below (no native pilot form;
+//                supersede's back-reference is COMPUTED).
 //
-// Plus :> (specialization/derivation) which is native.
-//
-// SUSPICION propagates DOWNSTREAM along :>, Satisfy, Verify, Allocate, and
-// semantic DependsOn — but NOT along an ordering-only dependency. Tag those
+// SUSPICION propagates DOWNSTREAM along satisfy, verify, :>, allocate, and
+// semantic dependsOn — but NOT along an ordering-only dependency. Tag those
 // with #OrderingOnly to exclude them (see contracts/computed-state.md).
 // =====================================================================
 package EngineRelationships {
 
-    metadata def Satisfy;
-    metadata def Verify;
+    // #Satisfy / #Verify markers dropped — those edges use the native forms above.
     metadata def Allocate;
-    metadata def Supersede;
     metadata def DependsOn;
+    metadata def Supersede;
     metadata def OrderingOnly;
 }
