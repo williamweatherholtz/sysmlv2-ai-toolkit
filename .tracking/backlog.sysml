@@ -141,9 +141,9 @@ package EngineBacklog {
         satisfy crKillStateDoD by crKillState;
         requirement crTruthDocsDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "docs match git reality; .tracking policy decided + recorded; usage.md valid; RESUME thinned; lying comments gone; EngineDocSync process added + tied into DoD and CLAUDE.md §4"; :>> verifiedAtCommit = "99e6ed7"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_instances"; }
         satisfy crTruthDocsDoD by crTruthDocs;
-        requirement crBootstrapHoleDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "CLAUDE.md §3e routes computed-view semantics changes as CHANGE"; }
+        requirement crBootstrapHoleDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "CLAUDE.md §3e routes computed-view semantics changes as CHANGE"; :>> verifiedAtCommit = "0a3aee2"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "inspect"; }
         satisfy crBootstrapHoleDoD by crBootstrapHole;
-        requirement crDecisionsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "Decisions 0011+ backfilled and parse green; CR-acceptance discipline recorded in CLAUDE.md §4"; }
+        requirement crDecisionsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "Decisions 0011-0017 backfilled and parse green (24/24); CR-acceptance discipline recorded in CLAUDE.md §4"; :>> verifiedAtCommit = "a092fc2"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_instances"; }
         satisfy crDecisionsDoD by crDecisions;
         requirement crTypeUniverseDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "_meta shadow item defs retired; workflows typed by schema/core; workflows + tracking validate green"; }
         satisfy crTypeUniverseDoD by crTypeUniverse;
