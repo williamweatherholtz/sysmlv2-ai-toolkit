@@ -91,7 +91,7 @@ package EngineBacklog {
         first strongTyping then nativeViews;
         first nativeTrace then nativeViews;
 
-        requirement strongTypingDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "enum def + typed Actor refs + value types (Timestamp/Uuid) adopted across schema/core; validates 12/12 green"; }
+        requirement strongTypingDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "enum def closed-sets + value types (Uuid/Timestamp) adopted across schema/core; validates 12/12 green (typed Actor ref deferred to userCapture)"; :>> verifiedAtCommit = "c4d2f75"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_schema"; }
         satisfy strongTypingDoD by strongTyping;
         requirement nativeTraceDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "native derive/refine/trace/satisfy/verify modeled; schema + a sample trace validate green and %show-render as discrete edges"; }
         satisfy nativeTraceDoD by nativeTrace;
