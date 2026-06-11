@@ -33,7 +33,9 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
   (and a single value also works: `:>> exitGate = gateA;`).
 - Instances via `part x : T { :>> attr = v; :>> ref = other; }` (the `:>>` redefines
   inherited features; `ref` features take element references).
-- Closed sets (`kind`, `nature`, `critic`, `cadence`) kept as `String` with documented
+- Closed sets are `enum def` types (pilot-confirmed 2026-06-10: `enum def X { a; b; }`
+  + `:>> attr = X::a` parse and render). The old keep-as-String guidance is superseded; the
+  remaining caveat is real: enum literals can't be reserved keywords — then fall back to
   vocab — avoids reserved-keyword enum-literal failures.
 - `Boolean` attributes parse (via `private import ScalarValues::*;`).
 - **Part/usage NAMES also collide with reserved keywords** (not just attribute names):

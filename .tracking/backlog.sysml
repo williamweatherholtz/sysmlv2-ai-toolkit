@@ -42,7 +42,7 @@ package EngineBacklog {
         first instanceAware then queryTools;
 
         // ---- acceptance (DoD) per task: method + recorded result (verifiedAtCommit) ----
-        // DONE (verified at 2f762a6):
+        // (done/outstanding is COMPUTED by query.py - never narrated here)
         requirement claudeMdDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "interaction discipline + triage accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy claudeMdDoD by claudeMd;
         requirement processSpecDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "process-model spec reviewed + accepted"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
@@ -58,7 +58,6 @@ package EngineBacklog {
         requirement whatsNextV2DoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "resolver lays out all workflows incl. parallelism; clean exit"; :>> verifiedAtCommit = "2f762a6"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "whats_next"; }
         satisfy whatsNextV2DoD by whatsNextV2;
 
-        // OUTSTANDING (no verifiedAtCommit yet):
         requirement testModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "verification model decided + native grammar validated"; :>> verifiedAtCommit = "0f5c7d1"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy testModelDoD by testModel;
         requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query DISCOVERS work-item backlogs from .tracking/*.sysml (action defs) and emits OUTSTANDING + SUSPECT; no hardcoded target; --target focuses one; item + override verified"; :>> verifiedAtCommit = "adc35ab"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "demo"; }
@@ -138,7 +137,7 @@ package EngineBacklog {
 
         requirement crWritePathDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "a schema/core-typed instance in .tracking passes validate_tracking; subdirs scanned; template exists"; :>> verifiedAtCommit = "1037d2d"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_tracking"; }
         satisfy crWritePathDoD by crWritePath;
-        requirement crKillStateDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "currentState/updatedAt gone from Element + Tracked bases; agile steps no longer author state; all green"; }
+        requirement crKillStateDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "currentState/updatedAt gone from Element + Tracked bases; agile steps no longer author state; all green"; :>> verifiedAtCommit = "4ef8679"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_schema"; }
         satisfy crKillStateDoD by crKillState;
         requirement crTruthDocsDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "docs match git reality; .tracking policy decided + recorded; usage.md valid; RESUME thinned; lying comments gone"; }
         satisfy crTruthDocsDoD by crTruthDocs;

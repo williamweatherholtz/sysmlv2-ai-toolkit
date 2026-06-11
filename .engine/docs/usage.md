@@ -1,69 +1,71 @@
 # Engine Usage Guide
 
 How to use the work-tracking engine, for humans and AI agents.
+(Rewritten 2026-06-11 — the previous guide taught pre-rewrite syntax that no longer parses.)
 
 ## Mental model
 
-Every artifact — work items, requirements, tests, decisions, safety analysis —
-is a typed element connected by typed edges (`:>`, `satisfy`, `verify`,
-`allocate`, `dependency`, `supersede`). The model is `.sysml` text. There is no
-other tracking system (no GitHub Issues, no kanban app). Computed state
-(satisfaction, coverage, suspicion) is a **view**, recomputed from the text +
-git history — never stored.
+Every artifact — work items, requirements, tests, decisions, safety analysis — is a
+typed element connected by typed edges. The model is `.sysml` text; there is no other
+tracking system. Computed state (done/ready/suspect, coverage, trace) is a **view**,
+recomputed from the text + git history — never stored or authored.
 
 ## Starting a project on the engine
 
-The project's root file imports the schema:
+Instance data lives in **`.tracking/`** (see `.tracking/README.md`). Copy authoring
+idioms from `.engine/docs/tracking-template.sysml` — it parses green. A typical file:
 
 ```sysml
-package MyProject {
-    import Engine::Core::*;
-    import Engine::Safety::*;   // only if safety-relevant
-    // requirements, work, tests, decisions go in top-level instance files
+package MyProjectNeeds {
+    private import EngineElement::*;
+    private import EngineNeeds::*;
+
+    requirement n1 : Need {
+        :>> id = "<uuid>";
+        :>> title = "...";
+        :>> source = NeedSource::customer;
+        :>> statement = "...";
+        :>> priority = Priority::must;
+    }
 }
 ```
 
-Instance files live at the repo top level (`requirements/`, `work/`,
-`architecture/`, `decisions/`) — visible and project-specific.
+`schema/core` packages (`EngineNeeds`, `EngineWork`, `EngineVerification`, ...) are the
+canonical vocabulary. Validate every change (CLAUDE.md §5) with the validator covering
+the layer you touched.
 
 ## Day-to-day
 
 | You want to... | Do this |
 |---|---|
-| Add new work | Create an `Epic`/`Story`/`Task` (set `kind`); link via `dependency`/`satisfy`. |
-| Define "done" for a Story | Create atomic `Test`s; link with `verify`. No text-blob criteria. |
-| Start work | Pass the Standup / Definition-of-Ready gate, then set `currentState = in_progress`. |
-| Record a result | Append a `TestResult` with `outcome`, `judgedAgainst` (commit SHA), `judgedBy`. |
-| See what's affected by a change | Query `whats-stale-since <ref>` (once the query tool exists). |
-| Record a decision | Create a `Decision`; supersede an old one via the `supersede` edge. |
-| Register an AI skill | Add an `AISkill`/`Agent` to the skills registry with a `writePolicy`. |
+| Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `<task>DoD : AcceptanceCriterion` and `satisfy <task>DoD by <task>;` |
+| Order work | `first taskA then taskB;` (succession) |
+| See what's next | `python .engine/tools/query.py` (`whats-next` / `outstanding` / `suspect` / `item` / `downstream` / `trace`) |
+| Mark done | Record the verification result on the DoD (`verifiedAtCommit`/`verifiedAt`/`verifiedBy`). `method=confirmation` requires the human's explicit sign-off. |
+| Record a result | Append a `TestResult` with `outcome` (VerdictKind), `judgedAgainst` (commit SHA), `judgedBy` — never overwrite. |
+| Record a decision | Author a `Decision` part (see any `.engine/decisions/` file for the pattern). |
+| Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 
-## Statuses (default workflow — modular, decision 0009)
-
-`backlog → ready → in_progress → in_review → done` (+ `blocked`). States are
-data; a project may define others (e.g. `deployment`, `ai-review`).
-
-## Edge cheatsheet
+## Edge cheatsheet (pilot-confirmed syntax only)
 
 | To say... | Use |
 |---|---|
 | X fulfills requirement R | `satisfy R by X;` |
-| Test T checks element E | `verify E by T;` (validation = verify a need/market-req) |
-| B derives from / refines A | `B :> A;` (specialization) |
-| B can't start until A | `dependency` (tag `@OrderingOnly`) |
-| Function F runs on component C | `allocate F to C;` |
-| D2 replaces D1 | `dependency ... : Supersede { source=D2; target=D1; }` |
+| Verification V checks requirement R | `verification def V { subject s; objective r; }` (structural — `verify R by V` does **not** parse) |
+| B derives from / refines A | `B :> A;` (specialization; v1 `derive`/`refine`/`trace` don't exist in v2) |
+| B can't start until A | `first A then B;` in a backlog; `#OrderingOnly` marks non-semantic dependencies |
+| Function F runs on component C | `allocate f to c;` |
+| D2 replaces D1 | a `dependency` from D2 to D1 marked `#Supersede` |
 
 ## What never goes in the model
 
-Runtime events (CI runs, image digests, telemetry), and any deliverable-domain
-vocabulary (e.g. `Department`, `PensionPlan` — those belong in the *deliverable*
+Computed state (`ready`, `done`, `in_review` — views, never fields), runtime events
+(CI runs, telemetry), and deliverable-domain vocabulary (belongs in the deliverable's
 model, not the engine).
 
 ## For AI agents
 
-You use the same API as the GUI. Your `writePolicy` is set in the skills
-registry and enforced by the API — you cannot change it. `read-only` = query
-only; `pr-only` = open a branch + PR; `direct` = commit to main (mechanical
-bookkeeping only). When a Standup/DoR check fails, invoke `grill-me` to drive it
-to resolution before starting work.
+Follow CLAUDE.md: classify every request (§3) before acting; direct text editing is the
+bootstrap write path (§4); validation green before every commit (§5); `main` is the only
+branch; commits auto-push. `writePolicy` in the skills registry is the *intended* write
+boundary — enforcement arrives with the write API (until then it binds by discipline).

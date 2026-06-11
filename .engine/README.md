@@ -28,41 +28,42 @@ given project) changes.
 ```
 schema/core/     Always imported. The universal work-tracking vocabulary.
 schema/safety/   Optional. STPA. Import only for safety-relevant projects.
+workflows/       The six workflows as native action defs (+ _meta artifact types).
 contracts/       The computed-state specification (satisfaction/coverage/suspicion).
-processes/       The disciplined workflow (agile-for-solo+AI, DoD, DoR).
-skills/          Default AI skill registrations.
+processes/       Agile-for-solo+AI, DoR, DoD, architectural-critique, doc-sync.
+skills/          AI skill registrations + SKILL.md definitions.
 decisions/       Architecture decision records — why the engine is shaped this way.
-docs/            Usage guide.
+tools/           query.py, capture_user.py, whats_next.py + validate/ (4 validators).
+docs/            Usage guide, syntax notes, tracking template.
 ```
 
 ## How a project uses the engine
 
-A project's root SysMLv2 file imports the engine schema:
+A project's instance files live in **`.tracking/`** (see `.tracking/README.md`) and
+import the flat schema packages:
 
 ```sysml
-package MyProject {
-    import Engine::Core::*;          // always
-    import Engine::Safety::*;        // only if safety-relevant
-
-    // ... the project's requirements, work items, tests, decisions ...
+package MyProjectNeeds {
+    private import EngineElement::*;   // bases, enums, value types
+    private import EngineNeeds::*;     // + EngineWork / EngineVerification / ... as needed
+    // EngineSafety only if safety-relevant
 }
 ```
 
-The project's instance files (`requirements/`, `work/`, `architecture/`,
-`decisions/`) live at the repo top level — visible, project-specific, and
-replaced when the engine is reused as a template for a new project.
+Copy authoring idioms from `docs/tracking-template.sysml` (it parses green). Query
+the tracked work with `tools/query.py`; validate with the four layer validators in
+`tools/validate/` (mandatory before commit, CLAUDE.md §5).
 
 ## Reuse model
 
-The engine is reused as a **template**: clone the repo, keep `.engine/`,
-replace the top-level instance files. There are no pluggable "domain packages"
-beyond the optional `schema/safety` import — the engine schema is general
-enough to track any project's work uniformly.
+The engine is reused as a **template**: clone the repo, keep `.engine/`, replace
+`.tracking/`. There are no pluggable "domain packages" beyond the optional
+`schema/safety` import — the engine schema is general enough to track any
+project's work uniformly.
 
-## Status / caveat
+## Status
 
-**SysMLv2 textual syntax in these files is PENDING VALIDATION against the
-pilot implementation** (tracked work item: validate-against-pilot). The
-*conceptual* schema — the types, relationships, and semantics — is settled;
-the exact keyword spelling may shift when first parsed. Do not treat the
-syntax as proven.
+The schema and instance files parse green against the OMG pilot kernel (validated
+2026-06-10/11; see `docs/sysmlv2-syntax-notes.md` for confirmed do's/don'ts). The
+write API, indexer, and GUI do not exist yet — direct text editing is the
+sanctioned bootstrap write path (CLAUDE.md §4).

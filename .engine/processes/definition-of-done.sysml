@@ -40,7 +40,8 @@ package EngineDoD {
     part dodDocs : ProcessStep {
         :>> title = "Docs in sync";
         :>> order = 4;
-        :>> actionText = "If user-facing behavior changed, docs updated in the same PR.";
+        :>> actionText = "Run the Documentation Sync process (EngineDocSync): every doc claim "
+                       + "the change invalidates is fixed in the same commit.";
         :>> owner = "either";
     }
 }

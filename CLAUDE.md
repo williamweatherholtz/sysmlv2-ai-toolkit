@@ -3,10 +3,12 @@
 This repo **is a work-tracking engine** built on SysML v2 text files. It tracks the work of
 building things — and is being built using its own discipline. Read this before doing anything.
 
-> **Status: BOOTSTRAP.** The engine's runtime (parser, indexer, query/view engine, write API)
-> does **not exist yet**, and the schema does **not parse yet** (see `RESUME.md`). So the
-> discipline below is enforced by *you and convention*, not by tooling. Where a rule says the
-> engine "computes" or "drives," that is the target; today you do it by hand, by the rules here.
+> **Status: BOOTSTRAP (late).** The schema parses green (four layer validators in
+> `.engine/tools/validate/`) and a query layer computes views (`.engine/tools/query.py` —
+> whats-next/suspect/trace). The write API, indexer, and GUI do **not exist yet**: direct text
+> editing is still the write path, and the discipline below is enforced by *you and convention*
+> plus the validators. Where a rule says the engine "computes" or "drives," the query layer does
+> some of it; the rest you do by hand, by the rules here.
 
 ---
 
@@ -17,7 +19,9 @@ building things — and is being built using its own discipline. Read this befor
   project. Committed.
 - **`.tracking/`** — instance data that falls out of running the process on *this* project
   (personas, needs, requirements, work items, decisions, test results, workflow state).
-  **Gitignored.** Replaced per project; never the deliverable.
+  **Committed in THIS repo** (the self-build's construction history is part of its evidence;
+  recorded 2026-06-11). Downstream projects choose their own tracked-vs-ignored policy.
+  See `.tracking/README.md` for layout + authoring rules.
 - **Two models, never conflated:** the *engine model* tracks the work; the *deliverable* is
   what the work produces. The deliverable's domain vocabulary never enters the engine.
 
@@ -144,6 +148,10 @@ The six workflows (see the spec for detail):
   2. **validate green** before commit (§5).
 - **Commit convention:** prefix commits that change process/schema with `CR: <short rationale>`
   so the audit trail exists before the engine can enforce it.
+- **Doc-sync rides every change:** when you create or change an item type, schema, workflow,
+  process, skill, tool, or template, run the Documentation Sync process
+  (`.engine/processes/doc-sync.sysml`) — fix every doc claim the change invalidates **in the
+  same commit**. Documentation drift was a recorded HIGH critique finding (2026-06-11).
 - **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while
   implementing *accepted* work needs no separate permission. But green-lighting an
   *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE

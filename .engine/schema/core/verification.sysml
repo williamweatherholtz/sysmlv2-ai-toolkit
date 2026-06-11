@@ -9,7 +9,7 @@
 // the latest result + git ancestry (what query.py does), never a stored field.
 // Native enums: VerdictKind = {pass, fail, inconclusive, error};
 // VerificationMethodKind = {inspect, analyze, demo, test} — engine ADDS
-// `confirmation` (human sign-off). Vocab kept as String per the closed-set policy.
+// `confirmation` (human sign-off). Closed sets are enum-typed (EngineElement).
 // =====================================================================
 package EngineVerification {
     private import ScalarValues::*;
