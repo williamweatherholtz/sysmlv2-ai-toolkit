@@ -95,7 +95,7 @@ package EngineBacklog {
 
         requirement strongTypingDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "enum def closed-sets + value types (Uuid/Timestamp) adopted across schema/core; validates 12/12 green (typed Actor ref deferred to userCapture)"; :>> verifiedAtCommit = "c4d2f75"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_schema"; }
         satisfy strongTypingDoD by strongTyping;
-        requirement nativeTraceDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "edge strategy set + documented in relationships.sysml: satisfy (native stmt) + verify (native verification objective) confirmed parsing; derive/refine/trace are v1-only -> :>/deferred; allocate/dependsOn/supersede stay markers; schema validates 12/12 green"; }
+        requirement nativeTraceDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "edge strategy set + documented in relationships.sysml: satisfy (native stmt) + verify (native verification objective) confirmed parsing; derive/refine/trace are v1-only -> :>/deferred; allocate/dependsOn/supersede stay markers; schema validates 12/12 green"; :>> verifiedAtCommit = "c4ea4c7"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_schema"; }
         satisfy nativeTraceDoD by nativeTrace;
         requirement nativeViewsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "at least one engine view authored as a native view def with expose; query renders/computes it"; }
         satisfy nativeViewsDoD by nativeViews;
