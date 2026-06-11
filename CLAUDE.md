@@ -147,9 +147,12 @@ The six workflows (see the spec for detail):
 - **Direct editing of `.sysml` / instance files is the sanctioned bootstrap write path.** There
   is no write API yet. Edit deliberately.
 - **Every change to schema or a workflow/process definition MUST:**
-  1. be recorded as a `Decision` (a Change Request with a one-line rationale — capture the
-     decision even if small), and
-  2. **validate green** before commit (§5).
+  1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
+     rationale — capture the decision even if small; commit messages and memory are NOT
+     decision records — this lapsed once for ~11 CRs and was a HIGH critique finding), and
+  2. carry its **recorded acceptance** — who accepted, when, at what commit (the Decision
+     file or a confirmation-method DoD is the artifact), and
+  3. **validate green** before commit (§5).
 - **Commit convention:** prefix commits that change process/schema with `CR: <short rationale>`
   so the audit trail exists before the engine can enforce it.
 - **Doc-sync rides every change:** when you create or change an item type, schema, workflow,
