@@ -67,5 +67,43 @@ package EngineBacklog {
         satisfy instanceMigrationDoD by instanceMigration;
         requirement queryToolsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "general query layer answers item/downstream/trace/suspect/outstanding"; }
         satisfy queryToolsDoD by queryTools;
+
+        // ---- schemaAudit critique findings (2026-06-10): native SysML v2 leverage ----
+        // All depend on schemaAudit (the native-metaclass migration). strongTyping is
+        // foundational; views expose traces; checkable reqs build on typed constraints.
+        action strongTyping;     // enum def + typed Actor refs + value types (no more String-everywhere)
+        action nativeTrace;      // native derive/refine/trace/satisfy/verify relationships (B)
+        action nativeViews;      // view def / viewpoint / expose for the materialized-view layer (A)
+        action checkableReqs;    // requirements carry require/assume evaluable constraints (C)
+        action analysisCalc;     // computed derivations as native calc/analysis def
+        action nativeAlloc;      // architecture allocate + interface def / connection
+        action temporalModel;    // decide: native occurrence/snapshot/timeslice vs git-only ancestry
+        action sec26Materialize; // add a sanctioned materialized-view sentence to CLAUDE.md §2.6
+
+        first schemaAudit then strongTyping;
+        first schemaAudit then nativeTrace;
+        first schemaAudit then analysisCalc;
+        first schemaAudit then nativeAlloc;
+        first schemaAudit then temporalModel;
+        first strongTyping then checkableReqs;
+        first strongTyping then nativeViews;
+        first nativeTrace then nativeViews;
+
+        requirement strongTypingDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "enum def + typed Actor refs + value types (Timestamp/Uuid) adopted across schema/core; validates 12/12 green"; }
+        satisfy strongTypingDoD by strongTyping;
+        requirement nativeTraceDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "native derive/refine/trace/satisfy/verify modeled; schema + a sample trace validate green and %show-render as discrete edges"; }
+        satisfy nativeTraceDoD by nativeTrace;
+        requirement nativeViewsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "at least one engine view authored as a native view def with expose; query renders/computes it"; }
+        satisfy nativeViewsDoD by nativeViews;
+        requirement checkableReqsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "requirements carry require/assume constraints that parse; a sample requirement evaluates"; }
+        satisfy checkableReqsDoD by checkableReqs;
+        requirement analysisCalcDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "at least one computed derivation (e.g. coverage) expressed as a native calc/analysis def"; }
+        satisfy analysisCalcDoD by analysisCalc;
+        requirement nativeAllocDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "architecture function->component via native allocate + interface def parses green"; }
+        satisfy nativeAllocDoD by nativeAlloc;
+        requirement temporalModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "decided: adopt native occurrence/snapshot/timeslice or stay git-only for ancestry"; }
+        satisfy temporalModelDoD by temporalModel;
+        requirement sec26MaterializeDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "CLAUDE.md §2.6 gains a sanctioned marked-materialized-view clause"; }
+        satisfy sec26MaterializeDoD by sec26Materialize;
     }
 }

@@ -45,8 +45,12 @@ Authoritative reading order: this file → `.engine/README.md` → the design sp
    verdict, or sequence — `ready`, `blocked`, `done`, `needs-review`, execution order — is a
    *computed view* or a *reference*, never an authored field. (A phase's gate/DoD = its
    `verify`-linked Tests passing; execution order/parallelism = the dependency DAG, computed
-   from `consumes`/`produces` + typed edges. "Test" is the universal verifiable condition,
+   from the `succession` graph + typed edges. "Test" is the universal verifiable condition,
    distinguished by `method` and `verify` target — so gate-checks and critics are Tests too.)
+   **Materialized views are allowed** — a derived answer (status, trace matrix, baseline) MAY
+   be cached/rendered for legibility, performance, or tool interop, *provided* it is clearly
+   marked as derived (`#View`) and regenerable from authored facts + git. Materializing a view
+   is not authoring truth; only *irreducible* facts and recorded judgments are authored.
 
 ---
 
