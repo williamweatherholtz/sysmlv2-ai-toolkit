@@ -99,7 +99,7 @@ package EngineBacklog {
         satisfy nativeTraceDoD by nativeTrace;
         requirement nativeViewsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "at least one engine view authored as a native view def with expose; query renders/computes it"; }
         satisfy nativeViewsDoD by nativeViews;
-        requirement checkableReqsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "concrete requirements may carry native require/assume constraints (parses, _spike_trace.py); documented in requirements.sysml; evaluation is solver-dependent (external SysIDE), not the kernel; schema 12/12 green"; }
+        requirement checkableReqsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "concrete requirements may carry native require/assume constraints (parses, _spike_trace.py); documented in requirements.sysml; evaluation is solver-dependent (external SysIDE), not the kernel; schema 12/12 green"; :>> verifiedAtCommit = "f0044f4"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "validate_schema"; }
         satisfy checkableReqsDoD by checkableReqs;
         requirement analysisCalcDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "at least one computed derivation (e.g. coverage) expressed as a native calc/analysis def"; }
         satisfy analysisCalcDoD by analysisCalc;
