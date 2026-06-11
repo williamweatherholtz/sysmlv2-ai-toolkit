@@ -23,6 +23,7 @@ ORDER = [
     "schema/core/verification.sysml",
     "schema/core/work.sysml",
     "schema/core/architecture.sysml",
+    "schema/core/computed.sysml",
     "schema/core/relationships.sysml",
     "schema/core/workflow.sysml",
     "schema/core/process.sysml",
