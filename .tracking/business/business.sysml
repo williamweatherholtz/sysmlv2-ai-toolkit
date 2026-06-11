@@ -261,6 +261,7 @@ package ProjectBusiness {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Brief authored with problem, opportunity, and constraintsNote; problem statement is solution-free; opportunity names the mechanism; team lead accepts.";
     }
+    part briefGateR1 : TestResult { :>> id = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f70f0e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification personasGate : Test {
         :>> id = "0df4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b";
@@ -270,6 +271,7 @@ package ProjectBusiness {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "At least two distinct personas authored with description and goals; each represents a real stakeholder segment; team lead accepts.";
     }
+    part personasGateR1 : TestResult { :>> id = "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f70f0e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification needsGate : Test {
         :>> id = "1e05b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c";
@@ -279,6 +281,7 @@ package ProjectBusiness {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "At least five Needs authored; each carries source, priority, and a solution-free statement; MoSCoW priorities distributed across must/should/could; team lead accepts.";
     }
+    part needsGateR1 : TestResult { :>> id = "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f70f0e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification useCasesGate : Test {
         :>> id = "2f16c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d";
@@ -288,6 +291,7 @@ package ProjectBusiness {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "At least five UseCases authored; every must-priority Need is covered by at least one UseCase; mainSuccess and extensions present on each; team lead accepts.";
     }
+    part useCasesGateR1 : TestResult { :>> id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f70f0e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     // ====================================================================
     // DependsOn edges: Needs derive their context from the Brief
