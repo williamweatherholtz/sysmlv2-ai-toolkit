@@ -65,7 +65,7 @@ package EngineBacklog {
         satisfy instanceAwareDoD by instanceAware;
         requirement schemaAuditDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "schema types aligned with natives"; :>> verifiedAtCommit = "72bb02b"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy schemaAuditDoD by schemaAudit;
-        requirement instanceMigrationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "processes/decisions/skills-registry parse green under new packages"; }
+        requirement instanceMigrationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "all 14 instance files (10 decisions + 3 processes + skills-registry) migrated to flat Engine<Concern> packages; parse green via validate_instances (14/14); Gate/GateCheck reconceived as Process/ProcessStep; legacy validate_sysml.py retired"; :>> verifiedAtCommit = "e39a49e"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_instances"; }
         satisfy instanceMigrationDoD by instanceMigration;
         requirement queryToolsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "general query layer answers item/downstream/trace/suspect/outstanding (+ whats-next); verified on whatsNextV2/schemaAudit"; :>> verifiedAtCommit = "35f5d54"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "demo"; }
         satisfy queryToolsDoD by queryTools;
