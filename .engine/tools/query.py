@@ -1,5 +1,4 @@
-"""Engine query layer (v0) — small queries over the work-item model. This is the
-general query core the user asked for; `whats-next` is one VIEW over it.
+"""Engine query layer — small queries over the work-item model.
 
 Subcommands (argv[1], default 'whats-next'):
   orient          -> the state cursor (.tracking/state.sysml) + ready/suspect frontier
@@ -9,6 +8,7 @@ Subcommands (argv[1], default 'whats-next'):
   item <name>     -> introspect one task (done?, method, commit, deps + their states)
   downstream <n>  -> tasks transitively dependent on <n> (impact set)
   trace <name>    -> a task's full lineage: transitive upstream + downstream + DoD
+  workflows       -> the six workflow DAGs as Kahn-layered parallel waves (JSON)
 
 INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
 `action def`s (an action def in .tracking IS a work backlog; workflows live in
@@ -43,20 +43,35 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _kernel  # noqa: E402
-from whats_next import parse_show  # noqa: E402  (shared AST parser)
 
 ENGINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(ENGINE)
-# Full preload so .tracking instances may be typed by ANY engine type (CR-1):
-# schema/core is the canonical instance vocabulary; _meta still backs the backlog dialect.
+WF_DIR = os.path.join(ENGINE, "workflows")
+# (package, action def) for each of the six workflows
+WORKFLOWS = [
+    ("BusinessWorkflow",      "Business"),
+    ("ArchitectureWorkflow",  "Architecture"),
+    ("DeliveryWorkflow",      "Delivery"),
+    ("DeployWorkflow",        "Deploy"),
+    ("OperateWorkflow",       "Operate"),
+    ("ChangeRequestWorkflow", "ChangeMgmt"),
+]
+# Full preload: schema/core (canonical instance vocabulary) + all six workflow defs
+# so `workflows` subcommand can %show any action def without a second kernel start.
 PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
     "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
     "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
     "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
     "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
-    "schema/safety/stpa.sysml", "workflows/_meta.sysml",
+    "schema/safety/stpa.sysml",
+    "workflows/_meta.sysml", "workflows/business.sysml", "workflows/architecture.sysml",
+    "workflows/delivery.sysml", "workflows/deploy.sysml", "workflows/operate.sysml",
+    "workflows/change-request.sysml",
 )]
 TRACKING_DIR = os.path.join(REPO, ".tracking")
+
+# UUID suffix pattern used by parse_show to strip kernel-appended elementIds
+_UUID = re.compile(r'^(.*?)\s*\([0-9a-fA-F-]{36}\)\s*$')
 
 # Dialect v2 (CR-3): criterion = `verification <task>DoD : Test { ... }` (one line);
 # results = APPENDED `part <task>R<n> : TestResult { ... }` (immutable; latest wins).
@@ -70,6 +85,88 @@ _ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
 _ORDERING_ONLY = re.compile(r'#OrderingOnly\s+first\s+(\w+)\s+then\s+(\w+)\s*;')
 # legacy (pre-CR-3) criterion line — used when reading OLD revisions for material change
 _LEGACY_DOD = re.compile(r'requirement\s+(\w+)DoD\s*:\s*AcceptanceCriterion')
+
+
+def parse_show(text):
+    """Parse a `%show` indented AST into a tree of {rel,type,name,children}.
+    Inlined from whats_next.py (foldWhatsNext 2026-06-11)."""
+    root, stack = None, []
+    for raw in text.splitlines():
+        if not raw.strip():
+            continue
+        indent = len(raw) - len(raw.lstrip(' '))
+        content = raw.strip()
+        rel = None
+        if content.startswith('['):
+            rel, content = content[1:].split(']', 1)
+            content = content.strip()
+        m = _UUID.match(content)
+        if m:
+            content = m.group(1).strip()
+        bits = content.split(' ', 1)
+        node = {'rel': rel, 'type': bits[0],
+                'name': bits[1].strip() if len(bits) > 1 else '', 'children': []}
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if stack:
+            stack[-1][1]['children'].append(node)
+        else:
+            root = node
+        stack.append((indent, node))
+    return root
+
+
+def _wf_phases(root):
+    """ActionUsage members of a workflow action def -> [{name, artifacts}]."""
+    out = []
+    for c in root['children']:
+        if c['rel'] == 'FeatureMembership' and c['type'] == 'ActionUsage':
+            arts = []
+            for p in c['children']:
+                if p['rel'] == 'FeatureMembership' and p['type'] == 'ReferenceUsage':
+                    it = next((g['name'] for g in p['children']
+                               if g['type'] == 'ItemDefinition'), None)
+                    if it:
+                        arts.append(it)
+            out.append({'name': c['name'], 'artifacts': sorted(set(arts))})
+    return out
+
+
+def _wf_edges(root):
+    """SuccessionAsUsage edges in a workflow action def -> [(earlier, later)]."""
+    edges = []
+    for c in root['children']:
+        if c['type'] == 'SuccessionAsUsage':
+            ends = {}
+            for e in c['children']:
+                if e['rel'] == 'EndFeatureMembership':
+                    act = next((g['name'] for g in e['children']
+                                if g['rel'] == 'ReferenceSubsetting'
+                                and g['type'] == 'ActionUsage'), None)
+                    ends[e['name']] = act
+            a, b = ends.get('earlierOccurrence'), ends.get('laterOccurrence')
+            if a and b:
+                edges.append((a, b))
+    return edges
+
+
+def _kahn_waves(ph, edges):
+    """Kahn layering of workflow phases into ordered parallel-ready waves."""
+    names = [p['name'] for p in ph]
+    deps = {n: set() for n in names}
+    for a, b in edges:
+        if a in deps and b in deps:
+            deps[b].add(a)
+    by_name = {p['name']: p for p in ph}
+    out, done, remaining = [], set(), set(names)
+    while remaining:
+        ready = sorted(n for n in remaining if deps[n] <= done)
+        if not ready:
+            return None, sorted(remaining)
+        out.append([by_name[n] for n in ready])
+        done |= set(ready)
+        remaining -= set(ready)
+    return out, []
 
 
 def tracking_files():
@@ -351,6 +448,21 @@ def main():
         out = {"name": arg, "upstream": upstream(tasks, arg),
                "downstream": downstream(tasks, arg),
                "done": tasks.get(arg, {}).get('done'), "dod": tasks.get(arg, {}).get('dod', {})}
+    elif sub == "workflows":
+        result = {"workflows": []}
+        for pkg, act in WORKFLOWS:
+            _, text = _kernel.run_cell(kc, f"%show {pkg}::{act}")
+            root = parse_show(text)
+            ph = _wf_phases(root)
+            w, cycle = _kahn_waves(ph, _wf_edges(root))
+            wf = {"workflow": act, "package": pkg, "phaseCount": len(ph)}
+            if cycle:
+                wf["error"], wf["cycle"] = "dependency cycle", cycle
+            else:
+                wf["waves"] = [[{"action": p['name'], "artifacts": p['artifacts']}
+                                for p in wave] for wave in w]
+            result["workflows"].append(wf)
+        out = result
     else:  # whats-next
         out = {"ready": sorted(t for t, i in tasks.items() if i['ready']),
                "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
