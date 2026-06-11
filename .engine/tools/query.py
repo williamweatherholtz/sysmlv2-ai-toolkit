@@ -46,7 +46,15 @@ from whats_next import parse_show  # noqa: E402  (shared AST parser)
 
 ENGINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(ENGINE)
-META = os.path.join(ENGINE, "workflows", "_meta.sysml")
+# Full preload so .tracking instances may be typed by ANY engine type (CR-1):
+# schema/core is the canonical instance vocabulary; _meta still backs the backlog dialect.
+PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
+    "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
+    "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
+    "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
+    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
+    "schema/safety/stpa.sysml", "workflows/_meta.sysml",
+)]
 TRACKING_DIR = os.path.join(REPO, ".tracking")
 
 # A DoD line: `requirement <task>DoD : AcceptanceCriterion { ... k = "v"; ... }`.
@@ -57,7 +65,7 @@ _ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
 
 
 def tracking_files():
-    return sorted(glob.glob(os.path.join(TRACKING_DIR, "*.sysml")))
+    return sorted(glob.glob(os.path.join(TRACKING_DIR, "**", "*.sysml"), recursive=True))
 
 
 def read_all_dods():
@@ -182,8 +190,9 @@ def main():
         override = tuple(sys.argv[sys.argv.index("--target") + 1].split("::"))
 
     km, kc = _kernel.start()
-    with open(META, encoding="utf-8") as fh:
-        _kernel.run_cell(kc, fh.read())
+    for f in PRELOAD:
+        with open(f, encoding="utf-8") as fh:
+            _kernel.run_cell(kc, fh.read())
     for f in tracking_files():
         with open(f, encoding="utf-8") as fh:
             _kernel.run_cell(kc, fh.read())

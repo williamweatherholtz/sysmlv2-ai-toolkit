@@ -24,7 +24,8 @@ SCHEMA = [
 
 INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))
              + sorted(glob.glob(os.path.join(ENGINE, "processes", "*.sysml")))
-             + [os.path.join(ENGINE, "skills", "skills-registry.sysml")])
+             + [os.path.join(ENGINE, "skills", "skills-registry.sysml"),
+                os.path.join(ENGINE, "docs", "tracking-template.sysml")])
 
 ERR = ("error", "couldn't", "cannot", "unexpected", "mismatched",
        "no viable", "unresolved", "extraneous", "wasn't expected")
