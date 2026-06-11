@@ -109,7 +109,7 @@ package EngineBacklog {
         satisfy temporalModelDoD by temporalModel;
         requirement sec26MaterializeDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "CLAUDE.md §2.6 gains a sanctioned marked-materialized-view clause"; :>> verifiedAtCommit = "062b97f"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy sec26MaterializeDoD by sec26Materialize;
-        requirement userCaptureDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "acting user captured from git config (piggyback; fallback .env/prompt) + appended to the actor registry; authoredBy/verifiedBy reference it"; }
+        requirement userCaptureDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "capture_user.py captures the acting user from git EFFECTIVE identity (git var GIT_COMMITTER_IDENT — config is often unset; fallback .env/prompt) + idempotently registers in .tracking/actors.sysml ActorId enum; demonstrated (wweatherholtz); parses via validate_tracking. Wiring authoredBy/verifiedBy to ActorId deferred to instanceMigration"; :>> verifiedAtCommit = "3e40ff7"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "demo"; }
         satisfy userCaptureDoD by userCapture;
     }
 }
