@@ -285,6 +285,7 @@ package ProjectArchitecture {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Nine SystemRequirements authored (one per Need); each has statement, rationale, kind, priority, verificationMethod; satisfy edges link every SR to its Need; team lead accepts.";
     }
+    part dataArchGateR1 : TestResult { :>> id = "0607182a-9b0c-41d2-3e4f-5a6b7c8d9e0f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abb033a"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification appArchGate : Test {
         :>> id = "67f55607-7889-444d-8ecf-364758697081";
@@ -294,6 +295,7 @@ package ProjectArchitecture {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "At least five Components authored with description; components represent the engine's real subsystems; team lead accepts.";
     }
+    part appArchGateR1 : TestResult { :>> id = "1718293b-0c1d-42e3-4f5a-6b7c8d9e0f1a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abb033a"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification techArchGate : Test {
         :>> id = "78006718-8990-455e-9fd0-475869708192";
@@ -303,6 +305,7 @@ package ProjectArchitecture {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "At least four SubsystemRequirements authored; each refines a SystemRequirement via #DependsOn; team lead accepts.";
     }
+    part techArchGateR1 : TestResult { :>> id = "2829304c-1d2e-43f4-5a6b-7c8d9e0f1a2b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abb033a"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 
     verification allocIfaceGate : Test {
         :>> id = "89117829-9001-466f-a0e1-586970819203";
@@ -312,4 +315,5 @@ package ProjectArchitecture {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Every SystemRequirement has an allocate edge to a Component; satisfy edges from all nine Needs to SRs authored; team lead accepts.";
     }
+    part allocIfaceGateR1 : TestResult { :>> id = "393a415d-2e3f-44a5-6b7c-8d9e0f1a2b3c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abb033a"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 }
