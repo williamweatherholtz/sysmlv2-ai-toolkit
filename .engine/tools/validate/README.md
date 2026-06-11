@@ -22,7 +22,7 @@ Must run through `conda run -n sysml` (the kernelspec invokes bare `java`, which
 is only on PATH inside the activated env). Disable the sandbox (subprocess +
 kernel). Classifier: a cell FAILS iff kernel output contains `ERROR:`.
 
-## Files (the four validators — one per layer)
+## Files (the four validators — one per layer; `validate_all.py` runs every layer on ONE kernel)
 
 - `validate_schema.py` — `schema/core/*` + `schema/safety/*` (13 files), in
   dependency order on one shared kernel.

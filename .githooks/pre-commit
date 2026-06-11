@@ -1,0 +1,23 @@
+#!/bin/sh
+# Engine process (CLAUDE.md §5, CR-11): validation green BEFORE commit — because
+# post-commit auto-pushes to canonical main, nothing unvalidated may land.
+# Runs only the layer(s) matching staged .sysml paths (each boots a ~20s kernel);
+# commits touching no .sysml are not slowed. Escape hatch: SKIP_VALIDATE=1.
+[ "$SKIP_VALIDATE" = "1" ] && { echo "pre-commit: SKIP_VALIDATE=1 — validation skipped"; exit 0; }
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.sysml$' || true)
+[ -z "$staged" ] && exit 0
+
+CONDA="C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe"
+V=".engine/tools/validate"
+run() {
+    echo "pre-commit: $1"
+    "$CONDA" run -n sysml --no-capture-output python "$V/$1" || {
+        echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+}
+
+echo "$staged" | grep -q '^\.engine/schema/'    && run validate_schema.py
+echo "$staged" | grep -q '^\.engine/workflows/' && run validate_workflows.py
+echo "$staged" | grep -qE '^\.engine/(decisions|processes|skills|docs)/.*\.sysml$' && run validate_instances.py
+echo "$staged" | grep -q '^\.tracking/'         && run validate_tracking.py
+exit 0

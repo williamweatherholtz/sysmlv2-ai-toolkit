@@ -33,10 +33,22 @@ _KILL_SIG = getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
 def start():
-    """Start the sysml kernel with stdout/stderr suppressed. Returns (km, kc)."""
+    """Start the sysml kernel with stdout/stderr suppressed. Returns (km, kc).
+    Registers an atexit kill (CR-11): interrupted runs (exceptions, timeouts that
+    unwind normally) no longer leak the JVM. A hard SIGKILL of Python still
+    leaks — sweep with tools/kill_stale_kernels.py."""
+    import atexit
     from jupyter_client.manager import start_new_kernel
-    return start_new_kernel(kernel_name="sysml",
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    km, kc = start_new_kernel(kernel_name="sysml",
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _cleanup():
+        try:
+            os.kill(km.provisioner.pid, _KILL_SIG)
+        except Exception:
+            pass
+    atexit.register(_cleanup)
+    return km, kc
 
 
 def run_cell(kc, code, timeout=180):
