@@ -189,4 +189,63 @@ package EngineBacklog {
         part userCaptureR1 : TestResult { :>> id = "78f73f4e-84c5-4eca-9439-f3adc4e58fbb"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3e40ff7"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         part userCaptureR2 : TestResult { :>> id = "3a019ce5-42fd-4599-82a7-c3b19ca892b5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
     }
+// =================================================================
+    // NextWork — the post-bootstrap queue (2026-06-11 handoff). EngineBuild
+    // (above) is COMPLETE 34/34; this is what comes next. Sources: the first
+    // real dogfood (CLAUDE.md §4), deferred critique findings (M3/M6/U2/U5-U7,
+    // UC3/UC9/UC10), parked pre-critique findings, and the runtime roadmap.
+    // Resume: `python .engine/tools/query.py orient` surfaces the ready set.
+    // =================================================================
+    action def NextWork {
+        // ---- the headline: first real dogfood (in order) ----
+        action dogfoodBusiness;     // move cursor to BusinessWorkflow::Business/brief; author a REAL Brief->Personas->Needs->UseCases in .tracking (use the template idioms) + the phase-gate verification instances (critique S6)
+        action dogfoodArchitecture; // derive SystemRequirements with native satisfy from the Needs; native allocate to Components
+        action dogfoodDelivery;     // run one Story/task through DoR -> implement -> appended TestResults -> DoD
+
+        // ---- query/tooling gaps from the use-case walkthroughs ----
+        action traceNeeds;          // UC3: satisfy-edge text reader + `trace-need <name>` subcommand in query.py
+        action issueLoop;           // UC10: .tracking/issues.sysml convention + `query.py issues` listing
+        action baselineView;        // UC9: Release = commit SHA + explicit member refs; baseline view computed from it
+
+        // ---- deferred native-leverage (spiked or design-ready) ----
+        action trackedMetadata;     // U2: @Tracked attributed-metadata refactor (SPIKED GREEN) replacing the 4 Tracked* bases
+        action stateDefSpike;       // M3: spike native state def/transition; if green replace WorkflowDefinition.transitions strings
+        action occurrenceRetype;    // M6: spike occurrence def :> Element; retype TestResult (+Decision?) if green
+        action authoredByRefs;      // M4 remainder: authoredBy/judgedBy as typed refs to ProjectActors parts (deferred at CR-5)
+
+        // ---- parked design questions (pre-critique + critique) ----
+        action safetyCaseViews;     // parked: curated-view + frozen Baseline/Signoff design for the safety case
+        action needLayer;           // parked: does Need require a layer discriminator? decide + record
+        action crVersioning;        // parked: CR self-modification versioning (meta-process unfreeze design)
+        action skillsRefresh;       // rename agile-refinement->backlog-refinement; build test-design/test-result/traceability-audit skills; register
+
+        // ---- the deliverable runtime (after dogfood proves the model) ----
+        action runtimeParser;       // text parser/indexer (Rust candidate) replacing kernel+regex readers; opens SysON interop
+        action writeApi;            // the write API: enforces writePolicy, ids, append-only results (D0003 becomes real)
+        action toolchainWatch;      // adopt expose/render, verify-by, derive/refine/trace when a newer SysML v2 toolchain supports them
+
+        first dogfoodBusiness then dogfoodArchitecture;
+        first dogfoodArchitecture then dogfoodDelivery;
+        first traceNeeds then baselineView;
+        first dogfoodDelivery then runtimeParser;
+        first runtimeParser then writeApi;
+
+        verification dogfoodBusinessDoD : Test { :>> id = "dec73f98-f883-4f0c-b50a-ff8dd24e0e27"; :>> method = VerificationMethod::confirmation; :>> procedureText = "a real Brief/Personas/Needs/UseCases authored in .tracking, phase gates as verification instances, cursor moved, all green; user accepts the Business run"; }
+        verification dogfoodArchitectureDoD : Test { :>> id = "1ddedbcd-ced1-4537-ace3-ae82759ee1bf"; :>> method = VerificationMethod::confirmation; :>> procedureText = "SystemRequirements satisfy-linked to Needs, allocated to Components; trace queryable; user accepts"; }
+        verification dogfoodDeliveryDoD : Test { :>> id = "50c631b3-5396-4f3c-84f0-054da815afd3"; :>> method = VerificationMethod::confirmation; :>> procedureText = "one item through DoR->implement->appended results->DoD with gates computed; user accepts"; }
+        verification traceNeedsDoD : Test { :>> id = "9465131e-1510-4d5d-9827-72f311601e0c"; :>> method = VerificationMethod::test; :>> procedureText = "query.py trace-need answers upstream/downstream over satisfy edges read from text; demonstrated on dogfood data"; }
+        verification issueLoopDoD : Test { :>> id = "1456d1db-63be-4cad-9c0b-4bc8ea2dee97"; :>> method = VerificationMethod::demo; :>> procedureText = "an Issue authored per convention surfaces in `query.py issues` and routes to a backlog task"; }
+        verification baselineViewDoD : Test { :>> id = "25e39c3c-632e-4d51-af2e-1b1604539dbb"; :>> method = VerificationMethod::demo; :>> procedureText = "a Release (commit + member refs) renders a computed baseline view"; }
+        verification trackedMetadataDoD : Test { :>> id = "b9e59c15-75e2-475f-94fc-9f73e77646dc"; :>> method = VerificationMethod::test; :>> procedureText = "@Tracked metadata replaces the four Tracked* bases; instances migrated; validate_all green"; }
+        verification stateDefSpikeDoD : Test { :>> id = "37c1b11f-e0f4-4955-bdd1-b1e15651aad5"; :>> method = VerificationMethod::test; :>> procedureText = "state def/transition spike verdict recorded; transitions strings replaced if green"; }
+        verification occurrenceRetypeDoD : Test { :>> id = "4ef8cff4-11db-4a48-9e20-58447aafe676"; :>> method = VerificationMethod::test; :>> procedureText = "occurrence def spike verdict recorded; TestResult retyped if green; validate_all green"; }
+        verification authoredByRefsDoD : Test { :>> id = "40a97fd6-50bb-4831-b505-60da3050ab97"; :>> method = VerificationMethod::test; :>> procedureText = "authoredBy/judgedBy reference ProjectActors parts (typed or validated-name); tooling reads them"; }
+        verification safetyCaseViewsDoD : Test { :>> id = "a316b216-d051-4f5f-acec-11f7ec092981"; :>> method = VerificationMethod::confirmation; :>> procedureText = "curated-view + frozen Baseline/Signoff design decided + recorded as a Decision"; }
+        verification needLayerDoD : Test { :>> id = "c2c81ff3-059e-4831-a609-602d7312809e"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Need layer-discriminator question decided + recorded as a Decision"; }
+        verification crVersioningDoD : Test { :>> id = "a0db11b0-fd52-4166-9436-db03ad1d9e42"; :>> method = VerificationMethod::confirmation; :>> procedureText = "CR self-modification versioning decided + recorded as a Decision"; }
+        verification skillsRefreshDoD : Test { :>> id = "e5a7417c-bf60-46e0-895f-38aee849b01b"; :>> method = VerificationMethod::inspect; :>> procedureText = "agile-refinement renamed backlog-refinement; test-design/test-result/traceability-audit built + registered"; }
+        verification runtimeParserDoD : Test { :>> id = "7c78b3cd-b51e-4a26-9b84-bd5e7040b605"; :>> method = VerificationMethod::test; :>> procedureText = "standalone parser/indexer reads schema+instances without the pilot kernel; query layer runs on it; parity with current outputs"; }
+        verification writeApiDoD : Test { :>> id = "864722ea-23bb-469b-9813-a8840d0d526d"; :>> method = VerificationMethod::test; :>> procedureText = "write API enforces writePolicy/ids/append-only; direct text editing retired as the write path"; }
+        verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
+    }
 }

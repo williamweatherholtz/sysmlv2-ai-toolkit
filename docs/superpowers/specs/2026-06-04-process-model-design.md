@@ -1,3 +1,9 @@
+> **STATUS (2026-06-11): historical.** This is the original design spec. The architecture
+> evolved through the bootstrap + the 2026-06-11 critique (all 13 CRs applied): workflows are
+> native `action def`s (no Workflow/Phase/Gate meta-model), verification is criteria + appended
+> TestResults, the edge algebra is native-first. Current truth: `CLAUDE.md` → `.engine/decisions/`
+> (0001–0017) → `docs/design-history/2026-06-11-architectural-critique.md`.
+
 # Process Model Design — the engine's project lifecycle as data
 
 **Status:** Design / pending review · **Date:** 2026-06-04 · **Branch:** `engine-restructure`
