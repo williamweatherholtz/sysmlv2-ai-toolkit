@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0007 {
+    private import EngineWork::*;
 
     part d0007 : Decision {
         :>> title = "The project is a reusable work-tracking engine; two models";
@@ -7,7 +7,7 @@ package Engine { package Decisions {
         :>> context = "Scope drifted toward an abstract 'modeling kernel with "
             + "pluggable HR/software domains'. That over-abstracts. The actual "
             + "intent: a work-tracking engine, reused across projects.";
-        :>> decision = "This repo IS a work-tracking engine: its schema + "
+        :>> decisionText = "This repo IS a work-tracking engine: its schema + "
             + "processes + computed-state contract track WORK BEING DONE for "
             + "any project. TWO MODELS, never conflated: (1) the engine model "
             + "tracks the work; (2) the deliverable is what the work produces "
@@ -20,4 +20,4 @@ package Engine { package Decisions {
             + "stays live via suspicion. Cons: requires discipline to keep "
             + "deliverable vocabulary out of the engine.";
     }
-}}
+}

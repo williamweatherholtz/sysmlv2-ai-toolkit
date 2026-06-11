@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0004 {
+    private import EngineWork::*;
 
     part d0004 : Decision {
         :>> title = "Atomic items, not nested checklists";
@@ -7,7 +7,7 @@ package Engine { package Decisions {
         :>> context = "An early proposal nested a verification checklist inside "
             + "each Story (tagged objective/subjective). Soft criteria buried "
             + "in items erode into rubber-stamps.";
-        :>> decision = "Tests, decisions, requirements, and acceptance criteria "
+        :>> decisionText = "Tests, decisions, requirements, and acceptance criteria "
             + "are ATOMIC, first-class, independently queryable elements linked "
             + "by typed edges — never sub-lines inside another item. A Story's "
             + "acceptance criteria ARE its verify-linked Tests. Satisfaction "
@@ -17,4 +17,4 @@ package Engine { package Decisions {
             + "clean queries, no eroding checklists. Cons: more elements and "
             + "edges to author (offset by AI doing the mechanical linking).";
     }
-}}
+}

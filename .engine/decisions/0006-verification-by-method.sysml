@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0006 {
+    private import EngineWork::*;
 
     part d0006 : Decision {
         :>> title = "Verification by method; drop subjective/objective; verify subsumes validate";
@@ -7,7 +7,7 @@ package Engine { package Decisions {
         :>> context = "An objective/subjective flag on tests was proposed. It is "
             + "redundant with the verification method. Separately, verify vs "
             + "validate were considered as distinct edges.";
-        :>> decision = "Tests carry a `method`: test | analysis | inspection | "
+        :>> decisionText = "Tests carry a `method`: test | analysis | inspection | "
             + "demonstration. Whether a human is required FALLS OUT of method "
             + "(test/analysis automatable; inspection/demonstration human) — no "
             + "separate flag. `validate` is NOT a distinct edge: validation is "
@@ -17,4 +17,4 @@ package Engine { package Decisions {
             + "derives from method. Cons: V&V distinction is a query, not a "
             + "stored label (acceptable).";
     }
-}}
+}

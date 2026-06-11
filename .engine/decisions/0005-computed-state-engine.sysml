@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0005 {
+    private import EngineWork::*;
 
     part d0005 : Decision {
         :>> title = "Computed-state engine: git-ancestry, material-change, scoped edges";
@@ -7,7 +7,7 @@ package Engine { package Decisions {
         :>> context = "Satisfaction/coverage/suspicion must be computed (0001). "
             + "A naive implementation storms suspicion on cosmetic edits and "
             + "mis-orders evidence using wall-clock time.";
-        :>> decision = "Three rules (full spec in contracts/computed-state.md): "
+        :>> decisionText = "Three rules (full spec in contracts/computed-state.md): "
             + "(1) happened-before is GIT ANCESTRY, not wall-clock — a pass "
             + "covers a change only if its judgedAgainst commit is a "
             + "descendant-or-equal of the change commit. (2) MATERIAL-CHANGE "
@@ -19,4 +19,4 @@ package Engine { package Decisions {
             + "Cons: indexer needs git-ancestry + semantic-hash logic; coverage "
             + "states (covered/suspect/failing/uncovered) must be implemented.";
     }
-}}
+}

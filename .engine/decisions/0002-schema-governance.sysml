@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0002 {
+    private import EngineWork::*;
 
     part d0002 : Decision {
         :>> title = "Schema governance: frozen core, optional safety module, .engine folder";
@@ -8,7 +8,7 @@ package Engine { package Decisions {
             + "value evaporates (convention drift). But the engine must also "
             + "be reusable and must not force safety vocabulary on non-safety "
             + "projects.";
-        :>> decision = "The engine schema lives in a .engine/ dotfolder as "
+        :>> decisionText = "The engine schema lives in a .engine/ dotfolder as "
             + "infrastructure (like .git). schema/core is always imported and "
             + "is frozen — changes require a Decision. schema/safety (STPA) is "
             + "an OPTIONAL import, via plain SysMLv2 package import; non-safety "
@@ -18,4 +18,4 @@ package Engine { package Decisions {
             + "growth without core churn; clean top-level. Cons: friction to "
             + "add a concept (must go through a Decision) — intentional.";
     }
-}}
+}

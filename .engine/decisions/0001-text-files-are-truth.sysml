@@ -1,5 +1,5 @@
-package Engine { package Decisions {
-    private import Engine::Core::*;
+package Decision0001 {
+    private import EngineWork::*;
 
     part d0001 : Decision {
         :>> title = "Text files are the sole source of truth; computed values are views";
@@ -8,7 +8,7 @@ package Engine { package Decisions {
             + "Two homes for one fact creates the 'racing the API' failure "
             + "mode. Separately, the engine relies on many COMPUTED fields "
             + "(satisfaction, coverage, suspicion).";
-        :>> decision = "Authored facts (elements, edges, logged TestResults) "
+        :>> decisionText = "Authored facts (elements, edges, logged TestResults) "
             + "live ONLY in text. The index (Kuzu) is rebuilt from text and "
             + "is disposable. Computed values are VIEWS, recomputed on demand, "
             + "and NEVER stored as attributes in any .sysml file. A pure "
@@ -19,4 +19,4 @@ package Engine { package Decisions {
             + "PRs); text round-trip without destroying formatting becomes "
             + "the writer's hardest problem.";
     }
-}}
+}
