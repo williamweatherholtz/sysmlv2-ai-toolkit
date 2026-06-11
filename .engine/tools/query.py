@@ -2,9 +2,12 @@
 general query core the user asked for; `whats-next` is one VIEW over it.
 
 Subcommands (argv[1], default 'whats-next'):
-  whats-next   -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
-  suspect      -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
-  item <name>  -> introspect one task (done?, method, commit, deps + their states)
+  whats-next      -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
+  outstanding     -> every not-done task
+  suspect         -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
+  item <name>     -> introspect one task (done?, method, commit, deps + their states)
+  downstream <n>  -> tasks transitively dependent on <n> (impact set)
+  trace <name>    -> a task's full lineage: transitive upstream + downstream + DoD
 
 INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
 `action def`s (an action def in .tracking IS a work backlog; workflows live in
@@ -145,6 +148,30 @@ def classify(tasks):
     return tasks
 
 
+def _successors(tasks, name):
+    return [t for t, i in tasks.items() if name in i.get('deps', [])]
+
+
+def _reach(tasks, name, step):
+    """Transitive closure of `step` (deps=upstream / successors=downstream) from name."""
+    seen, stack = set(), [name]
+    while stack:
+        cur = stack.pop()
+        for nxt in step(tasks, cur):
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append(nxt)
+    return sorted(seen)
+
+
+def upstream(tasks, name):
+    return _reach(tasks, name, lambda t, n: t.get(n, {}).get('deps', []))
+
+
+def downstream(tasks, name):
+    return _reach(tasks, name, _successors)
+
+
 def main():
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     sub = argv[0] if argv else "whats-next"
@@ -173,6 +200,14 @@ def main():
         out = tasks.get(arg, {"error": f"no task '{arg}'"})
     elif sub == "suspect":
         out = {"suspect": sorted(t for t, i in tasks.items() if i['suspect'])}
+    elif sub == "outstanding":
+        out = {"outstanding": sorted(t for t, i in tasks.items() if not i['done'])}
+    elif sub == "downstream" and arg:
+        out = {"name": arg, "downstream": downstream(tasks, arg)}
+    elif sub == "trace" and arg:
+        out = {"name": arg, "upstream": upstream(tasks, arg),
+               "downstream": downstream(tasks, arg),
+               "done": tasks.get(arg, {}).get('done'), "dod": tasks.get(arg, {}).get('dod', {})}
     else:  # whats-next
         out = {"ready": sorted(t for t, i in tasks.items() if i['ready']),
                "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
