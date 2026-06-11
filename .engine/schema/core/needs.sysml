@@ -11,6 +11,8 @@
 // not a separate type.
 // =====================================================================
 package EngineNeeds {
+    doc /* Business-layer item types: Brief, Persona, Need (native requirement def, source-discriminated), UseCase (native use case def). Scope = Decisions that supersede Needs; no Constraint type. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 

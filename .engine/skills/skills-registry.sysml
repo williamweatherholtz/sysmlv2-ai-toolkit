@@ -8,6 +8,7 @@
 // discipline (CLAUDE.md §4).
 // =====================================================================
 package EngineSkillRegistry {
+    private import EngineElement::*;     // WritePolicy enum
     private import EngineSkills::*;
 
     part engineTriage : AISkill {
@@ -16,7 +17,7 @@ package EngineSkillRegistry {
         :>> purpose = "Classify EVERY substantive request into CHANGE/EXECUTE/RECORD/VIEW/BOOTSTRAP/ORIENT before acting; state the route out loud (CLAUDE.md 3).";
         :>> location = ".engine/skills/engine-triage/SKILL.md";
         :>> triggerCondition = "Any substantive request arrives.";
-        :>> writePolicy = "read-only";
+        :>> writePolicy = WritePolicy::readOnly;
     }
     part requirementQuality : AISkill {
         :>> id = "61c1f9c2-08e8-4f55-9b34-1f5fb1f0a111";
@@ -24,7 +25,7 @@ package EngineSkillRegistry {
         :>> purpose = "Audit requirements against INCOSE GtWR rules + EARS syntax; emit findings + rewrites.";
         :>> location = ".engine/skills/requirement-quality/SKILL.md";
         :>> triggerCondition = "A requirement is authored or changed; DoR gate.";
-        :>> writePolicy = "pr-only";
+        :>> writePolicy = WritePolicy::prOnly;
     }
     part stpaSkill : AISkill {
         :>> id = "7d20a9c4-26cd-4f0a-8413-2b6fb2f0b222";
@@ -32,7 +33,7 @@ package EngineSkillRegistry {
         :>> purpose = "Run STPA (losses/hazards/UCAs/constraints) per the SOP for safety-relevant scope.";
         :>> location = ".engine/skills/stpa/SKILL.md";
         :>> triggerCondition = "Safety-relevant Need/UseCase/Component enters scope.";
-        :>> writePolicy = "pr-only";
+        :>> writePolicy = WritePolicy::prOnly;
     }
     part agileRefinement : AISkill {
         :>> id = "8e31bad5-37de-4b1b-9524-3c70c3f0c333";
@@ -40,7 +41,7 @@ package EngineSkillRegistry {
         :>> purpose = "Run backlog refinement: criteria as verification DoDs, sizing, dependency links (rename to backlog-refinement pending).";
         :>> location = ".engine/skills/agile-refinement/SKILL.md";
         :>> triggerCondition = "New backlog items need refinement to ready.";
-        :>> writePolicy = "pr-only";
+        :>> writePolicy = WritePolicy::prOnly;
     }
     part repoPush : AISkill {
         :>> id = "9f42cbe6-48ef-4c2c-a635-4d81d4f0d444";
@@ -48,6 +49,6 @@ package EngineSkillRegistry {
         :>> purpose = "Repository discipline: commit message grammar + pre-push checks (adapted: main-only policy, auto-push hook).";
         :>> location = ".engine/skills/repo-push/SKILL.md";
         :>> triggerCondition = "Committing engine/process work.";
-        :>> writePolicy = "direct";
+        :>> writePolicy = WritePolicy::direct;
     }
 }

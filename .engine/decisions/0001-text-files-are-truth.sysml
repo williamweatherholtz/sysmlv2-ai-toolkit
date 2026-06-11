@@ -4,7 +4,7 @@ package Decision0001 {
     part d0001 : Decision {
         :>> id = "219fca70-508f-482a-9f65-71f8bf8c2070";
         :>> title = "Text files are the sole source of truth; computed values are views";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "State could live in text (.sysml) or in a graph DB. "
             + "Two homes for one fact creates the 'racing the API' failure "
             + "mode. Separately, the engine relies on many COMPUTED fields "

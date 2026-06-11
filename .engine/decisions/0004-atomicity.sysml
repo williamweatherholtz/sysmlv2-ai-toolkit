@@ -4,7 +4,7 @@ package Decision0004 {
     part d0004 : Decision {
         :>> id = "0f794d10-85e6-40de-bd0c-a09b0546deda";
         :>> title = "Atomic items, not nested checklists";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "An early proposal nested a verification checklist inside "
             + "each Story (tagged objective/subjective). Soft criteria buried "
             + "in items erode into rubber-stamps.";

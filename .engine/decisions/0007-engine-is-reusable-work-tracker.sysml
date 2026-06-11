@@ -4,7 +4,7 @@ package Decision0007 {
     part d0007 : Decision {
         :>> id = "67a098fc-9431-4a12-b2fd-98b80b6d9cda";
         :>> title = "The project is a reusable work-tracking engine; two models";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "Scope drifted toward an abstract 'modeling kernel with "
             + "pluggable HR/software domains'. That over-abstracts. The actual "
             + "intent: a work-tracking engine, reused across projects.";

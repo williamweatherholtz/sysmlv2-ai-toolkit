@@ -16,6 +16,8 @@
 // Decisions). `kind` carries functional/non-functional/safety/etc.
 // =====================================================================
 package EngineRequirements {
+    doc /* Technical requirement cascade (native requirement defs): System -> Subsystem -> Component, plus Assumption (suspicion input). Concrete requirements may carry native require/assume constraints. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 

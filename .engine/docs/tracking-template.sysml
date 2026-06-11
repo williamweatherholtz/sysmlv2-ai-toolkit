@@ -11,6 +11,7 @@ package TrackingTemplate {
     private import EngineElement::*;     // Element bases, Priority, value types
     private import EngineNeeds::*;
     private import EngineWork::*;
+    private import EngineRelationships::*; // #Supersede / #DependsOn markers
     private import EngineVerification::*; // Test (criterion) + TestResult (appended record)
 
     // -- a Business-phase artifact: the project brief --
@@ -39,11 +40,17 @@ package TrackingTemplate {
         :>> id = "584746d4-7277-4b07-ac30-c5153debee57";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000003";
         :>> title = "Example: we will not pursue X";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "Why the question arose.";
         :>> decisionText = "What was decided.";
         :>> consequences = "What follows.";
     }
+
+    // -- EDGE MARKERS, worked examples (CR-12; relationships.sysml is the law) --
+    // Scope-cut: the Decision SUPERSEDES the Need (back-reference is computed):
+    #Supersede dependency from exampleDecision to exampleNeed;
+    // Semantic dependence (suspicion-carrying; contrast #OrderingOnly in a backlog):
+    #DependsOn dependency from exampleNeed to exampleBrief;
 
     // -- work-item backlog dialect v2 (read by query.py; CR-3) --
     // An `action def` in .tracking IS a backlog; tasks = actions; deps = succession.

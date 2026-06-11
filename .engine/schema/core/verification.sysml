@@ -12,6 +12,8 @@
 // `confirmation` (human sign-off). Closed sets are enum-typed (EngineElement).
 // =====================================================================
 package EngineVerification {
+    doc /* Verification PROCESS vs RESULT: Test/TestPlan are native verification defs (the reusable check); TestResult is the appended immutable record of ONE execution (outcome + judgedAgainst commit). Current status is always a computed view. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 

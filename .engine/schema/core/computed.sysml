@@ -12,6 +12,8 @@
 // computed views query.py produces. Full native `expose` views await a newer toolchain.
 // =====================================================================
 package EngineComputed {
+    doc /* The materialized-view + derivation layer: native calc/analysis defs and view-def anchors. Computed by tooling from authored facts + git - never authored as truth. */
+
     private import ScalarValues::*;
 
     // ---- derivations as native calc / analysis defs (analysisCalc) ----

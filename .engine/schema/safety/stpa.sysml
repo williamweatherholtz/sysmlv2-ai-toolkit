@@ -7,6 +7,8 @@
 // EngineNeeds::Need with source = "safety" (design spec §11).
 // =====================================================================
 package EngineSafety {
+    doc /* STPA element types (optional module): losses/hazards/constraints, the typed control loop (Controller/ControlAction/Feedback/Process refs), UCAs, scenarios, SafetyRequirement. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 
@@ -22,17 +24,32 @@ package EngineSafety {
     }
 
     // ---- Control structure (STPA Step 2) ----------------------------
-    part def Controller :> Element { attribute name : String; }
-    part def ProcessModel :> Element { attribute beliefs : String; }
-    part def ControlAction :> Element { attribute name : String; }
-    part def Feedback :> Element { attribute name : String; }
-    part def ControlledProcess :> Element { attribute name : String; }
-    part def Sensor :> Element { attribute name : String; }
-    part def Actuator :> Element { attribute name : String; }
+    // The control LOOP is structural (CR-12, critique M5): who issues what on
+    // which process, and which feedback returns - typed refs, not a label inventory.
+    // (Duplicate `name` attrs dropped: Element supplies `title`.)
+    part def Controller :> Element;
+    part def ProcessModel :> Element {
+        attribute beliefs : String;
+        ref heldBy : Controller[0..1];
+    }
+    part def ControlledProcess :> Element;
+    part def ControlAction :> Element {
+        ref issuedBy : Controller[0..1];
+        ref actsOn : ControlledProcess[0..1];
+    }
+    part def Feedback :> Element {
+        ref sensedFrom : ControlledProcess[0..1];
+        ref reportsTo : Controller[0..1];
+    }
+    part def Sensor :> Element;
+    part def Actuator :> Element;
 
     // ---- Analytical outputs (STPA Steps 3-4) ------------------------
+    enum def UcaType { provided; notProvided; wrongTimingOrder; stoppedTooSoonAppliedTooLong; }
+
     part def UnsafeControlAction :> Element {
-        attribute ucaType : String;            // provided | not-provided | wrong-timing-order | stopped-too-soon-applied-too-long
+        attribute ucaType : UcaType;
+        ref unsafeAction : ControlAction[0..1]; // the ControlAction made unsafe (`action` is reserved)
         attribute context : String;
         attribute statement : String;
     }

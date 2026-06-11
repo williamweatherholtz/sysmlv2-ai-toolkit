@@ -4,7 +4,7 @@ package Decision0008 {
     part d0008 : Decision {
         :>> id = "0b7a7f53-e22f-43ed-846b-fba8b1802a8a";
         :>> title = "STPA first-class; HARA and ASIL out of scope";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "Both STPA and HARA were researched and integrated, "
             + "converging on a shared Hazard and a shared SafetyRequirement "
             + "output. The user scoped HARA (and ASIL) out.";

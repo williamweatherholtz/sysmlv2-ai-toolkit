@@ -4,7 +4,7 @@ package Decision0002 {
     part d0002 : Decision {
         :>> id = "7ef57346-417a-4704-bc82-03c0c896837d";
         :>> title = "Schema governance: frozen core, optional safety module, .engine folder";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "If contributors model 'task' three ways the typed-graph "
             + "value evaporates (convention drift). But the engine must also "
             + "be reusable and must not force safety vocabulary on non-safety "

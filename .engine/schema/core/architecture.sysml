@@ -6,6 +6,8 @@
 // and from allocate edges) and are therefore NOT authored types here.
 // =====================================================================
 package EngineArchitecture {
+    doc /* Solution structure: Component (native ports), DesignElement, FunctionAllocation (native allocate). ICDs + allocation matrix are computed views. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 

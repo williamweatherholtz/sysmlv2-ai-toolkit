@@ -6,12 +6,14 @@
 //  trigger -> triggerCondition.)
 // =====================================================================
 package EngineProcess {
+    doc /* Procedure modeling: Process + ordered ProcessSteps (the procedure inside a workflow phase). Step pass/fail is computed or human judgment per its evaluability label. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 
     part def Process :> Element {
         attribute purpose : String;
-        attribute cadence : String;        // continuous | event-driven | per-item | per-sprint | ad-hoc
+        attribute cadence : Cadence;
     }
 
     part def ProcessStep :> Element {
@@ -19,6 +21,6 @@ package EngineProcess {
         attribute triggerCondition : String;   // when this step fires
         attribute actionText : String;         // what is done
         attribute producedArtifact : String;   // the tracked artifact change produced
-        attribute owner : String;              // human | ai | either
+        attribute owner : Owner;
     }
 }

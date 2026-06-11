@@ -4,7 +4,7 @@ package Decision0006 {
     part d0006 : Decision {
         :>> id = "9a61a74f-745b-4a0a-959d-af8003d87812";
         :>> title = "Verification by method; drop subjective/objective; verify subsumes validate";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "An objective/subjective flag on tests was proposed. It is "
             + "redundant with the verification method. Separately, verify vs "
             + "validate were considered as distinct edges.";

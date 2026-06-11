@@ -7,13 +7,14 @@
 // is a computed view, never authored. Kind-specific checks are noted in actionText.
 // =====================================================================
 package EngineDoR {
+    private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
 
     part dor : Process {
         :>> id = "5ae3bc44-7af3-42d7-bda1-cc7c4ca3eeef";
         :>> title = "Definition of Ready";
         :>> purpose = "Standup gate, before starting a ~5-point batch: each check below passes.";
-        :>> cadence = "event-driven";
+        :>> cadence = Cadence::eventDriven;
     }
 
     // -- Universal checks (all work items) --
@@ -22,28 +23,28 @@ package EngineDoR {
         :>> title = "Goal & boundary clear";
         :>> order = 1;
         :>> actionText = "[judgment] Title and intent are unambiguous; scope boundaries stated.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part dorTests : ProcessStep {
         :>> id = "4aba2383-2c35-47ea-a173-db53762a95b1";
         :>> title = "Acceptance criteria exist as Tests";
         :>> order = 2;
         :>> actionText = "[computed: query.py item] The task has a method-tagged DoD criterion; no bare text blobs.";
-        :>> owner = "ai";
+        :>> owner = Owner::ai;
     }
     part dorDeps : ProcessStep {
         :>> id = "f5d1d708-7112-46da-ba9c-36bff889b100";
         :>> title = "Dependencies linked";
         :>> order = 3;
         :>> actionText = "[judgment] Upstream successions authored; no unstated prerequisites.";
-        :>> owner = "ai";
+        :>> owner = Owner::ai;
     }
     part dorSized : ProcessStep {
         :>> id = "99661c95-ff8f-413d-a367-79d74b1dedd3";
         :>> title = "Sized";
         :>> order = 4;
         :>> actionText = "[judgment] Sized (optional for backlog tasks during bootstrap).";
-        :>> owner = "human";
+        :>> owner = Owner::human;
     }
 
     // -- kind-specific (stricter) --
@@ -53,7 +54,7 @@ package EngineDoR {
         :>> order = 5;
         :>> actionText = "[judgment] For kind=code: inputs/outputs specified; example input->output "
                        + "present; test method per Test set.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part dorResearchQ : ProcessStep {
         :>> id = "4a173954-cd94-436c-b216-77e972adac81";
@@ -61,7 +62,7 @@ package EngineDoR {
         :>> order = 6;
         :>> actionText = "[judgment] For kind=research: the question is crystallized; success = "
                        + "'we know X' / 'we have evidence of Y'; time-box set.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part dorDecision : ProcessStep {
         :>> id = "0cf86114-a9af-4216-aa48-cf260791de7b";
@@ -69,7 +70,7 @@ package EngineDoR {
         :>> order = 7;
         :>> actionText = "[judgment] For kind=decision: options enumerated; selection criteria stated; "
                        + "consequences considered.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 
     // -- Escalation --
@@ -79,6 +80,6 @@ package EngineDoR {
         :>> order = 99;
         :>> actionText = "[judgment] Any failing check above is resolved, OR the grill-me skill is "
                        + "invoked to drive it to resolution before work starts.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 }

@@ -4,15 +4,19 @@
 // materialized Risk becomes an EngineWork::Issue.
 // =====================================================================
 package EngineRisk {
+    doc /* Enterprise risk register (NOT safety hazards - those are STPA). A materialized Risk becomes an Issue. */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 
+    enum def RiskStatus { open; mitigated; accepted; materialized; }
+
     part def Risk :> Element {
         attribute statement : String;
-        attribute likelihood : String;    // high | medium | low
-        attribute impact : String;        // high | medium | low
-        attribute residual : String;      // remaining after mitigation
-        attribute status : String;        // open | mitigated | accepted | materialized
+        attribute likelihood : RiskLevel;
+        attribute impact : RiskLevel;
+        attribute residual : RiskLevel;        // remaining after mitigation
+        attribute status : RiskStatus;
     }
 
     part def Mitigation :> Element {

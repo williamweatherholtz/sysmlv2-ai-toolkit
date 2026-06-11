@@ -3,12 +3,18 @@
 // All :> Element, so id/title/createdAt/authoredBy are inherited (state is computed).
 // =====================================================================
 package EngineWork {
+    doc /* Work-item types (Epic/Story/Task), Decision (immutable ADR; replaced via supersede), ChangeRequest, Issue, Release (baseline is a computed view). */
+
     private import ScalarValues::*;
     private import EngineElement::*;
 
+    enum def WorkKind { code; research; documentation; refactor; decision; modeling; }
+    enum def WorkPriority { p0; p1; p2; p3; }
+    enum def DecisionStatus { proposed; accepted; superseded; }
+
     part def WorkItem :> Element {
-        attribute kind : String;          // code|research|documentation|refactor|decision|modeling
-        attribute priority : String;      // p0|p1|p2|p3
+        attribute kind : WorkKind;
+        attribute priority : WorkPriority;
         attribute owner : String;         // Actor id
     }
     part def Epic :> WorkItem {
@@ -27,7 +33,7 @@ package EngineWork {
     // Decision (ADR). Immutable once accepted; replaced via the `supersede`
     // edge, not by editing. Scope decisions supersede Needs (see the spec §5).
     part def Decision :> Element {
-        attribute status : String;        // proposed|accepted|superseded
+        attribute status : DecisionStatus;
         attribute context : String;
         attribute decisionText : String;
         attribute consequences : String;

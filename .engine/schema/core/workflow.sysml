@@ -8,6 +8,8 @@
 // passing, CLAUDE.md §2.6, not an authored type.)
 // =====================================================================
 package EngineState {
+    doc /* Modular workflow states as data (WorkflowState/WorkflowDefinition) and the StateCursor pointer that orient reads. Element state is a computed view, never authored. */
+
     private import ScalarValues::*;
 
     part def WorkflowState {
@@ -19,8 +21,8 @@ package EngineState {
 
     part def WorkflowDefinition {
         attribute name : String;
-        attribute states : String[*];      // names of WorkflowStates
-        attribute transitions : String[*]; // "from->to" pairs, as strings
+        ref states : WorkflowState[*];     // typed refs (M4)
+        attribute transitions : String[*]; // "from->to" strings (native state-def spike deferred)
     }
 
     // The state CURSOR (CR-6): where a project currently stands in the workflows.

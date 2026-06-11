@@ -4,7 +4,7 @@ package Decision0003 {
     part d0003 : Decision {
         :>> id = "13e4fd55-8929-4e78-9942-44d9d8473085";
         :>> title = "Single API surface for humans and AI; enforced write policy";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "Building a 'rich' GUI API and a 'simple' AI API causes "
             + "drift between human and AI capability. AI must be first-class "
             + "but not unconstrained.";

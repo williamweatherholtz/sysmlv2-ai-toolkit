@@ -11,6 +11,8 @@
 // Computed fields (satisfaction, coverage, suspicion) are likewise views.
 // =====================================================================
 package EngineElement {
+    doc /* Universal tracked-element base (Element + per-metaclass Tracked bases), shared enums and value types, and the minimal actor model. Identity = authored id (native elementId is parse-ephemeral). NOTE: attributed metadata (@Tracked with values) SPIKED GREEN 2026-06-11 - a future refactor may collapse the Tracked* bases into one annotation. */
+
     private import ScalarValues::*;
 
     // ---- shared value types + enumerations (strongTyping 2026-06-10) ----
@@ -26,6 +28,10 @@ package EngineElement {
     enum def VerificationMethod { inspect; analyze; demo; test; confirmation; }  // native set + engine confirmation
     enum def Priority { must; should; could; wont; }                            // MoSCoW
     enum def RequirementKind { functional; nonFunctional; safety; security; interfaceReq; }
+    enum def RiskLevel { high; medium; low; }
+    enum def Owner { human; ai; either; }
+    enum def Cadence { continuous; eventDriven; perItem; perSprint; perStory; adHoc; }
+    enum def WritePolicy { readOnly; prOnly; direct; }
 
     abstract part def Element {
         attribute id : Uuid;              // immutable identity

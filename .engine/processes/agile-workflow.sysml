@@ -7,6 +7,7 @@
 // SYNTAX PENDING PILOT VALIDATION.
 // =====================================================================
 package EngineAgileProcess {
+    private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
     private import EngineState::*;
     private import ScalarValues::*;
@@ -43,7 +44,7 @@ package EngineAgileProcess {
         :>> title = "Backlog Refinement";
         :>> purpose = "Move items backlog -> ready: acceptance criteria "
                     + "(as atomic Tests), sizing, dependency links.";
-        :>> cadence = "continuous";
+        :>> cadence = Cadence::continuous;
     }
     part refineCriteria : ProcessStep {
         :>> id = "c9bef132-83ef-44df-a312-24211035a191";
@@ -54,7 +55,7 @@ package EngineAgileProcess {
                   + "criterion (method + procedureText) in the backlog action def. "
                   + "NO acceptance-criteria text blob.";
         :>> producedArtifact = "Method-tagged DoD criterion authored.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part refineSize : ProcessStep {
         :>> id = "3fea750a-db19-4555-be64-717955fa110b";
@@ -64,7 +65,7 @@ package EngineAgileProcess {
         :>> actionText = "Assign rough size (Fibonacci when Story instances exist; "
                   + "optional for backlog tasks during bootstrap).";
         :>> producedArtifact = "Sized item.";
-        :>> owner = "human";
+        :>> owner = Owner::human;
     }
     part refineLink : ProcessStep {
         :>> id = "d4510352-ecf7-4b77-ac8a-d980ea60c18d";
@@ -74,7 +75,7 @@ package EngineAgileProcess {
         :>> actionText = "Add `first A then B` successions (#OrderingOnly when non-"
                   + "semantic). Readiness is the COMPUTED view - never authored.";
         :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 
     // ---- Planning (per-sprint, event-driven) ------------------------
@@ -83,7 +84,7 @@ package EngineAgileProcess {
         :>> title = "Sprint Planning";
         :>> purpose = "Triage 'ready' Stories into a Sprint under the "
                     + "points budget, against a one-sentence goal.";
-        :>> cadence = "event-driven";
+        :>> cadence = Cadence::eventDriven;
     }
     part planGoal : ProcessStep {
         :>> id = "b1dedc21-9235-4489-9b71-5765be94ebfc";
@@ -92,7 +93,7 @@ package EngineAgileProcess {
         :>> triggerCondition = "Previous sprint closed OR new batch initiated by human.";
         :>> actionText = "Write Sprint.goal.";
         :>> producedArtifact = "Sprint with goal.";
-        :>> owner = "human";
+        :>> owner = Owner::human;
     }
     part planPull : ProcessStep {
         :>> id = "f3fa7b01-4c55-4541-84dc-400bd6825f44";
@@ -103,7 +104,7 @@ package EngineAgileProcess {
                   + "(points budget when Stories exist). Triage priority and "
                   + "antagonistically question scope.";
         :>> producedArtifact = "Populated batch/Sprint.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 
     // ---- Standup (event-driven, per ~5 points) ----------------------
@@ -116,7 +117,7 @@ package EngineAgileProcess {
         :>> purpose = "Before each ~5-point batch, antagonistically "
                     + "critique each upcoming item against the DoR gate. "
                     + "If gaps: resolve them, or invoke grill-me.";
-        :>> cadence = "event-driven";
+        :>> cadence = Cadence::eventDriven;
     }
     part standupGate : ProcessStep {
         :>> id = "723f4b81-690e-4898-9544-118ea5d9a6ea";
@@ -126,7 +127,7 @@ package EngineAgileProcess {
         :>> actionText = "For each item run the Definition of Ready gate. "
                   + "Pass -> go. Fail -> resolve or invoke grill-me skill.";
         :>> producedArtifact = "Batch cleared to start, or gaps logged/resolved.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 
     // ---- Implementation (per-story) ---------------------------------
@@ -134,7 +135,7 @@ package EngineAgileProcess {
         :>> id = "6219917f-aa45-4d82-ab15-253ac7c46e13";
         :>> title = "Implementation";
         :>> purpose = "Move a Story in_progress -> in_review -> done.";
-        :>> cadence = "per-story";
+        :>> cadence = Cadence::perStory;
     }
     part implDo : ProcessStep {
         :>> id = "a6fc664a-e64a-4133-bc69-9326bfd658c4";
@@ -143,7 +144,7 @@ package EngineAgileProcess {
         :>> triggerCondition = "Story in_progress and past Standup.";
         :>> actionText = "Write code/content + the Tests that verify it.";
         :>> producedArtifact = "Working changes; TestResults appended.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part implModel : ProcessStep {
         :>> id = "dba37bd4-406f-43d3-af02-8e3ef8b0c017";
@@ -153,7 +154,7 @@ package EngineAgileProcess {
         :>> actionText = "Append TestResults (with commit SHA). The suspicion "
                   + "engine recomputes coverage/staleness automatically.";
         :>> producedArtifact = "Authored facts current; views recompute.";
-        :>> owner = "ai";
+        :>> owner = Owner::ai;
     }
     part implReview : ProcessStep {
         :>> id = "a77f1c0a-4761-4d35-9bf2-1476b2bdb713";
@@ -163,7 +164,7 @@ package EngineAgileProcess {
         :>> actionText = "Commit to main (per the main-only policy); review state is "
                   + "computed from the commit, never authored.";
         :>> producedArtifact = "PR open.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
     part implClose : ProcessStep {
         :>> id = "893dad0b-5a2a-4548-94e7-11dc07e87647";
@@ -173,7 +174,7 @@ package EngineAgileProcess {
         :>> actionText = "Run Definition of Done gate; append the passing TestResult. "
                   + "Done is the COMPUTED view over results - never authored.";
         :>> producedArtifact = "Story done iff satisfaction == verified.";
-        :>> owner = "ai";
+        :>> owner = Owner::ai;
     }
 
     // ---- Retrospective (per-sprint) ---------------------------------
@@ -184,7 +185,7 @@ package EngineAgileProcess {
         :>> title = "Retrospective";
         :>> purpose = "Promote workflow learnings into Decisions and "
                     + "process/convention changes.";
-        :>> cadence = "per-sprint";
+        :>> cadence = Cadence::perSprint;
     }
     part retroPromote : ProcessStep {
         :>> id = "5d66f22d-22db-4532-936d-8fc00b2b3a8e";
@@ -193,7 +194,7 @@ package EngineAgileProcess {
         :>> triggerCondition = "End of sprint; a learning changes future behavior.";
         :>> actionText = "Create a Decision; update Process/schema if needed.";
         :>> producedArtifact = "Tracked Decision; improved workflow.";
-        :>> owner = "human";
+        :>> owner = Owner::human;
     }
 
     // ---- Staleness sweep (continuous) -------------------------------
@@ -202,7 +203,7 @@ package EngineAgileProcess {
         :>> title = "Staleness Sweep";
         :>> purpose = "On material upstream change, recompute suspicion "
                     + "and surface newly-suspect items for review.";
-        :>> cadence = "continuous";
+        :>> cadence = Cadence::continuous;
     }
     part sweepDetect : ProcessStep {
         :>> id = "d0bca5d3-2f81-4986-8b9a-70bfd8f85fcc";
@@ -213,7 +214,7 @@ package EngineAgileProcess {
         :>> actionText = "Recompute suspicionState; comment newly-suspect "
                   + "items on the PR.";
         :>> producedArtifact = "Suspect set surfaced.";
-        :>> owner = "ai";
+        :>> owner = Owner::ai;
     }
     part sweepResolve : ProcessStep {
         :>> id = "e640fd43-a15e-428d-89f9-0e3558ab1310";
@@ -223,7 +224,7 @@ package EngineAgileProcess {
         :>> actionText = "Re-run/re-judge its Tests (auto or human by "
                   + "method), or open a follow-up Story.";
         :>> producedArtifact = "Coverage restored or follow-up created.";
-        :>> owner = "either";
+        :>> owner = Owner::either;
     }
 
 }

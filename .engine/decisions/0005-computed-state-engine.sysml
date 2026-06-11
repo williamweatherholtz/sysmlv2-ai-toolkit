@@ -4,7 +4,7 @@ package Decision0005 {
     part d0005 : Decision {
         :>> id = "d48e2ef4-af60-454b-ac16-765e2486ddb6";
         :>> title = "Computed-state engine: git-ancestry, material-change, scoped edges";
-        :>> status = "accepted";
+        :>> status = DecisionStatus::accepted;
         :>> context = "Satisfaction/coverage/suspicion must be computed (0001). "
             + "A naive implementation storms suspicion on cosmetic edits and "
             + "mis-orders evidence using wall-clock time.";
