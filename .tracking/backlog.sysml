@@ -33,7 +33,9 @@ package EngineBacklog {
         first workflows then whatsNextV2;
         first whatsNextV2 then schemaAudit;
         first whatsNextV2 then testModel;
-        first schemaAudit then testModel;
+        // (removed `first schemaAudit then testModel` 2026-06-10: testModel — verification
+        //  model + grammar — was parallel to schemaAudit, not downstream of it; the edge
+        //  made testModel falsely SUSPECT when schemaAudit landed later.)
         first testModel then instanceAware;
         first whatsNextV2 then instanceAware;
         first schemaAudit then instanceMigration;
