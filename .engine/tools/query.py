@@ -6,6 +6,11 @@ Subcommands (argv[1], default 'whats-next'):
   suspect      -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
   item <name>  -> introspect one task (done?, method, commit, deps + their states)
 
+INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
+`action def`s (an action def in .tracking IS a work backlog; workflows live in
+.engine/workflows). All discovered backlogs are merged. `--target Pkg::Def`
+focuses a single one. (No longer hardcoded to EngineBacklog::EngineBuild.)
+
 Semantics:
   DONE        = the task's AcceptanceCriterion has a `verifiedAtCommit` (a pass result).
   OUTSTANDING = not done.
@@ -28,6 +33,7 @@ Run:
 import os
 import re
 import sys
+import glob
 import json
 import subprocess
 
@@ -38,12 +44,41 @@ from whats_next import parse_show  # noqa: E402  (shared AST parser)
 ENGINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(ENGINE)
 META = os.path.join(ENGINE, "workflows", "_meta.sysml")
-BACKLOG = os.path.join(REPO, ".tracking", "backlog.sysml")
-TARGET = ("EngineBacklog", "EngineBuild")
+TRACKING_DIR = os.path.join(REPO, ".tracking")
 
 # A DoD line: `requirement <task>DoD : AcceptanceCriterion { ... k = "v"; ... }`.
 _DOD_LINE = re.compile(r'requirement\s+(\w+)DoD\s*:')
 _ASSIGN = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
+_PKG = re.compile(r'package\s+(\w+)')
+_ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
+
+
+def tracking_files():
+    return sorted(glob.glob(os.path.join(TRACKING_DIR, "*.sysml")))
+
+
+def read_all_dods():
+    """DoD scalar values across every .tracking file, merged by task name."""
+    merged = {}
+    for f in tracking_files():
+        merged.update(read_dods(f))
+    return merged
+
+
+def discover_targets():
+    """(package, actionDef) work-item backlogs across .tracking/*.sysml. An
+    `action def` in .tracking IS a work backlog (workflows live in .engine/workflows,
+    not .tracking) — so the query is instance-aware, not hardcoded to EngineBuild."""
+    targets = []
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            text = fh.read()
+        pm = _PKG.search(text)
+        if not pm:
+            continue
+        for m in _ACTION_DEF.finditer(text):
+            targets.append((pm.group(1), m.group(1)))
+    return targets
 
 
 def read_dods(path):
@@ -111,15 +146,28 @@ def classify(tasks):
 
 
 def main():
-    sub = sys.argv[1] if len(sys.argv) > 1 else "whats-next"
-    arg = sys.argv[2] if len(sys.argv) > 2 else None
+    argv = [a for a in sys.argv[1:] if not a.startswith("--")]
+    sub = argv[0] if argv else "whats-next"
+    arg = argv[1] if len(argv) > 1 else None
+    # optional --target Pkg::Def to focus a single backlog (else discover all)
+    override = None
+    if "--target" in sys.argv:
+        override = tuple(sys.argv[sys.argv.index("--target") + 1].split("::"))
+
     km, kc = _kernel.start()
-    for f in (META, BACKLOG):
+    with open(META, encoding="utf-8") as fh:
+        _kernel.run_cell(kc, fh.read())
+    for f in tracking_files():
         with open(f, encoding="utf-8") as fh:
             _kernel.run_cell(kc, fh.read())
-    _, text = _kernel.run_cell(kc, f"%show {TARGET[0]}::{TARGET[1]}")
-    dods = read_dods(BACKLOG)
-    tasks = classify(build_model(parse_show(text), dods))
+
+    targets = [override] if override else discover_targets()
+    dods = read_all_dods()
+    tasks = {}
+    for pkg, adef in targets:
+        _, text = _kernel.run_cell(kc, f"%show {pkg}::{adef}")
+        tasks.update(build_model(parse_show(text), dods))
+    classify(tasks)
 
     if sub == "item" and arg:
         out = tasks.get(arg, {"error": f"no task '{arg}'"})
