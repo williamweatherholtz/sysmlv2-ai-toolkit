@@ -151,6 +151,7 @@ package EngineBacklog {
         verification crTypeUniverseDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "_meta shadow item defs retired; workflows typed by schema/core; workflows + tracking validate green"; }
         part crTypeUniverseR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6f965c0"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_workflows"; }
         verification crVerificationDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "DoD verdicts are appended TestResult records (immutable); method uses VerificationMethod enum; query computes done from results; all green"; }
+        part crVerificationR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "df27aa2"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_tracking"; }
         verification crSuspicionDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "suspicion = material change (git) over satisfy/:> + #OrderingOnly honored + transitive; verifiedAtCommit SHAs validated (INVALID-EVIDENCE bucket); ordering edge restored"; }
         verification crIdentityDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "all instances carry :>> id UUIDs; tooling keys qualified; actor registry = Person parts; validators warn on missing id"; }
         verification crCursorDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = ".tracking/state.sysml cursor exists; query orient merges cursor + ready + suspect"; }
