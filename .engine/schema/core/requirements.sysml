@@ -32,6 +32,14 @@ package EngineRequirements {
     requirement def SubsystemRequirement :> Requirement;
     requirement def ComponentRequirement :> Requirement;
 
+    // CHECKABLE REQUIREMENTS (checkableReqs 2026-06-10): a concrete requirement MAY carry
+    // native `require constraint { <predicate over its attributes/subject> }` and/or
+    // `assume { ... }` to be machine-checkable (parses — see _spike_trace.py). Prefer this
+    // over a prose `statement` when the condition is formalizable. EVALUATION is solver-
+    // dependent (an external evaluator such as SysIDE walks `satisfy` edges and checks these);
+    // the pilot kernel PARSES but does not evaluate. Authored at instance time, not on the
+    // abstract type above.
+
     // Assumption — taken as true without proof. First-class because when an
     // assumption BREAKS, everything derived from it goes suspect (a high-value
     // input to the suspicion engine).
