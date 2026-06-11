@@ -61,7 +61,7 @@ package EngineBacklog {
         satisfy testModelDoD by testModel;
         requirement instanceAwareDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "query emits OUTSTANDING + SUSPECT from .tracking work-items"; }
         satisfy instanceAwareDoD by instanceAware;
-        requirement schemaAuditDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "schema types aligned with natives"; }
+        requirement schemaAuditDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "schema types aligned with natives"; :>> verifiedAtCommit = "72bb02b"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy schemaAuditDoD by schemaAudit;
         requirement instanceMigrationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "processes/decisions/skills-registry parse green under new packages"; }
         satisfy instanceMigrationDoD by instanceMigration;
@@ -79,8 +79,10 @@ package EngineBacklog {
         action nativeAlloc;      // architecture allocate + interface def / connection
         action temporalModel;    // decide: native occurrence/snapshot/timeslice vs git-only ancestry
         action sec26Materialize; // add a sanctioned materialized-view sentence to CLAUDE.md §2.6
+        action userCapture;      // capture acting user (git piggyback; fallback .env/prompt) -> actor registry
 
         first schemaAudit then strongTyping;
+        first strongTyping then userCapture;
         first schemaAudit then nativeTrace;
         first schemaAudit then analysisCalc;
         first schemaAudit then nativeAlloc;
@@ -103,7 +105,9 @@ package EngineBacklog {
         satisfy nativeAllocDoD by nativeAlloc;
         requirement temporalModelDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "decided: adopt native occurrence/snapshot/timeslice or stay git-only for ancestry"; }
         satisfy temporalModelDoD by temporalModel;
-        requirement sec26MaterializeDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "CLAUDE.md §2.6 gains a sanctioned marked-materialized-view clause"; }
+        requirement sec26MaterializeDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "CLAUDE.md §2.6 gains a sanctioned marked-materialized-view clause"; :>> verifiedAtCommit = "062b97f"; :>> verifiedAt = "2026-06-10"; :>> verifiedBy = "user"; }
         satisfy sec26MaterializeDoD by sec26Materialize;
+        requirement userCaptureDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "acting user captured from git config (piggyback; fallback .env/prompt) + appended to the actor registry; authoredBy/verifiedBy reference it"; }
+        satisfy userCaptureDoD by userCapture;
     }
 }
