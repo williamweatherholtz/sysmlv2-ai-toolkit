@@ -148,7 +148,11 @@ The six workflows (see the spec for detail):
   implementing *accepted* work needs no separate permission. But green-lighting an
   *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE
   (process / schema / decision, §3a) needs human acceptance before commit; when unsure, treat it
-  as needing acceptance. (Don't merge to `main` until told.)
+  as needing acceptance.
+- **`main` is the canonical branch — work on it directly.** Commit accepted work straight to
+  `main`; the `post-commit` hook pushes every commit. No long-lived feature branches: everything
+  is pushed and merged to `main` only. (This overrides the generic "branch off the default branch
+  first" default — per explicit standing instruction, 2026-06-11.)
 - **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
 - **Bootstrap exemption:** building the engine's own tooling is tracked in `RESUME.md` (the

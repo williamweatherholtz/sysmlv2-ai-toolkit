@@ -12,10 +12,12 @@ separate deliverable. Full rationale: `.engine/decisions/0001`–`0010`.
 
 ## Git state
 
-- Branch: **`engine-restructure`** (off `main`), pushed to
-  `github.com/williamweatherholtz/sysmlv2-ai-toolkit`. Do NOT merge to `main`
-  until the schema validates green.
-- Prior commit: `9f6d319` (the `.engine/` restructure).
+- **`main` is the canonical branch — work on it directly** (standing instruction
+  2026-06-11). Everything is pushed and merged to `main` only; no long-lived feature
+  branches. The `post-commit` hook pushes every commit. Repo:
+  `github.com/williamweatherholtz/sysmlv2-ai-toolkit`.
+- The `engine-restructure` branch was fast-forward-merged into `main` (2026-06-11); all
+  schema/process/tooling work now lives on `main`.
 
 ## Status
 
