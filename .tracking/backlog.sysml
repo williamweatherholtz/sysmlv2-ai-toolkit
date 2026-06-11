@@ -54,25 +54,31 @@ package EngineBacklog {
         part processSpecR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
         verification schemaRewriteDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "validate_schema 12/12 green"; }
         part schemaRewriteR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_schema"; }
+        part schemaRewriteR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification workflowsDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "validate_workflows 7/7 green"; }
         part workflowsR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_workflows"; }
+        part workflowsR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_workflows"; }
         verification validatorFixDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "validator returns cleanly; zero orphaned JVMs"; }
         part validatorFixR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "demo"; }
         verification autoPushDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "a commit triggers an automatic push"; }
         part autoPushR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "demo"; }
         verification whatsNextV2DoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "resolver lays out all workflows incl. parallelism; clean exit"; }
         part whatsNextV2R1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2f762a6"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "whats_next"; }
+        part whatsNextV2R2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "whats_next"; }
 
         verification testModelDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "verification model decided + native grammar validated"; }
         part testModelR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0f5c7d1"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
         verification instanceAwareDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "query DISCOVERS work-item backlogs from .tracking/*.sysml (action defs) and emits OUTSTANDING + SUSPECT; no hardcoded target; --target focuses one; item + override verified"; }
         part instanceAwareR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "adc35ab"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
+        part instanceAwareR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         verification schemaAuditDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "schema types aligned with natives"; }
         part schemaAuditR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "72bb02b"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
         verification instanceMigrationDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "all 14 instance files (10 decisions + 3 processes + skills-registry) migrated to flat Engine<Concern> packages; parse green via validate_instances (14/14); Gate/GateCheck reconceived as Process/ProcessStep; legacy validate_sysml.py retired"; }
         part instanceMigrationR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e39a49e"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_instances"; }
+        part instanceMigrationR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_instances"; }
         verification queryToolsDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "general query layer answers item/downstream/trace/suspect/outstanding (+ whats-next); verified on whatsNextV2/schemaAudit"; }
         part queryToolsR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35f5d54"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
+        part queryToolsR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
 
         // ---- schemaAudit critique findings (2026-06-10): native SysML v2 leverage ----
         // All depend on schemaAudit (the native-metaclass migration). strongTyping is
@@ -99,16 +105,22 @@ package EngineBacklog {
 
         verification strongTypingDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "enum def closed-sets + value types (Uuid/Timestamp) adopted across schema/core; validates 12/12 green (typed Actor ref deferred to userCapture)"; }
         part strongTypingR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c4d2f75"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_schema"; }
+        part strongTypingR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification nativeTraceDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "edge strategy set + documented in relationships.sysml: satisfy (native stmt) + verify (native verification objective) confirmed parsing; derive/refine/trace are v1-only -> :>/deferred; allocate/dependsOn/supersede stay markers; schema validates 12/12 green"; }
         part nativeTraceR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c4ea4c7"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_schema"; }
+        part nativeTraceR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification nativeViewsDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "engine views declared as native view def anchors (Outstanding/Suspect/Trace) + viewpoint in computed.sysml; expose/render NOT in pilot grammar so bodies stay computed by query.py (deferred to newer toolchain); 13/13 green"; }
         part nativeViewsR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71ad96d"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
+        part nativeViewsR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         verification checkableReqsDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "concrete requirements may carry native require/assume constraints (parses, _spike_trace.py); documented in requirements.sysml; evaluation is solver-dependent (external SysIDE), not the kernel; schema 12/12 green"; }
         part checkableReqsR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f0044f4"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "validate_schema"; }
+        part checkableReqsR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification analysisCalcDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "derivations expressed as native calc/analysis defs (RequirementCoverage calc w/ expression + SuspicionSweep analysis) in computed.sysml; 13/13 green"; }
         part analysisCalcR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71ad96d"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
+        part analysisCalcR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
         verification nativeAllocDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "native allocate X to Y + allocation def + connect + interface def(>=2 ends) confirmed parsing; allocation def anchor in EngineArchitecture; ICD/matrix stay computed; 13/13 green"; }
         part nativeAllocR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71ad96d"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
+        part nativeAllocR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_schema"; }
         verification temporalModelDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "DECIDED stay git-only (merge-base ancestry) for the engine timeline; native occurrence/snapshot/timeslice noted as available for deliverable/subject-version modeling, not the engine clock"; }
         part temporalModelR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0e8b24c"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
         // ---- 2026-06-11 architectural critique: 13 CRs, ALL ACCEPTED BY USER ----
@@ -155,6 +167,7 @@ package EngineBacklog {
         verification crVerificationDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "DoD verdicts are appended TestResult records (immutable); method uses VerificationMethod enum; query computes done from results; all green"; }
         part crVerificationR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "df27aa2"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "validate_tracking"; }
         verification crSuspicionDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "suspicion = material change (git) over satisfy/:> + #OrderingOnly honored + transitive; verifiedAtCommit SHAs validated (INVALID-EVIDENCE bucket); ordering edge restored"; }
+        part crSuspicionR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "_test_suspect"; }
         verification crIdentityDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "all instances carry :>> id UUIDs; tooling keys qualified; actor registry = Person parts; validators warn on missing id"; }
         verification crCursorDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = ".tracking/state.sysml cursor exists; query orient merges cursor + ready + suspect"; }
         verification crProcessHonestyDoD : Test { :>> method = VerificationMethod::inspect; :>> procedureText = "registry lists the 5 real skills (phantoms gone); agile process matches main-only reality; DoR/DoD steps carry evaluability labels"; }
@@ -165,5 +178,6 @@ package EngineBacklog {
         part sec26MaterializeR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "062b97f"; :>> judgedAt = "2026-06-10"; :>> judgedBy = "user"; }
         verification userCaptureDoD : Test { :>> method = VerificationMethod::demo; :>> procedureText = "capture_user.py captures the acting user from git EFFECTIVE identity (git var GIT_COMMITTER_IDENT — config is often unset; fallback .env/prompt) + idempotently registers in .tracking/actors.sysml ActorId enum; demonstrated (wweatherholtz); parses via validate_tracking. Wiring authoredBy/verifiedBy to ActorId deferred to instanceMigration"; }
         part userCaptureR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3e40ff7"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
+        part userCaptureR2 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "61850f4"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "demo"; }
     }
 }
