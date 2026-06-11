@@ -13,13 +13,27 @@
 package EngineElement {
     private import ScalarValues::*;
 
+    // ---- shared value types + enumerations (strongTyping 2026-06-10) ----
+    // Named scalar value types (intent + future validation) and closed-set
+    // enums replace bare String where the domain is fixed. CROSS-FILE vocab
+    // lives here (EngineElement is imported everywhere); domain-only vocab
+    // (e.g. NeedSource) lives in its own domain file.
+    attribute def Uuid :> String;          // immutable identity
+    attribute def Timestamp :> String;     // ISO-8601 date/time
+
+    enum def ActorKind { human; ai; }
+    enum def VerdictKind { pass; fail; inconclusive; error; }                    // native verification verdict
+    enum def VerificationMethod { inspect; analyze; demo; test; confirmation; }  // native set + engine confirmation
+    enum def Priority { must; should; could; wont; }                            // MoSCoW
+    enum def RequirementKind { functional; nonFunctional; safety; security; interfaceReq; }
+
     abstract part def Element {
-        attribute id : String;            // UUID — immutable identity
+        attribute id : Uuid;              // immutable identity
         attribute title : String;         // authored human label (may duplicate)
-        attribute createdAt : String;     // ISO 8601
-        attribute updatedAt : String;     // ISO 8601
-        attribute authoredBy : String;    // actor id (human or AI skill)
-        attribute currentState : String;  // name of the current WorkflowState
+        attribute createdAt : Timestamp;
+        attribute updatedAt : Timestamp;
+        attribute authoredBy : String;    // actor id (typed ref to the registry comes with userCapture)
+        attribute currentState : String;  // name of the current WorkflowState (slated to become a view)
     }
 
     // Native metaclasses (requirement / use case / verification def) CANNOT
@@ -29,26 +43,26 @@ package EngineElement {
     // parse-ephemeral (regenerated every parse), so it can't be durable identity.
     // (schemaAudit 2026-06-10 — supersedes the prior part-based-everything choice.)
     abstract requirement def TrackedRequirement {
-        attribute id : String;
+        attribute id : Uuid;
         attribute title : String;
-        attribute createdAt : String;
-        attribute updatedAt : String;
+        attribute createdAt : Timestamp;
+        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
         attribute currentState : String;
     }
     abstract use case def TrackedUseCase {
-        attribute id : String;
+        attribute id : Uuid;
         attribute title : String;
-        attribute createdAt : String;
-        attribute updatedAt : String;
+        attribute createdAt : Timestamp;
+        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
         attribute currentState : String;
     }
     abstract verification def TrackedVerification {
-        attribute id : String;
+        attribute id : Uuid;
         attribute title : String;
-        attribute createdAt : String;
-        attribute updatedAt : String;
+        attribute createdAt : Timestamp;
+        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
         attribute currentState : String;
     }
@@ -57,10 +71,10 @@ package EngineElement {
     // Rich org modeling is DELIVERABLE subject matter, never the engine.
     part def Actor {
         attribute name : String;
-        attribute kind : String;          // "human" | "ai"
+        attribute kind : ActorKind;
     }
     part def Person :> Actor {
-        :>> kind = "human";
+        :>> kind = ActorKind::human;
     }
     part def Role {
         attribute name : String;          // a function filled while doing tracked work

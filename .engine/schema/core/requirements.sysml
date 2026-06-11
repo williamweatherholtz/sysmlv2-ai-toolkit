@@ -22,10 +22,10 @@ package EngineRequirements {
     abstract requirement def Requirement :> TrackedRequirement {
         attribute statement : String;               // EARS-formatted
         attribute rationale : String;
-        attribute kind : String[0..1];               // functional|non-functional|safety|security|interface
+        attribute kind : RequirementKind[0..1];
         attribute safetyLevel : String[0..1];        // PLr / SIL / ASIL when safety-related
-        attribute verificationMethod : String[*];    // inspect|analyze|demo|test (native) + confirmation (engine)
-        attribute priority : String;                // MoSCoW
+        attribute verificationMethod : VerificationMethod[*];
+        attribute priority : Priority;               // MoSCoW
     }
 
     requirement def SystemRequirement :> Requirement;
@@ -35,9 +35,11 @@ package EngineRequirements {
     // Assumption — taken as true without proof. First-class because when an
     // assumption BREAKS, everything derived from it goes suspect (a high-value
     // input to the suspicion engine).
+    enum def Confidence { high; medium; low; }
+
     part def Assumption :> Element {
         attribute statement : String;
-        attribute confidence : String;              // high | medium | low
-        attribute validUntil : String[0..1];         // optional review date
+        attribute confidence : Confidence;
+        attribute validUntil : Timestamp[0..1];      // optional review date
     }
 }

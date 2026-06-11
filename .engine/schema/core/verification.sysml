@@ -19,7 +19,7 @@ package EngineVerification {
     // checks is linked via the engine #Verify edge; `method` implies who runs it
     // (test/analyze -> automatable; inspect/demo/confirmation -> human).
     verification def Test :> TrackedVerification {
-        attribute method : String;          // inspect | analyze | demo | test | confirmation
+        attribute method : VerificationMethod;
         attribute procedureText : String;   // how to carry it out
         attribute location : String[0..1];   // path to an automated test, if any
     }
@@ -33,8 +33,8 @@ package EngineVerification {
     // judgedAgainst is a git commit SHA: happened-before is computed via git
     // ANCESTRY (wall-clock can't order divergent branches). See the contract.
     part def TestResult :> Element {
-        attribute outcome : String;         // pass | fail | inconclusive | error (VerdictKind)
-        attribute judgedAt : String;        // ISO 8601 (display only)
+        attribute outcome : VerdictKind;
+        attribute judgedAt : Timestamp;     // display only
         attribute judgedAgainst : String;   // git commit SHA (causal truth)
         attribute judgedBy : String;        // ci | actor id
         attribute notes : String[0..1];

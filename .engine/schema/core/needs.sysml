@@ -14,6 +14,9 @@ package EngineNeeds {
     private import ScalarValues::*;
     private import EngineElement::*;
 
+    // domain-only vocab (used only here)
+    enum def NeedSource { customer; operator; internal; competitive; regulatory; safety; }
+
     part def Brief :> Element {
         attribute problem : String;
         attribute opportunity : String;
@@ -29,10 +32,10 @@ package EngineNeeds {
     // tracked via TrackedRequirement. Distinguished from technical requirements by
     // `source`, not by metaclass.
     requirement def Need :> TrackedRequirement {
-        attribute source : String;                   // customer|operator|internal|competitive|regulatory|safety
+        attribute source : NeedSource;
         attribute statement : String;                // solution-free desired outcome (JTBD)
         attribute marketJustification : String[0..1]; // opportunity / competitive rationale
-        attribute priority : String;                 // MoSCoW
+        attribute priority : Priority;               // MoSCoW
     }
 
     // UseCase is a native `use case def`; scenarios stay as its sub-text.
