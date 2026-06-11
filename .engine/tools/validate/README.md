@@ -15,19 +15,23 @@ engine's `.sysml` files. Confirmed findings live in
 
 ```
 & "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe" run -n sysml \
-    --no-capture-output python <this-dir>\validate_sysml.py
+    --no-capture-output python <this-dir>\validate_schema.py
 ```
 
 Must run through `conda run -n sysml` (the kernelspec invokes bare `java`, which
 is only on PATH inside the activated env). Disable the sandbox (subprocess +
 kernel). Classifier: a cell FAILS iff kernel output contains `ERROR:`.
 
-## Files
+## Files (the four validators — one per layer)
 
-- `validate_sysml.py` — main harness: probes + per-file checks. **NOTE:** its
-  `ENGINE` path and the cell-by-cell approach predate the "distinct packages +
-  imports, validate concatenated" decision — update it to concatenate
-  dependency-ordered files into one submission during the schema rewrite.
-- `validate_probes.py`, `import_probe.py`, `structure_probe.py` — the
-  exploratory probes that established the syntax findings; kept as templates and
-  evidence.
+- `validate_schema.py` — `schema/core/*` + `schema/safety/*` (13 files), in
+  dependency order on one shared kernel.
+- `validate_workflows.py` — `workflows/*.sysml` + `_meta.sysml`.
+- `validate_instances.py` — the `.engine` instance content (decisions / processes /
+  skills-registry), loaded after the schema.
+- `validate_tracking.py` — `.tracking/*.sysml` (backlog, actors), loaded after `_meta`.
+- `_kernel.py` — shared kernel driver (DEVNULL + clean teardown; see its header).
+- `_spike_*.py` — pilot grammar spikes (evidence for syntax findings); kept as templates.
+- `validate_probes.py`, `import_probe.py`, `structure_probe.py` — exploratory probes.
+
+(The legacy `validate_sysml.py` was retired 2026-06-11 — it predated the flat-package split.)

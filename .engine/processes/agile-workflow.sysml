@@ -6,9 +6,10 @@
 // medium/long-term direction.
 // SYNTAX PENDING PILOT VALIDATION.
 // =====================================================================
-package Engine {
-package Processes {
-    private import Engine::Core::*;
+package EngineAgileProcess {
+    private import EngineProcess::*;
+    private import EngineState::*;
+    private import ScalarValues::*;
 
     // -----------------------------------------------------------------
     // Default workflow states (modular — a project may redefine).
@@ -36,59 +37,59 @@ package Processes {
 
     // ---- Refinement (continuous) ------------------------------------
     part refinement : Process {
-        :>> name = "Backlog Refinement";
+        :>> title = "Backlog Refinement";
         :>> purpose = "Move items backlog -> ready: acceptance criteria "
                     + "(as atomic Tests), sizing, dependency links.";
         :>> cadence = "continuous";
     }
     part refineCriteria : ProcessStep {
-        :>> name = "Acceptance criteria as Tests";
+        :>> title = "Acceptance criteria as Tests";
         :>> order = 1;
-        :>> trigger = "Candidate Story selected.";
-        :>> action = "For each criterion, create an atomic Test and link "
+        :>> triggerCondition = "Candidate Story selected.";
+        :>> actionText = "For each criterion, create an atomic Test and link "
                   + "it by `verify`. NO acceptance-criteria text blob.";
-        :>> output = "Tests created and verify-linked.";
+        :>> producedArtifact = "Tests created and verify-linked.";
         :>> owner = "either";
     }
     part refineSize : ProcessStep {
-        :>> name = "Size";
+        :>> title = "Size";
         :>> order = 2;
-        :>> trigger = "Criteria present as Tests.";
-        :>> action = "Assign estimatedPoints (Fibonacci 1,2,3,5,8).";
-        :>> output = "Sized Story.";
+        :>> triggerCondition = "Criteria present as Tests.";
+        :>> actionText = "Assign estimatedPoints (Fibonacci 1,2,3,5,8).";
+        :>> producedArtifact = "Sized Story.";
         :>> owner = "human";
     }
     part refineLink : ProcessStep {
-        :>> name = "Link & promote";
+        :>> title = "Link & promote";
         :>> order = 3;
-        :>> trigger = "Sized.";
-        :>> action = "Add dependency/satisfy edges; set currentState = ready.";
-        :>> output = "Graph-connected, sprint-eligible Story.";
+        :>> triggerCondition = "Sized.";
+        :>> actionText = "Add dependency/satisfy edges; set currentState = ready.";
+        :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
         :>> owner = "either";
     }
 
     // ---- Planning (per-sprint, event-driven) ------------------------
     part planning : Process {
-        :>> name = "Sprint Planning";
+        :>> title = "Sprint Planning";
         :>> purpose = "Triage 'ready' Stories into a Sprint under the "
                     + "points budget, against a one-sentence goal.";
         :>> cadence = "event-driven";
     }
     part planGoal : ProcessStep {
-        :>> name = "Set goal";
+        :>> title = "Set goal";
         :>> order = 1;
-        :>> trigger = "Previous sprint closed OR new batch initiated by human.";
-        :>> action = "Write Sprint.goal.";
-        :>> output = "Sprint with goal.";
+        :>> triggerCondition = "Previous sprint closed OR new batch initiated by human.";
+        :>> actionText = "Write Sprint.goal.";
+        :>> producedArtifact = "Sprint with goal.";
         :>> owner = "human";
     }
     part planPull : ProcessStep {
-        :>> name = "Pull & triage";
+        :>> title = "Pull & triage";
         :>> order = 2;
-        :>> trigger = "Goal set.";
-        :>> action = "Add 'ready' Stories until points ~ budget target. "
+        :>> triggerCondition = "Goal set.";
+        :>> actionText = "Add 'ready' Stories until points ~ budget target. "
                   + "Triage priority and antagonistically question scope.";
-        :>> output = "Populated Sprint.";
+        :>> producedArtifact = "Populated Sprint.";
         :>> owner = "either";
     }
 
@@ -97,61 +98,61 @@ package Processes {
     // each ~5-point batch of upcoming work. This is the Definition of
     // Ready gate in action (see definition-of-ready.sysml).
     part standup : Process {
-        :>> name = "Standup";
+        :>> title = "Standup";
         :>> purpose = "Before each ~5-point batch, antagonistically "
                     + "critique each upcoming item against the DoR gate. "
                     + "If gaps: resolve them, or invoke grill-me.";
         :>> cadence = "event-driven";
     }
     part standupGate : ProcessStep {
-        :>> name = "Run DoR gate on the batch";
+        :>> title = "Run DoR gate on the batch";
         :>> order = 1;
-        :>> trigger = "About to start ~5 points of work.";
-        :>> action = "For each item run the Definition of Ready gate. "
+        :>> triggerCondition = "About to start ~5 points of work.";
+        :>> actionText = "For each item run the Definition of Ready gate. "
                   + "Pass -> go. Fail -> resolve or invoke grill-me skill.";
-        :>> output = "Batch cleared to start, or gaps logged/resolved.";
+        :>> producedArtifact = "Batch cleared to start, or gaps logged/resolved.";
         :>> owner = "either";
     }
 
     // ---- Implementation (per-story) ---------------------------------
     part implementation : Process {
-        :>> name = "Implementation";
+        :>> title = "Implementation";
         :>> purpose = "Move a Story in_progress -> in_review -> done.";
         :>> cadence = "per-story";
     }
     part implDo : ProcessStep {
-        :>> name = "Build";
+        :>> title = "Build";
         :>> order = 1;
-        :>> trigger = "Story in_progress and past Standup.";
-        :>> action = "Write code/content + the Tests that verify it.";
-        :>> output = "Working changes; TestResults appended.";
+        :>> triggerCondition = "Story in_progress and past Standup.";
+        :>> actionText = "Write code/content + the Tests that verify it.";
+        :>> producedArtifact = "Working changes; TestResults appended.";
         :>> owner = "either";
     }
     part implModel : ProcessStep {
-        :>> name = "Update the model";
+        :>> title = "Update the model";
         :>> order = 2;
-        :>> trigger = "Implementation complete locally.";
-        :>> action = "Append TestResults (with commit SHA). The suspicion "
+        :>> triggerCondition = "Implementation complete locally.";
+        :>> actionText = "Append TestResults (with commit SHA). The suspicion "
                   + "engine recomputes coverage/staleness automatically.";
-        :>> output = "Authored facts current; views recompute.";
+        :>> producedArtifact = "Authored facts current; views recompute.";
         :>> owner = "ai";
     }
     part implReview : ProcessStep {
-        :>> name = "Review";
+        :>> title = "Review";
         :>> order = 3;
-        :>> trigger = "Changes ready.";
-        :>> action = "Open PR (CI comments computed-state deltas). "
+        :>> triggerCondition = "Changes ready.";
+        :>> actionText = "Open PR (CI comments computed-state deltas). "
                   + "Set currentState = in_review.";
-        :>> output = "PR open.";
+        :>> producedArtifact = "PR open.";
         :>> owner = "either";
     }
     part implClose : ProcessStep {
-        :>> name = "Close out";
+        :>> title = "Close out";
         :>> order = 4;
-        :>> trigger = "PR merged.";
-        :>> action = "Run Definition of Done gate. If it passes, set "
+        :>> triggerCondition = "PR merged.";
+        :>> actionText = "Run Definition of Done gate. If it passes, set "
                   + "currentState = done.";
-        :>> output = "Story done iff satisfaction == verified.";
+        :>> producedArtifact = "Story done iff satisfaction == verified.";
         :>> owner = "ai";
     }
 
@@ -159,46 +160,45 @@ package Processes {
     // Valuable for solo+AI: turns workflow learnings into Decisions /
     // process changes (e.g. "bash failed on Windows -> use PowerShell").
     part retrospective : Process {
-        :>> name = "Retrospective";
+        :>> title = "Retrospective";
         :>> purpose = "Promote workflow learnings into Decisions and "
                     + "process/convention changes.";
         :>> cadence = "per-sprint";
     }
     part retroPromote : ProcessStep {
-        :>> name = "Promote learnings";
+        :>> title = "Promote learnings";
         :>> order = 1;
-        :>> trigger = "End of sprint; a learning changes future behavior.";
-        :>> action = "Create a Decision; update Process/schema if needed.";
-        :>> output = "Tracked Decision; improved workflow.";
+        :>> triggerCondition = "End of sprint; a learning changes future behavior.";
+        :>> actionText = "Create a Decision; update Process/schema if needed.";
+        :>> producedArtifact = "Tracked Decision; improved workflow.";
         :>> owner = "human";
     }
 
     // ---- Staleness sweep (continuous) -------------------------------
     part stalenessSweep : Process {
-        :>> name = "Staleness Sweep";
+        :>> title = "Staleness Sweep";
         :>> purpose = "On material upstream change, recompute suspicion "
                     + "and surface newly-suspect items for review.";
         :>> cadence = "continuous";
     }
     part sweepDetect : ProcessStep {
-        :>> name = "Recompute & flag";
+        :>> title = "Recompute & flag";
         :>> order = 1;
-        :>> trigger = "Commit materially changes a Requirement, Decision, "
+        :>> triggerCondition = "Commit materially changes a Requirement, Decision, "
                   + "Component, Assumption, or any STPA element.";
-        :>> action = "Recompute suspicionState; comment newly-suspect "
+        :>> actionText = "Recompute suspicionState; comment newly-suspect "
                   + "items on the PR.";
-        :>> output = "Suspect set surfaced.";
+        :>> producedArtifact = "Suspect set surfaced.";
         :>> owner = "ai";
     }
     part sweepResolve : ProcessStep {
-        :>> name = "Resolve suspicion";
+        :>> title = "Resolve suspicion";
         :>> order = 2;
-        :>> trigger = "Item is suspect.";
-        :>> action = "Re-run/re-judge its Tests (auto or human by "
+        :>> triggerCondition = "Item is suspect.";
+        :>> actionText = "Re-run/re-judge its Tests (auto or human by "
                   + "method), or open a follow-up Story.";
-        :>> output = "Coverage restored or follow-up created.";
+        :>> producedArtifact = "Coverage restored or follow-up created.";
         :>> owner = "either";
     }
 
-}
 }

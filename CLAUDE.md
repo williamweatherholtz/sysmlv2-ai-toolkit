@@ -164,14 +164,18 @@ The six workflows (see the spec for detail):
 
 ## 5. Validation (mandatory for every `.sysml` change)
 
-The SysML v2 syntax here is **pending validation against the pilot implementation** — treat it
-as unproven. A change is not done until it parses with zero `ERROR:`:
+A change is not done until it parses with zero `ERROR:`. Run the validator that covers
+what you touched (each starts the pilot kernel, ~20s):
 
 ```
-conda run -n sysml --no-capture-output python .engine\tools\validate\validate_sysml.py
+conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
+conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
+conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
+conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
 ```
 
-(Run through `conda run -n sysml`; the kernel calls bare `java`. Sandbox must be disabled.)
+(Run through `conda run -n sysml`; the kernel calls bare `java`. Sandbox must be disabled.
+The legacy `validate_sysml.py` was retired 2026-06-11 — it predates the flat-package split.)
 See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts before authoring.
 
 ---

@@ -5,49 +5,47 @@
 // self-promoted by a skill (decision 0003).
 // SYNTAX PENDING PILOT VALIDATION.
 // =====================================================================
-package Engine {
-package Skills {
-    private import Engine::Core::*;
+package EngineSkillRegistry {
+    private import EngineSkills::*;
 
     part triage : AISkill {
-        :>> name = "triage";
+        :>> title = "triage";
         :>> purpose = "Run backlog refinement steps on new items up to "
                     + "the human sizing gate: acceptance criteria as "
                     + "Tests, dependency links.";
         :>> location = ".engine/skills/triage/SKILL.md";
-        :>> trigger = "WorkItem created in 'backlog'.";
+        :>> triggerCondition = "WorkItem created in 'backlog'.";
         :>> writePolicy = "pr-only";
     }
 
     part stalenessSweepSkill : Agent {
-        :>> name = "staleness-sweep";
+        :>> title = "staleness-sweep";
         :>> purpose = "Recompute suspicion on material upstream change "
                     + "and comment newly-suspect items on the PR. "
                     + "Mechanical bookkeeping only.";
         :>> location = ".engine/skills/staleness-sweep/SKILL.md";
-        :>> trigger = "Commit hook / scheduled.";
+        :>> triggerCondition = "Commit hook / scheduled.";
         :>> writePolicy = "direct";
         :>> subagents = ();
     }
 
     part implementer : Agent {
-        :>> name = "implementer";
+        :>> title = "implementer";
         :>> purpose = "Take a 'ready' Story past Standup, build it + its "
                     + "Tests, append results, open a PR.";
         :>> location = ".engine/skills/implementer/SKILL.md";
-        :>> trigger = "Dispatched by human or planner.";
+        :>> triggerCondition = "Dispatched by human or planner.";
         :>> writePolicy = "pr-only";
         :>> subagents = ();
     }
 
     part grillMe : AISkill {
-        :>> name = "grill-me";
+        :>> title = "grill-me";
         :>> purpose = "Antagonistically interrogate an item/plan to drive "
                     + "DoR gaps to resolution before work starts.";
         :>> location = "~/.claude/skills/grill-me/SKILL.md";
-        :>> trigger = "A Standup/DoR check fails and needs resolution.";
+        :>> triggerCondition = "A Standup/DoR check fails and needs resolution.";
         :>> writePolicy = "read-only";
     }
 
-}
 }

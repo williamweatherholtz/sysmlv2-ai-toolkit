@@ -38,10 +38,16 @@ separate deliverable. Full rationale: `.engine/decisions/0001`–`0010`.
   Work/Architecture/Relationships/State/Process/Skills/Risk + EngineSafety). Run
   `.engine/tools/validate/validate_schema.py`. The process-as-data workflows
   (`.engine/workflows/`, 7/7) parse via `validate_workflows.py`.
-- **Remaining migration:** the instance files `processes/*.sysml`,
-  `decisions/*.sysml`, and `skills/skills-registry.sysml` still use the old nested
-  `Engine::Core` structure and must be rewritten to import the new packages; retire
-  the legacy `validate_sysml.py` in favor of `validate_schema.py`/`validate_workflows.py`.
+- **Instance migration — DONE (2026-06-11, `instanceMigration`).** All 14 instance files
+  (10 decisions + 3 processes + skills-registry) migrated from nested `Engine::Core` to the
+  flat `Engine<Concern>` packages and parse green via the new `validate_instances.py` (14/14).
+  Decisions: `decision`→`decisionText`, one package each. agile-workflow + skills: attribute
+  renames (`name`→`title`, `trigger`→`triggerCondition`, `action`→`actionText`,
+  `output`→`producedArtifact`). DoD/DoR: `Gate`/`GateCheck` **removed** (CLAUDE.md §2.7 — a
+  gate is its verify-linked Tests, not a type) and reconceived as `Process`+`ProcessStep`.
+  Legacy `validate_sysml.py` **retired** (4 layer validators now: schema/workflows/instances/tracking).
+  Parked: reconcile `_meta`'s `AcceptanceCriterion` with `EngineVerification` (the backlog's
+  DoD representation; works as-is, separate concern).
 
 ## CURRENT WORKLIST (2026-06-09 — our tracker; the CLI task list was retired)
 
@@ -187,7 +193,9 @@ query CLI (`whats-downstream`, `whats-stale-since`), API, browser GUI. See
 ## How to validate (every schema change)
 See `.engine/tools/validate/README.md` and the memory note
 "SysMLv2 validation toolchain". TL;DR:
-`conda run -n sysml --no-capture-output python .engine\tools\validate\validate_sysml.py`
+`conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py`
+(+ `validate_workflows.py` / `validate_instances.py` / `validate_tracking.py` per layer;
+`validate_sysml.py` was retired 2026-06-11).
 (sandbox disabled).
 
 ## Recommended first action on resume

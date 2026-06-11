@@ -1,46 +1,46 @@
 // =====================================================================
-// Engine::Processes::DefinitionOfDone
-// The gate a Story passes before currentState -> done.
-// GateChecks are queryable completeness rules (engine-evaluated).
-// SYNTAX PENDING PILOT VALIDATION.
+// EngineDoD — Definition of Done: the gate a Story passes before a terminal state.
+//
+// instanceMigration 2026-06-11: Gate/GateCheck are GONE (CLAUDE.md §2.7 — a gate/DoD
+// is its verify-linked Tests passing, not an authored Gate type). DoD is reconceived
+// as a `Process` whose checks are ordered `ProcessStep`s; each step's `actionText` is
+// the verifiable rule. The pass/fail of each is a COMPUTED view (satisfaction +
+// git-ancestry), never authored.
 // =====================================================================
-package Engine {
-package Processes {
-    private import Engine::Core::*;
+package EngineDoD {
+    private import EngineProcess::*;
 
-    part dod : Gate {
-        :>> name = "Definition of Done";
-        :>> appliesWhen = "Before setting a Story to a terminal state.";
+    part dod : Process {
+        :>> title = "Definition of Done";
+        :>> purpose = "Gate before setting a Story to a terminal state: every check below passes.";
+        :>> cadence = "per-item";
     }
 
-    part dodMerged : GateCheck {
-        :>> name = "Merged";
-        :>> rule = "Change is merged to main / PR approved.";
+    part dodMerged : ProcessStep {
+        :>> title = "Merged";
         :>> order = 1;
+        :>> actionText = "Change is merged to main / PR approved.";
         :>> owner = "ai";
     }
-    part dodVerified : GateCheck {
-        :>> name = "Satisfaction == verified";
-        :>> rule = "Computed satisfaction(Story) == verified: every "
-                + "verifying Test has a covering pass (commit ancestry), "
-                + "transitively. No suspect/failing/uncovered.";
+    part dodVerified : ProcessStep {
+        :>> title = "Satisfaction == verified";
         :>> order = 2;
+        :>> actionText = "Computed satisfaction(Story) == verified: every verifying Test "
+                       + "has a covering pass (commit ancestry), transitively. No "
+                       + "suspect/failing/uncovered.";
         :>> owner = "ai";
     }
-    part dodStaleness : GateCheck {
-        :>> name = "Downstream staleness cleared";
-        :>> rule = "Items this Story's changes put into `suspect` are "
-                + "resolved (re-verified) or have follow-up Stories.";
+    part dodStaleness : ProcessStep {
+        :>> title = "Downstream staleness cleared";
         :>> order = 3;
+        :>> actionText = "Items this Story's changes put into `suspect` are resolved "
+                       + "(re-verified) or have follow-up Stories.";
         :>> owner = "either";
     }
-    part dodDocs : GateCheck {
-        :>> name = "Docs in sync";
-        :>> rule = "If user-facing behavior changed, docs updated in the "
-                + "same PR.";
+    part dodDocs : ProcessStep {
+        :>> title = "Docs in sync";
         :>> order = 4;
+        :>> actionText = "If user-facing behavior changed, docs updated in the same PR.";
         :>> owner = "either";
     }
-
-}
 }
