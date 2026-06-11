@@ -126,8 +126,12 @@ it and never mutate** — status, trace matrix, suspicion / stale set, coverage,
 baseline are all views (§2.1).
 
 **§3e — BOOTSTRAP.** Building the engine's own runtime / tooling is exempt from the full
-workflow (it can't yet track its own construction). Do the work, track it in `RESUME.md`,
+workflow (it can't yet track its own construction). Do the work, track it in the backlog,
 and still validate green + commit `CR:` for any schema/process touch (§4, §5).
+**Exception:** a tooling change that alters the *meaning* of a computed view (what counts
+as done / ready / suspect / satisfied) changes process behavior as surely as editing a
+workflow — that is **CHANGE (§3a)**, not BOOTSTRAP: it needs human acceptance and a
+recorded `Decision`.
 
 **§3f — ORIENT.** Read the state cursor and report; no mutation.
 

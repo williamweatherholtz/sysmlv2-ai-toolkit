@@ -139,7 +139,7 @@ package EngineBacklog {
         satisfy crWritePathDoD by crWritePath;
         requirement crKillStateDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "currentState/updatedAt gone from Element + Tracked bases; agile steps no longer author state; all green"; :>> verifiedAtCommit = "4ef8679"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_schema"; }
         satisfy crKillStateDoD by crKillState;
-        requirement crTruthDocsDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "docs match git reality; .tracking policy decided + recorded; usage.md valid; RESUME thinned; lying comments gone"; }
+        requirement crTruthDocsDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "docs match git reality; .tracking policy decided + recorded; usage.md valid; RESUME thinned; lying comments gone; EngineDocSync process added + tied into DoD and CLAUDE.md §4"; :>> verifiedAtCommit = "99e6ed7"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_instances"; }
         satisfy crTruthDocsDoD by crTruthDocs;
         requirement crBootstrapHoleDoD : AcceptanceCriterion { :>> method = "inspect"; :>> statement = "CLAUDE.md §3e routes computed-view semantics changes as CHANGE"; }
         satisfy crBootstrapHoleDoD by crBootstrapHole;
