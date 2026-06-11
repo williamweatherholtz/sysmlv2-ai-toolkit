@@ -7,8 +7,8 @@ package ProjectState {
     private import EngineState::*;
 
     part cursor : StateCursor {
-        :>> activeWorkflow = "BOOTSTRAP";
-        :>> activePhase = "EngineBacklog::EngineBuild";
+        :>> activeWorkflow = "BusinessWorkflow";
+        :>> activePhase = "Business/useCases";
         :>> enteredAt = "2026-06-11";
         :>> enteredBy = "claudeOpus";
     }

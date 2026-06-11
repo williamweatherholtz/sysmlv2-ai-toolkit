@@ -193,14 +193,16 @@ A change is not done until it parses with zero `ERROR:`. Run the validator that 
 what you touched (each starts the pilot kernel, ~20s):
 
 ```
-conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
-conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
-conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
-conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
+$conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
 ```
 
-(Run through `conda run -n sysml`; the kernel calls bare `java`. Sandbox must be disabled.
-The legacy `validate_sysml.py` was retired 2026-06-11 — it predates the flat-package split.)
+(Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.
+The kernel calls bare `java`. Sandbox must be disabled. The legacy `validate_sysml.py` was
+retired 2026-06-11 — it predates the flat-package split.)
 See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts before authoring.
 
 ---
@@ -208,6 +210,13 @@ See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts befo
 ## 6. Environment notes
 
 - Windows + PowerShell. Use PowerShell syntax (`$null`, `$env:VAR`, backtick line-continuation).
+- **`conda` is NOT on `$env:PATH`** in PowerShell sessions that don't run conda init (e.g.
+  Claude Code's shell). Use the full miniforge3 path every time:
+  ```
+  & "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe" run -n sysml --no-capture-output python ...
+  ```
+  Installation root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, **not** miniconda3).
+  The validator commands in §5 must use this prefix — `conda run` as a bare word will not be found.
 - **NEVER pipe `conda run` output into a live cmdlet or redirect** (`| Select-String`,
   `| Out-Null`, `> $null`) — the kernel JVM holds the pipe and the shell HANGS. Run plain.
 - Interrupted kernel runs can orphan JVMs: `python .engine/tools/kill_stale_kernels.py`.
