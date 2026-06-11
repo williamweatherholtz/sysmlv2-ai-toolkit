@@ -1,9 +1,12 @@
 // =====================================================================
 // EngineRelationships — the engine edge algebra as metadata markers.
 //
-// Because the engine's tracked items are parts (:> Element), edges are
-// realized as metadata markers applied to a `dependency` at instance time
-// (there is no `dependency def`). Markers:
+// The engine's tracked items are now MIXED metaclasses (native requirement /
+// use case / verification def + part def). Edges are realized as uniform
+// metadata markers applied to a `dependency` at instance time (there is no
+// `dependency def`), independent of the target's metaclass — so one edge
+// algebra spans natives and parts alike (native satisfy/verify also exist for
+// the native types, but the markers keep the engine layer uniform). Markers:
 //   #Satisfy   design element fulfills a requirement / Need
 //   #Verify    evidence checks an element (validation is the SAME marker
 //              pointing at a Need/UseCase — distinguished by target type)

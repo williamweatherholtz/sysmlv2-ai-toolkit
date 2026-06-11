@@ -1,27 +1,39 @@
 // =====================================================================
-// EngineVerification — atomic verification: TestPlan -> Test -> TestResult.
-// No subjective/objective flag — the verification METHOD carries that.
+// EngineVerification — the verification PROCESS vs. the RESULT RECORD.
+//
+// schemaAudit 2026-06-10 (research-backed): a test IS a verification, so the
+// PROCESS is a native `verification def` (the reusable check/spec — runs 1-to-many).
+// The RESULT is a SEPARATE engine record (TestResult) — never folded into the def,
+// because a verdict is a property of ONE performance against ONE version, not of
+// the reusable spec. "Current pass/fail status" is therefore a COMPUTED VIEW over
+// the latest result + git ancestry (what query.py does), never a stored field.
+// Native enums: VerdictKind = {pass, fail, inconclusive, error};
+// VerificationMethodKind = {inspect, analyze, demo, test} — engine ADDS
+// `confirmation` (human sign-off). Vocab kept as String per the closed-set policy.
 // =====================================================================
 package EngineVerification {
     private import ScalarValues::*;
     private import EngineElement::*;
 
-    part def TestPlan :> Element;          // a suite; contains Tests
-
-    // Test — an ATOMIC verification element, linked to what it checks via
-    // `verify`. `method` implies whether a human is required:
-    //   test/analysis -> automatable;  inspection/demonstration -> human.
-    part def Test :> Element {
-        attribute method : String;          // test | analysis | inspection | demonstration
+    // Test — the reusable verification PROCESS (native verification def). What it
+    // checks is linked via the engine #Verify edge; `method` implies who runs it
+    // (test/analyze -> automatable; inspect/demo/confirmation -> human).
+    verification def Test :> TrackedVerification {
+        attribute method : String;          // inspect | analyze | demo | test | confirmation
         attribute procedureText : String;   // how to carry it out
         attribute location : String[0..1];   // path to an automated test, if any
     }
 
-    // TestResult — an AUTHORED fact: one execution, appended never overwritten.
+    // TestPlan — a suite: a verification that composes member verifications
+    // (native grouping idiom; SysML has no dedicated suite type).
+    verification def TestPlan :> TrackedVerification;
+
+    // TestResult — the engine's atomic immutable RECORD of ONE execution,
+    // appended never overwritten, SEPARATE from the verification process.
     // judgedAgainst is a git commit SHA: happened-before is computed via git
     // ANCESTRY (wall-clock can't order divergent branches). See the contract.
     part def TestResult :> Element {
-        attribute outcome : String;         // pass | fail | skip
+        attribute outcome : String;         // pass | fail | inconclusive | error (VerdictKind)
         attribute judgedAt : String;        // ISO 8601 (display only)
         attribute judgedAgainst : String;   // git commit SHA (causal truth)
         attribute judgedBy : String;        // ci | actor id

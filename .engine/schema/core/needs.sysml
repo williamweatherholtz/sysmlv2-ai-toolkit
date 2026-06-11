@@ -25,14 +25,18 @@ package EngineNeeds {
         attribute goals : String[*];                 // stable, solution-free goals (Cooper)
     }
 
-    part def Need :> Element {
+    // Need is a native `requirement def` (a need IS a requirement on the solution),
+    // tracked via TrackedRequirement. Distinguished from technical requirements by
+    // `source`, not by metaclass.
+    requirement def Need :> TrackedRequirement {
         attribute source : String;                   // customer|operator|internal|competitive|regulatory|safety
         attribute statement : String;                // solution-free desired outcome (JTBD)
         attribute marketJustification : String[0..1]; // opportunity / competitive rationale
         attribute priority : String;                 // MoSCoW
     }
 
-    part def UseCase :> Element {
+    // UseCase is a native `use case def`; scenarios stay as its sub-text.
+    use case def UseCase :> TrackedUseCase {
         attribute description : String;
         attribute mainSuccess : String;              // main success scenario
         attribute extensions : String[*];            // alternate / failure scenarios

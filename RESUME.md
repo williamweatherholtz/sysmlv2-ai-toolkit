@@ -94,11 +94,26 @@ Next, in order:
    **NEXT (v3): instance-aware** — generalize beyond EngineBuild to read arbitrary
    `.tracking/` work-items + their verification results; fold into the schema-type
    audit (verification → native `verification`).
-2b. **Native schema-type audit** — align schema with native SysML where we
-   reinvented it: `Need`→`requirement def` (+ `satisfy`/`verify`), `UseCase`→
-   `use case def`, `Test`/`TestResult`→verification, views→`view def`, and native
-   `elementId` instead of an authored `id`. Keep only the genuinely-novel engine
-   concepts (real/view policy, git-ancestry suspicion, AI `writePolicy`) as metadata.
+2b. **Native schema-type audit — DONE 2026-06-10 (schema/core 12/12 green).**
+   Migrated to native metaclasses via per-metaclass abstract tracked bases
+   (`TrackedRequirement`/`TrackedUseCase`/`TrackedVerification` in EngineElement,
+   since native defs can't `:> part def Element`): `Need`→`requirement def`,
+   `UseCase`→`use case def`, `Requirement`+cascade→`requirement def`, `Test`→
+   `verification def`. **Verification split (research-backed):** `verification def`
+   = reusable PROCESS; `TestResult` stays a SEPARATE `part def` RECORD (verdict +
+   git-ancestry); status is a computed view. `outcome`→VerdictKind vocab
+   {pass|fail|inconclusive|error}; `method` adds `confirmation` to native
+   {inspect|analyze|demo|test}. Engine concepts (Brief/Persona/Assumption/Decision/
+   Issue/Component/actors/risk) stay `part :> Element`. Edge algebra stays uniform
+   metadata markers (EngineRelationships) across natives + parts.
+   **FINDING: native `elementId` is parse-ephemeral** (regenerated each parse) → it
+   CANNOT be durable identity; **authored `id` stays** (corrects the earlier
+   "use native elementId" plan). Pattern validated in `tools/validate/_spike_native.py`.
+   **Parked** (separate invariant-cleanups, not this pass): drop `currentState`
+   (computed view, §2.6); `updatedAt` git-derivable; reconcile `_meta`
+   `AcceptanceCriterion` into this model (during instanceMigration); views→`view def`/`#View`.
+   schemaAudit DoD ("types aligned with natives") is now truthfully confirmable —
+   awaiting explicit human sign-off (per the confirmation rule).
 3. **Instance-file migration** — rewrite `processes/*.sysml`, `decisions/*.sysml`,
    `skills/skills-registry.sysml` to import the new packages; retire `validate_sysml.py`.
 4. **Parked critique findings** — curated-view + frozen Baseline/Signoff for the
