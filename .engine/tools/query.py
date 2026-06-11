@@ -2,6 +2,7 @@
 general query core the user asked for; `whats-next` is one VIEW over it.
 
 Subcommands (argv[1], default 'whats-next'):
+  orient          -> the state cursor (.tracking/state.sysml) + ready/suspect frontier
   whats-next      -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
   outstanding     -> every not-done task
   suspect         -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
@@ -200,6 +201,21 @@ def _criterion_at(sha, task):
     return None
 
 
+def read_cursor():
+    """The state cursor (.tracking/state.sysml) — where the project stands (CR-6)."""
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            text = fh.read()
+        if "StateCursor" not in text:
+            continue
+        attrs = dict(_ASSIGN.findall(text))
+        return {'activeWorkflow': attrs.get('activeWorkflow'),
+                'activePhase': attrs.get('activePhase'),
+                'enteredAt': attrs.get('enteredAt'),
+                'enteredBy': attrs.get('enteredBy')}
+    return None
+
+
 def read_ordering_only():
     """(earlier, later) succession pairs tagged #OrderingOnly — excluded from suspicion."""
     pairs = set()
@@ -316,7 +332,14 @@ def main():
         tasks.update(part)
     classify(tasks, read_ordering_only())
 
-    if sub == "item" and arg:
+    if sub == "orient":
+        out = {"cursor": read_cursor(),
+               "ready": sorted(t for t, i in tasks.items() if i['ready']),
+               "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
+               "invalidEvidence": sorted(t for t, i in tasks.items() if i['invalidEvidence']),
+               "counts": {"done": sum(1 for i in tasks.values() if i['done']),
+                          "outstanding": sum(1 for i in tasks.values() if not i['done'])}}
+    elif sub == "item" and arg:
         out = tasks.get(arg, {"error": f"no task '{arg}'"})
     elif sub == "suspect":
         out = {"suspect": sorted(t for t, i in tasks.items() if i['suspect'])}
