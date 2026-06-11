@@ -22,7 +22,9 @@ package EngineAgileProcess {
     part done        : WorkflowState { :>> name = "done";        :>> order = 6; :>> isTerminal = true;  }
 
     // -----------------------------------------------------------------
-    // Sprint — EVENT-DRIVEN (decision 0010). Not calendar. A sprint is
+    // Sprint — EVENT-DRIVEN (decision 0010). NOTE (CR-10): Sprint/points apply
+    // when Story instances exist; during bootstrap the unit of work is the
+    // backlog task (action + DoD criterion + appended TestResults). Not calendar. A sprint is
     // a coherent batch sized by a points budget (initial target 30-50,
     // to be tuned experimentally) that makes the short-term path clear
     // while producing demonstrable work.
@@ -48,9 +50,10 @@ package EngineAgileProcess {
         :>> title = "Acceptance criteria as Tests";
         :>> order = 1;
         :>> triggerCondition = "Candidate Story selected.";
-        :>> actionText = "For each criterion, create an atomic Test and link "
-                  + "it by `verify`. NO acceptance-criteria text blob.";
-        :>> producedArtifact = "Tests created and verify-linked.";
+        :>> actionText = "Author the task's one-line `verification <task>DoD : Test` "
+                  + "criterion (method + procedureText) in the backlog action def. "
+                  + "NO acceptance-criteria text blob.";
+        :>> producedArtifact = "Method-tagged DoD criterion authored.";
         :>> owner = "either";
     }
     part refineSize : ProcessStep {
@@ -58,8 +61,9 @@ package EngineAgileProcess {
         :>> title = "Size";
         :>> order = 2;
         :>> triggerCondition = "Criteria present as Tests.";
-        :>> actionText = "Assign estimatedPoints (Fibonacci 1,2,3,5,8).";
-        :>> producedArtifact = "Sized Story.";
+        :>> actionText = "Assign rough size (Fibonacci when Story instances exist; "
+                  + "optional for backlog tasks during bootstrap).";
+        :>> producedArtifact = "Sized item.";
         :>> owner = "human";
     }
     part refineLink : ProcessStep {
@@ -67,8 +71,8 @@ package EngineAgileProcess {
         :>> title = "Link & promote";
         :>> order = 3;
         :>> triggerCondition = "Sized.";
-        :>> actionText = "Add dependency/satisfy edges. Readiness is the COMPUTED view "
-                  + "(DoR checks pass) - never authored.";
+        :>> actionText = "Add `first A then B` successions (#OrderingOnly when non-"
+                  + "semantic). Readiness is the COMPUTED view - never authored.";
         :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
         :>> owner = "either";
     }
@@ -95,9 +99,10 @@ package EngineAgileProcess {
         :>> title = "Pull & triage";
         :>> order = 2;
         :>> triggerCondition = "Goal set.";
-        :>> actionText = "Add 'ready' Stories until points ~ budget target. "
-                  + "Triage priority and antagonistically question scope.";
-        :>> producedArtifact = "Populated Sprint.";
+        :>> actionText = "Pull `query.py orient` ready tasks into a coherent batch "
+                  + "(points budget when Stories exist). Triage priority and "
+                  + "antagonistically question scope.";
+        :>> producedArtifact = "Populated batch/Sprint.";
         :>> owner = "either";
     }
 

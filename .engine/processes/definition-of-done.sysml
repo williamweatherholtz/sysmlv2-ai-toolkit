@@ -21,32 +21,31 @@ package EngineDoD {
         :>> id = "5d88008f-fb04-450f-a71b-cdf50041fe01";
         :>> title = "Merged";
         :>> order = 1;
-        :>> actionText = "Change is merged to main / PR approved.";
+        :>> actionText = "[computed: git] Change is committed to main (main-only policy; auto-pushed).";
         :>> owner = "ai";
     }
     part dodVerified : ProcessStep {
         :>> id = "46ec4593-4d12-42c2-9248-492db952f02e";
         :>> title = "Satisfaction == verified";
         :>> order = 2;
-        :>> actionText = "Computed satisfaction(Story) == verified: every verifying Test "
-                       + "has a covering pass (commit ancestry), transitively. No "
-                       + "suspect/failing/uncovered.";
+        :>> actionText = "[computed: query.py] The item's LATEST appended TestResult is a "
+                       + "pass and it is not suspect (D0005 material-change suspicion).";
         :>> owner = "ai";
     }
     part dodStaleness : ProcessStep {
         :>> id = "a6b3bdc1-0454-4b66-bffa-fbbc9be27e7a";
         :>> title = "Downstream staleness cleared";
         :>> order = 3;
-        :>> actionText = "Items this Story's changes put into `suspect` are resolved "
-                       + "(re-verified) or have follow-up Stories.";
+        :>> actionText = "[computed: query.py suspect] Items this change put into suspect "
+                       + "are re-verified (appended results) or have follow-up tasks.";
         :>> owner = "either";
     }
     part dodDocs : ProcessStep {
         :>> id = "1741a1c7-6b24-4823-975c-92be30ecdbad";
         :>> title = "Docs in sync";
         :>> order = 4;
-        :>> actionText = "Run the Documentation Sync process (EngineDocSync): every doc claim "
-                       + "the change invalidates is fixed in the same commit.";
+        :>> actionText = "[judgment] Run the Documentation Sync process (EngineDocSync): every "
+                       + "doc claim the change invalidates is fixed in the same commit.";
         :>> owner = "either";
     }
 }
