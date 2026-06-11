@@ -65,6 +65,10 @@ _ASSIGN = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 _ENUM = re.compile(r'(\w+)\s*=\s*\w+::(\w+)')
 _PKG = re.compile(r'package\s+(\w+)')
 _ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
+# ordering-only successions: gate readiness but do NOT carry suspicion (D0005)
+_ORDERING_ONLY = re.compile(r'#OrderingOnly\s+first\s+(\w+)\s+then\s+(\w+)\s*;')
+# legacy (pre-CR-3) criterion line — used when reading OLD revisions for material change
+_LEGACY_DOD = re.compile(r'requirement\s+(\w+)DoD\s*:\s*AcceptanceCriterion')
 
 
 def tracking_files():
@@ -158,19 +162,101 @@ def _is_ancestor(a, b):
                           capture_output=True).returncode == 0
 
 
-def classify(tasks):
+def _sha_valid(sha):
+    """True if sha resolves to a commit (evidence integrity — critique A9)."""
+    r = subprocess.run(["git", "-C", REPO, "cat-file", "-t", sha], capture_output=True, text=True)
+    return r.returncode == 0 and r.stdout.strip() == "commit"
+
+
+_SHOW_CACHE = {}
+
+
+def _file_at(sha, path):
+    """File content at a commit (relative path, '/'-separated), or None."""
+    key = (sha, path)
+    if key not in _SHOW_CACHE:
+        r = subprocess.run(["git", "-C", REPO, "show", f"{sha}:{path}"],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+        _SHOW_CACHE[key] = r.stdout if r.returncode == 0 else None
+    return _SHOW_CACHE[key]
+
+
+def _criterion_at(sha, task):
+    """The task's criterion statement AS OF a commit (material-change detection,
+    D0005 rule 3). Reads both dialects (v2 verification line / legacy requirement
+    line) so pre-CR-3 revisions compare correctly. None = not determinable."""
+    for f in tracking_files():
+        rel = os.path.relpath(f, REPO).replace(os.sep, "/")
+        text = _file_at(sha, rel)
+        if text is None:
+            continue
+        for line in text.splitlines():
+            m = _DOD_LINE.search(line)
+            if m and m.group(1) == task:
+                return dict(_ASSIGN.findall(line)).get('procedureText')
+            m = _LEGACY_DOD.search(line)
+            if m and m.group(1) == task:
+                return dict(_ASSIGN.findall(line)).get('statement')
+    return None
+
+
+def read_ordering_only():
+    """(earlier, later) succession pairs tagged #OrderingOnly — excluded from suspicion."""
+    pairs = set()
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            for line in fh:
+                m = _ORDERING_ONLY.search(line)
+                if m:
+                    pairs.add((m.group(1), m.group(2)))
+    return pairs
+
+
+def classify(tasks, ordering_only=frozenset()):
+    """D0005-honest classification (CR-4):
+      - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
+      - suspicion triggers: upstream re-verified at a DESCENDANT commit, OR upstream's
+        criterion text MATERIALLY CHANGED since this task's judgment commit;
+      - suspicion travels only over SEMANTIC deps (ordering-only excluded);
+      - suspicion is TRANSITIVE downstream."""
     for info in tasks.values():
-        info['ready'] = (not info['done']) and all(
+        ct = info.get('verifiedAtCommit')
+        info['invalidEvidence'] = bool(info['done'] and ct and not _sha_valid(ct))
+        if info['invalidEvidence']:
+            info['done'] = False           # unverifiable evidence is not done
+            info['verifiedAtCommit'] = None
+    for name, info in tasks.items():
+        info['ready'] = (not info['done']) and not info['invalidEvidence'] and all(
             tasks[d]['done'] for d in info['deps'] if d in tasks)
         suspect = False
         if info['done']:
-            ct = info.get('verifiedAtCommit')
+            ct = info['verifiedAtCommit']
             for d in info['deps']:
-                cd = tasks.get(d, {}).get('verifiedAtCommit')
-                if tasks.get(d, {}).get('done') and cd and ct and cd != ct and _is_ancestor(ct, cd):
-                    suspect = True
+                if (d, name) in ordering_only or d not in tasks:
+                    continue
+                cd = tasks[d].get('verifiedAtCommit')
+                if tasks[d].get('done') and cd and ct and cd != ct and _is_ancestor(ct, cd):
+                    suspect = True           # upstream re-verified after this judgment
+                    break
+                old = _criterion_at(ct, d) if ct else None
+                cur = tasks[d].get('dod', {}).get('statement')
+                if old is not None and cur is not None and old != cur:
+                    suspect = True           # upstream's definition materially changed
                     break
         info['suspect'] = suspect
+    # transitive: a done task whose SEMANTIC dep is suspect is itself suspect
+    changed = True
+    while changed:
+        changed = False
+        for name, info in tasks.items():
+            if info['done'] and not info['suspect']:
+                for d in info['deps']:
+                    if (d, name) in ordering_only:
+                        continue
+                    if tasks.get(d, {}).get('suspect'):
+                        info['suspect'] = True
+                        changed = True
+                        break
     return tasks
 
 
@@ -221,7 +307,7 @@ def main():
     for pkg, adef in targets:
         _, text = _kernel.run_cell(kc, f"%show {pkg}::{adef}")
         tasks.update(build_model(parse_show(text), dods))
-    classify(tasks)
+    classify(tasks, read_ordering_only())
 
     if sub == "item" and arg:
         out = tasks.get(arg, {"error": f"no task '{arg}'"})
@@ -238,7 +324,9 @@ def main():
     else:  # whats-next
         out = {"ready": sorted(t for t, i in tasks.items() if i['ready']),
                "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
-               "blocked": sorted(t for t, i in tasks.items() if not i['done'] and not i['ready']),
+               "invalidEvidence": sorted(t for t, i in tasks.items() if i['invalidEvidence']),
+               "blocked": sorted(t for t, i in tasks.items()
+                                 if not i['done'] and not i['ready'] and not i['invalidEvidence']),
                "done": sorted(t for t, i in tasks.items() if i['done'])}
     print(json.dumps(out, indent=2))
     _kernel.teardown_and_exit(km, 0)

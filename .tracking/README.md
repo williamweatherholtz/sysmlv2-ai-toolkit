@@ -26,7 +26,11 @@ An `action def` here IS a work backlog: tasks = `action`s, dependencies =
 `part <task>R<n> : TestResult` records (outcome + `judgedAgainst` commit) —
 re-verification appends `R2`, never edits `R1`. **Done = the latest result is a
 pass.** Textual contract: `<task>DoD` / `<task>R<n>` naming, one line each
-(the reader is line-based).
+(the reader is line-based). Tag pure-ordering edges `#OrderingOnly first A then B;`
+— they gate readiness but do **not** carry suspicion (D0005). Suspicion fires when
+an upstream is re-verified later OR its criterion text changes after your judgment
+commit, and it propagates transitively; unresolvable `judgedAgainst` SHAs land in
+`invalidEvidence` (not done).
 
 ## Validate (mandatory before commit)
 

@@ -13,6 +13,7 @@
 package EngineBacklog {
     private import EngineElement::*;        // enums (VerificationMethod, VerdictKind)
     private import EngineVerification::*;   // Test (criterion) + TestResult (appended record)
+    private import EngineRelationships::*;  // #OrderingOnly marker
 
     action def EngineBuild {
         // ---- tasks ----
@@ -36,9 +37,10 @@ package EngineBacklog {
         first workflows then whatsNextV2;
         first whatsNextV2 then schemaAudit;
         first whatsNextV2 then testModel;
-        // (removed `first schemaAudit then testModel` 2026-06-10: testModel — verification
-        //  model + grammar — was parallel to schemaAudit, not downstream of it; the edge
-        //  made testModel falsely SUSPECT when schemaAudit landed later.)
+        // Restored 2026-06-11 (CR-4): this TRUE ordering fact was deleted on 2026-06-10 to
+        // silence a false SUSPECT — workaround-by-deletion anti-pattern. Tagged #OrderingOnly:
+        // it gates ordering but does NOT carry suspicion (D0005).
+        #OrderingOnly first schemaAudit then testModel;
         first testModel then instanceAware;
         first whatsNextV2 then instanceAware;
         first schemaAudit then instanceMigration;
