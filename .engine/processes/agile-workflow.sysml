@@ -63,7 +63,8 @@ package EngineAgileProcess {
         :>> title = "Link & promote";
         :>> order = 3;
         :>> triggerCondition = "Sized.";
-        :>> actionText = "Add dependency/satisfy edges; set currentState = ready.";
+        :>> actionText = "Add dependency/satisfy edges. Readiness is the COMPUTED view "
+                  + "(DoR checks pass) - never authored.";
         :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
         :>> owner = "either";
     }
@@ -141,8 +142,8 @@ package EngineAgileProcess {
         :>> title = "Review";
         :>> order = 3;
         :>> triggerCondition = "Changes ready.";
-        :>> actionText = "Open PR (CI comments computed-state deltas). "
-                  + "Set currentState = in_review.";
+        :>> actionText = "Commit to main (per the main-only policy); review state is "
+                  + "computed from the commit, never authored.";
         :>> producedArtifact = "PR open.";
         :>> owner = "either";
     }
@@ -150,8 +151,8 @@ package EngineAgileProcess {
         :>> title = "Close out";
         :>> order = 4;
         :>> triggerCondition = "PR merged.";
-        :>> actionText = "Run Definition of Done gate. If it passes, set "
-                  + "currentState = done.";
+        :>> actionText = "Run Definition of Done gate; append the passing TestResult. "
+                  + "Done is the COMPUTED view over results - never authored.";
         :>> producedArtifact = "Story done iff satisfaction == verified.";
         :>> owner = "ai";
     }

@@ -136,7 +136,7 @@ package EngineBacklog {
         first crProcessHonesty then crValidateAll;
         first crValidateAll then crNativeWins;
 
-        requirement crWritePathDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "a schema/core-typed instance in .tracking passes validate_tracking; subdirs scanned; template exists"; }
+        requirement crWritePathDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "a schema/core-typed instance in .tracking passes validate_tracking; subdirs scanned; template exists"; :>> verifiedAtCommit = "1037d2d"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_tracking"; }
         satisfy crWritePathDoD by crWritePath;
         requirement crKillStateDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "currentState/updatedAt gone from Element + Tracked bases; agile steps no longer author state; all green"; }
         satisfy crKillStateDoD by crKillState;

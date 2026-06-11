@@ -1,6 +1,6 @@
 // =====================================================================
 // EngineWork — the "things you do" + the decision/change/release/issue types.
-// All :> Element, so id/title/timestamps/authoredBy/currentState are inherited.
+// All :> Element, so id/title/createdAt/authoredBy are inherited (state is computed).
 // =====================================================================
 package EngineWork {
     private import ScalarValues::*;

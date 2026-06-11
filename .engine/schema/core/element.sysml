@@ -31,9 +31,7 @@ package EngineElement {
         attribute id : Uuid;              // immutable identity
         attribute title : String;         // authored human label (may duplicate)
         attribute createdAt : Timestamp;
-        attribute updatedAt : Timestamp;
         attribute authoredBy : String;    // actor id (typed ref to the registry comes with userCapture)
-        attribute currentState : String;  // name of the current WorkflowState (slated to become a view)
     }
 
     // Native metaclasses (requirement / use case / verification def) CANNOT
@@ -46,25 +44,19 @@ package EngineElement {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
-        attribute currentState : String;
     }
     abstract use case def TrackedUseCase {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
-        attribute currentState : String;
     }
     abstract verification def TrackedVerification {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute updatedAt : Timestamp;
         attribute authoredBy : String;
-        attribute currentState : String;
     }
 
     // Minimal actor model — only enough to record WHO does tracked work.
