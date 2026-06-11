@@ -14,13 +14,13 @@ INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
 .engine/workflows). All discovered backlogs are merged. `--target Pkg::Def`
 focuses a single one. (No longer hardcoded to EngineBacklog::EngineBuild.)
 
-Semantics:
-  DONE        = the task's AcceptanceCriterion has a `verifiedAtCommit` (a pass result).
-  OUTSTANDING = not done.
+Semantics (dialect v2, CR-3 — criteria + APPENDED results):
+  DONE        = the task's LATEST appended TestResult (<task>R<n>, immutable) is a pass.
+  OUTSTANDING = not done (no results, or latest is fail/inconclusive/error).
   READY       = outstanding AND every dependency (succession predecessor) is done.
-  SUSPECT     = done, but a dependency was verified at a commit strictly DESCENDED
-                from this task's verifiedAtCommit (git merge-base --is-ancestor) —
-                i.e. the upstream moved after this task was verified (D0005 suspicion).
+  SUSPECT     = done, but a dependency's latest pass was judged at a commit strictly
+                DESCENDED from this task's (git merge-base --is-ancestor) — the
+                upstream moved after this task was verified (D0005 suspicion).
 
 Reads the model in TWO complementary ways:
   - GRAPH (tasks + dependency successions) from the pilot kernel %show — the
@@ -57,9 +57,12 @@ PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
 )]
 TRACKING_DIR = os.path.join(REPO, ".tracking")
 
-# A DoD line: `requirement <task>DoD : AcceptanceCriterion { ... k = "v"; ... }`.
-_DOD_LINE = re.compile(r'requirement\s+(\w+)DoD\s*:')
+# Dialect v2 (CR-3): criterion = `verification <task>DoD : Test { ... }` (one line);
+# results = APPENDED `part <task>R<n> : TestResult { ... }` (immutable; latest wins).
+_DOD_LINE = re.compile(r'verification\s+(\w+)DoD\s*:\s*Test')
+_RESULT_LINE = re.compile(r'part\s+(\w+)R(\d+)\s*:\s*TestResult')
 _ASSIGN = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
+_ENUM = re.compile(r'(\w+)\s*=\s*\w+::(\w+)')
 _PKG = re.compile(r'package\s+(\w+)')
 _ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
 
@@ -93,20 +96,31 @@ def discover_targets():
 
 
 def read_dods(path):
-    """DoD scalar values per task, parsed from .sysml text (kernel can't read them)."""
-    dods = {}
+    """Criteria + appended results per task, from .sysml text (the kernel can't
+    render verification-usage attribute values — D0006). Done is NOT stored:
+    it's computed from the LATEST appended TestResult (CR-3)."""
+    dods, results = {}, {}
     with open(path, encoding="utf-8") as fh:
         for line in fh:
             m = _DOD_LINE.search(line)
-            if not m:
+            if m:
+                attrs = dict(_ASSIGN.findall(line))
+                enums = dict(_ENUM.findall(line))
+                dods[m.group(1)] = {'method': enums.get('method'),
+                                    'statement': attrs.get('procedureText')}
                 continue
-            task = m.group(1)
-            attrs = dict(_ASSIGN.findall(line))
-            dods[task] = {'method': attrs.get('method'),
-                          'statement': attrs.get('statement'),
-                          'verifiedAtCommit': attrs.get('verifiedAtCommit'),
-                          'verifiedBy': attrs.get('verifiedBy'),
-                          'verifiedAt': attrs.get('verifiedAt')}
+            r = _RESULT_LINE.search(line)
+            if r:
+                attrs = dict(_ASSIGN.findall(line))
+                enums = dict(_ENUM.findall(line))
+                results.setdefault(r.group(1), []).append(
+                    {'n': int(r.group(2)), 'outcome': enums.get('outcome'),
+                     'judgedAgainst': attrs.get('judgedAgainst'),
+                     'judgedAt': attrs.get('judgedAt'),
+                     'judgedBy': attrs.get('judgedBy')})
+    for task, rs in results.items():
+        rs.sort(key=lambda x: x['n'])
+        dods.setdefault(task, {})['results'] = rs
     return dods
 
 
@@ -130,7 +144,11 @@ def build_model(root, dods):
     for t, info in tasks.items():
         info['dod'] = dods.get(t, {})
         info['deps'] = sorted(a for a, b in edges if b == t)
-        info['done'] = bool(info['dod'].get('verifiedAtCommit'))
+        rs = info['dod'].get('results', [])
+        last = rs[-1] if rs else None
+        # done = the LATEST appended result is a pass (results are immutable; CR-3)
+        info['done'] = bool(last and last.get('outcome') == 'pass')
+        info['verifiedAtCommit'] = last.get('judgedAgainst') if info['done'] else None
     return tasks
 
 
@@ -146,9 +164,9 @@ def classify(tasks):
             tasks[d]['done'] for d in info['deps'] if d in tasks)
         suspect = False
         if info['done']:
-            ct = info['dod'].get('verifiedAtCommit')
+            ct = info.get('verifiedAtCommit')
             for d in info['deps']:
-                cd = tasks.get(d, {}).get('dod', {}).get('verifiedAtCommit')
+                cd = tasks.get(d, {}).get('verifiedAtCommit')
                 if tasks.get(d, {}).get('done') and cd and ct and cd != ct and _is_ancestor(ct, cd):
                     suspect = True
                     break

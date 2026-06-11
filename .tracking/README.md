@@ -21,9 +21,12 @@ choose their own policy.
 ## The backlog dialect (read by `query.py`)
 
 An `action def` here IS a work backlog: tasks = `action`s, dependencies =
-`first A then B` successions, each task `satisfy`s a `<task>DoD : AcceptanceCriterion`.
-**Textual contract:** the DoD usage must be named `<taskName>DoD` and authored on
-**one line** (the reader is line-based). Done = the DoD carries `verifiedAtCommit`.
+`first A then B` successions. Each task's DoD is a method-tagged
+`verification <task>DoD : Test` criterion. Results are **appended, immutable**
+`part <task>R<n> : TestResult` records (outcome + `judgedAgainst` commit) —
+re-verification appends `R2`, never edits `R1`. **Done = the latest result is a
+pass.** Textual contract: `<task>DoD` / `<task>R<n>` naming, one line each
+(the reader is line-based).
 
 ## Validate (mandatory before commit)
 

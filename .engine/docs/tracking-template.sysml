@@ -11,7 +11,7 @@ package TrackingTemplate {
     private import EngineElement::*;     // Element bases, Priority, value types
     private import EngineNeeds::*;
     private import EngineWork::*;
-    private import EngineArtifacts::*;   // AcceptanceCriterion (backlog dialect)
+    private import EngineVerification::*; // Test (criterion) + TestResult (appended record)
 
     // -- a Business-phase artifact: the project brief --
     part exampleBrief : Brief {
@@ -42,18 +42,21 @@ package TrackingTemplate {
         :>> consequences = "What follows.";
     }
 
-    // -- work-item backlog dialect (read by query.py whats-next) --
-    // An `action def` in .tracking IS a backlog; tasks = actions; deps = succession;
-    // each task satisfies a method-tagged DoD. NOTE the textual contract:
-    // the DoD usage must be named <task>DoD and authored ON ONE LINE.
+    // -- work-item backlog dialect v2 (read by query.py; CR-3) --
+    // An `action def` in .tracking IS a backlog; tasks = actions; deps = succession.
+    // Each task's DoD = a method-tagged `verification <task>DoD : Test` criterion.
+    // Results are APPENDED, immutable `part <task>R<n> : TestResult` records —
+    // re-verification appends R2, NEVER edits R1. Done = the latest result is a pass.
+    // TEXTUAL CONTRACT: <task>DoD / <task>R<n> naming, authored ON ONE LINE each.
     action def ExampleBacklog {
         action firstTask;
         action secondTask;
         first firstTask then secondTask;
 
-        requirement firstTaskDoD : AcceptanceCriterion { :>> method = "confirmation"; :>> statement = "what done means"; }
-        satisfy firstTaskDoD by firstTask;
-        requirement secondTaskDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "what done means"; }
-        satisfy secondTaskDoD by secondTask;
+        verification firstTaskDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "what done means"; }
+        verification secondTaskDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "what done means"; }
+
+        // appended when firstTask passed (judgedAgainst = the commit it was judged at):
+        part firstTaskR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abc1234"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
     }
 }

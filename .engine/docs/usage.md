@@ -38,10 +38,10 @@ the layer you touched.
 
 | You want to... | Do this |
 |---|---|
-| Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `<task>DoD : AcceptanceCriterion` and `satisfy <task>DoD by <task>;` |
+| Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `verification <task>DoD : Test` criterion |
 | Order work | `first taskA then taskB;` (succession) |
 | See what's next | `python .engine/tools/query.py` (`whats-next` / `outstanding` / `suspect` / `item` / `downstream` / `trace`) |
-| Mark done | Record the verification result on the DoD (`verifiedAtCommit`/`verifiedAt`/`verifiedBy`). `method=confirmation` requires the human's explicit sign-off. |
+| Mark done | APPEND a `part <task>R<n> : TestResult` (outcome, `judgedAgainst` commit, judgedAt, judgedBy) — never edit a prior result. `method=confirmation` requires the human's explicit sign-off. |
 | Record a result | Append a `TestResult` with `outcome` (VerdictKind), `judgedAgainst` (commit SHA), `judgedBy` — never overwrite. |
 | Record a decision | Author a `Decision` part (see any `.engine/decisions/` file for the pattern). |
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
