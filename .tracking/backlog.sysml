@@ -67,7 +67,7 @@ package EngineBacklog {
         satisfy schemaAuditDoD by schemaAudit;
         requirement instanceMigrationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "processes/decisions/skills-registry parse green under new packages"; }
         satisfy instanceMigrationDoD by instanceMigration;
-        requirement queryToolsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "general query layer answers item/downstream/trace/suspect/outstanding"; }
+        requirement queryToolsDoD : AcceptanceCriterion { :>> method = "demonstration"; :>> statement = "general query layer answers item/downstream/trace/suspect/outstanding (+ whats-next); verified on whatsNextV2/schemaAudit"; :>> verifiedAtCommit = "35f5d54"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "demo"; }
         satisfy queryToolsDoD by queryTools;
 
         // ---- schemaAudit critique findings (2026-06-10): native SysML v2 leverage ----
