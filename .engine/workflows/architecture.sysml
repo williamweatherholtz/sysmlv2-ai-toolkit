@@ -4,7 +4,9 @@
 // into Allocation & Interfaces (three successions into it). See spec §6.
 // =====================================================================
 package ArchitectureWorkflow {
-    private import EngineArtifacts::*;
+    private import EngineRequirements::*;   // SystemRequirement, SubsystemRequirement
+    private import EngineArchitecture::*;   // Component
+    private import EngineArtifacts::*;      // ICD (#View)
 
     action def Architecture {
         action dataArch { out sysReq : SystemRequirement; }

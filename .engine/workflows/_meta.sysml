@@ -1,54 +1,32 @@
 // =====================================================================
-// EngineArtifacts — the item types that flow through the workflows.
+// EngineArtifacts — workflow-local artifact types ONLY.
 //
-// RE-GROUNDED on native SysML v2 (2026-06-09): a workflow IS a behavior, so a
-// workflow is a native `action def`; phases are nested `action`s; order is
-// `succession` (first/then); artifact handoff is item `flow`; parallelism is
-// convergent successions. There is NO custom Workflow/Phase/produces/consumes
-// meta-model — that reinvented SysML's native activity model (which is more
-// comprehensive and `%show`-readable: succession renders as a discrete
-// earlier/laterOccurrence element, not an opaque tuple).
+// CR-2 (2026-06-11): the shadow item defs that duplicated schema/core types
+// (Brief/Need/UseCase/Decision/Story/TestResult/...) are RETIRED — schema/core
+// is the canonical vocabulary and workflow pins/flows are typed by it directly
+// (spiked: part-def and requirement-def pins + flows parse).
 //
-// These `item def`s are the artifacts produced/consumed. They are intermediate:
-// they will later align with the real schema types (Need -> requirement def,
-// UseCase -> use case def, TestResult -> verification, ...). `#View` marks a
-// computed (never-authored) artifact.
+// What remains here:
+//  - COMPUTED-VIEW artifacts (#View): outputs a workflow names but no one
+//    authors — regenerated from authored facts + git (CLAUDE.md §2.1/§2.6).
+//  - AcceptanceCriterion: the backlog DoD dialect (INTERIM — Decision 0012
+//    records it as debt; superseded by appended TestResults when CR-3 lands).
 // =====================================================================
 package EngineArtifacts {
     private import ScalarValues::*;
 
-    item def Brief;
-    item def Persona;
-    item def Need;
-    item def UseCase;
-    item def SystemRequirement;
-    item def SubsystemRequirement;
-    item def ComponentRequirement;
-    item def Component;
-    item def DesignElement;
-    item def Decision;
-    item def ICD;                 // view
-    item def AllocationMatrix;    // view
-    item def Story;
-    item def TestResult;
-    item def Release;
-    item def Baseline;            // view
-    item def SafetyCase;          // view
-    item def ReleaseNotes;        // view
-    item def Issue;
-    item def ChangeRequest;
-
     metadata def View;            // marks an artifact whose nature is computed, not authored
 
-    // Acceptance criterion / Definition of Done for a task (verification model, option A).
-    // `method`: test | analysis | inspection | demonstration | confirmation
-    // (confirmation = a human sign-off — the common, lightweight path). A task
-    // `satisfy`s its AcceptanceCriterion; "done" = a recorded pass result (commit SHA).
+    #View item def ICD;               // computed from ports/connections
+    #View item def AllocationMatrix;  // computed from allocate edges
+    #View item def Baseline;          // computed from Release + commit match
+    #View item def SafetyCase;        // computed (curated view; see parked critique findings)
+    #View item def ReleaseNotes;      // computed from Release membership
+
+    // INTERIM backlog DoD dialect (verification model: Decision 0012; replaced by CR-3).
     requirement def AcceptanceCriterion {
         attribute method : String;
         attribute statement : String;
-        // The recorded pass RESULT. Present => done; the commit it passed against
-        // (enables git-ancestry suspicion). Absent => outstanding.
         attribute verifiedAtCommit : String[0..1];
         attribute verifiedBy : String[0..1];
         attribute verifiedAt : String[0..1];        // ISO-8601 attestation time (own fact, not the commit date)

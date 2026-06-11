@@ -16,6 +16,16 @@ from queue import Empty
 ENGINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WF = os.path.join(ENGINE, "workflows")
 
+# Workflows are typed by schema/core (CR-2), so the schema is PRELOADED silently
+# (validated by validate_schema; here it just makes imports resolve).
+SCHEMA_PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
+    "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
+    "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
+    "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
+    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
+    "schema/safety/stpa.sysml",
+)]
+
 # Dependency order: meta-model first, then workflows that import it.
 ORDER = [
     "_meta.sysml",
@@ -85,6 +95,10 @@ def main():
     km, kc = start_new_kernel(kernel_name="sysml",
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print("Kernel up.\n")
+
+    for p in SCHEMA_PRELOAD:
+        with open(p, "r", encoding="utf-8") as fh:
+            run_cell(kc, fh.read())
 
     results = []
     for fn in ORDER:

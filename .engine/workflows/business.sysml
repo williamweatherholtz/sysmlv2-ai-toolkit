@@ -4,7 +4,7 @@
 // Each action's in/out is the artifact it consumes/produces. See spec §5.
 // =====================================================================
 package BusinessWorkflow {
-    private import EngineArtifacts::*;
+    private import EngineNeeds::*;          // Brief, Persona, Need, UseCase (canonical schema types)
 
     action def Business {
         action brief { out o : Brief; }

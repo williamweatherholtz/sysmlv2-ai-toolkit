@@ -27,6 +27,14 @@ REPO = os.path.dirname(ENGINE)
 WF_DIR = os.path.join(ENGINE, "workflows")
 BACKLOG = os.path.join(REPO, ".tracking", "backlog.sysml")  # self-build plan (dogfood)
 
+# Workflows are typed by schema/core (CR-2): preload it so imports resolve.
+SCHEMA = [os.path.join(ENGINE, *rel.split("/")) for rel in (
+    "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
+    "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
+    "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
+    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
+    "schema/safety/stpa.sysml",
+)]
 LOAD = ["_meta.sysml", "business.sysml", "architecture.sysml", "delivery.sysml",
         "deploy.sysml", "operate.sysml", "change-request.sysml"]
 # (package, action def) per workflow
@@ -118,6 +126,9 @@ def waves(ph, edges):
 
 def main():
     km, kc = _kernel.start()
+    for p in SCHEMA:
+        with open(p, encoding="utf-8") as fh:
+            _kernel.run_cell(kc, fh.read())
     for fn in LOAD:
         with open(os.path.join(WF_DIR, fn), encoding="utf-8") as fh:
             _kernel.run_cell(kc, fh.read())

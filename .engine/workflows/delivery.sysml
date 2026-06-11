@@ -3,7 +3,8 @@
 // refine -> standup -> implement -> review -> done. See spec §7.
 // =====================================================================
 package DeliveryWorkflow {
-    private import EngineArtifacts::*;
+    private import EngineWork::*;           // Story
+    private import EngineVerification::*;   // TestResult
 
     action def Delivery {
         action refine { out s : Story; }

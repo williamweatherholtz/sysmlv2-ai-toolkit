@@ -3,7 +3,7 @@
 // back as new work via Change Request. See spec §9.
 // =====================================================================
 package OperateWorkflow {
-    private import EngineArtifacts::*;
+    private import EngineWork::*;           // Issue
 
     action def Operate {
         action support { out iss : Issue; }

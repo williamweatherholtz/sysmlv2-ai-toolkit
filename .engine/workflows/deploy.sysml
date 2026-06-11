@@ -4,7 +4,8 @@
 // then converge into deliver. Baseline/notes/safety-case are views. See spec §8.
 // =====================================================================
 package DeployWorkflow {
-    private import EngineArtifacts::*;
+    private import EngineWork::*;           // Release
+    private import EngineArtifacts::*;      // SafetyCase, ReleaseNotes (#View)
 
     action def Deploy {
         action declare { out r : Release; }
