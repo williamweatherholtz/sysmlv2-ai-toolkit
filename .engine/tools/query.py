@@ -305,7 +305,15 @@ def main():
     tasks = {}
     for pkg, adef in targets:
         _, text = _kernel.run_cell(kc, f"%show {pkg}::{adef}")
-        tasks.update(build_model(parse_show(text), dods))
+        part = build_model(parse_show(text), dods)
+        # items must never collide on name (§2.3): REFUSE silent merge across backlogs
+        clash = set(tasks) & set(part)
+        if clash:
+            print(json.dumps({"error": "task-name collision across backlogs — "
+                              "qualify with --target", "collisions": sorted(clash),
+                              "backlog": f"{pkg}::{adef}"}, indent=2))
+            _kernel.teardown_and_exit(km, 2)
+        tasks.update(part)
     classify(tasks, read_ordering_only())
 
     if sub == "item" and arg:

@@ -2,6 +2,7 @@ package Decision0010 {
     private import EngineWork::*;
 
     part d0010 : Decision {
+        :>> id = "95a5f2f6-9489-4d7d-8597-1c24500e0ef8";
         :>> title = "Keep agile ceremonies for solo+AI as discipline, not ritual";
         :>> status = "accepted";
         :>> context = "Solo + AI development. Argued whether sprint ceremonies "

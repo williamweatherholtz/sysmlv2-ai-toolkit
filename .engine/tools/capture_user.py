@@ -84,16 +84,15 @@ def slug(name, email):
 
 
 def registry_ids(text):
-    body = re.search(r"enum def ActorId\s*\{(.*?)\}", text, re.DOTALL)
-    if not body:
-        return set()
-    return set(re.findall(r"^\s*([A-Za-z]\w*)\s*;", body.group(1), re.MULTILINE))
+    """Declared part names of registered actors (CR-5: typed Person/Actor parts —
+    name/email/kind are model data, not comments)."""
+    return set(re.findall(r"^\s*part\s+(\w+)\s*:\s*(?:Person|Actor)\b", text, re.MULTILINE))
 
 
 def append_id(text, actor_id, name, email):
-    line = f"        {actor_id};   // {name} <{email}> — human (captured from git)\n"
-    # insert before the closing brace of the ActorId enum
-    return re.sub(r"(\n)(\s*\}\s*\n\})", r"\1" + line + r"\2", text, count=1)
+    line = f'    part {actor_id} : Person {{ :>> name = "{name}"; :>> email = "{email}"; }}\n'
+    i = text.rstrip().rfind("}")          # before the package's closing brace
+    return text[:i] + line + text[i:]
 
 
 def main():

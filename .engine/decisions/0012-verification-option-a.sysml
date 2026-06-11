@@ -2,6 +2,7 @@ package Decision0012 {
     private import EngineWork::*;
 
     part d0012 : Decision {
+        :>> id = "ee75ccbf-5d66-43db-8fb3-64ff4e5b973e";
         :>> title = "Verification is native, method-tagged; human confirmation first-class";
         :>> status = "accepted";
         :>> context = "Most engine tasks are not programming-centric; verification needed to be method-agnostic with human sign-off as a common path. Two options were defended (A: method on a native verification; B: code-test-centric workflow).";

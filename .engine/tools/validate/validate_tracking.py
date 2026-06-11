@@ -26,6 +26,22 @@ PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
 )]
 TRACKING = sorted(glob.glob(os.path.join(REPO, ".tracking", "**", "*.sysml"), recursive=True))
 
+_ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
+             "Brief", "Persona", "Need", "Issue", "Story", "Release", "ChangeRequest",
+             "Component", "DesignElement", "Test")
+
+
+def warn_missing_ids(path, text):
+    """Identity invariant (§2.3): every tracked instance carries :>> id. WARN (not
+    fail) during bootstrap when instances outnumber ids."""
+    import re as _re
+    inst = len(_re.findall(r"(?:part|verification|requirement)\s+\w+\s*:\s*(?:%s)"
+                           % "|".join(_ID_TYPES), text))
+    ids = text.count(":>> id =")
+    if inst > ids:
+        print(f"    WARN {path}: {inst - ids} tracked instance(s) missing :>> id")
+
+
 ERR = ("error", "couldn't", "cannot", "unexpected", "mismatched",
        "no viable", "unresolved", "extraneous", "wasn't expected")
 
@@ -40,6 +56,7 @@ def main():
         bad = any(w in (text or "").lower() for w in ERR)
         results.append((os.path.basename(f), not bad))
         print(f"[{'PASS' if not bad else 'FAIL'}] {os.path.basename(f)}")
+        warn_missing_ids(os.path.basename(f), open(f, encoding="utf-8").read())
         if bad:
             print("    " + (text or "").strip().replace("\n", "\n    ")[:600])
     print("=" * 48)

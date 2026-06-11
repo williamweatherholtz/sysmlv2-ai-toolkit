@@ -2,6 +2,7 @@ package Decision0005 {
     private import EngineWork::*;
 
     part d0005 : Decision {
+        :>> id = "d48e2ef4-af60-454b-ac16-765e2486ddb6";
         :>> title = "Computed-state engine: git-ancestry, material-change, scoped edges";
         :>> status = "accepted";
         :>> context = "Satisfaction/coverage/suspicion must be computed (0001). "

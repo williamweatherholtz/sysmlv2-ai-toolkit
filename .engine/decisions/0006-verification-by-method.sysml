@@ -2,6 +2,7 @@ package Decision0006 {
     private import EngineWork::*;
 
     part d0006 : Decision {
+        :>> id = "9a61a74f-745b-4a0a-959d-af8003d87812";
         :>> title = "Verification by method; drop subjective/objective; verify subsumes validate";
         :>> status = "accepted";
         :>> context = "An objective/subjective flag on tests was proposed. It is "

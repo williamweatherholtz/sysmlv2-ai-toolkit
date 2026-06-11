@@ -11,18 +11,21 @@ package EngineDoD {
     private import EngineProcess::*;
 
     part dod : Process {
+        :>> id = "88f837a6-3bb7-4dc7-a903-3017b9e62747";
         :>> title = "Definition of Done";
         :>> purpose = "Gate before setting a Story to a terminal state: every check below passes.";
         :>> cadence = "per-item";
     }
 
     part dodMerged : ProcessStep {
+        :>> id = "5d88008f-fb04-450f-a71b-cdf50041fe01";
         :>> title = "Merged";
         :>> order = 1;
         :>> actionText = "Change is merged to main / PR approved.";
         :>> owner = "ai";
     }
     part dodVerified : ProcessStep {
+        :>> id = "46ec4593-4d12-42c2-9248-492db952f02e";
         :>> title = "Satisfaction == verified";
         :>> order = 2;
         :>> actionText = "Computed satisfaction(Story) == verified: every verifying Test "
@@ -31,6 +34,7 @@ package EngineDoD {
         :>> owner = "ai";
     }
     part dodStaleness : ProcessStep {
+        :>> id = "a6b3bdc1-0454-4b66-bffa-fbbc9be27e7a";
         :>> title = "Downstream staleness cleared";
         :>> order = 3;
         :>> actionText = "Items this Story's changes put into `suspect` are resolved "
@@ -38,6 +42,7 @@ package EngineDoD {
         :>> owner = "either";
     }
     part dodDocs : ProcessStep {
+        :>> id = "1741a1c7-6b24-4823-975c-92be30ecdbad";
         :>> title = "Docs in sync";
         :>> order = 4;
         :>> actionText = "Run the Documentation Sync process (EngineDocSync): every doc claim "

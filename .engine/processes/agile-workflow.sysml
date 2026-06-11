@@ -37,12 +37,14 @@ package EngineAgileProcess {
 
     // ---- Refinement (continuous) ------------------------------------
     part refinement : Process {
+        :>> id = "27768cee-4609-49db-8229-aa1cd3ae1885";
         :>> title = "Backlog Refinement";
         :>> purpose = "Move items backlog -> ready: acceptance criteria "
                     + "(as atomic Tests), sizing, dependency links.";
         :>> cadence = "continuous";
     }
     part refineCriteria : ProcessStep {
+        :>> id = "c9bef132-83ef-44df-a312-24211035a191";
         :>> title = "Acceptance criteria as Tests";
         :>> order = 1;
         :>> triggerCondition = "Candidate Story selected.";
@@ -52,6 +54,7 @@ package EngineAgileProcess {
         :>> owner = "either";
     }
     part refineSize : ProcessStep {
+        :>> id = "3fea750a-db19-4555-be64-717955fa110b";
         :>> title = "Size";
         :>> order = 2;
         :>> triggerCondition = "Criteria present as Tests.";
@@ -60,6 +63,7 @@ package EngineAgileProcess {
         :>> owner = "human";
     }
     part refineLink : ProcessStep {
+        :>> id = "d4510352-ecf7-4b77-ac8a-d980ea60c18d";
         :>> title = "Link & promote";
         :>> order = 3;
         :>> triggerCondition = "Sized.";
@@ -71,12 +75,14 @@ package EngineAgileProcess {
 
     // ---- Planning (per-sprint, event-driven) ------------------------
     part planning : Process {
+        :>> id = "3e69977e-2488-4127-bebf-110d3001425b";
         :>> title = "Sprint Planning";
         :>> purpose = "Triage 'ready' Stories into a Sprint under the "
                     + "points budget, against a one-sentence goal.";
         :>> cadence = "event-driven";
     }
     part planGoal : ProcessStep {
+        :>> id = "b1dedc21-9235-4489-9b71-5765be94ebfc";
         :>> title = "Set goal";
         :>> order = 1;
         :>> triggerCondition = "Previous sprint closed OR new batch initiated by human.";
@@ -85,6 +91,7 @@ package EngineAgileProcess {
         :>> owner = "human";
     }
     part planPull : ProcessStep {
+        :>> id = "f3fa7b01-4c55-4541-84dc-400bd6825f44";
         :>> title = "Pull & triage";
         :>> order = 2;
         :>> triggerCondition = "Goal set.";
@@ -99,6 +106,7 @@ package EngineAgileProcess {
     // each ~5-point batch of upcoming work. This is the Definition of
     // Ready gate in action (see definition-of-ready.sysml).
     part standup : Process {
+        :>> id = "4c504acb-763b-4e88-b525-26469f5facb8";
         :>> title = "Standup";
         :>> purpose = "Before each ~5-point batch, antagonistically "
                     + "critique each upcoming item against the DoR gate. "
@@ -106,6 +114,7 @@ package EngineAgileProcess {
         :>> cadence = "event-driven";
     }
     part standupGate : ProcessStep {
+        :>> id = "723f4b81-690e-4898-9544-118ea5d9a6ea";
         :>> title = "Run DoR gate on the batch";
         :>> order = 1;
         :>> triggerCondition = "About to start ~5 points of work.";
@@ -117,11 +126,13 @@ package EngineAgileProcess {
 
     // ---- Implementation (per-story) ---------------------------------
     part implementation : Process {
+        :>> id = "6219917f-aa45-4d82-ab15-253ac7c46e13";
         :>> title = "Implementation";
         :>> purpose = "Move a Story in_progress -> in_review -> done.";
         :>> cadence = "per-story";
     }
     part implDo : ProcessStep {
+        :>> id = "a6fc664a-e64a-4133-bc69-9326bfd658c4";
         :>> title = "Build";
         :>> order = 1;
         :>> triggerCondition = "Story in_progress and past Standup.";
@@ -130,6 +141,7 @@ package EngineAgileProcess {
         :>> owner = "either";
     }
     part implModel : ProcessStep {
+        :>> id = "dba37bd4-406f-43d3-af02-8e3ef8b0c017";
         :>> title = "Update the model";
         :>> order = 2;
         :>> triggerCondition = "Implementation complete locally.";
@@ -139,6 +151,7 @@ package EngineAgileProcess {
         :>> owner = "ai";
     }
     part implReview : ProcessStep {
+        :>> id = "a77f1c0a-4761-4d35-9bf2-1476b2bdb713";
         :>> title = "Review";
         :>> order = 3;
         :>> triggerCondition = "Changes ready.";
@@ -148,6 +161,7 @@ package EngineAgileProcess {
         :>> owner = "either";
     }
     part implClose : ProcessStep {
+        :>> id = "893dad0b-5a2a-4548-94e7-11dc07e87647";
         :>> title = "Close out";
         :>> order = 4;
         :>> triggerCondition = "PR merged.";
@@ -161,12 +175,14 @@ package EngineAgileProcess {
     // Valuable for solo+AI: turns workflow learnings into Decisions /
     // process changes (e.g. "bash failed on Windows -> use PowerShell").
     part retrospective : Process {
+        :>> id = "2a3a5a1f-7f8b-4388-948f-49787fe09656";
         :>> title = "Retrospective";
         :>> purpose = "Promote workflow learnings into Decisions and "
                     + "process/convention changes.";
         :>> cadence = "per-sprint";
     }
     part retroPromote : ProcessStep {
+        :>> id = "5d66f22d-22db-4532-936d-8fc00b2b3a8e";
         :>> title = "Promote learnings";
         :>> order = 1;
         :>> triggerCondition = "End of sprint; a learning changes future behavior.";
@@ -177,12 +193,14 @@ package EngineAgileProcess {
 
     // ---- Staleness sweep (continuous) -------------------------------
     part stalenessSweep : Process {
+        :>> id = "69fb93a5-7c68-4bf2-a925-d47c642deb22";
         :>> title = "Staleness Sweep";
         :>> purpose = "On material upstream change, recompute suspicion "
                     + "and surface newly-suspect items for review.";
         :>> cadence = "continuous";
     }
     part sweepDetect : ProcessStep {
+        :>> id = "d0bca5d3-2f81-4986-8b9a-70bfd8f85fcc";
         :>> title = "Recompute & flag";
         :>> order = 1;
         :>> triggerCondition = "Commit materially changes a Requirement, Decision, "
@@ -193,6 +211,7 @@ package EngineAgileProcess {
         :>> owner = "ai";
     }
     part sweepResolve : ProcessStep {
+        :>> id = "e640fd43-a15e-428d-89f9-0e3558ab1310";
         :>> title = "Resolve suspicion";
         :>> order = 2;
         :>> triggerCondition = "Item is suspect.";

@@ -2,6 +2,7 @@ package Decision0011 {
     private import EngineWork::*;
 
     part d0011 : Decision {
+        :>> id = "75f09a66-6ab9-4247-a341-b822f9dbf623";
         :>> title = "Schema types use native SysML v2 metaclasses";
         :>> status = "accepted";
         :>> context = "The original schema modeled requirements/use-cases/tests as part defs :> Element for a uniform identity base (recorded in requirements.sysml comments). The schemaAudit asked what native alignment should mean; %show value-elision (D0006-limit) and the Element-base loss were the costs.";

@@ -2,6 +2,7 @@ package Decision0016 {
     private import EngineWork::*;
 
     part d0016 : Decision {
+        :>> id = "62f55738-0d12-448e-a8f4-277d64c7a812";
         :>> title = "Confirmation results need explicit human sign-off; classification is visible-first";
         :>> status = "accepted";
         :>> context = "The AI recorded a method=confirmation DoD as verified from an instruction to 'do the sign-offs' - inferring attestation instead of obtaining it. The user caught it.";

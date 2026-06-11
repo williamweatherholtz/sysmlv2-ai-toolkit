@@ -15,6 +15,7 @@ package TrackingTemplate {
 
     // -- a Business-phase artifact: the project brief --
     part exampleBrief : Brief {
+        :>> id = "8b072149-43ca-430f-89d7-e9acf8773bf4";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000001";
         :>> title = "Example project brief";
         :>> createdAt = "2026-06-11";
@@ -25,6 +26,7 @@ package TrackingTemplate {
 
     // -- a Need, traced to by later requirements via native `satisfy` --
     requirement exampleNeed : Need {
+        :>> id = "4104b609-8d64-49d1-b795-c9651b22b5e4";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000002";
         :>> title = "Example need";
         :>> source = NeedSource::customer;
@@ -34,6 +36,7 @@ package TrackingTemplate {
 
     // -- a scope-cut Decision (captured even though it produces no action) --
     part exampleDecision : Decision {
+        :>> id = "584746d4-7277-4b07-ac30-c5153debee57";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000003";
         :>> title = "Example: we will not pursue X";
         :>> status = "accepted";
@@ -53,10 +56,10 @@ package TrackingTemplate {
         action secondTask;
         first firstTask then secondTask;
 
-        verification firstTaskDoD : Test { :>> method = VerificationMethod::confirmation; :>> procedureText = "what done means"; }
-        verification secondTaskDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "what done means"; }
+        verification firstTaskDoD : Test { :>> id = "8141239f-ac94-4c86-b3fe-f0e9cbd1e85c"; :>> method = VerificationMethod::confirmation; :>> procedureText = "what done means"; }
+        verification secondTaskDoD : Test { :>> id = "1b19ad68-d31a-4f9a-a114-6b22b6e533ff"; :>> method = VerificationMethod::test; :>> procedureText = "what done means"; }
 
         // appended when firstTask passed (judgedAgainst = the commit it was judged at):
-        part firstTaskR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abc1234"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
+        part firstTaskR1 : TestResult { :>> id = "ba68ea19-73f0-4a70-b9e8-c2d487a342c1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abc1234"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "user"; }
     }
 }

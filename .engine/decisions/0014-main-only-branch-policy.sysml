@@ -2,6 +2,7 @@ package Decision0014 {
     private import EngineWork::*;
 
     part d0014 : Decision {
+        :>> id = "e92f5006-c0f2-4945-8aac-b74d2a540f3f";
         :>> title = "main is the canonical branch; everything pushes and merges to main only";
         :>> status = "accepted";
         :>> context = "Work had accumulated on a feature branch (engine-restructure) under a don't-merge-until-told caution; the user found work stranded on side branches counterproductive for this solo+AI project.";

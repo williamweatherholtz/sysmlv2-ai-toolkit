@@ -2,6 +2,7 @@ package Decision0013 {
     private import EngineWork::*;
 
     part d0013 : Decision {
+        :>> id = "3b87ce25-4a33-4e86-8832-dfa79c08dea5";
         :>> title = "The engine clock is git ancestry, not native occurrence modeling";
         :>> status = "accepted";
         :>> context = "SysML v2 offers occurrence/snapshot/timeslice + HappensBefore for temporal structure. The engine needed happened-before for verification staleness.";

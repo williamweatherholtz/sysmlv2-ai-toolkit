@@ -2,6 +2,7 @@ package Decision0003 {
     private import EngineWork::*;
 
     part d0003 : Decision {
+        :>> id = "13e4fd55-8929-4e78-9942-44d9d8473085";
         :>> title = "Single API surface for humans and AI; enforced write policy";
         :>> status = "accepted";
         :>> context = "Building a 'rich' GUI API and a 'simple' AI API causes "

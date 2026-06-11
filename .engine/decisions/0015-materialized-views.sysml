@@ -2,6 +2,7 @@ package Decision0015 {
     private import EngineWork::*;
 
     part d0015 : Decision {
+        :>> id = "9b870d42-b946-4b8c-8012-e25394d09a86";
         :>> title = "Materialized views are sanctioned when marked and regenerable";
         :>> status = "accepted";
         :>> context = "Critiquing invariant 2.6 surfaced real costs of pure-computed state: no legibility without a runtime, no portability to other tools, recompute cost.";

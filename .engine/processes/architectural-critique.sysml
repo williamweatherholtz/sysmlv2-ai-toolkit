@@ -16,12 +16,14 @@ package EngineCritiqueProcess {
     private import EngineProcess::*;
 
     part critique : Process {
+        :>> id = "078920a4-2b97-4a19-96ef-f834319b4cbe";
         :>> title = "Antagonistic Architectural Critique";
         :>> purpose = "Adversarially audit the engine + its processes; end in CR proposals, never applied changes.";
         :>> cadence = "ad-hoc";
     }
 
     part criScope : ProcessStep {
+        :>> id = "44087f52-aaa9-4ee6-9719-3dd6b25ab70b";
         :>> title = "Scope inventory";
         :>> order = 1;
         :>> actionText = "Enumerate what exists: schema packages, workflows, processes, "
@@ -30,6 +32,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criMisuse : ProcessStep {
+        :>> id = "e95d59cd-ebd9-4961-bac1-d8fc30a98505";
         :>> title = "SysML v2 misuse audit";
         :>> order = 2;
         :>> actionText = "For each schema/workflow construct, ask: is this how SysML v2 "
@@ -39,6 +42,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criUnused : ProcessStep {
+        :>> id = "f3a224fc-cb24-40d7-944a-12757c20e702";
         :>> title = "Unused-feature audit";
         :>> order = 3;
         :>> actionText = "Sweep the SysML v2 feature set (incl. KerML + std library) for "
@@ -48,6 +52,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criUseCases : ProcessStep {
+        :>> id = "cd3e78d4-446e-4df0-8732-f61ccab99db9";
         :>> title = "Top-10 use-case walkthrough";
         :>> order = 4;
         :>> actionText = "Identify the top 10 use cases of the work-tracking workflow and "
@@ -57,6 +62,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criAntiPatterns : ProcessStep {
+        :>> id = "0bf26c26-53b7-4d37-845b-cab55c57f45e";
         :>> title = "Anti-pattern scan";
         :>> order = 5;
         :>> actionText = "Hunt structural anti-patterns: invariant violations (does the "
@@ -67,6 +73,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criProcesses : ProcessStep {
+        :>> id = "f903132c-0670-4f90-8bd6-9c51057f8b75";
         :>> title = "Process-layer critique";
         :>> order = 6;
         :>> actionText = "Critique the processes ON TOP of the engine (workflows, DoR/DoD, "
@@ -76,6 +83,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criSynthesize : ProcessStep {
+        :>> id = "01a47b90-0f27-4f9d-92a9-cff44e7d1431";
         :>> title = "Synthesize change-request proposals";
         :>> order = 7;
         :>> actionText = "Dedupe + rank all findings by severity/leverage; convert each "
@@ -85,6 +93,7 @@ package EngineCritiqueProcess {
         :>> owner = "ai";
     }
     part criAccept : ProcessStep {
+        :>> id = "66e48601-b18f-4deb-acf0-5f690c4f6ac5";
         :>> title = "Human disposition";
         :>> order = 8;
         :>> actionText = "Human accepts / rejects / defers each CR proposal. Accepted ones "

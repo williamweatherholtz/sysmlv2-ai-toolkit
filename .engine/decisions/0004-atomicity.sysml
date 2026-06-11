@@ -2,6 +2,7 @@ package Decision0004 {
     private import EngineWork::*;
 
     part d0004 : Decision {
+        :>> id = "0f794d10-85e6-40de-bd0c-a09b0546deda";
         :>> title = "Atomic items, not nested checklists";
         :>> status = "accepted";
         :>> context = "An early proposal nested a verification checklist inside "

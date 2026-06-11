@@ -27,6 +27,22 @@ INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))
              + [os.path.join(ENGINE, "skills", "skills-registry.sysml"),
                 os.path.join(ENGINE, "docs", "tracking-template.sysml")])
 
+_ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
+             "Brief", "Persona", "Need", "Issue", "Story", "Release", "ChangeRequest",
+             "Component", "DesignElement", "Test")
+
+
+def warn_missing_ids(path, text):
+    """Identity invariant (§2.3): every tracked instance carries :>> id. WARN (not
+    fail) during bootstrap when instances outnumber ids."""
+    import re as _re
+    inst = len(_re.findall(r"(?:part|verification|requirement)\s+\w+\s*:\s*(?:%s)"
+                           % "|".join(_ID_TYPES), text))
+    ids = text.count(":>> id =")
+    if inst > ids:
+        print(f"    WARN {path}: {inst - ids} tracked instance(s) missing :>> id")
+
+
 ERR = ("error", "couldn't", "cannot", "unexpected", "mismatched",
        "no viable", "unresolved", "extraneous", "wasn't expected")
 
@@ -42,6 +58,7 @@ def main():
         rel = os.path.relpath(f, ENGINE)
         results.append((rel, not bad))
         print(f"[{'PASS' if not bad else 'FAIL'}] {rel}")
+        warn_missing_ids(rel, open(f, encoding="utf-8").read())
         if bad:
             print("    " + (text or "").strip().replace("\n", "\n    ")[:400])
     print("=" * 56)

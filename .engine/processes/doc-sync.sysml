@@ -12,12 +12,14 @@ package EngineDocSync {
     private import EngineProcess::*;
 
     part docSync : Process {
+        :>> id = "77891011-63dd-4792-80f4-1516a414d5a9";
         :>> title = "Documentation Sync";
         :>> purpose = "On every model/tool change, sweep the documentation set for claims the change invalidates; fix them in the same commit.";
         :>> cadence = "per-item";
     }
 
     part dsTrigger : ProcessStep {
+        :>> id = "97ab88cb-ead1-48bf-bbb2-e1177288dfbf";
         :>> title = "Detect a doc-bearing change";
         :>> order = 1;
         :>> triggerCondition = "An item type, schema package, workflow, process, skill, tool, or template is created or changed (any CHANGE/§3a or BOOTSTRAP/§3e work).";
@@ -26,6 +28,7 @@ package EngineDocSync {
         :>> owner = "ai";
     }
     part dsSweep : ProcessStep {
+        :>> id = "4d0d3399-9b73-4c92-b6e2-5a1b350a0ff6";
         :>> title = "Sweep the documentation set";
         :>> order = 2;
         :>> actionText = "Check each member of the DOC SET for invalidated claims: CLAUDE.md; "
@@ -36,6 +39,7 @@ package EngineDocSync {
         :>> owner = "ai";
     }
     part dsFix : ProcessStep {
+        :>> id = "2db7b7ec-ae00-469d-817e-c873d44f1c71";
         :>> title = "Fix in the SAME commit";
         :>> order = 3;
         :>> actionText = "Correct every stale claim in the same commit as the change that "
@@ -45,6 +49,7 @@ package EngineDocSync {
         :>> owner = "ai";
     }
     part dsVerify : ProcessStep {
+        :>> id = "783ec8e3-2650-4053-a2e4-79d59e2e8b0f";
         :>> title = "Verify claims match reality";
         :>> order = 4;
         :>> actionText = "Spot-check: do commands in docs run? Do quoted syntaxes parse "

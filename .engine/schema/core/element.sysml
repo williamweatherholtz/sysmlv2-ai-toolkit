@@ -63,6 +63,7 @@ package EngineElement {
     // Rich org modeling is DELIVERABLE subject matter, never the engine.
     part def Actor {
         attribute name : String;
+        attribute email : String[0..1];
         attribute kind : ActorKind;
     }
     part def Person :> Actor {

@@ -9,6 +9,7 @@ package EngineSkillRegistry {
     private import EngineSkills::*;
 
     part triage : AISkill {
+        :>> id = "f104da2c-9348-4558-bff2-1daf9a7d7f1f";
         :>> title = "triage";
         :>> purpose = "Run backlog refinement steps on new items up to "
                     + "the human sizing gate: acceptance criteria as "
@@ -19,6 +20,7 @@ package EngineSkillRegistry {
     }
 
     part stalenessSweepSkill : Agent {
+        :>> id = "6ddd1d79-67eb-42ea-9ac2-c68f18d69017";
         :>> title = "staleness-sweep";
         :>> purpose = "Recompute suspicion on material upstream change "
                     + "and comment newly-suspect items on the PR. "
@@ -30,6 +32,7 @@ package EngineSkillRegistry {
     }
 
     part implementer : Agent {
+        :>> id = "0ff1c1c9-f980-4dc4-aecc-f623e78592b3";
         :>> title = "implementer";
         :>> purpose = "Take a 'ready' Story past Standup, build it + its "
                     + "Tests, append results, open a PR.";
@@ -40,6 +43,7 @@ package EngineSkillRegistry {
     }
 
     part grillMe : AISkill {
+        :>> id = "ee6147f0-9514-465f-b054-194b4e78a734";
         :>> title = "grill-me";
         :>> purpose = "Antagonistically interrogate an item/plan to drive "
                     + "DoR gaps to resolution before work starts.";
