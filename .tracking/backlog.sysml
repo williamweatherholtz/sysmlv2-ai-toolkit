@@ -145,7 +145,7 @@ package EngineBacklog {
         satisfy crBootstrapHoleDoD by crBootstrapHole;
         requirement crDecisionsDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "Decisions 0011-0017 backfilled and parse green (24/24); CR-acceptance discipline recorded in CLAUDE.md §4"; :>> verifiedAtCommit = "a092fc2"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_instances"; }
         satisfy crDecisionsDoD by crDecisions;
-        requirement crTypeUniverseDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "_meta shadow item defs retired; workflows typed by schema/core; workflows + tracking validate green"; }
+        requirement crTypeUniverseDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "_meta shadow item defs retired; workflows typed by schema/core; workflows + tracking validate green"; :>> verifiedAtCommit = "6f965c0"; :>> verifiedAt = "2026-06-11"; :>> verifiedBy = "validate_workflows"; }
         satisfy crTypeUniverseDoD by crTypeUniverse;
         requirement crVerificationDoD : AcceptanceCriterion { :>> method = "test"; :>> statement = "DoD verdicts are appended TestResult records (immutable); method uses VerificationMethod enum; query computes done from results; all green"; }
         satisfy crVerificationDoD by crVerification;
