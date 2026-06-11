@@ -31,6 +31,7 @@ package ProjectDelivery {
     action def DeliveryRun {
         action storyFoldWhatsNext;
         verification storyFoldWhatsNextDoD : Test { :>> id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs with parity to whats_next.py; whats_next.py retired; validate_all green; single query tool"; }
+        part storyFoldWhatsNextR1 : TestResult { :>> id = "5c6d7e8f-9a0b-4c1d-2e3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
     }
 
     // ====================================================================
@@ -85,4 +86,5 @@ package ProjectDelivery {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "foldWhatsNextR1 recorded in backlog (pass); storyFoldWhatsNextR1 recorded in DeliveryRun (pass); query.py orient shows foldWhatsNext as done; user accepts.";
     }
+    part closeOutGateR1 : TestResult { :>> id = "7e8f9a0b-1c2d-4e3f-4a5b-6c7d8e9f0a1b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "wweatherholtz"; }
 }
