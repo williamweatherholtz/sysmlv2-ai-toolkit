@@ -1,14 +1,15 @@
 """Engine query layer — small queries over the work-item model.
 
 Subcommands (argv[1], default 'whats-next'):
-  orient          -> the state cursor (.tracking/state.sysml) + ready/suspect frontier
-  whats-next      -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
-  outstanding     -> every not-done task
-  suspect         -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
-  item <name>     -> introspect one task (done?, method, commit, deps + their states)
-  downstream <n>  -> tasks transitively dependent on <n> (impact set)
-  trace <name>    -> a task's full lineage: transitive upstream + downstream + DoD
-  workflows       -> the six workflow DAGs as Kahn-layered parallel waves (JSON)
+  orient             -> the state cursor (.tracking/state.sysml) + ready/suspect frontier
+  whats-next         -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
+  outstanding        -> every not-done task
+  suspect            -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
+  item <name>        -> introspect one task (done?, method, commit, deps + their states)
+  downstream <n>     -> tasks transitively dependent on <n> (impact set)
+  trace <name>       -> a task's full lineage: transitive upstream + downstream + DoD
+  trace-need <name>  -> trace a Need/SR/Component over satisfy+allocate edges (text-read)
+  workflows          -> the six workflow DAGs as Kahn-layered parallel waves (JSON)
 
 INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
 `action def`s (an action def in .tracking IS a work backlog; workflows live in
@@ -85,6 +86,9 @@ _ACTION_DEF = re.compile(r'action\s+def\s+(\w+)')
 _ORDERING_ONLY = re.compile(r'#OrderingOnly\s+first\s+(\w+)\s+then\s+(\w+)\s*;')
 # legacy (pre-CR-3) criterion line — used when reading OLD revisions for material change
 _LEGACY_DOD = re.compile(r'requirement\s+(\w+)DoD\s*:\s*AcceptanceCriterion')
+# satisfy/allocate edge patterns for trace-need subcommand
+_SATISFY = re.compile(r'\bsatisfy\s+(\w+)\s+by\s+(\w+)\s*;')
+_ALLOCATE = re.compile(r'\ballocate\s+(\w+)\s+to\s+(\w+)\s*;')
 
 
 def parse_show(text):
@@ -325,6 +329,81 @@ def read_ordering_only():
     return pairs
 
 
+def read_satisfy_edges():
+    """(need, sr) pairs from `satisfy <need> by <sr>;` in all tracking files."""
+    edges = []
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            for line in fh:
+                m = _SATISFY.search(line)
+                if m:
+                    edges.append((m.group(1), m.group(2)))
+    return edges
+
+
+def read_allocate_edges():
+    """(sr, component) pairs from `allocate <sr> to <comp>;` in all tracking files."""
+    edges = []
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            for line in fh:
+                m = _ALLOCATE.search(line)
+                if m:
+                    edges.append((m.group(1), m.group(2)))
+    return edges
+
+
+def trace_need(name, satisfy_edges, allocate_edges):
+    """Trace a Need/SR/Component over satisfy and allocate edges.
+
+    Need  -> satisfiedBy (SRs) -> allocatedTo (Components)
+    SR    -> satisfies (Needs) + allocatedTo (Components)
+    Comp  -> allocatedFrom (SRs) -> satisfies (Needs)
+    """
+    satisfied_by = {}    # need -> [sr]
+    satisfies_needs = {} # sr   -> [need]
+    for need, sr in satisfy_edges:
+        satisfied_by.setdefault(need, []).append(sr)
+        satisfies_needs.setdefault(sr, []).append(need)
+
+    allocated_to = {}   # sr   -> [comp]
+    allocated_from = {} # comp -> [sr]
+    for sr, comp in allocate_edges:
+        allocated_to.setdefault(sr, []).append(comp)
+        allocated_from.setdefault(comp, []).append(sr)
+
+    out = {"name": name}
+    is_need = name in satisfied_by
+    is_sr   = name in satisfies_needs or name in allocated_to
+    is_comp = name in allocated_from
+
+    if is_need:
+        out["kind"] = "need"
+        srs = sorted(set(satisfied_by[name]))
+        out["satisfiedBy"] = srs
+        comps = sorted(set(c for s in srs for c in allocated_to.get(s, [])))
+        if comps:
+            out["allocatedTo"] = comps
+    elif is_sr:
+        out["kind"] = "systemRequirement"
+        needs = sorted(set(satisfies_needs.get(name, [])))
+        if needs:
+            out["satisfies"] = needs
+        alloc = sorted(set(allocated_to.get(name, [])))
+        if alloc:
+            out["allocatedTo"] = alloc
+    elif is_comp:
+        out["kind"] = "component"
+        srs = sorted(set(allocated_from[name]))
+        out["allocatedFrom"] = srs
+        needs = sorted(set(n for s in srs for n in satisfies_needs.get(s, [])))
+        if needs:
+            out["satisfies"] = needs
+    else:
+        out["error"] = f"no satisfy or allocate edge found for '{name}'"
+    return out
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -448,6 +527,8 @@ def main():
         out = {"name": arg, "upstream": upstream(tasks, arg),
                "downstream": downstream(tasks, arg),
                "done": tasks.get(arg, {}).get('done'), "dod": tasks.get(arg, {}).get('dod', {})}
+    elif sub == "trace-need" and arg:
+        out = trace_need(arg, read_satisfy_edges(), read_allocate_edges())
     elif sub == "workflows":
         result = {"workflows": []}
         for pkg, act in WORKFLOWS:
