@@ -1,0 +1,11 @@
+[package]
+name = "sysmlv2-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "sysmlv2"
+path = "src/main.rs"
+
+[dependencies]
+sysmlv2-parser = { path = "../sysmlv2-parser" }

@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "sysmlv2-parser",
+    "sysmlv2-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["William Weatherholtz <0612@asirobots.com>"]
+license = "MIT OR Apache-2.0"

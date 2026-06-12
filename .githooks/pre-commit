@@ -1,23 +1,36 @@
 #!/bin/sh
 # Engine process (CLAUDE.md §5, CR-11): validation green BEFORE commit — because
 # post-commit auto-pushes to canonical main, nothing unvalidated may land.
-# Runs only the layer(s) matching staged .sysml paths (each boots a ~20s kernel);
-# commits touching no .sysml are not slowed. Escape hatch: SKIP_VALIDATE=1.
+# Runs only the layer(s) matching staged paths; commits touching no guarded files
+# are not slowed. Escape hatch: SKIP_VALIDATE=1.
 [ "$SKIP_VALIDATE" = "1" ] && { echo "pre-commit: SKIP_VALIDATE=1 — validation skipped"; exit 0; }
 
-staged=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.sysml$' || true)
-[ -z "$staged" ] && exit 0
+all_staged=$(git diff --cached --name-only --diff-filter=ACMR || true)
+sysml_staged=$(echo "$all_staged" | grep '\.sysml$' || true)
+rust_staged=$(echo "$all_staged" | grep -E '(\.rs$|Cargo\.toml$|Cargo\.lock$)' || true)
 
 CONDA="C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe"
 V=".engine/tools/validate"
-run() {
+
+sysml_run() {
     echo "pre-commit: $1"
     "$CONDA" run -n sysml --no-capture-output python "$V/$1" || {
         echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
 
-echo "$staged" | grep -q '^\.engine/schema/'    && run validate_schema.py
-echo "$staged" | grep -q '^\.engine/workflows/' && run validate_workflows.py
-echo "$staged" | grep -qE '^\.engine/(decisions|processes|skills|docs)/.*\.sysml$' && run validate_instances.py
-echo "$staged" | grep -q '^\.tracking/'         && run validate_tracking.py
+# SysML validation (kernel-based; ~20s per layer)
+if [ -n "$sysml_staged" ]; then
+    echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
+    echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
+    echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs)/.*\.sysml$' && sysml_run validate_instances.py
+    echo "$sysml_staged" | grep -q '^\.tracking/'         && sysml_run validate_tracking.py
+fi
+
+# Rust validation: clippy -D warnings across the workspace (<5s incremental)
+if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
+    echo "pre-commit: cargo clippy"
+    cargo clippy --workspace --all-targets -- -D warnings || {
+        echo "pre-commit: CARGO CLIPPY FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 exit 0

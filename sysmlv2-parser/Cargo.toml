@@ -1,0 +1,12 @@
+[package]
+name = "sysmlv2-parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror = "1"
+
+[dev-dependencies]
+proptest = "1"
+cucumber = { version = "0.20", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
