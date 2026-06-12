@@ -305,4 +305,130 @@ package ProjectBusiness {
     #DependsOn dependency from n07AgentAutonomy to projectBrief;
     #DependsOn dependency from n08TraceQueryable to projectBrief;
     #DependsOn dependency from n09SelfHosting to projectBrief;
+
+    // ====================================================================
+    // Rust parser CLI initiative (2026-06-12): personas
+    // ====================================================================
+    part rustEngineer : Persona {
+        :>> id = "ee6d528f-bb6c-43bc-a3f8-a8512c46b46e";
+        :>> title = "Rust/Systems Engineer";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "A systems developer building the Rust parser CLI who needs deterministic startup, zero-panic runtime guarantees, and a spec-pinned grammar. Frustrated by 20-second JVM cold starts blocking tight feedback loops; needs sub-second validate/orient for productive iteration.";
+        :>> goals = "Build a parser that is panic-free, spec-traceable, and fast enough that it disappears from the workflow.";
+    }
+
+    part qualityEngineer : Persona {
+        :>> id = "87b50f01-6be5-4188-9e82-360f00217feb";
+        :>> title = "Quality/Reliability Engineer";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "Responsible for enforcing TDD/BDD practices, #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)] compliance, property-based testing (proptest), BDD scenarios (cucumber-rs), and zero-unwrap policies. Catches regressions before they reach main.";
+        :>> goals = "Every production code path has property coverage; every panic possibility is documented or eliminated; the build fails loudly on any drift from quality gates.";
+    }
+
+    // ====================================================================
+    // Rust parser CLI initiative (2026-06-12): needs
+    // ====================================================================
+    requirement n10NoJvm : Need {
+        :>> id = "93d69860-a5de-47d6-bfcd-f9503fe9c983";
+        :>> title = "No JVM runtime dependency for parse and validate";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> source = NeedSource::internal;
+        :>> statement = "The system shall provide parsing and validation of the engine's .sysml dialect without requiring a JVM, Jupyter kernel, or conda environment — a single Rust binary shall suffice.";
+        :>> priority = Priority::must;
+    }
+
+    requirement n11FastStart : Need {
+        :>> id = "dcd4d3c8-f946-484c-a05f-3541bd83fef4";
+        :>> title = "Sub-second cold-start for parse and orient";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "A full parse-and-orient cycle over the current repo shall complete in under 500ms on developer hardware, enabling tight feedback loops without context-switching overhead.";
+        :>> priority = Priority::must;
+    }
+
+    requirement n12PanicFree : Need {
+        :>> id = "0f426c1f-3f34-4098-8ff8-dbd35d555c3c";
+        :>> title = "Panic-free production runtime";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> source = NeedSource::internal;
+        :>> statement = "All production-path Rust code shall compile under #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)] with no .unwrap(), .expect(), or unguarded indexing; every recoverable error shall be surfaced via a typed error hierarchy.";
+        :>> priority = Priority::must;
+    }
+
+    requirement n13SpecPin : Need {
+        :>> id = "00f66b58-4292-4c5e-9007-c00d5c52f28e";
+        :>> title = "Grammar pinned to canonical SysML v2 spec URL";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "The parser shall embed the canonical SysML v2 specification URL and grammar version in build.rs; the build shall fail if the local dialect diverges from the pinned spec version beyond declared extensions.";
+        :>> priority = Priority::must;
+    }
+
+    requirement n14TddBdd : Need {
+        :>> id = "58f1e760-d7d4-44c7-83a8-1cc747665b5c";
+        :>> title = "TDD/BDD test coverage enforced by CI";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> source = NeedSource::internal;
+        :>> statement = "All parser behavior shall be driven by failing BDD scenarios (cucumber-rs) and property-based tests (proptest) before implementation; CI shall reject PRs where cargo test or cargo clippy -D warnings fails.";
+        :>> priority = Priority::should;
+    }
+
+    // ====================================================================
+    // Rust parser CLI initiative (2026-06-12): use cases
+    // ====================================================================
+    use case uc11ParseNoJvm : UseCase {
+        :>> id = "26d7e539-9694-4d23-89ea-73fa9b67a692";
+        :>> title = "Parse and validate .sysml files without JVM";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "A developer or CI runner validates tracking and schema files using the Rust CLI, receiving structured error output with file/line context within 500ms — no conda, no JVM, no kernel startup.";
+        :>> mainSuccess = "User runs `sysmlv2 validate .tracking/`; receives PASS/FAIL per file with error location and message; exits in under 500ms.";
+        :>> extensions = "If a file references a type not in the loaded schema, the error names the unresolved reference and the file line where it appears.";
+    }
+
+    use case uc12SpecCompat : UseCase {
+        :>> id = "47d76e86-424c-4fea-ab6e-47493e7faf68";
+        :>> title = "Spec compliance checked at build time";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "A Rust developer builds the sysmlv2-parser crate; build.rs fetches the grammar manifest from the canonical SysML v2 spec URL and verifies the hash matches the pinned version. Build fails if diverged.";
+        :>> mainSuccess = "cargo build succeeds; build.rs prints 'SysML v2 grammar pinned at <version> — OK'.";
+        :>> extensions = "If SYSML_V2_SPEC_OFFLINE=1, skip the remote check and use the locally cached manifest.";
+    }
+
+    use case uc13RustCli : UseCase {
+        :>> id = "e91551d5-298f-4dec-aa55-52caa2cae992";
+        :>> title = "Orient and query via Rust CLI (no kernel)";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "An agent or developer runs `sysmlv2 orient` or `sysmlv2 trace-need <name>` and gets the same JSON output as query.py — cursor, ready list, suspect list — without starting a JVM.";
+        :>> mainSuccess = "Output is byte-for-byte JSON-equivalent to query.py orient for the same repo state.";
+        :>> extensions = "If a required tracking file is missing, the CLI reports which file and exits non-zero.";
+    }
+
+    use case uc14SprintRetro : UseCase {
+        :>> id = "50a2857d-a808-47b4-a699-b088106c4399";
+        :>> title = "Sprint retro: review and update processes";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "At the end of each Rust parser sprint, the team lead and agent review what went well, what to improve, and whether any process changes (workflow phases, DoD criteria, skill registry updates) are warranted. A Decision is authored for any accepted change.";
+        :>> mainSuccess = "Retro held; action items identified; any accepted process changes recorded as Decisions; retroGate confirmed by team lead.";
+        :>> extensions = "If no process changes are warranted, a 'no change' Decision is still authored to record the retro occurred.";
+    }
+
+    // ====================================================================
+    // DependsOn edges: Rust parser Needs derive their context from the Brief
+    // ====================================================================
+    #DependsOn dependency from n10NoJvm to projectBrief;
+    #DependsOn dependency from n11FastStart to projectBrief;
+    #DependsOn dependency from n12PanicFree to projectBrief;
+    #DependsOn dependency from n13SpecPin to projectBrief;
+    #DependsOn dependency from n14TddBdd to projectBrief;
 }

@@ -131,6 +131,68 @@ package ProjectArchitecture {
         :>> verificationMethod = VerificationMethod::confirmation;
     }
 
+    // ---- Rust parser CLI initiative (2026-06-12): SystemRequirements ----
+
+    requirement sr10RustCli : SystemRequirement {
+        :>> id = "751c232e-3ccc-4692-8580-8bb44f1ddb45";
+        :>> title = "Rust CLI replaces JVM kernel for all parse/validate/query operations";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "The system shall provide a Rust CLI binary (sysmlv2) that performs all operations currently requiring the pilot kernel — parse, validate, orient, workflows, trace-need — without JVM, conda, or Jupyter.";
+        :>> rationale = "JVM cold start (~20s) is unacceptable for CI and tight feedback loops; a Rust binary delivers sub-second startup and removes the conda environment dependency.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement sr11FastStart : SystemRequirement {
+        :>> id = "8012de84-7218-4499-8593-d1dc0efe3692";
+        :>> title = "Cold-start parse and orient complete in under 500ms";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "The sysmlv2 CLI shall parse the full engine repo (schema + tracking) and emit orient JSON in under 500ms on a developer laptop with no warm cache.";
+        :>> rationale = "500ms is the human perception threshold for 'instant'; exceeding it forces developers to context-switch.";
+        :>> kind = RequirementKind::nonFunctional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement sr12DenyWarnings : SystemRequirement {
+        :>> id = "5b0feaba-235e-474d-884f-b457e6de6287";
+        :>> title = "Production Rust code enforces deny(warnings) and zero-unwrap policy";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "The sysmlv2-parser and sysmlv2-cli crates shall compile with #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]; no .unwrap(), .expect(), or index-without-bounds shall appear in src/ outside #[cfg(test)] blocks.";
+        :>> rationale = "Unwrap panics are production bugs; clippy::pedantic surfaces logic issues before they manifest; deny(warnings) prevents warning accumulation.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement sr13SpecPin : SystemRequirement {
+        :>> id = "75d66430-2d91-4d70-81bd-df374a3ae7ac";
+        :>> title = "build.rs pins grammar to canonical SysML v2 spec URL";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "The sysmlv2-parser crate's build.rs shall embed the canonical SysML v2 spec URL (https://github.com/Systems-Modeling/SysML-v2-Release) and the pinned grammar commit SHA as compile-time constants; the build shall fail if the fetched manifest hash diverges.";
+        :>> rationale = "Without a spec pin, grammar drift is silent; a build-time check makes divergence visible and actionable.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement sr14TddBdd : SystemRequirement {
+        :>> id = "859e584a-f1ba-4461-80ac-5975f088e2c3";
+        :>> title = "BDD scenarios and property-based tests gate all parser behavior";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "All parser and semantic-layer behavior shall be covered by BDD scenarios authored with cucumber-rs before implementation; property-based tests with proptest shall cover all tokenizer and parser combinator cases; CI shall enforce cargo test and cargo clippy -D warnings green.";
+        :>> rationale = "TDD/BDD drives correctness by specification rather than implementation; property tests find edge cases that example tests miss.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::should;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
     // ====================================================================
     // Phase: appArch — Components (the engine's software subsystems)
     // ====================================================================
@@ -181,6 +243,24 @@ package ProjectArchitecture {
         :>> createdAt = "2026-06-11";
         :>> authoredBy = "wweatherholtz";
         :>> description = "The .engine/processes/ (DoR, DoD, doc-sync, agile, critique) and .engine/skills/ (registry) definitions. Provides the procedural detail agents reference when executing phases.";
+    }
+
+    // ---- Rust parser CLI initiative (2026-06-12): Components ----
+
+    part rustParserComp : Component {
+        :>> id = "c75fd116-86d8-475c-9c3c-459a6a3e6235";
+        :>> title = "sysmlv2-parser — Rust parser/indexer library crate";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "The sysmlv2-parser crate. Implements the lexer, recursive-descent parser, package registry, cross-package reference resolver, and type checker for the engine's SysML v2 dialect. Produces a typed AST and index structure. No .unwrap() in src/; full thiserror error hierarchy; proptest-covered.";
+    }
+
+    part rustCliComp : Component {
+        :>> id = "1e1719d4-ca14-4892-9065-65228829d02d";
+        :>> title = "sysmlv2-cli — Rust CLI binary crate";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "The sysmlv2-cli crate. Wraps sysmlv2-parser and implements the orient, workflows, trace-need, validate, and item subcommands. Produces JSON output parity with query.py. Replaces the JVM kernel calls in validate_*.py and query.py.";
     }
 
     // ====================================================================
@@ -235,6 +315,52 @@ package ProjectArchitecture {
         :>> verificationMethod = VerificationMethod::inspect;
     }
 
+    // ---- Rust parser CLI initiative (2026-06-12): SubsystemRequirements ----
+
+    requirement ssr05Workspace : SubsystemRequirement {
+        :>> id = "751ebac0-f86e-42e4-a279-892b44e3402a";
+        :>> title = "Cargo workspace at repo root with sysmlv2-parser and sysmlv2-cli crates";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "A Cargo.toml workspace shall exist at the repo root containing sysmlv2-parser (library) and sysmlv2-cli (binary) crates; the workspace shall enforce edition = '2021' and resolver = '2'.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement ssr06NoUnwrap : SubsystemRequirement {
+        :>> id = "aa707cd5-3dc4-473b-b06c-bfe18da8434d";
+        :>> title = "All error types use thiserror; no panic paths in sysmlv2-parser/src/";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "Every error type in sysmlv2-parser shall derive thiserror::Error; all Result return types shall use a typed error enum; no panic!, unwrap(), or expect() shall appear in src/ outside test modules; clippy::panics_disallowed shall be enabled.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement ssr07SpecBuild : SubsystemRequirement {
+        :>> id = "b76ad1d7-9214-4517-bb08-6d8096f6f05b";
+        :>> title = "build.rs fetches grammar manifest; build fails on hash mismatch";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "sysmlv2-parser/build.rs shall define SYSML_V2_SPEC_URL pointing to the SysML v2 Release repo grammar manifest; on build, it shall verify the SHA256 of the grammar files matches the pinned SYSML_V2_GRAMMAR_SHA constant; SYSML_V2_SPEC_OFFLINE=1 skips the check.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
+    requirement ssr08TestCoverage : SubsystemRequirement {
+        :>> id = "e970f35b-a7e7-4717-af73-343d0ba6de06";
+        :>> title = "proptest strategies cover lexer and parser; cucumber BDD scenarios cover subcommands";
+        :>> createdAt = "2026-06-12";
+        :>> authoredBy = "wweatherholtz";
+        :>> statement = "sysmlv2-parser shall have proptest-based property tests for all token types and parser productions; sysmlv2-cli shall have cucumber-rs BDD feature files for orient, validate, trace-need, and workflows subcommands; minimum 50 proptest cases per strategy.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::should;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
     // ====================================================================
     // Phase: allocIface — satisfy edges + allocate edges
     //
@@ -252,6 +378,12 @@ package ProjectArchitecture {
     satisfy n08TraceQueryable by sr08TraceQuery;
     satisfy n09SelfHosting by sr09SelfBuild;
 
+    satisfy n10NoJvm by sr10RustCli;
+    satisfy n11FastStart by sr11FastStart;
+    satisfy n12PanicFree by sr12DenyWarnings;
+    satisfy n13SpecPin by sr13SpecPin;
+    satisfy n14TddBdd by sr14TddBdd;
+
     allocate sr01TypedItems to schemaCoreComp;
     allocate sr02DecisionRecord to trackingData;
     allocate sr03AppendResults to trackingData;
@@ -267,11 +399,26 @@ package ProjectArchitecture {
     allocate ssr03RecursiveTracking to validatorStack;
     allocate ssr04CondaFullPath to validatorStack;
 
+    allocate sr10RustCli to rustCliComp;
+    allocate sr11FastStart to rustParserComp;
+    allocate sr12DenyWarnings to rustParserComp;
+    allocate sr13SpecPin to rustParserComp;
+    allocate sr14TddBdd to rustParserComp;
+    allocate ssr05Workspace to rustCliComp;
+    allocate ssr06NoUnwrap to rustParserComp;
+    allocate ssr07SpecBuild to rustParserComp;
+    allocate ssr08TestCoverage to rustParserComp;
+
     // DependsOn: SubsystemRequirements refine SystemRequirements
     #DependsOn dependency from ssr01ValidatorGreen to sr07AgentLoop;
     #DependsOn dependency from ssr02QueryOrient to sr04ComputedViews;
     #DependsOn dependency from ssr03RecursiveTracking to sr03AppendResults;
     #DependsOn dependency from ssr04CondaFullPath to sr07AgentLoop;
+
+    #DependsOn dependency from ssr05Workspace to sr10RustCli;
+    #DependsOn dependency from ssr06NoUnwrap to sr12DenyWarnings;
+    #DependsOn dependency from ssr07SpecBuild to sr13SpecPin;
+    #DependsOn dependency from ssr08TestCoverage to sr14TddBdd;
 
     // ====================================================================
     // Phase gates (S6 extension: Architecture phase gates)

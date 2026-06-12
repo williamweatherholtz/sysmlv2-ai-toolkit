@@ -229,11 +229,40 @@ package EngineBacklog {
         action specRefresh;         // rewrite/retire the historical design spec so no doc contradicts decisions (was RESUME 'known debt' prose)
         action modelOnlyState;      // D0018: RESUME.md deleted; orient computed; CLAUDE.md bans prose state docs
 
+        // ---- Rust parser CLI sprint backlog (2026-06-12): rustS0..rustS4 feed runtimeParser ----
+        action rustS0Workspace;   // Sprint 0: Cargo workspace + quality gates + BDD harness
+        action rustS1Lexer;       // Sprint 1: tokenizer for engine dialect; proptest-covered
+        action rustS2Parser;      // Sprint 2: recursive descent parser; full thiserror; no .unwrap()
+        action rustS3Semantic;    // Sprint 3: package registry + cross-package resolution + type checking
+        action rustS4SpecCompat;  // Sprint 4: build.rs spec pin + compile-time grammar hash assertion
+
+        verification rustS0WorkspaceDoR : Test { :>> id = "c6788072-6045-438f-a95b-879ce9147ebd"; :>> method = VerificationMethod::inspect; :>> procedureText = "Cargo workspace layout agreed (sysmlv2-parser lib + sysmlv2-cli bin); deny attributes decided; BDD framework (cucumber-rs) selected; CI script drafted; no blocking dependencies"; }
+        verification rustS0WorkspaceDoD : Test { :>> id = "4092ffcd-70a7-4fc5-98f6-aebacb68ecff"; :>> method = VerificationMethod::test; :>> procedureText = "Cargo.toml workspace at repo root; sysmlv2-parser and sysmlv2-cli crates exist; both compile with #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]; cargo test passes with zero warnings; pre-commit hook runs cargo clippy -D warnings; validate_all.py still green"; }
+        verification rustS0RetroGate : Test { :>> id = "baecae84-8740-494d-b091-982bffed0b14"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 0 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS1LexerDoR : Test { :>> id = "554ef94a-5eba-4e38-8d39-6a503c20960b"; :>> method = VerificationMethod::inspect; :>> procedureText = "Token type list complete; at least three failing proptest strategies written (identifier, string_lit, enum_literal); lexer API type signature agreed; DoD accepted"; }
+        verification rustS1LexerDoD : Test { :>> id = "113eaa88-c18b-4ed3-8cf8-11eeb4e94cee"; :>> method = VerificationMethod::test; :>> procedureText = "Lexer tokenizes all token types in the engine dialect (package, import, action/part/verification/requirement/use-case/attribute/enum def, :>>, ::, first/then, string, UUID, enum literal); proptest: minimum 50 cases/strategy; zero panics; no .unwrap() in src/; cargo test + cargo clippy -D warnings green"; }
+        verification rustS1RetroGate : Test { :>> id = "4b5a378d-60f6-495c-96c1-964f99aaa6f5"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 1 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS2ParserDoR : Test { :>> id = "13b90e4a-4c91-4368-9383-cecb5834efe4"; :>> method = VerificationMethod::inspect; :>> procedureText = "BDD feature file has passing scenario skeletons for package, part def, action def, succession, satisfy, allocate; AST node types sketched; error recovery strategy (synchronize-on-semicolon) accepted; DoD accepted"; }
+        verification rustS2ParserDoD : Test { :>> id = "5b62f1fd-2b49-44ac-87a3-e122a4c012c3"; :>> method = VerificationMethod::test; :>> procedureText = "Recursive-descent parser produces typed AST for full engine dialect (package, import, part/action/verification/requirement/use-case def, attribute, enum, block, :>> assignments, first/then, satisfy, allocate, #DependsOn); all existing .tracking/ and .engine/ files parse without error; BDD scenarios green; no .unwrap() in src/; cargo test + cargo clippy -D warnings green"; }
+        verification rustS2RetroGate : Test { :>> id = "b746580e-0978-468e-b101-f88aa41f5a12"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 2 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS3SemanticDoR : Test { :>> id = "80047e3a-6b18-4d89-84ad-7be64038b968"; :>> method = VerificationMethod::inspect; :>> procedureText = "Package registry API agreed; cross-package import resolution algorithm sketched (topological load order); at least two failing BDD scenarios for unresolved-reference errors; DoD accepted"; }
+        verification rustS3SemanticDoD : Test { :>> id = "ca479d99-727d-4367-837d-50bcde3781da"; :>> method = VerificationMethod::test; :>> procedureText = "PackageRegistry resolves `private import X::*` across all preloaded schema + tracking files; typed references (`: Story`, `: TestResult`) validated against registry; enum literals (e.g. `WorkKind::code`) validated; diagnostic messages include file + line + suggested fix; all .tracking/ files validate green; proptest covers registry merge; cargo test + cargo clippy -D warnings green"; }
+        verification rustS3RetroGate : Test { :>> id = "51cbca04-1509-46ce-8fab-0cabb90ac7f5"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 3 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS4SpecCompatDoR : Test { :>> id = "171b72f1-f5b5-4fc1-bc12-701bed84c53c"; :>> method = VerificationMethod::inspect; :>> procedureText = "Canonical SysML v2 spec URL confirmed (https://github.com/Systems-Modeling/SysML-v2-Release); grammar manifest format understood; SYSML_V2_GRAMMAR_SHA constant to pin agreed; offline-mode env var name agreed; DoD accepted"; }
+        verification rustS4SpecCompatDoD : Test { :>> id = "7ce88f0c-6f1d-40bb-a3c8-8c045daba7af"; :>> method = VerificationMethod::test; :>> procedureText = "build.rs defines SYSML_V2_SPEC_URL and SYSML_V2_GRAMMAR_SHA constants; fetches grammar manifest on build and verifies SHA256; build fails with actionable message if hash mismatch; SYSML_V2_SPEC_OFFLINE=1 skips remote check; version string emitted as cargo:rustc-env=SYSML_V2_GRAMMAR_VERSION; BDD scenario covers offline and mismatch cases; cargo test + cargo clippy -D warnings green"; }
+        verification rustS4RetroGate : Test { :>> id = "0e7c8f1c-6aeb-49e4-af15-50a937a8f68a"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 4 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
         first traceNeeds then baselineView;
         first dogfoodDelivery then runtimeParser;
         first runtimeParser then writeApi;
+        first dogfoodDelivery then rustS0Workspace;
+        first rustS0Workspace then rustS1Lexer;
+        first rustS1Lexer then rustS2Parser;
+        first rustS2Parser then rustS3Semantic;
+        first rustS3Semantic then rustS4SpecCompat;
+        first rustS4SpecCompat then runtimeParser;
 
         verification foldWhatsNextDoD : Test { :>> id = "4338695c-eb93-4d73-b904-c9c4c1469840"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs (parity with whats_next.py); whats_next.py retired; single query tool"; }
         part foldWhatsNextR1 : TestResult { :>> id = "6d7e8f9a-0b1c-4d2e-3f4a-5b6c7d8e9f0a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
