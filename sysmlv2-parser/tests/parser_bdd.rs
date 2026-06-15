@@ -2,6 +2,7 @@
 
 use cucumber::{given, then, when, World};
 use sysmlv2_parser::{ast::{Item, Value}, parse, tokenize};
+use sysmlv2_parser::ast::Item::TypeDef as ItemTypeDef;
 
 #[derive(Debug, Default, World)]
 pub struct ParserWorld {
@@ -77,6 +78,16 @@ fn then_first_part_attr(world: &mut ParserWorld, attr_name: String, expected: St
         panic!("attribute value is not a string: {:?}", attr.value);
     };
     assert_eq!(*actual, expected);
+}
+
+#[then(expr = "the first item is a TypeDef named {string}")]
+fn then_first_is_typedef(world: &mut ParserWorld, name: String) {
+    let pkg = world.package.as_ref().expect("no package");
+    let item = pkg.items.first().expect("no items");
+    let ItemTypeDef(td) = item else {
+        panic!("first item is not a TypeDef: {:?}", item);
+    };
+    assert_eq!(td.name, name);
 }
 
 #[tokio::main]

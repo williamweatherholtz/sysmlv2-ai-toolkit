@@ -25,11 +25,12 @@ Feature: SysML v2 recursive-descent parser
     Then parsing succeeds
     And the package has 1 items
 
-  Scenario: Part definition (type) is skipped without error
+  Scenario: Part definition (type) is captured as a TypeDef item
     Given the parser source "package P { part def MyType { attribute x : String; } }"
     When I parse the source
     Then parsing succeeds
-    And the package has 0 items
+    And the package has 1 items
+    And the first item is a TypeDef named "MyType"
 
   Scenario: Missing closing brace is a parse error
     Given the parser source "package P {"

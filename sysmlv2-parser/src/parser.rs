@@ -1,6 +1,6 @@
 use crate::ast::{
-    ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, Import, Item, Package,
-    Part, SatisfyEdge, Succession, Value, Verification,
+    ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, EnumDef, Import, Item,
+    Package, Part, SatisfyEdge, Succession, TypeDef, Value, Verification,
 };
 use crate::error::ParseError;
 use crate::token::{Span, Token, TokenKind};
@@ -222,6 +222,7 @@ fn parse_attribute_body(
             }
             TokenKind::ColonGtGt => {
                 let attr_start = p.current_span();
+                let attr_line = p.peek_token().line;
                 p.advance();
                 let (name, _) = p.expect_ident(filename)?;
                 p.expect(&TokenKind::Eq, filename)?;
@@ -232,6 +233,7 @@ fn parse_attribute_body(
                     name,
                     value,
                     span: Span { start: attr_start.start, end: end.start },
+                    line: attr_line,
                 });
             }
             _ => { skip_item(p); }
@@ -293,14 +295,16 @@ fn parse_action_def_body(
                 actions.push(ActionDecl { name: n, span: s });
             }
             TokenKind::Part => {
+                let item_line = p.peek_token().line;
                 let s = p.current_span(); p.advance();
                 let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-                parts.push(Part { name: n, type_name: tn, attributes: a, span: sp });
+                parts.push(Part { name: n, type_name: tn, attributes: a, span: sp, line: item_line });
             }
             TokenKind::Verification => {
+                let item_line = p.peek_token().line;
                 let s = p.current_span(); p.advance();
                 let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-                verifications.push(Verification { name: n, type_name: tn, attributes: a, span: sp });
+                verifications.push(Verification { name: n, type_name: tn, attributes: a, span: sp, line: item_line });
             }
             TokenKind::First => {
                 if let Some(s) = parse_succession(p, filename)? { successions.push(s); }
@@ -372,17 +376,57 @@ fn skip_brace_block(p: &mut Parser) {
     }
 }
 
+/// Extract an ident-or-keyword name at the current position and advance.
+/// Returns `None` (without advancing) when the current token is neither.
+fn extract_ident_name(p: &mut Parser) -> Option<String> {
+    match p.peek().clone() {
+        TokenKind::Ident(s) => { p.advance(); Some(s) }
+        kw if is_keyword(&kw) => { let n = keyword_text(&kw).to_owned(); p.advance(); Some(n) }
+        _ => None,
+    }
+}
+
+/// Parse an enum body `{ member1; member2; ... }` and return member names.
+/// Tolerant: skips anything that is not an ident/keyword followed by `;`.
+fn parse_enum_body(p: &mut Parser) -> Vec<String> {
+    let mut members = Vec::new();
+    if !p.eat(&TokenKind::LBrace) { return members; }
+    loop {
+        match p.peek().clone() {
+            TokenKind::RBrace | TokenKind::Eof => {
+                p.eat(&TokenKind::RBrace);
+                break;
+            }
+            TokenKind::Semicolon => { p.advance(); }
+            TokenKind::Ident(s) => {
+                members.push(s);
+                p.advance();
+                p.eat(&TokenKind::Semicolon);
+            }
+            kw if is_keyword(&kw) => {
+                members.push(keyword_text(&kw).to_owned());
+                p.advance();
+                p.eat(&TokenKind::Semicolon);
+            }
+            _ => { p.advance(); }
+        }
+    }
+    members
+}
+
 // ── package-level item parsers ─────────────────────────────────────────────
 
 fn parse_import(p: &mut Parser, filename: &str) -> Result<Import, ParseError> {
-    let s = p.current_span(); p.advance(); // consume 'private'
+    let s = p.current_span();
+    let import_line = p.peek_token().line;
+    p.advance(); // consume 'private'
     p.expect(&TokenKind::Import, filename)?;
     let (ns, _) = p.expect_ident(filename)?;
     p.expect(&TokenKind::ColonColon, filename)?;
     let end = p.current_span();
     p.expect(&TokenKind::Star, filename)?;
     p.expect(&TokenKind::Semicolon, filename)?;
-    Ok(Import { namespace: ns, span: Span { start: s.start, end: end.start } })
+    Ok(Import { namespace: ns, span: Span { start: s.start, end: end.start }, line: import_line })
 }
 
 fn parse_satisfy(p: &mut Parser, filename: &str) -> Result<SatisfyEdge, ParseError> {
@@ -444,35 +488,121 @@ fn parse_action_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, Par
 // ── top-level dispatch ─────────────────────────────────────────────────────
 
 fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError> {
+    let start = p.current_span();
+    let start_line = p.peek_token().line;
+
+    // `abstract` only prefixes type definitions; consume and continue matching.
+    let had_abstract = if matches!(p.peek(), TokenKind::Abstract) {
+        p.advance();
+        true
+    } else {
+        false
+    };
+
     match p.peek().clone() {
         TokenKind::RBrace | TokenKind::Eof => Ok(None),
+
         TokenKind::Doc => { p.advance(); Ok(None) }
-        TokenKind::Private => parse_import(p, filename).map(|i| Some(Item::Import(i))),
-        TokenKind::Action => parse_action_item(p, filename),
+
+        // These items never appear after `abstract`.
+        TokenKind::Private if !had_abstract =>
+            parse_import(p, filename).map(|i| Some(Item::Import(i))),
+
+        TokenKind::Action if !had_abstract => parse_action_item(p, filename),
+
+        TokenKind::First if !had_abstract =>
+            parse_succession(p, filename).map(|s| s.map(Item::Succession)),
+
+        TokenKind::Satisfy if !had_abstract =>
+            parse_satisfy(p, filename).map(|s| Some(Item::Satisfy(s))),
+
+        TokenKind::Allocate if !had_abstract =>
+            parse_allocate(p, filename).map(|a| Some(Item::Allocate(a))),
+
+        TokenKind::Hash if !had_abstract => parse_hash_item(p, filename),
+
+        // `enum def Name { member; ... }` → EnumDef (Sprint 3)
+        TokenKind::Enum => {
+            p.advance(); // consume 'enum'
+            if matches!(p.peek(), TokenKind::Def) {
+                p.advance(); // consume 'def'
+                if let Some(name) = extract_ident_name(p) {
+                    let members = parse_enum_body(p);
+                    return Ok(Some(Item::EnumDef(EnumDef { name, members, span: start, line: start_line })));
+                }
+            }
+            skip_item(p);
+            Ok(None)
+        }
+
+        // `part def Name ...` → TypeDef; `part Name ...` → Part instance
         TokenKind::Part => {
-            // `part def ...` is a type definition — skip entirely
             if matches!(p.peek_next(), TokenKind::Def) {
+                p.advance(); p.advance(); // consume 'part' 'def'
+                let name = extract_ident_name(p);
                 skip_item(p);
-                return Ok(None);
+                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
             }
+            if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
             let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, span: sp })))
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
         }
+
+        // `verification def Name ...` → TypeDef; `verification Name ...` → Verification instance
         TokenKind::Verification => {
-            // `verification def ...` is a type definition — skip entirely
             if matches!(p.peek_next(), TokenKind::Def) {
+                p.advance(); p.advance(); // consume 'verification' 'def'
+                let name = extract_ident_name(p);
                 skip_item(p);
-                return Ok(None);
+                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
             }
+            if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
             let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-            Ok(Some(Item::Verification(Verification { name: n, type_name: tn, attributes: a, span: sp })))
+            Ok(Some(Item::Verification(Verification { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
         }
-        TokenKind::First => parse_succession(p, filename).map(|s| s.map(Item::Succession)),
-        TokenKind::Satisfy => parse_satisfy(p, filename).map(|s| Some(Item::Satisfy(s))),
-        TokenKind::Allocate => parse_allocate(p, filename).map(|a| Some(Item::Allocate(a))),
-        TokenKind::Hash => parse_hash_item(p, filename),
+
+        // `attribute def Name ...` → TypeDef
+        TokenKind::Attribute => {
+            p.advance(); // consume 'attribute'
+            if matches!(p.peek(), TokenKind::Def) {
+                p.advance();
+                let name = extract_ident_name(p);
+                skip_item(p);
+                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+            }
+            skip_item(p);
+            Ok(None)
+        }
+
+        // `requirement def Name ...` → TypeDef
+        TokenKind::Requirement => {
+            p.advance();
+            if matches!(p.peek(), TokenKind::Def) {
+                p.advance();
+                let name = extract_ident_name(p);
+                skip_item(p);
+                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+            }
+            skip_item(p);
+            Ok(None)
+        }
+
+        // `use case def Name ...` → TypeDef
+        TokenKind::Use => {
+            p.advance(); // consume 'use'
+            if matches!(p.peek(), TokenKind::Case) { p.advance(); } // consume 'case'
+            if matches!(p.peek(), TokenKind::Def) {
+                p.advance();
+                let name = extract_ident_name(p);
+                skip_item(p);
+                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+            }
+            skip_item(p);
+            Ok(None)
+        }
+
         _ => { skip_item(p); Ok(None) }
     }
 }

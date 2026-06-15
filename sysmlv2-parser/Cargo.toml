@@ -18,3 +18,7 @@ harness = false
 [[test]]
 name = "parser_bdd"
 harness = false
+
+[[test]]
+name = "semantic_bdd"
+harness = false
