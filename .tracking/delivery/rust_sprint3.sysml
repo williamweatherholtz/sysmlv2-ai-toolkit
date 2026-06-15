@@ -29,6 +29,7 @@ package ProjectDeliveryRustS3 {
     action def DeliveryRunRustS3 {
         action storyRustS3Semantic;
         verification storyRustS3SemanticDoD : Test { :>> id = "f6a7b8c9-5555-4f6a-c7d8-e9f0a1b2c3d5"; :>> method = VerificationMethod::test; :>> procedureText = "PackageRegistry resolves private import X::* across all preloaded schema + tracking files; typed references and enum literals validated; diagnostics include file+line+suggestion; all .tracking/ files validate green; 4 proptest strategies green; 8 BDD scenarios green; cargo test + clippy -D warnings clean; no .unwrap() in src/."; }
+        part storyRustS3SemanticDoDR1 : TestResult { :>> id = "a9b0c1d2-9012-4a6b-c7d8-e9f0a1b2c3d4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d32fda4"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
