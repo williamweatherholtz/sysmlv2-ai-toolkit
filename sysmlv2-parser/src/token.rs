@@ -1,5 +1,5 @@
 /// Byte-offset span of a token in the source text.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     /// Start byte (inclusive).
     pub start: usize,
@@ -54,11 +54,18 @@ pub enum TokenKind {
     /// `dependency`
     Dependency,
 
+    /// `doc`
+    Doc,
+
     // ── punctuation & operators ────────────────────────────────────────────
     /// `{`
     LBrace,
     /// `}`
     RBrace,
+    /// `[`
+    LBracket,
+    /// `]`
+    RBracket,
     /// `;`
     Semicolon,
     /// `.`
@@ -69,6 +76,10 @@ pub enum TokenKind {
     Hash,
     /// `=`
     Eq,
+    /// `+`
+    Plus,
+    /// `/`
+    Slash,
     /// `::`
     ColonColon,
     /// `:>>`

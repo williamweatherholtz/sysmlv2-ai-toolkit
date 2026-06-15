@@ -14,3 +14,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 [[test]]
 name = "lexer_bdd"
 harness = false
+
+[[test]]
+name = "parser_bdd"
+harness = false

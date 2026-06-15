@@ -48,11 +48,27 @@ impl<'src> Lexer<'src> {
             if ch.is_whitespace() {
                 continue;
             }
-            if ch == '/' && self.peek_char() == Some('/') {
-                while self.peek_char().is_some_and(|c| c != '\n') {
-                    self.next_char();
+            if ch == '/' {
+                if self.peek_char() == Some('/') {
+                    while self.peek_char().is_some_and(|c| c != '\n') {
+                        self.next_char();
+                    }
+                    continue;
                 }
-                continue;
+                if self.peek_char() == Some('*') {
+                    self.next_char(); // consume '*'
+                    loop {
+                        match self.next_char() {
+                            None => break,
+                            Some((_, '*', _, _)) if self.peek_char() == Some('/') => {
+                                self.next_char(); // consume '/'
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                    continue;
+                }
             }
             return Some((pos, ch, line, col));
         }
@@ -167,11 +183,15 @@ impl<'src> Lexer<'src> {
         let kind = match ch {
             '{' => TokenKind::LBrace,
             '}' => TokenKind::RBrace,
+            '[' => TokenKind::LBracket,
+            ']' => TokenKind::RBracket,
             ';' => TokenKind::Semicolon,
             '.' => TokenKind::Dot,
             '*' => TokenKind::Star,
             '#' => TokenKind::Hash,
             '=' => TokenKind::Eq,
+            '+' => TokenKind::Plus,
+            '/' => TokenKind::Slash,
             ':' => self.scan_colon(),
             '"' => return self.lex_string(byte_pos, line, col),
             c if c.is_ascii_digit() => return Ok(self.lex_number(c, byte_pos, line, col)),
@@ -231,6 +251,7 @@ fn keyword_or_ident(s: &str) -> TokenKind {
         "to" => TokenKind::To,
         "from" => TokenKind::From,
         "dependency" => TokenKind::Dependency,
+        "doc" => TokenKind::Doc,
         _ => TokenKind::Ident(s.to_owned()),
     }
 }

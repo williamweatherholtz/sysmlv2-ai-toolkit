@@ -1,0 +1,644 @@
+use crate::ast::{
+    ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, Import, Item, Package,
+    Part, SatisfyEdge, Succession, Value, Verification,
+};
+use crate::error::ParseError;
+use crate::token::{Span, Token, TokenKind};
+
+// ── parser state ───────────────────────────────────────────────────────────
+
+struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
+}
+
+impl Parser {
+    #[allow(clippy::missing_const_for_fn)] // Vec is not const-constructible in stable Rust
+    fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, pos: 0 }
+    }
+
+    fn peek(&self) -> &TokenKind {
+        &self.tokens[self.pos].kind
+    }
+
+    fn peek_next(&self) -> &TokenKind {
+        self.tokens
+            .get(self.pos + 1)
+            .map_or(&TokenKind::Eof, |t| &t.kind)
+    }
+
+    fn peek_token(&self) -> &Token {
+        &self.tokens[self.pos]
+    }
+
+    fn advance(&mut self) -> &Token {
+        let tok = &self.tokens[self.pos];
+        if self.pos + 1 < self.tokens.len() {
+            self.pos += 1;
+        }
+        tok
+    }
+
+    fn current_span(&self) -> Span {
+        self.peek_token().span
+    }
+
+    fn expect_ident(&mut self, filename: &str) -> Result<(String, Span), ParseError> {
+        let tok = self.peek_token().clone();
+        match &tok.kind {
+            TokenKind::Ident(s) => {
+                let name = s.clone();
+                self.advance();
+                Ok((name, tok.span))
+            }
+            kw if is_keyword(kw) => {
+                let name = keyword_text(kw).to_owned();
+                self.advance();
+                Ok((name, tok.span))
+            }
+            other => Err(ParseError::Expected {
+                expected: "identifier".into(),
+                got: format!("{other:?}").into(),
+                filename: filename.into(),
+                line: tok.line,
+                col: tok.col,
+            }),
+        }
+    }
+
+    fn expect(&mut self, kind: &TokenKind, filename: &str) -> Result<Span, ParseError> {
+        let tok = self.peek_token().clone();
+        if &tok.kind == kind {
+            self.advance();
+            Ok(tok.span)
+        } else {
+            Err(ParseError::Expected {
+                expected: format!("{kind:?}").into(),
+                got: format!("{:?}", tok.kind).into(),
+                filename: filename.into(),
+                line: tok.line,
+                col: tok.col,
+            })
+        }
+    }
+
+    fn eat(&mut self, kind: &TokenKind) -> bool {
+        if &self.tokens[self.pos].kind == kind {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+const fn is_keyword(k: &TokenKind) -> bool {
+    matches!(
+        k,
+        TokenKind::Package
+            | TokenKind::Private
+            | TokenKind::Import
+            | TokenKind::Part
+            | TokenKind::Action
+            | TokenKind::Def
+            | TokenKind::Verification
+            | TokenKind::Requirement
+            | TokenKind::Use
+            | TokenKind::Case
+            | TokenKind::Attribute
+            | TokenKind::Enum
+            | TokenKind::Abstract
+            | TokenKind::First
+            | TokenKind::Then
+            | TokenKind::Satisfy
+            | TokenKind::Allocate
+            | TokenKind::By
+            | TokenKind::To
+            | TokenKind::From
+            | TokenKind::Dependency
+    )
+}
+
+const fn keyword_text(k: &TokenKind) -> &'static str {
+    match k {
+        TokenKind::Package => "package",
+        TokenKind::Private => "private",
+        TokenKind::Import => "import",
+        TokenKind::Part => "part",
+        TokenKind::Action => "action",
+        TokenKind::Def => "def",
+        TokenKind::Verification => "verification",
+        TokenKind::Requirement => "requirement",
+        TokenKind::Use => "use",
+        TokenKind::Case => "case",
+        TokenKind::Attribute => "attribute",
+        TokenKind::Enum => "enum",
+        TokenKind::Abstract => "abstract",
+        TokenKind::First => "first",
+        TokenKind::Then => "then",
+        TokenKind::Satisfy => "satisfy",
+        TokenKind::Allocate => "allocate",
+        TokenKind::By => "by",
+        TokenKind::To => "to",
+        TokenKind::From => "from",
+        TokenKind::Dependency => "dependency",
+        _ => "",
+    }
+}
+
+// ── value parser ──────────────────────────────────────────────────────────
+
+fn parse_value(p: &mut Parser, filename: &str) -> Result<Value, ParseError> {
+    let tok = p.peek_token().clone();
+    match &tok.kind {
+        TokenKind::Str(s) => {
+            let mut value = s.clone();
+            p.advance();
+            while p.eat(&TokenKind::Plus) {
+                if let TokenKind::Str(s2) = p.peek().clone() {
+                    value.push_str(&s2);
+                    p.advance();
+                }
+            }
+            Ok(Value::Str(value))
+        }
+        TokenKind::Int(n) => {
+            let v = Value::Int(*n);
+            p.advance();
+            Ok(v)
+        }
+        TokenKind::Ident(s) => {
+            let name = s.clone();
+            p.advance();
+            if p.eat(&TokenKind::ColonColon) {
+                let (member, _) = p.expect_ident(filename)?;
+                Ok(Value::EnumLit { namespace: name, member })
+            } else {
+                Ok(Value::Ident(name))
+            }
+        }
+        kw if is_keyword(kw) => {
+            let name = keyword_text(kw).to_owned();
+            p.advance();
+            if p.eat(&TokenKind::ColonColon) {
+                let (member, _) = p.expect_ident(filename)?;
+                Ok(Value::EnumLit { namespace: name, member })
+            } else {
+                Ok(Value::Ident(name))
+            }
+        }
+        other => Err(ParseError::Expected {
+            expected: "value (string, integer, identifier, or enum literal)".into(),
+            got: format!("{other:?}").into(),
+            filename: filename.into(),
+            line: tok.line,
+            col: tok.col,
+        }),
+    }
+}
+
+// ── attribute body ─────────────────────────────────────────────────────────
+
+fn parse_attribute_body(
+    p: &mut Parser,
+    filename: &str,
+    start: Span,
+) -> Result<(Vec<Attribute>, Span), ParseError> {
+    p.expect(&TokenKind::LBrace, filename)?;
+    let mut attrs = Vec::new();
+    loop {
+        match p.peek() {
+            TokenKind::RBrace => { p.advance(); break; }
+            TokenKind::Eof => {
+                let tok = p.peek_token();
+                return Err(ParseError::UnexpectedEof {
+                    filename: filename.into(),
+                    line: tok.line,
+                    col: tok.col,
+                });
+            }
+            TokenKind::ColonGtGt => {
+                let attr_start = p.current_span();
+                p.advance();
+                let (name, _) = p.expect_ident(filename)?;
+                p.expect(&TokenKind::Eq, filename)?;
+                let value = parse_value(p, filename)?;
+                let end = p.current_span();
+                p.expect(&TokenKind::Semicolon, filename)?;
+                attrs.push(Attribute {
+                    name,
+                    value,
+                    span: Span { start: attr_start.start, end: end.start },
+                });
+            }
+            _ => { skip_item(p); }
+        }
+    }
+    let end_span = p.current_span();
+    Ok((attrs, Span { start: start.start, end: end_span.start }))
+}
+
+fn parse_typed_item_body(
+    p: &mut Parser,
+    filename: &str,
+    item_start: Span,
+) -> Result<(String, Option<String>, Vec<Attribute>, Span), ParseError> {
+    let (name, _) = p.expect_ident(filename)?;
+    let type_name = if p.eat(&TokenKind::Colon) {
+        let (tn, _) = p.expect_ident(filename)?;
+        if matches!(p.peek(), TokenKind::LBracket) {
+            skip_bracket_block(p);
+        }
+        Some(tn)
+    } else {
+        None
+    };
+    let (attrs, span) = parse_attribute_body(p, filename, item_start)?;
+    Ok((name, type_name, attrs, span))
+}
+
+// ── action def body ───────────────────────────────────────────────────────
+
+fn parse_action_def_body(
+    p: &mut Parser,
+    filename: &str,
+    name: String,
+    start: Span,
+) -> Result<ActionDef, ParseError> {
+    p.expect(&TokenKind::LBrace, filename)?;
+    let mut actions = Vec::new();
+    let mut parts = Vec::new();
+    let mut verifications = Vec::new();
+    let mut successions = Vec::new();
+    loop {
+        match p.peek().clone() {
+            TokenKind::RBrace => { p.advance(); break; }
+            TokenKind::Eof => {
+                let tok = p.peek_token();
+                return Err(ParseError::UnexpectedEof {
+                    filename: filename.into(), line: tok.line, col: tok.col,
+                });
+            }
+            TokenKind::Action => {
+                let s = p.current_span(); p.advance();
+                let (n, _) = p.expect_ident(filename)?;
+                if matches!(p.peek(), TokenKind::LBrace) {
+                    skip_brace_block(p);
+                } else {
+                    p.expect(&TokenKind::Semicolon, filename)?;
+                }
+                actions.push(ActionDecl { name: n, span: s });
+            }
+            TokenKind::Part => {
+                let s = p.current_span(); p.advance();
+                let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
+                parts.push(Part { name: n, type_name: tn, attributes: a, span: sp });
+            }
+            TokenKind::Verification => {
+                let s = p.current_span(); p.advance();
+                let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
+                verifications.push(Verification { name: n, type_name: tn, attributes: a, span: sp });
+            }
+            TokenKind::First => {
+                if let Some(s) = parse_succession(p, filename)? { successions.push(s); }
+            }
+            TokenKind::Hash => {
+                p.advance();
+                p.expect_ident(filename)?; // marker name
+                if matches!(p.peek(), TokenKind::First) {
+                    if let Some(s) = parse_succession(p, filename)? { successions.push(s); }
+                } else {
+                    skip_item(p);
+                }
+            }
+            _ => skip_item(p),
+        }
+    }
+    let end = p.current_span();
+    Ok(ActionDef { name, actions, parts, verifications, successions,
+        span: Span { start: start.start, end: end.start } })
+}
+
+fn parse_succession(p: &mut Parser, filename: &str) -> Result<Option<Succession>, ParseError> {
+    let s = p.current_span();
+    p.advance(); // consume 'first'
+    let (first, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::Then, filename)?;
+    let (then, _) = p.expect_ident(filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(Some(Succession { first, then, span: Span { start: s.start, end: end.start } }))
+}
+
+/// Skip one unknown item. Stops (and consumes) on `;`; stops (without extra
+/// consume) when a `{...}` block ends the construct; stops without consuming
+/// on `}` or EOF (the caller's closing delimiter).
+fn skip_item(p: &mut Parser) {
+    loop {
+        match p.peek() {
+            TokenKind::Semicolon => { p.advance(); break; }
+            TokenKind::RBrace | TokenKind::Eof => break,
+            TokenKind::LBrace => { skip_brace_block(p); break; }
+            TokenKind::LBracket => skip_bracket_block(p),
+            _ => { p.advance(); }
+        }
+    }
+}
+
+fn skip_bracket_block(p: &mut Parser) {
+    p.advance(); // consume '['
+    while !matches!(p.peek(), TokenKind::RBracket | TokenKind::Eof) {
+        p.advance();
+    }
+    p.eat(&TokenKind::RBracket);
+}
+
+fn skip_brace_block(p: &mut Parser) {
+    p.advance(); // consume '{'
+    let mut depth = 1usize;
+    loop {
+        match p.peek() {
+            TokenKind::LBrace => { depth += 1; p.advance(); }
+            TokenKind::RBrace => {
+                depth -= 1; p.advance();
+                if depth == 0 { break; }
+            }
+            TokenKind::Eof => break,
+            _ => { p.advance(); }
+        }
+    }
+}
+
+// ── package-level item parsers ─────────────────────────────────────────────
+
+fn parse_import(p: &mut Parser, filename: &str) -> Result<Import, ParseError> {
+    let s = p.current_span(); p.advance(); // consume 'private'
+    p.expect(&TokenKind::Import, filename)?;
+    let (ns, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::ColonColon, filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Star, filename)?;
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(Import { namespace: ns, span: Span { start: s.start, end: end.start } })
+}
+
+fn parse_satisfy(p: &mut Parser, filename: &str) -> Result<SatisfyEdge, ParseError> {
+    let s = p.current_span(); p.advance(); // consume 'satisfy'
+    let (need, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::By, filename)?;
+    let (by, _) = p.expect_ident(filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(SatisfyEdge { need, by, span: Span { start: s.start, end: end.start } })
+}
+
+fn parse_allocate(p: &mut Parser, filename: &str) -> Result<AllocateEdge, ParseError> {
+    let s = p.current_span(); p.advance(); // consume 'allocate'
+    let (sr, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::To, filename)?;
+    let (to, _) = p.expect_ident(filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(AllocateEdge { sr, to, span: Span { start: s.start, end: end.start } })
+}
+
+fn parse_hash_item(
+    p: &mut Parser,
+    filename: &str,
+) -> Result<Option<Item>, ParseError> {
+    let s = p.current_span(); p.advance(); // consume '#'
+    let (marker, _) = p.expect_ident(filename)?;
+    if !matches!(p.peek(), TokenKind::Dependency) {
+        skip_item(p);
+        return Ok(None);
+    }
+    p.advance(); // consume 'dependency'
+    p.expect(&TokenKind::From, filename)?;
+    let (from, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::To, filename)?;
+    let (to, _) = p.expect_ident(filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(Some(Item::Dependency(DependencyAnnotation {
+        marker, from, to,
+        span: Span { start: s.start, end: end.start },
+    })))
+}
+
+fn parse_action_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError> {
+    let s = p.current_span(); p.advance(); // consume 'action'
+    if p.eat(&TokenKind::Def) {
+        let (n, _) = p.expect_ident(filename)?;
+        let adef = parse_action_def_body(p, filename, n, s)?;
+        Ok(Some(Item::ActionDef(adef)))
+    } else {
+        let (n, _) = p.expect_ident(filename)?;
+        p.expect(&TokenKind::Semicolon, filename)?;
+        Ok(Some(Item::ActionDecl(ActionDecl { name: n, span: s })))
+    }
+}
+
+// ── top-level dispatch ─────────────────────────────────────────────────────
+
+fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError> {
+    match p.peek().clone() {
+        TokenKind::RBrace | TokenKind::Eof => Ok(None),
+        TokenKind::Doc => { p.advance(); Ok(None) }
+        TokenKind::Private => parse_import(p, filename).map(|i| Some(Item::Import(i))),
+        TokenKind::Action => parse_action_item(p, filename),
+        TokenKind::Part => {
+            // `part def ...` is a type definition — skip entirely
+            if matches!(p.peek_next(), TokenKind::Def) {
+                skip_item(p);
+                return Ok(None);
+            }
+            let s = p.current_span(); p.advance();
+            let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, span: sp })))
+        }
+        TokenKind::Verification => {
+            // `verification def ...` is a type definition — skip entirely
+            if matches!(p.peek_next(), TokenKind::Def) {
+                skip_item(p);
+                return Ok(None);
+            }
+            let s = p.current_span(); p.advance();
+            let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
+            Ok(Some(Item::Verification(Verification { name: n, type_name: tn, attributes: a, span: sp })))
+        }
+        TokenKind::First => parse_succession(p, filename).map(|s| s.map(Item::Succession)),
+        TokenKind::Satisfy => parse_satisfy(p, filename).map(|s| Some(Item::Satisfy(s))),
+        TokenKind::Allocate => parse_allocate(p, filename).map(|a| Some(Item::Allocate(a))),
+        TokenKind::Hash => parse_hash_item(p, filename),
+        _ => { skip_item(p); Ok(None) }
+    }
+}
+
+fn parse_package(p: &mut Parser, filename: &str) -> Result<Package, ParseError> {
+    let pkg_start = p.current_span();
+    p.expect(&TokenKind::Package, filename)?;
+    let (pkg_name, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::LBrace, filename)?;
+    let mut items = Vec::new();
+    loop {
+        if matches!(p.peek(), TokenKind::RBrace | TokenKind::Eof) { break; }
+        if let Some(item) = parse_item(p, filename)? { items.push(item); }
+    }
+    let end = p.expect(&TokenKind::RBrace, filename)?;
+    Ok(Package { name: pkg_name, items, span: Span { start: pkg_start.start, end: end.start } })
+}
+
+// ── public entry point ─────────────────────────────────────────────────────
+
+/// Parse a `SysML` v2 engine-dialect token stream into a [`Package`] AST.
+///
+/// # Errors
+///
+/// Returns [`ParseError`] when the token stream does not conform to the
+/// engine-dialect grammar.
+pub fn parse(tokens: Vec<Token>, filename: &str) -> Result<Package, ParseError> {
+    let mut p = Parser::new(tokens);
+    parse_package(&mut p, filename)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ast::Item, tokenize};
+
+    fn parse_src(src: &str) -> Package {
+        let tokens = tokenize(src, "test").expect("lex failed");
+        parse(tokens, "test").expect("parse failed")
+    }
+
+    #[test]
+    fn empty_package() {
+        let pkg = parse_src("package Foo {}");
+        assert_eq!(pkg.name, "Foo");
+        assert!(pkg.items.is_empty());
+    }
+
+    #[test]
+    fn import_item() {
+        let pkg = parse_src("package P { private import Foo::*; }");
+        assert_eq!(pkg.items.len(), 1);
+        assert!(matches!(&pkg.items[0], Item::Import(i) if i.namespace == "Foo"));
+    }
+
+    #[test]
+    fn part_with_attributes() {
+        let src = r#"package P {
+            part myPart : Story {
+                :>> id = "abc-123";
+                :>> estimatedPoints = 2;
+                :>> kind = WorkKind::code;
+            }
+        }"#;
+        let pkg = parse_src(src);
+        assert_eq!(pkg.items.len(), 1);
+        let Item::Part(part) = &pkg.items[0] else { panic!("expected Part") };
+        assert_eq!(part.name, "myPart");
+        assert_eq!(part.type_name.as_deref(), Some("Story"));
+        assert_eq!(part.attributes.len(), 3);
+        assert_eq!(part.attributes[0].name, "id");
+        assert!(matches!(&part.attributes[0].value, Value::Str(s) if s == "abc-123"));
+        assert!(matches!(&part.attributes[1].value, Value::Int(2)));
+        assert!(
+            matches!(&part.attributes[2].value, Value::EnumLit { namespace, member }
+                if namespace == "WorkKind" && member == "code")
+        );
+    }
+
+    #[test]
+    fn verification_item() {
+        let src = r#"package P {
+            verification myTest : Test {
+                :>> method = VerificationMethod::test;
+                :>> procedureText = "do the thing";
+            }
+        }"#;
+        let pkg = parse_src(src);
+        let Item::Verification(v) = &pkg.items[0] else { panic!("expected Verification") };
+        assert_eq!(v.name, "myTest");
+        assert_eq!(v.type_name.as_deref(), Some("Test"));
+        assert_eq!(v.attributes.len(), 2);
+    }
+
+    #[test]
+    fn succession_item() {
+        let pkg = parse_src("package P { first alpha then beta; }");
+        assert!(matches!(&pkg.items[0], Item::Succession(s) if s.first == "alpha" && s.then == "beta"));
+    }
+
+    #[test]
+    fn satisfy_edge() {
+        let pkg = parse_src("package P { satisfy n1 by sr1; }");
+        assert!(matches!(&pkg.items[0], Item::Satisfy(s) if s.need == "n1" && s.by == "sr1"));
+    }
+
+    #[test]
+    fn allocate_edge() {
+        let pkg = parse_src("package P { allocate sr1 to comp1; }");
+        assert!(matches!(&pkg.items[0], Item::Allocate(a) if a.sr == "sr1" && a.to == "comp1"));
+    }
+
+    #[test]
+    fn dependency_annotation() {
+        let pkg = parse_src("package P { #DependsOn dependency from a to b; }");
+        let Item::Dependency(d) = &pkg.items[0] else { panic!("expected Dependency") };
+        assert_eq!(d.marker, "DependsOn");
+        assert_eq!(d.from, "a");
+        assert_eq!(d.to, "b");
+    }
+
+    #[test]
+    fn action_def_with_nested_items() {
+        let src = r#"package P {
+            action def MyDef {
+                action taskA;
+                action taskB;
+                first taskA then taskB;
+                verification myDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = "ok"; }
+                part myResult : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = "abc"; :>> judgedAt = "2026-01-01"; :>> judgedBy = "user"; }
+            }
+        }"#;
+        let pkg = parse_src(src);
+        let Item::ActionDef(adef) = &pkg.items[0] else { panic!("expected ActionDef") };
+        assert_eq!(adef.name, "MyDef");
+        assert_eq!(adef.actions.len(), 2);
+        assert_eq!(adef.successions.len(), 1);
+        assert_eq!(adef.verifications.len(), 1);
+        assert_eq!(adef.parts.len(), 1);
+    }
+
+    #[test]
+    fn line_comment_inside_package() {
+        let src = "package P {\n// this is a comment\npart x : T { :>> id = \"u\"; }\n}";
+        let pkg = parse_src(src);
+        assert_eq!(pkg.items.len(), 1);
+    }
+
+    #[test]
+    fn missing_closing_brace_error() {
+        let tokens = tokenize("package P {", "test").expect("lex");
+        assert!(parse(tokens, "test").is_err());
+    }
+
+    #[test]
+    fn ordering_only_marker_in_action_def() {
+        let src = r"package P {
+            action def D {
+                action a;
+                action b;
+                #OrderingOnly first a then b;
+            }
+        }";
+        let pkg = parse_src(src);
+        let Item::ActionDef(adef) = &pkg.items[0] else { panic!() };
+        assert_eq!(adef.successions.len(), 1);
+        assert_eq!(adef.successions[0].first, "a");
+    }
+}
