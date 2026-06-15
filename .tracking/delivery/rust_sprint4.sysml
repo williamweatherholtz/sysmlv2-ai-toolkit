@@ -29,6 +29,7 @@ package ProjectDeliveryRustS4 {
     action def DeliveryRunRustS4 {
         action storyRustS4SpecCompat;
         verification storyRustS4SpecCompatDoD : Test { :>> id = "12345678-6666-4f6a-c7d8-e9f0a1b2c3d6"; :>> method = VerificationMethod::test; :>> procedureText = "build.rs defines SYSML_V2_SPEC_URL and SYSML_V2_GRAMMAR_SHA constants; fetches on build + verifies SHA256; fails with actionable message on mismatch; SYSML_V2_SPEC_OFFLINE=1 skips remote check; SYSML_V2_GRAMMAR_VERSION emitted as rustc-env; .cargo/config.toml sets offline default; 3 BDD scenarios + 68 total tests green; clippy -D warnings clean."; }
+        part storyRustS4SpecCompatDoDR1 : TestResult { :>> id = "ef012345-cdef-4a6b-c7d8-e9f0a1b2c3d5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bbf241"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
