@@ -1,0 +1,7 @@
+# Workspace-level Cargo configuration.
+#
+# SYSML_V2_SPEC_OFFLINE: when "1", build.rs skips the remote spec-pin check.
+# force=false means this value is only injected when the env var is not already set,
+# so CI can override with SYSML_V2_SPEC_OFFLINE=0 to run the real check.
+[env]
+SYSML_V2_SPEC_OFFLINE = { value = "1", force = false }

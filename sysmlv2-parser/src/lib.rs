@@ -9,6 +9,7 @@
 pub mod ast;
 pub mod error;
 pub mod registry;
+pub mod spec_compat;
 pub mod token;
 mod lexer;
 mod parser;
