@@ -62,6 +62,7 @@ package ProjectDeliveryRustS0 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "Cargo.toml workspace exists; both crates compile; cargo clippy --workspace --all-targets -D warnings passes; cargo test --workspace passes; pre-commit hook updated.";
     }
+    part rustS0ImplementGateR1 : TestResult { :>> id = "e2f3a4b5-cccc-4d6e-f7a8-b9c0d1e2f3a4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fdffd53"; :>> judgedAt = "2026-06-12"; :>> judgedBy = "claudeOpus"; }
 
     verification rustS0ReviewGate : Test {
         :>> id = "c9d0e1f2-9999-4a3b-c4d5-e6f7a8b9c0d1";
@@ -71,6 +72,7 @@ package ProjectDeliveryRustS0 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: workspace layout correct; deny attributes present in both crates; hook addition is surgical (no regressions to SysML path); Cargo.lock committed.";
     }
+    part rustS0ReviewGateR1 : TestResult { :>> id = "f3a4b5c6-dddd-4e7f-a8b9-c0d1e2f3a4b5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fdffd53"; :>> judgedAt = "2026-06-12"; :>> judgedBy = "claudeOpus"; }
 
     verification rustS0CloseOutGate : Test {
         :>> id = "d0e1f2a3-aaaa-4b4c-d5e6-f7a8b9c0d1e2";
@@ -80,6 +82,7 @@ package ProjectDeliveryRustS0 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "rustS0WorkspaceR1 recorded (pass); storyRustS0WorkspaceR1 recorded (pass); rustS0WorkspaceDoRR1 recorded in backlog (pass); validate_all green; user accepts Sprint 0 complete.";
     }
+    part rustS0CloseOutGateR1 : TestResult { :>> id = "a4b5c6d7-eeee-4f8a-b9c0-d1e2f3a4b5c6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fdffd53"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "wweatherholtz"; }
 
     verification rustS0RetroGate : Test {
         :>> id = "e1f2a3b4-bbbb-4c5d-e6f7-a8b9c0d1e2f3";
@@ -89,4 +92,5 @@ package ProjectDeliveryRustS0 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 0 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part rustS0RetroGateR1 : TestResult { :>> id = "b5c6d7e8-ffff-4a9b-c0d1-e2f3a4b5c6d7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fdffd53"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -8,8 +8,8 @@ package ProjectState {
 
     part cursor : StateCursor {
         :>> activeWorkflow = "DeliveryWorkflow";
-        :>> activePhase = "Delivery/closeOut";
-        :>> enteredAt = "2026-06-11";
+        :>> activePhase = "Delivery/implement";
+        :>> enteredAt = "2026-06-15";
         :>> enteredBy = "claudeOpus";
     }
 }
