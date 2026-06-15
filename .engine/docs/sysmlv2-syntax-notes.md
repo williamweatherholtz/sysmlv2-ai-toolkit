@@ -85,6 +85,16 @@ The kernelspec calls bare `java`, so it MUST run through `conda run -n sysml`
 (subprocess + the kernel). A cell FAILS iff the kernel emits a line containing
 `ERROR:`.
 
+## TestResult naming and enum conventions (confirmed Sprint 6, 2026-06-15)
+
+- **DoD TestResult naming**: `part <task>DoDR<n> : TestResult` — the suffix is `DoDR<n>`,
+  not just `R<n>`. The pure-Rust `orient_root` (sysmlv2-cli) looks for the `DoDR` infix to
+  link a result back to its task. Standalone phase-gate results use `<gate>R<n>`.
+- **Outcome enum**: `outcome = VerdictKind::pass` (or `::fail`). The enum is `VerdictKind`,
+  **not** `TestOutcome`. Using the wrong name silently produces a non-pass result.
+- **Required TestResult fields**: `id` (UUID), `outcome` (VerdictKind), `judgedAgainst`
+  (short git SHA), `judgedAt` (ISO-8601 date), `judgedBy` (actor name string).
+
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 
 - `%show <FQN>` is a reliable STRUCTURE dumper, an unreliable VALUE dumper.

@@ -1,0 +1,12 @@
+package Decision0022 {
+    private import EngineWork::*;
+
+    part d0022 : Decision {
+        :>> id = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4b";
+        :>> title = "S6 review docSync: orient Rust alternative + VerdictKind naming + DoDR naming convention";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Sprint 6 review phase identified three process improvements: (1) CLAUDE.md and .engine/docs/usage.md referenced only query.py orient; the new sysmlv2 orient [ROOT] Rust-native command was undocumented. (2) usage.md described TestResult naming as <task>R<n> — ambiguous; the DoD-linked naming is <task>DoDR<n> (the DoDR infix is required by orient_root for done-detection). (3) sysmlv2-syntax-notes.md had no entry for VerdictKind::pass (the correct outcome enum); an agent artifact (orient_bdd.rs) initially used TestOutcome::pass (wrong), caught only at test-write time — a documented convention would prevent recurrence.";
+        :>> decisionText = "Applied as Sprint 6 review phase docSync. (1) CLAUDE.md §1 and §4 updated: added 'or Rust-native: sysmlv2 orient [ROOT]' alongside the query.py command. (2) usage.md day-to-day table: 'See what's next' row updated to mention sysmlv2 orient; 'Mark done' row clarified to use <task>DoDR<n> naming and VerdictKind::pass; added 'Record a standalone result' row for phase-gate R<n> pattern. (3) sysmlv2-syntax-notes.md: new section 'TestResult naming and enum conventions' documents DoDR<n> infix rule, VerdictKind enum name, and required fields. Accepted: wweatherholtz standing instruction (fix internal processes in each sprint review), 2026-06-15.";
+        :>> consequences = "Any future agent authoring TestResults has the correct VerdictKind::pass enum and DoDR<n> naming documented in sysmlv2-syntax-notes.md — the source of ground truth for authoring .sysml. orient_root done-detection and usage.md conventions are now consistent. CLAUDE.md mentions both orient paths so agents can use the Rust binary without the Jupyter kernel.";
+    }
+}

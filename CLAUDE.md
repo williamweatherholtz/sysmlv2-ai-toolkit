@@ -31,6 +31,7 @@ Authoritative reading order: this file → `.engine/README.md` → `.engine/deci
 superseded in full by decisions 0001–0018; decisions win.)
 **Orient** (where things stand / what's next) is never read from prose — compute it:
 `conda run -n sysml --no-capture-output python .engine/tools/query.py orient`
+(or Rust-native, no kernel required: `sysmlv2 orient [ROOT]`)
 
 ---
 
@@ -181,7 +182,7 @@ The six workflows (see the spec for detail):
 - **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
   `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
   reproduced once even after the critique). Where things stand is COMPUTED
-  (`python .engine/tools/query.py orient`); what's next is the backlog's ready frontier;
+  (`python .engine/tools/query.py orient` or `sysmlv2 orient [ROOT]`); what's next is the backlog's ready frontier;
   how to work here is THIS file; mechanics live in `.tracking/README.md`,
   `.engine/docs/` and `.engine/decisions/`. Never author a status/worklist/handoff doc —
   if resuming requires knowledge, it belongs in the model, a Decision, or these docs.
