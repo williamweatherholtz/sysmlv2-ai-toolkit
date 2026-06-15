@@ -17,3 +17,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 [[test]]
 name = "cli_bdd"
 harness = false
+
+[[test]]
+name = "orient_bdd"
+harness = false

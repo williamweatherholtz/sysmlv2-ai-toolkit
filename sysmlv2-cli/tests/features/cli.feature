@@ -14,3 +14,21 @@ Feature: sysmlv2-cli library
     Given a temporary directory containing 2 SysML files
     When I collect SysML files from the directory
     Then 2 paths are collected
+
+  Scenario: orient extracts cursor from state.sysml
+    Given orient fixtures loaded from "tests/fixtures/orient"
+    When I parse the orient cursor
+    Then the cursor active workflow is "TestFlow"
+
+  Scenario: orient computes done and ready tasks
+    Given orient fixtures loaded from "tests/fixtures/orient"
+    When I compute the orient state
+    Then 1 task is done
+    Then 1 task is outstanding
+    Then "taskB" is in the ready list
+
+  Scenario: orient JSON includes cursor and ready task
+    Given orient fixtures loaded from "tests/fixtures/orient"
+    When I compute the orient state
+    Then the orient JSON contains "TestFlow"
+    Then the orient JSON contains "taskB"
