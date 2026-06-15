@@ -1450,7 +1450,9 @@ dependencies = [
 name = "sysmlv2-cli"
 version = "0.1.0"
 dependencies = [
+ "cucumber",
  "sysmlv2-parser",
+ "tokio",
 ]
 
 [[package]]

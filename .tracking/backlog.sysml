@@ -229,12 +229,14 @@ package EngineBacklog {
         action specRefresh;         // rewrite/retire the historical design spec so no doc contradicts decisions (was RESUME 'known debt' prose)
         action modelOnlyState;      // D0018: RESUME.md deleted; orient computed; CLAUDE.md bans prose state docs
 
-        // ---- Rust parser CLI sprint backlog (2026-06-12): rustS0..rustS4 feed runtimeParser ----
+        // ---- Rust parser CLI sprint backlog (2026-06-12): rustS0..rustS6 feed runtimeParser ----
         action rustS0Workspace;   // Sprint 0: Cargo workspace + quality gates + BDD harness
         action rustS1Lexer;       // Sprint 1: tokenizer for engine dialect; proptest-covered
         action rustS2Parser;      // Sprint 2: recursive descent parser; full thiserror; no .unwrap()
         action rustS3Semantic;    // Sprint 3: package registry + cross-package resolution + type checking
         action rustS4SpecCompat;  // Sprint 4: build.rs spec pin + compile-time grammar hash assertion
+        action rustS5CLI;         // Sprint 5: sysmlv2 binary — check + validate subcommands; CI exit codes
+        action rustS6Orient;      // Sprint 6: sysmlv2 orient subcommand — pure-Rust pipeline view
 
         verification rustS0WorkspaceDoR : Test { :>> id = "c6788072-6045-438f-a95b-879ce9147ebd"; :>> method = VerificationMethod::inspect; :>> procedureText = "Cargo workspace layout agreed (sysmlv2-parser lib + sysmlv2-cli bin); deny attributes decided; BDD framework (cucumber-rs) selected; CI script drafted; no blocking dependencies"; }
         part rustS0WorkspaceDoRR1 : TestResult { :>> id = "d7891183-7156-4f9c-a0a6-980dc058b4e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "53cd43a"; :>> judgedAt = "2026-06-12"; :>> judgedBy = "claudeOpus"; }
@@ -261,6 +263,13 @@ package EngineBacklog {
         verification rustS4SpecCompatDoD : Test { :>> id = "7ce88f0c-6f1d-40bb-a3c8-8c045daba7af"; :>> method = VerificationMethod::test; :>> procedureText = "build.rs defines SYSML_V2_SPEC_URL and SYSML_V2_GRAMMAR_SHA constants; fetches grammar manifest on build and verifies SHA256; build fails with actionable message if hash mismatch; SYSML_V2_SPEC_OFFLINE=1 skips remote check; version string emitted as cargo:rustc-env=SYSML_V2_GRAMMAR_VERSION; BDD scenario covers offline and mismatch cases; cargo test + cargo clippy -D warnings green"; }
         part rustS4SpecCompatDoDR1 : TestResult { :>> id = "def01234-bcde-4f6a-b7c8-d9e0f1a2b3c5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bbf241"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification rustS4RetroGate : Test { :>> id = "0e7c8f1c-6aeb-49e4-af15-50a937a8f68a"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 4 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS5CLIDoR : Test { :>> id = "f01234ab-5678-4cde-9012-3456789abc10"; :>> method = VerificationMethod::inspect; :>> procedureText = "sysmlv2-cli binary approach agreed: lib.rs (check_files/validate_root/collect_sysml) + main.rs dispatching check/validate/ls; BDD tests via cucumber-rs test lib functions directly; 3 scenarios outlined; no clap dep; DoD accepted"; }
+        part rustS5CLIDoRR1 : TestResult { :>> id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0d379c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        verification rustS5CLIDoD : Test { :>> id = "01234abc-5678-4bcd-ef01-23456789abcd"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2 binary: check FILE... exits 0/1/2; validate [ROOT] registers schema + validates .tracking/ exits 0/1/2; ls [ROOT] lists .sysml files; lib.rs exports check_files/validate_root/collect_sysml; 3 BDD scenarios green; 71 total tests pass; clippy -D warnings clean"; }
+        verification rustS5CLIRetroGate : Test { :>> id = "12345bcd-6789-4dea-f012-3456789abcde"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 5 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS6OrientDoR : Test { :>> id = "23456cde-789a-4efb-0123-456789abcdef"; :>> method = VerificationMethod::inspect; :>> procedureText = "orient subcommand approach agreed: reads .tracking/state.sysml cursor + backlog.sysml outstanding/ready; outputs current phase, ready items, suspect items; exit 0; DoD accepted"; }
+        verification rustS6OrientDoD : Test { :>> id = "3456def0-89ab-4f0c-1234-56789abcdef0"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2 orient [ROOT]: reads state cursor from .tracking/state.sysml; resolves ready/outstanding from backlog action defs + TestResult outcomes; outputs orientation view matching query.py orient; all tests pass; clippy -D warnings clean"; }
+        verification rustS6OrientRetroGate : Test { :>> id = "456ef012-9abc-4a1d-2345-6789abcdef01"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 6 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
@@ -272,7 +281,9 @@ package EngineBacklog {
         first rustS1Lexer then rustS2Parser;
         first rustS2Parser then rustS3Semantic;
         first rustS3Semantic then rustS4SpecCompat;
-        first rustS4SpecCompat then runtimeParser;
+        first rustS4SpecCompat then rustS5CLI;
+        first rustS5CLI then rustS6Orient;
+        first rustS6Orient then runtimeParser;
 
         verification foldWhatsNextDoD : Test { :>> id = "4338695c-eb93-4d73-b904-c9c4c1469840"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs (parity with whats_next.py); whats_next.py retired; single query tool"; }
         part foldWhatsNextR1 : TestResult { :>> id = "6d7e8f9a-0b1c-4d2e-3f4a-5b6c7d8e9f0a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }

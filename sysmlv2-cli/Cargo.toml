@@ -9,3 +9,11 @@ path = "src/main.rs"
 
 [dependencies]
 sysmlv2-parser = { path = "../sysmlv2-parser" }
+
+[dev-dependencies]
+cucumber = { version = "0.20", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[[test]]
+name = "cli_bdd"
+harness = false
