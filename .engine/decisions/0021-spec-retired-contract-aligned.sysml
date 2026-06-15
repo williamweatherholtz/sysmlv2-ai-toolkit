@@ -1,0 +1,12 @@
+package Decision0021 {
+    private import EngineWork::*;
+
+    part d0021 : Decision {
+        :>> id = "e2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f60";
+        :>> title = "specRefresh + contractAlign: retire 2026-06-04 spec to design-history; remove stale currentState reference from computed-state contract";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Two backlog items were ready: (1) specRefresh: the 2026-06-04 design spec was marked historical with a STATUS banner but still lived in docs/superpowers/specs/ alongside the CLAUDE.md reference pointing to it as 'HISTORICAL — superseded in places'; the backlog DoD required formal retirement to design-history. (2) contractAlign: the computed-state contract contained a stale reference to `currentState` (deleted in CR-7); the banner said 'STALE REFERENCE' but the stale text remained in the contract body (line 44).";
+        :>> decisionText = "Applied as part of Sprint 5 review phase. specRefresh: docs/superpowers/specs/2026-06-04-process-model-design.md moved to docs/design-history/2026-06-04-process-model-design-retired.md via git mv; CLAUDE.md updated to reference the new path and use 'retired' language. contractAlign: STATUS banner in computed-state.md updated to reflect the fix date and remove the 'STALE REFERENCE' callout; the body paragraph referencing `currentState` (line 44) rewritten to say done is computed from appended TestResults (no `currentState`); `coverageState()` and `satisfaction()` annotated as explicitly queued (not yet implemented). Both items complete: no doc contradicts the model; no stale references remain. Accepted: wweatherholtz standing instruction (fix internal processes in each sprint review), 2026-06-15.";
+        :>> consequences = "No doc contradicts decisions 0001-0018. The computed-state contract is self-consistent: implemented views labelled implemented, unimplemented views labelled queued, no stale concepts. CLAUDE.md points to the right location for the retired spec.";
+    }
+}

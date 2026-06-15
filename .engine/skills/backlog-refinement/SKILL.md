@@ -1,5 +1,5 @@
 ---
-name: agile-refinement
+name: backlog-refinement
 description: |
   Takes a work item (Story/Epic/Task) through INVEST and the Definition-of-Ready
   gate, and turns its acceptance criteria into atomic Gherkin-style Test items
@@ -11,13 +11,13 @@ description: |
   wording quality (use requirement-quality), STPA (use stpa), or committing /
   PRs (use repo-push).
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   domain: [agile, INVEST, BDD, Gherkin, definition-of-ready, SysMLv2]
   writePolicy: pr-only
   engine: sysmlv2-ai-toolkit
 ---
 
-# agile-refinement
+# backlog-refinement
 
 Runs the engine's Refinement process and Definition-of-Ready gate on `WorkItem`
 items (`Story`, `Epic`, `Task`) from `Engine::Core`. Its defining move: acceptance

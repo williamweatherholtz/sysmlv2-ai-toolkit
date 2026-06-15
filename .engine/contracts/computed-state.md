@@ -1,10 +1,10 @@
-> **IMPLEMENTATION STATUS (2026-06-11).** Partially implemented; this contract is the
-> TARGET. Implemented today (query.py): done-from-appended-results, ready/blocked,
+> **IMPLEMENTATION STATUS (2026-06-15).** Partially implemented; this contract is the
+> TARGET. Implemented (query.py): done-from-appended-results, ready/blocked,
 > D0005 suspicion (material-change trigger over semantic deps, transitive, #OrderingOnly
-> excluded), evidence validation. NOT yet implemented: coverageState()/satisfaction()
-> over verify edges, whats-stale-since, coverageGaps. STALE REFERENCE: `currentState`
-> was deleted (CR-7) — "marked done" is now itself computed. Alignment is tracked as
-> the `contractAlign` backlog task — keep code, contract, and backlog converging there.
+> excluded), evidence validation. NOT yet implemented (explicitly queued as backlog
+> items): coverageState()/satisfaction() over verify edges, whats-stale-since,
+> coverageGaps. Fixed (contractAlign, 2026-06-15): removed stale `currentState`
+> reference — "done" is fully computed from appended TestResults (CR-7).
 
 # Computed-State Contract
 
@@ -41,9 +41,9 @@ For an element with verifying Tests:
 - **stale** — would be verified, but a downstream Test result is `suspect`.
 - **unverified** — otherwise.
 
-An item is truly **done** only when `currentState` is terminal **and**
-`satisfaction == verified`. The two can disagree; that disagreement is itself a
-query ("marked done but not verified").
+An item is truly **done** only when `satisfaction == verified` (computed from
+appended TestResults and git ancestry — `currentState` was deleted in CR-7).
+The query ("marked done but not yet verified") is itself a computed view.
 
 ### `suspicionState(element)`
 - **clean** — no upstream material change postdates this element's coverage.

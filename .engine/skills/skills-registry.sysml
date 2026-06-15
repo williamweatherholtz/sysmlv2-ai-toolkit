@@ -35,13 +35,37 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Safety-relevant Need/UseCase/Component enters scope.";
         :>> writePolicy = WritePolicy::prOnly;
     }
-    part agileRefinement : AISkill {
+    part backlogRefinement : AISkill {
         :>> id = "8e31bad5-37de-4b1b-9524-3c70c3f0c333";
-        :>> title = "agile-refinement";
-        :>> purpose = "Run backlog refinement: criteria as verification DoDs, sizing, dependency links (rename to backlog-refinement = `skillsRefresh` task).";
-        :>> location = ".engine/skills/agile-refinement/SKILL.md";
+        :>> title = "backlog-refinement";
+        :>> purpose = "Run backlog refinement: INVEST check, acceptance criteria as atomic Test items linked by verify, DoR gate, story-slicing.";
+        :>> location = ".engine/skills/backlog-refinement/SKILL.md";
         :>> triggerCondition = "New backlog items need refinement to ready.";
         :>> writePolicy = WritePolicy::prOnly;
+    }
+    part testDesign : AISkill {
+        :>> id = "a042dce7-59f0-4d2c-b635-5e92e5f0e555";
+        :>> title = "test-design";
+        :>> purpose = "Design verification Tests for engine items: choose method (test/demo/inspect/analysis/confirmation), write BDD/Gherkin scenarios, map acceptance criteria to atomic Test instances.";
+        :>> location = ".engine/skills/test-design/SKILL.md";
+        :>> triggerCondition = "Authoring DoD criteria, acceptance tests, or BDD scenarios for engine items.";
+        :>> writePolicy = WritePolicy::prOnly;
+    }
+    part testResult : AISkill {
+        :>> id = "b153edf8-6a01-4e3d-c746-6fa3f6f0f666";
+        :>> title = "test-result";
+        :>> purpose = "Record test execution outcomes as appended TestResult instances: outcome + judgedAgainst commit + judgedAt + judgedBy. Never mutate prior results.";
+        :>> location = ".engine/skills/test-result/SKILL.md";
+        :>> triggerCondition = "Executing tests, recording gate verdicts, or closing a DoD.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part traceabilityAudit : AISkill {
+        :>> id = "c264fe09-7b12-4f4e-d857-7b047b01c777";
+        :>> title = "traceability-audit";
+        :>> purpose = "Audit satisfy/verify/allocate coverage: surface uncovered Needs, unverified Requirements, unallocated Components; trace-need paths; flag suspect items.";
+        :>> location = ".engine/skills/traceability-audit/SKILL.md";
+        :>> triggerCondition = "Architecture/Delivery review gates, DoD coverage checks, or asked to audit traceability.";
+        :>> writePolicy = WritePolicy::readOnly;
     }
     part repoPush : AISkill {
         :>> id = "9f42cbe6-48ef-4c2c-a635-4d81d4f0d444";

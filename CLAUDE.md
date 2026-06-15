@@ -26,8 +26,9 @@ building things — and is being built using its own discipline. Read this befor
   what the work produces. The deliverable's domain vocabulary never enters the engine.
 
 Authoritative reading order: this file → `.engine/README.md` → `.engine/decisions/`
-(0001–0018) → the critiques in `docs/design-history/`. (The original design spec in
-`docs/superpowers/specs/` is HISTORICAL — superseded in places; decisions win.)
+(0001–0018) → the critiques in `docs/design-history/`. (The original design spec
+`docs/design-history/2026-06-04-process-model-design-retired.md` is retired —
+superseded in full by decisions 0001–0018; decisions win.)
 **Orient** (where things stand / what's next) is never read from prose — compute it:
 `conda run -n sysml --no-capture-output python .engine/tools/query.py orient`
 
