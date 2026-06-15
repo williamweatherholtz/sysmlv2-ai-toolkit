@@ -24,11 +24,12 @@ package ProjectDeliveryRustS6 {
     }
 
     // ====================================================================
-    // Delivery backlog — DoD read by query.py. (TestResult appended after sprint commit)
+    // Delivery backlog — DoD read by query.py.
     // ====================================================================
     action def DeliveryRunRustS6 {
         action storyRustS6Orient;
         verification storyRustS6OrientDoD : Test { :>> id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2 orient [ROOT]: reads state cursor from .tracking/state.sysml; resolves ready/outstanding from backlog action defs + TestResult DoD outcomes; outputs JSON {cursor, ready, suspect, invalidEvidence, counts} matching query.py orient; 6 BDD scenarios, 21 steps green; clippy -D warnings clean."; }
+        part storyRustS6OrientDoDR1 : TestResult { :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6f45a85"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -60,8 +61,9 @@ package ProjectDeliveryRustS6 {
         :>> createdAt = "2026-06-15";
         :>> authoredBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
-        :>> procedureText = "lib.rs: Cursor/OrientReport types, json_str/dod_result_is_pass/part_outcome_is_pass/str_value helpers, parse_cursor/compute_orient_state/orient_root public API; main.rs: cmd_orient + orient dispatch; cli_bdd.rs: 3 orient scenarios (cursor, done/ready, JSON); fixture files orient/state.sysml + orient/backlog.sysml; 6 BDD scenarios 21 steps green; clippy -D warnings clean.";
+        :>> procedureText = "lib.rs: Cursor/OrientReport types, json_str/dod_result_is_pass/part_outcome_is_pass/str_value helpers, parse_cursor/compute_orient_state/orient_root public API; main.rs: cmd_orient + orient dispatch; cli_bdd.rs: 3 orient scenarios (cursor, done/ready, JSON); orient_bdd.rs: 3 orient_root scenarios; 9 total BDD scenarios 37 steps green; clippy -D warnings clean.";
     }
+    part rustS6ImplementGateR1 : TestResult { :>> id = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6f45a85"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS6ReviewGate : Test {
         :>> id = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a";
@@ -71,6 +73,7 @@ package ProjectDeliveryRustS6 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: lib.rs uses is_none_or/is_some_and/clone_into per clippy::nursery/pedantic; map_or_else for cursor JSON; dod_result_is_pass finds latest-n DoDR Part correctly; compute_orient_state sorts ready list deterministically; orient_root delegates cleanly to parse_cursor + compute_orient_state; json_str escapes all JSON special chars; to_json matches query.py orient format.";
     }
+    part rustS6ReviewGateR1 : TestResult { :>> id = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6f45a85"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS6CloseOutGate : Test {
         :>> id = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c";
