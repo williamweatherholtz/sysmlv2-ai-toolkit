@@ -29,7 +29,7 @@ package ProjectDeliveryRustS5 {
     action def DeliveryRunRustS5 {
         action storyRustS5CLI;
         verification storyRustS5CLIDoD : Test { :>> id = "6b7c8d9e-0f1a-4b2c-3d4e-5f6a7b8c9d0e"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2-cli lib.rs exports check_files/validate_root/collect_sysml; main.rs dispatches check/validate/ls; 3 BDD scenarios green; 71 total tests pass; clippy -D warnings clean."; }
-        part storyRustS5CLIDoDR1 : TestResult { :>> id = "7c8d9e0f-1a2b-4c3d-4e5f-6a7b8c9d0e1f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDING"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        part storyRustS5CLIDoDR1 : TestResult { :>> id = "7c8d9e0f-1a2b-4c3d-4e5f-6a7b8c9d0e1f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "18e5a51"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -63,7 +63,7 @@ package ProjectDeliveryRustS5 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "sysmlv2-cli/src/lib.rs authored with check_files/validate_root/collect_sysml/Report/CheckError; sysmlv2-cli/src/main.rs dispatches check/validate/ls subcommands; cli_bdd.rs 3 scenarios green; 71 total tests pass; clippy -D warnings clean; Cargo.toml [[test]] cli_bdd harness=false.";
     }
-    part rustS5ImplementGateR1 : TestResult { :>> id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDING"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+    part rustS5ImplementGateR1 : TestResult { :>> id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "18e5a51"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS5ReviewGate : Test {
         :>> id = "4d5e6f7a-8b9c-4d0e-1f2a-3b4c5d6e7f8b";
@@ -73,7 +73,7 @@ package ProjectDeliveryRustS5 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: lib.rs no .unwrap() in production code; validate_root registers schema without validating it (schema may use ScalarValues::*); collect_sysml sorts output for determinism; BDD uses AtomicUsize counter to avoid temp file races; main.rs uses process::exit() for CI-clean exit codes; report_status human-readable + stderr for non-zero.";
     }
-    part rustS5ReviewGateR1 : TestResult { :>> id = "5e6f7a8b-9c0d-4e1f-2a3b-4c5d6e7f8a9c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDING"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+    part rustS5ReviewGateR1 : TestResult { :>> id = "5e6f7a8b-9c0d-4e1f-2a3b-4c5d6e7f8a9c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "18e5a51"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS5CloseOutGate : Test {
         :>> id = "6f7a8b9c-0d1e-4f2a-3b4c-5d6e7f8a9b0d";
