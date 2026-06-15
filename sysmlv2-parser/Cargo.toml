@@ -10,3 +10,7 @@ thiserror = "1"
 proptest = "1"
 cucumber = { version = "0.20", features = ["macros"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[[test]]
+name = "lexer_bdd"
+harness = false
