@@ -83,6 +83,7 @@ package ProjectDeliveryS16 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyDeliverySkillsDoD recorded (pass); deliverySkillsDoD in backlog (pass); validate_all green; user accepts Sprint 16 complete.";
     }
+    part deliverySkillsCloseOutGateR1 : TestResult { :>> id = "9f801385-e032-41d5-2463-9f1031527385"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0f326b5"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification deliverySkillsRetroGate : Test {
         :>> id = "a0912385-e032-41d5-2463-9f1031527384";
@@ -92,4 +93,5 @@ package ProjectDeliveryS16 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 16 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part deliverySkillsRetroGateR1 : TestResult { :>> id = "a0912496-f143-41d5-2463-9f1031527396"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0f326b5"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }

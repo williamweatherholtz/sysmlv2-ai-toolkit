@@ -26,6 +26,14 @@ if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.tracking/'         && sysml_run validate_tracking.py
 fi
 
+# Ceremony-gate ordering guard (pure-Python, no kernel; <1s) — issue010 / D0047.
+# Fails if a gate passed while an earlier-ordered gate in the same sprint is unpassed.
+if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
+    echo "pre-commit: validate_ceremony.py"
+    python "$V/validate_ceremony.py" || {
+        echo "pre-commit: CEREMONY ORDERING FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     echo "pre-commit: cargo clippy"

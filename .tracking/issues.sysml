@@ -99,4 +99,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "deliverySkills";
     }
+
+    part issue010 : Issue {
+        :>> id = "c9daebfc-012d-4e3f-046f-8091021324a5";
+        :>> title = "No guard prevents ceremony gates being skipped or recorded out of order — only surfaced post-hoc by orient/traceability, not prevented";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "During Sprint 16, gate TestResults were recorded Refine->Implement->Review with Standup SKIPPED; the omission was caught only because orient happened to be run (it showed pending=Standup while later gates passed). There is no validator/pre-commit guard enforcing the invariant 'no ceremony gate may pass while an earlier-ordered gate in the same sprint is unpassed.' Views surface subversion (orient pending, traceability orange highlight) but nothing PREVENTS it at author/commit time. This is the same class as the Sprint 14 retro finding (tracked-but-recurring): the durable fix is an automated guard, not manual vigilance. Meta: corrections found mid-work must be logged as bugs AND get a permanent guard, not patched silently.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "ceremonyGateGuard";
+    }
 }
