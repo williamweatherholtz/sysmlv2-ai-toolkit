@@ -84,6 +84,7 @@ package ProjectDeliveryS14 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyToolchainAndBaselineDoDR1 recorded (pass); toolchainWatchDoDR1 + baselineViewDoDR1 in backlog (pass); validate_all green; user accepts Sprint 14 complete.";
     }
+    part toolchainAndBaselineCloseOutGateR1 : TestResult { :>> id = "16a97b00-8eb1-4d6f-a15e-26d25a9f67dd"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "81402ee"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification toolchainAndBaselineRetroGate : Test {
         :>> id = "4e1f2a3b-5c6d-4e7f-8a9b-0c1d2e3f4a5b";
