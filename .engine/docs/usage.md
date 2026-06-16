@@ -41,6 +41,7 @@ the layer you touched.
 | Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `verification <task>DoD : Test` criterion |
 | Order work | `first taskA then taskB;` (succession) |
 | See what's next | `python .engine/tools/query.py orient` — or Rust-native (no kernel): `sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list, one per line) |
+| Track an issue | Author a `part <name> : Issue { ... }` in `.tracking/issues.sysml` with `description`, `discoveredInField`, and `relatedTask` (the backlog action to address it). Surface with `python .engine/tools/query.py issues`. |
 | Mark done | Use `sysmlv2 append-result --file FILE --task TASK --sha SHA [--verdict pass\|fail] [--judged-by ACTOR] [--judged-at DATE]` — auto-generates UUID, enforces append-only N+1. Or directly APPEND `part <task>DoDR<n> : TestResult` (same fields: `id`, `judgedAgainst`, `judgedAt`, `judgedBy`, `outcome = VerdictKind::pass`). `method=confirmation` requires the human's explicit sign-off. |
 | Record a standalone result | For phase gates (not DoD-linked): `part <gate>R<n> : TestResult { ... }`. Same fields. |
 | Add a new task | Use `sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT [--method test\|inspect\|confirmation\|demo\|analysis]` — auto-generates UUID, rejects duplicate names. |

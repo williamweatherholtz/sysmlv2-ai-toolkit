@@ -46,6 +46,17 @@ package TrackingTemplate {
         :>> consequences = "What follows.";
     }
 
+    // -- an Issue (UC10: issueLoop), routed to its addressing backlog task --
+    part exampleIssue : Issue {
+        :>> id = "3f1c9a2e-0000-4000-8000-00000000000a";
+        :>> title = "Example: some known gap or bug";
+        :>> createdAt = "2026-06-15";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "Description of the gap. What is wrong, where it occurs, what impact it has.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "backlogTaskName";
+    }
+
     // -- EDGE MARKERS, worked examples (CR-12; relationships.sysml is the law) --
     // Scope-cut: the Decision SUPERSEDES the Need (back-reference is computed):
     #Supersede dependency from exampleDecision to exampleNeed;
