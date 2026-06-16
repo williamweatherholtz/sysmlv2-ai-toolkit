@@ -20,6 +20,12 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
 - Metadata application: `#MarkerName <element>` (prefix) and
   `<element> { @MarkerName; }` (member) both work, including a `#Marker` on a
   `dependency`.
+- **`#Marker first X then Y;`** succession prefix: `#OrderingOnly first A then B;`
+  marks a succession edge as ordering-only (confirmed Sprint 8, 2026-06-15). Works both
+  inside `action def` bodies and at package level. The Rust parser preserves the marker
+  in `Succession.is_ordering_only`; the indexer excludes ordering-only edges from semantic
+  dependency computation (they gate ordering but do not block `ready` or propagate
+  suspicion — see D0025).
 - `doc /* ... */` documentation clauses.
 - **Distinct packages + `private import Sibling::*;`** to cross-reference
   between files (the standard-library idiom).
@@ -76,14 +82,21 @@ imports resolve) — see `.engine/tools/validate/`.
 
 ## How to validate
 
+Use the four-layer validators (retired legacy `validate_sysml.py` 2026-06-11):
+
+```powershell
+$conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py
 ```
-& "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe" run -n sysml \
-    --no-capture-output python <repo>\.engine\tools\validate\validate_sysml.py
-```
+
 The kernelspec calls bare `java`, so it MUST run through `conda run -n sysml`
 (running the env python directly fails with WinError 2). Needs sandbox disabled
 (subprocess + the kernel). A cell FAILS iff the kernel emits a line containing
-`ERROR:`.
+`ERROR:`. NEVER pipe `conda run` output into another cmdlet — the JVM holds the
+pipe and the shell hangs.
 
 ## TestResult naming and enum conventions (updated Sprint 7, 2026-06-15)
 
