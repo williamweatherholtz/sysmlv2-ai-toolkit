@@ -29,6 +29,7 @@ package ProjectDeliveryRustS7 {
     action def DeliveryRunRustS7 {
         action storyRustS7QueryAlign;
         verification storyRustS7QueryAlignDoD : Test { :>> id = "f3a4b5c6-d7e8-4f9a-ab0c-2d3e4f5a6b7c"; :>> method = VerificationMethod::test; :>> procedureText = "dod_result_is_pass handles DoDR + legacy R naming; parse_result_header handles both; query.py regex fixed; sysmlv2 whats-next outputs ready list; 6 orient + 6 cli BDD scenarios green; clippy clean."; }
+        part storyRustS7QueryAlignDoDR1 : TestResult { :>> id = "4de5f6a7-b8c9-4d0e-bf2f-3a4b5c6d7e8f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2811f5c"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -62,6 +63,7 @@ package ProjectDeliveryRustS7 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "lib.rs dod_result_is_pass: or_else chain (DoDRprefix first, then legacy R prefix); whats_next_root exported; query.py _RESULT_LINE non-greedy; main.rs cmd_whats_next + dispatch; orient.feature: 6 scenarios (4 original + invalidEvidence + legacy + whats-next); cli.feature: 6 scenarios; 12 scenarios 50 steps green; clippy -D warnings clean.";
     }
+    part rustS7ImplementGateR1 : TestResult { :>> id = "2bc3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2811f5c"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS7ReviewGate : Test {
         :>> id = "d7e8f9a0-b1c2-4d3e-bf40-6a7b8c9d0e1f";
@@ -71,6 +73,7 @@ package ProjectDeliveryRustS7 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: dod_result_is_pass or_else fallback non-ambiguous (DoDR prefix checked first so DoDR1 never matches legacy R prefix); query.py non-greedy regex correctly keys both naming styles; cmd_whats_next clean (no allocation, uses orient::compute); D0023 recorded.";
     }
+    part rustS7ReviewGateR1 : TestResult { :>> id = "3cd4e5f6-a7b8-4c9d-ae1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2811f5c"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS7CloseOutGate : Test {
         :>> id = "e8f9a0b1-c2d3-4e4f-8a51-7b8c9d0e1f2a";
