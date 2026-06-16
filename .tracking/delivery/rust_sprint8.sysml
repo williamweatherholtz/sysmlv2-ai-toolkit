@@ -83,6 +83,7 @@ package ProjectDeliveryRustS8 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyRuntimeParserDoDR1 recorded (pass); runtimeParserDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 8 complete.";
     }
+    part runtimeParserCloseOutGateR1 : TestResult { :>> id = "2f3a4b5c-d6e7-4f8a-e794-1c2d3e4f5a6b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification runtimeParserRetroGate : Test {
         :>> id = "69b0c1d2-e3f4-4a5b-b26d-0e1f2a3b4c5d";
@@ -92,4 +93,5 @@ package ProjectDeliveryRustS8 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 8 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part runtimeParserRetroGateR1 : TestResult { :>> id = "3a4b5c6d-e7f8-4a9b-f8a5-2d3e4f5a6b7c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }

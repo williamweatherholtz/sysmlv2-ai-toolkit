@@ -79,6 +79,7 @@ package ProjectDeliveryS11 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyNativeSpikesDoDR1 recorded (pass); stateDefSpikeDoDR1 + occurrenceRetypeDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 11 complete.";
     }
+    part nativeSpikesCloseOutGateR1 : TestResult { :>> id = "8f9a0b1c-d2e3-4f4a-edfa-7c8d9e0f1a2b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification nativeSpikesRetroGate : Test {
         :>> id = "c39e0f1a-2b3c-4d4e-fa5b-6c7d8e9f0a1b";
@@ -88,4 +89,5 @@ package ProjectDeliveryS11 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 11 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part nativeSpikesRetroGateR1 : TestResult { :>> id = "9a0b1c2d-e3f4-4a5b-feab-8d9e0f1a2b3c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -88,6 +88,7 @@ package ProjectDeliveryS10 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyIssueLoopDoDR1 recorded (pass); issueLoopDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 10 complete.";
     }
+    part issueLoopCloseOutGateR1 : TestResult { :>> id = "6d7e8f9a-b0c1-4d2e-cbd8-5a6b7c8d9e0f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification issueLoopRetroGate : Test {
         :>> id = "9c0d1e2f-a3b4-4c5d-d464-7f8a9b0c1d2e";
@@ -97,4 +98,5 @@ package ProjectDeliveryS10 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 10 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part issueLoopRetroGateR1 : TestResult { :>> id = "7e8f9a0b-c1d2-4e3f-dce9-6b7c8d9e0f1a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }

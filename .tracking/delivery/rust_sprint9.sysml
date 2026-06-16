@@ -83,6 +83,7 @@ package ProjectDeliveryRustS9 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyWriteApiDoDR1 recorded (pass); writeApiDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 9 complete.";
     }
+    part writeApiCloseOutGateR1 : TestResult { :>> id = "4b5c6d7e-f8a9-4b0c-a9b6-3e4f5a6b7c8d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification writeApiRetroGate : Test {
         :>> id = "fd0e1f2a-b3c4-4d5e-e5a6-7b8c9d0e1f2a";
@@ -92,4 +93,5 @@ package ProjectDeliveryRustS9 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 9 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part writeApiRetroGateR1 : TestResult { :>> id = "5c6d7e8f-a9b0-4c1d-bac7-4f5a6b7c8d9e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c431705"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }
