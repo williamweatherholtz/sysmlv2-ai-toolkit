@@ -41,8 +41,9 @@ the layer you touched.
 | Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `verification <task>DoD : Test` criterion |
 | Order work | `first taskA then taskB;` (succession) |
 | See what's next | `python .engine/tools/query.py orient` — or Rust-native (no kernel): `sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list, one per line) |
-| Mark done | APPEND a `part <task>DoDR<n> : TestResult` after the `verification <task>DoD`. Use `outcome = VerdictKind::pass` (not `TestOutcome`). Include `id` (UUID), `judgedAgainst` (commit SHA), `judgedAt` (ISO date), `judgedBy`. Never edit a prior result. `method=confirmation` requires the human's explicit sign-off. |
+| Mark done | Use `sysmlv2 append-result --file FILE --task TASK --sha SHA [--verdict pass\|fail] [--judged-by ACTOR] [--judged-at DATE]` — auto-generates UUID, enforces append-only N+1. Or directly APPEND `part <task>DoDR<n> : TestResult` (same fields: `id`, `judgedAgainst`, `judgedAt`, `judgedBy`, `outcome = VerdictKind::pass`). `method=confirmation` requires the human's explicit sign-off. |
 | Record a standalone result | For phase gates (not DoD-linked): `part <gate>R<n> : TestResult { ... }`. Same fields. |
+| Add a new task | Use `sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT [--method test\|inspect\|confirmation\|demo\|analysis]` — auto-generates UUID, rejects duplicate names. |
 | Record a decision | Author a `Decision` part (see any `.engine/decisions/` file for the pattern). |
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 
