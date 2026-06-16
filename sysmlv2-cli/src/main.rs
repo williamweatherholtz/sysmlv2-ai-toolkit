@@ -1,14 +1,16 @@
 //! `sysmlv2` — CLI entry point.
 //!
 //! Subcommands:
-//!   `validate [ROOT]`   — semantic-validate all `.tracking/` files
-//!   `check FILE...`     — parse-check one or more `.sysml` files
-//!   `orient [ROOT]`     — print orient state (cursor + ready/done/outstanding) as JSON
+//!   `validate [ROOT]`    — semantic-validate all `.tracking/` files
+//!   `check FILE...`      — parse-check one or more `.sysml` files
+//!   `orient [ROOT]`      — print orient state (cursor + ready/done/outstanding) as JSON
+//!   `whats-next [ROOT]`  — print ready task names, one per line
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use std::{path::PathBuf, process};
 
-use sysmlv2_cli::{check_files, collect_sysml, orient_root, validate_root};
+use sysmlv2_cli::{check_files, collect_sysml, validate_root};
+use sysmlv2_cli::orient;
 
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
@@ -99,7 +101,26 @@ fn cmd_orient(args: &[String]) -> i32 {
             }
         }
     };
-    println!("{}", orient_root(&root).to_json());
+    println!("{}", orient::compute(&root).to_json());
+    0
+}
+
+fn cmd_whats_next(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ directory found from the current directory upward.");
+                eprintln!("usage: sysmlv2 whats-next [ROOT]");
+                return 2;
+            }
+        }
+    };
+    for task in orient::compute(&root).ready {
+        println!("{task}");
+    }
     0
 }
 
@@ -125,12 +146,14 @@ fn main() {
         Some("check") => cmd_check(&args[2..]),
         Some("ls") => cmd_ls(&args[2..]),
         Some("orient") => cmd_orient(&args[2..]),
+        Some("whats-next") => cmd_whats_next(&args[2..]),
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
             eprintln!("  validate [ROOT]    semantic-validate all .tracking/ files");
             eprintln!("  check FILE...      parse-check one or more .sysml files");
             eprintln!("  ls [ROOT]          list .tracking/ .sysml files");
             eprintln!("  orient [ROOT]      print orient state as JSON");
+            eprintln!("  whats-next [ROOT]  print ready task names (one per line)");
             2
         }
     };

@@ -21,3 +21,22 @@ Feature: orient subcommand
     Then done count is 1
     And outstanding count is 1
     And ready contains "taskB"
+
+  Scenario: task with unresolvable SHA appears in invalidEvidence
+    Given a tracking dir with task "taskEvil" and an invalid SHA result
+    When I run orient on the prepared dir
+    Then done count is 0
+    And invalidEvidence contains "taskEvil"
+
+  Scenario: legacy R naming (without DoDR infix) is detected as done
+    Given a tracking dir with a legacy-named result for "taskOld"
+    When I run orient on the prepared dir
+    Then done count is 1
+    And outstanding count is 0
+    And ready is empty
+
+  Scenario: whats-next returns tasks with completed predecessors
+    Given a tracking dir with task "taskA" and a passing result
+    And task "taskB" depends on "taskA"
+    When I run whats-next
+    Then ready contains "taskB"

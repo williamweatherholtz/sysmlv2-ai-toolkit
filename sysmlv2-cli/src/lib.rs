@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use sysmlv2_parser::ast::{ActionDef, Item, Package, Part, Value};
 use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
+pub mod orient;
+
 // ── file discovery ────────────────────────────────────────────────────────────
 
 /// Recursively collect every `.sysml` file under `dir`, sorted by path.
@@ -146,10 +148,14 @@ fn json_str(s: &str) -> String {
 }
 
 fn dod_result_is_pass(task_name: &str, def: &ActionDef) -> bool {
-    let prefix = format!("{task_name}DoDR");
+    // Accept both `{task}DoDR{n}` (Sprint 6+ naming) and `{task}R{n}` (legacy naming).
+    let dodr_prefix = format!("{task_name}DoDR");
+    let legacy_prefix = format!("{task_name}R");
     let mut best: Option<(u32, bool)> = None;
     for part in &def.parts {
-        if let Some(suffix) = part.name.strip_prefix(&prefix) {
+        let suffix = part.name.strip_prefix(&dodr_prefix)
+            .or_else(|| part.name.strip_prefix(&legacy_prefix));
+        if let Some(suffix) = suffix {
             if let Ok(n) = suffix.parse::<u32>() {
                 let is_pass = part_outcome_is_pass(part);
                 if best.is_none_or(|(b, _)| n > b) {
@@ -269,6 +275,15 @@ pub fn compute_orient_state(packages: &[Package]) -> (Vec<String>, usize, usize)
     let done = done_set.len();
     let outstanding = actions.len().saturating_sub(done);
     (ready, done, outstanding)
+}
+
+/// Return the list of ready tasks from a project root — the `whats-next` view.
+///
+/// Identical to `orient_root(root).ready`; exported as a first-class API so
+/// callers and tests can use it without constructing a full `OrientReport`.
+#[must_use]
+pub fn whats_next_root(root: &Path) -> Vec<String> {
+    orient_root(root).ready
 }
 
 /// Compute the orient view from a project root.

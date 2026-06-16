@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cucumber::{given, then, when, World};
-use sysmlv2_cli::orient_root;
+use sysmlv2_cli::orient;
 
 static DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -16,6 +16,7 @@ fn unique_root() -> PathBuf {
 /// Write a valid SysML package to `<root>/.tracking/tasks.sysml`.
 ///
 /// `tasks`: (name, has_pass_result) — names with results get a `{name}DoDR1 : TestResult`.
+/// Use empty `judgedAgainst` so git-SHA validation is bypassed in temp dirs.
 /// `succs`: (pred, succ) succession edges.
 fn write_sysml(root: &Path, tasks: &[(String, bool)], succs: &[(String, String)]) {
     let tracking = root.join(".tracking");
@@ -26,13 +27,24 @@ fn write_sysml(root: &Path, tasks: &[(String, bool)], succs: &[(String, String)]
         if *done {
             let id = format!("{:08x}-0000-4000-8000-{:012x}", i + 1, i + 1);
             body.push_str(&format!(
-                "        part {name}DoDR1 : TestResult {{ :>> id = \"{id}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n"
+                "        part {name}DoDR1 : TestResult {{ :>> id = \"{id}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n"
             ));
         }
     }
     for (pred, succ) in succs {
         body.push_str(&format!("        first {pred} then {succ};\n"));
     }
+    let content = format!("package TestOrientBdd {{\n    action def TestRun {{\n{body}    }}\n}}\n");
+    std::fs::write(tracking.join("tasks.sysml"), content).unwrap();
+}
+
+/// Write a task with a NON-EMPTY invalid SHA so it lands in `invalidEvidence`.
+fn write_sysml_invalid_sha(root: &Path, name: &str) {
+    let tracking = root.join(".tracking");
+    std::fs::create_dir_all(&tracking).unwrap();
+    let body = format!(
+        "        action {name};\n        part {name}DoDR1 : TestResult {{ :>> id = \"ffffffff-0000-4000-8000-000000000001\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"deadbeef00000000000000000000000000000001\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n"
+    );
     let content = format!("package TestOrientBdd {{\n    action def TestRun {{\n{body}    }}\n}}\n");
     std::fs::write(tracking.join("tasks.sysml"), content).unwrap();
 }
@@ -45,6 +57,7 @@ pub struct OrientWorld {
     done: usize,
     outstanding: usize,
     ready: Vec<String>,
+    invalid_evidence: Vec<String>,
 }
 
 impl Drop for OrientWorld {
@@ -87,16 +100,58 @@ fn given_task_depends(world: &mut OrientWorld, succ: String, pred: String) {
     world.succs.push((pred, succ));
 }
 
+#[given(regex = r#"^a tracking dir with task "([^"]+)" and an invalid SHA result$"#)]
+fn given_task_invalid_sha(world: &mut OrientWorld, name: String) {
+    let root = unique_root();
+    write_sysml_invalid_sha(&root, &name);
+    world.root = Some(root);
+}
+
+#[given(regex = r#"^a tracking dir with a legacy-named result for "([^"]+)"$"#)]
+fn given_legacy_result(world: &mut OrientWorld, name: String) {
+    let root = unique_root();
+    let tracking = root.join(".tracking");
+    std::fs::create_dir_all(&tracking).unwrap();
+    let body = format!(
+        "        action {name};\n        part {name}R1 : TestResult {{ :>> id = \"aa000001-0000-4000-8000-000000000001\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n"
+    );
+    let content = format!("package LegacyOrientBdd {{\n    action def LegacyRun {{\n{body}    }}\n}}\n");
+    std::fs::write(tracking.join("legacy.sysml"), content).unwrap();
+    world.root = Some(root);
+}
+
 // ── when steps ────────────────────────────────────────────────────────────────
 
 #[when("I run orient")]
 fn when_run_orient(world: &mut OrientWorld) {
     let root = world.root.as_ref().unwrap();
     write_sysml(root, &world.tasks, &world.succs);
-    let output = orient_root(root);
+    let output = orient::compute(root);
     world.done = output.done;
     world.outstanding = output.outstanding;
     world.ready = output.ready;
+    world.invalid_evidence = output.invalid_evidence;
+}
+
+#[when("I run orient on the prepared dir")]
+fn when_run_orient_prepared(world: &mut OrientWorld) {
+    let root = world.root.as_ref().unwrap();
+    let output = orient::compute(root);
+    world.done = output.done;
+    world.outstanding = output.outstanding;
+    world.ready = output.ready;
+    world.invalid_evidence = output.invalid_evidence;
+}
+
+#[when("I run whats-next")]
+fn when_run_whats_next(world: &mut OrientWorld) {
+    let root = world.root.as_ref().unwrap();
+    write_sysml(root, &world.tasks, &world.succs);
+    let output = orient::compute(root);
+    world.done = output.done;
+    world.outstanding = output.outstanding;
+    world.ready = output.ready;
+    world.invalid_evidence = output.invalid_evidence;
 }
 
 // ── then steps ────────────────────────────────────────────────────────────────
@@ -123,6 +178,16 @@ fn then_ready_contains(world: &mut OrientWorld, name: String) {
         "expected {:?} in ready {:?}",
         name,
         world.ready
+    );
+}
+
+#[then(regex = r#"^invalidEvidence contains "([^"]+)"$"#)]
+fn then_invalid_evidence_contains(world: &mut OrientWorld, name: String) {
+    assert!(
+        world.invalid_evidence.contains(&name),
+        "expected {:?} in invalidEvidence {:?}",
+        name,
+        world.invalid_evidence
     );
 }
 

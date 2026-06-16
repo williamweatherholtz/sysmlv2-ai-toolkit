@@ -77,7 +77,7 @@ _UUID = re.compile(r'^(.*?)\s*\([0-9a-fA-F-]{36}\)\s*$')
 # Dialect v2 (CR-3): criterion = `verification <task>DoD : Test { ... }` (one line);
 # results = APPENDED `part <task>R<n> : TestResult { ... }` (immutable; latest wins).
 _DOD_LINE = re.compile(r'verification\s+(\w+)DoD\s*:\s*Test')
-_RESULT_LINE = re.compile(r'part\s+(\w+)R(\d+)\s*:\s*TestResult')
+_RESULT_LINE = re.compile(r'part\s+(\w+?)(?:DoD)?R(\d+)\s*:\s*TestResult')
 _ASSIGN = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 _ENUM = re.compile(r'(\w+)\s*=\s*\w+::(\w+)')
 _PKG = re.compile(r'package\s+(\w+)')

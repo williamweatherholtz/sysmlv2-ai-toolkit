@@ -229,7 +229,7 @@ package EngineBacklog {
         action specRefresh;         // rewrite/retire the historical design spec so no doc contradicts decisions (was RESUME 'known debt' prose)
         action modelOnlyState;      // D0018: RESUME.md deleted; orient computed; CLAUDE.md bans prose state docs
 
-        // ---- Rust parser CLI sprint backlog (2026-06-12): rustS0..rustS6 feed runtimeParser ----
+        // ---- Rust parser CLI sprint backlog (2026-06-12): rustS0..rustS7 feed runtimeParser ----
         action rustS0Workspace;   // Sprint 0: Cargo workspace + quality gates + BDD harness
         action rustS1Lexer;       // Sprint 1: tokenizer for engine dialect; proptest-covered
         action rustS2Parser;      // Sprint 2: recursive descent parser; full thiserror; no .unwrap()
@@ -237,6 +237,7 @@ package EngineBacklog {
         action rustS4SpecCompat;  // Sprint 4: build.rs spec pin + compile-time grammar hash assertion
         action rustS5CLI;         // Sprint 5: sysmlv2 binary — check + validate subcommands; CI exit codes
         action rustS6Orient;      // Sprint 6: sysmlv2 orient subcommand — pure-Rust pipeline view
+        action rustS7QueryAlign;  // Sprint 7: fix done detection (DoDR + R naming); sysmlv2 whats-next; query.py regex align
 
         verification rustS0WorkspaceDoR : Test { :>> id = "c6788072-6045-438f-a95b-879ce9147ebd"; :>> method = VerificationMethod::inspect; :>> procedureText = "Cargo workspace layout agreed (sysmlv2-parser lib + sysmlv2-cli bin); deny attributes decided; BDD framework (cucumber-rs) selected; CI script drafted; no blocking dependencies"; }
         part rustS0WorkspaceDoRR1 : TestResult { :>> id = "d7891183-7156-4f9c-a0a6-980dc058b4e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "53cd43a"; :>> judgedAt = "2026-06-12"; :>> judgedBy = "claudeOpus"; }
@@ -273,6 +274,9 @@ package EngineBacklog {
         verification rustS6OrientDoD : Test { :>> id = "3456def0-89ab-4f0c-1234-56789abcdef0"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2 orient [ROOT]: reads state cursor from .tracking/state.sysml; resolves ready/outstanding from backlog action defs + TestResult outcomes; outputs orientation view matching query.py orient; all tests pass; clippy -D warnings clean"; }
         part rustS6OrientDoDR1 : TestResult { :>> id = "e1d2c3b4-a5f6-4e7d-8c9b-0a1f2e3d4c5b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6f45a85"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification rustS6OrientRetroGate : Test { :>> id = "456ef012-9abc-4a1d-2345-6789abcdef01"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 6 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS7QueryAlignDoR : Test { :>> id = "a5b6c7d8-e9f0-4a1b-9c2d-3e4f5a6b7c8d"; :>> method = VerificationMethod::inspect; :>> procedureText = "done detection updated to handle both {task}DoDR{n} and {task}R{n} naming in dod_result_is_pass (lib.rs) and parse_result_header (orient.rs); query.py _RESULT_LINE regex aligned (non-greedy + optional DoD infix); sysmlv2 whats-next subcommand approach agreed (outputs orient.ready as plain lines); CHANGE accepted (D0023); DoD accepted"; }
+        verification rustS7QueryAlignDoD : Test { :>> id = "b6c7d8e9-f0a1-4b2c-8d3e-4f5a6b7c8d9e"; :>> method = VerificationMethod::test; :>> procedureText = "dod_result_is_pass handles both {task}DoDR{n} (new) and {task}R{n} (legacy) naming; parse_result_header handles both; query.py regex updated to key results under task name; sysmlv2 orient shows all S0-S6 sprints done; sysmlv2 whats-next [ROOT] outputs ready list (one per line); 6 orient BDD scenarios + 6 cli BDD scenarios green; clippy -D warnings clean"; }
+        verification rustS7QueryAlignRetroGate : Test { :>> id = "c7d8e9f0-a1b2-4c3d-be4f-5a6b7c8d9e0f"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 7 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
@@ -286,7 +290,8 @@ package EngineBacklog {
         first rustS3Semantic then rustS4SpecCompat;
         first rustS4SpecCompat then rustS5CLI;
         first rustS5CLI then rustS6Orient;
-        first rustS6Orient then runtimeParser;
+        first rustS6Orient then rustS7QueryAlign;
+        first rustS7QueryAlign then runtimeParser;
 
         verification foldWhatsNextDoD : Test { :>> id = "4338695c-eb93-4d73-b904-c9c4c1469840"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs (parity with whats_next.py); whats_next.py retired; single query tool"; }
         part foldWhatsNextR1 : TestResult { :>> id = "6d7e8f9a-0b1c-4d2e-3f4a-5b6c7d8e9f0a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }

@@ -1,0 +1,12 @@
+package Decision0023 {
+    private import EngineWork::*;
+
+    part d0023 : Decision {
+        :>> id = "d1e2f3a4-b5c6-4d7e-8f90-9a0b1c2d3e4f";
+        :>> title = "S7 CHANGE: align done-detection naming across Rust orient + query.py; add whats-next subcommand";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Sprint 6 introduced {task}DoDR{n} naming for DoD-linked TestResults. Legacy items (EngineBuild, dogfood) use {task}R{n} naming. Two bugs existed: (1) lib.rs dod_result_is_pass only matched DoDR{n} prefix — legacy tasks always appeared outstanding. (2) query.py _RESULT_LINE regex r'(\\w+)R(\\d+)' keyed DoDRn results under '<task>DoD' not '<task>' — sprints S0-S6 appeared not done in query.py. A third gap: no 'sysmlv2 whats-next' subcommand existed to output just the ready list as plain text (the orient subcommand outputs JSON). This change alters what tasks count as 'done' in both the Rust orient and query.py views — a computed-view semantics change (§3e → CHANGE §3a).";
+        :>> decisionText = "Applied as Sprint 7 implement. (1) lib.rs dod_result_is_pass: added or_else fallback to accept {task}R{n} legacy naming alongside {task}DoDR{n}. (2) orient.rs parse_result_header: the background-agent implementation already handles both naming styles via rfind('DoDR') + fallback R-scan. (3) query.py _RESULT_LINE: changed to r'part\\s+(\\w+?)(?:DoD)?R(\\d+)\\s*:\\s*TestResult' — non-greedy capture + optional DoD infix correctly keys both naming styles under the base task name. (4) main.rs: added sysmlv2 whats-next [ROOT] subcommand (calls orient::compute(root).ready, prints one per line). (5) orient.feature: 2 new BDD scenarios (legacy naming, whats-next). Accepted: wweatherholtz standing instruction (continue through sprints), 2026-06-15.";
+        :>> consequences = "sysmlv2 orient and sysmlv2 whats-next correctly report all S0-S6 sprints as done and S7 as ready. query.py orient also shows correct done state for all sprints. The {task}DoDR{n} naming convention remains canonical for new work; legacy {task}R{n} naming in existing files is tolerated without migration. orient.feature has 6 BDD scenarios, cli.feature has 6 BDD scenarios, all green.";
+    }
+}
