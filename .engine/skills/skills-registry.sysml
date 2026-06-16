@@ -115,4 +115,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part statusReport : AISkill {
+        :>> id = "c820fk6f-3b78-4e0c-de13-3b60b7k6j333";
+        :>> title = "status-report";
+        :>> purpose = "Generate a self-contained HTML project status dashboard: active sprint, velocity/efficiency, backlog, decisions, git activity. Materialized VIEW — not authored content.";
+        :>> location = ".engine/skills/status-report/SKILL.md";
+        :>> triggerCondition = "Asked for a status report, HTML dashboard, visual overview, or 'where does the project stand'.";
+        :>> writePolicy = WritePolicy::readOnly;
+    }
 }

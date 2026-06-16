@@ -1,0 +1,12 @@
+package Decision0040 {
+    private import EngineWork::*;
+
+    part d0040 : Decision {
+        :>> id = "be9e4fd3-1b2c-4d3e-efa4-5c6d7e8f9a0b";
+        :>> title = "recurring-task-skill-rule: check recurring vs one-time before executing; skill-before-execute for recurring tasks; status-report skill + report.py added";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Recurring tasks (code review, report generation, deployment, environment setup, estimation) were being executed ad-hoc without checking if a skill existed or should be created. This allowed process knowledge to escape into conversation history rather than being encoded in durable, reusable skills. The engine-triage classification step had no gate for this. The result: the same guidance was re-derived each time, and process improvements were not captured systematically.";
+        :>> decisionText = "Adopted: (1) A mandatory 'recurring or one-time?' pre-execution check is added to the interaction loop (CLAUDE.md §3 and engine-triage skill). Rule: for any EXECUTE or VIEW request, ask if it will recur. If yes and no skill exists → CHANGE: create/update a skill first, then execute using it. If clearly one-time → execute directly. If ambiguous → ask the user. Examples: 'I am on Windows' = recurring environment fact → CLAUDE.md §6; 'make an HTML report' = recurring → ask + create status-report skill; 'review sprint transcript' = recurring → sprint-review skill (already exists). (2) status-report skill added: VIEW skill for generating the HTML project dashboard. (3) report.py added to .engine/tools/: generates a self-contained HTML dashboard from tracking files + git + sysmlv2 CLI orient JSON. Accepted: wweatherholtz 2026-06-16.";
+        :>> consequences = "Every execution of a recurring task is preceded by a skill check. New skills are created when recurring tasks lack them. Engine-triage and CLAUDE.md §3 are both updated. Status report is a materialized VIEW (regenerable, marked as derived). Skills registry grows by one (status-report). Report.py is a BOOTSTRAP tool tracked in the backlog.";
+    }
+}

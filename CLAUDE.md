@@ -84,6 +84,24 @@ EXECUTE from BOOTSTRAP, ask: *am I building the engine (which tracks the work) o
 deliverable (what the work produces)?* — engine ⇒ BOOTSTRAP, deliverable ⇒ EXECUTE.
 When unsure of the category, say so and ask rather than defaulting to EXECUTE.
 
+**Recurring-or-one-time check (D0040 — mandatory before EXECUTE or VIEW).**
+After classifying, ask: *will this task recur?* If yes and no skill exists → treat
+as CHANGE first: create/update a skill that encodes the approach, then execute using
+it. If clearly one-time → execute directly. If ambiguous → ask the user.
+
+| Example request                       | Recurring? | Route                                    |
+|---------------------------------------|------------|------------------------------------------|
+| "I'm on Windows"                      | Yes        | Permanent fact → CLAUDE.md §6 or memory |
+| "Make an HTML status report"          | Recurring  | CREATE skill first (status-report)       |
+| "Review sprint transcript"            | Recurring  | Existing skill: sprint-review            |
+| "Deploy to GitHub"                    | Recurring  | Existing skill: repo-push                |
+| "Rename this one variable"            | One-time   | Execute directly                         |
+| "Generate the architecture diagram"   | Ambiguous  | Ask: recurring or one-time?              |
+
+This rule exists because every recurring task executed without a skill leaks process
+knowledge into conversation history, where it cannot be enforced, reviewed, or
+improved. Skills are the durable encoding of how we do things.
+
 **Classification is a visible, mandatory first move.** Open every substantive response by
 naming the category and route — e.g. *"RECORD → §3c"* — *before* acting. Never
 infer-and-act silently: a silent mis-route is exactly how an action slips past the

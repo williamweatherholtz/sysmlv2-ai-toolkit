@@ -54,7 +54,21 @@ mandatory, so nothing slips past silently.
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
 
-5. **Ceremony routing.** Sprint ceremonies are rigid EXECUTE sub-types — route to the
+5. **Recurring-or-one-time check (D0040).** After classifying into a category, for
+   EXECUTE and VIEW: ask *will this task recur?*
+
+   | Determination | Action |
+   |---------------|--------|
+   | Recurring, no skill exists | CHANGE first: create/update a skill; then execute using it |
+   | Recurring, skill exists    | Invoke the skill, execute using it |
+   | Clearly one-time           | Execute directly |
+   | Ambiguous                  | Ask the user before acting |
+
+   Examples: "I'm on Windows" → permanent env fact → CLAUDE.md §6.
+   "Generate HTML report" → recurring → status-report skill (create if absent, then use).
+   "Rename this one local variable" → one-time → execute directly.
+
+6. **Ceremony routing.** Sprint ceremonies are rigid EXECUTE sub-types — route to the
    matching skill before acting:
 
    | Ceremony phrase                           | Skill to invoke          |
