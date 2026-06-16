@@ -186,6 +186,11 @@ The six workflows (see the spec for detail):
   process, skill, tool, or template, run the Documentation Sync process
   (`.engine/processes/doc-sync.sysml`) — fix every doc claim the change invalidates **in the
   same commit**. Documentation drift was a recorded HIGH critique finding (2026-06-11).
+- **Corrections become permanent guards (D0047):** a defect or correction found mid-work that
+  reveals a *recurrable* process gap MUST be (1) logged as a tracked `Issue` and (2) given a
+  permanent automated guard (validator / pre-commit check / lint) — never patched silently.
+  Trivial one-off edits (typos, wording) are exempt; the test is *"could this class recur?"*
+  Manual vigilance is not a control (the Sprint 14 → 16 repeat proved it).
 - **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while
   implementing *accepted* work needs no separate permission. But green-lighting an
   *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE
@@ -223,6 +228,7 @@ $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
 python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
+python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering — no gate passes while an earlier one is unpassed (no kernel; D0047)
 ```
 
 (Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.
