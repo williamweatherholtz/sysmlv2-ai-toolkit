@@ -40,7 +40,7 @@ the layer you touched.
 |---|---|
 | Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `verification <task>DoD : Test` criterion |
 | Order work | `first taskA then taskB;` (succession) |
-| See what's next | `python .engine/tools/query.py orient` — or Rust-native (no kernel): `sysmlv2 orient [ROOT]` |
+| See what's next | `python .engine/tools/query.py orient` — or Rust-native (no kernel): `sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list, one per line) |
 | Mark done | APPEND a `part <task>DoDR<n> : TestResult` after the `verification <task>DoD`. Use `outcome = VerdictKind::pass` (not `TestOutcome`). Include `id` (UUID), `judgedAgainst` (commit SHA), `judgedAt` (ISO date), `judgedBy`. Never edit a prior result. `method=confirmation` requires the human's explicit sign-off. |
 | Record a standalone result | For phase gates (not DoD-linked): `part <gate>R<n> : TestResult { ... }`. Same fields. |
 | Record a decision | Author a `Decision` part (see any `.engine/decisions/` file for the pattern). |

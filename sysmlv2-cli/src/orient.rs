@@ -167,13 +167,15 @@ fn parse_result_header(line: &str) -> Option<(String, u32)> {
 /// Parse `verification <name>DoD : Test` → `name`.
 fn parse_dod_header(line: &str) -> Option<String> {
     let rest = line.trim().strip_prefix("verification ")?;
-    let pos = rest.find("DoD")?;
-    // Make sure "DoD" is followed by " : Test" (not just a substring).
-    let after = &rest[pos + 3..];
-    if !after.starts_with(' ') && !after.starts_with(':') {
+    // Only search for "DoD" in the name portion (before " : Test"), so we don't
+    // match "DoD" appearing in procedureText strings on the same line.
+    let test_sep = rest.find(" : Test")?;
+    let name_part = &rest[..test_sep];
+    let pos = name_part.rfind("DoD")?;
+    if pos + 3 != name_part.len() {
         return None;
     }
-    Some(rest[..pos].to_owned())
+    Some(name_part[..pos].to_owned())
 }
 
 /// Parse `first X then Y;` → `(X, Y)` (non-ordering-only).
@@ -243,10 +245,12 @@ fn read_backlog(tracking: &Path) -> (HashMap<String, TaskData>, HashSet<(String,
         scan_file(&path, &mut tasks, &mut all_edges, &mut ordering_only, &mut raw_results);
     }
 
-    // Attach sorted results to tasks.
+    // Attach sorted results to known tasks only — don't create phantom tasks from result names.
     for (name, mut rs) in raw_results {
         rs.sort_by_key(|r| r.n);
-        tasks.entry(name).or_default().results = rs;
+        if let Some(task) = tasks.get_mut(&name) {
+            task.results = rs;
+        }
     }
 
     // Build deps from succession edges.

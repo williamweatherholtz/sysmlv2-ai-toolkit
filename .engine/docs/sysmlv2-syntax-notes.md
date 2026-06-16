@@ -85,11 +85,14 @@ The kernelspec calls bare `java`, so it MUST run through `conda run -n sysml`
 (subprocess + the kernel). A cell FAILS iff the kernel emits a line containing
 `ERROR:`.
 
-## TestResult naming and enum conventions (confirmed Sprint 6, 2026-06-15)
+## TestResult naming and enum conventions (updated Sprint 7, 2026-06-15)
 
-- **DoD TestResult naming**: `part <task>DoDR<n> : TestResult` — the suffix is `DoDR<n>`,
-  not just `R<n>`. The pure-Rust `orient_root` (sysmlv2-cli) looks for the `DoDR` infix to
-  link a result back to its task. Standalone phase-gate results use `<gate>R<n>`.
+- **DoD TestResult naming**: `part <task>DoDR<n> : TestResult` — canonical suffix is `DoDR<n>`.
+  Standalone phase-gate results use `<gate>R<n>`.
+- **Legacy naming**: `part <task>R<n> : TestResult` — accepted by the Rust orient engine
+  (`orient::compute` in sysmlv2-cli) as a fallback. Sprint 7 extended done-detection to accept
+  both `{task}DoDR{n}` (primary) and `{task}R{n}` (legacy fallback). New work should use the
+  `DoDR` canonical form; existing legacy files are tolerated without migration.
 - **Outcome enum**: `outcome = VerdictKind::pass` (or `::fail`). The enum is `VerdictKind`,
   **not** `TestOutcome`. Using the wrong name silently produces a non-pass result.
 - **Required TestResult fields**: `id` (UUID), `outcome` (VerdictKind), `judgedAgainst`
