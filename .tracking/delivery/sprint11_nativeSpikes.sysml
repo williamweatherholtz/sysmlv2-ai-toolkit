@@ -29,7 +29,7 @@ package ProjectDeliveryS11 {
     action def DeliveryRunS11 {
         action storyNativeSpikes;
         verification storyNativeSpikesDoD : Test { :>> id = "da057a8b-9c0d-4e1f-abc2-3d4e5f6a7b8c"; :>> method = VerificationMethod::test; :>> procedureText = "stateDefSpike verdict recorded (D0031): pilot 0.59.0 does not support state def body syntax; transitions stay String[*]. occurrenceRetype verdict recorded (D0032): green — TestResult retyped to occurrence def in verification.sysml; existing part instances still parse; validate_schema 13/13 green."; }
-        part storyNativeSpikesDoDR1 : TestResult { :>> id = "ea168b9c-0d1e-4f2a-bcd3-4e5f6a7b8c9e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "placeholder"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        part storyNativeSpikesDoDR1 : TestResult { :>> id = "ea168b9c-0d1e-4f2a-bcd3-4e5f6a7b8c9e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "146bc25"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
