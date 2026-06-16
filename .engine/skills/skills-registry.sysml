@@ -2,10 +2,11 @@
 // EngineSkillRegistry — the AI skills that ACTUALLY EXIST on disk.
 //
 // CR-10 (2026-06-11): the four phantom registrations (triage, staleness-sweep,
-// implementer, grill-me — none existed) are gone; the five real skills are
-// registered (critique P1). writePolicy is the INTENDED write boundary —
-// enforcement arrives with the write API (D0003); until then it binds by
-// discipline (CLAUDE.md §4).
+// implementer, grill-me — none existed) are gone; only skills that ACTUALLY
+// EXIST on disk are registered (critique P1). The set has since grown (ceremony
+// skills D0039; build + test-verify D0046/issue008). writePolicy is the INTENDED
+// write boundary — enforcement arrives with the write API (D0003); until then it
+// binds by discipline (CLAUDE.md §4).
 // =====================================================================
 package EngineSkillRegistry {
     private import EngineElement::*;     // WritePolicy enum
@@ -70,10 +71,26 @@ package EngineSkillRegistry {
     part repoPush : AISkill {
         :>> id = "9f42cbe6-48ef-4c2c-a635-4d81d4f0d444";
         :>> title = "repo-push";
-        :>> purpose = "Repository discipline: commit message grammar + pre-push checks (adapted: main-only policy, auto-push hook).";
+        :>> purpose = "Repository discipline: main-only direct commits, CR: prefix for schema/process changes, Co-Authored-By trailer, pre-commit validation + post-commit auto-push hooks (reconciled to D0014, issue009).";
         :>> location = ".engine/skills/repo-push/SKILL.md";
         :>> triggerCondition = "Committing engine/process work.";
         :>> writePolicy = WritePolicy::direct;
+    }
+    part build : AISkill {
+        :>> id = "a3c8e1f0-5b9d-4e2a-8f6c-1d7b3e9a2c50";
+        :>> title = "build";
+        :>> purpose = "Compile the deliverable (Rust sysmlv2 workspace) with warnings-as-errors and confirm the engine model still validates; report binary path + validation verdict. Prerequisite for test-verify; does not test or commit.";
+        :>> location = ".engine/skills/build/SKILL.md";
+        :>> triggerCondition = "Asked to build/compile, or before claiming the toolchain works.";
+        :>> writePolicy = WritePolicy::readOnly;
+    }
+    part testVerify : AISkill {
+        :>> id = "b4d9f201-6c0e-4f3b-9a7d-2e8c4f0b3d61";
+        :>> title = "test-verify";
+        :>> purpose = "Run the deliverable's verification gate: cargo test + clippy -D warnings + BDD scenarios + Python<->Rust orient parity; report per-layer pass/fail as evidence for a method=test DoD. Hands off to test-result for recording; does not commit.";
+        :>> location = ".engine/skills/test-verify/SKILL.md";
+        :>> triggerCondition = "Asked to test/verify, check parity, or before recording a deliverable DoD TestResult.";
+        :>> writePolicy = WritePolicy::readOnly;
     }
     part sprintPlanning : AISkill {
         :>> id = "d375af1a-8c23-4f5d-e968-8c15c2f1e888";

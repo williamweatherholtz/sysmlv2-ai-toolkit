@@ -89,4 +89,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "deliverySkills";
     }
+
+    part issue009 : Issue {
+        :>> id = "b8c9daeb-fc01-4d2e-f36e-7f8091021324";
+        :>> title = "repo-push skill contradicts the main-only branch policy (D0014): tells AI to branch off main + open PRs + never commit to main";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "The repo-push SKILL.md mandates a PR/feature-branch workflow ('never commit to main/master', 'branch off main', 'open the PR', writePolicy pr-only) but the project's standing policy is main-only direct commits with an auto-push post-commit hook (D0014, CLAUDE.md §4). An AI following repo-push verbatim would violate the actual workflow. Discovered while building deliverySkills. Fix under deliverySkills: reconcile repo-push to the main-only reality.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "deliverySkills";
+    }
 }
