@@ -52,6 +52,7 @@ package ProjectDeliveryS15 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Sprint 15 refine gate passed (f5f7323); cursor at Delivery/refine. traceabilityView: 4-section Traceability tab in report.py; parse sprint delivery files, decisions, skills; no schema changes. No blockers.";
     }
+    part traceabilityViewStandupGateR1 : TestResult { :>> id = "07098d0a-b33e-4e1b-95a3-0ddc59ffbf53"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a13ae77"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification traceabilityViewImplementGate : Test {
         :>> id = "de8b40b7-9dbc-44c8-a48d-5c15ead85f95";

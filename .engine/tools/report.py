@@ -8,7 +8,8 @@ Tabs:
   3. Process Health   — skills inventory, decision velocity, open issues, coverage
   4. Workflows        — visual delivery pipeline + all engine workflows
   5. Baselines        — Release milestones (commit SHA + purpose); computed baseline view
-  6. All Decisions    — full decision log, filterable
+  6. Traceability     — sprint-gate coverage, process evolution, item→decision trace, subversions
+  7. All Decisions    — full decision log, filterable
 
 Usage:
   python .engine/tools/report.py [--output PATH] [--stdout]
@@ -136,6 +137,47 @@ def parse_issues():
             "task":    task_m.group(1) if task_m else "",
         })
     return issues
+
+def parse_sprint_traceability():
+    """For each sprint delivery file, detect which ceremony gates have TestResult records."""
+    delivery = ROOT / ".tracking" / "delivery"
+    results = []
+    for f in sorted(delivery.glob("*.sysml")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if not re.search(r":>>\s+estimatedPoints\s*=\s*\d+", text):
+            continue
+        gates = {}
+        for gate in ("Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"):
+            # Match: part <any>RefineGateR1 : TestResult  (or R2, R3...)
+            gates[gate] = bool(re.search(
+                rf"part\s+\w*{gate}Gate\w*R\d+\s*:\s*TestResult", text, re.IGNORECASE))
+        done = sum(1 for v in gates.values() if v)
+        results.append({
+            "file":      f.stem,
+            "gates":     gates,
+            "done":      done,
+            "complete":  done == 6,
+            "subverted": 0 < done < 6,
+        })
+    return results
+
+
+def parse_decision_timeline():
+    """Parse decisions for the process evolution timeline."""
+    dec_dir = ROOT / ".engine" / "decisions"
+    events = []
+    for f in sorted(dec_dir.glob("*.sysml")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        num_m  = re.match(r"0*(\d+)", f.stem)
+        date_m = re.search(r":>>\s+createdAt\s*=\s*\"([^\"]+)\"", text)
+        title_m= re.search(r":>>\s+title\s*=\s*\"([^\"]+)\"", text)
+        events.append({
+            "num":   int(num_m.group(1)) if num_m else 0,
+            "date":  date_m.group(1) if date_m else "",
+            "title": (title_m.group(1)[:90] if title_m else f.stem),
+        })
+    return events
+
 
 def parse_baselines():
     b_file = ROOT / ".tracking" / "baselines.sysml"
@@ -590,7 +632,156 @@ def tab_baselines(baselines):
 </div>"""
 
 # ---------------------------------------------------------------------------
-# Tab 6 — All Decisions
+# Tab 6 — Traceability
+# ---------------------------------------------------------------------------
+
+_GATE_ORDER = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]
+_GATE_SKILLS = {
+    "Refine":     "sprint-planning",
+    "Standup":    "sprint-standup",
+    "Implement":  "repo-push / test-result",
+    "Review":     "sprint-review",
+    "CloseOut":   "sprint-closeout",
+    "Retro":      "sprint-retro",
+}
+
+
+def tab_traceability(sprint_trace, decision_events, issues, decisions, skills):
+    # ── Section 1: Sprint gate coverage ──────────────────────────────────
+    gate_header = "".join(f'<th style="text-align:center;font-size:10px">{g}</th>'
+                          for g in _GATE_ORDER)
+    gate_rows = ""
+    for s in sprint_trace:
+        row_cls = ' style="background:#2d1506"' if s["subverted"] else ""
+        cells = ""
+        for g in _GATE_ORDER:
+            if s["gates"][g]:
+                cells += '<td style="text-align:center;color:#3fb950;font-size:13px">&#10003;</td>'
+            else:
+                cells += '<td style="text-align:center;color:#484f58;font-size:11px">&mdash;</td>'
+        status_badge = (badge("complete", "green") if s["complete"]
+                        else badge(f'{s["done"]}/6', "orange" if s["subverted"] else "gray"))
+        gate_rows += (f'<tr{row_cls}>'
+                      f'<td style="font-family:monospace;font-size:11px">{esc(s["file"])}</td>'
+                      f'{cells}'
+                      f'<td style="text-align:center">{status_badge}</td>'
+                      f'</tr>')
+
+    subverted = [s for s in sprint_trace if s["subverted"]]
+    complete  = [s for s in sprint_trace if s["complete"]]
+    sub_note = ""
+    if subverted:
+        sub_note = (f'<p class="warn-note" style="margin-top:8px">&#9888; '
+                    f'{len(subverted)} sprint(s) with incomplete gate coverage (highlighted): '
+                    + ", ".join(esc(s["file"]) for s in subverted) + "</p>")
+
+    # ── Section 2: Process evolution timeline ────────────────────────────
+    # Group decisions by date — show date bands
+    by_date: dict[str, list] = {}
+    for ev in decision_events:
+        by_date.setdefault(ev["date"], []).append(ev)
+
+    timeline_rows = ""
+    for date in sorted(by_date.keys(), reverse=True)[:30]:
+        evs = by_date[date]
+        timeline_rows += (f'<tr>'
+                          f'<td style="font-family:monospace;font-size:11px;color:#58a6ff;'
+                          f'white-space:nowrap;vertical-align:top">{esc(date)}</td>'
+                          f'<td>' +
+                          "".join(f'<div style="font-size:12px;padding:1px 0">'
+                                  f'<span style="color:#8b949e;font-family:monospace">D{ev["num"]:04d}</span> '
+                                  f'{esc(ev["title"])}</div>'
+                                  for ev in sorted(evs, key=lambda e: e["num"]))
+                          + '</td></tr>')
+
+    # Skills evolution — skills sorted by name (no createdAt in schema currently)
+    skill_chips = "".join(
+        f'<span class="chip-small" title="{esc(sk["purpose"][:80])}">{esc(sk["name"])}</span>'
+        for sk in skills)
+
+    # ── Section 3: Item → Decision trace ─────────────────────────────────
+    # Issues → relatedTask, then find decisions whose title/consequences mention it
+    dec_by_title: dict[str, str] = {d["file"]: d["title"] for d in decisions}
+
+    issue_trace_rows = ""
+    for iss in issues:
+        task = iss.get("task", "")
+        # Find decisions whose file stem contains the task name or vice versa
+        governing = [d for d in decisions
+                     if task and (task.lower() in d["title"].lower()
+                                  or task.lower() in d["context"].lower())]
+        gov_html = ("".join(
+            f'<span style="font-family:monospace;font-size:11px;color:#58a6ff">{esc(g["num"])}</span> '
+            f'<span style="font-size:11px">{esc(g["title"][:60])}</span><br>'
+            for g in governing[:2])
+            or '<span class="dim" style="font-size:11px">no direct decision link</span>')
+        issue_trace_rows += (
+            f'<tr>'
+            f'<td style="font-size:12px;font-weight:500;color:#d29922">{esc(iss["title"][:60])}</td>'
+            f'<td style="font-family:monospace;font-size:11px;color:#58a6ff">'
+            f'{esc(task) if task else "<span class=\'dim\'>—</span>"}</td>'
+            f'<td style="font-size:11px">{gov_html}</td>'
+            f'</tr>')
+
+    if not issues:
+        issue_trace_rows = '<tr><td colspan="3" class="dim">No open issues.</td></tr>'
+
+    return f"""
+<div class="card full" style="margin-bottom:16px">
+  <h2>1. Sprint Gate Coverage &mdash; {len(complete)}/{len(sprint_trace)} sprints fully gated</h2>
+  <p style="color:#8b949e;font-size:11px;margin:4px 0 10px">
+    Each ceremony gate should produce a TestResult record. Missing gates indicate a sprint
+    ran without the full process — highlighted in orange.
+  </p>
+  <table style="margin-top:4px">
+    <thead><tr>
+      <th>Sprint</th>{gate_header}<th style="text-align:center">Status</th>
+    </tr></thead>
+    <tbody>{gate_rows}</tbody>
+  </table>
+  {sub_note}
+</div>
+
+<div class="grid2" style="margin-bottom:16px">
+  <div class="card">
+    <h2>2. Process Evolution Timeline (most recent 30 decision days)</h2>
+    <p style="color:#8b949e;font-size:11px;margin-bottom:8px">
+      Decisions record process changes. Each entry = when the process changed and why.
+    </p>
+    <table style="margin-top:4px">
+      <thead><tr><th>Date</th><th>Decisions recorded</th></tr></thead>
+      <tbody>{timeline_rows}</tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Skills in effect</h2>
+    <p style="color:#8b949e;font-size:11px;margin-bottom:8px">
+      {len(skills)} skills encode the current process. Hover for purpose.
+    </p>
+    <div style="margin-top:4px">{skill_chips}</div>
+    <div style="margin-top:14px">
+      <h2>Gate → Skill mapping</h2>
+      {"".join(f'<div class="kv"><span class="key">{esc(g)}</span><span class="val dim" style="font-size:11px">{esc(_GATE_SKILLS[g])}</span></div>' for g in _GATE_ORDER)}
+    </div>
+  </div>
+</div>
+
+<div class="card full">
+  <h2>3. Issue → Task → Decision Trace</h2>
+  <p style="color:#8b949e;font-size:11px;margin-bottom:8px">
+    Open issues, the backlog task they route to, and any governing decisions.
+  </p>
+  <table>
+    <thead><tr>
+      <th>Issue</th><th>Related Backlog Task</th><th>Governing Decision(s)</th>
+    </tr></thead>
+    <tbody>{issue_trace_rows}</tbody>
+  </table>
+</div>"""
+
+
+# ---------------------------------------------------------------------------
+# Tab 7 — All Decisions
 # ---------------------------------------------------------------------------
 
 def tab_decisions(decisions):
@@ -727,13 +918,15 @@ function filterDecisions(q) {
 }
 """
 
-def render_html(sprints, orient, commits, decisions, skills, issues, baselines, generated_at, sha):
+def render_html(sprints, orient, commits, decisions, skills, issues, baselines,
+                sprint_trace, decision_events, generated_at, sha):
     t1 = tab_current(sprints, orient, commits)
     t2 = tab_history(sprints)
     t3 = tab_process(skills, decisions, issues, sprints)
     t4 = tab_workflows(orient)
     t5 = tab_baselines(baselines)
-    t6 = tab_decisions(decisions)
+    t6 = tab_traceability(sprint_trace, decision_events, issues, decisions, skills)
+    t7 = tab_decisions(decisions)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -750,19 +943,21 @@ def render_html(sprints, orient, commits, decisions, skills, issues, baselines, 
     HEAD <code style="color:#58a6ff">{esc(sha)}</code></div>
 </header>
 <nav class="tabs">
-  <button class="tab-btn active" data-tab="sprint"    onclick="showTab('sprint')">Current Sprint</button>
-  <button class="tab-btn"        data-tab="history"   onclick="showTab('history')">Sprint History</button>
-  <button class="tab-btn"        data-tab="process"   onclick="showTab('process')">Process Health</button>
-  <button class="tab-btn"        data-tab="workflows" onclick="showTab('workflows')">Workflows</button>
-  <button class="tab-btn"        data-tab="baselines" onclick="showTab('baselines')">Baselines ({len(baselines)})</button>
-  <button class="tab-btn"        data-tab="decisions" onclick="showTab('decisions')">All Decisions ({len(decisions)})</button>
+  <button class="tab-btn active" data-tab="sprint"        onclick="showTab('sprint')">Current Sprint</button>
+  <button class="tab-btn"        data-tab="history"       onclick="showTab('history')">Sprint History</button>
+  <button class="tab-btn"        data-tab="process"       onclick="showTab('process')">Process Health</button>
+  <button class="tab-btn"        data-tab="workflows"     onclick="showTab('workflows')">Workflows</button>
+  <button class="tab-btn"        data-tab="baselines"     onclick="showTab('baselines')">Baselines ({len(baselines)})</button>
+  <button class="tab-btn"        data-tab="traceability"  onclick="showTab('traceability')">Traceability</button>
+  <button class="tab-btn"        data-tab="decisions"     onclick="showTab('decisions')">All Decisions ({len(decisions)})</button>
 </nav>
-<div id="tab-sprint"    class="tab-content active">{t1}</div>
-<div id="tab-history"   class="tab-content">{t2}</div>
-<div id="tab-process"   class="tab-content">{t3}</div>
-<div id="tab-workflows" class="tab-content">{t4}</div>
-<div id="tab-baselines" class="tab-content">{t5}</div>
-<div id="tab-decisions" class="tab-content">{t6}</div>
+<div id="tab-sprint"       class="tab-content active">{t1}</div>
+<div id="tab-history"      class="tab-content">{t2}</div>
+<div id="tab-process"      class="tab-content">{t3}</div>
+<div id="tab-workflows"    class="tab-content">{t4}</div>
+<div id="tab-baselines"    class="tab-content">{t5}</div>
+<div id="tab-traceability" class="tab-content">{t6}</div>
+<div id="tab-decisions"    class="tab-content">{t7}</div>
 <footer>
   Generated by <code>.engine/tools/report.py</code> &mdash;
   <strong>derived VIEW</strong>, not authored content (D0015, D0040).
@@ -782,17 +977,20 @@ def main():
     parser.add_argument("--stdout", action="store_true")
     args = parser.parse_args()
 
-    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
-    sha       = head_sha()
-    sprints   = parse_sprint_metrics()
-    orient    = orient_data()
-    commits   = recent_commits(12)
-    decisions  = all_decisions()
-    skills     = parse_skills()
-    issues     = parse_issues()
-    baselines  = parse_baselines()
+    generated_at      = datetime.now().strftime("%Y-%m-%d %H:%M")
+    sha               = head_sha()
+    sprints           = parse_sprint_metrics()
+    orient            = orient_data()
+    commits           = recent_commits(12)
+    decisions         = all_decisions()
+    skills            = parse_skills()
+    issues            = parse_issues()
+    baselines         = parse_baselines()
+    sprint_trace      = parse_sprint_traceability()
+    decision_events   = parse_decision_timeline()
 
-    html = render_html(sprints, orient, commits, decisions, skills, issues, baselines, generated_at, sha)
+    html = render_html(sprints, orient, commits, decisions, skills, issues, baselines,
+                       sprint_trace, decision_events, generated_at, sha)
 
     if args.stdout:
         print(html)
@@ -802,7 +1000,8 @@ def main():
     out_path.write_text(html, encoding="utf-8")
     print(f"[report.py] Dashboard written to: {out_path}")
     print(f"            {len(sprints)} sprints, {len(decisions)} decisions, "
-          f"{len(skills)} skills, {len(baselines)} baselines -- HEAD {sha}")
+          f"{len(skills)} skills, {len(baselines)} baselines, "
+          f"{len(sprint_trace)} traced -- HEAD {sha}")
 
     try:
         import webbrowser
