@@ -29,6 +29,7 @@ package ProjectDeliveryS15 {
     action def DeliveryRunS15 {
         action storyTraceabilityView;
         verification storyTraceabilityViewDoD : Test { :>> id = "74b16e84-d059-47a1-88e7-90da0fc7b8b2"; :>> method = VerificationMethod::demo; :>> procedureText = "traceabilityViewDoDR1 in backlog (pass): report.py Traceability tab renders (1) per-sprint process linkage, (2) process evolution timeline, (3) item-to-decision trace, (4) subversion highlighting."; }
+        part storyTraceabilityViewDoDR1 : TestResult { :>> id = "5613c3dc-966d-4b8a-8f3f-ea36ff6eeb81"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ce9e8d"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -62,6 +63,7 @@ package ProjectDeliveryS15 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "report.py Traceability tab (tab 6) renders all 4 sections; Decisions tab shifts to tab 7; validate_all green; traceabilityViewDoDR1 added to backlog (pass).";
     }
+    part traceabilityViewImplementGateR1 : TestResult { :>> id = "a581a8a0-4c21-4cee-93a4-62dc307dcdbe"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ce9e8d"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification traceabilityViewReviewGate : Test {
         :>> id = "186dcb2c-d5f2-445f-b1b9-2f60acb9b152";
@@ -71,6 +73,7 @@ package ProjectDeliveryS15 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: Traceability tab renders correct data from sprint + decision + skills files; no regressions in tabs 1-5; doc-sync complete.";
     }
+    part traceabilityViewReviewGateR1 : TestResult { :>> id = "5d4c1c9b-8c4b-44ad-af59-f0958d7c9893"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ce9e8d"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification traceabilityViewCloseOutGate : Test {
         :>> id = "93172fbc-c932-47cc-af7f-310c8a30ebff";

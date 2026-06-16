@@ -357,5 +357,6 @@ package EngineBacklog {
         first baselineView then traceabilityView;
 
         verification traceabilityViewDoD : Test { :>> id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a"; :>> method = VerificationMethod::demo; :>> procedureText = "report.py Traceability tab shows: (1) per-sprint process linkage (which skills/workflows each sprint used); (2) process evolution timeline (when skills/decisions changed); (3) item-to-decision trace (backlog items linked to their governing decisions); (4) subversion highlighting (sprints that skipped expected gates). Demonstrates full vertical traceability through the self-improving engine."; }
+        part traceabilityViewDoDR1 : TestResult { :>> id = "21349c50-163b-4b49-8a67-c243cba0caeb"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ce9e8d"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
     }
 }
