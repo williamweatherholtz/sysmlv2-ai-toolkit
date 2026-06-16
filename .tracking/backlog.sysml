@@ -350,5 +350,11 @@ package EngineBacklog {
         verification writeApiDoD : Test { :>> id = "864722ea-23bb-469b-9813-a8840d0d526d"; :>> method = VerificationMethod::test; :>> procedureText = "write API enforces writePolicy/ids/append-only; direct text editing retired as the write path"; }
         part writeApiDoDR1 : TestResult { :>> id = "ef0a1b2c-d3e4-4f5a-c06b-7d8e9f0a1b2c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
+        part toolchainWatchDoDR1 : TestResult { :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "aba9e6f"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
+
+        action traceabilityView;    // Sprint 15+: process traceability dashboard tab — sprint-to-process linkage, process evolution timeline, item-to-decision trace, subversion highlighting (issue002, user request 2026-06-16)
+        first baselineView then traceabilityView;
+
+        verification traceabilityViewDoD : Test { :>> id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a"; :>> method = VerificationMethod::demo; :>> procedureText = "report.py Traceability tab shows: (1) per-sprint process linkage (which skills/workflows each sprint used); (2) process evolution timeline (when skills/decisions changed); (3) item-to-decision trace (backlog items linked to their governing decisions); (4) subversion highlighting (sprints that skipped expected gates). Demonstrates full vertical traceability through the self-improving engine."; }
     }
 }

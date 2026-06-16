@@ -13,6 +13,9 @@ package TrackingTemplate {
     private import EngineWork::*;
     private import EngineRelationships::*; // #Supersede / #DependsOn markers
     private import EngineVerification::*; // Test (criterion) + TestResult (appended record)
+    // NOTE: EngineBaseline::Release and EngineWork::Release conflict in scope.
+    // baselines.sysml imports EngineBaseline::* only (no conflict there).
+    // Tracking-template omits EngineBaseline until Release types are consolidated.
 
     // -- a Business-phase artifact: the project brief --
     part exampleBrief : Brief {

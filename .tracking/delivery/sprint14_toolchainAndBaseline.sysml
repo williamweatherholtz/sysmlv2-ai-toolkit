@@ -51,8 +51,9 @@ package ProjectDeliveryS14 {
         :>> createdAt = "2026-06-16";
         :>> authoredBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
-        :>> procedureText = "toolchainWatch research underway; baselineView schema approach agreed; no blockers.";
+        :>> procedureText = "Sprint 14 refine gate passed (aba9e6f); cursor at Delivery/refine. toolchainWatch: research SysML v2 toolchain expose/verify-by/derive support status; record Decision. baselineView: Release occurrence def + query.py baseline subcommand + demo. No blockers.";
     }
+    part toolchainAndBaselineStandupGateR1 : TestResult { :>> id = "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "aba9e6f"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification toolchainAndBaselineImplementGate : Test {
         :>> id = "1b8c9d0e-2f3a-4b4c-5d6e-7f8a9b0c1d2e";
@@ -60,7 +61,7 @@ package ProjectDeliveryS14 {
         :>> createdAt = "2026-06-16";
         :>> authoredBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
-        :>> procedureText = "toolchainWatch Decision recorded; baselineView Release type + query baseline + demo working; validate_all green.";
+        :>> procedureText = "D0041 (toolchainWatch: all deferred, D0031 confirmed); D0042 (baselineView: EngineBaseline::Release occurrence def + baselines.sysml + report.py tab 5); schema 14/14 green; instances 49/49 green; tracking 23+/23+ green. toolchainWatchDoDR1 + baselineViewDoDR1 to be added to backlog.";
     }
 
     verification toolchainAndBaselineReviewGate : Test {

@@ -118,9 +118,18 @@ pipe and the shell hangs.
 - `part <name> : OccurrenceDef { :>> a = "v"; }` instances continue to parse unchanged after retype.
 - `TestResult` was retyped from `part def` to `occurrence def` in `EngineVerification` (Sprint 11, D0032) — test results are events (performances of verifications at a point in time). Existing `part <n> : TestResult` instances parse without migration.
 
-## `state def` body syntax — NOT supported in pilot 0.59.0 (D0031)
+## `state def` body syntax — NOT supported in pilot 0.59.0 (D0031, D0041)
 
-Bare `state def X;` parses. But the body transition syntax (`entry state`, `then` keyword) fails with "no viable alternative at input 'entry'". `WorkflowDefinition.transitions : String[*]` stays as string-encoded values (e.g. `'brief->brief-review'`). Revisit when a newer toolchain ships (tracked by `toolchainWatch`).
+Bare `state def X;` parses. But the body transition syntax (`entry state`, `then` keyword) fails with "no viable alternative at input 'entry'". `WorkflowDefinition.transitions : String[*]` stays as string-encoded values (e.g. `'brief->brief-review'`). toolchainWatch sprint (D0041) evaluated this: still deferred — pilot 0.59.0 unchanged; re-evaluate when a new pilot release ships.
+
+## toolchainWatch verdict — Sprint 14 (D0041)
+
+Three feature areas evaluated and deferred:
+- `expose`/`render` in view/viewpoint — spec-level feature requiring SysIDE live kernel; incompatible with text-file-first approach. Defer.
+- `derive`/`refine`/`trace` — SysML v1 keywords; v2 uses `:>` idiomatically. Defer (consistent with crNativeWins).
+- `verify-by` — not a standard SysML v2 keyword; native `verification def` + `verify` target is equivalent. Defer.
+
+Current stack (Rust parser + pilot 0.59.0 + query.py) is stable. Re-evaluate when a new pilot release ships.
 
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 

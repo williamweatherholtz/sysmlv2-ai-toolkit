@@ -19,7 +19,7 @@ SCHEMA = [
     "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
     "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
     "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
-    "schema/safety/stpa.sysml", "workflows/_meta.sysml",
+    "schema/core/baseline.sysml", "schema/safety/stpa.sysml", "workflows/_meta.sysml",
 ]
 
 INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))

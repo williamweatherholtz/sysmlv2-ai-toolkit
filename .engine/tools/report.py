@@ -7,7 +7,8 @@ Tabs:
   2. Sprint History   — full metrics table + efficiency bars
   3. Process Health   — skills inventory, decision velocity, open issues, coverage
   4. Workflows        — visual delivery pipeline + all engine workflows
-  5. All Decisions    — full decision log, filterable
+  5. Baselines        — Release milestones (commit SHA + purpose); computed baseline view
+  6. All Decisions    — full decision log, filterable
 
 Usage:
   python .engine/tools/report.py [--output PATH] [--stdout]
@@ -135,6 +136,27 @@ def parse_issues():
             "task":    task_m.group(1) if task_m else "",
         })
     return issues
+
+def parse_baselines():
+    b_file = ROOT / ".tracking" / "baselines.sysml"
+    if not b_file.exists():
+        return []
+    text = b_file.read_text(encoding="utf-8", errors="replace")
+    baselines = []
+    for block in re.finditer(r"part\s+(\w+)\s*:\s*Release\s*\{([^}]+)\}", text, re.DOTALL):
+        body = block.group(2)
+        title_m  = re.search(r":>>\s+title\s*=\s*\"([^\"]+)\"", body)
+        commit_m = re.search(r":>>\s+commit\s*=\s*\"([^\"]+)\"", body)
+        date_m   = re.search(r":>>\s+createdAt\s*=\s*\"([^\"]+)\"", body)
+        purp_m   = re.search(r":>>\s+purpose\s*=\s*\"([^\"]+)\"", body)
+        baselines.append({
+            "name":    block.group(1),
+            "title":   title_m.group(1) if title_m else block.group(1),
+            "commit":  commit_m.group(1) if commit_m else "",
+            "date":    date_m.group(1) if date_m else "",
+            "purpose": purp_m.group(1) if purp_m else "",
+        })
+    return baselines
 
 def velocity_stats(sprints, window=3):
     complete = [s for s in sprints if s["hours"] is not None]
@@ -533,7 +555,42 @@ def tab_workflows(orient):
 </div>"""
 
 # ---------------------------------------------------------------------------
-# Tab 5 — All Decisions
+# Tab 5 — Baselines
+# ---------------------------------------------------------------------------
+
+def tab_baselines(baselines):
+    if not baselines:
+        return '<div class="card full"><p class="dim">No baseline releases recorded yet.</p></div>'
+
+    rows = ""
+    for b in baselines:
+        rows += (f'<tr>'
+                 f'<td style="font-family:monospace;font-weight:600;color:#58a6ff">{esc(b["commit"])}</td>'
+                 f'<td style="font-size:12px;font-weight:500">{esc(b["title"][:90])}</td>'
+                 f'<td style="font-size:11px;color:#8b949e">{esc(b["date"])}</td>'
+                 f'<td style="font-size:11px;color:#8b949e">{esc(b["purpose"][:110])}</td>'
+                 f'</tr>')
+
+    return f"""
+<div class="card full">
+  <h2>{len(baselines)} Release Baseline{"s" if len(baselines) != 1 else ""} Recorded</h2>
+  <p style="color:#8b949e;font-size:11px;margin:6px 0 12px">
+    A Release is a named project milestone: a git commit SHA + purpose (D0042).
+    The <em>computed</em> baseline view derives member-item state from git ancestry
+    (any item with a passing TestResult judged at-or-before this commit is in scope).
+    Release instances are authored in <code>.tracking/baselines.sysml</code>; this view
+    is regenerated — never stored.
+  </p>
+  <table>
+    <thead><tr>
+      <th>Commit</th><th>Title</th><th>Date</th><th>Purpose</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+</div>"""
+
+# ---------------------------------------------------------------------------
+# Tab 6 — All Decisions
 # ---------------------------------------------------------------------------
 
 def tab_decisions(decisions):
@@ -670,12 +727,13 @@ function filterDecisions(q) {
 }
 """
 
-def render_html(sprints, orient, commits, decisions, skills, issues, generated_at, sha):
+def render_html(sprints, orient, commits, decisions, skills, issues, baselines, generated_at, sha):
     t1 = tab_current(sprints, orient, commits)
     t2 = tab_history(sprints)
     t3 = tab_process(skills, decisions, issues, sprints)
     t4 = tab_workflows(orient)
-    t5 = tab_decisions(decisions)
+    t5 = tab_baselines(baselines)
+    t6 = tab_decisions(decisions)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -696,13 +754,15 @@ def render_html(sprints, orient, commits, decisions, skills, issues, generated_a
   <button class="tab-btn"        data-tab="history"   onclick="showTab('history')">Sprint History</button>
   <button class="tab-btn"        data-tab="process"   onclick="showTab('process')">Process Health</button>
   <button class="tab-btn"        data-tab="workflows" onclick="showTab('workflows')">Workflows</button>
+  <button class="tab-btn"        data-tab="baselines" onclick="showTab('baselines')">Baselines ({len(baselines)})</button>
   <button class="tab-btn"        data-tab="decisions" onclick="showTab('decisions')">All Decisions ({len(decisions)})</button>
 </nav>
 <div id="tab-sprint"    class="tab-content active">{t1}</div>
 <div id="tab-history"   class="tab-content">{t2}</div>
 <div id="tab-process"   class="tab-content">{t3}</div>
 <div id="tab-workflows" class="tab-content">{t4}</div>
-<div id="tab-decisions" class="tab-content">{t5}</div>
+<div id="tab-baselines" class="tab-content">{t5}</div>
+<div id="tab-decisions" class="tab-content">{t6}</div>
 <footer>
   Generated by <code>.engine/tools/report.py</code> &mdash;
   <strong>derived VIEW</strong>, not authored content (D0015, D0040).
@@ -727,11 +787,12 @@ def main():
     sprints   = parse_sprint_metrics()
     orient    = orient_data()
     commits   = recent_commits(12)
-    decisions = all_decisions()
-    skills    = parse_skills()
-    issues    = parse_issues()
+    decisions  = all_decisions()
+    skills     = parse_skills()
+    issues     = parse_issues()
+    baselines  = parse_baselines()
 
-    html = render_html(sprints, orient, commits, decisions, skills, issues, generated_at, sha)
+    html = render_html(sprints, orient, commits, decisions, skills, issues, baselines, generated_at, sha)
 
     if args.stdout:
         print(html)
@@ -741,7 +802,7 @@ def main():
     out_path.write_text(html, encoding="utf-8")
     print(f"[report.py] Dashboard written to: {out_path}")
     print(f"            {len(sprints)} sprints, {len(decisions)} decisions, "
-          f"{len(skills)} skills -- HEAD {sha}")
+          f"{len(skills)} skills, {len(baselines)} baselines -- HEAD {sha}")
 
     try:
         import webbrowser
