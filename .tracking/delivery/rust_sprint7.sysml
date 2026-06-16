@@ -74,6 +74,7 @@ package ProjectDeliveryRustS7 {
         :>> procedureText = "Diff reviewed: dod_result_is_pass or_else fallback non-ambiguous (DoDR prefix checked first so DoDR1 never matches legacy R prefix); query.py non-greedy regex correctly keys both naming styles; cmd_whats_next clean (no allocation, uses orient::compute); D0023 recorded.";
     }
     part rustS7ReviewGateR1 : TestResult { :>> id = "3cd4e5f6-a7b8-4c9d-ae1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2811f5c"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+    part rustS7ReviewGateR2 : TestResult { :>> id = "5ef6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "56ba800"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification rustS7CloseOutGate : Test {
         :>> id = "e8f9a0b1-c2d3-4e4f-8a51-7b8c9d0e1f2a";
