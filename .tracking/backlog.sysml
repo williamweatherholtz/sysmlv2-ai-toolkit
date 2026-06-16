@@ -341,6 +341,7 @@ package EngineBacklog {
         verification writeApiDoR : Test { :>> id = "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: write.rs uses parser for validation + text insertion; append_result: parse→find N→gen UUID→text insert; add_task: find action def→check dup→gen UUID→insert; subcommands parse --file/--task/--sha/--def/--dod/--method flags; 7 BDD scenarios agreed; CLAUDE.md §4 updates scoped; DoD accepted"; }
         part writeApiDoRR1 : TestResult { :>> id = "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d9fdb5"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification writeApiDoD : Test { :>> id = "864722ea-23bb-469b-9813-a8840d0d526d"; :>> method = VerificationMethod::test; :>> procedureText = "write API enforces writePolicy/ids/append-only; direct text editing retired as the write path"; }
+        part writeApiDoDR1 : TestResult { :>> id = "ef0a1b2c-d3e4-4f5a-c06b-7d8e9f0a1b2c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
     }
 }
