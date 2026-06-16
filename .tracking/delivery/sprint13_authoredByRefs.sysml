@@ -83,6 +83,7 @@ package ProjectDeliveryS13 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyAuthoredByRefsDoDR1 recorded (pass); authoredByRefsDoDR1 in backlog (pass); validate_actors.py PASS; user accepts Sprint 13 complete.";
     }
+    part authoredByRefsCloseOutGateR1 : TestResult { :>> id = "da7gdp2-0e1f-4a2b-bcd3-4f5a6b7c8d9e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35bf281"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification authoredByRefsRetroGate : Test {
         :>> id = "da6fcm0-8c9d-4e0f-fab1-2d3e4f5a6b7c";
@@ -92,4 +93,5 @@ package ProjectDeliveryS13 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 13 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part authoredByRefsRetroGateR1 : TestResult { :>> id = "eb8heq3-1f2a-4b3c-cde4-5a6b7c8d9e0f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35bf281"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }

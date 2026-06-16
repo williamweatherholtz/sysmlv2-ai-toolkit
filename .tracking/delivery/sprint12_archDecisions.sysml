@@ -82,6 +82,7 @@ package ProjectDeliveryS12 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyArchDecisionsDoDR1 recorded (pass); crVersioningDoDR1 + needLayerDoDR1 + safetyCaseViewsDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 12 complete.";
     }
+    part archDecisionsCloseOutGateR1 : TestResult { :>> id = "eb5ebf9-6a7b-4c8d-efa9-0b1c2d3e4f5a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d61c32e"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 
     verification archDecisionsRetroGate : Test {
         :>> id = "be4dae8-5f6a-4b7c-def8-9a0b1c2d3e4f";
@@ -91,4 +92,5 @@ package ProjectDeliveryS12 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 12 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part archDecisionsRetroGateR1 : TestResult { :>> id = "fc6fcn1-9d0e-4f1a-abc2-3e4f5a6b7c8d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d61c32e"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
 }
