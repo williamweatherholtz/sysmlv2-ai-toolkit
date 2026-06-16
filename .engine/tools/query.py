@@ -1,7 +1,7 @@
 """Engine query layer — small queries over the work-item model.
 
 Subcommands (argv[1], default 'whats-next'):
-  orient             -> the state cursor (.tracking/state.sysml) + ready/suspect frontier
+  orient             -> in-progress sprint ceremony status (computed) + ready/suspect frontier
   whats-next         -> READY outstanding tasks (all deps done) + done/blocked/suspect summary
   outstanding        -> every not-done task
   suspect            -> DONE tasks whose verification is stale vs an upstream (git-ancestry)
@@ -307,19 +307,38 @@ def _criterion_at(sha, task):
     return None
 
 
-def read_cursor():
-    """The state cursor (.tracking/state.sysml) — where the project stands (CR-6)."""
-    for f in tracking_files():
-        with open(f, encoding="utf-8") as fh:
-            text = fh.read()
-        if "StateCursor" not in text:
+_GATE_PASS = re.compile(
+    r'part\s+\w+(?P<gate>Refine|Standup|Implement|Review|CloseOut|Retro)Gate\w*\s*:\s*TestResult'
+    r'[^}]*:>>\s+outcome\s*=\s*VerdictKind::pass',
+    re.DOTALL,
+)
+_GATE_ORDER = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]
+
+
+def read_sprint_ceremony_status():
+    """Compute in-progress sprints from delivery file TestResults (D0045 — replaces StateCursor)."""
+    delivery = os.path.join(TRACKING_DIR, "delivery")
+    if not os.path.isdir(delivery):
+        return []
+    results = []
+    for fname in sorted(os.listdir(delivery)):
+        if not fname.endswith(".sysml"):
             continue
-        attrs = dict(_ASSIGN.findall(text))
-        return {'activeWorkflow': attrs.get('activeWorkflow'),
-                'activePhase': attrs.get('activePhase'),
-                'enteredAt': attrs.get('enteredAt'),
-                'enteredBy': attrs.get('enteredBy')}
-    return None
+        fpath = os.path.join(delivery, fname)
+        with open(fpath, encoding="utf-8") as fh:
+            text = fh.read()
+        passed = {m.group("gate") for m in _GATE_PASS.finditer(text)}
+        if not passed:
+            continue
+        if "Retro" in passed:
+            continue  # Retro passed = ceremony complete regardless of earlier gaps
+        pending = next((g for g in _GATE_ORDER if g not in passed), None)
+        results.append({
+            "sprint": fname[:-6],
+            "passed": [g for g in _GATE_ORDER if g in passed],
+            "pending": pending,
+        })
+    return results
 
 
 def read_ordering_only():
@@ -541,7 +560,7 @@ def main():
     classify(tasks, read_ordering_only())
 
     if sub == "orient":
-        out = {"cursor": read_cursor(),
+        out = {"in_progress_sprints": read_sprint_ceremony_status(),
                "ready": sorted(t for t, i in tasks.items() if i['ready']),
                "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
                "invalidEvidence": sorted(t for t, i in tasks.items() if i['invalidEvidence']),

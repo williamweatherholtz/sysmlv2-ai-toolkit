@@ -1,15 +1,9 @@
 // =====================================================================
-// ProjectState — THE state cursor (CR-6). Where this project stands.
-// An authored pointer (like git HEAD): updated in place; history = git log.
-// query.py `orient` merges this with the computed ready/suspect frontier.
+// state.sysml — RETIRED by D0045 (2026-06-16).
+// The StateCursor hand-maintained pointer is gone. Orient now computes
+// sprint ceremony status directly from delivery file TestResults.
+// File retained as a tombstone so git history references are traceable.
 // =====================================================================
 package ProjectState {
-    private import EngineState::*;
-
-    part cursor : StateCursor {
-        :>> activeWorkflow = "DeliveryWorkflow";
-        :>> activePhase = "Delivery/retro";
-        :>> enteredAt = "2026-06-16";
-        :>> enteredBy = "wweatherholtz";
-    }
+    // no parts — StateCursor retired
 }

@@ -247,15 +247,26 @@ def bar(value, max_val, width=80, cls="bar-blue"):
 # Tab 1 — Current Sprint
 # ---------------------------------------------------------------------------
 
+_CEREMONY_GATES = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]
+
+
+def _sprint_gate_html(sprint_info):
+    chips = []
+    for g in _CEREMONY_GATES:
+        if g in sprint_info.get("passed", []):
+            chips.append(f'<span class="chip" style="background:#1a7f37;color:#fff">&#10003;&thinsp;{esc(g)}</span>')
+        elif g == sprint_info.get("pending"):
+            chips.append(f'<span class="chip" style="background:#d29922;color:#fff">&#9744;&thinsp;{esc(g)}</span>')
+    return " ".join(chips)
+
+
 def tab_current(sprints, orient, commits):
     o = orient
-    cursor = o.get("cursor", {})
+    in_progress = o.get("in_progress_sprints", [])
     counts = o.get("counts", {})
     done = counts.get("done", "?")
     outstanding = counts.get("outstanding", "?")
     suspect_count = len(o.get("suspect", []))
-    active_phase = cursor.get("activePhase", "—")
-    active_workflow = cursor.get("activeWorkflow", "—")
 
     active = sprints[-1] if sprints else None
     v3 = velocity_stats(sprints, 3)
@@ -292,14 +303,20 @@ def tab_current(sprints, orient, commits):
     fallback = ('<p class="warn-note">&#9888; sysmlv2.exe not found &mdash; counts unavailable</p>'
                 if o.get("_fallback") else "")
 
+    if in_progress:
+        ip_rows = "".join(
+            f'<div style="margin-bottom:8px"><span class="dim" style="font-size:11px">{esc(s["sprint"])}</span><br>'
+            f'{_sprint_gate_html(s)}</div>'
+            for s in in_progress
+        )
+    else:
+        ip_rows = '<span class="dim">no sprints in progress</span>'
+
     return f"""
 <div class="grid3">
   <div class="card">
-    <h2>Active Cursor</h2>
-    {kv("Workflow", esc(active_workflow))}
-    {kv("Phase", f'<span class="phase-chip">{esc(active_phase)}</span>')}
-    {kv("Entered at", esc(cursor.get("enteredAt", "&mdash;")))}
-    {kv("Entered by", esc(cursor.get("enteredBy", "&mdash;")))}
+    <h2>In-Progress Sprints</h2>
+    {ip_rows}
     {fallback}
   </div>
   <div class="card">
@@ -485,11 +502,11 @@ def tab_process(skills, decisions, issues, sprints):
 # ---------------------------------------------------------------------------
 
 def tab_workflows(orient):
-    cursor = orient.get("cursor", {})
-    active_phase = cursor.get("activePhase", "").lower()
+    in_progress = orient.get("in_progress_sprints", [])
+    pending_gates = {s["pending"].lower() for s in in_progress if s.get("pending")}
 
     def phase_box(name, skills, gate_method, phase_key):
-        is_active = phase_key in active_phase
+        is_active = phase_key in pending_gates
         active_cls = " phase-active" if is_active else ""
         active_label = '<div class="active-badge">&#9654; ACTIVE</div>' if is_active else ""
         skill_chips = "".join(f'<div class="phase-skill">{esc(s)}</div>' for s in skills)
@@ -538,10 +555,13 @@ def tab_workflows(orient):
         "Next Sprint (new skill in effect)",
     ])
 
+    pending_label = (", ".join(s["pending"] for s in in_progress if s.get("pending"))
+                     or "&mdash;")
+
     return f"""
 <div class="card full" style="margin-bottom:16px">
-  <h2>Delivery Workflow &mdash; <span style="color:#8b949e;font-weight:400">active cursor:
-    <span class="phase-chip">{esc(cursor.get("activePhase","&mdash;"))}</span></span></h2>
+  <h2>Delivery Workflow &mdash; <span style="color:#8b949e;font-weight:400">pending gate:
+    <span class="phase-chip">{pending_label}</span></span></h2>
   <div class="workflow-row" style="margin-top:14px">
     {delivery_boxes}
   </div>

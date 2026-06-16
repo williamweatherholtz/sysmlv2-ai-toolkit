@@ -117,12 +117,13 @@ validate green (§5), record a `Decision`, and commit `CR:`. `schema/core` is fr
 (out-of-band Decision only — §4).
 
 **§3b — EXECUTE.** The core loop:
-1. **Orient** on the active workflow + phase from the state cursor in `.tracking/`. (None
-   yet ⇒ Business workflow, first phase.)
-2. **Act within the active phase only** — produce its defined artifact(s) as items + edges;
+1. **Orient** — run `sysmlv2 orient [ROOT]` or `python .engine/tools/query.py orient` to
+   compute in-progress sprint ceremony status + ready/outstanding backlog frontier.
+   (No cursor file — orientation is fully computed from delivery file TestResults, D0045.)
+2. **Act within the appropriate phase** — produce its defined artifact(s) as items + edges;
    don't invent artifacts the phase doesn't call for. If the request targets a *different*
-   phase than the cursor, **surface the mismatch** — don't silently jump; switching phases
-   is itself a recorded `Decision`.
+   phase than the current frontier, **surface the mismatch** — don't silently jump;
+   switching work items is itself a recorded `Decision`.
 3. **Record back** the items/edges + a recorded judgment (what, why) with authorship +
    timestamp into `.tracking/`. You are a task tool: you execute the phase, you don't
    redefine it.
@@ -156,7 +157,7 @@ as done / ready / suspect / satisfied) changes process behavior as surely as edi
 workflow — that is **CHANGE (§3a)**, not BOOTSTRAP: it needs human acceptance and a
 recorded `Decision`.
 
-**§3f — ORIENT.** Read the state cursor and report; no mutation.
+**§3f — ORIENT.** Compute from authored facts — `query.py orient` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
 
 The six workflows (see the spec for detail):
 **Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →
@@ -171,7 +172,7 @@ The six workflows (see the spec for detail):
   to append a `TestResult` and `sysmlv2 add-task` to add a task + `DoD` to an action def — both
   enforce UUID generation and append-only semantics automatically. Direct editing of `.sysml` /
   instance files is still possible but is no longer the primary path; use it only when the write
-  API does not yet cover the operation (schema changes, decision files, cursor updates).
+  API does not yet cover the operation (schema changes, decision files).
 - **Every change to schema or a workflow/process definition MUST:**
   1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
      rationale — capture the decision even if small; commit messages and memory are NOT

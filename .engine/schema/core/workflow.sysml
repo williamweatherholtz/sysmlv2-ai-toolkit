@@ -8,7 +8,7 @@
 // passing, CLAUDE.md §2.6, not an authored type.)
 // =====================================================================
 package EngineState {
-    doc /* Modular workflow states as data (WorkflowState/WorkflowDefinition) and the StateCursor pointer that orient reads. Element state is a computed view, never authored. */
+    doc /* Modular workflow states as data (WorkflowState/WorkflowDefinition). Element state is a computed view, never authored. StateCursor retired by D0045 — orient now computes sprint ceremony status from delivery file TestResults. */
 
     private import ScalarValues::*;
 
@@ -25,15 +25,6 @@ package EngineState {
         attribute transitions : String[*]; // "from->to" strings (native state-def spike deferred)
     }
 
-    // The state CURSOR (CR-6): where a project currently stands in the workflows.
-    // CLAUDE.md §3b/§3f orient on this. It is an authored POINTER (like git HEAD):
-    // updating it in place is sanctioned — its history IS the git history; entering
-    // a phase is a recorded judgment (who/when). One instance lives in
-    // .tracking/state.sysml. "BOOTSTRAP" is a sanctioned activeWorkflow value (§3e).
-    part def StateCursor {
-        attribute activeWorkflow : String;   // e.g. "BusinessWorkflow::Business" | "BOOTSTRAP"
-        attribute activePhase : String;      // e.g. "brief" | the active backlog during bootstrap
-        attribute enteredAt : String;        // ISO-8601
-        attribute enteredBy : String;        // actor id
-    }
+    // StateCursor RETIRED by D0045 (2026-06-16). orient now computes sprint ceremony
+    // status from delivery file TestResults — no hand-maintained pointer needed.
 }
