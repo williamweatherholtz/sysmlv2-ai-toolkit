@@ -83,6 +83,9 @@ pub struct ActionDecl {
 pub struct Succession {
     pub first: String,
     pub then: String,
+    /// `true` when prefixed with `#OrderingOnly` — edge orders execution but does not
+    /// create a semantic dependency for suspect-propagation purposes.
+    pub is_ordering_only: bool,
     pub span: Span,
 }
 

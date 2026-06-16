@@ -307,13 +307,14 @@ fn parse_action_def_body(
                 verifications.push(Verification { name: n, type_name: tn, attributes: a, span: sp, line: item_line });
             }
             TokenKind::First => {
-                if let Some(s) = parse_succession(p, filename)? { successions.push(s); }
+                if let Some(s) = parse_succession(p, filename, false)? { successions.push(s); }
             }
             TokenKind::Hash => {
                 p.advance();
-                p.expect_ident(filename)?; // marker name
+                let (marker, _) = p.expect_ident(filename)?;
                 if matches!(p.peek(), TokenKind::First) {
-                    if let Some(s) = parse_succession(p, filename)? { successions.push(s); }
+                    let is_oo = marker == "OrderingOnly";
+                    if let Some(s) = parse_succession(p, filename, is_oo)? { successions.push(s); }
                 } else {
                     skip_item(p);
                 }
@@ -326,7 +327,7 @@ fn parse_action_def_body(
         span: Span { start: start.start, end: end.start } })
 }
 
-fn parse_succession(p: &mut Parser, filename: &str) -> Result<Option<Succession>, ParseError> {
+fn parse_succession(p: &mut Parser, filename: &str, is_ordering_only: bool) -> Result<Option<Succession>, ParseError> {
     let s = p.current_span();
     p.advance(); // consume 'first'
     let (first, _) = p.expect_ident(filename)?;
@@ -334,7 +335,7 @@ fn parse_succession(p: &mut Parser, filename: &str) -> Result<Option<Succession>
     let (then, _) = p.expect_ident(filename)?;
     let end = p.current_span();
     p.expect(&TokenKind::Semicolon, filename)?;
-    Ok(Some(Succession { first, then, span: Span { start: s.start, end: end.start } }))
+    Ok(Some(Succession { first, then, is_ordering_only, span: Span { start: s.start, end: end.start } }))
 }
 
 /// Skip one unknown item. Stops (and consumes) on `;`; stops (without extra
@@ -455,6 +456,11 @@ fn parse_hash_item(
 ) -> Result<Option<Item>, ParseError> {
     let s = p.current_span(); p.advance(); // consume '#'
     let (marker, _) = p.expect_ident(filename)?;
+    // `#Marker first X then Y;` — succession with ordering-only flag
+    if matches!(p.peek(), TokenKind::First) {
+        let is_oo = marker == "OrderingOnly";
+        return parse_succession(p, filename, is_oo).map(|opt| opt.map(Item::Succession));
+    }
     if !matches!(p.peek(), TokenKind::Dependency) {
         skip_item(p);
         return Ok(None);
@@ -511,7 +517,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
         TokenKind::Action if !had_abstract => parse_action_item(p, filename),
 
         TokenKind::First if !had_abstract =>
-            parse_succession(p, filename).map(|s| s.map(Item::Succession)),
+            parse_succession(p, filename, false).map(|s| s.map(Item::Succession)),
 
         TokenKind::Satisfy if !had_abstract =>
             parse_satisfy(p, filename).map(|s| Some(Item::Satisfy(s))),

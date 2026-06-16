@@ -107,6 +107,30 @@ fn given_task_invalid_sha(world: &mut OrientWorld, name: String) {
     world.root = Some(root);
 }
 
+#[given(regex = r#"^a tracking dir with an ordering-only edge from "([^"]+)" to "([^"]+)"$"#)]
+fn given_ordering_only_edge(world: &mut OrientWorld, pred: String, succ: String) {
+    let root = unique_root();
+    let tracking = root.join(".tracking");
+    std::fs::create_dir_all(&tracking).unwrap();
+    let content = format!(
+        "package OOBdd {{\n    action def OORun {{\n        action {pred};\n        action {succ};\n        #OrderingOnly first {pred} then {succ};\n    }}\n}}\n"
+    );
+    std::fs::write(tracking.join("oo.sysml"), content).unwrap();
+    world.root = Some(root);
+}
+
+#[given(regex = r#"^a tracking dir with package-level task "([^"]+)" and result$"#)]
+fn given_package_level_task(world: &mut OrientWorld, name: String) {
+    let root = unique_root();
+    let tracking = root.join(".tracking");
+    std::fs::create_dir_all(&tracking).unwrap();
+    let content = format!(
+        "package PkgLevelBdd {{\n    action {name};\n    part {name}DoDR1 : TestResult {{ :>> id = \"bb000001-0000-4000-8000-000000000001\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n}}\n"
+    );
+    std::fs::write(tracking.join("pkglevel.sysml"), content).unwrap();
+    world.root = Some(root);
+}
+
 #[given(regex = r#"^a tracking dir with a legacy-named result for "([^"]+)"$"#)]
 fn given_legacy_result(world: &mut OrientWorld, name: String) {
     let root = unique_root();

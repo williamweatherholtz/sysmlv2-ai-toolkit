@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use sysmlv2_parser::ast::{ActionDef, Item, Package, Part, Value};
 use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
+pub mod indexer;
 pub mod orient;
 
 // ── file discovery ────────────────────────────────────────────────────────────
@@ -237,7 +238,9 @@ pub fn compute_orient_state(packages: &[Package]) -> (Vec<String>, usize, usize)
                     actions.push(action.name.clone());
                 }
                 for suc in &def.successions {
-                    successions.push((suc.first.clone(), suc.then.clone()));
+                    if !suc.is_ordering_only {
+                        successions.push((suc.first.clone(), suc.then.clone()));
+                    }
                 }
             }
         }
