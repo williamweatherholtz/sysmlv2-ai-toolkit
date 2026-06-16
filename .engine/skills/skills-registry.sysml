@@ -75,4 +75,44 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Committing engine/process work.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part sprintPlanning : AISkill {
+        :>> id = "d375af1a-8c23-4f5d-e968-8c15c2f1e888";
+        :>> title = "sprint-planning";
+        :>> purpose = "Orient on ready frontier, select scope, apply Fibonacci sizing to set estimatedPoints, pass DoR gate before sprint work begins.";
+        :>> location = ".engine/skills/sprint-planning/SKILL.md";
+        :>> triggerCondition = "Sprint refine gate; asked to plan next sprint, size a story, or select scope.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part sprintStandup : AISkill {
+        :>> id = "e486bg2b-9d34-4a6e-fa79-9d26d3g2f999";
+        :>> title = "sprint-standup";
+        :>> purpose = "Orient on current status, surface blockers, confirm active phase alignment, state next action — lightweight 2-minute ceremony.";
+        :>> location = ".engine/skills/sprint-standup/SKILL.md";
+        :>> triggerCondition = "Sprint standup gate; start of work session; asked for status or blockers.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part sprintReview : AISkill {
+        :>> id = "f597ch3c-0e45-4b7f-ab80-0e37e4h3g000";
+        :>> title = "sprint-review";
+        :>> purpose = "Verify DoD, record actualHours, compute velocity/efficiency/accuracy metrics, and run transcript review to produce improvement items.";
+        :>> location = ".engine/skills/sprint-review/SKILL.md";
+        :>> triggerCondition = "Sprint review gate; asked for velocity, efficiency, estimate accuracy, or process issues.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part sprintCloseout : AISkill {
+        :>> id = "a608di4d-1f56-4c8a-bc91-1f48f5i4h111";
+        :>> title = "sprint-closeout";
+        :>> purpose = "Verify DoD complete, confirm actualHours set, obtain explicit human sign-off, record confirmation gate TestResult, commit.";
+        :>> location = ".engine/skills/sprint-closeout/SKILL.md";
+        :>> triggerCondition = "Sprint closeOut gate; asked to close or accept a sprint.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part sprintRetro : AISkill {
+        :>> id = "b719ej5e-2a67-4d9b-cd02-2a59a6j5i222";
+        :>> title = "sprint-retro";
+        :>> purpose = "Triage improvement items from sprint-review, dispatch accepted items (skill-update/decision/backlog), record retro gate confirmation, close sprint.";
+        :>> location = ".engine/skills/sprint-retro/SKILL.md";
+        :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

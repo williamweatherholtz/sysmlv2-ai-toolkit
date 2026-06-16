@@ -33,11 +33,27 @@ Small, Testable; story-slicing / vertical slice; spike (for unknowns).
 Scenario Outline, declarative vs imperative steps, one-behavior-per-scenario.
 
 **Flow gates:** Definition of Ready, Definition of Done, acceptance criteria
-(rule-oriented vs scenario-oriented), story points (Fibonacci), epic→story→task
-hierarchy.
+(rule-oriented vs scenario-oriented), story points (Fibonacci only — see scale
+below), epic→story→task hierarchy.
 
-**Engine binding:** `Story.estimatedPoints`, atomic `Test` (method = test/
-demonstration), `verify` edge (Test → Story), `dependency` (blocked-by),
+**Fibonacci scale (D0038):** Only these values are valid for `estimatedPoints`:
+
+| Points | Guideline wall-clock | Typical scope                              |
+|--------|----------------------|--------------------------------------------|
+| 1      | < 2 h                | Tiny: decision record, config, doc update  |
+| 2      | 2–5 h                | Small: a tool, a validator, minor code     |
+| 3      | 5–10 h               | Medium: a module, schema change            |
+| 5      | ~1 day               | Large: a subsystem with tests              |
+| 8      | 2–3 days             | Extra-large: major cross-cutting feature   |
+| 13+    | > 3 days             | Epic-sized — **split before sprint start** |
+
+Non-Fibonacci values (4, 6, 7, 9, 10, 11, 12) are an anti-pattern. When in
+doubt between two sizes, take the larger. For final sizing + DoR gate at
+sprint start, use the **sprint-planning** skill.
+
+**Engine binding:** `Story.estimatedPoints` (Fibonacci integer), `Story.actualHours`
+(Real — wall-clock hours recorded at closeOut per D0038), atomic `Test` (method =
+test/demonstration), `verify` edge (Test → Story), `dependency` (blocked-by),
 `currentState` (modular workflow), event-driven Sprint.
 
 ## Anti-Pattern Watchlist
@@ -61,6 +77,8 @@ demonstration), `verify` edge (Test → Story), `dependency` (blocked-by),
 6. **Unsized "ready"** — Detection: `estimatedPoints` empty but state set to
    ready. Resolution: DoR requires a size; if unsizable, spawn a `research`
    (spike) work item first.
+7. **Non-Fibonacci estimate** — Detection: `estimatedPoints` set to 4, 6, 7, 9,
+   etc. Resolution: round up to the next Fibonacci number. Document the rationale.
 7. **Imperative over-specified scenario** — Detection: Gherkin steps dictate UI
    mechanics ("click the blue button at x,y"). Resolution: write declarative
    steps about behavior/outcome, not implementation.

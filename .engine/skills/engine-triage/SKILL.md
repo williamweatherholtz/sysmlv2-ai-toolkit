@@ -54,6 +54,23 @@ mandatory, so nothing slips past silently.
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
 
+5. **Ceremony routing.** Sprint ceremonies are rigid EXECUTE sub-types — route to the
+   matching skill before acting:
+
+   | Ceremony phrase                           | Skill to invoke          |
+   |-------------------------------------------|--------------------------|
+   | "plan the sprint," "what's next," "size"  | `sprint-planning`        |
+   | "standup," "status," "any blockers"       | `sprint-standup`         |
+   | "sprint review," "velocity," "efficiency" | `sprint-review`          |
+   | "close out," "accept the sprint"          | `sprint-closeout`        |
+   | "retro," "retrospective," "improvements"  | `sprint-retro`           |
+   | "refine this story," "INVEST check"       | `backlog-refinement`     |
+
+6. **Continuous improvement capture.** When an improvement item surfaces mid-sprint
+   (a process violation, a skill gap, a schema gap), record it immediately as an
+   `Issue` in `.tracking/issues.sysml` rather than letting it slip to memory. It
+   will be triaged at retro. Use `relatedTask` to point to the relevant backlog action.
+
 ## Why this exists
 
 CLAUDE.md describes the discipline but cannot force the classify-first step; a passive
