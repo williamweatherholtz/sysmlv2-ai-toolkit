@@ -30,6 +30,7 @@ package ProjectDeliveryS14 {
     action def DeliveryRunS14 {
         action storyToolchainAndBaseline;
         verification storyToolchainAndBaselineDoD : Test { :>> id = "6c3d4e5f-7a8b-4c9d-0e1f-2a3b4c5d6e7f"; :>> method = VerificationMethod::demo; :>> procedureText = "toolchainWatchDoDR1 in backlog (pass): newer SysML v2 toolchain evaluated; expose/verify-by/derive adoption Decision recorded. baselineViewDoDR1 in backlog (pass): Release (commit + member refs) renders a computed baseline view via query.py or report.py."; }
+        part storyToolchainAndBaselineDoDR1 : TestResult { :>> id = "2ccbf0fc-c583-43e0-8e1f-e8c00d26d9b5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "62cd0b6"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -63,6 +64,7 @@ package ProjectDeliveryS14 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "D0041 (toolchainWatch: all deferred, D0031 confirmed); D0042 (baselineView: EngineBaseline::Release occurrence def + baselines.sysml + report.py tab 5); schema 14/14 green; instances 49/49 green; tracking 23+/23+ green. toolchainWatchDoDR1 + baselineViewDoDR1 to be added to backlog.";
     }
+    part toolchainAndBaselineImplementGateR1 : TestResult { :>> id = "782b12a3-b2c3-41f3-9786-41cc932f6893"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "62cd0b6"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification toolchainAndBaselineReviewGate : Test {
         :>> id = "2c9d0e1f-3a4b-4c5d-6e7f-8a9b0c1d2e3f";
@@ -72,6 +74,7 @@ package ProjectDeliveryS14 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: toolchainWatch Decision consistent with D0040 view rule; baselineView Release type in schema + baseline query clean; doc-sync complete.";
     }
+    part toolchainAndBaselineReviewGateR1 : TestResult { :>> id = "142c6fe6-e9f8-4617-b22a-1e05704558ab"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "62cd0b6"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification toolchainAndBaselineCloseOutGate : Test {
         :>> id = "3d0e1f2a-4b5c-4d6e-7f8a-9b0c1d2e3f4a";
