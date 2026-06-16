@@ -203,6 +203,7 @@ $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
+python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
 ```
 
 (Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.
