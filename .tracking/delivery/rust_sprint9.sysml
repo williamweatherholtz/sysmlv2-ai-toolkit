@@ -29,6 +29,7 @@ package ProjectDeliveryRustS9 {
     action def DeliveryRunRustS9 {
         action storyWriteApi;
         verification storyWriteApiDoD : Test { :>> id = "db2c3d4e-f5a6-4b7c-cd8e-9f0a1b2c3d4e"; :>> method = VerificationMethod::test; :>> procedureText = "write.rs module: append_result enforces append-only + auto-UUID; add_task enforces no-dup + auto-UUID; sysmlv2 append-result + add-task subcommands; 7 write BDD scenarios + all existing tests green; CLAUDE.md §4 updated to retire direct editing; clippy clean."; }
+        part storyWriteApiDoDR1 : TestResult { :>> id = "ab5c6d7e-f8a9-4b0c-ef1d-2e3f4a5b6c7d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -62,6 +63,7 @@ package ProjectDeliveryRustS9 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "All 7 write BDD scenarios pass; 8 orient BDD scenarios pass; all other existing tests pass; clippy -D warnings clean.";
     }
+    part writeApiImplementGateR1 : TestResult { :>> id = "bc6d7e8f-a9b0-4c1d-f02e-3f4a5b6c7d8e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification writeApiReviewGate : Test {
         :>> id = "db8c9d0e-f1a2-4b3c-c3e4-5f6a7b8c9d0e";
@@ -71,6 +73,7 @@ package ProjectDeliveryRustS9 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: write.rs clean (no panics, no unwrap in src/); append_result correctly enforces N+1 and append-only; add_task correctly enforces no-dup; UUID generation deterministic-free; CLAUDE.md §4 updated; D0027 recorded.";
     }
+    part writeApiReviewGateR1 : TestResult { :>> id = "cd7e8f9a-b0c1-4d2e-a13f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification writeApiCloseOutGate : Test {
         :>> id = "ec9d0e1f-a2b3-4c4d-d4f5-6a7b8c9d0e1f";

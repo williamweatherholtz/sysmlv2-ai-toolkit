@@ -287,6 +287,7 @@ package EngineBacklog {
         verification rustS9writeApiDoR : Test { :>> id = "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: write.rs uses parser for validation + text insertion; append_result: parse→find N→gen UUID→text insert; add_task: find action def→check dup→gen UUID→insert; subcommands parse --file/--task/--sha/--def/--dod/--method flags; 7 BDD scenarios agreed; CLAUDE.md §4 updates scoped; DoD accepted"; }
         part rustS9writeApiDoRR1 : TestResult { :>> id = "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d9fdb5"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification rustS9writeApiDoD : Test { :>> id = "fa8d9e0f-a1b2-4c3d-ef4a-5b6c7d8e9f0a"; :>> method = VerificationMethod::test; :>> procedureText = "write.rs: append_result enforces append-only + auto-UUID; add_task enforces no-dup + auto-UUID; sysmlv2 append-result + add-task subcommands; 7 write BDD scenarios green; all existing tests green; CLAUDE.md §4 updated to retire direct editing as primary path; clippy clean"; }
+        part rustS9writeApiDoDR1 : TestResult { :>> id = "de8f9a0b-c1d2-4e3f-b24a-5c6d7e8f9a0b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58ba2c3"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
