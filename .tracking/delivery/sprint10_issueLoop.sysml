@@ -30,6 +30,7 @@ package ProjectDeliveryS10 {
     action def DeliveryRunS10 {
         action storyIssueLoop;
         verification storyIssueLoopDoD : Test { :>> id = "2b3c4d5e-f6a7-4b8c-cd9d-0e1f2a3b4c5d"; :>> method = VerificationMethod::demo; :>> procedureText = "query.py issues subcommand: reads Issue instances from all .tracking files; outputs JSON list with name/title/description/discoveredInField/relatedTask; .tracking/issues.sysml has issue001 linked to authoredByRefs; demo run passes; schema relatedTask field added (D0029); validate_schema green."; }
+        part storyIssueLoopDoDR1 : TestResult { :>> id = "3c4d5e6f-a7b8-4c9d-de0e-1f2a3b4c5d6e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ed8c55"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -44,6 +45,8 @@ package ProjectDeliveryS10 {
         :>> procedureText = "Approach agreed: add relatedTask : String[0..1] to Issue (D0029); multi-line Issue instances in .tracking/issues.sysml; query.py issues subcommand using _ISSUE_BLOCK regex (multiline match on part...Issue{...}); read_issues() extracts name/title/description/discoveredInField/relatedTask; demo: query.py issues shows issue001 linked to authoredByRefs; DoD accepted.";
     }
 
+    part issueLoopRefineGateR1 : TestResult { :>> id = "ad1e2f3a-b4c5-4d6e-e575-8a9b0c1d2e3f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ed8c55"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+
     verification issueLoopStandupGate : Test {
         :>> id = "5e6f7a8b-c9d0-4e1f-f020-3b4c5d6e7f8a";
         :>> title = "Sprint 10 standup gate";
@@ -52,6 +55,8 @@ package ProjectDeliveryS10 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation: work.sysml Issue type has relatedTask field; .tracking/issues.sysml with issue001; query.py: _ISSUE_BLOCK + _BOOL_ASSIGN regexes added; read_issues() function; issues subcommand in main(); all validators green; no blocking issues.";
     }
+
+    part issueLoopStandupGateR1 : TestResult { :>> id = "be2f3a4b-c5d6-4e7f-f686-9b0c1d2e3f4a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ed8c55"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification issueLoopImplementGate : Test {
         :>> id = "6f7a8b9c-d0e1-4f2a-a131-4c5d6e7f8a9b";
@@ -62,6 +67,8 @@ package ProjectDeliveryS10 {
         :>> procedureText = "validate_schema green; validate_tracking green (issues.sysml parses); query.py issues outputs issue001 with all fields; relatedTask = authoredByRefs surfaced correctly.";
     }
 
+    part issueLoopImplementGateR1 : TestResult { :>> id = "cf3a4b5c-d6e7-4f8a-a797-0c1d2e3f4a5b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ed8c55"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+
     verification issueLoopReviewGate : Test {
         :>> id = "7a8b9c0d-e1f2-4a3b-b242-5d6e7f8a9b0c";
         :>> title = "Sprint 10 review gate";
@@ -70,6 +77,8 @@ package ProjectDeliveryS10 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: work.sysml relatedTask field added correctly; issues.sysml parses green; query.py issues subcommand clean (no import side effects); D0029 recorded; doc-sync D0030 recorded.";
     }
+
+    part issueLoopReviewGateR1 : TestResult { :>> id = "d04b5c6d-e7f8-4a9b-b8a8-1d2e3f4a5b6c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ed8c55"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
 
     verification issueLoopCloseOutGate : Test {
         :>> id = "8b9c0d1e-f2a3-4b4c-c353-6e7f8a9b0c1d";
