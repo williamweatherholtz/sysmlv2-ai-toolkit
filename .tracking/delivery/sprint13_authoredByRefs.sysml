@@ -29,7 +29,7 @@ package ProjectDeliveryS13 {
     action def DeliveryRunS13 {
         action storyAuthoredByRefs;
         verification storyAuthoredByRefsDoD : Test { :>> id = "ad7c3ed1-9f0a-4b1c-cde2-3a4b5c6d7e8f"; :>> method = VerificationMethod::test; :>> procedureText = "claudeSonnet46 in actors.sysml; validate_actors.py exits 0 (PASS); 0 unknown-actor errors; D0037 recorded; authoredByRefsDoDR1 in backlog."; }
-        part storyAuthoredByRefsDoDR1 : TestResult { :>> id = "be8d4fe2-0a1b-4c2d-def3-4b5c6d7e8f9a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "placeholder"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
+        part storyAuthoredByRefsDoDR1 : TestResult { :>> id = "be8d4fe2-0a1b-4c2d-def3-4b5c6d7e8f9a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35bf281"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
     }
 
     // ====================================================================
@@ -63,6 +63,7 @@ package ProjectDeliveryS13 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "claudeSonnet46 in actors.sysml; validate_actors.py exits 0; 0 unknown-actor errors; D0037 recorded; validate_instances green.";
     }
+    part authoredByRefsImplementGateR1 : TestResult { :>> id = "cf4c9ek7-5f6a-4b7c-cde8-9a0b1c2d3e4f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35bf281"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification authoredByRefsReviewGate : Test {
         :>> id = "be4daek8-6a7b-4c8d-def9-0b1c2d3e4f5a";
@@ -72,6 +73,7 @@ package ProjectDeliveryS13 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: actors.sysml clean (claudeSonnet46 added); validate_actors.py clean (no subprocess, pure-Python regex, legacy set documented); D0037 consistent with D0035 (type approach); CLAUDE.md §5 updated if needed.";
     }
+    part authoredByRefsReviewGateR1 : TestResult { :>> id = "da5d0fl8-6a7b-4c8d-def9-0b1c2d3e4f5a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "35bf281"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification authoredByRefsCloseOutGate : Test {
         :>> id = "cf5ebl9-7b8c-4d9e-efa0-1c2d3e4f5a6b";
