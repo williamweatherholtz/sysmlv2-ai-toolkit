@@ -11,27 +11,13 @@ import sys
 import re
 import subprocess
 from queue import Empty
+import _schema_files
 
 # .engine/tools/validate/validate_schema.py -> .engine
 ENGINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# (relative-path, ) in dependency order. EngineElement first; siblings import it.
-ORDER = [
-    "schema/core/element.sysml",
-    "schema/core/needs.sysml",
-    "schema/core/requirements.sysml",
-    "schema/core/verification.sysml",
-    "schema/core/work.sysml",
-    "schema/core/architecture.sysml",
-    "schema/core/computed.sysml",
-    "schema/core/relationships.sysml",
-    "schema/core/workflow.sysml",
-    "schema/core/process.sysml",
-    "schema/core/skills.sysml",
-    "schema/core/risk.sysml",
-    "schema/core/baseline.sysml",
-    "schema/safety/stpa.sysml",
-]
+# ORDER is the canonical dependency sequence — defined once in _schema_files.py.
+ORDER = _schema_files.SCHEMA_ORDER
 
 ERR = re.compile(
     r"(error|couldn't|could not|wasn't expected|mismatched|no viable|"
@@ -77,6 +63,15 @@ def ok(status, text):
 
 
 def main():
+    # Coverage check before the expensive kernel starts: fail hard if any
+    # schema/*.sysml is unregistered in _schema_files.SCHEMA_ORDER.
+    missing = _schema_files.check_coverage(ENGINE)
+    if missing:
+        for rel in missing:
+            print(f"ERROR: schema file not registered in _schema_files.SCHEMA_ORDER: {rel}")
+        print("Add the file to _schema_files.py SCHEMA_ORDER in dependency order, then re-run.")
+        sys.exit(2)
+
     from jupyter_client.kernelspec import KernelSpecManager
     from jupyter_client.manager import start_new_kernel
 

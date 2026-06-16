@@ -11,16 +11,23 @@ import glob
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import _kernel  # noqa: E402
+from _schema_files import SCHEMA_ORDER  # noqa: E402
 
 ENGINE = os.path.dirname(os.path.dirname(HERE))
 
-SCHEMA = [
-    "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
-    "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
-    "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
-    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
-    "schema/core/baseline.sysml", "schema/safety/stpa.sysml", "workflows/_meta.sysml",
-]
+# SCHEMA: all schema files (canonical ordered list) + workflow meta.
+SCHEMA = SCHEMA_ORDER + ["workflows/_meta.sysml"]
+
+
+def lint_decision_imports(engine_root):
+    """Decision files must import EngineWork — that is where the Decision type lives.
+    Returns list of offending relative paths."""
+    failures = []
+    for f in sorted(glob.glob(os.path.join(engine_root, "decisions", "*.sysml"))):
+        content = open(f, encoding="utf-8").read()
+        if "import EngineWork" not in content:
+            failures.append(os.path.relpath(f, engine_root).replace("\\", "/"))
+    return failures
 
 INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))
              + sorted(glob.glob(os.path.join(ENGINE, "processes", "*.sysml")))
@@ -48,6 +55,13 @@ ERR = ("error", "couldn't", "cannot", "unexpected", "mismatched",
 
 
 def main():
+    lint_fails = lint_decision_imports(ENGINE)
+    if lint_fails:
+        for rel in lint_fails:
+            print(f"[LINT-FAIL] {rel}: missing 'import EngineWork::*' (Decision type is in EngineWork)")
+        print("Fix the import(s) above, then re-run.")
+        sys.exit(2)
+
     km, kc = _kernel.start()
     for rel in SCHEMA:
         _kernel.run_cell(kc, open(os.path.join(ENGINE, rel), encoding="utf-8").read())

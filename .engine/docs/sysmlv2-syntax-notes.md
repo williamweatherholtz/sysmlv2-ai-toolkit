@@ -131,6 +131,14 @@ Three feature areas evaluated and deferred:
 
 Current stack (Rust parser + pilot 0.59.0 + query.py) is stable. Re-evaluate when a new pilot release ships.
 
+## Decision file authoring (`.engine/decisions/`)
+
+Decision files are standalone SysML v2 packages. Common mistakes caught by the lint check in `validate_instances.py`:
+
+- **Import `EngineWork::*`, not `EngineElement::*`.** `Decision` is defined in `EngineWork`. Using `EngineElement::*` alone gives "Couldn't resolve reference to Type 'Decision'". `validate_instances.py` now lint-checks this before starting the kernel.
+- **Fields**: `id`, `title`, `createdAt`, `authoredBy` (inherited from `Element`) + `status : DecisionStatus`, `context : String`, `decisionText : String`, `consequences : String`. There is no `rationale`, `acceptedBy`, `acceptedAt`, or `acceptedAtCommit` field.
+- **Template**: always copy an existing file (e.g. `0042-baseline-view.sysml`) — do not author from scratch.
+
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 
 - `%show <FQN>` is a reliable STRUCTURE dumper, an unreliable VALUE dumper.

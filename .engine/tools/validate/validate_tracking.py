@@ -14,16 +14,13 @@ import glob
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))  # .engine/tools
 import _kernel  # noqa: E402
+from _schema_files import SCHEMA_ORDER  # noqa: E402
 
 ENGINE = os.path.dirname(os.path.dirname(HERE))   # .engine
 REPO = os.path.dirname(ENGINE)
-PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
-    "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
-    "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
-    "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
-    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
-    "schema/core/baseline.sysml", "schema/safety/stpa.sysml", "workflows/_meta.sysml",
-)]
+# PRELOAD: all schema files (from the single canonical list) + workflow meta.
+PRELOAD = ([os.path.join(ENGINE, *rel.split("/")) for rel in SCHEMA_ORDER]
+           + [os.path.join(ENGINE, "workflows", "_meta.sysml")])
 TRACKING = sorted(glob.glob(os.path.join(REPO, ".tracking", "**", "*.sysml"), recursive=True))
 
 _ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
