@@ -149,8 +149,11 @@ The six workflows (see the spec for detail):
 
 ## 4. Bootstrap rules (in force NOW, until the runtime exists)
 
-- **Direct editing of `.sysml` / instance files is the sanctioned bootstrap write path.** There
-  is no write API yet. Edit deliberately.
+- **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `sysmlv2 append-result`
+  to append a `TestResult` and `sysmlv2 add-task` to add a task + `DoD` to an action def — both
+  enforce UUID generation and append-only semantics automatically. Direct editing of `.sysml` /
+  instance files is still possible but is no longer the primary path; use it only when the write
+  API does not yet cover the operation (schema changes, decision files, cursor updates).
 - **Every change to schema or a workflow/process definition MUST:**
   1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
      rationale — capture the decision even if small; commit messages and memory are NOT

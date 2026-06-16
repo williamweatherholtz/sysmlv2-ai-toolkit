@@ -1,16 +1,19 @@
 //! `sysmlv2` — CLI entry point.
 //!
 //! Subcommands:
-//!   `validate [ROOT]`    — semantic-validate all `.tracking/` files
-//!   `check FILE...`      — parse-check one or more `.sysml` files
-//!   `orient [ROOT]`      — print orient state (cursor + ready/done/outstanding) as JSON
-//!   `whats-next [ROOT]`  — print ready task names, one per line
+//!   `validate [ROOT]`         — semantic-validate all `.tracking/` files
+//!   `check FILE...`           — parse-check one or more `.sysml` files
+//!   `orient [ROOT]`           — print orient state (cursor + ready/done/outstanding) as JSON
+//!   `whats-next [ROOT]`       — print ready task names, one per line
+//!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
+//!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use std::{path::PathBuf, process};
 
 use sysmlv2_cli::{check_files, collect_sysml, validate_root};
 use sysmlv2_cli::orient;
+use sysmlv2_cli::write as w;
 
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
@@ -139,6 +142,65 @@ fn cmd_ls(args: &[String]) -> i32 {
     0
 }
 
+/// Parse simple `--key value` flag pairs from a flat args slice.
+fn flag(args: &[String], name: &str) -> Option<String> {
+    let key = format!("--{name}");
+    args.windows(2)
+        .find(|w| w[0] == key)
+        .map(|w| w[1].clone())
+}
+
+fn cmd_append_result(args: &[String]) -> i32 {
+    let Some(file_str) = flag(args, "file") else {
+        eprintln!("usage: sysmlv2 append-result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        return 2;
+    };
+    let Some(task) = flag(args, "task") else {
+        eprintln!("error: --task required");
+        return 2;
+    };
+    let Some(sha) = flag(args, "sha") else {
+        eprintln!("error: --sha required");
+        return 2;
+    };
+    let file = PathBuf::from(file_str);
+    let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
+    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    // Callers should pass --judged-at for determinism; this is a safe fallback.
+    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+
+    match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by) {
+        Ok(uuid) => { println!("{uuid}"); 0 }
+        Err(e) => { eprintln!("error: {e}"); 1 }
+    }
+}
+
+fn cmd_add_task(args: &[String]) -> i32 {
+    let Some(file_str) = flag(args, "file") else {
+        eprintln!("usage: sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
+        return 2;
+    };
+    let Some(def_name) = flag(args, "def") else {
+        eprintln!("error: --def required");
+        return 2;
+    };
+    let Some(task) = flag(args, "task") else {
+        eprintln!("error: --task required");
+        return 2;
+    };
+    let Some(dod) = flag(args, "dod") else {
+        eprintln!("error: --dod required");
+        return 2;
+    };
+    let file = PathBuf::from(file_str);
+    let method = flag(args, "method").unwrap_or_else(|| "test".to_owned());
+
+    match w::add_task(&file, &def_name, &task, &dod, &method) {
+        Ok(uuid) => { println!("{uuid}"); 0 }
+        Err(e) => { eprintln!("error: {e}"); 1 }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let code = match args.get(1).map(String::as_str) {
@@ -147,13 +209,17 @@ fn main() {
         Some("ls") => cmd_ls(&args[2..]),
         Some("orient") => cmd_orient(&args[2..]),
         Some("whats-next") => cmd_whats_next(&args[2..]),
+        Some("append-result") => cmd_append_result(&args[2..]),
+        Some("add-task") => cmd_add_task(&args[2..]),
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
-            eprintln!("  validate [ROOT]    semantic-validate all .tracking/ files");
-            eprintln!("  check FILE...      parse-check one or more .sysml files");
-            eprintln!("  ls [ROOT]          list .tracking/ .sysml files");
-            eprintln!("  orient [ROOT]      print orient state as JSON");
-            eprintln!("  whats-next [ROOT]  print ready task names (one per line)");
+            eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
+            eprintln!("  check FILE...                parse-check one or more .sysml files");
+            eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
+            eprintln!("  orient [ROOT]                print orient state as JSON");
+            eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
+            eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
+            eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");
             2
         }
     };

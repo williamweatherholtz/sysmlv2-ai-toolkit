@@ -13,6 +13,7 @@ use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod indexer;
 pub mod orient;
+pub mod write;
 
 // ── file discovery ────────────────────────────────────────────────────────────
 

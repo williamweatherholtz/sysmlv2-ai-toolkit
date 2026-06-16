@@ -238,6 +238,8 @@ package EngineBacklog {
         action rustS5CLI;         // Sprint 5: sysmlv2 binary — check + validate subcommands; CI exit codes
         action rustS6Orient;      // Sprint 6: sysmlv2 orient subcommand — pure-Rust pipeline view
         action rustS7QueryAlign;  // Sprint 7: fix done detection (DoDR + R naming); sysmlv2 whats-next; query.py regex align
+        action rustS8runtimeParser; // Sprint 8: AST-driven indexer replacing text-scan; Succession.is_ordering_only; parity
+        action rustS9writeApi;    // Sprint 9: write.rs — append-result + add-task enforcing UUID/append-only
 
         verification rustS0WorkspaceDoR : Test { :>> id = "c6788072-6045-438f-a95b-879ce9147ebd"; :>> method = VerificationMethod::inspect; :>> procedureText = "Cargo workspace layout agreed (sysmlv2-parser lib + sysmlv2-cli bin); deny attributes decided; BDD framework (cucumber-rs) selected; CI script drafted; no blocking dependencies"; }
         part rustS0WorkspaceDoRR1 : TestResult { :>> id = "d7891183-7156-4f9c-a0a6-980dc058b4e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "53cd43a"; :>> judgedAt = "2026-06-12"; :>> judgedBy = "claudeOpus"; }
@@ -278,6 +280,13 @@ package EngineBacklog {
         verification rustS7QueryAlignDoD : Test { :>> id = "b6c7d8e9-f0a1-4b2c-8d3e-4f5a6b7c8d9e"; :>> method = VerificationMethod::test; :>> procedureText = "dod_result_is_pass handles both {task}DoDR{n} (new) and {task}R{n} (legacy) naming; parse_result_header handles both; query.py regex updated to key results under task name; sysmlv2 orient shows all S0-S6 sprints done; sysmlv2 whats-next [ROOT] outputs ready list (one per line); 6 orient BDD scenarios + 6 cli BDD scenarios green; clippy -D warnings clean"; }
         part rustS7QueryAlignDoDR1 : TestResult { :>> id = "5ef6a7b8-c9d0-4e1f-8f30-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2811f5c"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification rustS7QueryAlignRetroGate : Test { :>> id = "c7d8e9f0-a1b2-4c3d-be4f-5a6b7c8d9e0f"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 7 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification rustS8runtimeParserDoR : Test { :>> id = "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: Succession.is_ordering_only field added (D0025); indexer.rs AST-based extractor replaces orient.rs text-scan; orient::compute wired to indexer; 8 orient BDD scenarios green; parity verified (60 done, same ready list); DoD accepted"; }
+        part rustS8runtimeParserDoRR1 : TestResult { :>> id = "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "276c833"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        verification rustS8runtimeParserDoD : Test { :>> id = "f0a1b2c3-d4e5-4f6a-bc7d-8e9f0a1b2c3d"; :>> method = VerificationMethod::test; :>> procedureText = "Succession.is_ordering_only added to AST (D0025); indexer.rs extracts tasks/succs/DoDs/results; orient::compute uses indexer; ordering-only edges handled; package-level items indexed; 8 orient BDD scenarios green; parity with query.py orient (same done/ready counts); clippy clean"; }
+        part rustS8runtimeParserDoDR1 : TestResult { :>> id = "ad3e4f5a-b6c7-4d8e-a19c-3b4c5d6e7f8a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ec2c08"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        verification rustS9writeApiDoR : Test { :>> id = "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: write.rs uses parser for validation + text insertion; append_result: parse→find N→gen UUID→text insert; add_task: find action def→check dup→gen UUID→insert; subcommands parse --file/--task/--sha/--def/--dod/--method flags; 7 BDD scenarios agreed; CLAUDE.md §4 updates scoped; DoD accepted"; }
+        part rustS9writeApiDoRR1 : TestResult { :>> id = "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d9fdb5"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
+        verification rustS9writeApiDoD : Test { :>> id = "fa8d9e0f-a1b2-4c3d-ef4a-5b6c7d8e9f0a"; :>> method = VerificationMethod::test; :>> procedureText = "write.rs: append_result enforces append-only + auto-UUID; add_task enforces no-dup + auto-UUID; sysmlv2 append-result + add-task subcommands; 7 write BDD scenarios green; all existing tests green; CLAUDE.md §4 updated to retire direct editing as primary path; clippy clean"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
@@ -292,7 +301,9 @@ package EngineBacklog {
         first rustS4SpecCompat then rustS5CLI;
         first rustS5CLI then rustS6Orient;
         first rustS6Orient then rustS7QueryAlign;
-        first rustS7QueryAlign then runtimeParser;
+        first rustS7QueryAlign then rustS8runtimeParser;
+        first rustS8runtimeParser then rustS9writeApi;
+        first rustS9writeApi then writeApi;
 
         verification foldWhatsNextDoD : Test { :>> id = "4338695c-eb93-4d73-b904-c9c4c1469840"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs (parity with whats_next.py); whats_next.py retired; single query tool"; }
         part foldWhatsNextR1 : TestResult { :>> id = "6d7e8f9a-0b1c-4d2e-3f4a-5b6c7d8e9f0a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
@@ -326,6 +337,8 @@ package EngineBacklog {
         verification runtimeParserDoD : Test { :>> id = "7c78b3cd-b51e-4a26-9b84-bd5e7040b605"; :>> method = VerificationMethod::test; :>> procedureText = "standalone parser/indexer reads schema+instances without the pilot kernel; query layer runs on it; parity with current outputs"; }
         part runtimeParserDoDR1 : TestResult { :>> id = "ad3e4f5a-b6c7-4d8e-a19c-3b4c5d6e7f8a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5ec2c08"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification runtimeParserRetroGate : Test { :>> id = "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 8 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
+        verification writeApiDoR : Test { :>> id = "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: write.rs uses parser for validation + text insertion; append_result: parse→find N→gen UUID→text insert; add_task: find action def→check dup→gen UUID→insert; subcommands parse --file/--task/--sha/--def/--dod/--method flags; 7 BDD scenarios agreed; CLAUDE.md §4 updates scoped; DoD accepted"; }
+        part writeApiDoRR1 : TestResult { :>> id = "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d9fdb5"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification writeApiDoD : Test { :>> id = "864722ea-23bb-469b-9813-a8840d0d526d"; :>> method = VerificationMethod::test; :>> procedureText = "write API enforces writePolicy/ids/append-only; direct text editing retired as the write path"; }
         verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
     }

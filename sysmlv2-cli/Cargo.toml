@@ -21,3 +21,7 @@ harness = false
 [[test]]
 name = "orient_bdd"
 harness = false
+
+[[test]]
+name = "write_bdd"
+harness = false
