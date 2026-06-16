@@ -10,6 +10,7 @@ Subcommands (argv[1], default 'whats-next'):
   trace <name>       -> a task's full lineage: transitive upstream + downstream + DoD
   trace-need <name>  -> trace a Need/SR/Component over satisfy+allocate edges (text-read)
   workflows          -> the six workflow DAGs as Kahn-layered parallel waves (JSON)
+  issues             -> Issue instances from all .tracking files (name/title/description/relatedTask)
 
 INSTANCE-AWARE: discovers work-item backlogs by scanning .tracking/*.sysml for
 `action def`s (an action def in .tracking IS a work backlog; workflows live in
@@ -89,6 +90,10 @@ _LEGACY_DOD = re.compile(r'requirement\s+(\w+)DoD\s*:\s*AcceptanceCriterion')
 # satisfy/allocate edge patterns for trace-need subcommand
 _SATISFY = re.compile(r'\bsatisfy\s+(\w+)\s+by\s+(\w+)\s*;')
 _ALLOCATE = re.compile(r'\ballocate\s+(\w+)\s+to\s+(\w+)\s*;')
+# Issue instance blocks — multi-line match; [^}]* matches newlines (negated char class)
+_ISSUE_BLOCK = re.compile(r'part\s+(\w+)\s*:\s*Issue\s*\{([^}]*)\}')
+# Boolean attribute assignments (not captured by _ASSIGN which only matches quoted strings)
+_BOOL_ASSIGN = re.compile(r'(\w+)\s*=\s*(true|false)')
 
 
 def parse_show(text):
@@ -404,6 +409,28 @@ def trace_need(name, satisfy_edges, allocate_edges):
     return out
 
 
+def read_issues():
+    """Issue instances from all .tracking files (issueLoop UC10)."""
+    issues = []
+    for f in tracking_files():
+        with open(f, encoding='utf-8') as fh:
+            text = fh.read()
+        for m in _ISSUE_BLOCK.finditer(text):
+            body = m.group(2)
+            attrs = dict(_ASSIGN.findall(body))
+            bools = dict(_BOOL_ASSIGN.findall(body))
+            issues.append({
+                'name': m.group(1),
+                'title': attrs.get('title', ''),
+                'description': attrs.get('description', ''),
+                'discoveredInField': bools.get('discoveredInField', 'false') == 'true',
+                'relatedTask': attrs.get('relatedTask', ''),
+                'createdAt': attrs.get('createdAt', ''),
+                'authoredBy': attrs.get('authoredBy', ''),
+            })
+    return issues
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -483,6 +510,11 @@ def main():
     override = None
     if "--target" in sys.argv:
         override = tuple(sys.argv[sys.argv.index("--target") + 1].split("::"))
+
+    # issues is a pure text-read — skip the kernel entirely
+    if sub == "issues":
+        print(json.dumps({"issues": read_issues()}, indent=2))
+        return
 
     km, kc = _kernel.start()
     for f in PRELOAD:

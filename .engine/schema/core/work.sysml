@@ -47,6 +47,7 @@ package EngineWork {
     part def Issue :> Element {
         attribute description : String;
         attribute discoveredInField : Boolean;
+        attribute relatedTask : String[0..1];  // backlog task name this issue should be addressed by
     }
 
     // A Release is a declaration + a membership rule. The baseline, release
