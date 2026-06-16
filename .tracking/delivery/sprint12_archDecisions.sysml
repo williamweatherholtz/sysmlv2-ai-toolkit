@@ -28,6 +28,7 @@ package ProjectDeliveryS12 {
     action def DeliveryRunS12 {
         action storyArchDecisions;
         verification storyArchDecisionsDoD : Test { :>> id = "fc6b2cb0-7d8e-4f9a-bcd0-1e2f3a4b5c6d"; :>> method = VerificationMethod::confirmation; :>> procedureText = "D0034 (crVersioning), D0035 (needLayer), D0036 (safetyCaseViews) recorded and accepted; validate_instances green; crVersioningDoDR1 + needLayerDoDR1 + safetyCaseViewsDoDR1 recorded in backlog; user accepts Sprint 12 complete."; }
+        part storyArchDecisionsDoDR1 : TestResult { :>> id = "be9e5fe3-0a1b-4c2d-efa4-5c6d7e8f9a0b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "30a9476"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
     }
 
     // ====================================================================
@@ -61,6 +62,7 @@ package ProjectDeliveryS12 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "D0034 + D0035 + D0036 recorded in .engine/decisions/; validate_instances green (43/43); no schema changes.";
     }
+    part archDecisionsImplementGateR1 : TestResult { :>> id = "cf0f6af4-1b2c-4d3e-fab5-6d7e8f9a0b1c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "30a9476"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification archDecisionsReviewGate : Test {
         :>> id = "fc2b8cb6-3d4e-4f5a-bcd6-7e8f9a0b1c2d";
@@ -70,6 +72,7 @@ package ProjectDeliveryS12 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Decisions reviewed: D0034 consistent with D0013 (git temporal model); D0035 consistent with EngineNeeds/EngineRequirements schema; D0036 consistent with D0015 (materialized views) and EngineWork::Release; no doc-sync needed (no schema changes).";
     }
+    part archDecisionsReviewGateR1 : TestResult { :>> id = "da1a7ba5-2c3d-4e4f-abc6-7e8f9a0b1c2d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "30a9476"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
     verification archDecisionsCloseOutGate : Test {
         :>> id = "ad3c9dc7-4e5f-4a6b-cde7-8f9a0b1c2d3e";
