@@ -462,7 +462,7 @@ def tab_workflows(orient):
 
     business_flow = simple_flow(["Persona Analysis", "Need Elicitation", "Need Prioritization", "Backlog"])
     arch_flow     = simple_flow(["Data Architecture", "Application Architecture", "Technology Architecture"])
-    deploy_flow   = simple_flow(["Release Planning", "Configuration", "V&amp;V", "Operate"])
+    deploy_flow   = simple_flow(["Release Planning", "Configuration", "V&V", "Operate"])
     operate_flow  = simple_flow(["Field Feedback", "Issue Triage", "Incorporate"])
     cr_flow       = simple_flow(["Propose Change", "Human Accept", "Apply + Validate", "Record Decision", "Commit CR:"])
 
@@ -562,96 +562,96 @@ def tab_decisions(decisions):
 # ---------------------------------------------------------------------------
 
 CSS = """
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-     background:#0d1117;color:#c9d1d9;font-size:14px}}
-header{{background:#161b22;border-bottom:1px solid #30363d;
-        padding:14px 24px;display:flex;justify-content:space-between;align-items:center}}
-header h1{{font-size:17px;color:#58a6ff;font-weight:600}}
-header .meta{{color:#8b949e;font-size:12px}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:#0d1117;color:#c9d1d9;font-size:14px}
+header{background:#161b22;border-bottom:1px solid #30363d;
+        padding:14px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:17px;color:#58a6ff;font-weight:600}
+header .meta{color:#8b949e;font-size:12px}
 /* tabs */
-.tabs{{background:#161b22;border-bottom:1px solid #30363d;padding:0 24px;display:flex;gap:2px}}
-.tab-btn{{padding:10px 18px;background:none;border:none;color:#8b949e;cursor:pointer;
-          font-size:13px;border-bottom:2px solid transparent;transition:.15s}}
-.tab-btn:hover{{color:#c9d1d9}}
-.tab-btn.active{{color:#58a6ff;border-bottom-color:#58a6ff}}
-.tab-content{{display:none;padding:20px 24px}}
-.tab-content.active{{display:block}}
+.tabs{background:#161b22;border-bottom:1px solid #30363d;padding:0 24px;display:flex;gap:2px}
+.tab-btn{padding:10px 18px;background:none;border:none;color:#8b949e;cursor:pointer;
+          font-size:13px;border-bottom:2px solid transparent;transition:.15s}
+.tab-btn:hover{color:#c9d1d9}
+.tab-btn.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.tab-content{display:none;padding:20px 24px}
+.tab-content.active{display:block}
 /* layout */
-.grid3{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}}
-.grid2{{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}}
-.full{{grid-column:1/-1}}
-.card{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}}
-.card h2{{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase;
-          letter-spacing:.08em;margin-bottom:10px}}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.full{grid-column:1/-1}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.card h2{font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase;
+          letter-spacing:.08em;margin-bottom:10px}
 /* kv */
-.kv{{display:flex;justify-content:space-between;padding:4px 0;
-     border-bottom:1px solid #21262d;gap:12px}}
-.kv:last-child{{border-bottom:none}}
-.kv .key{{color:#8b949e;flex-shrink:0}}
-.kv .val{{color:#e6edf3;font-weight:500;text-align:right}}
-.kv .val.dim{{color:#8b949e;font-weight:400}}
-.dim{{color:#8b949e}}
+.kv{display:flex;justify-content:space-between;padding:4px 0;
+     border-bottom:1px solid #21262d;gap:12px}
+.kv:last-child{border-bottom:none}
+.kv .key{color:#8b949e;flex-shrink:0}
+.kv .val{color:#e6edf3;font-weight:500;text-align:right}
+.kv .val.dim{color:#8b949e;font-weight:400}
+.dim{color:#8b949e}
 /* badges & chips */
-.badge{{display:inline-block;padding:2px 7px;border-radius:10px;
-        font-size:11px;font-weight:600;margin-right:4px}}
-.badge.green {{background:#1a3a1a;color:#3fb950;border:1px solid #238636}}
-.badge.blue  {{background:#0d2b4e;color:#58a6ff;border:1px solid #1f6feb}}
-.badge.orange{{background:#3b2300;color:#d29922;border:1px solid #9e6a03}}
-.badge.gray  {{background:#21262d;color:#8b949e;border:1px solid #30363d}}
-.badge.purple{{background:#2d1f45;color:#bc8cff;border:1px solid #6e40c9}}
-.chip{{display:inline-block;background:#21262d;border:1px solid #30363d;
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;
+        font-size:11px;font-weight:600;margin-right:4px}
+.badge.green {background:#1a3a1a;color:#3fb950;border:1px solid #238636}
+.badge.blue  {background:#0d2b4e;color:#58a6ff;border:1px solid #1f6feb}
+.badge.orange{background:#3b2300;color:#d29922;border:1px solid #9e6a03}
+.badge.gray  {background:#21262d;color:#8b949e;border:1px solid #30363d}
+.badge.purple{background:#2d1f45;color:#bc8cff;border:1px solid #6e40c9}
+.chip{display:inline-block;background:#21262d;border:1px solid #30363d;
        border-radius:4px;padding:2px 8px;margin:2px;font-size:12px;
-       color:#58a6ff;font-family:monospace}}
-.chip-small{{display:inline-block;background:#1a2d4e;border:1px solid #1f6feb;
-             border-radius:3px;padding:1px 6px;margin:1px;font-size:11px;color:#79c0ff}}
+       color:#58a6ff;font-family:monospace}
+.chip-small{display:inline-block;background:#1a2d4e;border:1px solid #1f6feb;
+             border-radius:3px;padding:1px 6px;margin:1px;font-size:11px;color:#79c0ff}
 /* phase-chip inline */
-.phase-chip{{background:#1a2d4e;border:1px solid #1f6feb;border-radius:4px;
-             padding:2px 10px;font-size:12px;color:#79c0ff;font-weight:500}}
+.phase-chip{background:#1a2d4e;border:1px solid #1f6feb;border-radius:4px;
+             padding:2px 10px;font-size:12px;color:#79c0ff;font-weight:500}
 /* tables */
-table{{width:100%;border-collapse:collapse}}
-th{{text-align:left;color:#8b949e;font-size:11px;font-weight:600;
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:#8b949e;font-size:11px;font-weight:600;
     text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;
-    border-bottom:1px solid #30363d}}
-td{{padding:6px 8px;border-bottom:1px solid #21262d;color:#c9d1d9}}
-tr:last-child td{{border-bottom:none}}
-.num{{font-family:monospace;text-align:right}}
-.good{{color:#3fb950}}.warn{{color:#d29922}}
+    border-bottom:1px solid #30363d}
+td{padding:6px 8px;border-bottom:1px solid #21262d;color:#c9d1d9}
+tr:last-child td{border-bottom:none}
+.num{font-family:monospace;text-align:right}
+.good{color:#3fb950}.warn{color:#d29922}
 /* commits */
-.commit{{font-family:monospace;font-size:12px;padding:3px 0;
+.commit{font-family:monospace;font-size:12px;padding:3px 0;
          border-bottom:1px solid #21262d;white-space:nowrap;
-         overflow:hidden;text-overflow:ellipsis}}
-.commit:last-child{{border-bottom:none}}
-.sha{{color:#58a6ff}}
+         overflow:hidden;text-overflow:ellipsis}
+.commit:last-child{border-bottom:none}
+.sha{color:#58a6ff}
 /* bars */
-.bar-blue  {{background:#1f6feb}}
-.bar-green {{background:#238636}}
-.bar-purple{{background:#6e40c9}}
+.bar-blue  {background:#1f6feb}
+.bar-green {background:#238636}
+.bar-purple{background:#6e40c9}
 /* workflow */
-.workflow-row{{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}}
-.phase-box{{background:#161b22;border:1px solid #30363d;border-radius:6px;
+.workflow-row{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+.phase-box{background:#161b22;border:1px solid #30363d;border-radius:6px;
             padding:12px 14px;min-width:120px;flex:1;text-align:center;
-            transition:.15s}}
-.phase-box.phase-active{{background:#0d2b4e;border-color:#58a6ff;
-                          box-shadow:0 0 0 1px #1f6feb}}
-.active-badge{{font-size:10px;color:#58a6ff;font-weight:700;margin-bottom:4px}}
-.phase-name{{font-size:13px;font-weight:600;color:#e6edf3;margin-bottom:6px}}
-.phase-skills{{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}}
-.phase-skill{{font-size:10px;background:#21262d;border-radius:3px;padding:1px 5px;
-              color:#8b949e;font-family:monospace}}
-.phase-gate{{font-size:10px;color:#484f58}}
-.phase-arrow{{display:flex;align-items:center;padding:0 4px;
-              color:#30363d;font-size:22px;font-weight:300}}
+            transition:.15s}
+.phase-box.phase-active{background:#0d2b4e;border-color:#58a6ff;
+                          box-shadow:0 0 0 1px #1f6feb}
+.active-badge{font-size:10px;color:#58a6ff;font-weight:700;margin-bottom:4px}
+.phase-name{font-size:13px;font-weight:600;color:#e6edf3;margin-bottom:6px}
+.phase-skills{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.phase-skill{font-size:10px;background:#21262d;border-radius:3px;padding:1px 5px;
+              color:#8b949e;font-family:monospace}
+.phase-gate{font-size:10px;color:#484f58}
+.phase-arrow{display:flex;align-items:center;padding:0 4px;
+              color:#30363d;font-size:22px;font-weight:300}
 /* simple flow */
-.simple-flow{{display:flex;flex-wrap:wrap;gap:4px;align-items:center}}
-.simple-phase{{background:#21262d;border:1px solid #30363d;border-radius:4px;
-               padding:4px 10px;font-size:12px;color:#c9d1d9}}
-.simple-arrow{{color:#8b949e;font-size:16px;padding:0 2px}}
+.simple-flow{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.simple-phase{background:#21262d;border:1px solid #30363d;border-radius:4px;
+               padding:4px 10px;font-size:12px;color:#c9d1d9}
+.simple-arrow{color:#8b949e;font-size:16px;padding:0 2px}
 /* misc */
-.warn-note{{color:#d29922;font-size:11px;margin-top:8px}}
-footer{{text-align:center;padding:14px;color:#484f58;font-size:11px;
-        border-top:1px solid #30363d;margin-top:8px}}
-@media(max-width:900px){{.grid3,.grid2{{grid-template-columns:1fr}}}}
+.warn-note{color:#d29922;font-size:11px;margin-top:8px}
+footer{text-align:center;padding:14px;color:#484f58;font-size:11px;
+        border-top:1px solid #30363d;margin-top:8px}
+@media(max-width:900px){.grid3,.grid2{grid-template-columns:1fr}}
 """
 
 JS = """
