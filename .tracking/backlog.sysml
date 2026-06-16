@@ -354,9 +354,12 @@ package EngineBacklog {
         part toolchainWatchDoDR1 : TestResult { :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "aba9e6f"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
         action traceabilityView;    // Sprint 15+: process traceability dashboard tab — sprint-to-process linkage, process evolution timeline, item-to-decision trace, subversion highlighting (issue002, user request 2026-06-16)
+        action specVersionRuntimeCheck; // sysmlv2 check --spec-version: report compiled grammar SHA vs current upstream at runtime; SYSML_V2_SPEC_OFFLINE=1 skips remote fetch (user request 2026-06-16)
         first baselineView then traceabilityView;
+        first rustS4SpecCompat then specVersionRuntimeCheck;
 
         verification traceabilityViewDoD : Test { :>> id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a"; :>> method = VerificationMethod::demo; :>> procedureText = "report.py Traceability tab shows: (1) per-sprint process linkage (which skills/workflows each sprint used); (2) process evolution timeline (when skills/decisions changed); (3) item-to-decision trace (backlog items linked to their governing decisions); (4) subversion highlighting (sprints that skipped expected gates). Demonstrates full vertical traceability through the self-improving engine."; }
         part traceabilityViewDoDR1 : TestResult { :>> id = "21349c50-163b-4b49-8a67-c243cba0caeb"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ce9e8d"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
+        verification specVersionRuntimeCheckDoD : Test { :>> id = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c"; :>> method = VerificationMethod::test; :>> procedureText = "sysmlv2 check --spec-version reports the grammar SHA baked at compile time (SYSML_V2_GRAMMAR_VERSION); optionally fetches current upstream manifest SHA and reports diff; SYSML_V2_SPEC_OFFLINE=1 skips remote fetch and exits 0; exits 0 when current or offline, exits 1 when stale; BDD scenarios cover: online-current, online-stale (exits 1 + prints diff), offline (skips fetch, exits 0); cargo test + clippy -D warnings green"; }
     }
 }

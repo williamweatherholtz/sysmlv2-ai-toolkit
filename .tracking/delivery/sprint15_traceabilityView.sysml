@@ -84,6 +84,8 @@ package ProjectDeliveryS15 {
         :>> procedureText = "storyTraceabilityViewDoDR1 recorded (pass); traceabilityViewDoDR1 in backlog (pass); validate_all green; user accepts Sprint 15 complete.";
     }
 
+    part traceabilityViewCloseOutGateR1 : TestResult { :>> id = "b3d7a291-e4f8-4c0a-9d12-6e5b8f1a0c23"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c1a7720"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "wweatherholtz"; }
+
     verification traceabilityViewRetroGate : Test {
         :>> id = "ea34680d-ff4e-4553-a163-0aac9e970e78";
         :>> title = "Sprint 15 retro gate";
