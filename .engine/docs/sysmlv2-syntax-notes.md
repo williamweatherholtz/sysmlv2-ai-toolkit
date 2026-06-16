@@ -111,6 +111,17 @@ pipe and the shell hangs.
 - **Required TestResult fields**: `id` (UUID), `outcome` (VerdictKind), `judgedAgainst`
   (short git SHA), `judgedAt` (ISO-8601 date), `judgedBy` (actor name string).
 
+## `occurrence def` — confirmed Sprint 11 (D0032)
+
+`occurrence def X :> Element { attribute a : String; }` parses correctly. Key rules:
+- Avoid reserved attribute names (`doc`, `action`, `actor`, `state`, `item`, etc.) — see Fails section.
+- `part <name> : OccurrenceDef { :>> a = "v"; }` instances continue to parse unchanged after retype.
+- `TestResult` was retyped from `part def` to `occurrence def` in `EngineVerification` (Sprint 11, D0032) — test results are events (performances of verifications at a point in time). Existing `part <n> : TestResult` instances parse without migration.
+
+## `state def` body syntax — NOT supported in pilot 0.59.0 (D0031)
+
+Bare `state def X;` parses. But the body transition syntax (`entry state`, `then` keyword) fails with "no viable alternative at input 'entry'". `WorkflowDefinition.transitions : String[*]` stays as string-encoded values (e.g. `'brief->brief-review'`). Revisit when a newer toolchain ships (tracked by `toolchainWatch`).
+
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 
 - `%show <FQN>` is a reliable STRUCTURE dumper, an unreliable VALUE dumper.

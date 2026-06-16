@@ -34,7 +34,10 @@ package EngineVerification {
     // appended never overwritten, SEPARATE from the verification process.
     // judgedAgainst is a git commit SHA: happened-before is computed via git
     // ANCESTRY (wall-clock can't order divergent branches). See the contract.
-    part def TestResult :> Element {
+    // Retyped to occurrence def (occurrenceRetype spike, D0032): a test result IS
+    // an event — a performance of a verification at a specific moment in time.
+    // Existing `part <name> : TestResult { ... }` instances continue to parse.
+    occurrence def TestResult :> Element {
         attribute outcome : VerdictKind;
         attribute judgedAt : Timestamp;     // display only
         attribute judgedAgainst : String;   // git commit SHA (causal truth)
