@@ -109,4 +109,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "ceremonyGateGuard";
     }
+
+    part issue011 : Issue {
+        :>> id = "daebfc01-2d3e-4f40-156f-91021324a5b6";
+        :>> title = "Sprint ceremony skills are invoked by convention only — the sprint-review Phase-3 transcript scan can be (and in S16 was) skipped, so process-improvement findings are missed";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "sprint-review SKILL.md Phase 3 (transcript review) is a mandatory process-improvement scan whose detection cues include 'Missing guard — a check that SHOULD have been automatic was done manually' — i.e. it is designed to catch exactly the issue010 class. But nothing ENFORCES that the skill is actually invoked before the review gate TestResult is recorded. In Sprint 16 the review gate was recorded WITHOUT running the Phase-3 scan, which is why issue010 (Standup-skip) and issue009 (repo-push contradiction) were found ad hoc rather than by review. Gap: ceremony-skill invocation is discipline, not control. Fix (reviewInvocationGuard): make the review gate require recorded transcript-scan evidence (improvement items, even if 'none material'), so a review gate without a scan artifact is incomplete; guard it. Guard DESIGN to be dispatched at the next retro (per D0047) since it needs human input.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "reviewInvocationGuard";
+    }
 }
