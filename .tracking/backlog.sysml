@@ -489,5 +489,6 @@ package EngineBacklog {
         part noSprintGuardDoDR1 : TestResult { :>> id = "4a0058e9-9a88-47ca-b948-24516596662a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
         action triageRouterSkill;
         verification triageRouterSkillDoD : Test { :>> id = "cf800b0f-a8fe-4f68-aa02-889ffeeca7bc"; :>> method = VerificationMethod::inspect; :>> procedureText = "Per-interaction triage router (D0064): engine-triage skill upgraded to break a request into parts, route each to its process (CHANGE/EXECUTE/RECORD/VIEW/ORIENT, sprinted), and FLAG parts that don't cleanly map; (5b) a UserPromptSubmit hook in settings.json fires triage every turn; CLAUDE.md §3 references it; registered in skills-registry; validate_all green."; }
+        part triageRouterSkillDoDR1 : TestResult { :>> id = "5494ef60-5d47-43cd-9783-c611f0ea2e17"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "773126f"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 }
