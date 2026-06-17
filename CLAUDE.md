@@ -151,6 +151,12 @@ it even though it produces no action. Never a document blob.
   *avoidable* issues into tracked items. The single human `confirmation` is the per-**sitting**
   sprint review (a sitting = one work session, ≥1 sprint), where the human accepts the
   sitting's content (batchable, D0019). Do not pause to confirm individual sprint ends.
+- **Confirm only what tests can't (D0051).** `method=test/inspect/analyze` items are
+  self-evidencing — their automated runs (cargo test, clippy, `sysmlv2 validate`, ceremony
+  guard, `parity_check`) ARE the evidence; never ask a human to confirm a green test. The
+  only confirmation-worthy class is non-test-verifiable judgment — Decisions / direction —
+  where the evidence IS the human's word (D0016). A sitting of all-tested work with
+  inline-accepted decisions has nothing to confirm.
 - **Every recorded fact carries provenance:** *who* (`authoredBy` / `verifiedBy`), *when*
   (an authored ISO-8601 `*At` timestamp — the attestation time is its own irreducible fact,
   distinct from the commit date), and the commit it was made against (`verifiedAtCommit`,

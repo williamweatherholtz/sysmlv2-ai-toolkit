@@ -107,22 +107,25 @@ improvement_items:
 4. **Route high-priority items to retro** for immediate action. Medium/low go into the
    backlog or are held for the next retro.
 
-## Phase 4 — Human confirmation of the sitting (the one gate, D0049)
+## Phase 4 — Confirm ONLY non-test-verifiable items (D0051)
 
-This is the single human touchpoint. Per-sprint review gates may be recorded
-autonomously (method=inspect, AI) as a technical check; the HUMAN gate is here, at
-sitting granularity:
+The single human touchpoint — but it confirms only what tests can't (D0051). Split the
+sitting into two buckets:
 
-1. **Present the sitting** — list its sprints, what each shipped, the metrics, and the
-   improvement items the retro will/​did dispatch.
-2. **Ask for explicit confirmation:**
-   > "Sitting review: sprints [N..M] — [summary]. Do you accept this sitting's content?"
-   This is a `method=confirmation` attestation (D0016): never inferred, always the
-   human's explicit word. Confirmations across the sitting's sprints may be batched
-   (D0019) onto a single "yes."
-3. **Record** the per-sitting review confirmation (`judgedBy = wweatherholtz`) once given.
-   closeOut + retro for the sitting's sprints are already autonomous — they do not wait
-   on this; this is sitting acceptance, not a per-sprint blocker.
+1. **Test-backed work [NO confirmation].** Every `method=test/inspect/analyze` item is
+   self-evidencing — its automated run (cargo test, clippy, `sysmlv2 validate`, ceremony
+   guard, `parity_check`) IS the evidence. Recap it; do not ask the human to confirm it.
+   A human "yes" on a green test adds nothing.
+2. **Non-test-verifiable items [the only confirmation ask].** Decisions / direction /
+   acceptance calls — which framework, whether to promote X, a ceremony-model change —
+   where the evidence IS the human's word (D0016). Present any that are still OUTSTANDING
+   (not already accepted inline) and ask:
+   > "These decisions need your acceptance: [list]. Accept?"
+   Record the confirmation (`judgedBy = wweatherholtz`) once given; batch per D0019.
+
+If every item is test-backed and the decisions were accepted inline, state **"nothing to
+confirm — recap only"** and stop. Sprints never wait on this; it is sitting acceptance of
+the irreducible judgment calls, not a gate on tested work.
 
 ## Anti-Patterns
 
