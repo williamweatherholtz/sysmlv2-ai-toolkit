@@ -12,5 +12,14 @@
       "Skill(critic-stakeholder)",
       "Skill(critic-traceability)"
     ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python .engine/tools/triage_reminder.py" }
+        ]
+      }
+    ]
   }
 }

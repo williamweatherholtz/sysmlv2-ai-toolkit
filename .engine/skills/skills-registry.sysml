@@ -15,7 +15,7 @@ package EngineSkillRegistry {
     part engineTriage : AISkill {
         :>> id = "5b3f6f3e-91a4-4f47-9f57-1f2f3a4b5c6d";
         :>> title = "engine-triage";
-        :>> purpose = "Classify EVERY substantive request into CHANGE/EXECUTE/RECORD/VIEW/BOOTSTRAP/ORIENT before acting; state the route out loud (CLAUDE.md 3).";
+        :>> purpose = "Break EVERY request into parts and route EACH to CHANGE/EXECUTE/RECORD/VIEW/ORIENT before acting; flag what doesn't cleanly map; state routes out loud (CLAUDE.md 3, D0064). Fired every turn by a UserPromptSubmit hook.";
         :>> location = ".engine/skills/engine-triage/SKILL.md";
         :>> triggerCondition = "Any substantive request arrives.";
         :>> writePolicy = WritePolicy::readOnly;

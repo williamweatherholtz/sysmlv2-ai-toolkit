@@ -1,19 +1,18 @@
 ---
 name: engine-triage
 description: |
-  Routes EVERY substantive request in an engine repo through the work-tracking
-  discipline before any action. Classifies the request into exactly one category
-  — CHANGE / EXECUTE / RECORD / VIEW / BOOTSTRAP / ORIENT (CLAUDE.md §3) — states
-  the category + route out loud, then follows that route's rules. Use at the start
-  of any request that changes a workflow/schema, produces a tracked artifact,
-  records a decision/test result/issue, asks for a computed answer, builds the
-  engine's own tooling, or asks where things stand. This is the guard that stops
-  actions slipping past the process (e.g. recording a confirmation that was never
-  explicitly given). Do NOT use for purely conversational replies that change
-  nothing. The categories' rules live in CLAUDE.md §3 (source of truth) — this
-  skill is the always-on checklist that makes classify-first visible and mandatory.
+  Routes EVERY request in this engine repo through the work-tracking discipline before any
+  action. Breaks the request into parts and routes EACH to its process — CHANGE / EXECUTE /
+  RECORD / VIEW / ORIENT (CLAUDE.md §3) — states the routes out loud, and FLAGS anything that
+  does not cleanly map to a process rather than force-fitting it. Use at the start of every
+  request that changes a workflow/schema, produces a tracked artifact, records a
+  decision/test result/issue, asks for a computed answer, or asks where things stand. This is
+  the guard that stops actions slipping past the process (e.g. recording a confirmation that
+  was never given, or doing delivery/engine work with no sprint). Do NOT use for purely
+  conversational replies that change nothing. CLAUDE.md §3 is the source of truth — this skill
+  is the always-on checklist, fired every turn by a UserPromptSubmit hook (D0064).
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
   engine: sysmlv2-ai-toolkit
@@ -23,28 +22,32 @@ metadata:
 
 The engine tracks the *work of building things*. Every substantive request must be
 routed through the discipline **before** acting. CLAUDE.md §3 is the source of truth;
-this skill is the per-request checklist that makes the classify-first step visible and
-mandatory, so nothing slips past silently.
+this skill is the per-request checklist that makes the route-first step visible and
+mandatory, so nothing slips past silently. It is fired every turn by a `UserPromptSubmit`
+hook (`.engine/tools/triage_reminder.py`, D0064).
 
 ## The checklist (do this first, every time)
 
-1. **Classify** the request into exactly one category by *what it changes*:
+1. **Break the request into parts** and classify EACH by *what it changes*:
 
-   | Category   | The request…                                                  | Route |
+   | Category   | The part…                                                     | Route |
    |------------|---------------------------------------------------------------|-------|
    | CHANGE     | changes a workflow / phase / gate / schema definition         | §3a   |
    | EXECUTE    | produces the active phase's typed artifact (tracked work)     | §3b   |
    | RECORD     | records ONE atomic fact (decision / test result / issue)      | §3c   |
    | VIEW       | asks for a computed answer (status, trace, stale set, a doc)  | §3d   |
-   | BOOTSTRAP  | builds or fixes the engine's OWN runtime / tooling            | §3e   |
    | ORIENT     | asks where things stand / what is next                        | §3f   |
 
-2. **State it out loud** in the first line of your response: e.g. `RECORD → §3c`.
-   If the request spans categories, **split it** and name each route.
+2. **State the routes out loud** in the first line of your response — e.g. `RECORD → §3c`.
+   A request often spans categories: **split it** and name each route. **Flag anything that
+   does not cleanly map** to a category rather than forcing it into one — say so and ask.
+   Routing *every* part (not just the first) is mandatory (D0064).
 
-3. **If you cannot classify confidently, ask** — do not default to EXECUTE.
-   Engine vs deliverable test: building the engine that *tracks* the work ⇒ BOOTSTRAP;
-   producing what the work *delivers* ⇒ EXECUTE.
+3. **If you cannot classify confidently, ask** — do not default to EXECUTE. Engine work
+   (building the engine's own runtime/tooling) is not a separate route: route it by *what it
+   changes* — schema/process ⇒ CHANGE §3a, otherwise ⇒ EXECUTE §3b — and it goes through a
+   **sprint** like all substantive work; only trivial one-off edits (a typo, a single rename,
+   one doc line) skip a sprint (D0064).
 
 4. **Follow that route's rules** (CLAUDE.md §3a–§3f). The traps that most need this guard:
    - **CHANGE** never freelances: state change + rationale → **explicit human acceptance**
@@ -53,6 +56,8 @@ mandatory, so nothing slips past silently.
      that specific claim — never inferred from "go do the sign-offs" or from the work being
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
+   - **substantive work goes through a sprint** — no raw backlog execution; the no-sprint
+     guard (`validate_sprint_coverage.py`) enforces it.
 
 5. **Recurring-or-one-time check (D0040).** After classifying into a category, for
    EXECUTE and VIEW: ask *will this task recur?*
@@ -80,16 +85,14 @@ mandatory, so nothing slips past silently.
    | "retro," "retrospective," "improvements"  | `sprint-retro`           |
    | "refine this story," "INVEST check"       | `backlog-refinement`     |
 
-6. **Continuous improvement capture.** When an improvement item surfaces mid-sprint
+7. **Continuous improvement capture.** When an improvement item surfaces mid-sprint
    (a process violation, a skill gap, a schema gap), record it immediately as an
    `Issue` in `.tracking/issues.sysml` rather than letting it slip to memory. It
    will be triaged at retro. Use `relatedTask` to point to the relevant backlog action.
 
 ## Why this exists
 
-CLAUDE.md describes the discipline but cannot force the classify-first step; a passive
-doc only works if the step is actually performed each turn. This skill makes it an active,
-visible gate. (Bootstrap note: until the engine's runtime can intercept requests itself,
-this checklist is enforced by you + CLAUDE.md; it graduates to runtime enforcement once the
-write API exists. Register it in `skills/skills-registry.sysml` during the instance-file
-migration.)
+CLAUDE.md describes the discipline but cannot force the route-first step; a passive doc only
+works if the step is actually performed each turn. This skill makes it an active, visible gate,
+fired every turn by a `UserPromptSubmit` hook (D0064) so the route-first move is structural,
+not vigilance.
