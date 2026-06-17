@@ -13,7 +13,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-bd50-405162738420";
         :>> title = "Sprint 24: formalViewpointsSchema (3 pts) — Viewpoint type + declared viewpoint registry (D0057)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::modeling;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -30,7 +30,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-1153-405162738423";
         :>> title = "Sprint 24 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach (D0057, schema sign-off given): model Viewpoint as part def :> Element (engine-registry style, like AISkill — carries queryable concern/audience/sources/renderer; native viewpoint def can't and its expose/render don't parse). Declare 8 viewpoints in .engine/views/. Wire validate_instances + pre-commit + _ID_TYPES. Re-freeze schema after. Lightweight (no Capella/Kitalpha). estimatedPoints=3. DoD accepted.";
     }
@@ -40,7 +40,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-3353-405162738425";
         :>> title = "Sprint 24 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. formalViewpointsSchema: Viewpoint def + registry + validator wiring. No blockers.";
     }
@@ -50,7 +50,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-5553-405162738427";
         :>> title = "Sprint 24 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "part def Viewpoint :> Element {concern/audience/sources/renderer} in computed.sysml; .engine/views/viewpoint-registry.sysml declares orient/whats-next/traceability/safety/requirements/decisions/baselines/suspect; validate_instances INSTANCES += views glob + _ID_TYPES += Viewpoint; pre-commit covers .engine/views/; validate_schema 14/14 + validate_instances green.";
     }
@@ -60,7 +60,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-7753-405162738429";
         :>> title = "Sprint 24 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: Viewpoint is registry-style (consistent with AISkill); 8 viewpoints declared incl. the requested safety/requirements/whats-next/traceability; schema re-frozen. Phase-3 scan: no avoidable issues; increment 2 (renderer rewiring + concern-coverage) correctly deferred to formalViewpoints.";
     }
@@ -70,7 +70,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-9953-405162738431";
         :>> title = "Sprint 24 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + backlog DoD recorded; validate_all green. Schema sign-off was the human gate (D0057); ceremony gates AI.";
     }
@@ -80,7 +80,7 @@ package ProjectDeliveryS24 {
         :>> id = "61728394-0a5b-4c6d-bb53-405162738433";
         :>> title = "Sprint 24 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049): no avoidable issues. Note: chose part def Viewpoint over native viewpoint def deliberately (queryable + parseable); increment 2 (formalViewpoints) will make renderers declaration-driven. Estimate 3 pts held.";
     }

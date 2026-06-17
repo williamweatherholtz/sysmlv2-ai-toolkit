@@ -13,7 +13,7 @@ package ProjectDeliveryS18 {
         :>> id = "4a316e29-8adc-4f6e-bd1c-3f5a7b9c2e3d";
         :>> title = "Sprint 18: auditSkill (3 pts) — architectural-critique skill (CAE+GQM+ATAM); critique process records tracked findings";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::modeling;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -31,7 +31,7 @@ package ProjectDeliveryS18 {
         :>> id = "7d649153-bd0f-4f02-fe40-6c8d0e2f5061";
         :>> title = "Sprint 18 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach agreed: new .engine/skills/architectural-critique/SKILL.md encoding D0046 (CAE Goal->Strategy->Evidence backbone + GQM metric set: gate-coverage, satisfy-coverage, done-verified, deliverable-parity, decisions-recorded, doc-truth + ATAM scenario walkthroughs); findings recorded as tracked Issue/Decision items. Rewrite architectural-critique.sysml criSynthesize/criAccept to tracked-findings + per-sitting disposition (issue007). Register the skill. estimatedPoints=3. Ready (orient: auditSkill unblocked after rustToolchainFix). DoD accepted.";
     }
@@ -41,7 +41,7 @@ package ProjectDeliveryS18 {
         :>> id = "9f861375-df21-4014-1352-8e0f20417283";
         :>> title = "Sprint 18 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. auditSkill: SKILL.md + process rewrite + registry entry. No blockers.";
     }
@@ -51,7 +51,7 @@ package ProjectDeliveryS18 {
         :>> id = "b1083597-f143-4236-3574-0a2142639405";
         :>> title = "Sprint 18 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "architectural-critique/SKILL.md authored (CAE+GQM+ATAM, tracked-findings discipline); skills-registry registers it; architectural-critique.sysml criSynthesize/criAccept rewritten to tracked findings + per-sitting disposition; validate_instances green.";
     }
@@ -61,7 +61,7 @@ package ProjectDeliveryS18 {
         :>> id = "d32a5719-1365-4458-5796-2c4364850627";
         :>> title = "Sprint 18 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: skill follows the SKILL.md shape; process steps consistent (criSynthesize→tracked items, criAccept→per-sitting); registry entry correct; doc-sync complete; no regressions. Phase-3 transcript scan: clean sprint, no avoidable issues beyond those already tracked.";
     }
@@ -71,7 +71,7 @@ package ProjectDeliveryS18 {
         :>> id = "f54c793b-3587-465a-79ab-4e6586a70849";
         :>> title = "Sprint 18 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): storyAuditSkillDoD recorded (pass); auditSkillDoD in backlog (pass); .tracking validates green. No human gate.";
     }
@@ -81,7 +81,7 @@ package ProjectDeliveryS18 {
         :>> id = "176e915d-57a9-487c-9bcd-6a87a8c90a61";
         :>> title = "Sprint 18 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049, sprint-retro skill): no new avoidable issues — clean skill+process authoring sprint; existing items (issue007 closed by this work; issue011/012/013 tracked) stand. One-off note: estimate 3 pts held.";
     }

@@ -13,7 +13,7 @@ package ProjectDeliveryS19 {
         :>> id = "5b427f30-9bed-4f6e-bd2e-4a6b8c0d3e4d";
         :>> title = "Sprint 19: deliverableSuspicion (3 pts) — Rust source drift marks deliverable TestResults suspect (D0050)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -31,7 +31,7 @@ package ProjectDeliveryS19 {
         :>> id = "8e750264-ce10-4f6e-0241-7d9e1f306161";
         :>> title = "Sprint 19 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach agreed: .engine/deliverable-manifest.txt declares deliverable source paths + verification task names; orient.rs reads it and marks a listed done task suspect when git shows a commit touching a source path after the task's latest passing judgedAgainst (kernel-free, git-based). Closes issue006. estimatedPoints=3. Ready (orient: deliverableSuspicion unblocked after rustToolchainFix). DoD accepted.";
     }
@@ -41,7 +41,7 @@ package ProjectDeliveryS19 {
         :>> id = "a0972486-e032-4f6e-2463-9f1031528361";
         :>> title = "Sprint 19 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. deliverableSuspicion: manifest + orient.rs helper + suspect merge. No blockers.";
     }
@@ -51,7 +51,7 @@ package ProjectDeliveryS19 {
         :>> id = "c2194608-0254-4f6e-4685-1b3253740361";
         :>> title = "Sprint 19 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "deliverable-manifest.txt added; orient.rs load_deliverable_manifest + deliverable_drifted + apply_deliverable_suspicion implemented and merged into suspect; cargo test + clippy -D warnings green; demonstrated: sysmlv2 orient suspect lists the 12 deliverable tasks (source drifted since verified).";
     }
@@ -61,7 +61,7 @@ package ProjectDeliveryS19 {
         :>> id = "e43b682a-2476-4f6e-689a-3d5475960361";
         :>> title = "Sprint 19 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: manifest format clear; orient deliverable-suspicion correct + clippy-clean (helper extracted for line limit); doc-sync (CLAUDE.md §1, D0050). Phase-3 scan: the 12 suspect tasks are the feature working — turned into reverifyDeliverable (issue014); no other avoidable issues.";
     }
@@ -71,7 +71,7 @@ package ProjectDeliveryS19 {
         :>> id = "065d804c-4698-4f6e-8abc-5f7697b80361";
         :>> title = "Sprint 19 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): storyDeliverableSuspicionDoD recorded (pass); deliverableSuspicionDoD in backlog (pass); .tracking validates green. No human gate.";
     }
@@ -81,7 +81,7 @@ package ProjectDeliveryS19 {
         :>> id = "287a026e-68ba-4f6e-acde-7b98b9da1361";
         :>> title = "Sprint 19 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049, sprint-retro skill): avoidable-issue scan — the 12 deliverable-suspect tasks need re-verification at HEAD; turned into issue014 + backlog reverifyDeliverable. clippy line-limit hit on compute_orient (extracted helper) — one-off, no item. Estimate 3 pts held.";
     }

@@ -13,7 +13,7 @@ package ProjectDeliveryS23 {
         :>> id = "9f861375-df21-4f6e-bd47-8e0f20417121";
         :>> title = "Sprint 23: reviewInvocationGuard (2 pts) — guard that the retro avoidable-issue scan actually ran";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p2;
         :>> owner = "claudeOpus";
@@ -30,7 +30,7 @@ package ProjectDeliveryS23 {
         :>> id = "c2194608-0254-4f6e-3574-1b3253740121";
         :>> title = "Sprint 23 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach: D0049 already makes the retro autonomous (the scan always runs at close), so the residual issue011 risk is an EMPTY/rubber-stamp retro. Guard it: validate_ceremony.py flags a delivery file whose Retro gate passed but whose retro verification procedureText records no avoidable-issue scan evidence (keywords: avoidable/improvement/retro held/no avoidable/process improvement). Pure-Python, already in pre-commit. estimatedPoints=2. DoD accepted.";
     }
@@ -40,7 +40,7 @@ package ProjectDeliveryS23 {
         :>> id = "e43b682a-2476-4f6e-5796-3d5475960121";
         :>> title = "Sprint 23 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. reviewInvocationGuard: retro-scan-evidence check in validate_ceremony.py. No blockers.";
     }
@@ -50,7 +50,7 @@ package ProjectDeliveryS23 {
         :>> id = "065d804c-4698-4f6e-79ab-5f7697b80121";
         :>> title = "Sprint 23 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "validate_ceremony.py gains retro_scan_missing() + a per-file check: Retro passed but no scan evidence -> ERROR. Positive test: all 24 delivery files PASS (existing retros carry evidence; sprint11 grandfathered). Negative test: empty rubber-stamp retro -> missing=True (caught), evidence retro -> False. Pure-Python; already wired in pre-commit.";
     }
@@ -60,7 +60,7 @@ package ProjectDeliveryS23 {
         :>> id = "287a026e-68ba-4f6e-9bcd-7b98b9da0121";
         :>> title = "Sprint 23 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: guard is keyword-evidence (lightweight but a real backstop against empty retros); D0049 already prevents skip, this prevents rubber-stamp. Phase-3 scan (this very sprint, via the guard's own discipline): no avoidable issues; pure-python so no deliverable re-suspect.";
     }
@@ -70,7 +70,7 @@ package ProjectDeliveryS23 {
         :>> id = "4a9c248a-8adc-4f6e-bdef-9dba0bdc0121";
         :>> title = "Sprint 23 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + backlog DoD recorded; .tracking validates green. No human gate (D0051: test-backed).";
     }
@@ -80,7 +80,7 @@ package ProjectDeliveryS23 {
         :>> id = "6a9e469c-9bed-4f6e-defa-bedc2ede0121";
         :>> title = "Sprint 23 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049): no avoidable issues — the guard self-applies (this sprint's retro carries scan evidence). Note: the keyword-based evidence check is lightweight; a future enrichment could tie retro findings to actual tracked issueNNN refs. Estimate 2 pts held.";
     }

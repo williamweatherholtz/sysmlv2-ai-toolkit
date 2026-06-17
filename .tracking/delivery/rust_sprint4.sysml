@@ -16,7 +16,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "01234567-5555-4e5f-b6c7-d8e9f0a1b2c6";
         :>> title = "Sprint 4: SysML v2 spec-compatibility check in build.rs";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeSonnet46";
@@ -39,7 +39,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "23456789-7777-4a7b-d8e9-f0a1b2c3d4e7";
         :>> title = "Sprint 4 refine gate (DoR)";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "SysML v2 Release repo URL confirmed (github.com/Systems-Modeling/SysML-v2-Release); build.rs approach agreed (5s timeout, non-fatal network error, fatal SHA mismatch); SYSML_V2_SPEC_OFFLINE=1 default via .cargo/config.toml; SYSML_V2_GRAMMAR_VERSION constant agreed; 3 BDD scenarios outlined (offline mode reflected, SHA mismatch error, correct SHA passes); sha2 + hex + ureq build-deps agreed; DoD accepted.";
     }
@@ -49,7 +49,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "456789ab-9999-4c9d-f0a1-b2c3d4e5f6a9";
         :>> title = "Sprint 4 standup gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation approach: build.rs standalone with sha256_hex using sha2+hex; ureq::get with 5s timeout; process::exit(1) on mismatch (cleaner than panic!); spec_compat.rs library module exposes SYSML_V2_SPEC_URL, SYSML_V2_GRAMMAR_SHA, SYSML_V2_GRAMMAR_VERSION, is_offline(), sha256_hex(), verify_sha(); BDD tests pure library functions (no env var mutation, no network); no blockers.";
     }
@@ -59,7 +59,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "6789abcd-bbbb-4e1f-b2c3-d4e5f6a7b8cb";
         :>> title = "Sprint 4 implement gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
         :>> procedureText = "build.rs authored with SYSML_V2_SPEC_URL + SYSML_V2_GRAMMAR_SHA constants, offline check, ureq fetch, SHA verify, actionable mismatch message; spec_compat.rs authored with constants + is_offline + sha256_hex + verify_sha + ShaMismatch; .cargo/config.toml SYSML_V2_SPEC_OFFLINE=1 default; 3 spec_compat BDD scenarios green; 68 total tests pass; clippy -D warnings clean.";
     }
@@ -69,7 +69,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "89abcdef-dddd-4a3b-d4e5-f6a7b8c9d0ed";
         :>> title = "Sprint 4 review gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: build.rs is standalone (no lib import); spec_compat.rs has no.unwrap() in production code; process::exit(1) used instead of panic! for clean error message; SHA placeholder clearly documented as not-yet-pinned sentinel; .cargo/config.toml force=false allows CI override; BDD tests pure functions (no network, no env var mutation); sha2+hex in both deps and build-deps; version constant is compile-time env!(); is_offline() tests runtime env var for completeness.";
     }
@@ -79,7 +79,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "abcdef01-ffff-4c5d-f6a7-b8c9d0e1f2af";
         :>> title = "Sprint 4 closeOut gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyRustS4SpecCompatDoDR1 recorded (pass); rustS4SpecCompatDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 4 complete.";
     }
@@ -89,7 +89,7 @@ package ProjectDeliveryRustS4 {
         :>> id = "bcdef012-0000-4d6e-a7b8-c9d0e1f2a3b0";
         :>> title = "Sprint 4 retro gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 4 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }

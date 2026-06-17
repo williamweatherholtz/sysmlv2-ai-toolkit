@@ -17,7 +17,7 @@ package ProjectDeliveryS14 {
         :>> id = "5b2c3d4e-6f7a-4b8c-9d0e-1f2a3b4c5d6e";
         :>> title = "Sprint 14: toolchainWatch (2 pts) + baselineView (3 pts) — toolchain adoption decision + computed baseline view";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::modeling;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeSonnet46";
@@ -40,7 +40,7 @@ package ProjectDeliveryS14 {
         :>> id = "8e5f6a7b-9c0d-4e1f-2a3b-4c5d6e7f8a9b";
         :>> title = "Sprint 14 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach agreed: toolchainWatch = research SysML v2 toolchain (expose/verify-by/derive status in current + upcoming releases) + record adoption Decision; baselineView = define Release occurrence def in schema/core + author a baseline instance in .tracking + extend query.py or report.py with baseline tab/subcommand + demo. estimatedPoints = 5 (2+3). Both unblocked. DoD accepted.";
     }
@@ -50,7 +50,7 @@ package ProjectDeliveryS14 {
         :>> id = "0a7b8c9d-1e2f-4a3b-4c5d-6e7f8a9b0c1d";
         :>> title = "Sprint 14 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Sprint 14 refine gate passed (aba9e6f); cursor at Delivery/refine. toolchainWatch: research SysML v2 toolchain expose/verify-by/derive support status; record Decision. baselineView: Release occurrence def + query.py baseline subcommand + demo. No blockers.";
     }
@@ -60,7 +60,7 @@ package ProjectDeliveryS14 {
         :>> id = "1b8c9d0e-2f3a-4b4c-5d6e-7f8a9b0c1d2e";
         :>> title = "Sprint 14 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
         :>> procedureText = "D0041 (toolchainWatch: all deferred, D0031 confirmed); D0042 (baselineView: EngineBaseline::Release occurrence def + baselines.sysml + report.py tab 5); schema 14/14 green; instances 49/49 green; tracking 23+/23+ green. toolchainWatchDoDR1 + baselineViewDoDR1 to be added to backlog.";
     }
@@ -70,7 +70,7 @@ package ProjectDeliveryS14 {
         :>> id = "2c9d0e1f-3a4b-4c5d-6e7f-8a9b0c1d2e3f";
         :>> title = "Sprint 14 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: toolchainWatch Decision consistent with D0040 view rule; baselineView Release type in schema + baseline query clean; doc-sync complete.";
     }
@@ -80,7 +80,7 @@ package ProjectDeliveryS14 {
         :>> id = "3d0e1f2a-4b5c-4d6e-7f8a-9b0c1d2e3f4a";
         :>> title = "Sprint 14 closeOut gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyToolchainAndBaselineDoDR1 recorded (pass); toolchainWatchDoDR1 + baselineViewDoDR1 in backlog (pass); validate_all green; user accepts Sprint 14 complete.";
     }
@@ -90,7 +90,7 @@ package ProjectDeliveryS14 {
         :>> id = "4e1f2a3b-5c6d-4e7f-8a9b-0c1d2e3f4a5b";
         :>> title = "Sprint 14 retro gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 14 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }

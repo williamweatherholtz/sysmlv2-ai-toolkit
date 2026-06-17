@@ -10,7 +10,7 @@ package Decision0044 {
         :>> id = "a46ed6da-7d16-4deb-a969-12b630de37d8";
         :>> title = "D0044: raise sprint capacity cap to ≤8 pts (from ≤5); Fibonacci scale unchanged";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> status = DecisionStatus::accepted;
         :>> context = "Solo+AI team velocity has been capped at 5 pts per sprint. Several items (e.g. trackedMetadata, traceabilityView) are 5 pts each, and larger feature requests would benefit from single-sprint delivery without forced splits. The ≤5 cap was conservative for early sprint rhythm establishment (D0038). Consistent delivery suggests headroom to raise the cap.";
         :>> decisionText = "Sprint capacity cap raised from ≤5 pts to ≤8 pts per sprint. Fibonacci scale unchanged (1/2/3/5/8/13). Items estimated at 13+ must still be split before scheduling. D0038 hour-guideline for 8 pts (2-3 days) remains the reference. Combinations up to 8 pts total are valid (e.g. 5+3, 8, 3+3+2). Accepted: wweatherholtz 2026-06-16.";

@@ -13,7 +13,7 @@ package ProjectDeliveryS21 {
         :>> id = "7d649153-bd0f-4f6e-bd40-6c8d0e2f3e4b";
         :>> title = "Sprint 21: backlogPrioritization (2 pts) — rank ready by declaration order (D0052)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -30,7 +30,7 @@ package ProjectDeliveryS21 {
         :>> id = "a0972486-e032-4f6e-2463-9f1031528241";
         :>> title = "Sprint 21 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach: add TaskData.order (declaration index) in indexer.rs; orient.rs ranks ready by it; query.py aligned (insertion order); D0052 records backlog-order = priority + AI auto-follows top sign-off-free item. estimatedPoints=2. DoD accepted.";
     }
@@ -40,7 +40,7 @@ package ProjectDeliveryS21 {
         :>> id = "c2194608-0254-4f6e-4685-1b3253740241";
         :>> title = "Sprint 21 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. backlogPrioritization: indexer order + orient rank + query.py + D0052. No blockers.";
     }
@@ -50,7 +50,7 @@ package ProjectDeliveryS21 {
         :>> id = "e43b682a-2476-4f6e-689a-3d5475960241";
         :>> title = "Sprint 21 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "TaskData.order added; orient ready sorted by order; query.py ready insertion-order; cargo test + clippy -D warnings green; sysmlv2 orient ready = trackedMetadata, specVersionRuntimeCheck, reviewInvocationGuard (backlog order, not alphabetical).";
     }
@@ -60,7 +60,7 @@ package ProjectDeliveryS21 {
         :>> id = "065d804c-4698-4f6e-8abc-5f7697b80241";
         :>> title = "Sprint 21 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: ranking correct + clippy-clean. Phase-3 scan: this sprint changes deliverable source (orient.rs/indexer.rs), so deliverable-suspicion (D0050) will re-flag the rust tasks — re-verify follows (intended source-change loop), not an avoidable issue.";
     }
@@ -70,7 +70,7 @@ package ProjectDeliveryS21 {
         :>> id = "287a026e-68ba-4f6e-acde-7b98b9da1241";
         :>> title = "Sprint 21 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): storyBacklogPrioritizationDoD + backlog DoD recorded; .tracking validates green. No human gate (D0051: test-backed).";
     }
@@ -80,7 +80,7 @@ package ProjectDeliveryS21 {
         :>> id = "4a9c248a-8adc-4f6e-cdef-9dba0bdc1241";
         :>> title = "Sprint 21 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049): avoidable-issue scan — the AI was asking 'which item?' because the frontier was unranked; fixed at root (D0052 ranking). Source-change re-suspect is expected (D0050). Estimate 2 pts held.";
     }

@@ -14,7 +14,7 @@ package EngineViewpoints {
     part orientVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-1619-405162738410";
         :>> title = "orient";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Where do things stand and what is ready to work next?";
         :>> audience = "maintainer / lead";
         :>> sources = "backlog action defs + latest TestResults + succession DAG + delivery-file ceremony gates";
@@ -23,7 +23,7 @@ package EngineViewpoints {
     part whatsNextVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-2619-405162738411";
         :>> title = "whats-next";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Which outstanding items are unblocked, in priority order?";
         :>> audience = "maintainer / AI executor";
         :>> sources = "ready frontier (outstanding tasks with all deps done), ranked by backlog declaration order (D0052)";
@@ -32,7 +32,7 @@ package EngineViewpoints {
     part traceabilityVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-3619-405162738412";
         :>> title = "traceability";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Are needs->requirements->verification linked, and where are the gaps / subversions?";
         :>> audience = "reviewer / auditor";
         :>> sources = "satisfy + verify edges; sprint ceremony gate coverage; issue->decision links; process-evolution timeline";
@@ -41,7 +41,7 @@ package EngineViewpoints {
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
         :>> title = "safety";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Are safety-relevant losses/hazards/UCAs identified and constrained, and is each constraint verified?";
         :>> audience = "safety engineer";
         :>> sources = "STPA losses/hazards/UCAs/constraints (EngineSafety); safety-kind requirements; verify edges to their Tests";
@@ -50,7 +50,7 @@ package EngineViewpoints {
     part requirementsVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-5619-405162738414";
         :>> title = "requirements";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "What does the system need to do, are requirements well-formed, and is each satisfied + verified?";
         :>> audience = "systems engineer / requirements owner";
         :>> sources = "Need / Requirement items; satisfy edges (to components) + verify edges (to Tests); requirement-quality (INCOSE/EARS)";
@@ -59,7 +59,7 @@ package EngineViewpoints {
     part decisionsVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-6619-405162738415";
         :>> title = "decisions";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "What was decided, by whom, when, and why (incl. alternatives)?";
         :>> audience = "lead / auditor / future maintainer";
         :>> sources = ".engine/decisions/*.sysml Decision items (context/decisionText/consequences; alternatives via decisionAnalysis/issue016)";
@@ -68,7 +68,7 @@ package EngineViewpoints {
     part baselinesVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-7619-405162738416";
         :>> title = "baselines";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "What was the state of the model at a given release/commit?";
         :>> audience = "release manager / auditor";
         :>> sources = "Release (commit SHA + member refs); baseline view computed from git + authored facts";
@@ -77,7 +77,7 @@ package EngineViewpoints {
     part suspectVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-8619-405162738417";
         :>> title = "suspect";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Which done items have stale evidence (model OR deliverable-source drift) and need re-verification?";
         :>> audience = "maintainer / QA";
         :>> sources = "git-ancestry of judgedAgainst vs upstream change over satisfy/:> edges; deliverable-manifest source drift (D0050)";
@@ -86,7 +86,7 @@ package EngineViewpoints {
     part orphansVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-9619-405162738418";
         :>> title = "orphans";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> concernText = "Which model elements are orphaned / dangling — a Need with no satisfying Requirement, a Requirement with no satisfy or verify edge, a task with no DoD, an Issue with no relatedTask, a Decision referenced by nothing — i.e. broken or missing required traceability?";
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "all items + typed edges; flag any element missing a REQUIRED incoming/outgoing edge for its kind (Need->Requirement satisfy; Requirement->Test verify; task->DoD; Issue->relatedTask)";

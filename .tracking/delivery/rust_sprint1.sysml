@@ -15,7 +15,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "b2c3d4e5-1111-4f6a-b7c8-d9e0f1a2b3c4";
         :>> title = "Sprint 1: SysML v2 engine-dialect lexer (tokenizer)";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -38,7 +38,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "e5f6a7b8-4444-4c9d-e0f1-a2b3c4d5e6f7";
         :>> title = "Sprint 1 refine gate (DoR)";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Token type list complete (21 keywords + 11 operators + 3 literal kinds + Eof); proptest strategies identified (arb_identifier, arb_simple_string, arb_enum_literal); lexer API agreed (tokenize(source, filename) -> Result<Vec<Token>, LexError>); DoD accepted.";
     }
@@ -48,7 +48,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "a7b8c9d0-6666-4e1f-a2b3-c4d5e6f7a8b9";
         :>> title = "Sprint 1 standup gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation approach: Lexer<'src> struct with CharIndices peekable; next_char returns (pos, ch, line, col); skip_trivia handles whitespace and // comments; scan_colon dispatches ::/:>>/:>/: ; keyword_or_ident maps keywords; three proptest strategies written TDD-first; no blockers.";
     }
@@ -58,7 +58,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "c9d0e1f2-8888-4a3b-c4d5-e6f7a8b9c0d1";
         :>> title = "Sprint 1 implement gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
         :>> procedureText = "error.rs + token.rs + lexer.rs authored; cargo test --workspace: 15 unit + 10 BDD + 3 proptest suites all pass; cargo clippy --workspace --all-targets -D warnings: clean.";
     }
@@ -68,7 +68,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "e1f2a3b4-aaaa-4c5d-e6f7-a8b9c0d1e2f3";
         :>> title = "Sprint 1 review gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: LexError uses thiserror; Token/TokenKind/Span are pub with doc comments; Lexer struct is private; tokenize() is the single public entry point; no .unwrap() in src/; BDD feature file matches step definitions; proptest strategies cover ident/string/enum-literal.";
     }
@@ -78,7 +78,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "a3b4c5d6-cccc-4e7f-a8b9-c0d1e2f3a4b5";
         :>> title = "Sprint 1 closeOut gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyRustS1LexerR1 recorded (pass); rustS1LexerDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 1 complete.";
     }
@@ -88,7 +88,7 @@ package ProjectDeliveryRustS1 {
         :>> id = "b4c5d6e7-dddd-4f8a-b9c0-d1e2f3a4b5c6";
         :>> title = "Sprint 1 retro gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz";
+        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 1 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
