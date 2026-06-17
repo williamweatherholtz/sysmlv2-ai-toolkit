@@ -24,6 +24,7 @@ package ProjectDeliveryS35 {
     action def DeliveryRunS35 {
         action storyMigrationProcess;
         verification storyMigrationProcessDoD : Test { :>> id = "67940516-2c7d-4e8f-b035-516273849502"; :>> method = VerificationMethod::inspect; :>> procedureText = "migrationProcessDoD (pass): D0067 recorded (+ acceptance event); .engine/processes/migration.sysml (Process + 7 ProcessSteps) + .engine/skills/migration/SKILL.md (gates + edge-case checklist + historical-data rule) created + registered; engine-triage routes bulk migrations to it; CLAUDE.md §4 references it; validate_instances green."; }
+        part storyMigrationProcessDoDR1 : TestResult { :>> id = "0136557e-2a7a-4b4e-8b2e-f0d3abe632ca"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d8c67bf"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification migrationProcessRefineGate : Test {
@@ -54,6 +55,7 @@ package ProjectDeliveryS35 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "D0067 recorded (+ d0067Accept event). .engine/processes/migration.sysml (Process migration + 7 ProcessSteps mig0Justify..mig6Contract). .engine/skills/migration/SKILL.md (7 gates + anti-patterns + edge-case checklist + output format). Registered (migration : AISkill). engine-triage gains a bulk-migration routing bullet; CLAUDE.md §4 gains the migration-process rule. validate_instances green. migrationProcess backlog DoD recorded pass.";
     }
+    part migrationProcessImplementGateR1 : TestResult { :>> id = "b91bcf8b-7294-429a-8b2e-f0d39cd18406"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d8c67bf"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification migrationProcessReviewGate : Test {
         :>> id = "67940516-2c7d-4e8f-b035-516273849506";
@@ -63,6 +65,7 @@ package ProjectDeliveryS35 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: the process/skill encode exactly the gates the research converged on + the edge cases we actually hit this session (regex-miss -> AST/reconcile; createdBy [1..1] -> don't-hoist-unsatisfiable; fabricate -> grandfather/backfill-with-basis). D0059-conformant (process has a deploying skill). Phase-3 scan: the reconcile gate makes the silent-miss catch structural, not luck — the lesson from the contract step's regex bug.";
     }
+    part migrationProcessReviewGateR1 : TestResult { :>> id = "3a7fd47e-0a04-44d6-8b2e-f0d3a15f1592"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d8c67bf"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification migrationProcessCloseOutGate : Test {
         :>> id = "67940516-2c7d-4e8f-b035-516273849507";
@@ -72,6 +75,7 @@ package ProjectDeliveryS35 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + migrationProcess DoD recorded pass; validate_all green; D0067 sign-off recorded (+ dogfooded). No human gate beyond the design acceptance already given (D0051).";
     }
+    part migrationProcessCloseOutGateR1 : TestResult { :>> id = "ff39d341-61b3-4b06-8b2e-f0d3a5aa1232"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d8c67bf"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification migrationProcessRetroGate : Test {
         :>> id = "67940516-2c7d-4e8f-b035-516273849508";
@@ -81,4 +85,5 @@ package ProjectDeliveryS35 {
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) -- avoidable-issue scan. No new avoidable issue. Process improvement: the edge-case class that bit us (silent regex miss, unsafe tighten, fabricate-risk) is now a codified, deploying-skill-backed, research-grounded gated process -- caught structurally (reconcile gate) rather than by luck. Candidate follow-on (not blocking): a reusable reconciliation helper (control-totals) tool so the dry-run gate is one command. Estimate 3 pts held.";
     }
+    part migrationProcessRetroGateR1 : TestResult { :>> id = "0b321dc2-8568-45de-8b2e-f0d3a89b30a2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d8c67bf"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
