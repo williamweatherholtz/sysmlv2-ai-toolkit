@@ -190,4 +190,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "formalViewpoints";
     }
+
+    part issue019 : Issue {
+        :>> id = "61728394-0a5b-4c6d-b619-40516273841a";
+        :>> title = "read_issues / query.py issues silently truncated any Issue whose field value contains a brace — exposed by the orphans view on first run, fixed";
+        :>> createdAt = "2026-06-17";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "_ISSUE_BLOCK used `[^}]*`, which stops at the first '}'. issue005's description quotes 'verification ...DoR : Test {...}', so its block truncated before relatedTask -> query.py issues mis-reported it (empty description + relatedTask). Latent since issueLoop; the new orphans view (orphansVP) caught it on its first run by flagging issue005 as relatedTask-less (a FALSE positive that revealed the TRUE parser bug). Fixed: _ISSUE_BLOCK and _VIEWPOINT_BLOCK now anchor on the line-start closing brace (\\n\\s*\\}) with DOTALL, so braces inside field values no longer truncate. The corrected regex IS the guard (D0047). discoveredInField via the orphans view dogfooding itself.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "formalViewpoints";
+    }
 }

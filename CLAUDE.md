@@ -37,6 +37,10 @@ secondary cross-check; it has a known done-count undercount — issue012.)
 `orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
 verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
 source changed since it was verified — re-verify at HEAD to clear it.
+Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and
+tooling reads the registry: `query.py viewpoints` lists the declared lenses + render
+status (the concern-coverage view); `query.py orphans` renders the orphans viewpoint
+(needs/requirements/tasks/issues missing required edges).
 
 ---
 

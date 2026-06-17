@@ -90,8 +90,10 @@ _LEGACY_DOD = re.compile(r'requirement\s+(\w+)DoD\s*:\s*AcceptanceCriterion')
 # satisfy/allocate edge patterns for trace-need subcommand
 _SATISFY = re.compile(r'\bsatisfy\s+(\w+)\s+by\s+(\w+)\s*;')
 _ALLOCATE = re.compile(r'\ballocate\s+(\w+)\s+to\s+(\w+)\s*;')
-# Issue instance blocks — multi-line match; [^}]* matches newlines (negated char class)
-_ISSUE_BLOCK = re.compile(r'part\s+(\w+)\s*:\s*Issue\s*\{([^}]*)\}')
+# Issue instance blocks — capture to the LINE-ANCHORED closing brace (\n + indent + }),
+# NOT the first }: field values can contain } (e.g. a description quoting "Test {...}"),
+# which [^}]* would truncate on (latent bug exposed by the orphans view, 2026-06-17).
+_ISSUE_BLOCK = re.compile(r'part\s+(\w+)\s*:\s*Issue\s*\{(.*?)\n\s*\}', re.DOTALL)
 # Boolean attribute assignments (not captured by _ASSIGN which only matches quoted strings)
 _BOOL_ASSIGN = re.compile(r'(\w+)\s*=\s*(true|false)')
 
@@ -450,6 +452,52 @@ def read_issues():
     return issues
 
 
+_VIEWPOINT_BLOCK = re.compile(r'part\s+(\w+)\s*:\s*Viewpoint\s*\{(.*?)\n\s*\}', re.DOTALL)
+
+
+def read_viewpoints():
+    """Declared viewpoints from .engine/views/ (D0056/D0057) — the 'viewpoints' view:
+    a view OF the declared lenses + render status (the concern-coverage audit)."""
+    vps = []
+    for f in sorted(glob.glob(os.path.join(ENGINE, "views", "*.sysml"))):
+        with open(f, encoding="utf-8") as fh:
+            text = fh.read()
+        for m in _VIEWPOINT_BLOCK.finditer(text):
+            attrs = dict(_ASSIGN.findall(m.group(2)))
+            renderer = attrs.get("renderer", "")
+            vps.append({
+                "name": m.group(1),
+                "title": attrs.get("title", ""),
+                "concern": attrs.get("concernText", ""),
+                "audience": attrs.get("audience", ""),
+                "sources": attrs.get("sources", ""),
+                "renderer": renderer,
+                "rendered": not renderer.strip().startswith("(increment"),
+            })
+    return vps
+
+
+def compute_orphans():
+    """Orphaned / dangling elements (orphansVP, D0056) — kernel-free text read.
+    A task with no DoD, an Issue with no/dangling relatedTask = broken traceability."""
+    text_all = "\n".join(open(f, encoding="utf-8").read() for f in tracking_files())
+    actions = set(re.findall(r'\baction\s+(\w+)\s*;', text_all))
+    dods = set(re.findall(r'\bverification\s+(\w+)DoD\b', text_all))
+    tasks_without_dod = sorted(a for a in actions if a not in dods)
+    issues_no_rel, issues_dangling = [], []
+    for iss in read_issues():
+        rt = iss.get("relatedTask", "")
+        if not rt:
+            issues_no_rel.append(iss["name"])
+        elif rt not in actions:
+            issues_dangling.append({"issue": iss["name"], "relatedTask": rt})
+    return {
+        "tasks_without_dod": tasks_without_dod,
+        "issues_without_relatedTask": issues_no_rel,
+        "issues_dangling_relatedTask": issues_dangling,
+    }
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -530,9 +578,15 @@ def main():
     if "--target" in sys.argv:
         override = tuple(sys.argv[sys.argv.index("--target") + 1].split("::"))
 
-    # issues is a pure text-read — skip the kernel entirely
+    # issues / viewpoints / orphans are pure text-reads — skip the kernel entirely
     if sub == "issues":
         print(json.dumps({"issues": read_issues()}, indent=2))
+        return
+    if sub == "viewpoints":
+        print(json.dumps({"viewpoints": read_viewpoints()}, indent=2))
+        return
+    if sub == "orphans":
+        print(json.dumps(compute_orphans(), indent=2))
         return
 
     km, kc = _kernel.start()
