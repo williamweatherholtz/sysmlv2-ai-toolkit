@@ -180,4 +180,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "trackedMetadataReplan";
     }
+
+    part issue018 : Issue {
+        :>> id = "50617283-3940-4a51-976f-1324a5b6c7eb";
+        :>> title = "Views are CODE, not modeled viewpoints: view def anchors are empty stubs disconnected from the real report.py/orient views — no concern/stakeholder/source, no concern-coverage audit (ISO 42010 / Arcadia / SysML v2)";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "Benchmark/critique (D0056): computed.sysml's view def OutstandingView/SuspectView/TraceView + viewpoint def MaintainerVP are empty anchors, disconnected from the actual views (hardcoded report.py tabs + orient/whats-next). So no view declares its concern, stakeholder/audience, or source elements; we cannot audit whether every stakeholder concern has a view (orphan-concern risk — the exact thing ISO 42010 viewpoints prevent), and adding a view means writing code, not declaring a viewpoint. By the frameworks' discriminator (reuse x auditability x audience) our case justifies formalization. Preventing change (formalViewpoints): make Viewpoint/View first-class declared elements (concern+stakeholder+sources+renderer binding); convert code-views to declared viewpoints (safety/requirements/whats-next/traceability); keep computation in tooling, driven by the declaration; lightweight (no Capella/Kitalpha; friction is D0054). Frozen-schema -> needs §2.5 sign-off before build.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "formalViewpoints";
+    }
 }
