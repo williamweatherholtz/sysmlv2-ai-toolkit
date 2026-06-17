@@ -92,4 +92,14 @@ package EngineViewpoints {
         :>> sources = "all items + typed edges; flag any element missing a REQUIRED incoming/outgoing edge for its kind (Need->Requirement satisfy; Requirement->Test verify; task->DoD; Issue->relatedTask)";
         :>> renderer = "(increment 2) report.py orphans view / query.py orphans";
     }
+
+    part attestationCoverageVP : Viewpoint {
+        :>> id = "67940516-2c7d-4e8f-a067-516273849620";
+        :>> title = "attestation-coverage";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which items lack an attestation their governing process requires? Currently: every status=accepted Decision must carry a passing acceptance event (dNNNNAccept confirmation TestResult, D0066).";
+        :>> audience = "maintainer / auditor / reviewer";
+        :>> sources = "all decisions; flag any status=accepted Decision with no passing dNNNNAcceptR1 TestResult (extensible to other process-required attestations)";
+        :>> renderer = "query.py attestation-coverage";
+    }
 }

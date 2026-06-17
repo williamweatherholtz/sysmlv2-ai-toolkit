@@ -45,7 +45,8 @@ the layer you touched.
 | Mark done | Use `sysmlv2 append-result --file FILE --task TASK --sha SHA [--verdict pass\|fail] [--judged-by ACTOR] [--judged-at DATE]` — auto-generates UUID, enforces append-only N+1. Or directly APPEND `part <task>DoDR<n> : TestResult` (same fields: `id`, `judgedAgainst`, `judgedAt`, `judgedBy`, `outcome = VerdictKind::pass`). `method=confirmation` requires the human's explicit sign-off. |
 | Record a phase-gate result | Use `sysmlv2 append-gate-result --file FILE --gate GATE --sha SHA [--verdict pass\|fail] [--judged-by ACTOR] [--judged-at DATE]` — auto-generates UUID, enforces append-only N+1, inserts the `part <gate>R<n> : TestResult` after the gate's `verification` block. (Gates are `verification`s, not actions — distinct from `append-result`.) `method=confirmation` gates require the human's explicit sign-off as `judgedBy`. |
 | Add a new task | Use `sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT [--method test\|inspect\|confirmation\|demo\|analysis]` — auto-generates UUID, rejects duplicate names. |
-| Record a decision | Author a `Decision` part (see any `.engine/decisions/` file for the pattern). |
+| Record a decision | Author a `Decision` part (copy a recent `.engine/decisions/` file) with `context`/`decision`/`rationale`/`consequences`; a NEW accepted decision also carries an acceptance event — `verification dNNNNAccept : Test {method=confirmation}` + `part dNNNNAcceptR1 : TestResult {outcome=pass; judgedBy=<human>}` (D0066). |
+| Check attestation coverage | `python .engine/tools/query.py attestation-coverage` — lists `status=accepted` decisions missing their acceptance event (the declared `attestation-coverage` viewpoint). |
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)

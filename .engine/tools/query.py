@@ -498,6 +498,31 @@ def compute_orphans():
     }
 
 
+def compute_attestation_coverage():
+    """Process-required-attestation coverage (attrModelCoverageView, D0066) — kernel-free.
+    Lists items whose governing process requires an attestation they lack. Current rule:
+    every status=accepted Decision must carry a passing acceptance event
+    (`dNNNNAccept` confirmation TestResult). Extend with more (attestation, finder) pairs."""
+    missing = []
+    total = 0
+    for f in sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml"))):
+        with open(f, encoding="utf-8") as fh:
+            text = fh.read()
+        m = re.search(r'\bpart\s+(d\w+)\s*:\s*Decision\b', text)
+        if not m or "DecisionStatus::accepted" not in text:
+            continue
+        dname = m.group(1)
+        total += 1
+        if not re.search(rf'\b{re.escape(dname)}AcceptR1\b[^}}]*VerdictKind::pass', text):
+            missing.append(dname)
+    return {
+        "attestation": "accepted Decision -> acceptance event (dNNNNAccept, D0066)",
+        "total_accepted": total,
+        "covered": total - len(missing),
+        "missing": sorted(missing),
+    }
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -587,6 +612,9 @@ def main():
         return
     if sub == "orphans":
         print(json.dumps(compute_orphans(), indent=2))
+        return
+    if sub == "attestation-coverage":
+        print(json.dumps(compute_attestation_coverage(), indent=2))
         return
 
     km, kc = _kernel.start()
