@@ -42,6 +42,16 @@ _GATE_PASS = re.compile(
 )
 
 
+# reviewInvocationGuard (issue011 / D0049): the retro IS the autonomous avoidable-issue
+# scan; a passing Retro gate must record scan EVIDENCE in its verification text, not be an
+# empty rubber-stamp. Catches "review/retro recorded without the Phase-3 scan" (the S16 gap).
+_RETRO_TEXT = re.compile(
+    r'verification\s+\w*RetroGate\w*\s*:\s*Test\b.*?procedureText\s*=\s*"([^"]*)"',
+    re.DOTALL,
+)
+_SCAN_EVIDENCE = ("avoidable", "improvement", "retro held", "no avoidable", "process improvement")
+
+
 def analyze(path):
     """Return (defined:set, passed:set) of gate names for one delivery file."""
     with open(path, encoding="utf-8") as fh:
@@ -50,6 +60,19 @@ def analyze(path):
     passed = {m.group(1) for m in _GATE_PASS.finditer(text)}
     defined |= passed  # a passed gate is implicitly defined
     return defined, passed
+
+
+def retro_scan_missing(path, passed):
+    """True if Retro passed but its gate text records no avoidable-issue scan evidence."""
+    if "Retro" not in passed:
+        return False
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    m = _RETRO_TEXT.search(text)
+    if not m:
+        return False  # no retro verification block to check
+    body = m.group(1).lower()
+    return not any(k in body for k in _SCAN_EVIDENCE)
 
 
 def violations(defined, passed):
@@ -73,22 +96,26 @@ def main():
         stem = os.path.splitext(os.path.basename(path))[0]
         defined, passed = analyze(path)
         viols = violations(defined, passed)
-        if not viols:
-            continue
-        detail = "; ".join(f"{g} passed but {e} (earlier) unpassed" for g, e in viols)
-        if stem in GRANDFATHERED:
-            print(f"  WARN  {stem}: {detail} (grandfathered, pre-issue010)")
-            warnings += 1
-        else:
-            print(f"  ERROR {stem}: {detail}")
+        if viols:
+            detail = "; ".join(f"{g} passed but {e} (earlier) unpassed" for g, e in viols)
+            if stem in GRANDFATHERED:
+                print(f"  WARN  {stem}: {detail} (grandfathered, pre-issue010)")
+                warnings += 1
+            else:
+                print(f"  ERROR {stem}: {detail}")
+                errors += 1
+        # reviewInvocationGuard (issue011): Retro passed but no scan evidence recorded.
+        if retro_scan_missing(path, passed) and stem not in GRANDFATHERED:
+            print(f"  ERROR {stem}: Retro gate recorded without avoidable-issue scan evidence "
+                  "(run the autonomous retro / sprint-review Phase-3 scan; issue011)")
             errors += 1
     print(f"\n{'=' * 56}")
     print(f"  {len(files)} delivery files scanned")
     print(f"  {warnings} grandfathered warnings (tolerated)")
-    print(f"  {errors} ceremony-ordering violations")
+    print(f"  {errors} violations (ceremony ordering + retro-scan evidence)")
     if errors:
-        print("FAIL — a gate was recorded out of order; record the skipped earlier "
-              "gate(s) or fix the sequence before committing.")
+        print("FAIL — fix the gate ordering and/or record the retro avoidable-issue scan "
+              "before committing.")
         sys.exit(1)
     print("PASS")
 
