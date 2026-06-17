@@ -25,6 +25,7 @@ package ProjectDeliveryS34 {
     action def DeliveryRunS34 {
         action storyAttrModelAcceptanceEvents;
         verification storyAttrModelAcceptanceEventsDoD : Test { :>> id = "63940516-2c7d-4e8f-b034-516273849502"; :>> method = VerificationMethod::test; :>> procedureText = "attrModelAcceptanceEventsDoD (pass): D0066 recorded (acceptance = confirmation event, migrate-all not grandfather); migrate_acceptance_events.py added dNNNNAccept + dNNNNAcceptR1 to all 65 accepted decisions (superseded d0038 excluded); judgedBy=wweatherholtz, judgedAt=2026-06-17 (human's explicit attest-all directive); sysmlv2-syntax-notes convention updated; validate_instances 74/74 + validate . + validate_actors green."; }
+        part storyAttrModelAcceptanceEventsDoDR1 : TestResult { :>> id = "3e46c152-0a3e-4115-b004-8159908e323f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "db057b5"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification attrModelAcceptanceEventsRefineGate : Test {
@@ -55,6 +56,7 @@ package ProjectDeliveryS34 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "D0066 recorded (+ dogfood event). migrate_acceptance_events.py --apply added an acceptance event to 64 decisions (D0066 manual = 65 total; superseded d0038 excluded). 65 real Accept events; 0 double-applied (the 66th grep hit is prose in D0066). sysmlv2-syntax-notes Decision section rewritten (contracted fields + acceptance-event + alternatives-in-rationale). attrModelAcceptanceEventsDoD re-scoped. validate_instances 74/74 + validate . 42 clean + validate_actors PASS. attrModelAcceptanceEvents backlog DoD recorded pass.";
     }
+    part attrModelAcceptanceEventsImplementGateR1 : TestResult { :>> id = "3155909b-dfc1-41ed-b004-8159833093df"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "db057b5"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelAcceptanceEventsReviewGate : Test {
         :>> id = "63940516-2c7d-4e8f-b034-516273849506";
@@ -64,6 +66,7 @@ package ProjectDeliveryS34 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: every accepted decision has exactly one acceptance event (verified per-file, no double); superseded d0038 correctly excluded; events judgedBy=wweatherholtz grounded in the explicit attest-all directive (not inferred). status=accepted kept as the uniform structured fact. Phase-3 scan: the events are now the uniform acceptance signal that attrModelCoverageView + attrModelGuard will read.";
     }
+    part attrModelAcceptanceEventsReviewGateR1 : TestResult { :>> id = "c8b85e26-b10a-4139-b004-815985abeea7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "db057b5"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelAcceptanceEventsCloseOutGate : Test {
         :>> id = "63940516-2c7d-4e8f-b034-516273849507";
@@ -73,6 +76,7 @@ package ProjectDeliveryS34 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + attrModelAcceptanceEvents DoD recorded pass; validate_all green; D0066 sign-off recorded (+ dogfooded). No human gate beyond the attestation already given (D0051: the acceptance attestation was the explicit AskUserQuestion directive).";
     }
+    part attrModelAcceptanceEventsCloseOutGateR1 : TestResult { :>> id = "250885bb-4541-4f09-b004-815988ce2b4f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "db057b5"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelAcceptanceEventsRetroGate : Test {
         :>> id = "63940516-2c7d-4e8f-b034-516273849508";
@@ -82,4 +86,5 @@ package ProjectDeliveryS34 {
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) -- avoidable-issue scan. Avoidable confusion caught: the first design answer (prospective/grandfather) would have split acceptance into two formats -- the human flagged that tooling couldn't then uniformly identify resolution; corrected to migrate-all with explicit attestation. Lesson: when a model change is a representation REFACTOR of an existing fact, prefer uniform migration over grandfathering so downstream tooling stays single-path. No new tracked item. Process improvement: acceptance is now a first-class queryable event. Estimate 3 pts held.";
     }
+    part attrModelAcceptanceEventsRetroGateR1 : TestResult { :>> id = "39fdb591-f28a-47ed-b004-81598c6de817"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "db057b5"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
