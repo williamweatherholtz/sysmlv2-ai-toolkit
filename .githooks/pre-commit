@@ -25,6 +25,14 @@ if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
 fi
 
+# Acceptance-event guard (pure-Python, no kernel) — D0066/D0047. Fails if a status=accepted
+# Decision lacks a passing acceptance event (acceptance must be a TestResult, not prose/status).
+if echo "$sysml_staged" | grep -q '^\.engine/decisions/'; then
+    echo "pre-commit: validate_acceptance_events.py"
+    python "$V/validate_acceptance_events.py" || {
+        echo "pre-commit: ACCEPTANCE-EVENT GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 # .tracking changes: validated by the Rust authority (D0048) — fast, no JVM (ends the
 # kernel-leak, issue004). Falls back to the kernel validator if the binary isn't built.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
