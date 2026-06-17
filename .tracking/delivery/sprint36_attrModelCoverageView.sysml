@@ -24,6 +24,7 @@ package ProjectDeliveryS36 {
     action def DeliveryRunS36 {
         action storyAttrModelCoverageView;
         verification storyAttrModelCoverageViewDoD : Test { :>> id = "67940516-2c7d-4e8f-b036-516273849502"; :>> method = VerificationMethod::test; :>> procedureText = "attrModelCoverageViewDoD (pass): query.py attestation-coverage lists status=accepted decisions missing a passing acceptance event; demonstrated 66/66 covered, 0 missing; declared as attestationCoverageVP in the viewpoint-registry; usage.md row; validate_all green."; }
+        part storyAttrModelCoverageViewDoDR1 : TestResult { :>> id = "6ac6716e-9569-4a21-8e53-f3a015892e5f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "853901b"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification attrModelCoverageViewRefineGate : Test {
@@ -54,6 +55,7 @@ package ProjectDeliveryS36 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "query.py: compute_attestation_coverage() + 'attestation-coverage' dispatch (kernel-free). Ran: {total_accepted:66, covered:66, missing:[]} — full coverage demonstrated (the acceptance migration is complete). attestationCoverageVP declared in viewpoint-registry; usage.md row + decision-row updated for the acceptance event. validate_instances green. attrModelCoverageView backlog DoD recorded pass.";
     }
+    part attrModelCoverageViewImplementGateR1 : TestResult { :>> id = "4b375037-c7c5-429d-8e53-f3a0049d0eef"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "853901b"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelCoverageViewReviewGate : Test {
         :>> id = "67940516-2c7d-4e8f-b036-516273849506";
@@ -63,6 +65,7 @@ package ProjectDeliveryS36 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: the view is a pure computed read (§3d, no mutation); declared as a Viewpoint (D0056/D0057 — adding a view = declaring a viewpoint); extensible (more attestation rules can be added). Phase-3 scan: this view is exactly what attrModelGuard (next) will enforce at commit — view computes, guard blocks.";
     }
+    part attrModelCoverageViewReviewGateR1 : TestResult { :>> id = "5204f9da-8a4b-4c6d-8e53-f3a008d8716b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "853901b"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelCoverageViewCloseOutGate : Test {
         :>> id = "67940516-2c7d-4e8f-b036-516273849507";
@@ -72,6 +75,7 @@ package ProjectDeliveryS36 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + attrModelCoverageView DoD recorded pass; validate_all green. No human gate (D0051: a computed view, self-evidencing — it ran and reported 0 missing).";
     }
+    part attrModelCoverageViewCloseOutGateR1 : TestResult { :>> id = "35c00175-0302-418d-8e53-f3a00ce0fd0f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "853901b"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification attrModelCoverageViewRetroGate : Test {
         :>> id = "67940516-2c7d-4e8f-b036-516273849508";
@@ -81,4 +85,5 @@ package ProjectDeliveryS36 {
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) -- avoidable-issue scan. No avoidable issue. Process improvement: attestation coverage is now a computed, declared view (not vigilance) and confirms the acceptance migration is 100% complete. Only one attestation rule today (decision acceptance); the function is structured to add more (e.g. sprint-gate coverage) without new dispatch. Estimate 2 pts held.";
     }
+    part attrModelCoverageViewRetroGateR1 : TestResult { :>> id = "ca4a128e-1fa3-4c85-8e53-f3a0118dcb7b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "853901b"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
