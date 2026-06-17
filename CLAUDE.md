@@ -208,6 +208,14 @@ The six workflows (see the spec for detail):
   permanent automated guard (validator / pre-commit check / lint) — never patched silently.
   Trivial one-off edits (typos, wording) are exempt; the test is *"could this class recur?"*
   Manual vigilance is not a control (the Sprint 14 → 16 repeat proved it).
+- **Authoring friction is the #1 risk (D0054).** The benchmark research found the dominant
+  MBSE failure mode is not bad architecture but *adoption friction* — JPL's Europa Clipper
+  partially reverted requirements/architecture to spreadsheets because authoring cost more
+  than they were worth. Our architecture matches flagship practice (JPL OpenMBEE/openCAESAR,
+  NASA NPR 7123.1, DoD ASoT), so we inherit the same risk. **The write path must stay lower-
+  friction than a spreadsheet** — prefer the Rust no-kernel authority + `append-result`/`add-task`
+  write API over hand-editing; if recording a fact is harder than a spreadsheet edit, fix that
+  first (issue015). Friction is a first-class quality, not an afterthought.
 - **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while
   implementing *accepted* work needs no separate permission. But green-lighting an
   *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE

@@ -149,4 +149,35 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "reviewInvocationGuard";
     }
+
+    // ---- 2026-06-16 process-model benchmark findings (D0054) ----
+    part issue015 : Issue {
+        :>> id = "3e4f5061-7283-4940-467f-1324a5b6c7e6";
+        :>> title = "Adoption friction is the dominant MBSE failure mode (JPL Europa Clipper reverted) — the write path must beat a spreadsheet, and we don't measure friction";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "Benchmark research (D0054) surfaced the #1 sourced risk: JPL's 'Is MBSE Helping?' / Europa Clipper retrospective found teams partially ABANDONED MBSE for requirements/architecture and reverted to traditional tools — not because the architecture was wrong, but because authoring + framework upkeep cost more than a spreadsheet. Our engine has the same architecture, so it has the same risk. We mitigate via the Rust no-kernel authority + append-result write API, but we do NOT measure or guard authoring friction (e.g. steps/time to record a TestResult or Decision vs a spreadsheet edit). Preventing change: treat write-path friction as a first-class, monitored quality; keep the write API lower-friction than a spreadsheet; consider a friction metric in the GQM set (architectural-critique skill).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "writeApi";
+    }
+
+    part issue016 : Issue {
+        :>> id = "3e4f5061-7283-4940-477f-1324a5b6c7e7";
+        :>> title = "Decision records capture the verdict but not structured alternatives/criteria (ISO 42010 / NPR 7123.1 Decision Analysis)";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "ISO/IEC/IEEE 42010 makes architecture Decisions AND Rationale first-class and recommends recording the alternatives NOT chosen + the criteria; NASA NPR 7123.1 names Decision Analysis as one of the 17 technical processes. Our Decision items carry context/decisionText/consequences (good) but no STRUCTURED options-considered / selection-criteria / rejected-with-reason (ADR pattern). Preventing change (decisionAnalysis task): add an optional structured 'alternatives' + 'criteria' convention/fields to Decision authoring so trade rationale is captured, not just the outcome. Lightweight (convention first; schema later only if needed).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "decisionAnalysis";
+    }
+
+    part issue017 : Issue {
+        :>> id = "3e4f5061-7283-4940-487f-1324a5b6c7e8";
+        :>> title = "Cross-cutting concerns (status, suspicion) are computed externally; SysML v2 metadata is the idiomatic carrier — fold into the trackedMetadata migration";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> description = "Benchmark + SysML v2 research: metadata is the standard mechanism for cross-cutting concerns (status, suspicion, security) across metatypes (confirmed in D0053). We compute suspicion/status externally (orient) rather than as attachable typed metadata. This is the same @Tracked-metadata direction already deferred in D0053 — so it folds into trackedMetadataReplan rather than being a separate effort. Preventing change: when scoping trackedMetadataReplan, include cross-cutting status/suspicion metadata, not just id/title/createdAt/authoredBy.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "trackedMetadataReplan";
+    }
 }
