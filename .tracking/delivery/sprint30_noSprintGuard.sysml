@@ -24,6 +24,7 @@ package ProjectDeliveryS30 {
     action def DeliveryRunS30 {
         action storyNoSprintGuard;
         verification storyNoSprintGuardDoD : Test { :>> id = "63940516-2c7d-4e8f-b030-516273849502"; :>> method = VerificationMethod::test; :>> procedureText = "noSprintGuardDoD (pass): validate_sprint_coverage.py flags a done backlog task not referenced by any delivery file; pure-Python kernel-free; --selftest passes (covered-passes + orphan-flagged); 4 pre-D0064 tasks grandfathered; wired into pre-commit on .tracking/(backlog|delivery) changes; CLAUDE.md §5 updated; 0 violations at HEAD."; }
+        part storyNoSprintGuardDoDR1 : TestResult { :>> id = "8d7db48d-30e5-43aa-b948-2451603dc0ba"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification noSprintGuardRefineGate : Test {
@@ -54,6 +55,7 @@ package ProjectDeliveryS30 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "validate_sprint_coverage.py built (kernel-free); --selftest PASS (fakeCovered passes, fakeOrphan flagged); live run flags 4 pre-D0064 tasks -> grandfathered (ceremonyGateGuard, rustS8runtimeParser, rustS9writeApi, trackedMetadataReplan); 0 violations at HEAD; wired into .githooks/pre-commit on .tracking/(backlog|delivery); CLAUDE.md §5 lists it. noSprintGuard backlog DoD recorded pass.";
     }
+    part noSprintGuardImplementGateR1 : TestResult { :>> id = "ae5fd741-d9b7-4b5e-b948-245150286f86"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification noSprintGuardReviewGate : Test {
         :>> id = "63940516-2c7d-4e8f-b030-516273849506";
@@ -63,6 +65,7 @@ package ProjectDeliveryS30 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: guard mirrors validate_ceremony shape (GRANDFATHERED + scan + exit code); substring coverage is lenient (avoids false-positive commit blocks); grandfather set documented as pre-D0064. Phase-3 scan: the guard demonstrably catches issue020's class (attrModelSchema would flag before sprint28 existed).";
     }
+    part noSprintGuardReviewGateR1 : TestResult { :>> id = "bf11f812-39dd-434e-b948-2451543af6a2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification noSprintGuardCloseOutGate : Test {
         :>> id = "63940516-2c7d-4e8f-b030-516273849507";
@@ -72,6 +75,7 @@ package ProjectDeliveryS30 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + noSprintGuard DoD recorded pass; validate_all green; the guard itself runs clean in pre-commit. No human gate (D0051: a tested guard, self-evidencing).";
     }
+    part noSprintGuardCloseOutGateR1 : TestResult { :>> id = "a4b37473-97fa-4506-b948-24515847164a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification noSprintGuardRetroGate : Test {
         :>> id = "63940516-2c7d-4e8f-b030-516273849508";
@@ -81,4 +85,5 @@ package ProjectDeliveryS30 {
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) — avoidable-issue scan. No new avoidable issue this sprint. Process improvement delivered: issue020's enforcement gap is now closed by an automated guard (D0047 satisfied — the correction became a permanent control, not vigilance). Note: the guard's name-substring coverage is approximate; a precise sprint->task edge will come with processGovernanceLineage. Estimate 2 pts held.";
     }
+    part noSprintGuardRetroGateR1 : TestResult { :>> id = "2338c03a-b032-4aba-b948-24515c8dad22"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0b6d416"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
