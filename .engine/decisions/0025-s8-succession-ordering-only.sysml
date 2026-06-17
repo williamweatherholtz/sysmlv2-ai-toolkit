@@ -1,5 +1,7 @@
 package Decision0025 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0025 : Decision {
         :>> id = "f3a4b5c6-d7e8-4f9a-ab1c-4d5e6f7a8b9c";
@@ -10,4 +12,7 @@ package Decision0025 {
         :>> rationale = "The AST-based indexer replacing orient.rs's text-scan must preserve the #OrderingOnly marker, which the text-scan splits into a separate ordering_only set to suppress false-suspect propagation; without the field, parity breaks on the schemaAudit -> testModel edge in backlog.sysml. This is an additive change (new bool field, default false) — no existing semantics change. Accepted under standing sprint instruction (wweatherholtz, 2026-06-15).";
         :>> consequences = "Succession struct gains one bool field. All AST-based orient (lib.rs + indexer.rs) correctly distinguishes ordering-only edges. The schemaAudit -> testModel edge is correctly handled. Parity with orient.rs text-scan is achievable.";
     }
+
+    verification d0025Accept : Test { :>> id = "c982c64f-9dd6-4bea-914e-18b5b7b6c814"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0025 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0025AcceptR1 : TestResult { :>> id = "c6599b41-3eec-4ed6-bb90-0bf59d3a83e8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -1,5 +1,7 @@
 package Decision0001 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0001 : Decision {
         :>> id = "219fca70-508f-482a-9f65-71f8bf8c2070";
@@ -17,4 +19,7 @@ package Decision0001 {
             + "PRs); text round-trip without destroying formatting becomes "
             + "the writer's hardest problem.";
     }
+
+    verification d0001Accept : Test { :>> id = "f2c9ceaa-8477-4a9b-a4cd-e94292ace36d"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0001 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0001AcceptR1 : TestResult { :>> id = "f461ad93-25e7-42fc-865f-917b03520bdd"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

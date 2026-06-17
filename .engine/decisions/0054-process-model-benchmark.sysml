@@ -6,7 +6,9 @@
 // named gaps routed to issues015-017. Accepted 2026-06-16 by wweatherholtz (research).
 // =====================================================================
 package Decision0054 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0054 : Decision {
         :>> id = "3e4f5061-7283-4940-376f-1324a5b6c7e5";
@@ -19,4 +21,7 @@ package Decision0054 {
         :>> rationale = "Core invariants map to flagship practice: (1) 'text is truth; documents/matrices/baselines are COMPUTED views' = OpenMBEE DocGen + openCAESAR + NASA RVTM + DoD ASoT; (2) atomic items + typed edges = MagicGrid cells/links + OOSEM allocation; (3) gate = entrance(DoR)+success(DoD/verify-Tests)+recorded Decision = NPR 7123.1 KDP with entrance/success criteria + signed decision memo; (4) Decisions with who/when/commit provenance = JPL digital signoff + ISO 42010 rationale entities; (5) frozen schema + automated validators = IMCE ontology + reasoning. The friction risk is sourced (JPL 'Is MBSE Helping?' / Europa Clipper, which partially reverted requirements/architecture to traditional tools because authoring + framework upkeep cost more than a spreadsheet). Sources: OpenMBEE/MDK DocGen docs; openCAESAR MODELS'23; JPL 'Is MBSE Helping?' (NTRS/IEEE); NASA NPR 7123.1D; NASA SP-2016-6105 Rev2; DoD Digital Engineering Strategy 2018 / DE Fundamentals 2022; INCOSE MBSE methodologies survey; ISO/IEC/IEEE 42010; OMG SysML v2/KerML 2025.";
         :>> consequences = "Confidence that the architecture is sound and converges with flagship practice. Adoption-friction becomes an explicit first-class risk in CLAUDE.md (authoring must beat a spreadsheet). issue015 (friction), issue016 (decision analysis / ISO 42010), issue017 (metadata cross-cutting) tracked; decisionAnalysis added to the backlog. The three deliverable-domain patterns are recorded as evaluated-not-needed-yet (revisit at first real-system dogfood). Sources: OpenMBEE/MDK DocGen docs; openCAESAR MODELS'23; JPL 'Is MBSE Helping?' (NTRS/IEEE); NASA NPR 7123.1D; NASA SP-2016-6105 Rev2; DoD Digital Engineering Strategy 2018 / DE Fundamentals 2022; INCOSE MBSE methodologies survey; ISO/IEC/IEEE 42010; OMG SysML v2/KerML 2025.";
     }
+
+    verification d0054Accept : Test { :>> id = "71533241-5804-4c7f-92b2-c48beca526a9"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0054 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0054AcceptR1 : TestResult { :>> id = "e8366c46-1257-4f19-915d-1d5dd27f5965"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -12,7 +12,9 @@
 // 85 decisionText occurrences at once; pre-commit validate_instances would block it).
 // =====================================================================
 package Decision0063 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0063 : Decision {
         :>> id = "63940516-2c7d-4e8f-b93a-627384950662";
@@ -25,4 +27,7 @@ package Decision0063 {
         :>> rationale = "ALTERNATIVES: (A) atomic big-bang — do the rename + migrate all 389+85 occurrences + 6 tools + per-decision split in one commit — rejected: large, higher-risk, tree uncommittable mid-migration. (B EXPAND/MIGRATE/CONTRACT, CHOSEN): incremental, each step green and reviewable, decisionText split done lazily per decision. CRITERIA: each-commit-green x risk x reviewability x friction (D0054).";
         :>> consequences = "schema/core/element.sysml + work.sysml expanded (createdBy on Element + 3 Tracked* bases; decision + rationale on Decision; all [0..1]; old fields marked DEPRECATED in comments). Backlog: attrModelSchemaDoD re-scoped to the additive expand; new action attrModelContract + DoD added, ordered AFTER attrModelInstances + attrModelTooling. Authoring convention unchanged for now (keep authoredBy + decisionText; the Decision Analysis ALTERNATIVES/CRITERIA tail still lives in decisionText until the split). sysmlv2-syntax-notes.md Decision-fields note updated to the in-flight state. schema/core stays frozen-governed: this Decision is the recorded sign-off for the change (D0002). No instance or tool changed in this step — those are the migrate step, separately committed and green.";
     }
+
+    verification d0063Accept : Test { :>> id = "8199b966-580d-4613-9ae3-c91c0d492ff0"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0063 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0063AcceptR1 : TestResult { :>> id = "08714ea3-3d90-45da-a7d9-5f725adb28bf"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

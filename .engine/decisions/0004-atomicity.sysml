@@ -1,5 +1,7 @@
 package Decision0004 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0004 : Decision {
         :>> id = "0f794d10-85e6-40de-bd0c-a09b0546deda";
@@ -14,4 +16,7 @@ package Decision0004 {
             + "clean queries, no eroding checklists. Cons: more elements and "
             + "edges to author (offset by AI doing the mechanical linking).";
     }
+
+    verification d0004Accept : Test { :>> id = "93d42adb-1cb4-4280-b7b6-fd274dd5e785"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0004 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0004AcceptR1 : TestResult { :>> id = "a54b07eb-5cdd-4f39-8405-67dd58701aff"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

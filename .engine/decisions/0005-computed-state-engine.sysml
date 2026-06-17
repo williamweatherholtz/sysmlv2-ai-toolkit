@@ -1,5 +1,7 @@
 package Decision0005 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0005 : Decision {
         :>> id = "d48e2ef4-af60-454b-ac16-765e2486ddb6";
@@ -14,4 +16,7 @@ package Decision0005 {
             + "Cons: indexer needs git-ancestry + semantic-hash logic; coverage "
             + "states (covered/suspect/failing/uncovered) must be implemented.";
     }
+
+    verification d0005Accept : Test { :>> id = "7cdc0b08-f5fe-4ee0-b8e6-5175ae190186"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0005 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0005AcceptR1 : TestResult { :>> id = "29d0246c-a3ad-49c5-9935-7cb920677b73"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

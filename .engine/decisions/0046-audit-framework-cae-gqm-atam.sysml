@@ -5,7 +5,9 @@
 // Accepted 2026-06-16 by wweatherholtz (AskUserQuestion disposition).
 // =====================================================================
 package Decision0046 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0046 : Decision {
         :>> id = "c5e8a1f2-3b4d-4e6a-9c7f-8d0b1a2c3e4f";
@@ -18,4 +20,7 @@ package Decision0046 {
         :>> rationale = "The engine ALREADY IS a CAE machine (Requirement=claim, satisfy/verify edges=argument, TestResult=evidence), so auditing it with CAE dogfoods its own model. ASPICE/ISO-15504 maturity levels REJECTED as doc-theater that measures conformance to a generic model rather than computed evidence. W1 repairs sysmlv2 validate/orient parity with the Python authority + adds a parity gate + makes the no-kernel Rust path the default (kills the JVM-leak at root); W2 creates+registers an architectural-critique skill operationalizing CAE+GQM+ATAM and records findings as tracked Issues/Decisions; W3 adds build/compile + test/verify skills alongside repo-push; W4 extends suspicion so Rust source changes invalidate the parity TestResults.";
         :>> consequences = "Critique process gains a CAE+GQM+ATAM structure and a registered skill; findings become tracked model facts, not prose. The no-kernel Rust path becomes the default once W1 lands, retiring the JVM-leak (CLAUDE.md S5 to be updated in W1). Suspicion extends to the deliverable source tree (W4). Four new backlog work items added under NextWork with DoDs + successions. Each workstream still validates green + commits CR: + (for sprints) closes via confirmation gate. This Decision is the human acceptance for the DIRECTION; per-workstream review/closeout sign-offs are recorded separately.";
     }
+
+    verification d0046Accept : Test { :>> id = "62929618-c87e-4879-9ac6-60775b538e99"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0046 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0046AcceptR1 : TestResult { :>> id = "0366db5d-c6d2-4738-8072-17479d506a39"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

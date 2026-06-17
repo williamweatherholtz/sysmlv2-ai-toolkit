@@ -9,7 +9,9 @@
 // reframe the work then kick off").
 // =====================================================================
 package Decision0061 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0061 : Decision {
         :>> id = "61728394-0a5b-4c6d-e719-405162738440";
@@ -22,4 +24,7 @@ package Decision0061 {
         :>> rationale = "ALTERNATIVES on the naming: (A) keep only `context` — rejected: it conflates the situation with the justification and undersells the 'why'; (C) rename context->rationale (drop a separate context) — rejected: context and rationale are genuinely DIFFERENT (situation vs justification), so collapsing loses the forces/systems setup; (B) CHOSEN: keep BOTH as separate fields — `context` sets up the basis (what forces/systems are present), `rationale` gives the justification on that basis. CRITERIA: correctness (context != rationale) x standard-practice (Nygard Context + ISO 42010 Rationale) x clarity. (User: 'keep context and rationale — context for setting up the basis of rationale: what forces, systems, etc. are present.')";
         :>> consequences = "attributionModel (D0060) DECOMPOSED into six ordered sub-tasks (backlog NextWork), each with its own DoD: (1) attrModelSchema — authoredBy->createdBy on Element + the three Tracked* bases; retire decisionText (split into decision+rationale), ADD `decision` + `rationale`, KEEP `context` (distinct from rationale); keep id+title+consequences (frozen-schema, pre-authorized). (2) attrModelInstances — bulk-migrate every .engine + .tracking instance: authoredBy->createdBy; decision files KEEP context + split decisionText->decision+rationale. (3) attrModelAcceptanceEvents — Decision acceptance as a confirmation TestResult (verify edge); migrate existing 'Accepted: X' prose. (4) attrModelTooling — validate_actors (createdBy), query.py (read_issues/read_viewpoints), Rust parser/indexer + validate where the renamed fields appear, report.py; re-verify the deliverable (source drift). (5) attrModelCoverageView — process-required-attestation coverage view (items missing a required attestation), pairing with formalViewpoints. (6) attrModelGuard — guard that Decision acceptance is a TestResult, never prose (D0047). Order: schema -> {instances, tooling} -> acceptance-events -> {coverage, guard}. Supersedes the old `trackedMetadata` collapse (removed from backlog); resolves `trackedMetadataReplan` (do-vs-drop decided = do the attribution-events migration). Pre-authorized breaking change; kicked off in a fresh context. This Decision is authored in the current schema; it becomes the first thing the migration restructures.";
     }
+
+    verification d0061Accept : Test { :>> id = "63f18f60-c8e2-4448-8d30-af5df5637953"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0061 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0061AcceptR1 : TestResult { :>> id = "87a64460-0ac0-4793-a34e-b23dc7f81f72"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

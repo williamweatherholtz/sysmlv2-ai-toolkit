@@ -1,5 +1,7 @@
 package Decision0034 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0034 : Decision {
         :>> id = "be499efc-3a4b-4c5d-def6-7a8b9c0d1e2f";
@@ -10,4 +12,7 @@ package Decision0034 {
         :>> rationale = "An auditor can reconstruct the governing workflow at any point by checking out the `judgedAgainst` commit, so a separate version field is redundant. ALTERNATIVES considered: (1) a `workflowVersion` field per CR; (3) a permanently frozen CR workflow changeable only out-of-band. This is consistent with D0013 (git is the temporal model). Accepted: wweatherholtz 2026-06-16.";
         :>> consequences = "No schema change. CRs from before a workflow revision remain valid under the workflow version they were processed under — recoverable from git. Engineers following the CR process should note the workflow version (commit) in their `decisionText` when the workflow itself is under change. EngineWork::Decision schema unchanged.";
     }
+
+    verification d0034Accept : Test { :>> id = "16aec618-a6b1-4dad-bff4-cdfc12051ad2"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0034 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0034AcceptR1 : TestResult { :>> id = "b1db7527-5c7b-4e6e-9e4a-a098ab987216"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

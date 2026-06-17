@@ -5,7 +5,9 @@
 // run as a means of deployment ... use skills to cement processes").
 // =====================================================================
 package Decision0059 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0059 : Decision {
         :>> id = "61728394-0a5b-4c6d-c619-40516273841b";
@@ -18,4 +20,7 @@ package Decision0059 {
         :>> rationale = "ALTERNATIVES: (A) a pre-commit GUARD that fails when a change 'should' touch docs but didn't — rejected: 'should touch docs' is not mechanically decidable (which doc? what claim?), so the guard would be either toothless or noisy; (B) keep relying on the CLAUDE.md §4 rule + human vigilance — rejected: that is exactly the failure mode being fixed (drift was a HIGH finding, and it recurred); (C) CHOSEN: a deploying skill per process — the AI runs the process consistently, and process<->skill coverage is auditable as a view. CRITERIA: consistency (skills > prose rules for recurring work) x enforceability (a skill is invoked + auditable) x mechanizability (don't build guards for the non-mechanizable) x friction (D0054).";
         :>> consequences = "doc-sync skill registered + referenced in CLAUDE.md §4. The process<->skill mapping becomes a coverage concern (which processes lack a deploying skill -> orphan). Future processes ship with their deploying skill in the same change. Reduces the human-must-drive-doc-updates friction the principle was created to fix. Reaffirms D0040.";
     }
+
+    verification d0059Accept : Test { :>> id = "b4a1e25f-5800-47ba-aeea-e42f15efe244"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0059 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0059AcceptR1 : TestResult { :>> id = "7a97b218-da6d-46c5-85ed-63f9f1c18cbe"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

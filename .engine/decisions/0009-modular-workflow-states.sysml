@@ -1,5 +1,7 @@
 package Decision0009 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0009 : Decision {
         :>> id = "9e678ed3-de32-4af2-9cfb-a4c3d25e3e16";
@@ -13,4 +15,7 @@ package Decision0009 {
             + "engine changes. Cons: state validity must be checked against the "
             + "WorkflowDefinition by the validator.";
     }
+
+    verification d0009Accept : Test { :>> id = "00feedda-1bc9-4652-be44-fb3b19e3b970"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0009 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0009AcceptR1 : TestResult { :>> id = "135a038b-ae62-4b68-81ff-f002efae2125"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

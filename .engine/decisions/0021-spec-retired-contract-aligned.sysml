@@ -1,5 +1,7 @@
 package Decision0021 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0021 : Decision {
         :>> id = "e2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f60";
@@ -10,4 +12,7 @@ package Decision0021 {
         :>> rationale = "The backlog DoD required formal retirement of the historical spec to design-history, and the computed-state contract still carried a stale `currentState` reference (deleted in CR-7) despite a STALE REFERENCE banner. Applied as part of Sprint 5 review phase; both items complete with no doc contradicting the model and no stale references remaining. Accepted: wweatherholtz standing instruction (fix internal processes in each sprint review), 2026-06-15.";
         :>> consequences = "No doc contradicts decisions 0001-0018. The computed-state contract is self-consistent: implemented views labelled implemented, unimplemented views labelled queued, no stale concepts. CLAUDE.md points to the right location for the retired spec.";
     }
+
+    verification d0021Accept : Test { :>> id = "311d8117-f254-4602-a6da-f8c770a59875"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0021 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0021AcceptR1 : TestResult { :>> id = "87c5b7ab-709a-40ad-9b3e-485065c99bb9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

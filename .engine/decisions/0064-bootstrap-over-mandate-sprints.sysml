@@ -9,7 +9,9 @@
 // but also update claude.md to prevent process subversion").
 // =====================================================================
 package Decision0064 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0064 : Decision {
         :>> id = "63940516-2c7d-4e8f-b064-516273849564";
@@ -22,4 +24,7 @@ package Decision0064 {
         :>> rationale = "The §3e exemption existed only because the engine could not yet track its own construction; now it can, so keeping the exemption just invites the subversion issue020 demonstrated. Sprinting substantive work gives every change the gated, reviewable, ceremony-wrapped trail the engine exists to provide. ALTERNATIVES: (A) keep §3e (status quo) — rejected: its premise (no runtime) is now false and it directly caused issue020. (B) retire §3e AND unfreeze the meta-process — rejected: the meta-process freeze is a separate concern; descope it, leave it frozen. (C CHOSEN) retire the sprint-exemption + 'until runtime exists' framings + make triage-first mandatory, keeping the durable §4 rules and the meta-freeze. CRITERIA: premise-validity x prevents-recurrence (issue020) x scope-discipline.";
         :>> consequences = "Resolves bootstrapExitEval. CLAUDE.md edited: header BOOTSTRAP status updated; §3 triage-first made mandatory + flag-non-mapping; §3e block retired; §4 'until runtime exists' framings updated; durable rules kept. ENFORCEMENT is owed and queued as sprint30 (issue020): (1) a no-sprint guard (flag substantive .tracking/schema commits not covered by a sprint, D0047); (2) the per-interaction triage skill (engine-triage upgrade); (3) a UserPromptSubmit hook that fires triage every turn. Until the guard exists, the no-sprint rule binds by the now-mandatory triage discipline. doc-sync ran on this change.";
     }
+
+    verification d0064Accept : Test { :>> id = "e6c1b390-bddb-4c13-b3b5-fc7ed0201f1e"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0064 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0064AcceptR1 : TestResult { :>> id = "492b6881-1a7d-4613-9cb9-ca1bfacab801"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

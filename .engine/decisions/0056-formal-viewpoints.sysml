@@ -6,7 +6,9 @@
 // Recorded 2026-06-16 by wweatherholtz (research/critique; "dig in, don't placate").
 // =====================================================================
 package Decision0056 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0056 : Decision {
         :>> id = "50617283-3940-4a51-876f-1324a5b6c7ea";
@@ -19,4 +21,7 @@ package Decision0056 {
         :>> rationale = "By the frameworks' own discriminator our case CLEARS the bar — the engine is REUSABLE across downstream projects, has AUDITABLE/regulated concerns (safety/STPA, verification coverage), and serves MULTIPLE AUDIENCES (maintainer, safety, PM, downstream adopter); so formal viewpoints are justified here, unlike a one-off model. NON-ADOPTIONS (honest pushback): (1) NOT Capella/Kitalpha — heavy metamodel-extension tooling with documented adoption friction (Obeo survey); friction is our #1 risk (D0054), so viewpoints must be text-light + computed, not a framework. (2) NOT Arcadia's literal OA/SA/LA/PA layers — those model a DELIVERABLE system's architecture; our system-of-interest is the work/process (D0055), so the need-vs-solution CONCEPT transfers (Business=need, Architecture=solution, satisfy edges) but the four specific layers do not. (3) 42010 correspondence-rules/model-kinds are OPTIONAL — adopt the viewpoint-declaration core; add correspondence rules only where audit demands. GAPS (filed issue018): views are code not modeled (orphan-concern risk); no cross-cutting safety/perf/security viewpoints as declared lenses; the view def anchors are disconnected stubs. EXECUTION: formalViewpoints is a frozen-schema change (new Viewpoint/View schema + report.py/orient as declaration-driven renderers) -> needs explicit human sign-off per §2.5 (like trackedMetadata) before build; surfaced, not auto-run.";
         :>> consequences = "Direction accepted; the schema change is gated on a §2.5 sign-off (formalViewpoints backlog item carries a sign-off DoD, surfaced not auto-run per D0052). When built: views become declared, auditable, extensible-by-declaration; concern-coverage becomes a computable view itself (which concerns lack a viewpoint). Keep it lightweight to honor D0054 (friction). Reaffirms D0055 (engine is systems modeling of the work/process). Sources: ISO 42010 conceptual model; Arcadia (Voirin/ISTE, mbse-capella); Kitalpha; SysML v2 view/viewpoint/expose/render; Obeo Capella adoption survey 2022.";
     }
+
+    verification d0056Accept : Test { :>> id = "44115fd2-3323-4593-a33c-1f7039a65c57"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0056 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0056AcceptR1 : TestResult { :>> id = "62c574ac-de7e-461e-9786-495effedfda4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

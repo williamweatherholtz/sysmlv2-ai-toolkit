@@ -1,5 +1,7 @@
 package Decision0024 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0024 : Decision {
         :>> id = "e2f3a4b5-c6d7-4e8f-9a1c-3d4e5f6a7b8c";
@@ -10,4 +12,7 @@ package Decision0024 {
         :>> rationale = "Three docs were stale after Sprint 7: syntax-notes still named orient_root (renamed to orient::compute in Sprint 6) and omitted the legacy R-suffix fallback added in Sprint 7, and both usage.md and CLAUDE.md listed only sysmlv2 orient without the new whats-next subcommand. Future authors need to know DoDR is canonical for new work while legacy {task}R{n} files are tolerated. Accepted: wweatherholtz standing instruction (continue through sprints), 2026-06-15.";
         :>> consequences = "Documentation now accurately reflects the Sprint 7 dual-naming done-detection and the whats-next subcommand. Future authors know to use {task}DoDR{n} for new work and that legacy {task}R{n} files are tolerated. orient::compute is the correct function name reference.";
     }
+
+    verification d0024Accept : Test { :>> id = "0a8da029-a0ac-455c-bb21-63fbc2c15b24"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0024 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0024AcceptR1 : TestResult { :>> id = "0be4514a-13f3-4354-9a39-f480cfb8cdd3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

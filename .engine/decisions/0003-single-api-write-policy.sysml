@@ -1,5 +1,7 @@
 package Decision0003 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0003 : Decision {
         :>> id = "13e4fd55-8929-4e78-9942-44d9d8473085";
@@ -14,4 +16,7 @@ package Decision0003 {
             + "one API must serve UI ergonomics and machine use (GraphQL eases "
             + "this).";
     }
+
+    verification d0003Accept : Test { :>> id = "2d5ce709-1369-4308-93c2-2a8bf69e06c2"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0003 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0003AcceptR1 : TestResult { :>> id = "32883715-4194-4caa-9c0d-70745b821254"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

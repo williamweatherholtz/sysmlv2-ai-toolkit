@@ -135,18 +135,15 @@ Current stack (Rust parser + pilot 0.59.0 + query.py) is stable. Re-evaluate whe
 
 Decision files are standalone SysML v2 packages. Common mistakes caught by the lint check in `validate_instances.py`:
 
-- **Import `EngineWork::*`, not `EngineElement::*`.** `Decision` is defined in `EngineWork`. Using `EngineElement::*` alone gives "Couldn't resolve reference to Type 'Decision'". `validate_instances.py` now lint-checks this before starting the kernel.
-- **Fields**: `id`, `title`, `createdAt`, `authoredBy`/`createdBy` (inherited from `Element`) + `status : DecisionStatus`, `context : String`, `decision : String[0..1]`, `rationale : String[0..1]`, `decisionText : String`, `consequences : String`. **Migration in flight (D0063 expand→migrate→contract):** `createdBy`, `decision`, `rationale` were ADDED (additive, `[0..1]`); `authoredBy` and `decisionText` are DEPRECATED and will be dropped at the contract step (`attrModelContract`). Until then keep authoring `authoredBy` + `decisionText` (the tools still read them; `attrModelInstances`/`attrModelTooling` migrate existing instances + readers). There is still no `acceptedBy`, `acceptedAt`, or `acceptedAtCommit` field (acceptance becomes a confirmation TestResult — `attrModelAcceptanceEvents`).
-- **Template**: always copy an existing file (e.g. `0042-baseline-view.sysml`) — do not author from scratch.
-- **Decision Analysis convention (D0058 / issue016; ISO 42010 / NPR 7123.1 / ADR).** When a
-  Decision chose between real options, capture the *trade*, not just the verdict — include,
-  inside `decisionText`, a structured tail:
+- **Imports**: `EngineWork::*` (for `Decision`), `EngineElement::*` (for `VerificationMethod`/`VerdictKind`), and `EngineVerification::*` (for the acceptance event's `Test`/`TestResult`). `Decision` lives in `EngineWork`, so that import is required; `validate_instances.py` lint-checks it.
+- **Fields**: `id`, `title`, `createdAt`, `createdBy` (inherited from `Element`) + `status : DecisionStatus`, `context : String` (the forces/situation), `decision : String` (the choice), `rationale : String` (why — incl. alternatives + criteria), `consequences : String`. Acceptance is NOT a field — it is a confirmation event (below).
+- **Template**: always copy a recent file (e.g. `0065-attribution-contract.sysml`) — do not author from scratch.
+- **Acceptance is a confirmation event (D0066), not a field.** A new accepted Decision `dNNNN` carries `verification dNNNNAccept : Test { :>> method = VerificationMethod::confirmation; ... }` (verifies `dNNNN` by naming) + `part dNNNNAcceptR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedBy = <accepting human>; :>> judgedAt; :>> judgedAgainst; }`. `status = accepted` is the structured fact; the event carries who/when/commit. Tooling reads acceptance from the event.
+- **Decision Analysis convention (D0058; ISO 42010 / NPR 7123.1 / ADR).** When a Decision chose
+  between real options, capture the *trade* in `rationale`:
   `ALTERNATIVES: (A) <opt> — rejected: <why>; (B) <opt> — rejected: <why>; (C) <chosen>.
-  CRITERIA: <the axes the choice was made on>.` This is a CONVENTION (no schema field — keeps
-  `schema/core` frozen and authoring friction low, D0054); the alternatives/criteria live in
-  the existing `decisionText` String. Skip it for record-only or no-alternative decisions
-  (the test: *was a real option rejected?*). Captures rationale that would otherwise be lost
-  — the ISO 42010 "record the alternatives not chosen" recommendation.
+  CRITERIA: <the axes the choice was made on>.` Skip for record-only / no-alternative decisions
+  (test: *was a real option rejected?*). Records the alternatives-not-chosen (ISO 42010).
 
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 

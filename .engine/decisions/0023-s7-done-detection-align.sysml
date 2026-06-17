@@ -1,5 +1,7 @@
 package Decision0023 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0023 : Decision {
         :>> id = "d1e2f3a4-b5c6-4d7e-8f90-9a0b1c2d3e4f";
@@ -10,4 +12,7 @@ package Decision0023 {
         :>> rationale = "Two bugs made S0-S6 sprints appear not-done: lib.rs only matched the DoDR prefix and query.py's regex keyed DoDRn results under '<task>DoD'; plus no whats-next subcommand existed to emit the plain-text ready list (orient outputs JSON). Because this alters what tasks count as 'done' in both computed views, it is a computed-view semantics change (§3e → CHANGE §3a). The {task}DoDR{n} convention remains canonical for new work; legacy {task}R{n} is tolerated without migration. Accepted: wweatherholtz standing instruction (continue through sprints), 2026-06-15.";
         :>> consequences = "sysmlv2 orient and sysmlv2 whats-next correctly report all S0-S6 sprints as done and S7 as ready. query.py orient also shows correct done state for all sprints. The {task}DoDR{n} naming convention remains canonical for new work; legacy {task}R{n} naming in existing files is tolerated without migration. orient.feature has 6 BDD scenarios, cli.feature has 6 BDD scenarios, all green.";
     }
+
+    verification d0023Accept : Test { :>> id = "e6343ac6-d925-405d-8c0a-6aff0bb8f282"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0023 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0023AcceptR1 : TestResult { :>> id = "ba5dab64-0ad3-42dd-87a8-76c5daae52c3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -1,6 +1,7 @@
 package Decision0018 {
     private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0018 : Decision {
         :>> id = "7c4a1e9d-8b2f-4e6a-9d3c-5f1e2a7b8c9d";
@@ -18,4 +19,7 @@ package Decision0018 {
             + "reading prose; cost: orient requires the kernel toolchain until runtimeParser "
             + "lands (mitigated: the backlog text itself is human-readable).";
     }
+
+    verification d0018Accept : Test { :>> id = "f00d2120-6c5b-459c-9a70-da9d9a93ee41"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0018 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0018AcceptR1 : TestResult { :>> id = "fb662570-0c57-4cd1-9e8a-5d7b0ead18d5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -1,5 +1,7 @@
 package Decision0026 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0026 : Decision {
         :>> id = "be4f5a6b-c7d8-4e9f-a0b1-c2d3e4f5a6b7";
@@ -10,4 +12,7 @@ package Decision0026 {
         :>> rationale = "Sprint 8 confirmed the #Marker succession prefix works in both action def bodies and at package level but it was undocumented, and the 'How to validate' section still pointed at validate_sysml.py (retired 2026-06-11) instead of the four layer validators. No schema or process semantics change. Accepted under standing sprint review instruction (wweatherholtz, 2026-06-15).";
         :>> consequences = "Syntax-notes correctly documents the #OrderingOnly succession prefix. Validate section no longer points to retired tooling. No schema or process semantics change.";
     }
+
+    verification d0026Accept : Test { :>> id = "738577e3-1996-4207-8c39-ef0c7d9c8cd4"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0026 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0026AcceptR1 : TestResult { :>> id = "afce16e4-92f5-4a3b-94cc-8f6276c92fc3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

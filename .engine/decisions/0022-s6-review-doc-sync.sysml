@@ -1,5 +1,7 @@
 package Decision0022 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0022 : Decision {
         :>> id = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4b";
@@ -10,4 +12,7 @@ package Decision0022 {
         :>> rationale = "The Rust-native orient command was undocumented, TestResult naming in usage.md was ambiguous, and the correct VerdictKind::pass enum had no documented convention — an agent artifact had used the wrong TestOutcome::pass, caught only at test-write time, so a documented convention prevents recurrence. sysmlv2-syntax-notes.md is the source of ground truth for authoring .sysml. Accepted: wweatherholtz standing instruction (fix internal processes in each sprint review), 2026-06-15.";
         :>> consequences = "Any future agent authoring TestResults has the correct VerdictKind::pass enum and DoDR<n> naming documented in sysmlv2-syntax-notes.md — the source of ground truth for authoring .sysml. orient_root done-detection and usage.md conventions are now consistent. CLAUDE.md mentions both orient paths so agents can use the Rust binary without the Jupyter kernel.";
     }
+
+    verification d0022Accept : Test { :>> id = "cfcffca5-826b-4e68-90ec-1e5e918add5b"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0022 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0022AcceptR1 : TestResult { :>> id = "8c889021-2189-407c-a494-51a15b2f803f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

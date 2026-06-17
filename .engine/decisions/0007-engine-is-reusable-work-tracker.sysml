@@ -1,5 +1,7 @@
 package Decision0007 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0007 : Decision {
         :>> id = "67a098fc-9431-4a12-b2fd-98b80b6d9cda";
@@ -14,4 +16,7 @@ package Decision0007 {
             + "stays live via suspicion. Cons: requires discipline to keep "
             + "deliverable vocabulary out of the engine.";
     }
+
+    verification d0007Accept : Test { :>> id = "41f185d3-ea4b-4921-993c-9ab84f206484"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0007 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0007AcceptR1 : TestResult { :>> id = "1cb91a3d-7395-4202-8d9f-0dff4dfc3b6d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

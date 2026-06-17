@@ -1,5 +1,7 @@
 package Decision0036 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0036 : Decision {
         :>> id = "da6b1bae-5c6d-4e7f-fab8-9c0d1e2f3a4b";
@@ -10,4 +12,7 @@ package Decision0036 {
         :>> rationale = "No new `Baseline`/`Signoff`/curated-view schema type is needed: a Decision IS a recorded attestation, and a Release anchor plus a need-source filter suffices for safety cases. ALTERNATIVES considered: (1) a new Baseline/Signoff schema type; (3) a metadata-annotated view definition. Accepted: wweatherholtz 2026-06-16.";
         :>> consequences = "EngineWork schema unchanged. The `baselineView` implementation task (which computes a baseline from a Release) remains on the ready frontier. Future `query.py baseline <release-id>` subcommand will read the Release membershipRule + git SHA and render the view. Safety case views are filtered query outputs, not authored items.";
     }
+
+    verification d0036Accept : Test { :>> id = "76669edb-53e5-447b-8916-3c88d70b0668"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0036 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0036AcceptR1 : TestResult { :>> id = "eca11f82-436c-475c-9177-84e49859705c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

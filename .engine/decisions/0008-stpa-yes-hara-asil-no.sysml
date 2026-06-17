@@ -1,5 +1,7 @@
 package Decision0008 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0008 : Decision {
         :>> id = "0b7a7f53-e22f-43ed-846b-fba8b1802a8a";
@@ -15,4 +17,7 @@ package Decision0008 {
             + "optional module if a standard requires it (architecture supports "
             + "it at zero core cost).";
     }
+
+    verification d0008Accept : Test { :>> id = "964df1ba-f52d-4990-8303-36ffa23e841a"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0008 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0008AcceptR1 : TestResult { :>> id = "daffeacd-1600-41fe-a3e7-b4080f6d3ec6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

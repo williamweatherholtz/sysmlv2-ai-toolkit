@@ -5,7 +5,9 @@
 // Accepted 2026-06-16 by wweatherholtz (W4 accepted in D0046; "yes proceed").
 // =====================================================================
 package Decision0050 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0050 : Decision {
         :>> id = "12d3e4f5-0617-4238-376f-1324a5b6c7e0";
@@ -18,4 +20,7 @@ package Decision0050 {
         :>> rationale = "Until now the suspicion model watched material change to .sysml authored facts over satisfy/:> edges, but nothing invalidated a TestResult when the Rust SOURCE it verifies changed (issue006) — the rustS8/S9 'parity verified' results stayed green while the binary regressed (issue005), a real traceability hole between the engine model and the deliverable code. With Rust promoted to authority (D0048), guarding the deliverable's verification is now obligatory. Demonstrated live: the Sprint 17 parser/orient changes post-date the rustS1..S9 judgedAgainst commits, so those tasks now surface as suspect.";
         :>> consequences = "orient.suspect now reflects deliverable drift, not just .sysml drift — code changes can no longer leave 'verified' green silently (issue006 closed). The manifest is the explicit, auditable list of deliverable verification tasks + paths (kept in sync as the deliverable grows). The mechanism is git-based and kernel-free (consistent with D0048). query.py (secondary) is not updated for this — the Rust authority carries it. Re-verification discipline: when the deliverable source changes, re-run cargo test + parity_check and append fresh TestResults to clear suspicion.";
     }
+
+    verification d0050Accept : Test { :>> id = "b9d3a60b-981d-4d9c-a8f9-fc09891b109f"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0050 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0050AcceptR1 : TestResult { :>> id = "05e4b8ee-874e-486b-87e2-eb1ed65ee073"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

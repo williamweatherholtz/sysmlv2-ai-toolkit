@@ -1,5 +1,7 @@
 package Decision0010 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0010 : Decision {
         :>> id = "95a5f2f6-9489-4d7d-8597-1c24500e0ef8";
@@ -15,4 +17,7 @@ package Decision0010 {
             + "direction; self-improving workflow. Cons: ceremony cost — "
             + "accepted as less than the cost of drift/indecision.";
     }
+
+    verification d0010Accept : Test { :>> id = "bb45abad-d920-4944-80d7-03f84be9f89b"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0010 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0010AcceptR1 : TestResult { :>> id = "62d4eaaf-81a3-424b-86a6-40d589bb870b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

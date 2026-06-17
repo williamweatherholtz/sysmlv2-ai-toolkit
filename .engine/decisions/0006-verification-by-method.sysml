@@ -1,5 +1,7 @@
 package Decision0006 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0006 : Decision {
         :>> id = "9a61a74f-745b-4a0a-959d-af8003d87812";
@@ -14,4 +16,7 @@ package Decision0006 {
             + "derives from method. Cons: V&V distinction is a query, not a "
             + "stored label (acceptable).";
     }
+
+    verification d0006Accept : Test { :>> id = "4fb36f3c-af32-4fa8-bfe9-b9df0a5ef867"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0006 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0006AcceptR1 : TestResult { :>> id = "3529a70d-0e09-48ee-863a-2e59a5545263"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

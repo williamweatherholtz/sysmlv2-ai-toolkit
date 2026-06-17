@@ -6,7 +6,9 @@
 // logged as a bug and the processes should be improved permanently").
 // =====================================================================
 package Decision0047 {
+    private import EngineElement::*;
     private import EngineWork::*;
+    private import EngineVerification::*;
 
     part d0047 : Decision {
         :>> id = "d0ebfc01-2d3e-4f40-156f-91021324a5b6";
@@ -19,4 +21,7 @@ package Decision0047 {
         :>> rationale = "We had VIEWS that surface ceremony subversion (orient pending, Sprint-15 traceability orange highlight) but no GUARD that prevents it at author/commit time, and the same failure mode recurred (Sprint 14 retro to Sprint 16) — manual vigilance is not a control. validate_ceremony.py is pure-Python (no kernel), wired into the pre-commit hook on .tracking/delivery/ changes, hard-fails (exit 1) on new violations, with historical anomalies grandfathered as WARN (sprint11_nativeSpikes), mirroring validate_actors LEGACY_ACTORS. Logged as issue010, addressed by backlog item ceremonyGateGuard.";
         :>> consequences = "A skipped or out-of-order ceremony gate now aborts the commit instead of relying on someone running orient. Future corrections follow the rule: Issue + guard. validate_ceremony.py joins the validator suite; the recurring-task-skill rule (D0040) and the retro dispatch (sprint-retro) gain a sibling discipline for defects. New delivery sprints must record gates in canonical order (Refine->Standup->Implement->Review->CloseOut->Retro); a legitimate in-progress prefix is allowed, a gap is not.";
     }
+
+    verification d0047Accept : Test { :>> id = "be4120b2-3bc0-4741-8806-36805c0f3b2c"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0047 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
+    part d0047AcceptR1 : TestResult { :>> id = "1d72e790-2253-4e93-8439-f1564b096ae3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }
