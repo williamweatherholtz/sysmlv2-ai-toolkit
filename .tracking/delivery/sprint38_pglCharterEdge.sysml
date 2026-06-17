@@ -28,6 +28,7 @@ package ProjectDeliveryS38 {
     action def DeliveryRunS38 {
         action storyPglCharterEdge;
         verification storyPglCharterEdgeDoD : Test { :>> id = "63940516-2c7d-4e8f-b038-516273849502"; :>> method = VerificationMethod::test; :>> procedureText = "pglCharterEdgeDoD (pass): metadata def CharteredBy added to relationships.sysml; >=1 #CharteredBy link demonstrated (sprint29 story -> d0064; sprint38 -> d0068); query.py charter <item> traverses work->charter; validate_schema 14/14 + validate . + check green."; }
+        part storyPglCharterEdgeDoDR1 : TestResult { :>> id = "3aa73650-e022-4768-9d71-9abb307681fc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d639fc"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification pglCharterEdgeRefineGate : Test {
@@ -58,6 +59,7 @@ package ProjectDeliveryS38 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "metadata def CharteredBy added (relationships.sysml) — validate_schema 14/14. Demonstrated: #CharteredBy dependency sprint29 story -> d0064 (+ sprint38 -> d0068 dogfood); sysmlv2 validate . 46 clean + check clean. query.py charter <item> traverses (processRigorHardeningStory -> d0064). doc-sync: usage.md row + edge cheatsheet. pglCharterEdge backlog DoD recorded pass. Resolves the core of issue002.";
     }
+    part pglCharterEdgeImplementGateR1 : TestResult { :>> id = "09625841-f05a-4bfc-9d71-9abb0b1e7a04"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d639fc"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification pglCharterEdgeReviewGate : Test {
         :>> id = "63940516-2c7d-4e8f-b038-516273849506";
@@ -67,6 +69,7 @@ package ProjectDeliveryS38 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: the edge uses the confirmed `#Marker dependency` idiom (kernel-validated, not invented syntax); from/to are name refs (like satisfy/relatedTask), traversed by query.py without kernel cross-resolution. Phase-3 scan: this is the authored IDENTITY half of D0068; the computed governing-VERSION (charter-time-freeze as-of resolution) is pglProcessRef + pglViews (Inc 2/3), correctly deferred.";
     }
+    part pglCharterEdgeReviewGateR1 : TestResult { :>> id = "3df200f2-9372-486c-9d71-9abb1411f71c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d639fc"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification pglCharterEdgeCloseOutGate : Test {
         :>> id = "63940516-2c7d-4e8f-b038-516273849507";
@@ -76,6 +79,7 @@ package ProjectDeliveryS38 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + pglCharterEdge DoD recorded pass; validate_all green. No human gate (D0051: a tested schema edge + reader, self-evidencing; pre-authorized by D0068).";
     }
+    part pglCharterEdgeCloseOutGateR1 : TestResult { :>> id = "a4b37473-97fa-4430-9d71-9abb1ce48bfc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d639fc"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification pglCharterEdgeRetroGate : Test {
         :>> id = "63940516-2c7d-4e8f-b038-516273849508";
@@ -85,4 +89,5 @@ package ProjectDeliveryS38 {
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) -- avoidable-issue scan. No avoidable issue. WELL: per the migration/care discipline, investigated the edge-authoring mechanism BEFORE the frozen-schema edit (confirmed #Marker-dependency is the validated idiom) — no fatigue-error. issue002's core (work->process linkage) is resolved by the charter edge. Next: pglProcessRef (governing-version + retroactivity class), pglViews. Estimate 3 pts held.";
     }
+    part pglCharterEdgeRetroGateR1 : TestResult { :>> id = "25ceb27a-4dc0-4ec8-9d71-9abb26ee2e8c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6d639fc"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
