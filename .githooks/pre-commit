@@ -46,6 +46,14 @@ if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
         echo "pre-commit: CEREMONY ORDERING FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
+# No-sprint guard (pure-Python, no kernel) — D0064 / issue020. Fails if a done backlog
+# task is not covered by a sprint (substantive work committed without a sprint wrapper).
+if echo "$all_staged" | grep -qE '^\.tracking/(backlog\.sysml|delivery/)'; then
+    echo "pre-commit: validate_sprint_coverage.py"
+    python "$V/validate_sprint_coverage.py" || {
+        echo "pre-commit: SPRINT COVERAGE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     echo "pre-commit: cargo clippy"

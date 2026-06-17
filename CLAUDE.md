@@ -256,6 +256,7 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
 python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering (no kernel; D0047)
+python .engine\tools\validate\validate_sprint_coverage.py                                        # done work is covered by a sprint (no kernel; D0064/issue020)
 python .engine\tools\validate\parity_check.py                                                    # rust orient == query.py orient cross-check (D0048)
 ```
 
