@@ -14,7 +14,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849501";
         :>> title = "Sprint 30: noSprintGuard (2 pts) — guard that done backlog work is covered by a sprint (D0064/issue020)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -31,7 +31,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849503";
         :>> title = "Sprint 30 refine gate (DoR)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "DoR: scope = the no-sprint guard owed by issue020/D0047 (sprint29 retro). Approach: a done backlog task (passing DoD) must be covered by a sprint (name appears in a delivery file); pre-D0064 historical tasks grandfathered; pure-Python kernel-free (D0048); pre-commit wired. No blocking dependency. DoD = guard + selftest + grandfather + pre-commit + doc-sync + 0 violations at HEAD. estimatedPoints=2. DoD accepted.";
     }
@@ -41,7 +41,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849504";
         :>> title = "Sprint 30 standup gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. Approach: validate_sprint_coverage.py parses backlog done-tasks (<task>DoDR<n> pass) + greps delivery files for coverage; GRANDFATHERED set for pre-D0064 work; --selftest for positive+negative; wire into .githooks/pre-commit next to validate_ceremony. No blockers.";
     }
@@ -51,7 +51,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849505";
         :>> title = "Sprint 30 implement gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "validate_sprint_coverage.py built (kernel-free); --selftest PASS (fakeCovered passes, fakeOrphan flagged); live run flags 4 pre-D0064 tasks -> grandfathered (ceremonyGateGuard, rustS8runtimeParser, rustS9writeApi, trackedMetadataReplan); 0 violations at HEAD; wired into .githooks/pre-commit on .tracking/(backlog|delivery); CLAUDE.md §5 lists it. noSprintGuard backlog DoD recorded pass.";
     }
@@ -61,7 +61,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849506";
         :>> title = "Sprint 30 review gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: guard mirrors validate_ceremony shape (GRANDFATHERED + scan + exit code); substring coverage is lenient (avoids false-positive commit blocks); grandfather set documented as pre-D0064. Phase-3 scan: the guard demonstrably catches issue020's class (attrModelSchema would flag before sprint28 existed).";
     }
@@ -71,7 +71,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849507";
         :>> title = "Sprint 30 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + noSprintGuard DoD recorded pass; validate_all green; the guard itself runs clean in pre-commit. No human gate (D0051: a tested guard, self-evidencing).";
     }
@@ -81,7 +81,7 @@ package ProjectDeliveryS30 {
         :>> id = "63940516-2c7d-4e8f-b030-516273849508";
         :>> title = "Sprint 30 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) — avoidable-issue scan. No new avoidable issue this sprint. Process improvement delivered: issue020's enforcement gap is now closed by an automated guard (D0047 satisfied — the correction became a permanent control, not vigilance). Note: the guard's name-substring coverage is approximate; a precise sprint->task edge will come with processGovernanceLineage. Estimate 2 pts held.";
     }

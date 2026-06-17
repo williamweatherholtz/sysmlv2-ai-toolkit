@@ -17,7 +17,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849501";
         :>> title = "Sprint 29: process-rigor hardening pt1 — retire §3e bootstrap exemption + mandate sprints + triage-first (D0064); resolves bootstrapExitEval";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::modeling;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -34,7 +34,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849503";
         :>> title = "Sprint 29 refine gate (DoR)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "DoR: scope = retire the §3e bootstrap sprint-exemption + CLAUDE.md hardening (delivers bootstrapExitEval). Trigger: issue020 (work committed with no sprint) + the §3e-vs-practice contradiction; bootstrap is over (write API + validators + computed orient exist). Split decided: governance here (3 pts); enforcement (no-sprint guard + triage skill + UserPromptSubmit hook) -> sprint30 (8-pt cap). No blocking dependency. DoD = D0064 + CLAUDE.md + doc-sync + validate green. estimatedPoints=3. DoD accepted.";
     }
@@ -44,7 +44,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849504";
         :>> title = "Sprint 29 standup gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Refine passed. Approach: (1) D0064 Decision (retire §3e exemption + 'until runtime exists' framings; mandate sprints for substantive work; keep durable §4 rules: validate-green, CR: commits, doc-sync, D0047, main-only; meta-process freeze out of scope); (2) CLAUDE.md edits — header BOOTSTRAP status, §3 mandatory triage-first + flag-non-mapping, §3e block, §4 framings; (3) doc-sync. No blockers.";
     }
@@ -54,7 +54,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849505";
         :>> title = "Sprint 29 implement gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "D0064 recorded; CLAUDE.md surgery applied (header status; §3 mandatory triage-first + flag-non-mapping; §3e retired; §4 'until runtime exists' framings updated); doc-sync; bootstrapExitEvalDoD recorded pass; validate_instances green. Enforcement queued (sprint30 tasks added).";
     }
@@ -64,7 +64,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849506";
         :>> title = "Sprint 29 review gate";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: D0064 uses alternatives/criteria convention; CLAUDE.md changes retire exemption without dropping durable rules; no broken internal refs. Phase-3 scan: enforcement deferral is explicit (sprint30/issue020), not dropped.";
     }
@@ -74,7 +74,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849507";
         :>> title = "Sprint 29 closeOut gate (autonomous, D0049)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + bootstrapExitEval DoD recorded pass; validate_all green. No human gate (D0051: a recorded Decision + doc edits; the direction was accepted inline this sitting).";
     }
@@ -84,7 +84,7 @@ package ProjectDeliveryS29 {
         :>> id = "63940516-2c7d-4e8f-a029-516273849508";
         :>> title = "Sprint 29 retro gate (autonomous, D0049)";
         :>> createdAt = "2026-06-17";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
         :>> procedureText = "Autonomous retro (D0049) — avoidable-issue scan. No NEW avoidable issue arose this sprint (the prior one, issue020, is what this sprint addresses). Process improvement delivered: D0064 removes the §3e-vs-practice contradiction that was issue020's root cause. ENFORCEMENT still owed (D0047): the no-sprint guard + per-interaction triage skill + UserPromptSubmit hook are queued as sprint30 (noSprintGuard, triageRouterSkill); until the guard exists the no-sprint rule binds by the now-mandatory triage discipline. WELL: the governance/enforcement split kept this sprint clean. Estimate 3 pts held.";
     }

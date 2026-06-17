@@ -17,7 +17,7 @@ package ProjectDelivery {
         :>> id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
         :>> title = "foldWhatsNext: merge whats_next.py into query.py workflows subcommand";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -42,7 +42,7 @@ package ProjectDelivery {
         :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f";
         :>> title = "refine phase gate (DoR)";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Story title clear; DoD criterion exists with method; no unmet dependencies; code I/O defined; DoR passes.";
     }
@@ -52,7 +52,7 @@ package ProjectDelivery {
         :>> id = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b";
         :>> title = "standup phase gate";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Story in-progress; implementation approach stated; no new blockers discovered at standup.";
     }
@@ -62,7 +62,7 @@ package ProjectDelivery {
         :>> id = "07b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d";
         :>> title = "implement phase gate";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::test;
         :>> procedureText = "query.py workflows outputs valid JSON for all six workflows; whats_next.py deleted; validate_all green; query.py orient still works.";
     }
@@ -72,7 +72,7 @@ package ProjectDelivery {
         :>> id = "18c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e";
         :>> title = "review phase gate";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation diff reviewed; no regressions in orient/whats-next/suspect subcommands; code is clean.";
     }
@@ -82,7 +82,7 @@ package ProjectDelivery {
         :>> id = "29d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f";
         :>> title = "closeOut phase gate";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "foldWhatsNextR1 recorded in backlog (pass); storyFoldWhatsNextR1 recorded in DeliveryRun (pass); query.py orient shows foldWhatsNext as done; user accepts.";
     }

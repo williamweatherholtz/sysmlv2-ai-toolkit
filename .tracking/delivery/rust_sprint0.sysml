@@ -15,7 +15,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "a1b2c3d4-1111-4e5f-a6b7-c8d9e0f1a2b3";
         :>> title = "Sprint 0: Cargo workspace + deny(warnings/clippy) + BDD harness";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -38,7 +38,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "d4e5f6a7-4444-4b8c-d9e0-f1a2b3c4d5e6";
         :>> title = "Sprint 0 refine gate (DoR)";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Workspace layout agreed (sysmlv2-parser lib + sysmlv2-cli bin); deny attributes decided; BDD framework (cucumber-rs) selected; no blocking dependencies.";
     }
@@ -48,7 +48,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "f6a7b8c9-6666-4d0e-f1a2-b3c4d5e6f7a8";
         :>> title = "Sprint 0 standup gate";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation approach stated: workspace at repo root, two crates, deny macros in lib.rs and main.rs, hook updated; no new blockers.";
     }
@@ -58,7 +58,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "b8c9d0e1-8888-4f2a-b3c4-d5e6f7a8b9c0";
         :>> title = "Sprint 0 implement gate";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::test;
         :>> procedureText = "Cargo.toml workspace exists; both crates compile; cargo clippy --workspace --all-targets -D warnings passes; cargo test --workspace passes; pre-commit hook updated.";
     }
@@ -68,7 +68,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "c9d0e1f2-9999-4a3b-c4d5-e6f7a8b9c0d1";
         :>> title = "Sprint 0 review gate";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: workspace layout correct; deny attributes present in both crates; hook addition is surgical (no regressions to SysML path); Cargo.lock committed.";
     }
@@ -78,7 +78,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "d0e1f2a3-aaaa-4b4c-d5e6-f7a8b9c0d1e2";
         :>> title = "Sprint 0 closeOut gate";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "rustS0WorkspaceR1 recorded (pass); storyRustS0WorkspaceR1 recorded (pass); rustS0WorkspaceDoRR1 recorded in backlog (pass); validate_all green; user accepts Sprint 0 complete.";
     }
@@ -88,7 +88,7 @@ package ProjectDeliveryRustS0 {
         :>> id = "e1f2a3b4-bbbb-4c5d-e6f7-a8b9c0d1e2f3";
         :>> title = "Sprint 0 retro gate";
         :>> createdAt = "2026-06-12";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 0 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }

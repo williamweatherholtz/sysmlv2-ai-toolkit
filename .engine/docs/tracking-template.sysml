@@ -23,7 +23,7 @@ package TrackingTemplate {
         :>> id = "3f1c9a2e-0000-4000-8000-000000000001";
         :>> title = "Example project brief";
         :>> createdAt = "2026-06-11";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> problem = "What hurts today.";
         :>> opportunity = "Why solving it is worth it.";
     }
@@ -44,8 +44,9 @@ package TrackingTemplate {
         :>> id = "3f1c9a2e-0000-4000-8000-000000000003";
         :>> title = "Example: we will not pursue X";
         :>> status = DecisionStatus::accepted;
-        :>> context = "Why the question arose.";
-        :>> decisionText = "What was decided.";
+        :>> context = "The forces/situation that set up the question.";
+        :>> decision = "What was decided (the choice).";
+        :>> rationale = "Why this choice; alternatives considered + criteria.";
         :>> consequences = "What follows.";
     }
 
@@ -54,7 +55,7 @@ package TrackingTemplate {
         :>> id = "3f1c9a2e-0000-4000-8000-00000000000a";
         :>> title = "Example: some known gap or bug";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> description = "Description of the gap. What is wrong, where it occurs, what impact it has.";
         :>> discoveredInField = false;
         :>> relatedTask = "backlogTaskName";

@@ -16,7 +16,7 @@ package ProjectDeliveryS16 {
         :>> id = "2e1f4b07-68ba-4f5d-aceb-1d3e5f7a9b0c";
         :>> title = "Sprint 16: deliverySkills (3 pts) — build + test/verify skills; reconcile repo-push to main-only";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::modeling;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeOpus";
@@ -39,7 +39,7 @@ package ProjectDeliveryS16 {
         :>> id = "4a3b6d29-8adc-4b7f-ce0d-3f5a7b9c1d2e";
         :>> title = "Sprint 16 refine gate (DoR)";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach agreed: create two AI skills under .engine/skills/ — (1) build (cargo build --release + run validators / sysmlv2 self-check; report compile + validation status) and (2) test-verify (cargo test + clippy -D warnings + BDD + Python<->Rust orient parity check). Register both in skills-registry.sysml with purpose/triggerCondition/writePolicy=readOnly. Reconcile repo-push SKILL.md to the main-only direct-commit policy (issue009): drop branch-off-main/PR mandates, reflect auto-push hook, writePolicy stays direct. doc-sync any doc claims touched. estimatedPoints=3 (medium: 2 skill docs + 1 reconcile + registry edit). Unblocked (ready in orient, parallel with rustToolchainFix). DoD accepted.";
     }
@@ -49,7 +49,7 @@ package ProjectDeliveryS16 {
         :>> id = "6c5d8f41-acfe-4d91-e02f-5b7c9d1e3f40";
         :>> title = "Sprint 16 standup gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Sprint 16 refine gate passed (14b7050). deliverySkills: 2 new skills (build, test-verify) + repo-push reconcile + registry edits. No blockers; parallel with rustToolchainFix.";
     }
@@ -59,7 +59,7 @@ package ProjectDeliveryS16 {
         :>> id = "7d6e9052-bd0f-4ea2-f130-6c8d0e2f4051";
         :>> title = "Sprint 16 implement gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "build/SKILL.md + test-verify/SKILL.md authored; repo-push/SKILL.md reconciled to main-only; skills-registry.sysml registers both new skills; validate_instances green (registry parses); storyDeliverySkillsDoR/deliverySkillsDoD recorded.";
     }
@@ -69,7 +69,7 @@ package ProjectDeliveryS16 {
         :>> id = "8e7f0163-ce10-4fb3-0241-7d9e1f305162";
         :>> title = "Sprint 16 review gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: skills follow the established SKILL.md shape (frontmatter + vocabulary + behavioral instructions + anti-patterns); registry entries correct; repo-push no longer contradicts main-only; doc-sync complete; no regressions.";
     }
@@ -79,7 +79,7 @@ package ProjectDeliveryS16 {
         :>> id = "9f801274-df21-40c4-1352-8e0f20416273";
         :>> title = "Sprint 16 closeOut gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyDeliverySkillsDoD recorded (pass); deliverySkillsDoD in backlog (pass); validate_all green; user accepts Sprint 16 complete.";
     }
@@ -89,7 +89,7 @@ package ProjectDeliveryS16 {
         :>> id = "a0912385-e032-41d5-2463-9f1031527384";
         :>> title = "Sprint 16 retro gate";
         :>> createdAt = "2026-06-16";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 16 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }

@@ -11,12 +11,6 @@ package Decision0002 {
             + "projects.";
         :>> decision = "The engine schema lives in a .engine/ dotfolder as infrastructure (like .git); schema/core is always imported and is frozen (changes require a Decision); schema/safety (STPA) is an OPTIONAL package import that non-safety projects omit; new types or modules are gated by a Decision.";
         :>> rationale = "If contributors model 'task' three ways the typed-graph value evaporates (convention drift), so core must be frozen; but the engine must stay reusable and not force safety vocabulary on non-safety projects, so safety is an optional import and growth is gated rather than freeform.";
-        :>> decisionText = "The engine schema lives in a .engine/ dotfolder as "
-            + "infrastructure (like .git). schema/core is always imported and "
-            + "is frozen — changes require a Decision. schema/safety (STPA) is "
-            + "an OPTIONAL import, via plain SysMLv2 package import; non-safety "
-            + "projects simply omit it. New types or modules are gated by a "
-            + "Decision.";
         :>> consequences = "Pros: integrity preserved at every level; unbounded "
             + "growth without core churn; clean top-level. Cons: friction to "
             + "add a concept (must go through a Decision) — intentional.";

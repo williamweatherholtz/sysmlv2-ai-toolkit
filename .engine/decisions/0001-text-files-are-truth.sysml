@@ -11,11 +11,6 @@ package Decision0001 {
             + "(satisfaction, coverage, suspicion).";
         :>> decision = "Authored facts (elements, edges, logged TestResults) live ONLY in text; the index (Kuzu) is rebuilt from text and is disposable; computed values are VIEWS, recomputed on demand and NEVER stored as attributes in any .sysml file.";
         :>> rationale = "Two homes for one fact creates the 'racing the API' failure mode; a pure function of truth is not itself truth, so storing computed values would duplicate truth — text stays canonical and the index stays rebuildable/disposable.";
-        :>> decisionText = "Authored facts (elements, edges, logged TestResults) "
-            + "live ONLY in text. The index (Kuzu) is rebuilt from text and "
-            + "is disposable. Computed values are VIEWS, recomputed on demand, "
-            + "and NEVER stored as attributes in any .sysml file. A pure "
-            + "function of truth is not itself truth.";
         :>> consequences = "Pros: git-native review, no sync tax, clean diffs, "
             + "rebuildable index. Cons: raw-file readers see evidence not "
             + "verdicts (mitigated by a CI bot commenting computed deltas on "

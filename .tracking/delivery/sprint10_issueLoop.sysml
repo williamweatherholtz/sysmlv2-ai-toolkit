@@ -17,7 +17,7 @@ package ProjectDeliveryS10 {
         :>> id = "1a2b3c4d-e5f6-4a7b-bc8c-9d0e1f2a3b4c";
         :>> title = "Sprint 10: issueLoop — .tracking/issues.sysml + query.py issues subcommand";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> kind = WorkKind::code;
         :>> priority = WorkPriority::p1;
         :>> owner = "claudeSonnet46";
@@ -40,7 +40,7 @@ package ProjectDeliveryS10 {
         :>> id = "4d5e6f7a-b8c9-4d0e-ef1f-2a3b4c5d6e7f";
         :>> title = "Sprint 10 refine gate (DoR)";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Approach agreed: add relatedTask : String[0..1] to Issue (D0029); multi-line Issue instances in .tracking/issues.sysml; query.py issues subcommand using _ISSUE_BLOCK regex (multiline match on part...Issue{...}); read_issues() extracts name/title/description/discoveredInField/relatedTask; demo: query.py issues shows issue001 linked to authoredByRefs; DoD accepted.";
     }
@@ -51,7 +51,7 @@ package ProjectDeliveryS10 {
         :>> id = "5e6f7a8b-c9d0-4e1f-f020-3b4c5d6e7f8a";
         :>> title = "Sprint 10 standup gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Implementation: work.sysml Issue type has relatedTask field; .tracking/issues.sysml with issue001; query.py: _ISSUE_BLOCK + _BOOL_ASSIGN regexes added; read_issues() function; issues subcommand in main(); all validators green; no blocking issues.";
     }
@@ -62,7 +62,7 @@ package ProjectDeliveryS10 {
         :>> id = "6f7a8b9c-d0e1-4f2a-a131-4c5d6e7f8a9b";
         :>> title = "Sprint 10 implement gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::demo;
         :>> procedureText = "validate_schema green; validate_tracking green (issues.sysml parses); query.py issues outputs issue001 with all fields; relatedTask = authoredByRefs surfaced correctly.";
     }
@@ -73,7 +73,7 @@ package ProjectDeliveryS10 {
         :>> id = "7a8b9c0d-e1f2-4a3b-b242-5d6e7f8a9b0c";
         :>> title = "Sprint 10 review gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: work.sysml relatedTask field added correctly; issues.sysml parses green; query.py issues subcommand clean (no import side effects); D0029 recorded; doc-sync D0030 recorded.";
     }
@@ -84,7 +84,7 @@ package ProjectDeliveryS10 {
         :>> id = "8b9c0d1e-f2a3-4b4c-c353-6e7f8a9b0c1d";
         :>> title = "Sprint 10 closeOut gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyIssueLoopDoDR1 recorded (pass); issueLoopDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 10 complete.";
     }
@@ -94,7 +94,7 @@ package ProjectDeliveryS10 {
         :>> id = "9c0d1e2f-a3b4-4c5d-d464-7f8a9b0c1d2e";
         :>> title = "Sprint 10 retro gate";
         :>> createdAt = "2026-06-15";
-        :>> authoredBy = "wweatherholtz"; :>> createdBy = "wweatherholtz";
+        :>> createdBy = "wweatherholtz";
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 10 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }

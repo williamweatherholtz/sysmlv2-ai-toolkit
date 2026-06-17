@@ -37,8 +37,7 @@ package EngineElement {
         attribute id : Uuid;              // immutable identity
         attribute title : String;         // authored human label (may duplicate)
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;    // DEPRECATED (D0063 expand): replaced by createdBy at contract (attrModelContract)
-        attribute createdBy : String[0..1]; // canonical author/creator (D0063 expand→migrate→contract; becomes [1..1], authoredBy dropped, at contract)
+        attribute createdBy : String[0..1]; // actor id of the creator (a ProjectActors part name); [0..1] — some Element subtypes (e.g. TestResult) use judgedBy instead
     }
 
     // Native metaclasses (requirement / use case / verification def) CANNOT
@@ -51,22 +50,19 @@ package EngineElement {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
-        attribute createdBy : String[0..1];  // canonical (D0063 expand)
+        attribute createdBy : String[0..1];  // actor id of the creator (a ProjectActors part name)
     }
     abstract use case def TrackedUseCase {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
-        attribute createdBy : String[0..1];  // canonical (D0063 expand)
+        attribute createdBy : String[0..1];  // actor id of the creator (a ProjectActors part name)
     }
     abstract verification def TrackedVerification {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
-        attribute createdBy : String[0..1];  // canonical (D0063 expand)
+        attribute createdBy : String[0..1];  // actor id of the creator (a ProjectActors part name)
     }
 
     // Minimal actor model — only enough to record WHO does tracked work.
