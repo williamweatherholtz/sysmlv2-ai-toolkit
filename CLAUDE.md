@@ -3,12 +3,14 @@
 This repo **is a work-tracking engine** built on SysML v2 text files. It tracks the work of
 building things — and is being built using its own discipline. Read this before doing anything.
 
-> **Status: BOOTSTRAP (late).** The schema parses green (four layer validators in
-> `.engine/tools/validate/`) and a query layer computes views (`.engine/tools/query.py` —
-> whats-next/suspect/trace). The write API, indexer, and GUI do **not exist yet**: direct text
-> editing is still the write path, and the discipline below is enforced by *you and convention*
-> plus the validators. Where a rule says the engine "computes" or "drives," the query layer does
-> some of it; the rest you do by hand, by the rules here.
+> **Status: sprint discipline in force (D0064).** The tracking engine exists and is the
+> authority (D0048): the Rust toolchain computes views (`sysmlv2 orient`/`whats-next`/`suspect`)
+> and the write API records facts (`append-result`/`add-task`/`append-gate-result`); four layer
+> validators gate every change. (The indexer and GUI don't exist yet; neither is needed for the
+> discipline.) **All substantive work — CHANGE, delivery, and engine work — goes through a sprint**
+> (refine→standup→implement→review→closeOut→retro); only trivial one-off edits are exempt, and
+> triage-first is mandatory (§3). Full per-interaction enforcement (the no-sprint guard + a triage
+> hook) is sprint30 (issue020); until then some rules bind by you + convention + the validators.
 
 ---
 
@@ -84,13 +86,13 @@ request
   ├─ produces the active phase's typed artifact (tracked work) ..... EXECUTE   → §3b
   ├─ records ONE atomic fact (decision / test result / issue) ...... RECORD    → §3c
   ├─ asks for a computed answer (status, trace, stale set, a doc) .. VIEW      → §3d
-  ├─ builds or fixes the engine's OWN runtime / tooling ........... BOOTSTRAP → §3e
   └─ asks where things stand / what is next ..................... ORIENT    → §3f
 ```
 
-If a request spans categories, **split it** and route each part. If you can't tell
-EXECUTE from BOOTSTRAP, ask: *am I building the engine (which tracks the work) or the
-deliverable (what the work produces)?* — engine ⇒ BOOTSTRAP, deliverable ⇒ EXECUTE.
+If a request spans categories, **split it** and route each part, and flag anything that
+doesn't cleanly map (§3). Engine work (building the engine's own runtime/tooling) is routed
+by *what it changes* (schema/process ⇒ CHANGE §3a; otherwise ⇒ EXECUTE §3b) and goes through
+a sprint; only trivial one-off edits skip a sprint.
 When unsure of the category, say so and ask rather than defaulting to EXECUTE.
 
 **Recurring-or-one-time check (D0040 — mandatory before EXECUTE or VIEW).**
@@ -111,19 +113,23 @@ This rule exists because every recurring task executed without a skill leaks pro
 knowledge into conversation history, where it cannot be enforced, reviewed, or
 improved. Skills are the durable encoding of how we do things.
 
-**Classification is a visible, mandatory first move.** Open every substantive response by
-naming the category and route — e.g. *"RECORD → §3c"* — *before* acting. Never
-infer-and-act silently: a silent mis-route is exactly how an action slips past the
-discipline (e.g. recording a confirmation that was never explicitly given). The
-`engine-triage` skill encodes this checklist; invoke it at the start of a request when in
-doubt.
+**Triage is a MANDATORY first move on EVERY request (D0064).** Open every substantive response
+by running the triage: break the request down, name the category + route for *each* part —
+e.g. *"RECORD → §3c"* — *before* acting, and explicitly **flag anything that does not cleanly
+map** to a process rather than force-fitting it. Never infer-and-act silently: a silent mis-route
+is exactly how an action slips past the discipline (e.g. recording a confirmation that was never
+given, or doing delivery/engine work with **no sprint** — issue020). The `engine-triage` skill
+encodes this checklist; invoke it at the start of every request. (A `UserPromptSubmit` triage
+hook that fires it every turn is sprint30.)
 
 **§3a — CHANGE.** Never freelance an edit to a workflow / phase / gate / schema. Route
 through **Change Request** (§4): state the change + rationale, research alternatives if
 non-trivial, get **explicit human acceptance**, then apply (create / `supersede` items),
 validate green (§5), record a `Decision`, and commit `CR:`. `schema/core` is frozen
-(human sign-off required); the Change Request workflow itself is frozen during bootstrap
-(out-of-band Decision only — §4).
+(human sign-off required); the Change Request workflow itself is frozen (out-of-band
+Decision only — §4). A tooling change that alters the *meaning* of a computed view
+(what counts as done / ready / suspect / satisfied) is CHANGE too — it shifts process
+behavior as surely as editing a gate.
 
 **§3b — EXECUTE.** The core loop:
 1. **Orient** — run `sysmlv2 orient [ROOT]` or `python .engine/tools/query.py orient` to
@@ -170,14 +176,6 @@ it even though it produces no action. Never a document blob.
 it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
 baseline are all views (§2.1).
 
-**§3e — BOOTSTRAP.** Building the engine's own runtime / tooling is exempt from the full
-workflow (it can't yet track its own construction). Do the work, track it in the backlog,
-and still validate green + commit `CR:` for any schema/process touch (§4, §5).
-**Exception:** a tooling change that alters the *meaning* of a computed view (what counts
-as done / ready / suspect / satisfied) changes process behavior as surely as editing a
-workflow — that is **CHANGE (§3a)**, not BOOTSTRAP: it needs human acceptance and a
-recorded `Decision`.
-
 **§3f — ORIENT.** Compute from authored facts — `query.py orient` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
 
 The six workflows (see the spec for detail):
@@ -187,7 +185,7 @@ The six workflows (see the spec for detail):
 
 ---
 
-## 4. Bootstrap rules (in force NOW, until the runtime exists)
+## 4. Working rules (sprint discipline in force, D0064)
 
 - **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `sysmlv2 append-result`
   to append a `TestResult` to an action task, `sysmlv2 append-gate-result` to append a `TestResult`
@@ -237,12 +235,8 @@ The six workflows (see the spec for detail):
   `main`; the `post-commit` hook pushes every commit. No long-lived feature branches: everything
   is pushed and merged to `main` only. (This overrides the generic "branch off the default branch
   first" default — per explicit standing instruction, 2026-06-11.)
-- **The meta-process is frozen during bootstrap:** do not use Change Request to modify the
+- **The meta-process is frozen:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
-- **Bootstrap exemption:** building the engine's own tooling is tracked **in the backlog**
-  (`.tracking/backlog.sysml`), not through the full workflow. The first *real* dogfood is a
-  downstream feature *after* the schema parses and one view computes (both true since
-  2026-06-10 — `dogfoodBusiness` is the queued next step).
 - **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
   `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
   reproduced once even after the critique). Where things stand is COMPUTED

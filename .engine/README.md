@@ -63,7 +63,8 @@ project's work uniformly.
 
 ## Status
 
-The schema and instance files parse green against the OMG pilot kernel (validated
-2026-06-10/11; see `docs/sysmlv2-syntax-notes.md` for confirmed do's/don'ts). The
-write API, indexer, and GUI do not exist yet — direct text editing is the
-sanctioned bootstrap write path (CLAUDE.md §4).
+The schema and instance files parse green against the OMG pilot kernel (see
+`docs/sysmlv2-syntax-notes.md` for confirmed do's/don'ts). The Rust toolchain (`sysmlv2`) is
+the authority for `.tracking` — `validate` / `orient` / `whats-next` / `suspect` — and the
+write API (`append-result` / `add-task` / `append-gate-result`) records facts. The indexer and
+GUI don't exist yet. Substantive work goes through a sprint (CLAUDE.md §3/§4, D0064).
