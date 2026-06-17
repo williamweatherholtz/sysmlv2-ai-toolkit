@@ -8,6 +8,8 @@ package Decision0008 {
         :>> context = "Both STPA and HARA were researched and integrated, "
             + "converging on a shared Hazard and a shared SafetyRequirement "
             + "output. The user scoped HARA (and ASIL) out.";
+        :>> decision = "Keep STPA in full (Losses, Hazards, control structure incl. Sensors/Actuators/ProcessModels, UCAs, ControllerConstraints, LossScenarios) as the optional schema/safety module; DROP HARA (operational situations, hazardous events, S/E/C, safety goals) and ASIL (no asil attribute, no rolledUpAsil view); with HARA gone, Hazard is a single unambiguous STPA concept with no STPA/HARA type split.";
+        :>> rationale = "Both STPA and HARA were researched and integrated (converging on a shared Hazard and SafetyRequirement), but the user scoped HARA and ASIL out, yielding a simpler safety model with one Hazard type; no ISO-26262 ASIL classification, which is re-addable later as its own optional module at zero core cost if a standard requires it.";
         :>> decisionText = "Keep STPA in full (Losses, Hazards, control structure "
             + "incl. Sensors/Actuators/ProcessModels, UCAs, ControllerConstraints, "
             + "LossScenarios) as the optional schema/safety module. DROP HARA "

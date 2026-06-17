@@ -9,6 +9,8 @@ package Decision0002 {
             + "value evaporates (convention drift). But the engine must also "
             + "be reusable and must not force safety vocabulary on non-safety "
             + "projects.";
+        :>> decision = "The engine schema lives in a .engine/ dotfolder as infrastructure (like .git); schema/core is always imported and is frozen (changes require a Decision); schema/safety (STPA) is an OPTIONAL package import that non-safety projects omit; new types or modules are gated by a Decision.";
+        :>> rationale = "If contributors model 'task' three ways the typed-graph value evaporates (convention drift), so core must be frozen; but the engine must stay reusable and not force safety vocabulary on non-safety projects, so safety is an optional import and growth is gated rather than freeform.";
         :>> decisionText = "The engine schema lives in a .engine/ dotfolder as "
             + "infrastructure (like .git). schema/core is always imported and "
             + "is frozen — changes require a Decision. schema/safety (STPA) is "

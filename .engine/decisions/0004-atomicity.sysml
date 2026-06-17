@@ -8,6 +8,8 @@ package Decision0004 {
         :>> context = "An early proposal nested a verification checklist inside "
             + "each Story (tagged objective/subjective). Soft criteria buried "
             + "in items erode into rubber-stamps.";
+        :>> decision = "Tests, decisions, requirements, and acceptance criteria are ATOMIC, first-class, independently queryable elements linked by typed edges — never sub-lines inside another item; a Story's acceptance criteria ARE its verify-linked Tests, and satisfaction propagates through the edge graph.";
+        :>> rationale = "An early proposal nested a verification checklist inside each Story (objective/subjective tagged), but soft criteria buried in items erode into rubber-stamps; making them atomic gives independent coverage and clean queries, and a parent is not satisfied while a downstream verifying Test is not passing.";
         :>> decisionText = "Tests, decisions, requirements, and acceptance criteria "
             + "are ATOMIC, first-class, independently queryable elements linked "
             + "by typed edges — never sub-lines inside another item. A Story's "

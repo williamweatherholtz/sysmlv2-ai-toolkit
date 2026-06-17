@@ -8,6 +8,8 @@ package Decision0005 {
         :>> context = "Satisfaction/coverage/suspicion must be computed (0001). "
             + "A naive implementation storms suspicion on cosmetic edits and "
             + "mis-orders evidence using wall-clock time.";
+        :>> decision = "Three rules govern computed state (full spec in contracts/computed-state.md): (1) happened-before is GIT ANCESTRY not wall-clock; (2) MATERIAL-CHANGE detection — only semantic-field changes bump an element's last-change commit; (3) suspicion propagates only along :>, satisfy, verify, allocate — NOT along @OrderingOnly dependencies.";
+        :>> rationale = "Satisfaction/coverage/suspicion must be computed (per 0001), but a naive implementation storms suspicion on cosmetic edits and mis-orders evidence using wall-clock time; git-ancestry ordering, material-change detection, and scoped-edge propagation give trustworthy live suspicion with no flag fatigue.";
         :>> decisionText = "Three rules (full spec in contracts/computed-state.md): "
             + "(1) happened-before is GIT ANCESTRY, not wall-clock — a pass "
             + "covers a change only if its judgedAgainst commit is a "
