@@ -67,9 +67,47 @@ fn cmd_validate(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_spec_version(args: &[String]) -> i32 {
+    use sysmlv2_parser::spec_compat as sc;
+    println!("grammar version (baked): {}", sc::SYSML_V2_GRAMMAR_VERSION);
+    println!("pinned sha:              {}", sc::SYSML_V2_GRAMMAR_SHA);
+    println!("spec url:                {}", sc::SYSML_V2_SPEC_URL);
+    if sc::is_offline() || args.iter().any(|a| a == "--no-fetch") {
+        println!("live check:              skipped (offline)");
+        return 0;
+    }
+    let fetched = std::process::Command::new("curl")
+        .args(["-sSL", sc::SYSML_V2_SPEC_URL])
+        .output();
+    let Ok(out) = fetched else {
+        println!("live check:              unavailable (curl not found)");
+        return 0;
+    };
+    if !out.status.success() || out.stdout.is_empty() {
+        println!("live check:              unavailable (no network)");
+        return 0;
+    }
+    let live = sc::sha256_hex(&out.stdout);
+    println!("live sha:                {live}");
+    let pinned = sc::SYSML_V2_GRAMMAR_SHA;
+    if pinned.bytes().all(|b| b == b'0') {
+        println!("status:                  not pinned — baked version is the reference; pin the live sha to enable drift detection");
+        0
+    } else if live == pinned {
+        println!("status:                  CURRENT");
+        0
+    } else {
+        println!("status:                  STALE — upstream changed since the pin");
+        1
+    }
+}
+
 fn cmd_check(args: &[String]) -> i32 {
+    if args.iter().any(|a| a == "--spec-version") {
+        return cmd_spec_version(args);
+    }
     if args.is_empty() {
-        eprintln!("usage: sysmlv2 check FILE [FILE...]");
+        eprintln!("usage: sysmlv2 check FILE [FILE...]  |  sysmlv2 check --spec-version [--no-fetch]");
         return 2;
     }
     let files: Vec<PathBuf> = args.iter().map(PathBuf::from).collect();
@@ -215,6 +253,7 @@ fn main() {
             eprintln!("sysmlv2 <subcommand> [args]");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
             eprintln!("  check FILE...                parse-check one or more .sysml files");
+        eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
             eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
             eprintln!("  orient [ROOT]                print orient state as JSON");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");

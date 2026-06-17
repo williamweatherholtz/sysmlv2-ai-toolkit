@@ -25,3 +25,4 @@ task: rustS9writeApi
 task: runtimeParser
 task: writeApi
 task: rustToolchainFix
+task: specVersionRuntimeCheck
