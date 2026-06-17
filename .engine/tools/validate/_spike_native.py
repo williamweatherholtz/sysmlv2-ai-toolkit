@@ -9,8 +9,11 @@ SRC = """
 package NativeSpike {
     private import ScalarValues::*;
 
-    // Per-metaclass tracked base — Element (part def) can't be shared across
-    // metaclasses, so each native metaclass gets its own abstract tracked base.
+    // Per-metaclass tracked base — a requirement/use-case/verification def CANNOT
+    // specialize part def Element (PROVEN in _spike_element_spec.py: kernel errors
+    // 'Cannot specialize structure' — Part vs RequirementCheck/Case are incompatible
+    // KerML roots). The clean cross-metatype fix is metadata (@Tracked), not a shared
+    // base; this per-metatype duplication is the anti-pattern trackedMetadata replaces.
     abstract requirement def TrackedRequirement {
         attribute createdAt : String;
         attribute authoredBy : String;
