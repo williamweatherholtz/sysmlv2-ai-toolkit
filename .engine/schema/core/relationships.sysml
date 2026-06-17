@@ -27,4 +27,9 @@ package EngineRelationships {
     metadata def DependsOn;
     metadata def Supersede;
     metadata def OrderingOnly;
+    // #CharteredBy: work item -> the originating item (Decision / Need / Requirement) that
+    // chartered it (D0068, charter-lineage governance). Authored as a marked dependency:
+    // `#CharteredBy dependency from <workItem> to <charter>;`. Carries process IDENTITY by
+    // lineage; the governing process VERSION is COMPUTED as-of the charter's creation commit.
+    metadata def CharteredBy;
 }

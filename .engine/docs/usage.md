@@ -48,6 +48,7 @@ the layer you touched.
 | Record a decision | Author a `Decision` part (copy a recent `.engine/decisions/` file) with `context`/`decision`/`rationale`/`consequences`; a NEW accepted decision also carries an acceptance event — `verification dNNNNAccept : Test {method=confirmation}` + `part dNNNNAcceptR1 : TestResult {outcome=pass; judgedBy=<human>}` (D0066). |
 | Check attestation coverage | `python .engine/tools/query.py attestation-coverage` — lists `status=accepted` decisions missing their acceptance event (the declared `attestation-coverage` viewpoint). |
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
+| Charter work to its origin | `#CharteredBy dependency from <workItem> to <decision/need/requirement>;` (import `EngineRelationships::*`) — the charter-lineage edge (D0068). Traverse: `python .engine/tools/query.py charter [<item>]`. |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)
 
@@ -59,6 +60,7 @@ the layer you touched.
 | B can't start until A | `first A then B;` in a backlog; `#OrderingOnly` marks non-semantic dependencies |
 | Function F runs on component C | `allocate f to c;` |
 | D2 replaces D1 | a `dependency` from D2 to D1 marked `#Supersede` |
+| Work W was chartered by origin O | `#CharteredBy dependency from W to O;` (D0068; carries process identity by lineage) |
 
 ## What never goes in the model
 

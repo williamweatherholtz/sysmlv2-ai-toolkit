@@ -12,6 +12,10 @@ package ProjectDeliveryS29 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;  // #CharteredBy marker
+
+    // charter lineage (D0068): this sprint's work was chartered by D0064.
+    #CharteredBy dependency from processRigorHardeningStory to d0064;
 
     part processRigorHardeningStory : Story {
         :>> id = "63940516-2c7d-4e8f-a029-516273849501";

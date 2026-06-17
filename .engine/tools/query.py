@@ -523,6 +523,21 @@ def compute_attestation_coverage():
     }
 
 
+_CHARTERED = re.compile(r'#CharteredBy\s+dependency\s+from\s+(\w+)\s+to\s+(\w+)')
+
+
+def read_charter_edges():
+    """#CharteredBy edges (D0068, pglCharterEdge) — kernel-free: a work item -> the item
+    (Decision/Need/Requirement) that chartered it, by name. The authored charter LINEAGE;
+    the governing process VERSION is computed from it as-of the charter (pglViews, Inc 3)."""
+    edges = []
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            for m in _CHARTERED.finditer(fh.read()):
+                edges.append({"work": m.group(1), "charteredBy": m.group(2)})
+    return edges
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -615,6 +630,14 @@ def main():
         return
     if sub == "attestation-coverage":
         print(json.dumps(compute_attestation_coverage(), indent=2))
+        return
+    if sub == "charter":
+        edges = read_charter_edges()
+        if arg:
+            ch = next((e["charteredBy"] for e in edges if e["work"] == arg), None)
+            print(json.dumps({"item": arg, "charteredBy": ch}, indent=2))
+        else:
+            print(json.dumps({"charter_edges": edges}, indent=2))
         return
 
     km, kc = _kernel.start()
