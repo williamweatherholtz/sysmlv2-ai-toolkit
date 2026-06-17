@@ -218,6 +218,12 @@ The six workflows (see the spec for detail):
   permanent automated guard (validator / pre-commit check / lint) — never patched silently.
   Trivial one-off edits (typos, wording) are exempt; the test is *"could this class recur?"*
   Manual vigilance is not a control (the Sprint 14 → 16 repeat proved it).
+- **Bulk migrations follow the migration process (run the `migration` skill, D0067):** any change
+  that edits the same field/shape across many instances/files (rename/split/drop/add) goes through
+  the gated expand/migrate/contract lifecycle — a committed transform script, a dry-run that
+  reconciles control totals (counts must balance), green at every step, backfill-before-tighten,
+  and historical/recorded data is **never fabricated** (grandfather or backfill-with-recorded-basis).
+  Deploys `.engine/processes/migration.sysml`.
 - **Authoring friction is the #1 risk (D0054).** The benchmark research found the dominant
   MBSE failure mode is not bad architecture but *adoption friction* — JPL's Europa Clipper
   partially reverted requirements/architecture to spreadsheets because authoring cost more

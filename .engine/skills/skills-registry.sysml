@@ -156,4 +156,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked for a status report, HTML dashboard, visual overview, or 'where does the project stand'.";
         :>> writePolicy = WritePolicy::readOnly;
     }
+    part migration : AISkill {
+        :>> id = "67940516-2c7d-4e8f-a067-516273849610";
+        :>> title = "migration";
+        :>> purpose = "Deploy the Safe Bulk Migration process (D0067): run any bulk migration of model data/schema (rename/split/drop/add a field across many sites) through the gated expand/migrate/contract lifecycle — committed transform script, dry-run+reconcile control totals, green at every step, backfill-before-tighten, grandfather/backfill-with-basis NEVER fabricate. The deploying skill for .engine/processes/migration.sysml.";
+        :>> location = ".engine/skills/migration/SKILL.md";
+        :>> triggerCondition = "Editing the same field/shape across many instances/files; a schema rename/split/drop/add; a representation refactor of authored model data.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

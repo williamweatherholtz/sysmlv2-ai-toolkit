@@ -58,6 +58,9 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
    - **substantive work goes through a sprint** — no raw backlog execution; the no-sprint
      guard (`validate_sprint_coverage.py`) enforces it.
+   - **bulk migration** (rename/split/drop/add a field across many instances/files) → invoke the
+     `migration` skill (D0067): committed transform script, dry-run+reconcile control totals,
+     expand/migrate/contract green at every step, backfill-before-tighten, never fabricate provenance.
 
 5. **Recurring-or-one-time check (D0040).** After classifying into a category, for
    EXECUTE and VIEW: ask *will this task recur?*
