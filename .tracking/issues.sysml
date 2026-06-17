@@ -200,4 +200,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "formalViewpoints";
     }
+
+    part issue020 : Issue {
+        :>> id = "62839405-1b6c-4d7e-c020-516273849562";
+        :>> title = "Significant delivery/CHANGE work committed with NO sprint wrapper — ceremony guard catches out-of-order gates but not a MISSING sprint";
+        :>> createdAt = "2026-06-17";
+        :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
+        :>> description = "The attribution-model migration (attrModelSchema + attrModelInstances) was implemented and committed (44e1e83/693b5e6/88b7727) as raw backlog tasks — no sprint Story, no refine/standup/implement/review/closeOut/retro gates, no delivery file. validate_ceremony.py only checks gate ORDERING within an existing delivery file, so work with NO delivery file passes pre-commit untouched. Human caught it (discoveredInField). Root cause: a doctrine contradiction — CLAUDE.md §3e exempts engine/bootstrap work from the full (sprint) workflow, but recent practice (sprints 25-27 sprinted engine work) and the rigor expectation require sprinting it. Bootstrap is now over (the tracking engine — write API, validators, computed orient — exists), so the §3e exemption should be retired. Preventing changes (sprint29): (1) Decision retiring §3e + mandating sprints for substantive work; (2) CLAUDE.md anti-subversion + mandatory triage-first; (3) a no-sprint GUARD that flags .tracking/schema CHANGE commits not tied to an open sprint's Implement phase (D0047); (4) the per-interaction triage skill (engine-triage upgrade + a UserPromptSubmit hook).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "bootstrapExitEval";
+    }
 }
