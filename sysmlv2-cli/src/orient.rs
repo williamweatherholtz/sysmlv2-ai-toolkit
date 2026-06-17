@@ -207,6 +207,67 @@ fn gate_passed(text: &str, gate: &str) -> bool {
     false
 }
 
+/// Load the deliverable-suspicion manifest (D0050): `(source_paths, task_names)`.
+/// Missing manifest → empty (feature inert). Lines: `path: <p>` / `task: <t>`; `#` = comment.
+fn load_deliverable_manifest(repo: &Path) -> (Vec<String>, HashSet<String>) {
+    let mut paths = Vec::new();
+    let mut tasks = HashSet::new();
+    let Ok(text) = std::fs::read_to_string(repo.join(".engine").join("deliverable-manifest.txt"))
+    else {
+        return (paths, tasks);
+    };
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(p) = l.strip_prefix("path:") {
+            paths.push(p.trim().to_owned());
+        } else if let Some(t) = l.strip_prefix("task:") {
+            tasks.insert(t.trim().to_owned());
+        }
+    }
+    (paths, tasks)
+}
+
+/// True if any commit touching `paths` exists strictly after `sha` (deliverable drifted
+/// since it was verified). Conservative: on git failure, returns false (don't flag).
+fn deliverable_drifted(repo: &Path, sha: &str, paths: &[String]) -> bool {
+    if sha.is_empty() || paths.is_empty() {
+        return false;
+    }
+    let mut args: Vec<String> = vec![
+        "-C".into(), repo.display().to_string(),
+        "log".into(), "--oneline".into(), format!("{sha}..HEAD"), "--".into(),
+    ];
+    args.extend(paths.iter().cloned());
+    Command::new("git")
+        .args(&args)
+        .output()
+        .map(|o| o.status.success() && !o.stdout.is_empty())
+        .unwrap_or(false)
+}
+
+/// Mark manifest deliverable tasks suspect when the source drifted since they were
+/// verified (D0050). Mutates `suspect_set` in place.
+fn apply_deliverable_suspicion(
+    repo: &Path,
+    done_map: &HashMap<String, bool>,
+    verified_at: &HashMap<String, String>,
+    suspect_set: &mut HashSet<String>,
+) {
+    let (dpaths, dtasks) = load_deliverable_manifest(repo);
+    if dpaths.is_empty() {
+        return;
+    }
+    for name in &dtasks {
+        if done_map.get(name.as_str()).copied().unwrap_or(false) {
+            if let Some(ct) = verified_at.get(name.as_str()) {
+                if deliverable_drifted(repo, ct, &dpaths) {
+                    suspect_set.insert(name.clone());
+                }
+            }
+        }
+    }
+}
+
 fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
     let ExtractedIndex { tasks, ordering_only, .. } = idx;
 
@@ -291,6 +352,9 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
             }
         }
     }
+
+    // Step 5: deliverable suspicion (D0050) — manifest tasks whose source drifted since verified.
+    apply_deliverable_suspicion(repo, &done_map, &verified_at, &mut suspect_set);
 
     let done = done_map.values().filter(|&&v| v).count();
     let outstanding = done_map.values().filter(|&&v| !v).count();

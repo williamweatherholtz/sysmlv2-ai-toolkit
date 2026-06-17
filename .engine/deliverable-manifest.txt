@@ -1,0 +1,27 @@
+# Deliverable-source suspicion manifest (D0050, closes issue006).
+# Read by `sysmlv2 orient` (orient.rs): a listed `task:` whose latest passing
+# TestResult was judged at a commit BEFORE a commit touching any `path:` below is
+# marked SUSPECT — the deliverable changed since it was verified, so the claim is stale.
+# Re-verifying (appending a TestResult judged at HEAD) clears it.
+#
+# Lines: `path: <repo-relative path>` and `task: <verification task name>`. '#' = comment.
+
+# --- deliverable source tree (the Rust toolchain) ---
+path: sysmlv2-parser
+path: sysmlv2-cli
+path: Cargo.toml
+path: Cargo.lock
+
+# --- verification tasks whose evidence depends on that source ---
+task: rustS1Lexer
+task: rustS2Parser
+task: rustS3Semantic
+task: rustS4SpecCompat
+task: rustS5CLI
+task: rustS6Orient
+task: rustS7QueryAlign
+task: rustS8runtimeParser
+task: rustS9writeApi
+task: runtimeParser
+task: writeApi
+task: rustToolchainFix

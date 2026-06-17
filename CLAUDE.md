@@ -34,6 +34,9 @@ The **Rust toolchain is the authority (D0048)**, no kernel required:
 `sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list).
 (`conda run -n sysml --no-capture-output python .engine/tools/query.py orient` is the
 secondary cross-check; it has a known done-count undercount — issue012.)
+`orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
+verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
+source changed since it was verified — re-verify at HEAD to clear it.
 
 ---
 

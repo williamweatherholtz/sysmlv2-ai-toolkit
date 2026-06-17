@@ -120,6 +120,16 @@ package ProjectIssues {
         :>> relatedTask = "rustToolchainFix";
     }
 
+    part issue014 : Issue {
+        :>> id = "012d3e4f-5061-4238-376f-1324a5b6c7e1";
+        :>> title = "12 Rust deliverable tasks are suspect: verified against source older than the Sprint 17 parser/orient changes — need re-verification at HEAD";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "Deliverable-suspicion (D0050) now flags rustS1..S9, runtimeParser, writeApi, rustToolchainFix as suspect: their latest passing TestResults were judged at commits BEFORE the Sprint 17 source changes (occurrence-def parse fix, orient rewrite) and the W4 orient.rs change, so their evidence is stale. This is the feature working as intended (issue006 closed), not a defect. Clearing it = re-verify at HEAD (cargo test + clippy + parity_check) and append fresh TestResults. Created by the autonomous retro (D0049), Sprint 19.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "reverifyDeliverable";
+    }
+
     part issue013 : Issue {
         :>> id = "fc012d3e-4f50-4126-376f-1324a5b6c7df";
         :>> title = "Shared cwd between the Bash and PowerShell tools: a `cd` in one silently breaks later relative-path commands in the other (Sprint 17 avoidable issue)";
