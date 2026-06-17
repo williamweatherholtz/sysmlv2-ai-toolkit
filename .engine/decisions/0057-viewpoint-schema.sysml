@@ -1,0 +1,20 @@
+// =====================================================================
+// D0057 — viewpoint-schema: §2.5 sign-off to unfreeze schema/core for the Viewpoint
+// type (D0056 increment 1). Adds part def Viewpoint + a declared registry; re-freezes
+// schema after. Accepted (schema unfreeze) 2026-06-16 by wweatherholtz ("agreed on all
+// points. proceed and unfreeze").
+// =====================================================================
+package Decision0057 {
+    private import EngineWork::*;
+
+    part d0057 : Decision {
+        :>> id = "61728394-0a5b-4c6d-976f-1324a5b6c7ec";
+        :>> title = "D0057: schema sign-off — add part def Viewpoint + viewpoint registry (formalViewpoints increment 1)";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "wweatherholtz";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "D0056 accepted the DIRECTION (formalize viewpoints; justified by reuse x auditability x audience) and gated the frozen-schema execution on an explicit §2.5 sign-off. The human gave it: 'agreed on all points. proceed and unfreeze.' This records that sign-off (who/when) per CLAUDE.md §4 and applies increment 1.";
+        :>> decisionText = "ACCEPTED schema unfreeze (wweatherholtz 2026-06-16) for ONE change: add `part def Viewpoint :> Element` to schema/core/computed.sysml with attributes concern/audience/sources/renderer (lightweight, engine-registry style — analogous to AISkill, NOT native viewpoint def which can't carry queryable data and whose expose/render don't parse in the pilot). Created .engine/views/viewpoint-registry.sysml declaring 8 viewpoints (orient, whats-next, traceability, safety, requirements, decisions, baselines, suspect) — each with concern + audience + sources + renderer, giving the formally-defined safety/requirements/whats-next/traceability viewpoints requested. validate_instances extended to cover .engine/views/; pre-commit + _ID_TYPES updated. schema/core is RE-FROZEN after this change (further schema edits need a new sign-off). This is INCREMENT 1 (formalViewpointsSchema); INCREMENT 2 (formalViewpoints) rewires report.py/orient to be declaration-DRIVEN renderers + adds a concern-coverage view (which stakeholder concerns lack a viewpoint) — remains gated/queued. NON-ADOPTIONS from D0056 stand (no Capella/Kitalpha; no literal OA/SA/LA/PA; 42010 correspondence rules optional). Accepted: wweatherholtz 2026-06-16.";
+        :>> consequences = "schema/core gains part def Viewpoint (then re-frozen). Views are now declarable as first-class registry entries with concern/audience/sources/renderer — auditable and extensible by declaration. The renderer-rewiring + concern-coverage computation (increment 2, formalViewpoints) is the remaining high-value work. validate_instances now validates .engine/views/. Reaffirms D0054 (keep it friction-light) + D0055 (engine is systems modeling of the work/process).";
+    }
+}

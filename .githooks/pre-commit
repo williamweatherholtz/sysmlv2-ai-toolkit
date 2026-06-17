@@ -22,7 +22,7 @@ sysml_run() {
 if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
-    echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs)/.*\.sysml$' && sysml_run validate_instances.py
+    echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
 fi
 
 # .tracking changes: validated by the Rust authority (D0048) — fast, no JVM (ends the

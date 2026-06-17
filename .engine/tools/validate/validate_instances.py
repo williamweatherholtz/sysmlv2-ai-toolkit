@@ -31,12 +31,13 @@ def lint_decision_imports(engine_root):
 
 INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))
              + sorted(glob.glob(os.path.join(ENGINE, "processes", "*.sysml")))
+             + sorted(glob.glob(os.path.join(ENGINE, "views", "*.sysml")))
              + [os.path.join(ENGINE, "skills", "skills-registry.sysml"),
                 os.path.join(ENGINE, "docs", "tracking-template.sysml")])
 
 _ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
              "Brief", "Persona", "Need", "Issue", "Story", "Release", "ChangeRequest",
-             "Component", "DesignElement", "Test")
+             "Component", "DesignElement", "Test", "Viewpoint")
 
 
 def warn_missing_ids(path, text):
