@@ -208,7 +208,9 @@ package EngineBacklog {
         action baselineView;        // UC9: Release = commit SHA + explicit member refs; baseline view computed from it
 
         // ---- deferred native-leverage (spiked or design-ready) ----
-        action trackedMetadata;     // U2: @Tracked attributed-metadata refactor (SPIKED GREEN) replacing the 4 Tracked* bases
+        action trackedMetadata;     // U2: @Tracked attributed-metadata refactor (DEFERRED — D0053; multi-system migration, blocked on trackedMetadataReplan)
+        action trackedMetadataReplan; // D0053: scope the @Tracked migration as a multi-sprint effort (Rust parser @Tracked support + instance-migration tool + validator updates + deliverable re-verify) before any schema unfreeze; decides do-vs-drop
+        first trackedMetadataReplan then trackedMetadata;
         action stateDefSpike;       // M3: spike native state def/transition; if green replace WorkflowDefinition.transitions strings
         action occurrenceRetype;    // M6: spike occurrence def :> Element; retype TestResult (+Decision?) if green
         action authoredByRefs;      // M4 remainder: authoredBy/judgedBy as typed refs to ProjectActors parts (deferred at CR-5)
@@ -345,6 +347,7 @@ package EngineBacklog {
         verification baselineViewDoD : Test { :>> id = "25e39c3c-632e-4d51-af2e-1b1604539dbb"; :>> method = VerificationMethod::demo; :>> procedureText = "a Release (commit + member refs) renders a computed baseline view"; }
         part baselineViewDoDR1 : TestResult { :>> id = "4e6b10fe-8963-46d5-8d40-1665cc7f4026"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "62cd0b6"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
         verification trackedMetadataDoD : Test { :>> id = "b9e59c15-75e2-475f-94fc-9f73e77646dc"; :>> method = VerificationMethod::test; :>> procedureText = "@Tracked metadata replaces the four Tracked* bases; instances migrated; validate_all green"; }
+        verification trackedMetadataReplanDoD : Test { :>> id = "293a4b5c-6d7e-4f81-0619-405162738401"; :>> method = VerificationMethod::confirmation; :>> procedureText = "migration scoped as a multi-sprint plan (Rust parser @Tracked support, bulk instance-migration tool, validate_actors + kernel-validator updates, deliverable re-verify); do-vs-drop decided + recorded; fresh human sign-off to unfreeze schema/core obtained before execution"; }
         verification stateDefSpikeDoD : Test { :>> id = "37c1b11f-e0f4-4955-bdd1-b1e15651aad5"; :>> method = VerificationMethod::test; :>> procedureText = "state def/transition spike verdict recorded; transitions strings replaced if green"; }
         part stateDefSpikeDoDR1 : TestResult { :>> id = "fb279cad-1e2f-4a3b-bcd4-5e6f7a8b9c0e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "146bc25"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
         verification occurrenceRetypeDoD : Test { :>> id = "4ef8cff4-11db-4a48-9e20-58447aafe676"; :>> method = VerificationMethod::test; :>> procedureText = "occurrence def spike verdict recorded; TestResult retyped if green; validate_all green"; }
