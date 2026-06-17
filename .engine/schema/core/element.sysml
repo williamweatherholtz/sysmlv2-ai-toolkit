@@ -37,7 +37,8 @@ package EngineElement {
         attribute id : Uuid;              // immutable identity
         attribute title : String;         // authored human label (may duplicate)
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;    // actor id (a ProjectActors part name; typed refs = `authoredByRefs` task)
+        attribute authoredBy : String;    // DEPRECATED (D0063 expand): replaced by createdBy at contract (attrModelContract)
+        attribute createdBy : String[0..1]; // canonical author/creator (D0063 expand→migrate→contract; becomes [1..1], authoredBy dropped, at contract)
     }
 
     // Native metaclasses (requirement / use case / verification def) CANNOT
@@ -50,19 +51,22 @@ package EngineElement {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;
+        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
+        attribute createdBy : String[0..1];  // canonical (D0063 expand)
     }
     abstract use case def TrackedUseCase {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;
+        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
+        attribute createdBy : String[0..1];  // canonical (D0063 expand)
     }
     abstract verification def TrackedVerification {
         attribute id : Uuid;
         attribute title : String;
         attribute createdAt : Timestamp;
-        attribute authoredBy : String;
+        attribute authoredBy : String;       // DEPRECATED (D0063 expand): replaced by createdBy at contract
+        attribute createdBy : String[0..1];  // canonical (D0063 expand)
     }
 
     // Minimal actor model — only enough to record WHO does tracked work.

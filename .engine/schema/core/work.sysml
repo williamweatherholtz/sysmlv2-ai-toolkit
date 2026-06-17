@@ -40,8 +40,10 @@ package EngineWork {
     // edge, not by editing. Scope decisions supersede Needs (see the spec §5).
     part def Decision :> Element {
         attribute status : DecisionStatus;
-        attribute context : String;
-        attribute decisionText : String;
+        attribute context : String;          // forces/situation present — the basis (Nygard ADR 'Context')
+        attribute decision : String[0..1];   // the choice statement (ADR 'Decision') — D0063 expand; [1..1] at contract
+        attribute rationale : String[0..1];  // justification for the choice (ISO 42010 'Rationale') — D0063 expand; [1..1] at contract
+        attribute decisionText : String;     // DEPRECATED (D0061/D0063): splits into decision+rationale; dropped at contract
         attribute consequences : String;
     }
 
