@@ -28,7 +28,7 @@ LEGACY_ACTORS = {
 }
 
 _PART_NAME_RE = re.compile(r'^\s*part\s+(\w+)\s*:\s*(?:Person|Actor)\b')
-_ATTR_VAL_RE = re.compile(r':>>\s*(?:authoredBy|judgedBy)\s*=\s*"([^"]+)"')
+_ATTR_VAL_RE = re.compile(r':>>\s*(?:authoredBy|createdBy|judgedBy)\s*=\s*"([^"]+)"')
 
 
 def load_known_actors(actors_file: str) -> set:

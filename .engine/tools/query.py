@@ -447,7 +447,7 @@ def read_issues():
                 'discoveredInField': bools.get('discoveredInField', 'false') == 'true',
                 'relatedTask': attrs.get('relatedTask', ''),
                 'createdAt': attrs.get('createdAt', ''),
-                'authoredBy': attrs.get('authoredBy', ''),
+                'authoredBy': attrs.get('createdBy') or attrs.get('authoredBy', ''),
             })
     return issues
 

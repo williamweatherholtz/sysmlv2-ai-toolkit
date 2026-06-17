@@ -89,7 +89,7 @@ def all_decisions():
         text = f.read_text(encoding="utf-8", errors="replace")
         title_m = re.search(r":>>\s+title\s*=\s*\"([^\"]{0,200})\"", text)
         ctx_m   = re.search(r":>>\s+context\s*=\s*\"([^\"]{0,300})\"", text)
-        dec_m   = re.search(r":>>\s+decisionText\s*=\s*\"([^\"]{0,100})", text)
+        dec_m   = re.search(r":>>\s+decision\s*=\s*\"([^\"]{0,100})", text) or re.search(r":>>\s+decisionText\s*=\s*\"([^\"]{0,100})", text)
         results.append({
             "num":     f.stem[:4],
             "file":    f.stem,
