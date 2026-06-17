@@ -138,6 +138,15 @@ Decision files are standalone SysML v2 packages. Common mistakes caught by the l
 - **Import `EngineWork::*`, not `EngineElement::*`.** `Decision` is defined in `EngineWork`. Using `EngineElement::*` alone gives "Couldn't resolve reference to Type 'Decision'". `validate_instances.py` now lint-checks this before starting the kernel.
 - **Fields**: `id`, `title`, `createdAt`, `authoredBy` (inherited from `Element`) + `status : DecisionStatus`, `context : String`, `decisionText : String`, `consequences : String`. There is no `rationale`, `acceptedBy`, `acceptedAt`, or `acceptedAtCommit` field.
 - **Template**: always copy an existing file (e.g. `0042-baseline-view.sysml`) — do not author from scratch.
+- **Decision Analysis convention (D0058 / issue016; ISO 42010 / NPR 7123.1 / ADR).** When a
+  Decision chose between real options, capture the *trade*, not just the verdict — include,
+  inside `decisionText`, a structured tail:
+  `ALTERNATIVES: (A) <opt> — rejected: <why>; (B) <opt> — rejected: <why>; (C) <chosen>.
+  CRITERIA: <the axes the choice was made on>.` This is a CONVENTION (no schema field — keeps
+  `schema/core` frozen and authoring friction low, D0054); the alternatives/criteria live in
+  the existing `decisionText` String. Skip it for record-only or no-alternative decisions
+  (the test: *was a real option rejected?*). Captures rationale that would otherwise be lost
+  — the ISO 42010 "record the alternatives not chosen" recommendation.
 
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 
