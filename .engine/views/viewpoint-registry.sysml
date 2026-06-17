@@ -83,4 +83,13 @@ package EngineViewpoints {
         :>> sources = "git-ancestry of judgedAgainst vs upstream change over satisfy/:> edges; deliverable-manifest source drift (D0050)";
         :>> renderer = "sysmlv2 orient (suspect) / query.py suspect";
     }
+    part orphansVP : Viewpoint {
+        :>> id = "61728394-0a5b-4c6d-9619-405162738418";
+        :>> title = "orphans";
+        :>> authoredBy = "wweatherholtz";
+        :>> concernText = "Which model elements are orphaned / dangling — a Need with no satisfying Requirement, a Requirement with no satisfy or verify edge, a task with no DoD, an Issue with no relatedTask, a Decision referenced by nothing — i.e. broken or missing required traceability?";
+        :>> audience = "maintainer / auditor / reviewer";
+        :>> sources = "all items + typed edges; flag any element missing a REQUIRED incoming/outgoing edge for its kind (Need->Requirement satisfy; Requirement->Test verify; task->DoD; Issue->relatedTask)";
+        :>> renderer = "(increment 2) report.py orphans view / query.py orphans";
+    }
 }
