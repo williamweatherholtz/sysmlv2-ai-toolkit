@@ -29,10 +29,11 @@ human's acceptance happens once per sitting at the sprint review, not here.
    - The `.tracking` validator (`sysmlv2 validate .`, D0048) is green.
 2. **Record `actualHours`** on the sprint Story if known (it feeds efficiency metrics;
    if genuinely unknown at closeOut, leave unset rather than guessing).
-3. **Record the closeOut gate** TestResult: `method = inspect`, `outcome = pass`,
-   `judgedBy` = the AI actor, `judgedAt` = today, `judgedAgainst` = HEAD. No human
-   confirmation (D0049) — do NOT write `judgedBy = wweatherholtz` and do NOT pause to
-   ask "do you accept?"
+3. **Record the closeOut gate** TestResult via `sysmlv2 append-gate-result --file <delivery
+   file> --gate <sprintCloseOutGate> --sha <HEAD> --judged-by <AI actor> --judged-at <today>`
+   (auto-UUID, append-only `{gate}R{n}`). The gate is `method = inspect`, AI-judged: no human
+   confirmation (D0049) — do NOT write `judgedBy = wweatherholtz` and do NOT pause to ask
+   "do you accept?"
 4. **Hand off to sprint-retro** (autonomous) to identify avoidable issues + create items.
 5. **Validate + commit** `CR:`; the post-commit hook pushes.
 

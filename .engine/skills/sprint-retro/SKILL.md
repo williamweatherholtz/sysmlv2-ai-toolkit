@@ -55,8 +55,9 @@ manufacture items.
      `action def` (the change to make).
    - If a guard is cheap and obvious, building it now is in-scope (per D0047 the
      correction must become a permanent guard, not a note).
-4. **Record the retro gate** TestResult: `method = analysis`, `judgedBy` = the AI actor,
-   `judgedAgainst` = HEAD. NO human confirmation (D0049).
+4. **Record the retro gate** TestResult via `sysmlv2 append-gate-result --file <delivery file>
+   --gate <sprintRetroGate> --sha <HEAD> --judged-by <AI actor> --judged-at <today>` (auto-UUID,
+   append-only `{gate}R{n}`). The gate is `method = analysis`, AI-judged: NO human confirmation (D0049).
 5. **Do NOT ask the human to accept.** Acceptance is the per-sitting sprint review.
    Schema/process changes still validate green + commit `CR:`; doc-sync rides along.
 

@@ -6,6 +6,7 @@
 //!   `orient [ROOT]`           — print orient state (cursor + ready/done/outstanding) as JSON
 //!   `whats-next [ROOT]`       — print ready task names, one per line
 //!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
+//!   `append-gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 
@@ -213,6 +214,31 @@ fn cmd_append_result(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_append_gate_result(args: &[String]) -> i32 {
+    let Some(file_str) = flag(args, "file") else {
+        eprintln!("usage: sysmlv2 append-gate-result --file FILE --gate GATE --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        return 2;
+    };
+    let Some(gate) = flag(args, "gate") else {
+        eprintln!("error: --gate required");
+        return 2;
+    };
+    let Some(sha) = flag(args, "sha") else {
+        eprintln!("error: --sha required");
+        return 2;
+    };
+    let file = PathBuf::from(file_str);
+    let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
+    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    // Callers should pass --judged-at for determinism; this is a safe fallback.
+    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+
+    match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by) {
+        Ok(uuid) => { println!("{uuid}"); 0 }
+        Err(e) => { eprintln!("error: {e}"); 1 }
+    }
+}
+
 fn cmd_add_task(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
         eprintln!("usage: sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
@@ -248,6 +274,7 @@ fn main() {
         Some("orient") => cmd_orient(&args[2..]),
         Some("whats-next") => cmd_whats_next(&args[2..]),
         Some("append-result") => cmd_append_result(&args[2..]),
+        Some("append-gate-result") => cmd_append_gate_result(&args[2..]),
         Some("add-task") => cmd_add_task(&args[2..]),
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
@@ -258,6 +285,7 @@ fn main() {
             eprintln!("  orient [ROOT]                print orient state as JSON");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
             eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
+            eprintln!("  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
             eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");
             2
         }

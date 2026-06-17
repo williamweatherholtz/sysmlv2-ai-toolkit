@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cucumber::{given, then, when, World};
-use sysmlv2_cli::write::{add_task, append_result, WriteError};
+use sysmlv2_cli::write::{add_task, append_gate_result, append_result, WriteError};
 
 static DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -49,6 +49,26 @@ fn write_def_with_task(dir: &Path, def_name: &str, task: &str) -> PathBuf {
     std::fs::create_dir_all(dir).unwrap();
     let content = format!(
         "package TestWrite {{\n    action def {def_name} {{\n        action {task};\n        verification {task}DoD : Test {{ :>> id = \"00000001-0000-4000-8000-000000000001\"; :>> method = VerificationMethod::test; :>> procedureText = \"test\"; }}\n    }}\n}}\n"
+    );
+    let path = dir.join("test.sysml");
+    std::fs::write(&path, content).unwrap();
+    path
+}
+
+fn write_gate_file(dir: &Path, gate: &str) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    let content = format!(
+        "package TestWrite {{\n    verification {gate} : Test {{\n        :>> id = \"00000001-0000-4000-8000-000000000001\";\n        :>> method = VerificationMethod::confirmation;\n        :>> procedureText = \"user accepts complete\";\n    }}\n}}\n"
+    );
+    let path = dir.join("test.sysml");
+    std::fs::write(&path, content).unwrap();
+    path
+}
+
+fn write_gate_file_with_result(dir: &Path, gate: &str) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    let content = format!(
+        "package TestWrite {{\n    verification {gate} : Test {{\n        :>> id = \"00000001-0000-4000-8000-000000000001\";\n        :>> method = VerificationMethod::confirmation;\n        :>> procedureText = \"user accepts complete\";\n    }}\n    part {gate}R1 : TestResult {{ :>> id = \"00000002-0000-4000-8000-000000000002\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc0001\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"wweatherholtz\"; }}\n}}\n"
     );
     let path = dir.join("test.sysml");
     std::fs::write(&path, content).unwrap();
@@ -115,6 +135,22 @@ fn given_def_with_task(world: &mut WriteWorld, def_name: String, task: String) {
     world.file = Some(path);
 }
 
+#[given(regex = r#"^a tracking file with gate "([^"]+)" and an existing R1$"#)]
+fn given_gate_with_result(world: &mut WriteWorld, gate: String) {
+    let dir = unique_dir();
+    let path = write_gate_file_with_result(&dir, &gate);
+    world.dir = Some(dir);
+    world.file = Some(path);
+}
+
+#[given(regex = r#"^a tracking file with gate "([^"]+)"$"#)]
+fn given_gate(world: &mut WriteWorld, gate: String) {
+    let dir = unique_dir();
+    let path = write_gate_file(&dir, &gate);
+    world.dir = Some(dir);
+    world.file = Some(path);
+}
+
 // ── when steps ────────────────────────────────────────────────────────────────
 
 #[when(regex = r#"^I append a passing result for "([^"]+)" at SHA "([^"]+)"$"#)]
@@ -144,6 +180,21 @@ fn when_add_task(world: &mut WriteWorld, task: String, dod: String, method: Stri
     let path = world.file.clone().unwrap();
     let res = add_task(&path, &def_name, &task, &dod, &method);
     world.last_content = std::fs::read_to_string(&path).ok();
+    world.result = Some(res.map_err(|e| e.to_string()));
+}
+
+#[when(regex = r#"^I append a passing gate result for "([^"]+)" at SHA "([^"]+)"$"#)]
+fn when_append_gate_pass(world: &mut WriteWorld, gate: String, sha: String) {
+    let path = world.file.clone().unwrap();
+    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz");
+    world.last_content = std::fs::read_to_string(&path).ok();
+    world.result = Some(res.map_err(|e| e.to_string()));
+}
+
+#[when(regex = r#"^I append a gate result for unknown gate "([^"]+)" at SHA "([^"]+)"$"#)]
+fn when_append_gate_unknown(world: &mut WriteWorld, gate: String, sha: String) {
+    let path = world.file.clone().unwrap();
+    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz");
     world.result = Some(res.map_err(|e| e.to_string()));
 }
 
@@ -210,6 +261,15 @@ fn then_invalid_verdict(world: &mut WriteWorld) {
     assert!(
         err.contains("invalid verdict"),
         "expected invalid-verdict error, got: {err}"
+    );
+}
+
+#[then("the write fails with gate-not-found")]
+fn then_gate_not_found(world: &mut WriteWorld) {
+    let err = world.result.as_ref().expect("no result").as_ref().unwrap_err();
+    assert!(
+        err.contains("gate not found"),
+        "expected gate-not-found error, got: {err}"
     );
 }
 

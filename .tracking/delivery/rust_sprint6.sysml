@@ -83,6 +83,7 @@ package ProjectDeliveryRustS6 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyRustS6OrientDoDR1 recorded (pass); rustS6OrientDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 6 complete.";
     }
+    part rustS6CloseOutGateR1 : TestResult { :>> id = "9751792e-48bf-4a80-b3d9-b62dcf56d328"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0cbc4d0"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 
     verification rustS6RetroGate : Test {
         :>> id = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d";
@@ -92,4 +93,5 @@ package ProjectDeliveryRustS6 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 6 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part rustS6RetroGateR1 : TestResult { :>> id = "040a58d6-ee7c-443d-a86c-6c9d55fb53cb"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0cbc4d0"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

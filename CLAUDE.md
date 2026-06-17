@@ -190,10 +190,12 @@ The six workflows (see the spec for detail):
 ## 4. Bootstrap rules (in force NOW, until the runtime exists)
 
 - **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `sysmlv2 append-result`
-  to append a `TestResult` and `sysmlv2 add-task` to add a task + `DoD` to an action def — both
-  enforce UUID generation and append-only semantics automatically. Direct editing of `.sysml` /
-  instance files is still possible but is no longer the primary path; use it only when the write
-  API does not yet cover the operation (schema changes, decision files).
+  to append a `TestResult` to an action task, `sysmlv2 append-gate-result` to append a `TestResult`
+  to a ceremony gate (`verification` — the `{gate}R{n}` form, used by sprint closeOut/retro), and
+  `sysmlv2 add-task` to add a task + `DoD` to an action def — all enforce UUID generation and
+  append-only semantics automatically. Direct editing of `.sysml` / instance files is still possible
+  but is no longer the primary path; use it only when the write API does not yet cover the operation
+  (schema changes, decision files).
 - **Every change to schema or a workflow/process definition MUST:**
   1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
      rationale — capture the decision even if small; commit messages and memory are NOT
@@ -223,7 +225,7 @@ The six workflows (see the spec for detail):
   partially reverted requirements/architecture to spreadsheets because authoring cost more
   than they were worth. Our architecture matches flagship practice (JPL OpenMBEE/openCAESAR,
   NASA NPR 7123.1, DoD ASoT), so we inherit the same risk. **The write path must stay lower-
-  friction than a spreadsheet** — prefer the Rust no-kernel authority + `append-result`/`add-task`
+  friction than a spreadsheet** — prefer the Rust no-kernel authority + `append-result`/`append-gate-result`/`add-task`
   write API over hand-editing; if recording a fact is harder than a spreadsheet edit, fix that
   first (issue015). Friction is a first-class quality, not an afterthought.
 - **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while

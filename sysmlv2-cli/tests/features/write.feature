@@ -37,3 +37,20 @@ Feature: write API — append-result and add-task
     Given a tracking file with task "taskUuid" and a DoD verification
     When I append a passing result for "taskUuid" at SHA "ccc0002"
     Then the new result has a non-empty id field
+
+  Scenario: append-gate-result creates R1 for a gate with no existing results
+    Given a tracking file with gate "myCloseOutGate"
+    When I append a passing gate result for "myCloseOutGate" at SHA "fed3210"
+    Then the file contains "myCloseOutGateR1 : TestResult"
+    And outcome is "VerdictKind::pass"
+    And judgedAgainst is "fed3210"
+
+  Scenario: append-gate-result on a gate with existing R1 creates R2
+    Given a tracking file with gate "myCloseOutGate" and an existing R1
+    When I append a passing gate result for "myCloseOutGate" at SHA "fed3211"
+    Then the file contains "myCloseOutGateR2 : TestResult"
+
+  Scenario: append-gate-result rejects an unknown gate
+    Given a tracking file with gate "myCloseOutGate"
+    When I append a gate result for unknown gate "noSuchGate" at SHA "fed3212"
+    Then the write fails with gate-not-found

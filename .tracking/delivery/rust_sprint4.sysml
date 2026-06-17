@@ -83,6 +83,7 @@ package ProjectDeliveryRustS4 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "storyRustS4SpecCompatDoDR1 recorded (pass); rustS4SpecCompatDoDR1 recorded in backlog (pass); validate_all green; user accepts Sprint 4 complete.";
     }
+    part rustS4CloseOutGateR1 : TestResult { :>> id = "afcf84bf-cfce-4464-b3d9-b62dbe698ad8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0cbc4d0"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 
     verification rustS4RetroGate : Test {
         :>> id = "bcdef012-0000-4d6e-a7b8-c9d0e1f2a3b0";
@@ -92,4 +93,5 @@ package ProjectDeliveryRustS4 {
         :>> method = VerificationMethod::confirmation;
         :>> procedureText = "Sprint 4 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete.";
     }
+    part rustS4RetroGateR1 : TestResult { :>> id = "eee1cdb9-d5f4-4304-b3d9-b62dc1573038"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0cbc4d0"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
 }

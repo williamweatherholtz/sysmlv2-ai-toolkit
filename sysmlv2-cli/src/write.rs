@@ -31,6 +31,8 @@ pub enum WriteError {
     ActionDefNotFound(String),
     /// Cannot find a `DoD` verification or existing result line for the task.
     InsertionPointNotFound(String),
+    /// Named ceremony gate (`verification`) not found in the file.
+    GateNotFound(String),
 }
 
 impl std::fmt::Display for WriteError {
@@ -44,6 +46,7 @@ impl std::fmt::Display for WriteError {
             Self::InvalidMethod(m) => write!(f, "invalid method '{m}'"),
             Self::ActionDefNotFound(n) => write!(f, "action def not found: {n}"),
             Self::InsertionPointNotFound(n) => write!(f, "cannot find insertion point for task: {n}"),
+            Self::GateNotFound(n) => write!(f, "gate not found: {n}"),
         }
     }
 }
@@ -144,6 +147,80 @@ fn max_result_n(pkg: &Package, task_name: &str) -> u32 {
         }
     }
     max_n
+}
+
+/// True if a ceremony gate `verification <name>` exists (top-level or inside an
+/// action def). Gates are `verification`s, not `action`s — distinct from `task_exists_in_pkg`.
+fn gate_exists_in_pkg(pkg: &Package, name: &str) -> bool {
+    pkg.items.iter().any(|item| match item {
+        Item::Verification(v) => v.name == name,
+        Item::ActionDef(def) => def.verifications.iter().any(|v| v.name == name),
+        _ => false,
+    })
+}
+
+/// Return the highest existing gate-result sequence number for `gate_name`.
+/// Gate results follow `{gate}R{n}` (e.g. `rustS1CloseOutGateR1`) — NOT the
+/// `{task}DoDR{n}` action convention.
+fn max_gate_result_n(pkg: &Package, gate_name: &str) -> u32 {
+    let pfx = format!("{gate_name}R");
+    let mut max_n = 0u32;
+
+    let scan = |name: &str, max: &mut u32| {
+        if let Some(n) = name.strip_prefix(&pfx).and_then(|s| s.parse::<u32>().ok()) {
+            if n > *max {
+                *max = n;
+            }
+        }
+    };
+
+    for item in &pkg.items {
+        match item {
+            Item::Part(p) => scan(&p.name, &mut max_n),
+            Item::ActionDef(def) => {
+                for p in &def.parts {
+                    scan(&p.name, &mut max_n);
+                }
+            }
+            _ => {}
+        }
+    }
+    max_n
+}
+
+/// Return the 0-indexed line after which to insert a new gate `TestResult`.
+///
+/// Prefers the last existing `part {gate}R{n}` result line; otherwise the closing
+/// brace of the gate's `verification` block (tracked by brace depth, so multi-line
+/// gate bodies are handled).
+fn find_gate_result_insertion(lines: &[&str], gate_name: &str) -> Result<usize, WriteError> {
+    let r_pfx = format!("part {gate_name}R");
+    let ver_pat = format!("verification {gate_name}");
+
+    let mut last_result = None;
+    let mut ver_line = None;
+
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim();
+        if t.strip_prefix(&r_pfx)
+            .is_some_and(|rest| rest.split([' ', ':']).next().unwrap_or("").parse::<u32>().is_ok())
+        {
+            last_result = Some(i);
+        }
+        if let Some(after) = t.strip_prefix(&ver_pat) {
+            // Guard against `gate_name` being a prefix of a longer name: the next
+            // char must terminate the identifier (` ` or `:`).
+            if after.starts_with(' ') || after.starts_with(':') {
+                ver_line = Some(i);
+            }
+        }
+    }
+
+    if let Some(r) = last_result {
+        return Ok(r);
+    }
+    let v = ver_line.ok_or_else(|| WriteError::GateNotFound(gate_name.to_owned()))?;
+    find_action_def_close(lines, v).ok_or_else(|| WriteError::GateNotFound(gate_name.to_owned()))
 }
 
 // ── text insertion helpers ────────────────────────────────────────────────────
@@ -290,6 +367,75 @@ pub fn append_result(
 
     let new_line = format!(
         "{indent}part {task_name}DoDR{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
+    );
+
+    let mut new_content = String::with_capacity(content.len() + new_line.len() + 1);
+    for (i, line) in lines.iter().enumerate() {
+        new_content.push_str(line);
+        new_content.push('\n');
+        if i == insert_after {
+            new_content.push_str(&new_line);
+            new_content.push('\n');
+        }
+    }
+
+    std::fs::write(path, new_content)?;
+    Ok(uuid)
+}
+
+/// Append a `part <gate>R<N+1> : TestResult { ... }` for a ceremony gate to `path`.
+///
+/// Records the result of a phase gate (refine/standup/implement/review/closeOut/retro),
+/// which is a `verification`, not an `action` — so it uses the `{gate}R{n}` naming and
+/// inserts after the gate's `verification` block (or after the last existing gate result).
+///
+/// Enforces:
+/// - The gate `verification` must exist (else `GateNotFound`).
+/// - `verdict` must be `"pass"` or `"fail"` (else `InvalidVerdict`).
+/// - The new result index is `(max existing N) + 1` — never overwrites.
+/// - A fresh UUID is auto-generated.
+///
+/// Returns the UUID of the newly created record.
+///
+/// # Errors
+/// Returns `WriteError::InvalidVerdict` if `verdict` is not `"pass"` or `"fail"`.
+/// Returns `WriteError::GateNotFound` if `gate_name` is not a `verification` in the file.
+/// Returns `WriteError::Parse` if the file cannot be lexed or parsed.
+/// Returns `WriteError::Io` on filesystem errors.
+pub fn append_gate_result(
+    path: &Path,
+    gate_name: &str,
+    sha: &str,
+    verdict: &str,
+    judged_at: &str,
+    judged_by: &str,
+) -> Result<String, WriteError> {
+    if verdict != "pass" && verdict != "fail" {
+        return Err(WriteError::InvalidVerdict(verdict.to_owned()));
+    }
+
+    let pkg = parse_file(path)?;
+
+    if !gate_exists_in_pkg(&pkg, gate_name) {
+        return Err(WriteError::GateNotFound(gate_name.to_owned()));
+    }
+
+    let n = max_gate_result_n(&pkg, gate_name) + 1;
+    let uuid = gen_uuid();
+
+    let content = std::fs::read_to_string(path)?;
+    let lines: Vec<&str> = content.lines().collect();
+    let insert_after = find_gate_result_insertion(&lines, gate_name)?;
+
+    // Match the indentation of the line we insert after.
+    let indent = {
+        let context_line = lines[insert_after].trim_start();
+        let indent_len = lines[insert_after].len() - context_line.len();
+        " ".repeat(indent_len)
+    };
+
+    let new_line = format!(
+        "{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
     );
 
     let mut new_content = String::with_capacity(content.len() + new_line.len() + 1);
