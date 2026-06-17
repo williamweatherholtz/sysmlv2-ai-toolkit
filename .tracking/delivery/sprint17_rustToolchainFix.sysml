@@ -30,6 +30,7 @@ package ProjectDeliveryS17 {
     action def DeliveryRunS17 {
         action storyRustToolchainFix;
         verification storyRustToolchainFixDoD : Test { :>> id = "4a316d29-8adc-4a7f-ce1d-3f5a7b9c2d3e"; :>> method = VerificationMethod::test; :>> procedureText = "rustToolchainFixDoD in backlog (pass): sysmlv2 validate . preloads schema + exits 0 on green tree; sysmlv2 orient . matches query.py orient (counts + ready set, no cursor key, no phantom tasks); parity check fails on divergence; CLAUDE.md §5 makes the no-kernel Rust path default; validate_all + cargo test + clippy green."; }
+        part storyRustToolchainFixDoDR1 : TestResult { :>> id = "5b427f30-9bed-4b80-df2e-4a6b8c0d6172"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bc1810"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
     }
 
     // ====================================================================
@@ -53,6 +54,7 @@ package ProjectDeliveryS17 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Sprint 17 refine gate passed (6701ca4). rustToolchainFix: parser correctness (validate + phantom-task), drop cursor + add in_progress_sprints, parity gate, CLAUDE.md §5. No blockers.";
     }
+    part rustToolchainFixStandupGateR1 : TestResult { :>> id = "6c538f41-acfe-4c91-e03f-5b7c9d1e5f61"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bc1810"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
 
     verification rustToolchainFixImplementGate : Test {
         :>> id = "8e750163-ce10-4eb3-0241-7d9e1f306172";
@@ -62,6 +64,7 @@ package ProjectDeliveryS17 {
         :>> method = VerificationMethod::test;
         :>> procedureText = "sysmlv2 validate . green (schema preloaded); sysmlv2 orient . parity with query.py orient (counts + ready set, no cursor, no phantom tasks); parity test added + green; CLAUDE.md §5 updated; cargo test + clippy -D warnings green; validate_all green; DoDs recorded.";
     }
+    part rustToolchainFixImplementGateR1 : TestResult { :>> id = "7d649153-bd0f-4da2-f140-6c8d0e2f6172"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bc1810"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
 
     verification rustToolchainFixReviewGate : Test {
         :>> id = "9f861274-df21-4fc4-1352-8e0f20417283";
@@ -71,6 +74,7 @@ package ProjectDeliveryS17 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "sprint-review skill Phase-3 transcript scan RUN (issue011 discipline): metrics (velocity/efficiency/accuracy incl. parser-depth estimate check) + improvement_items produced and routed to retro; diff reviewed; doc-sync complete; no regressions.";
     }
+    part rustToolchainFixReviewGateR1 : TestResult { :>> id = "8e750264-ce10-4eb3-0241-7d9e1f307283"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6bc1810"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
 
     verification rustToolchainFixCloseOutGate : Test {
         :>> id = "a0972385-e032-40d5-2463-9f1031528394";

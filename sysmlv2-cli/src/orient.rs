@@ -14,11 +14,22 @@ use crate::indexer::{ExtractedIndex, TaskData};
 
 // ── public types ──────────────────────────────────────────────────────────────
 
+/// Ceremony status of one in-progress sprint (D0045: replaces the retired cursor).
+#[derive(Debug)]
+pub struct SprintCeremony {
+    /// Delivery file stem, e.g. `sprint17_rustToolchainFix`.
+    pub sprint: String,
+    /// Gate names with a passing `TestResult`, in canonical order.
+    pub passed: Vec<String>,
+    /// First canonical gate not yet passed (`None` only if all are passed).
+    pub pending: Option<String>,
+}
+
 /// Output of the `orient` subcommand.
 #[derive(Debug)]
 pub struct Output {
-    /// Parsed state cursor (defaults to empty strings if state.sysml is absent).
-    pub cursor: crate::Cursor,
+    /// In-progress sprints with per-gate ceremony status (computed from delivery files).
+    pub in_progress_sprints: Vec<SprintCeremony>,
     /// Tasks that are outstanding and whose every dependency is done.
     pub ready: Vec<String>,
     /// Done tasks whose `DoD` criterion text changed since they were verified.
@@ -35,17 +46,24 @@ impl Output {
     /// Render as a JSON string matching the `query.py orient` output format.
     #[must_use]
     pub fn to_json(&self) -> String {
-        let c = &self.cursor;
-        let cursor_block = format!(
-            "{{\n    \"activeWorkflow\": \"{}\",\n    \"activePhase\": \"{}\",\n    \"enteredAt\": \"{}\",\n    \"enteredBy\": \"{}\"\n  }}",
-            json_esc(&c.active_workflow),
-            json_esc(&c.active_phase),
-            json_esc(&c.entered_at),
-            json_esc(&c.entered_by),
-        );
+        let sprints: Vec<String> = self.in_progress_sprints.iter().map(|s| {
+            let pending = s.pending.as_ref()
+                .map_or_else(|| "null".to_owned(), |p| format!("\"{}\"", json_esc(p)));
+            format!(
+                "{{\"sprint\": \"{}\", \"passed\": {}, \"pending\": {}}}",
+                json_esc(&s.sprint),
+                str_array(&s.passed),
+                pending,
+            )
+        }).collect();
+        let in_progress_block = if sprints.is_empty() {
+            "[]".to_owned()
+        } else {
+            format!("[{}]", sprints.join(", "))
+        };
         format!(
-            "{{\n  \"cursor\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}}\n}}",
-            cursor_block,
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}}\n}}",
+            in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
             str_array(&self.invalid_evidence),
@@ -142,8 +160,55 @@ fn git_criterion_at(sha: &str, task: &str, repo: &Path) -> Option<String> {
 
 // ── classification ────────────────────────────────────────────────────────────
 
+/// Canonical ceremony gate order (mirrors `query.py` `read_sprint_ceremony_status` + D0047).
+const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+
+/// Compute in-progress sprint ceremony status from `.tracking/delivery/*.sysml`
+/// (D0045: replaces the `StateCursor`). A sprint is in-progress if at least one gate
+/// passed and Retro has not; `pending` is the first canonical gate not yet passed.
+fn in_progress_sprints(repo: &Path) -> Vec<SprintCeremony> {
+    let delivery = repo.join(".tracking").join("delivery");
+    let mut out = Vec::new();
+    for path in crate::collect_sysml(&delivery) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let passed: Vec<String> = GATE_ORDER.iter()
+            .filter(|g| gate_passed(&text, g))
+            .map(|g| (*g).to_owned())
+            .collect();
+        if passed.is_empty() || passed.iter().any(|g| g == "Retro") {
+            continue; // not started, or ceremony complete
+        }
+        let pending = GATE_ORDER.iter()
+            .find(|g| !passed.iter().any(|p| p == *g))
+            .map(|g| (*g).to_owned());
+        let sprint = path.file_stem().map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        out.push(SprintCeremony { sprint, passed, pending });
+    }
+    out.sort_by(|a, b| a.sprint.cmp(&b.sprint));
+    out
+}
+
+/// True if a `part <...><Gate>Gate<...>R<n> : TestResult` with `outcome = pass`
+/// exists for the given canonical gate name in `text`.
+fn gate_passed(text: &str, gate: &str) -> bool {
+    let needle = format!("{gate}Gate");
+    for (idx, _) in text.match_indices(&needle) {
+        // Must be a `part ...R<n> : TestResult ... outcome = ...::pass` declaration.
+        let line_start = text[..idx].rfind('\n').map_or(0, |n| n + 1);
+        let stmt_end = text[idx..].find('}').map_or(text.len(), |e| idx + e);
+        let stmt = &text[line_start..stmt_end];
+        if stmt.contains("part ") && stmt.contains(": TestResult")
+            && stmt.contains("VerdictKind::pass")
+        {
+            return true;
+        }
+    }
+    false
+}
+
 fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
-    let ExtractedIndex { tasks, ordering_only, cursor } = idx;
+    let ExtractedIndex { tasks, ordering_only, .. } = idx;
 
     // Step 1: compute done/invalid-evidence/verified-at.
     let mut done_map: HashMap<String, bool> = HashMap::new();
@@ -236,7 +301,14 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
     suspect.sort();
     invalid_evidence.sort();
 
-    Output { cursor, ready: ready_sorted, suspect, invalid_evidence, done, outstanding }
+    Output {
+        in_progress_sprints: in_progress_sprints(repo),
+        ready: ready_sorted,
+        suspect,
+        invalid_evidence,
+        done,
+        outstanding,
+    }
 }
 
 fn all_deps_satisfied(

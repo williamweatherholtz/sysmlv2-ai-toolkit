@@ -29,9 +29,11 @@ Authoritative reading order: this file → `.engine/README.md` → `.engine/deci
 (0001–0018) → the critiques in `docs/design-history/`. (The original design spec
 `docs/design-history/2026-06-04-process-model-design-retired.md` is retired —
 superseded in full by decisions 0001–0018; decisions win.)
-**Orient** (where things stand / what's next) is never read from prose — compute it:
-`conda run -n sysml --no-capture-output python .engine/tools/query.py orient`
-(or Rust-native, no kernel required: `sysmlv2 orient [ROOT]` for JSON / `sysmlv2 whats-next [ROOT]` for ready list)
+**Orient** (where things stand / what's next) is never read from prose — compute it.
+The **Rust toolchain is the authority (D0048)**, no kernel required:
+`sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list).
+(`conda run -n sysml --no-capture-output python .engine/tools/query.py orient` is the
+secondary cross-check; it has a known done-count undercount — issue012.)
 
 ---
 
@@ -218,17 +220,26 @@ The six workflows (see the spec for detail):
 
 ## 5. Validation (mandatory for every `.sysml` change)
 
-A change is not done until it parses with zero `ERROR:`. Run the validator that covers
-what you touched (each starts the pilot kernel, ~20s):
+A change is not done until it parses with zero `ERROR:`. **The Rust toolchain is the
+canonical validator for `.tracking/` (D0048) — fast, no JVM:**
+
+```
+.\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
+python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
+python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering (no kernel; D0047)
+python .engine\tools\validate\parity_check.py                                                    # rust orient == query.py orient cross-check (D0048)
+```
+
+**`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
+SysML semantics than the Rust validator covers), and they remain the authoritative SysML
+oracle on demand / in CI (each starts the pilot kernel, ~20s):
 
 ```
 $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking/*.sysml
-python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
-python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering — no gate passes while an earlier one is unpassed (no kernel; D0047)
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking (kernel cross-check / fallback when the rust binary is unbuilt)
 ```
 
 (Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.

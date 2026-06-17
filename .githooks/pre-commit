@@ -18,12 +18,24 @@ sysml_run() {
         echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
 
-# SysML validation (kernel-based; ~20s per layer)
+# .engine schema/workflow/instance changes: kernel validators (deep SysML semantics).
 if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs)/.*\.sysml$' && sysml_run validate_instances.py
-    echo "$sysml_staged" | grep -q '^\.tracking/'         && sysml_run validate_tracking.py
+fi
+
+# .tracking changes: validated by the Rust authority (D0048) — fast, no JVM (ends the
+# kernel-leak, issue004). Falls back to the kernel validator if the binary isn't built.
+if echo "$sysml_staged" | grep -q '^\.tracking/'; then
+    if [ -x "target/release/sysmlv2.exe" ]; then
+        echo "pre-commit: sysmlv2 validate . (rust authority)"
+        ./target/release/sysmlv2.exe validate . || {
+            echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    else
+        echo "pre-commit: rust binary missing — falling back to kernel validate_tracking"
+        sysml_run validate_tracking.py
+    fi
 fi
 
 # Ceremony-gate ordering guard (pure-Python, no kernel; <1s) — issue010 / D0047.

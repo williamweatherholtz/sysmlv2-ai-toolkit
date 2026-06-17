@@ -110,6 +110,16 @@ package ProjectIssues {
         :>> relatedTask = "ceremonyGateGuard";
     }
 
+    part issue012 : Issue {
+        :>> id = "ebfc012d-3e4f-4051-267f-021324a5b6c7";
+        :>> title = "query.py orient undercounts done by 1 (sees 91 tasks vs the structurally-correct 92) — surfaced by the Sprint 17 parity check";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "The Sprint 17 parity check found sysmlv2 orient (Rust) reports 92 tasks (done 85 + outstanding 7), exactly matching the 92 distinct `action <name>;` declarations in .tracking, while query.py orient reports 91 (done 84 + outstanding 7) — query.py silently drops one task. The qualitative sets (in_progress_sprints, ready, suspect, invalidEvidence) are identical between the two. Rust is structurally correct; query.py has a latent discovery/counting bug (likely in %show-based action-def discovery or member regex). Post-D0048 the Rust path is the authority, so query.py is secondary and this is a non-blocking known delta (the parity gate tolerates it). Fix later: pin and correct query.py's dropped task so both agree at 92.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "rustToolchainFix";
+    }
+
     part issue011 : Issue {
         :>> id = "daebfc01-2d3e-4f40-156f-91021324a5b6";
         :>> title = "Sprint ceremony skills are invoked by convention only — the sprint-review Phase-3 transcript scan can be (and in S16 was) skipped, so process-improvement findings are missed";

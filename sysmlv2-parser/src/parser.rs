@@ -609,6 +609,17 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             Ok(None)
         }
 
+        // Generic `<classifier-kind> def Name ...` where the kind word lexes as an
+        // identifier rather than a dedicated keyword — e.g. `occurrence def TestResult`
+        // (D0032 retype), `connection def`, `port def`. Register the defined name as a
+        // TypeDef so `: Name` references resolve (bug fix, Sprint 17 / issue005).
+        TokenKind::Ident(_) if matches!(p.peek_next(), TokenKind::Def) => {
+            p.advance(); p.advance(); // consume <ident> 'def'
+            let name = extract_ident_name(p);
+            skip_item(p);
+            Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })))
+        }
+
         _ => { skip_item(p); Ok(None) }
     }
 }
