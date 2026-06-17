@@ -203,10 +203,16 @@ The six workflows (see the spec for detail):
   3. **validate green** before commit (§5).
 - **Commit convention:** prefix commits that change process/schema with `CR: <short rationale>`
   so the audit trail exists before the engine can enforce it.
-- **Doc-sync rides every change:** when you create or change an item type, schema, workflow,
-  process, skill, tool, or template, run the Documentation Sync process
-  (`.engine/processes/doc-sync.sysml`) — fix every doc claim the change invalidates **in the
-  same commit**. Documentation drift was a recorded HIGH critique finding (2026-06-11).
+- **Doc-sync rides every change (run the `doc-sync` skill):** when you create or change an item
+  type, schema, workflow, process, skill, tool, template, or a superseding decision/convention,
+  run the **`doc-sync` skill** (which deploys `.engine/processes/doc-sync.sysml`) — grep the doc
+  surface and fix every doc claim the change invalidates **in the same commit**. Documentation
+  drift was a recorded HIGH critique finding (2026-06-11).
+- **Every process has a downstream deploying skill (D0059).** A process defined without a skill
+  is inert (applied by vigilance, inconsistently). Each process is deployed by its own skill
+  (doc-sync→doc-sync, architectural-critique→architectural-critique) or a consuming ceremony skill
+  (DoR→sprint-planning, DoD→sprint-closeout, agile-workflow→sprint-*). A process with no deploying
+  skill is an orphan. Cement recurring process work in skills (generalizes D0040).
 - **Corrections become permanent guards (D0047):** a defect or correction found mid-work that
   reveals a *recurrable* process gap MUST be (1) logged as a tracked `Issue` and (2) given a
   permanent automated guard (validator / pre-commit check / lint) — never patched silently.

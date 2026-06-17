@@ -140,6 +140,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to audit/critique the engine or processes; on the architectural-critique process; periodic stress-test.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part docSync : AISkill {
+        :>> id = "d6e0a3c2-7e4f-4a9b-8c2d-3f8e5b1d9f72";
+        :>> title = "doc-sync";
+        :>> purpose = "Deploy the Documentation Sync process (D0059): on any change to a type/schema/workflow/process/skill/tool/template/superseding-decision/convention, grep the doc surface and fix every invalidated claim IN THE SAME COMMIT. The deploying skill for .engine/processes/doc-sync.sysml.";
+        :>> location = ".engine/skills/doc-sync/SKILL.md";
+        :>> triggerCondition = "Any CHANGE (§3a) or schema/process/skill/tool edit; before committing such a change.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part statusReport : AISkill {
         :>> id = "c820fk6f-3b78-4e0c-de13-3b60b7k6j333";
         :>> title = "status-report";
