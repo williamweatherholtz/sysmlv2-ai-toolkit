@@ -173,10 +173,10 @@ package ProjectIssues {
 
     part issue017 : Issue {
         :>> id = "3e4f5061-7283-4940-487f-1324a5b6c7e8";
-        :>> title = "Cross-cutting concerns (status, suspicion) are computed externally; SysML v2 metadata is the idiomatic carrier — fold into the trackedMetadata migration";
+        :>> title = "CLARIFIED (D0055): metadata-for-cross-cutting splits into authored attrs (=trackedMetadata, D0053) and computed concerns (status/suspicion) which must STAY computed — reject storing them";
         :>> createdAt = "2026-06-16";
         :>> authoredBy = "wweatherholtz";
-        :>> description = "Benchmark + SysML v2 research: metadata is the standard mechanism for cross-cutting concerns (status, suspicion, security) across metatypes (confirmed in D0053). We compute suspicion/status externally (orient) rather than as attachable typed metadata. This is the same @Tracked-metadata direction already deferred in D0053 — so it folds into trackedMetadataReplan rather than being a separate effort. Preventing change: when scoping trackedMetadataReplan, include cross-cutting status/suspicion metadata, not just id/title/createdAt/authoredBy.";
+        :>> description = "Original wording conflated two cases (it read as unclear because it was half-wrong): (a) AUTHORED cross-cutting attributes (id/title/createdAt/authoredBy) — metadata IS the right carrier, but that is exactly the @Tracked migration already deferred to trackedMetadataReplan (D0053); no new work. (b) COMPUTED cross-cutting concerns (status, suspicion) — the source suggested storing these as metadata too; that is REJECTED, it would violate §2.1 (computed views are never stored). Status/suspicion stay computed (orient). Net: this issue is subsumed by D0053 for (a) and closed-as-wontfix for (b). The only standalone cheap enrichment from the benchmark is issue016. See D0055.";
         :>> discoveredInField = true;
         :>> relatedTask = "trackedMetadataReplan";
     }
