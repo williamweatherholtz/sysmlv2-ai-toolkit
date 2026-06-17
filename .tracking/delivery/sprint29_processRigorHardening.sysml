@@ -27,6 +27,7 @@ package ProjectDeliveryS29 {
     action def DeliveryRunS29 {
         action storyProcessRigorHardening;
         verification storyProcessRigorHardeningDoD : Test { :>> id = "63940516-2c7d-4e8f-a029-516273849502"; :>> method = VerificationMethod::inspect; :>> procedureText = "bootstrapExitEvalDoD (pass): D0064 recorded (bootstrap over -> retire §3e sprint-exemption + 'until runtime exists' framings; mandate sprints for substantive work; durable §4 rules kept; meta-process freeze out of scope); CLAUDE.md surgery (header status, §3 mandatory triage-first + flag-non-mapping, §3e retired, §4 framings) done + doc-synced; enforcement (no-sprint guard + triage skill + hook) queued as sprint30/issue020; validate_instances green."; }
+        part storyProcessRigorHardeningDoDR1 : TestResult { :>> id = "cc95fa41-019b-4818-a166-944e218c0814"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34fa14d"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification processRigorHardeningRefineGate : Test {
@@ -57,6 +58,7 @@ package ProjectDeliveryS29 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "D0064 recorded; CLAUDE.md surgery applied (header status; §3 mandatory triage-first + flag-non-mapping; §3e retired; §4 'until runtime exists' framings updated); doc-sync; bootstrapExitEvalDoD recorded pass; validate_instances green. Enforcement queued (sprint30 tasks added).";
     }
+    part processRigorHardeningImplementGateR1 : TestResult { :>> id = "e65654c3-de12-424f-acd3-ddde8fa5291d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34fa14d"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification processRigorHardeningReviewGate : Test {
         :>> id = "63940516-2c7d-4e8f-a029-516273849506";
@@ -66,6 +68,7 @@ package ProjectDeliveryS29 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Diff reviewed: D0064 uses alternatives/criteria convention; CLAUDE.md changes retire exemption without dropping durable rules; no broken internal refs. Phase-3 scan: enforcement deferral is explicit (sprint30/issue020), not dropped.";
     }
+    part processRigorHardeningReviewGateR1 : TestResult { :>> id = "28d4cd78-a315-41ab-acd3-ddde92ca561d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34fa14d"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification processRigorHardeningCloseOutGate : Test {
         :>> id = "63940516-2c7d-4e8f-a029-516273849507";
@@ -75,6 +78,7 @@ package ProjectDeliveryS29 {
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Autonomous closeOut (D0049): story + bootstrapExitEval DoD recorded pass; validate_all green. No human gate (D0051: a recorded Decision + doc edits; the direction was accepted inline this sitting).";
     }
+    part processRigorHardeningCloseOutGateR1 : TestResult { :>> id = "d42f2b8c-2a3a-4618-a166-944e1adb80a8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34fa14d"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 
     verification processRigorHardeningRetroGate : Test {
         :>> id = "63940516-2c7d-4e8f-a029-516273849508";
@@ -82,6 +86,7 @@ package ProjectDeliveryS29 {
         :>> createdAt = "2026-06-17";
         :>> authoredBy = "claudeOpus"; :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::analyze;
-        :>> procedureText = "Autonomous retro (D0049). Root cause of issue020 (the §3e contradiction) is now removed by D0064. ENFORCEMENT still owed (D0047): the no-sprint guard + the per-interaction triage skill + UserPromptSubmit hook are NOT yet built — queued as sprint30 (noSprintGuard, triageRouterSkill). Until the guard exists, the no-sprint rule binds by the (now-mandatory) triage discipline only. WELL: split kept this sprint clean (governance vs enforcement). Estimate 3 pts held.";
+        :>> procedureText = "Autonomous retro (D0049) — avoidable-issue scan. No NEW avoidable issue arose this sprint (the prior one, issue020, is what this sprint addresses). Process improvement delivered: D0064 removes the §3e-vs-practice contradiction that was issue020's root cause. ENFORCEMENT still owed (D0047): the no-sprint guard + per-interaction triage skill + UserPromptSubmit hook are queued as sprint30 (noSprintGuard, triageRouterSkill); until the guard exists the no-sprint rule binds by the now-mandatory triage discipline. WELL: the governance/enforcement split kept this sprint clean. Estimate 3 pts held.";
     }
+    part processRigorHardeningRetroGateR1 : TestResult { :>> id = "8945fd2a-0bed-4c58-a166-944e1e68a868"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34fa14d"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "claudeOpus"; }
 }
