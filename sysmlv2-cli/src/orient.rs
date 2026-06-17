@@ -359,8 +359,9 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
     let done = done_map.values().filter(|&&v| v).count();
     let outstanding = done_map.values().filter(|&&v| !v).count();
 
+    // Rank ready by backlog declaration order (D0052) — priority, not alphabetical.
     let mut ready_sorted = ready;
-    ready_sorted.sort();
+    ready_sorted.sort_by_key(|name| tasks.get(name).map_or(u32::MAX, |t| t.order));
     let mut suspect: Vec<String> = suspect_set.into_iter().collect();
     suspect.sort();
     invalid_evidence.sort();

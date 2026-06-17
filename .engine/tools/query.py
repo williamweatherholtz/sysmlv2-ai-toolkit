@@ -561,7 +561,8 @@ def main():
 
     if sub == "orient":
         out = {"in_progress_sprints": read_sprint_ceremony_status(),
-               "ready": sorted(t for t, i in tasks.items() if i['ready']),
+               # ready ranked by declaration (insertion) order = backlog priority (D0052)
+               "ready": [t for t, i in tasks.items() if i['ready']],
                "suspect": sorted(t for t, i in tasks.items() if i['suspect']),
                "invalidEvidence": sorted(t for t, i in tasks.items() if i['invalidEvidence']),
                "counts": {"done": sum(1 for i in tasks.values() if i['done']),

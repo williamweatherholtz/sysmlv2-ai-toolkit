@@ -32,6 +32,9 @@ pub struct TaskData {
     pub dod_text: Option<String>,
     /// Test results sorted ascending by sequence number.
     pub results: Vec<ResultRecord>,
+    /// Declaration order across the tracking files (backlog priority — D0052).
+    /// Lower = higher priority; ready items are ranked by this, not alphabetically.
+    pub order: u32,
 }
 
 /// Fully extracted project index ready for orient/query computation.
@@ -134,55 +137,59 @@ fn try_extract_result(
         .push(ResultRecord { n, outcome, judged_against });
 }
 
+/// Ensure `name` exists in `tasks`, assigning it the next declaration-order index
+/// (backlog priority, D0052) the first time it is seen.
+fn touch_task(tasks: &mut HashMap<String, TaskData>, counter: &mut u32, name: &str) {
+    if !tasks.contains_key(name) {
+        let order = *counter;
+        *counter += 1;
+        tasks.insert(name.to_owned(), TaskData { order, ..Default::default() });
+    }
+}
+
+fn set_dod(tasks: &mut HashMap<String, TaskData>, counter: &mut u32, task: &str, text: String) {
+    touch_task(tasks, counter, task);
+    if let Some(t) = tasks.get_mut(task) {
+        t.dod_text = Some(text);
+    }
+}
+
 fn extract_items(
     pkg: &Package,
     tasks: &mut HashMap<String, TaskData>,
+    counter: &mut u32,
     edges: &mut Vec<(String, String)>,
     ordering_only: &mut HashSet<(String, String)>,
     raw_results: &mut HashMap<String, Vec<ResultRecord>>,
 ) {
     for item in &pkg.items {
         match item {
-            Item::ActionDecl(a) => {
-                tasks.entry(a.name.clone()).or_default();
-            }
+            Item::ActionDecl(a) => touch_task(tasks, counter, &a.name),
             Item::Succession(s) => {
                 push_succession(&s.first, &s.then, s.is_ordering_only, edges, ordering_only);
             }
             Item::Verification(v) => {
                 if let Some(task) = strip_dod_suffix(&v.name) {
-                    let text = str_attr(&v.attributes, "procedureText");
-                    tasks.entry(task).or_default().dod_text = Some(text);
+                    set_dod(tasks, counter, &task, str_attr(&v.attributes, "procedureText"));
                 }
             }
             Item::Part(p) => {
-                try_extract_result(
-                    &p.name,
-                    p.type_name.as_deref(),
-                    &p.attributes,
-                    raw_results,
-                );
+                try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, raw_results);
             }
             Item::ActionDef(def) => {
                 for a in &def.actions {
-                    tasks.entry(a.name.clone()).or_default();
+                    touch_task(tasks, counter, &a.name);
                 }
                 for s in &def.successions {
                     push_succession(&s.first, &s.then, s.is_ordering_only, edges, ordering_only);
                 }
                 for v in &def.verifications {
                     if let Some(task) = strip_dod_suffix(&v.name) {
-                        let text = str_attr(&v.attributes, "procedureText");
-                        tasks.entry(task).or_default().dod_text = Some(text);
+                        set_dod(tasks, counter, &task, str_attr(&v.attributes, "procedureText"));
                     }
                 }
                 for p in &def.parts {
-                    try_extract_result(
-                        &p.name,
-                        p.type_name.as_deref(),
-                        &p.attributes,
-                        raw_results,
-                    );
+                    try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, raw_results);
                 }
             }
             _ => {}
@@ -218,9 +225,10 @@ pub fn extract(tracking: &Path) -> ExtractedIndex {
     let mut edges: Vec<(String, String)> = Vec::new();
     let mut ordering_only: HashSet<(String, String)> = HashSet::new();
     let mut raw_results: HashMap<String, Vec<ResultRecord>> = HashMap::new();
+    let mut order_counter: u32 = 0;
 
     for pkg in &packages {
-        extract_items(pkg, &mut tasks, &mut edges, &mut ordering_only, &mut raw_results);
+        extract_items(pkg, &mut tasks, &mut order_counter, &mut edges, &mut ordering_only, &mut raw_results);
     }
 
     // Attach sorted results to known tasks only (no phantom tasks from result names).
