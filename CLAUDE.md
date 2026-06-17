@@ -142,6 +142,12 @@ it even though it produces no action. Never a document blob.
   it from an instruction to "do the sign-offs," from the underlying work being done, or from
   your own judgment. (test / analysis / inspection / demonstration are recorded from their
   own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
+- **Sprint ceremony is autonomous; the human gate is the per-sitting review (D0049).**
+  Per-sprint closeOut (`method=inspect`) and retro (`method=analysis`) are AI-recorded with
+  NO human sign-off — a sprint closes when its DoD passes, and the retro autonomously turns
+  *avoidable* issues into tracked items. The single human `confirmation` is the per-**sitting**
+  sprint review (a sitting = one work session, ≥1 sprint), where the human accepts the
+  sitting's content (batchable, D0019). Do not pause to confirm individual sprint ends.
 - **Every recorded fact carries provenance:** *who* (`authoredBy` / `verifiedBy`), *when*
   (an authored ISO-8601 `*At` timestamp — the attestation time is its own irreducible fact,
   distinct from the commit date), and the commit it was made against (`verifiedAtCommit`,
@@ -263,3 +269,11 @@ See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts befo
   `| Out-Null`, `> $null`) — the kernel JVM holds the pipe and the shell HANGS. Run plain.
 - Interrupted kernel runs can orphan JVMs: `python .engine/tools/kill_stale_kernels.py`.
 - SysML validation requires the `sysml` conda env (Jupyter SysML kernel, OpenJDK).
+- **Use absolute paths in shell commands; don't rely on cwd (issue013).** The Bash and
+  PowerShell tools share one working directory, so a `cd` in one silently changes the cwd
+  the other sees and breaks later relative-path commands. Pass absolute paths to scripts
+  and files (scripts like `query.py` self-locate the repo, so cwd doesn't matter to them).
+- **Validation-path tools must be kernel-free where possible (D0048).** A tool that gates
+  commits or routine checks should not start the JVM kernel — it's slow and orphans JVMs
+  (the leak W1 fixed). `parity_check.py` learned this the hard way; the Rust path is the
+  fast default.

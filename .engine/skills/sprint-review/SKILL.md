@@ -1,23 +1,30 @@
 ---
 name: sprint-review
 description: |
-  Guides the sprint Review phase: verify DoD criteria pass, record actualHours,
-  compute velocity/efficiency/accuracy metrics, and perform a transcript review
-  that converts errors/inefficiencies/bad-directions into process-improvement
-  items routed to retro. Use at the review gate, or when asked "sprint review,"
-  "what's our velocity," "how accurate were our estimates," or "review this sprint."
+  The per-SITTING human review (D0049) — the single human confirmation touchpoint.
+  After a sitting (one or more sprints), summarize the sitting's content + metrics,
+  run the transcript scan that feeds the autonomous retro, present it to the human,
+  and record their explicit confirmation of the sitting. Use when asked "sprint
+  review," "review the sitting," "what's our velocity," or at the end of a sitting.
 metadata:
-  version: 0.1.0
-  domain: [agile, sprint-review, metrics, velocity, efficiency, process-improvement, SysMLv2]
+  version: 0.2.0
+  domain: [agile, sprint-review, sitting, human-confirmation, metrics, process-improvement, SysMLv2]
   writePolicy: direct
   engine: sysmlv2-ai-toolkit
 ---
 
-# sprint-review
+# sprint-review (per-sitting, human-confirmed)
 
-Covers the Review phase of the Delivery workflow. Two distinct outputs:
-1. **Metrics snapshot** — velocity, efficiency, accuracy for this sprint + trailing trend.
-2. **Improvement queue** — findings from transcript review, dispatched to retro.
+The human touchpoint of the ceremony (D0049). Per-sprint closeOut + retro run
+autonomously (sprint-closeout / sprint-retro skills); the human does NOT gate each
+sprint. Instead, after a **sitting** (one continuous work session, ≥1 sprint), this
+review presents the sitting's content and records the human's explicit confirmation.
+
+Three outputs:
+1. **Sitting summary** — the sprints completed this sitting + what shipped.
+2. **Metrics snapshot** — velocity, efficiency, accuracy + trailing trend.
+3. **Improvement queue** — transcript-scan findings (feeds the autonomous retro).
+4. **Human confirmation** — the human accepts the sitting's content (the one gate).
 
 ## Expert Vocabulary Payload
 
@@ -100,11 +107,22 @@ improvement_items:
 4. **Route high-priority items to retro** for immediate action. Medium/low go into the
    backlog or are held for the next retro.
 
-## Phase 4 — Record the Review Gate
+## Phase 4 — Human confirmation of the sitting (the one gate, D0049)
 
-Once metrics are computed and improvement items are identified, record the review gate
-TestResult (method = inspect). The `procedureText` should reference the decisions reviewed
-for consistency.
+This is the single human touchpoint. Per-sprint review gates may be recorded
+autonomously (method=inspect, AI) as a technical check; the HUMAN gate is here, at
+sitting granularity:
+
+1. **Present the sitting** — list its sprints, what each shipped, the metrics, and the
+   improvement items the retro will/​did dispatch.
+2. **Ask for explicit confirmation:**
+   > "Sitting review: sprints [N..M] — [summary]. Do you accept this sitting's content?"
+   This is a `method=confirmation` attestation (D0016): never inferred, always the
+   human's explicit word. Confirmations across the sitting's sprints may be batched
+   (D0019) onto a single "yes."
+3. **Record** the per-sitting review confirmation (`judgedBy = wweatherholtz`) once given.
+   closeOut + retro for the sitting's sprints are already autonomous — they do not wait
+   on this; this is sitting acceptance, not a per-sprint blocker.
 
 ## Anti-Patterns
 

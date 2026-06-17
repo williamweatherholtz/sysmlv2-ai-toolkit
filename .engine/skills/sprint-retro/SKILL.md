@@ -1,108 +1,89 @@
 ---
 name: sprint-retro
 description: |
-  Guides the Retro phase of a sprint: consume improvement items from the sprint-review
-  transcript analysis, classify each by remediation type, dispatch accepted items to
-  the right process (skill update / Decision / CLAUDE.md / backlog), and record the
-  retro gate confirmation. Use at the retro gate, or when asked "retrospective,"
-  "retro," "what should we improve," or "process improvement."
+  Autonomously retrospects the just-finished sprint (D0049): scans the sprint for
+  AVOIDABLE issues — problems a guard, skill, doc, or check could have prevented —
+  and creates tracked Issue + backlog items for the fixes, then records the retro
+  gate (method=analysis, AI-judged) with NO human input. Use at the retro gate, or
+  when asked "retro," "what could we have avoided," or "what should we improve."
+  The human does not gate the retro (that moved to the per-sitting sprint review).
 metadata:
-  version: 0.1.0
-  domain: [agile, retrospective, process-improvement, continuous-improvement, SysMLv2]
+  version: 0.2.0
+  domain: [agile, retrospective, avoidable-issues, continuous-improvement, autonomous, SysMLv2]
   writePolicy: direct
   engine: sysmlv2-ai-toolkit
 ---
 
-# sprint-retro
+# sprint-retro (autonomous)
 
-Covers the Retro phase of the Delivery workflow — the last ceremony of each sprint.
-Its job: convert improvement findings from the sprint-review transcript scan into
-**concrete, tracked process changes** dispatched to the right place, then close the
-sprint permanently.
+The last per-sprint ceremony. Runs WITHOUT human input (D0049). Its job: find what
+was **avoidable** in the sprint and turn each into a tracked, actionable item — so the
+next sprint can't repeat it. Human acceptance is NOT sought here; it happens once per
+sitting at the sprint review (sprint-review skill).
 
-## The Three Retro Questions
+## What counts as an AVOIDABLE issue
 
-1. **What went well?** — identify and reinforce practices worth keeping.
-2. **What didn't go well?** — improvement items from sprint-review Phase 3.
-3. **What will we change?** — accepted improvements dispatched to process.
+A problem is *avoidable* if some durable artifact — a guard, validator, lint, skill
+rule, doc line, or check — could have prevented it or caught it earlier. The test:
+*"what one change would have stopped this from happening, or surfaced it immediately?"*
 
-## Behavioral Instructions
+| Signal (from the sprint transcript + git + diffs) | Avoidable by …                    |
+|---------------------------------------------------|-----------------------------------|
+| A correction the human had to point out           | a guard/lint that fails on it     |
+| A check done by hand that should be automatic      | wiring it into a validator/hook   |
+| Acting before classifying / skipped ceremony step  | a guard (e.g. validate_ceremony)  |
+| Re-did work after a wrong approach                 | a skill rule / clearer DoR        |
+| A tool in the validation path that hung/leaked     | a design rule (e.g. kernel-free)  |
+| Doc said X but reality was Y                        | doc-sync in the same commit       |
+| Estimate off by >2× vs guideline                   | record for accuracy calibration   |
 
-1. **Load improvement items** from the sprint-review output (Phase 3 transcript scan).
-   If sprint-review was not yet run, run it first — do not retro without findings.
+Not every annoyance is avoidable — a genuine one-off (an upstream outage, a
+truly-novel discovery) is a `retro-note`, not an item. Apply judgment; do not
+manufacture items.
 
-2. **Triage each item** by remediation type and priority:
+## Behavioral Instructions (autonomous)
 
-   | Type              | Dispatch to                                       | Condition                     |
-   |-------------------|---------------------------------------------------|-------------------------------|
-   | `skill-update`    | Edit the named skill's SKILL.md                   | Always — skills are process   |
-   | `claude-md-change`| Edit CLAUDE.md at the referenced section          | Accept if structural          |
-   | `decision`        | New Decision file in `.engine/decisions/`         | Capture even if no action     |
-   | `backlog-item`    | New `action` in backlog's `DeliveryRun`           | If tooling/automation needed  |
-   | `retro-note`      | Log but do not act; revisit next retro if recurs  | One-off incidents only        |
-
-3. **Apply accepted skill-updates** inline during the retro (they are process/CHANGE
-   items — get explicit human acceptance per §3a, then apply, validate, commit `CR:`).
-
-4. **Record accepted decisions** as new Decision files immediately — not "later."
-   The critique finding that prompted D0038+ was that CRs were missing their Decision
-   records for ~11 consecutive sprints. Do not let that recur.
-
-5. **Add accepted backlog items** to `.tracking/backlog.sysml` DeliveryRun action def.
-
-6. **Validate green** after any skill/schema/process changes.
-
-7. **Confirm process improvements with the human** before applying. Retro changes are
-   CHANGE-category work (§3a) — they need explicit acceptance.
-
-8. **Record the retro gate TestResult** (method = confirmation) with explicit human
-   sign-off. After applying all accepted improvements, ask:
-   > "Sprint N retro complete. Process improvements recorded/applied: [list].
-   >  Do you accept the retro as complete?"
-
-## Continuous Improvement Capture (between sprints)
-
-When improvement items surface mid-sprint (not just at retro), capture them as
-`Issue` items in `.tracking/issues.sysml` with `relatedTask` pointing to the
-relevant backlog action. This prevents them from being lost before the next retro.
-Record as: `part issueXxx : Issue { :>> description = "..."; :>> discoveredInField = false; }`.
+1. **Scan the just-finished sprint** — its conversation, commits, and diffs — for the
+   signals above. (If a sprint-review Phase-3 scan already produced improvement_items,
+   start from those.)
+2. **For each finding, decide avoidable vs one-off.** One-offs → a brief `retro-note`
+   in the retro gate result text. Avoidable → an item (next step).
+3. **Create a tracked item for each avoidable issue:**
+   - An `Issue` in `.tracking/issues.sysml` (`part issueNNN : Issue { … relatedTask = "…" }`)
+     describing the incident + the preventing change.
+   - If it needs tooling/automation, a backlog `action` + `…DoD` in the relevant
+     `action def` (the change to make).
+   - If a guard is cheap and obvious, building it now is in-scope (per D0047 the
+     correction must become a permanent guard, not a note).
+4. **Record the retro gate** TestResult: `method = analysis`, `judgedBy` = the AI actor,
+   `judgedAgainst` = HEAD. NO human confirmation (D0049).
+5. **Do NOT ask the human to accept.** Acceptance is the per-sitting sprint review.
+   Schema/process changes still validate green + commit `CR:`; doc-sync rides along.
 
 ## Anti-Patterns
 
-- **Retro without transcript review** — "nothing to improve" is almost never true.
-  Sprint-review Phase 3 surfaces what conversation-level memory misses.
-- **Improvement items as prose** — "we should be more careful" is not actionable.
-  Every item must be typed (skill-update/decision/etc.) with a target and a specific fix.
-- **Applying improvements without human acceptance** — retro changes are CHANGE-category.
-  Present, accept, then apply. Not the other way around.
-- **Silently discarding retro-notes** — log them. If the same note recurs three sprints
-  in a row, it is no longer a one-off: escalate to a tracked improvement item.
-- **Skipping the retro** — every sprint has a retro gate, even if the sprint was trivial.
-  A trivial retro takes two minutes. Skipping it means improvements accumulate silently.
+- **Waiting for human sign-off** — the retro is autonomous now (D0049). Don't block.
+- **Notes instead of items** — "we should be careful" is not trackable. Every
+  avoidable finding becomes an Issue/backlog item with a concrete preventing change.
+- **Manufacturing items** — a true one-off is a retro-note; don't inflate the count.
+- **Patching without guarding** — if the fix is a guard, build/track it (D0047), don't
+  just describe it.
 
 ## Output Format
 
 ```yaml
-sprint_retro: Sprint N
-went_well:
-  - "<observation>"
-improvement_items_reviewed: <count>
-accepted:
-  - item: "<incident>"
-    type: skill-update | claude-md-change | decision | backlog-item
-    target: "<skill / section / file>"
-    status: applied | recorded | queued
-deferred:
-  - item: "<incident>"
-    reason: "<why deferred>"
-retro_gate_result: recorded | PENDING_CONFIRMATION
+sprint_retro: Sprint N   (autonomous)
+avoidable_issues:
+  - incident: "<one sentence>"
+    preventing_change: "<guard / skill rule / doc / backlog item>"
+    tracked_as: "issueNNN" | "backlog:<action>" | "applied:<file>"
+one_off_notes:
+  - "<retro-note>"
+retro_gate_result: recorded (method=analysis, AI)
 ```
 
 ## Questions This Skill Answers
 
-- "Retrospective" / "retro"
-- "What should we improve?"
-- "Process improvement"
-- "Apply the improvement items"
-- "Close the sprint"
-- "Were there any process violations this sprint?"
+- "Run the retro" / "What could we have avoided this sprint?"
+- "Make items for the avoidable issues"
+- "Close the sprint's retro"

@@ -120,6 +120,16 @@ package ProjectIssues {
         :>> relatedTask = "rustToolchainFix";
     }
 
+    part issue013 : Issue {
+        :>> id = "fc012d3e-4f50-4126-376f-1324a5b6c7df";
+        :>> title = "Shared cwd between the Bash and PowerShell tools: a `cd` in one silently breaks later relative-path commands in the other (Sprint 17 avoidable issue)";
+        :>> createdAt = "2026-06-16";
+        :>> authoredBy = "claudeOpus";
+        :>> description = "During Sprint 17 a `cd .tracking` in a Bash tool call changed the working directory seen by subsequent PowerShell tool calls, so `python .engine/tools/query.py ...` failed with 'file not found' until invoked by absolute path. Avoidable: always use absolute paths for script/file args in shell commands, and never rely on cwd persisting (or rely on it only within a single call). Preventing change applied: CLAUDE.md §6 note. Discovered by the autonomous retro (D0049).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "rustToolchainFix";
+    }
+
     part issue011 : Issue {
         :>> id = "daebfc01-2d3e-4f40-156f-91021324a5b6";
         :>> title = "Sprint ceremony skills are invoked by convention only — the sprint-review Phase-3 transcript scan can be (and in S16 was) skipped, so process-improvement findings are missed";

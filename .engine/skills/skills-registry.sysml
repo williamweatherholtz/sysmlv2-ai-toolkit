@@ -111,7 +111,7 @@ package EngineSkillRegistry {
     part sprintReview : AISkill {
         :>> id = "f597ch3c-0e45-4b7f-ab80-0e37e4h3g000";
         :>> title = "sprint-review";
-        :>> purpose = "Verify DoD, record actualHours, compute velocity/efficiency/accuracy metrics, and run transcript review to produce improvement items.";
+        :>> purpose = "Per-sitting human review (D0049): summarize the sitting's sprints + metrics (velocity/efficiency/accuracy), run the transcript scan that feeds the autonomous retro, and record the human's explicit confirmation of the sitting — the single human gate.";
         :>> location = ".engine/skills/sprint-review/SKILL.md";
         :>> triggerCondition = "Sprint review gate; asked for velocity, efficiency, estimate accuracy, or process issues.";
         :>> writePolicy = WritePolicy::direct;
@@ -119,7 +119,7 @@ package EngineSkillRegistry {
     part sprintCloseout : AISkill {
         :>> id = "a608di4d-1f56-4c8a-bc91-1f48f5i4h111";
         :>> title = "sprint-closeout";
-        :>> purpose = "Verify DoD complete, confirm actualHours set, obtain explicit human sign-off, record confirmation gate TestResult, commit.";
+        :>> purpose = "Autonomously close a sprint (D0049): verify DoD passes, record actualHours, record the closeOut gate (method=inspect, AI-judged) with NO human confirmation, hand off to the autonomous retro.";
         :>> location = ".engine/skills/sprint-closeout/SKILL.md";
         :>> triggerCondition = "Sprint closeOut gate; asked to close or accept a sprint.";
         :>> writePolicy = WritePolicy::direct;
@@ -127,7 +127,7 @@ package EngineSkillRegistry {
     part sprintRetro : AISkill {
         :>> id = "b719ej5e-2a67-4d9b-cd02-2a59a6j5i222";
         :>> title = "sprint-retro";
-        :>> purpose = "Triage improvement items from sprint-review, dispatch accepted items (skill-update/decision/backlog), record retro gate confirmation, close sprint.";
+        :>> purpose = "Autonomously retro the just-finished sprint (D0049): identify AVOIDABLE issues (preventable by a guard/skill/doc/check), create tracked Issue + backlog items for the fixes, record the retro gate (method=analysis, AI-judged) — no human input.";
         :>> location = ".engine/skills/sprint-retro/SKILL.md";
         :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
         :>> writePolicy = WritePolicy::direct;
