@@ -19,7 +19,7 @@ package EngineCritiqueProcess {
     part critique : Process {
         :>> id = "078920a4-2b97-4a19-96ef-f834319b4cbe";
         :>> title = "Antagonistic Architectural Critique";
-        :>> purpose = "Adversarially audit the engine + its processes; end in CR proposals, never applied changes.";
+        :>> purpose = "Adversarially audit the engine + its processes using the CAE+GQM+ATAM framework (D0046); record findings as tracked Issue/Decision items (not prose). Operationalized by the architectural-critique skill.";
         :>> cadence = Cadence::adHoc;
     }
 
@@ -85,22 +85,27 @@ package EngineCritiqueProcess {
     }
     part criSynthesize : ProcessStep {
         :>> id = "01a47b90-0f27-4f9d-92a9-cff44e7d1431";
-        :>> title = "Synthesize change-request proposals";
+        :>> title = "Record findings as tracked items";
         :>> order = 7;
-        :>> actionText = "Dedupe + rank all findings by severity/leverage; convert each "
-                       + "actionable finding into a CR PROPOSAL (change, rationale, impact). "
-                       + "Present for human acceptance; apply NOTHING.";
-        :>> producedArtifact = "Ranked CR proposal list awaiting human acceptance.";
+        :>> actionText = "Dedupe + rank findings by severity x leverage. Record EACH as a "
+                       + "tracked Issue in .tracking/issues.sysml with a concrete preventing "
+                       + "change + relatedTask (NOT a prose doc). An accepted architectural "
+                       + "change becomes a Decision file; a cheap+obvious guard is built now "
+                       + "(D0047). No design-history report blob (prose findings were a HIGH "
+                       + "critique finding; D0046).";
+        :>> producedArtifact = "Tracked Issue items (+ Decisions / guards) ranked by leverage.";
         :>> owner = Owner::ai;
     }
     part criAccept : ProcessStep {
         :>> id = "66e48601-b18f-4deb-acf0-5f690c4f6ac5";
-        :>> title = "Human disposition";
+        :>> title = "Disposition at the per-sitting review";
         :>> order = 8;
-        :>> actionText = "Human accepts / rejects / defers each CR proposal. Accepted ones "
-                       + "enter the normal CHANGE path (§3a); rejections are recorded "
-                       + "Decisions (capture even when no action results).";
-        :>> producedArtifact = "Accepted CRs as backlog work items + recorded Decisions.";
+        :>> actionText = "Present the ranked tracked findings at the per-sitting sprint "
+                       + "review (D0049); the human accepts / defers / rejects. Accepted "
+                       + "changes enter the normal CHANGE path (§3a); rejections are recorded "
+                       + "Decisions (capture even when no action results). The audit does not "
+                       + "block per-finding — items are already tracked.";
+        :>> producedArtifact = "Human disposition recorded against the tracked findings.";
         :>> owner = Owner::human;
     }
 }

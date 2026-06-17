@@ -132,6 +132,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part architecturalCritique : AISkill {
+        :>> id = "c5f0a2b1-6d3e-4f8a-9b1c-2e7d4a0c8e61";
+        :>> title = "architectural-critique";
+        :>> purpose = "Run the antagonistic architecture/process audit with the CAE+GQM+ATAM framework (D0046): attack each claim for refuting evidence, compute the GQM metric set, play ATAM scenarios; record findings as tracked Issue/Decision items (not prose). Operationalizes the architectural-critique process.";
+        :>> location = ".engine/skills/architectural-critique/SKILL.md";
+        :>> triggerCondition = "Asked to audit/critique the engine or processes; on the architectural-critique process; periodic stress-test.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part statusReport : AISkill {
         :>> id = "c820fk6f-3b78-4e0c-de13-3b60b7k6j333";
         :>> title = "status-report";
