@@ -11,8 +11,10 @@ package Decision0049 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
-    part d0049 : Decision {
+    // D0070: this Decision changed the Delivery ceremony (prospective; D0062 default). Grandfathered for resolution (pre-guard).
+    #ProspectiveChange part d0049 : Decision {
         :>> id = "012d3e4f-5061-4237-376f-1324a5b6c7de";
         :>> title = "D0049: autonomous per-sprint closeOut+retro; human confirms per-sitting review";
         :>> createdAt = "2026-06-16";

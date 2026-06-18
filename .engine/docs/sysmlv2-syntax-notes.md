@@ -17,9 +17,12 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
   (the idiomatic v2 replacement for v1 `deriveReqt`/`refine`/`trace`).
 - `:>>` redefinition; `[*]` and `[0..1]` multiplicity.
 - `ref name : Type[0..1];` — reference (non-compositional) features.
-- Metadata application: `#MarkerName <element>` (prefix) and
-  `<element> { @MarkerName; }` (member) both work, including a `#Marker` on a
-  `dependency`.
+- Metadata application: the **prefix** form `#MarkerName <element>` (including a `#Marker` on a
+  `dependency`, a `first..then` succession, or a `part`) is portable — it validates in BOTH the
+  rust authority (D0048) and the kernel. The **member** form `<element> { @MarkerName; }` parses
+  in the KERNEL but the **rust parser REJECTS it** ('unexpected character @') — so prefer the
+  prefix form for anything rust validates (i.e. anything in the repo). (Found 2026-06-18 applying
+  a process-change marker to a Decision part; rust `validate .` caught the member form.)
 - **`#Marker first X then Y;`** succession prefix: `#OrderingOnly first A then B;`
   marks a succession edge as ordering-only (confirmed Sprint 8, 2026-06-15). Works both
   inside `action def` bodies and at package level. The Rust parser preserves the marker
@@ -149,9 +152,14 @@ Decision files are standalone SysML v2 packages. Common mistakes caught by the l
   processes, or workflows. So a Decision file CANNOT reference an element in another package
   (e.g. `#ProspectiveChange dependency from d0049 to Delivery` with `import DeliveryWorkflow`
   fails: both the namespace and the target are unresolvable; a package is also never a valid
-  `dependency` endpoint). Author any cross-package edge (`#CharteredBy`, `#ProspectiveChange`,
-  `#SafetyChange`) in **`.tracking`**, where rust validation is generic (name refs, no
-  cross-resolution). The edge is still semantically *from* the Decision — only its file home moves.
+  `dependency` endpoint). Two ways to live within this:
+  - **Don't reference — mark + compute.** Prefer a self-contained **prefix marker** on the part
+    (`#ProspectiveChange part dNNNN : Decision { ... }`, D0070) and derive the relation from git,
+    over storing a cross-package edge. This is how process-change Decisions record (the marker is
+    in-package, valid in both rust and the kernel — use the prefix form, not `{ @Marker; }`).
+  - **If a genuine cross-package edge is irreducible** (e.g. `#CharteredBy` work→origin, which git
+    cannot derive), author it in **`.tracking`**, where rust validation is generic (name refs, no
+    cross-resolution) — never in the kernel-validated `.engine` Decision file.
 
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 

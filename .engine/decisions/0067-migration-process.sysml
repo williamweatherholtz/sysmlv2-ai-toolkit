@@ -6,8 +6,10 @@ package Decision0067 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
-    part d0067 : Decision {
+    // D0070: this Decision created the migration process (prospective; D0062 default). Grandfathered for resolution (pre-guard).
+    #ProspectiveChange part d0067 : Decision {
         :>> id = "63940516-2c7d-4e8f-a067-516273849571";
         :>> title = "D0067: safe bulk-migration process (expand/migrate/contract + edge-case checklist) as a process + deploying skill";
         :>> createdAt = "2026-06-17";

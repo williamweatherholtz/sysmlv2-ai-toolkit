@@ -12,8 +12,10 @@ package Decision0064 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
-    part d0064 : Decision {
+    // D0070: this Decision changed the Delivery process (mandated sprints; prospective, D0062 default). Grandfathered for resolution (pre-guard).
+    #ProspectiveChange part d0064 : Decision {
         :>> id = "63940516-2c7d-4e8f-b064-516273849564";
         :>> title = "D0064: bootstrap is over — retire the §3e sprint-exemption; substantive work goes through a sprint; mandatory triage-first";
         :>> createdAt = "2026-06-17";

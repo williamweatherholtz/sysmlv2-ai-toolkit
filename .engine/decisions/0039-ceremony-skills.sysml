@@ -2,8 +2,10 @@ package Decision0039 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
-    part d0039 : Decision {
+    // D0070: this Decision changed the Delivery ceremony (prospective; D0062 default). Grandfathered for resolution (pre-guard).
+    #ProspectiveChange part d0039 : Decision {
         :>> id = "ad8d3ec2-0a1b-4c2d-def3-4b5c6d7e8f9a";
         :>> title = "ceremony-skills: sprint-planning/standup/review/closeout/retro skills added; transcript review in sprint-review; engine-triage ceremony routing table added";
         :>> status = DecisionStatus::accepted;

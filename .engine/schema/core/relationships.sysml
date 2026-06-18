@@ -33,17 +33,18 @@ package EngineRelationships {
     // lineage; the governing process VERSION is COMPUTED as-of the charter's creation commit.
     metadata def CharteredBy;
 
-    // #ProspectiveChange / #SafetyChange: a process-change Decision -> the Process MODULE it
-    // changed (D0068/D0069, process-governance). The class encodes RETROACTIVITY: prospective =
-    // outputs chartered under the prior version stay valid (accept-what-satisfied-the-then-process,
-    // D0062); safety = downstream items under the superseded version are mandatory reprocess
-    // candidates. The effective commit = that Decision's acceptance-event judgedAgainst (no new
-    // field); the governing version is COMPUTED by git-traversal (D0069). Authored as a marked
-    // dependency: `#ProspectiveChange dependency from <dNNNN> to <ProcessModule>;`.
-    // HOME: these edges live in .tracking (rust-validated, name-based) — NOT inside the kernel-
-    // validated Decision files, because validate_instances loads each .engine file in isolation
-    // (schema/core only) and cannot resolve a cross-package target like Delivery. See issue017 +
-    // sysmlv2-syntax-notes (cross-package refs must be authored where validation is generic).
+    // #ProspectiveChange / #SafetyChange: marks a Decision AS a process change + its RETROACTIVITY
+    // (D0068/D0070, process-governance). prospective = outputs chartered under the prior version
+    // stay valid (D0062 default); safety = downstream items are mandatory reprocess candidates.
+    // Applied as a PREFIX MARKER on the Decision part itself, in its own file (in-package, valid
+    // in BOTH rust and the kernel): `#ProspectiveChange part dNNNN : Decision { ... }`. (The
+    // `{ @Marker; }` member form parses in the kernel but the rust authority rejects it.) NO
+    // cross-reference to the process is stored — which-process + when are COMPUTED from git (the file(s)
+    // changed in that Decision's commit), made reliable by the keystone hard-lock guard (a
+    // process-def change must co-commit such a Decision, or the commit fails). This SUPERSEDES
+    // D0069's stored `#... dependency from dNNNN to <Process>` edge (which forced a floating
+    // .tracking file — issue021); the member-marker form removes the cross-package reference
+    // entirely, so issue021 dissolves. List: `query.py process-changes`.
     metadata def ProspectiveChange;
     metadata def SafetyChange;
 }

@@ -538,25 +538,30 @@ def read_charter_edges():
     return edges
 
 
-_PROC_CHANGE = re.compile(r'#(ProspectiveChange|SafetyChange)\s+dependency\s+from\s+(\w+)\s+to\s+(\w+)')
+# Prefix-marker form `#ProspectiveChange part dNNNN : Decision` (the rust parser rejects the
+# `{ @Marker; }` member form). Anchored at line-start (MULTILINE) so a real declaration matches
+# but an EXAMPLE inside a quoted string (prose) does not.
+_PROC_CHANGE = re.compile(
+    r'^[ \t]*#(ProspectiveChange|SafetyChange)\s+part\s+(\w+)\s*:\s*Decision\b',
+    re.MULTILINE)
 
 
-def read_process_change_edges():
-    """#ProspectiveChange / #SafetyChange edges (D0068/D0069, pglProcessRef) — kernel-free: a
-    process-change Decision -> the Process module it changed, with its retroactivity class. The
-    minimal authored input from which pglViews (Inc 3) computes the governing version of any work
-    item by git-traversal. retroactivity: 'prospective' (then-process outputs stay valid, D0062)
-    or 'safety' (downstream items are mandatory reprocess candidates)."""
-    edges = []
-    for f in tracking_files():
+def read_process_change_decisions():
+    """Process-change Decisions (D0068/D0070) — kernel-free: a Decision carrying a
+    @ProspectiveChange / @SafetyChange MEMBER MARKER on its part is a process change, with that
+    retroactivity class. NO process linkage is stored — which process(es) it governs + when are
+    COMPUTED from git (the process-def file(s) changed in that Decision's commit), the Inc-3
+    resolver (pglViews). retroactivity: 'prospective' (then-process outputs stay valid, D0062
+    default) or 'safety' (downstream items are mandatory reprocess candidates)."""
+    out = []
+    for f in sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml"))):
         with open(f, encoding="utf-8") as fh:
             for m in _PROC_CHANGE.finditer(fh.read()):
-                edges.append({
+                out.append({
                     "decision": m.group(2),
-                    "process": m.group(3),
                     "retroactivity": "safety" if m.group(1) == "SafetyChange" else "prospective",
                 })
-    return edges
+    return out
 
 
 def classify(tasks, ordering_only=frozenset()):
@@ -661,13 +666,9 @@ def main():
             print(json.dumps({"charter_edges": edges}, indent=2))
         return
     if sub == "process-changes":
-        edges = read_process_change_edges()
-        if arg:
-            # all process-change edges for one process module (e.g. Delivery)
-            hits = [e for e in edges if e["process"] == arg]
-            print(json.dumps({"process": arg, "changes": hits}, indent=2))
-        else:
-            print(json.dumps({"process_change_edges": edges}, indent=2))
+        # The process-change Decisions + their retroactivity class (D0070). Which process each
+        # governs is git-derived (the Inc-3 resolver, pglViews) — not filtered here.
+        print(json.dumps({"process_change_decisions": read_process_change_decisions()}, indent=2))
         return
 
     km, kc = _kernel.start()
