@@ -64,8 +64,16 @@ dependency unresolved; DoD criteria exist or are authored during refine.
 4. **Set `estimatedPoints`** on the Sprint Story before any implementation begins.
    Record it in the sprint delivery file (`.tracking/delivery/sprintN_*.sysml`).
 
+4b. **Charter the Story (D0068/D0069) — at prep, not hoped.** In the delivery file, author a
+   `#CharteredBy` edge from the sprint Story to the originating backlog item / Decision / Need /
+   Requirement that chartered the work: `#CharteredBy dependency from <story> to <dNNNN|need|req>;`
+   (import `EngineRelationships::*`). This is the work→origin lineage the governing-process VERSION
+   is computed from (pglViews). The charter guard (`validate_charter.py`) FAILS any newly-added
+   sprint whose Story has no `#CharteredBy` edge — so set it now.
+
 5. **Run the DoR checklist:**
    - estimatedPoints set ✓
+   - `#CharteredBy` edge set on the Story (charter lineage, D0068) ✓
    - Scope / acceptance criteria unambiguous ✓
    - No blocking dependency or dependency is explicitly listed ✓
    - DoD tests exist or will be authored in refine ✓

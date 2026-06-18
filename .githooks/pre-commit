@@ -72,6 +72,14 @@ if echo "$all_staged" | grep -qE '^\.tracking/(backlog\.sysml|delivery/)'; then
         echo "pre-commit: SPRINT COVERAGE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
+# Charter-edge guard (pure-Python, no kernel) — D0068/D0069/D0047. Fails if a NEWLY ADDED
+# delivery Story has no #CharteredBy edge (work->origin charter lineage enforced at prep, not hoped).
+if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
+    echo "pre-commit: validate_charter.py"
+    python "$V/validate_charter.py" || {
+        echo "pre-commit: CHARTER GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     echo "pre-commit: cargo clippy"
