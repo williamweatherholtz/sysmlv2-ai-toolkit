@@ -102,4 +102,24 @@ package EngineViewpoints {
         :>> sources = "all decisions; flag any status=accepted Decision with no passing dNNNNAcceptR1 TestResult (extensible to other process-required attestations)";
         :>> renderer = "query.py attestation-coverage";
     }
+
+    part governingVersionVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a070-516273849630";
+        :>> title = "governing-version";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which version of its governing process did a work item follow — i.e. what process was in force AS-OF the item's charter (charter-time freeze, D0068), so an output can be accepted against the process it actually satisfied (D0062) and audited / regenerated?";
+        :>> audience = "maintainer / auditor / reviewer";
+        :>> sources = "git ancestry (D0013): the process-def state at the latest change-commit that is an ancestor of the item's introduction commit; correlated with process-change Decisions (#ProspectiveChange/#SafetyChange markers, D0070) in force at vs. after the charter; work->process by convention (D0069)";
+        :>> renderer = "query.py governing-version <item>";
+    }
+
+    part reprocessVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a070-516273849631";
+        :>> title = "reprocess-candidates";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which items were chartered under a process version later superseded by a SAFETY change, and so must be re-processed against the new process (mandatory iff retroactivity=safety; prospective changes never flag — D0062)?";
+        :>> audience = "maintainer / safety reviewer";
+        :>> sources = "governing-version per item x process-change Decisions whose retroactivity=safety and whose effective commit post-dates the item's charter (git ancestry, D0070)";
+        :>> renderer = "query.py reprocess-candidates";
+    }
 }

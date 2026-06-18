@@ -50,6 +50,8 @@ the layer you touched.
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 | Charter work to its origin | `#CharteredBy dependency from <workItem> to <decision/need/requirement>;` (import `EngineRelationships::*`) — the charter-lineage edge (D0068). Traverse: `python .engine/tools/query.py charter [<item>]`. |
 | Record a process change | Prefix the Decision part with `#ProspectiveChange` (or `#SafetyChange` if downstream items must be reprocessed) — `#ProspectiveChange part dNNNN : Decision { ... }` (import `EngineRelationships::*`); which process + when are git-derived (D0070). List: `python .engine/tools/query.py process-changes`. |
+| Which process version governed an item | `python .engine/tools/query.py governing-version <storyName>` — the process-def state as-of the item's charter (charter-time freeze, D0068) + which process-change Decisions were in force then vs. after (D0070). |
+| What must be re-processed after a safety change | `python .engine/tools/query.py reprocess-candidates` — items chartered under a process version later superseded by a `#SafetyChange` (prospective changes never flag — D0062). |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)
 

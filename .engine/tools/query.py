@@ -548,7 +548,7 @@ _PROC_CHANGE = re.compile(
 
 def read_process_change_decisions():
     """Process-change Decisions (D0068/D0070) — kernel-free: a Decision carrying a
-    @ProspectiveChange / @SafetyChange MEMBER MARKER on its part is a process change, with that
+    #ProspectiveChange / #SafetyChange PREFIX MARKER on its part is a process change, with that
     retroactivity class. NO process linkage is stored — which process(es) it governs + when are
     COMPUTED from git (the process-def file(s) changed in that Decision's commit), the Inc-3
     resolver (pglViews). retroactivity: 'prospective' (then-process outputs stay valid, D0062
@@ -561,6 +561,132 @@ def read_process_change_decisions():
                     "decision": m.group(2),
                     "retroactivity": "safety" if m.group(1) == "SafetyChange" else "prospective",
                 })
+    return out
+
+
+# --- pglViews: the git-traversal process-governance RESOLVER (D0068/D0069/D0070, Inc 3) ----------
+# Reads the now-guarded authored inputs (process-change markers + charter edges) and COMPUTES, by
+# git ancestry, the process version that governed any work item AS-OF its charter — never a stored
+# per-item stamp (D0070). work->process is by CONVENTION/kind (D0069).
+
+# Convention: which process-def file governs an item of a given declared type (D0069).
+_GOVERNING_PROCESS = {
+    "Story": ".engine/workflows/delivery.sysml",  # a sprint Story is governed by Delivery
+}
+
+
+def _git_lines(*args):
+    r = subprocess.run(["git", "-C", REPO, *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    return [ln.strip() for ln in r.stdout.splitlines() if ln.strip()] if r.returncode == 0 else []
+
+
+def _item_intro_commit(name):
+    """The commit that INTRODUCED a named item into .tracking/delivery (charter-time anchor,
+    D0068 charter-time freeze). Earliest commit that changed occurrences of the name."""
+    commits = _git_lines("log", "--format=%H", "--reverse", "-S", name, "--", ".tracking/delivery")
+    return commits[0] if commits else None
+
+
+def _def_change_commits(path):
+    """Commits that changed a process-def file, newest-first."""
+    return _git_lines("log", "--format=%H", "--", path)
+
+
+def _decision_intro_commit(decision_file_rel):
+    """The commit that added a decision file (its effective introduction)."""
+    commits = _git_lines("log", "--diff-filter=A", "--format=%H", "--", decision_file_rel)
+    return commits[-1] if commits else None  # --reverse-equivalent: oldest add
+
+
+def _commit_files(sha):
+    return _git_lines("show", "--name-only", "--format=", sha)
+
+
+def process_change_decisions_full():
+    """Process-change Decisions + effective commit (acceptance-event judgedAgainst, D0069/D0070)
+    + git-DERIVED governed process-def files (the process-defs changed in the Decision's intro
+    commit). Grandfathered decisions (committed before the keystone guard) typically have no
+    co-committed process-def, so governed_defs == [] — honest, not fabricated (D0067)."""
+    out = []
+    for f in sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml"))):
+        rel = os.path.relpath(f, REPO).replace(os.sep, "/")
+        text = open(f, encoding="utf-8").read()
+        for m in _PROC_CHANGE.finditer(text):
+            dec = m.group(2)
+            jm = re.search(rf'\b{re.escape(dec)}AcceptR1\b.*?judgedAgainst\s*=\s*"(\w+)"', text, re.DOTALL)
+            eff = jm.group(1) if jm else None
+            intro = _decision_intro_commit(rel)
+            governed = [p for p in (_commit_files(intro) if intro else [])
+                        if p.endswith(".sysml") and (p.startswith(".engine/processes/")
+                                                     or p.startswith(".engine/workflows/"))]
+            out.append({
+                "decision": dec,
+                "retroactivity": "safety" if m.group(1) == "SafetyChange" else "prospective",
+                "effective_commit": eff,
+                "governed_defs": governed,
+            })
+    return out
+
+
+def governing_version(item):
+    """The process version that governed `item` AS-OF its charter (D0068 charter-time freeze).
+    Pure git: the process-def state at the latest change-commit that is an ancestor of the item's
+    introduction commit, correlated with the process-change Decisions in force then vs. after."""
+    item_commit = _item_intro_commit(item)
+    if not item_commit:
+        return {"item": item, "error": "no introduction commit found in .tracking/delivery"}
+    proc_def = _GOVERNING_PROCESS["Story"]  # convention (only declared kind so far)
+
+    def_commits = _def_change_commits(proc_def)
+    governing = next((c for c in def_commits if _is_ancestor(c, item_commit)), None)
+    later = [c for c in def_commits if not _is_ancestor(c, item_commit)]
+
+    pcs = process_change_decisions_full()
+    in_force, after = [], []
+    for d in pcs:
+        ec = d["effective_commit"]
+        if not ec or not _sha_valid(ec):
+            continue
+        (in_force if _is_ancestor(ec, item_commit) else after).append(d)
+    reprocess = sorted(d["decision"] for d in after if d["retroactivity"] == "safety")
+
+    return {
+        "item": item,
+        "process": "Delivery",
+        "process_def": proc_def,
+        "convention": "a sprint Story is governed by Delivery (D0069 work->process by kind)",
+        "item_commit": item_commit,
+        "governing_version_commit": governing,
+        "process_as_it_was": f"git show {governing}:{proc_def}" if governing else None,
+        "later_version_count": len(later),
+        "decisions_in_force_at_charter": sorted(d["decision"] for d in in_force),
+        "process_changes_after_charter": [
+            {"decision": d["decision"], "retroactivity": d["retroactivity"]} for d in after],
+        "reprocess_required": bool(reprocess),
+        "reprocess_due_to": reprocess,
+        "valid_then": "asserted by the item's own ceremony gates (they encode the process it followed)",
+    }
+
+
+def _all_delivery_stories():
+    out = []
+    for f in sorted(glob.glob(os.path.join(TRACKING_DIR, "delivery", "*.sysml"))):
+        for m in re.finditer(r'^[ \t]*part\s+(\w+)\s*:\s*Story\b', open(f, encoding="utf-8").read(),
+                             re.MULTILINE):
+            out.append(m.group(1))
+    return out
+
+
+def reprocess_candidates():
+    """Items chartered under a process version later superseded by a SAFETY change (mandatory
+    reprocess, D0069); prospective changes do NOT flag (D0062 — then-process outputs stay valid).
+    Empty while no safety change exists — correctly demonstrating the prospective default."""
+    out = []
+    for s in _all_delivery_stories():
+        gv = governing_version(s)
+        if gv.get("reprocess_required"):
+            out.append({"item": s, "due_to": gv["reprocess_due_to"]})
     return out
 
 
@@ -669,6 +795,17 @@ def main():
         # The process-change Decisions + their retroactivity class (D0070). Which process each
         # governs is git-derived (the Inc-3 resolver, pglViews) — not filtered here.
         print(json.dumps({"process_change_decisions": read_process_change_decisions()}, indent=2))
+        return
+    if sub == "governing-version":
+        # pglViews resolver (D0068/D0069/D0070): the process version governing an item as-of its
+        # charter, by git ancestry. Usage: query.py governing-version <storyName>
+        if not arg:
+            print(json.dumps({"error": "usage: governing-version <delivery Story name>"}, indent=2))
+            return
+        print(json.dumps(governing_version(arg), indent=2))
+        return
+    if sub == "reprocess-candidates":
+        print(json.dumps({"reprocess_candidates": reprocess_candidates()}, indent=2))
         return
 
     km, kc = _kernel.start()
