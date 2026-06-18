@@ -33,6 +33,16 @@ if echo "$sysml_staged" | grep -q '^\.engine/decisions/'; then
         echo "pre-commit: ACCEPTANCE-EVENT GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
+# Process-change keystone guard (pure-Python, no kernel) — D0070/D0047. Fails if a process-def
+# file (.engine/processes|workflows) is staged WITHOUT a co-committed #ProspectiveChange/
+# #SafetyChange-marked Decision — the hard lock that keeps the governing process version
+# git-computable (no per-item stamp). Typos included; no intent interpretation.
+if echo "$sysml_staged" | grep -qE '^\.engine/(processes|workflows)/'; then
+    echo "pre-commit: validate_process_change.py"
+    python "$V/validate_process_change.py" || {
+        echo "pre-commit: PROCESS-CHANGE GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+fi
+
 # .tracking changes: validated by the Rust authority (D0048) — fast, no JVM (ends the
 # kernel-leak, issue004). Falls back to the kernel validator if the binary isn't built.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
