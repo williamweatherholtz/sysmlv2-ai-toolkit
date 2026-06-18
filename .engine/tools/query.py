@@ -538,6 +538,27 @@ def read_charter_edges():
     return edges
 
 
+_PROC_CHANGE = re.compile(r'#(ProspectiveChange|SafetyChange)\s+dependency\s+from\s+(\w+)\s+to\s+(\w+)')
+
+
+def read_process_change_edges():
+    """#ProspectiveChange / #SafetyChange edges (D0068/D0069, pglProcessRef) — kernel-free: a
+    process-change Decision -> the Process module it changed, with its retroactivity class. The
+    minimal authored input from which pglViews (Inc 3) computes the governing version of any work
+    item by git-traversal. retroactivity: 'prospective' (then-process outputs stay valid, D0062)
+    or 'safety' (downstream items are mandatory reprocess candidates)."""
+    edges = []
+    for f in tracking_files():
+        with open(f, encoding="utf-8") as fh:
+            for m in _PROC_CHANGE.finditer(fh.read()):
+                edges.append({
+                    "decision": m.group(2),
+                    "process": m.group(3),
+                    "retroactivity": "safety" if m.group(1) == "SafetyChange" else "prospective",
+                })
+    return edges
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -638,6 +659,15 @@ def main():
             print(json.dumps({"item": arg, "charteredBy": ch}, indent=2))
         else:
             print(json.dumps({"charter_edges": edges}, indent=2))
+        return
+    if sub == "process-changes":
+        edges = read_process_change_edges()
+        if arg:
+            # all process-change edges for one process module (e.g. Delivery)
+            hits = [e for e in edges if e["process"] == arg]
+            print(json.dumps({"process": arg, "changes": hits}, indent=2))
+        else:
+            print(json.dumps({"process_change_edges": edges}, indent=2))
         return
 
     km, kc = _kernel.start()

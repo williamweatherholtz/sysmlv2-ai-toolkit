@@ -32,4 +32,18 @@ package EngineRelationships {
     // `#CharteredBy dependency from <workItem> to <charter>;`. Carries process IDENTITY by
     // lineage; the governing process VERSION is COMPUTED as-of the charter's creation commit.
     metadata def CharteredBy;
+
+    // #ProspectiveChange / #SafetyChange: a process-change Decision -> the Process MODULE it
+    // changed (D0068/D0069, process-governance). The class encodes RETROACTIVITY: prospective =
+    // outputs chartered under the prior version stay valid (accept-what-satisfied-the-then-process,
+    // D0062); safety = downstream items under the superseded version are mandatory reprocess
+    // candidates. The effective commit = that Decision's acceptance-event judgedAgainst (no new
+    // field); the governing version is COMPUTED by git-traversal (D0069). Authored as a marked
+    // dependency: `#ProspectiveChange dependency from <dNNNN> to <ProcessModule>;`.
+    // HOME: these edges live in .tracking (rust-validated, name-based) — NOT inside the kernel-
+    // validated Decision files, because validate_instances loads each .engine file in isolation
+    // (schema/core only) and cannot resolve a cross-package target like Delivery. See issue017 +
+    // sysmlv2-syntax-notes (cross-package refs must be authored where validation is generic).
+    metadata def ProspectiveChange;
+    metadata def SafetyChange;
 }

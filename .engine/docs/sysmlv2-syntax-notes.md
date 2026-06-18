@@ -144,6 +144,14 @@ Decision files are standalone SysML v2 packages. Common mistakes caught by the l
   `ALTERNATIVES: (A) <opt> — rejected: <why>; (B) <opt> — rejected: <why>; (C) <chosen>.
   CRITERIA: <the axes the choice was made on>.` Skip for record-only / no-alternative decisions
   (test: *was a real option rejected?*). Records the alternatives-not-chosen (ISO 42010).
+- **No cross-package references (issue021).** `validate_instances.py` loads each `.engine` file
+  in kernel isolation with only `schema/core` preloaded — it does NOT co-load other decisions,
+  processes, or workflows. So a Decision file CANNOT reference an element in another package
+  (e.g. `#ProspectiveChange dependency from d0049 to Delivery` with `import DeliveryWorkflow`
+  fails: both the namespace and the target are unresolvable; a package is also never a valid
+  `dependency` endpoint). Author any cross-package edge (`#CharteredBy`, `#ProspectiveChange`,
+  `#SafetyChange`) in **`.tracking`**, where rust validation is generic (name refs, no
+  cross-resolution). The edge is still semantically *from* the Decision — only its file home moves.
 
 ## `%show` read-path limits (pilot 0.59.0 — D0006)
 

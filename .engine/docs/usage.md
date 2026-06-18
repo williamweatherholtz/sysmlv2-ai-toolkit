@@ -49,6 +49,7 @@ the layer you touched.
 | Check attestation coverage | `python .engine/tools/query.py attestation-coverage` — lists `status=accepted` decisions missing their acceptance event (the declared `attestation-coverage` viewpoint). |
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 | Charter work to its origin | `#CharteredBy dependency from <workItem> to <decision/need/requirement>;` (import `EngineRelationships::*`) — the charter-lineage edge (D0068). Traverse: `python .engine/tools/query.py charter [<item>]`. |
+| Record a process change | `#ProspectiveChange dependency from <dNNNN> to <ProcessModule>;` (or `#SafetyChange` if downstream items must be reprocessed) in `.tracking/process-governance.sysml` (D0068/D0069). List: `python .engine/tools/query.py process-changes [<module>]`. |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)
 
@@ -61,6 +62,7 @@ the layer you touched.
 | Function F runs on component C | `allocate f to c;` |
 | D2 replaces D1 | a `dependency` from D2 to D1 marked `#Supersede` |
 | Work W was chartered by origin O | `#CharteredBy dependency from W to O;` (D0068; carries process identity by lineage) |
+| Decision D changed process P | `#ProspectiveChange dependency from D to P;` (`#SafetyChange` = downstream must reprocess) — authored in `.tracking` (D0069; cross-package, so never in the Decision file — issue021) |
 
 ## What never goes in the model
 

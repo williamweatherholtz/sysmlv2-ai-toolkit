@@ -210,4 +210,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "bootstrapExitEval";
     }
+
+    part issue021 : Issue {
+        :>> id = "73940516-2c7d-4e8f-d021-516273849563";
+        :>> title = "Kernel validate_instances loads each .engine file in isolation (schema/core only) — a Decision file CANNOT carry a cross-package edge (e.g. #ProspectiveChange -> Delivery); such edges must live in .tracking (generic rust validation)";
+        :>> createdAt = "2026-06-18";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Authoring the D0068/D0069 process-change edge ON decision 0049 (`#ProspectiveChange dependency from d0049 to Delivery;` with `import DeliveryWorkflow`) FAILED kernel validation twice: a package is not a valid dependency endpoint, AND validate_instances does not co-load .engine/workflows or other instance files when validating a decision -- so the namespace 'DeliveryWorkflow' and target 'Delivery' are both unresolvable (ERROR: Couldn't resolve reference). Root cause: kernel validation of .engine instances is per-file with only schema/core preloaded; ANY cross-package reference from a Decision to a process/workflow element is unresolvable. Resolution (sprint39): process-change edges live in .tracking/process-governance.sysml -- rust-validated, generic (name refs, no cross-resolution), the same home and reason as CharteredBy edges. Semantically identical to D0069 (the edge is FROM the decision); only the file home moves. The care discipline (test the edge form before scattering it across the ceremony chain) caught this before replication. PREVENTING-CHANGE: documented in relationships.sysml (marker-def comment) + sysmlv2-syntax-notes (cross-package refs must be authored where validation is generic). No automated guard warranted -- the failure is loud (validation ERROR) and self-correcting; the doc note is the control.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "pglProcessRef";
+    }
 }
