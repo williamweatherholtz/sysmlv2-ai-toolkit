@@ -765,6 +765,15 @@ def audit_report():
         findings.append(f"{len(missing_hours)}/{sprint_files} sprint(s) record no actualHours — D0038 "
                         f"estimation-feedback discipline is dormant project-wide (decide: retire for "
                         f"AI-autonomous sprints, or revive) [tracked: issue022]")
+    sitting_reviews = sorted({
+        m.group(1)
+        for f in tracking_files()
+        for m in re.finditer(r'part\s+(sitting\w*R\d+)\s*:\s*TestResult\s*\{[^}]*VerdictKind::pass',
+                             open(f, encoding="utf-8").read())
+    })
+    if not sitting_reviews:
+        findings.append("no per-sitting sprint-review record (D0049/D0073 human gate) — no "
+                        "sittingNNReviewRn pass artifact found")
     if not (uncharted_actionable or gates_actionable):
         findings.insert(0, "PASS: every sprint that should comply (charter since sprint%d; full ceremony) "
                         "does — recent sprints hold to ceremony + charter." % _CHARTER_SINCE)
@@ -779,11 +788,9 @@ def audit_report():
                                   "ok": len(gates_actionable) == 0},
         "estimation_discipline": {"missing_estimatedPoints": missing_points,
                                   "missing_actualHours_count": len(missing_hours)},
-        # Per-sitting-review currency (D0049) is NOT auto-detected: the review-RECORD artifact form
-        # is undefined until the sittingReviewRecord task (issue023) defines it. A loose prose grep
-        # false-positives, so this dimension stays tracked by issue023 until there's a real artifact
-        # to match — then add a precise check here.
-        "sitting_review": "not auto-detected — tracked by issue023 (record form undefined; see sittingReviewRecord)",
+        # Per-sitting-review currency (D0049/D0073): precise check — matches the real
+        # `sittingNNReviewRn : TestResult (pass)` artifact (NOT a prose grep, which false-positived).
+        "sitting_review": {"records": sitting_reviews, "ok": len(sitting_reviews) > 0},
         "findings": findings,
         "note": "Operationalizes the architectural-critique GQM adherence metrics (D0046); pairs with "
                 "the per-commit guards. Findings should be filed as tracked Issues, not prose.",
