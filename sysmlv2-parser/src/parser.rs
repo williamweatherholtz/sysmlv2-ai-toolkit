@@ -462,8 +462,11 @@ fn parse_hash_item(
         return parse_succession(p, filename, is_oo).map(|opt| opt.map(Item::Succession));
     }
     if !matches!(p.peek(), TokenKind::Dependency) {
-        skip_item(p);
-        return Ok(None);
+        // `#Marker part X : T { ... }` (D0070 marker-on-a-definition, e.g. a process-change
+        // Decision): parse + EMIT the underlying item so it is not silently dropped. The marker
+        // annotation itself is not yet retained in the AST (tracked: a rust `process-changes`
+        // view, M2, will need it). Without this, marked items vanished from every view (issue024).
+        return parse_item(p, filename);
     }
     p.advance(); // consume 'dependency'
     p.expect(&TokenKind::From, filename)?;
@@ -673,6 +676,23 @@ mod tests {
         let pkg = parse_src("package P { private import Foo::*; }");
         assert_eq!(pkg.items.len(), 1);
         assert!(matches!(&pkg.items[0], Item::Import(i) if i.namespace == "Foo"));
+    }
+
+    #[test]
+    fn marker_prefixed_part_is_preserved() {
+        // issue024: `#Marker part X : T { ... }` (D0070 marker-on-a-definition) must EMIT the
+        // part, not silently skip it. Marker is consumed; the underlying Part survives.
+        let src = r#"package P {
+            #ProspectiveChange part d0049 : Decision {
+                :>> id = "x";
+                :>> status = DecisionStatus::accepted;
+            }
+        }"#;
+        let pkg = parse_src(src);
+        assert_eq!(pkg.items.len(), 1, "marked part must not be dropped");
+        let Item::Part(part) = &pkg.items[0] else { panic!("expected Part from #Marker part") };
+        assert_eq!(part.name, "d0049");
+        assert_eq!(part.type_name.as_deref(), Some("Decision"));
     }
 
     #[test]

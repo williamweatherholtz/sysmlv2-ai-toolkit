@@ -240,4 +240,14 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "sittingReviewRecord";
     }
+
+    part issue024 : Issue {
+        :>> id = "73940516-2c7d-4e8f-d046-516273849690";
+        :>> title = "Rust parser silently DROPPED `#Marker part X : T` (marker-on-a-definition) — parse_hash_item skip_item'd anything not `first`/`dependency`, so D0070 process-change Decisions vanished from every view";
+        :>> createdAt = "2026-06-19";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Building the M1 view executor (sprint46) surfaced this: `view decisions-active-and-superseded` returned 70 of 75 decisions — the missing 5 were exactly the #ProspectiveChange-marked process-change Decisions (d0039/d0049/d0064/d0067/d0070). Root cause: parser.rs parse_hash_item handled `#Marker first..then` (succession) and `#Marker dependency from..to` (edge) but for ANY other follower (e.g. `part`) called skip_item + returned None — silently dropping the whole part. `sysmlv2 check` reported 'clean' because the part was skipped, not errored. The form was never caught because the Rust parser only validates .tracking (which uses `#CharteredBy dependency` edges), while the marker-on-PART form (D0070) lives only in .engine/decisions, which rust never parsed until the view executor read it. FIX (sprint47): parse_hash_item now delegates to parse_item for the non-edge case, EMITTING the underlying Part (marker consumed; marker-retention in the AST deferred to M2's rust process-changes view). GUARD (D0047): parser unit test `marker_prefixed_part_is_preserved` asserts the part survives; view now returns all 75. discoveredInField via M1 dogfooding.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "parserMarkerFix";
+    }
 }

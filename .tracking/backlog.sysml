@@ -534,7 +534,11 @@ package EngineBacklog {
         action tomlViewExecutor;
         verification tomlViewExecutorDoD : Test { :>> id = "73940516-2c7d-4e8f-d045-516273849682"; :>> method = VerificationMethod::test; :>> procedureText = "Migration M1 (D0074/D0075, resolves issue018): a Rust `sysmlv2 view <name>` executor reading .engine/views/<name>.view.toml (serde+toml, deny_unknown_fields, typed enums for direction/depth/edge-kind so bad view files fail at parse) over an enriched item-table (authored + computed attrs); select (type/eq/in/has-missing-edge) + traverse (edges/direction/depth + far-endpoint target predicate for ICD) + project; emits the induced subgraph as JSON. Requires typed-edge extraction in Rust (satisfy/verify/:>/#CharteredBy/dependency). 2-3 example .view.toml + an RWX skill. Velocity excluded (aggregation, not a view). cargo test + clippy green; demonstrated on a real view."; }
         part tomlViewExecutorDoDR1 : TestResult { :>> id = "9702b588-9c87-4e9f-8470-5f8beb705d19"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "95cf557"; :>> judgedAt = "2026-06-19"; :>> judgedBy = "claudeOpus"; }
+        action parserMarkerFix;
+        verification parserMarkerFixDoD : Test { :>> id = "73940516-2c7d-4e8f-d046-516273849691"; :>> method = VerificationMethod::test; :>> procedureText = "Fix issue024: parser.rs parse_hash_item silently dropped `#Marker part X : T` (skip_item for any non-first/dependency follower), so D0070-marked process-change Decisions vanished from views. Fix: delegate to parse_item, EMITTING the underlying Part (marker consumed; AST marker-retention deferred to M2). GUARD (D0047): parser unit test marker_prefixed_part_is_preserved. Verified: `view decisions-active-and-superseded` returns all 75 (was 70); cargo test --workspace --lib + parse_engine_files + clippy -D warnings green."; }
+        part parserMarkerFixDoDR1 : TestResult { :>> id = "d40727e8-e729-4ac7-a0bd-cc461f7b2fe5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cf12cca"; :>> judgedAt = "2026-06-19"; :>> judgedBy = "claudeOpus"; }
         first pglCharterEdge then pglProcessRef;
+        first tomlViewExecutor then parserMarkerFix;
         first rustFailLoudLints then parserLintCleanup;
         first rustFailLoudLints then tomlViewExecutor;
         first pglProcessRef then pglProcessMarkerCarrier;
