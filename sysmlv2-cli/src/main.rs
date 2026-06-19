@@ -158,6 +158,30 @@ fn cmd_orient(args: &[String]) -> i32 {
     0
 }
 
+fn cmd_attestation_coverage(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 attestation-coverage [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::attestation_coverage(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("attestation-coverage error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_view(args: &[String]) -> i32 {
     let Some(name) = args.first() else {
         eprintln!("usage: sysmlv2 view <name> [ROOT]");
@@ -316,6 +340,7 @@ fn main() {
         Some("orient") => cmd_orient(rest),
         Some("whats-next") => cmd_whats_next(rest),
         Some("view") => cmd_view(rest),
+        Some("attestation-coverage") => cmd_attestation_coverage(rest),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),

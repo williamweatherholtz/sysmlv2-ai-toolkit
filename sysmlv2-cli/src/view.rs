@@ -444,6 +444,44 @@ pub fn run(root: &Path, view_name: &str) -> Result<String, ViewError> {
     Ok(emit_json(&spec, &model, &result))
 }
 
+// ── attestation-coverage (M2.2: first algorithmic view ported from query.py) ─────────────────
+// Process-required-attestation coverage (D0066): every status=accepted Decision must carry a
+// passing acceptance event (`{dNNNN}AcceptR1 : TestResult, outcome=pass`). Algorithmic (a
+// naming + outcome correlation), so a Rust function — not a TOML filter.
+
+fn compute_attestation(model: &Model) -> (usize, Vec<String>) {
+    let mut accepted: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted"))
+        .map(|(n, _)| n)
+        .collect();
+    accepted.sort();
+    let missing: Vec<String> = accepted
+        .iter()
+        .filter(|d| {
+            let ev = format!("{d}AcceptR1");
+            model.items.get(&ev).and_then(|i| i.attrs.get("outcome")).map(String::as_str) != Some("pass")
+        })
+        .map(|d| (*d).clone())
+        .collect();
+    (accepted.len(), missing)
+}
+
+/// Attestation-coverage view (D0066) as JSON: accepted Decisions lacking a passing acceptance event.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn attestation_coverage(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let (total, missing) = compute_attestation(&model);
+    let covered = total - missing.len();
+    let miss = missing.iter().map(|m| format!("\"{}\"", json_esc(m))).collect::<Vec<_>>().join(", ");
+    Ok(format!(
+        "{{\n  \"attestation\": \"accepted Decision -> acceptance event (dNNNNAccept, D0066)\",\n  \"total_accepted\": {total},\n  \"covered\": {covered},\n  \"missing\": [{miss}]\n}}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -464,6 +502,14 @@ mod tests {
         let got = selects(&model(), &Select { type_: Some("Decision".to_string()), ..Default::default() });
         assert_eq!(got.len(), 1);
         assert!(got.contains("d1"));
+    }
+
+    #[test]
+    fn attestation_flags_accepted_without_event() {
+        // model()'s d1 is an accepted Decision with no d1AcceptR1 -> flagged missing.
+        let (total, missing) = compute_attestation(&model());
+        assert_eq!(total, 1);
+        assert_eq!(missing, vec!["d1".to_string()]);
     }
 
     #[test]
