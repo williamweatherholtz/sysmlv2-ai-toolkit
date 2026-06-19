@@ -304,7 +304,7 @@ fn parse_action_def_body(
                 let item_line = p.peek_token().line;
                 let s = p.current_span(); p.advance();
                 let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-                parts.push(Part { name: n, type_name: tn, attributes: a, span: sp, line: item_line });
+                parts.push(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: item_line });
             }
             TokenKind::Verification => {
                 let item_line = p.peek_token().line;
@@ -469,10 +469,16 @@ fn parse_hash_item(
     }
     if !matches!(p.peek(), TokenKind::Dependency) {
         // `#Marker part X : T { ... }` (D0070 marker-on-a-definition, e.g. a process-change
-        // Decision): parse + EMIT the underlying item so it is not silently dropped. The marker
-        // annotation itself is not yet retained in the AST (tracked: a rust `process-changes`
-        // view, M2, will need it). Without this, marked items vanished from every view (issue024).
-        return parse_item(p, filename);
+        // Decision): parse + EMIT the underlying item (issue024) AND RETAIN the marker on the Part
+        // (M2.0) so governance views can filter by it. A non-part follower drops the marker.
+        let inner = parse_item(p, filename)?;
+        return Ok(inner.map(|item| match item {
+            Item::Part(mut part) => {
+                part.marker = Some(marker);
+                Item::Part(part)
+            }
+            other => other,
+        }));
     }
     p.advance(); // consume 'dependency'
     p.expect(&TokenKind::From, filename)?;
@@ -561,7 +567,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
             let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: start_line })))
         }
 
         // `verification def Name ...` → TypeDef; `verification Name ...` → Verification instance
@@ -699,6 +705,7 @@ mod tests {
         let Item::Part(part) = &pkg.items[0] else { panic!("expected Part from #Marker part") };
         assert_eq!(part.name, "d0049");
         assert_eq!(part.type_name.as_deref(), Some("Decision"));
+        assert_eq!(part.marker.as_deref(), Some("ProspectiveChange"), "marker must be retained (M2.0)");
     }
 
     #[test]

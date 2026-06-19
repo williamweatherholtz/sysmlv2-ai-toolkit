@@ -1,0 +1,9 @@
+# Process-change Decisions (D0070) — a query.py command subsumed as a TOML declaration (M2.1):
+# select Decisions carrying a #ProspectiveChange/#SafetyChange marker. Marker retained by M2.0.
+name = "process-changes"
+concern = "Which Decisions changed a process, and with what retroactivity (D0070)?"
+audience = "maintainer / auditor"
+
+[select]
+type = "Decision"
+marker = ["ProspectiveChange", "SafetyChange"]

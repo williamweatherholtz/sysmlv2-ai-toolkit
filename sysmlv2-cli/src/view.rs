@@ -60,6 +60,8 @@ pub struct Select {
     pub has_edge: Option<String>,
     /// Keep only items that lack an outgoing edge of this kind.
     pub missing_edge: Option<String>,
+    /// Match the part's `#Marker` prefix (D0070, M2.0) — a value or a set (e.g. process-change kind).
+    pub marker: Option<AttrPred>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,6 +124,7 @@ pub struct Project {
 struct ItemInfo {
     type_name: String,
     attrs: HashMap<String, String>,
+    marker: Option<String>,
 }
 
 struct Edge {
@@ -194,16 +197,16 @@ impl Model {
     fn ingest(pkg: &Package, items: &mut HashMap<String, ItemInfo>, edges: &mut Vec<Edge>) {
         for item in &pkg.items {
             match item {
-                Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes),
-                Item::Verification(v) => add_item(items, &v.name, v.type_name.as_deref(), &v.attributes),
+                Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref()),
+                Item::Verification(v) => add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None),
                 Item::ActionDecl(a) => add_item_typed(items, &a.name, "action"),
                 Item::ActionDef(ad) => {
                     add_item_typed(items, &ad.name, "ActionDef");
                     for p in &ad.parts {
-                        add_item(items, &p.name, p.type_name.as_deref(), &p.attributes);
+                        add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref());
                     }
                     for v in &ad.verifications {
-                        add_item(items, &v.name, v.type_name.as_deref(), &v.attributes);
+                        add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None);
                     }
                     for a in &ad.actions {
                         add_item_typed(items, &a.name, "action");
@@ -226,13 +229,13 @@ impl Model {
     }
 }
 
-fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[sysmlv2_parser::ast::Attribute]) {
+fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[sysmlv2_parser::ast::Attribute], marker: Option<&str>) {
     let attrs = attributes.iter().map(|a| (a.name.clone(), value_to_string(&a.value))).collect();
-    items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs });
+    items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string) });
 }
 
 fn add_item_typed(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: &str) {
-    items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new() });
+    items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None });
 }
 
 // ── selection + traversal ─────────────────────────────────────────────────────
@@ -263,6 +266,16 @@ fn selects(model: &Model, sel: &Select) -> HashSet<String> {
             }
             for (k, pred) in &sel.attrs {
                 if !attr_matches(info, k, pred) {
+                    return false;
+                }
+            }
+            if let Some(pred) = &sel.marker {
+                let m = info.marker.as_deref().unwrap_or("");
+                let ok = match pred {
+                    AttrPred::One(w) => m == w,
+                    AttrPred::Many(ws) => ws.iter().any(|w| w == m),
+                };
+                if !ok {
                     return false;
                 }
             }
@@ -421,11 +434,11 @@ mod tests {
 
     fn model() -> Model {
         let mut items = HashMap::new();
-        items.insert("r1".to_string(), ItemInfo { type_name: "Requirement".to_string(), attrs: HashMap::new() });
-        items.insert("c1".to_string(), ItemInfo { type_name: "Component".to_string(), attrs: HashMap::new() });
+        items.insert("r1".to_string(), ItemInfo { type_name: "Requirement".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("c1".to_string(), ItemInfo { type_name: "Component".to_string(), attrs: HashMap::new(), marker: None });
         let mut dattrs = HashMap::new();
         dattrs.insert("status".to_string(), "accepted".to_string());
-        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs });
+        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: Some("ProspectiveChange".to_string()) });
         let edges = vec![Edge { kind: "satisfy".to_string(), from: "r1".to_string(), to: "c1".to_string() }];
         Model { items, edges }
     }
@@ -433,6 +446,15 @@ mod tests {
     #[test]
     fn select_by_type() {
         let got = selects(&model(), &Select { type_: Some("Decision".to_string()), ..Default::default() });
+        assert_eq!(got.len(), 1);
+        assert!(got.contains("d1"));
+    }
+
+    #[test]
+    fn select_by_marker() {
+        // M2.0: a process-change Decision is selectable by its #ProspectiveChange marker.
+        let sel = Select { marker: Some(AttrPred::One("ProspectiveChange".to_string())), ..Default::default() };
+        let got = selects(&model(), &sel);
         assert_eq!(got.len(), 1);
         assert!(got.contains("d1"));
     }

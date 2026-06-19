@@ -52,6 +52,9 @@ pub struct Part {
     pub type_name: Option<String>,
     /// Attribute assignments in the body.
     pub attributes: Vec<Attribute>,
+    /// Metadata marker applied as a `#Marker` prefix on the part (D0070, e.g. a process-change
+    /// Decision's `ProspectiveChange`). `None` if unmarked. Retained for views (M2.0).
+    pub marker: Option<String>,
     pub span: Span,
     /// 1-indexed source line of the `part` keyword.
     pub line: u32,
