@@ -1,0 +1,13 @@
+# Charter trace — seed every delivery Story, traverse the #CharteredBy edge one hop down to the
+# originating Decision/Need/Requirement. Demonstrates traverse + a typed edge (D0068/D0075).
+name = "charter-trace"
+concern = "What chartered each sprint Story (work -> origin lineage)?"
+audience = "reviewer / auditor"
+
+[select]
+type = "Story"
+
+[traverse]
+edges = ["charteredBy"]
+direction = "down"
+depth = 1

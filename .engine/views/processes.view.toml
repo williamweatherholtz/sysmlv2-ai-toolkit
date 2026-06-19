@@ -1,0 +1,7 @@
+# Only processes — a flat type filter (D0075 enriched-select; no traverse).
+name = "processes"
+concern = "What processes are defined in the engine?"
+audience = "maintainer"
+
+[select]
+type = "Process"

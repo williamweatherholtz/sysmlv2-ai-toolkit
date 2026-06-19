@@ -164,4 +164,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Editing the same field/shape across many instances/files; a schema rename/split/drop/add; a representation refactor of authored model data.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part viewSkill : AISkill {
+        :>> id = "67940516-2c7d-4e8f-a075-516273849611";
+        :>> title = "view";
+        :>> purpose = "Deploy query-driven viewpoints (D0075): read/write/execute lightweight TOML view files (.engine/views/*.view.toml) — a select + optional traverse + project filter over the tracking model, run by `sysmlv2 view <name>` (Rust authority, fail-loud). The deploying skill for D0075; resolves issue018.";
+        :>> location = ".engine/skills/view/SKILL.md";
+        :>> triggerCondition = "Asked to create/run a viewpoint, slice the model by a concern, or trace items along edges.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

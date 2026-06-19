@@ -157,6 +157,35 @@ fn cmd_orient(args: &[String]) -> i32 {
     0
 }
 
+fn cmd_view(args: &[String]) -> i32 {
+    let Some(name) = args.first() else {
+        eprintln!("usage: sysmlv2 view <name> [ROOT]");
+        return 2;
+    };
+    let root = match args.get(1) {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ directory found from the current directory upward.");
+                eprintln!("usage: sysmlv2 view <name> [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::run(&root, name) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("view error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_whats_next(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -283,6 +312,7 @@ fn main() {
         Some("ls") => cmd_ls(&args[2..]),
         Some("orient") => cmd_orient(&args[2..]),
         Some("whats-next") => cmd_whats_next(&args[2..]),
+        Some("view") => cmd_view(&args[2..]),
         Some("append-result") => cmd_append_result(&args[2..]),
         Some("append-gate-result") => cmd_append_gate_result(&args[2..]),
         Some("add-task") => cmd_add_task(&args[2..]),

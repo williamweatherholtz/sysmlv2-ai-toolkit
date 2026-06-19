@@ -14,6 +14,8 @@
     clippy::todo,
     clippy::unimplemented
 )]
+// Tests may use unwrap/expect/panic/asserts freely.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -23,6 +25,7 @@ use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod indexer;
 pub mod orient;
+pub mod view;
 pub mod write;
 
 // ── file discovery ────────────────────────────────────────────────────────────

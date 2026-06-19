@@ -9,6 +9,9 @@ path = "src/main.rs"
 
 [dependencies]
 sysmlv2-parser = { path = "../sysmlv2-parser" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+thiserror = "1"
 
 [dev-dependencies]
 cucumber = { version = "0.20", features = ["macros"] }
