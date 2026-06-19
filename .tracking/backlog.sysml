@@ -561,5 +561,8 @@ package EngineBacklog {
         first pglProcessChangeGuard then pglCharterEnforcement;
         first pglCharterEnforcement then pglViews;
         first pglViews then processGovernanceLineage;
+        action portOrphansAudit;
+        verification portOrphansAuditDoD : Test { :>> id = "7565bdb8-1361-4a17-be64-95478858f171"; :>> method = VerificationMethod::test; :>> procedureText = "Migration M2.2b (D0074/D0075): port the no-git ALGORITHMIC views orphans (compute_orphans) + audit (audit_report) from query.py to Rust subcommands. sysmlv2 orphans + sysmlv2 audit. PARITY: each output byte-identical to query.py orphans / query.py audit. Unit tests for orphans (tasks_without_dod, issues_without_relatedTask, dangling relatedTask) + audit (charter coverage, ceremony completeness, estimation discipline, sitting-review currency, grandfather constants). cargo test --workspace + clippy --all-targets -D warnings green. Leaves the git-traversal trio (governing-version/reprocess/suspect) as M2.2c under the portAlgorithmicViews umbrella."; }
+        part portOrphansAuditDoDR1 : TestResult { :>> id = "ab105387-35c4-43bc-a2ba-6bbd8f69bb40"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c85d097"; :>> judgedAt = "2026-06-19"; :>> judgedBy = "claudeOpus"; }
     }
 }

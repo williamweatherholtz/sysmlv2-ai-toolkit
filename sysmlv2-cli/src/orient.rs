@@ -191,7 +191,7 @@ fn in_progress_sprints(repo: &Path) -> Vec<SprintCeremony> {
 
 /// True if a `part <...><Gate>Gate<...>R<n> : TestResult` with `outcome = pass`
 /// exists for the given canonical gate name in `text`.
-fn gate_passed(text: &str, gate: &str) -> bool {
+pub(crate) fn gate_passed(text: &str, gate: &str) -> bool {
     let needle = format!("{gate}Gate");
     for (idx, _) in text.match_indices(&needle) {
         // Must be a `part ...R<n> : TestResult ... outcome = ...::pass` declaration.

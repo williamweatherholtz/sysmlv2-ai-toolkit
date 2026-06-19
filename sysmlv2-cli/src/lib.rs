@@ -24,7 +24,9 @@ use std::path::{Path, PathBuf};
 use sysmlv2_parser::ast::{ActionDef, Item, Package, Part, Value};
 use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
+pub mod algo;
 pub mod indexer;
+mod json;
 pub mod orient;
 pub mod view;
 pub mod write;

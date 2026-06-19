@@ -182,6 +182,54 @@ fn cmd_attestation_coverage(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_orphans(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 orphans [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::algo::orphans(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("orphans error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_audit(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 audit [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::algo::audit(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("audit error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_view(args: &[String]) -> i32 {
     let Some(name) = args.first() else {
         eprintln!("usage: sysmlv2 view <name> [ROOT]");
@@ -341,6 +389,8 @@ fn main() {
         Some("whats-next") => cmd_whats_next(rest),
         Some("view") => cmd_view(rest),
         Some("attestation-coverage") => cmd_attestation_coverage(rest),
+        Some("orphans") => cmd_orphans(rest),
+        Some("audit") => cmd_audit(rest),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
