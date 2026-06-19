@@ -117,6 +117,10 @@ pub enum ClosureWord {
 pub struct Project {
     #[serde(default)]
     pub types: Vec<String>,
+    /// Item attributes to include in the output (e.g. `title`, `status`, `relatedTask`); the
+    /// special name `marker` emits the #Marker. Empty = name+type only.
+    #[serde(default)]
+    pub fields: Vec<String>,
 }
 
 // ── the tracking model the view runs over ────────────────────────────────────
@@ -368,11 +372,23 @@ fn json_esc(s: &str) -> String {
 fn emit_json(spec: &ViewSpec, model: &Model, result: &HashSet<String>) -> String {
     let mut names: Vec<&String> = result.iter().collect();
     names.sort();
+    let fields: &[String] = spec.project.as_ref().map_or(&[], |p| p.fields.as_slice());
     let items: Vec<String> = names
         .iter()
         .filter_map(|n| {
             model.items.get(*n).map(|info| {
-                format!("    {{\"name\": \"{}\", \"type\": \"{}\"}}", json_esc(n), json_esc(&info.type_name))
+                let base = format!("\"name\": \"{}\", \"type\": \"{}\"", json_esc(n), json_esc(&info.type_name));
+                if fields.is_empty() {
+                    return format!("    {{{base}}}");
+                }
+                let rendered: Vec<String> = fields
+                    .iter()
+                    .filter_map(|f| {
+                        let val = if f == "marker" { info.marker.clone() } else { info.attrs.get(f).cloned() };
+                        val.map(|v| format!("\"{}\": \"{}\"", json_esc(f), json_esc(&v)))
+                    })
+                    .collect();
+                format!("    {{{base}, \"fields\": {{{}}}}}", rendered.join(", "))
             })
         })
         .collect();

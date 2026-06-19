@@ -1,0 +1,8 @@
+# All decisions with status (subsumes a query.py decisions listing, M2.1).
+name = "decisions"
+concern = "What was decided and what is its status?"
+audience = "auditor"
+[select]
+type = "Decision"
+[project]
+fields = ["title", "status"]

@@ -1,0 +1,8 @@
+# Open issues (subsumes query.py issues, M2.1): every Issue + its key fields.
+name = "issues"
+concern = "What issues are tracked, and which backlog task addresses each?"
+audience = "maintainer"
+[select]
+type = "Issue"
+[project]
+fields = ["title", "relatedTask", "discoveredInField"]
