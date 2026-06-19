@@ -8,7 +8,17 @@
 //!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
 //!   `append-gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
+#![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+// D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
+// (clippy::indexing_slicing deferred to M0b with the parser cleanup — see rustFailLoudLints.)
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented
+)]
 
 use std::{path::PathBuf, process};
 

@@ -3,7 +3,17 @@
 //! - [`validate_root`]: register schema packages, semantic-validate all `.tracking/` files.
 //! - [`check_files`]: parse-only check for one or more files.
 //! - [`orient_root`]: compute orient view from `.tracking/` (cursor + ready/outstanding).
+#![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+// D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
+// (clippy::indexing_slicing deferred to M0b with the parser cleanup — see rustFailLoudLints.)
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented
+)]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

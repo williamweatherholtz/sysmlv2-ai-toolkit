@@ -4,7 +4,12 @@
 //! Sprint 2 (`rustS2Parser`) adds the recursive-descent parser — see [`parse`].
 //! Sprint 3 (`rustS3Semantic`) adds cross-package reference resolution — see [`PackageRegistry`].
 //! Sprint 4 (`rustS4SpecCompat`) adds the build-time spec-pin check.
+#![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+// D0074 fail-loud: restriction lints (unwrap_used/expect_used/panic/indexing_slicing) for the
+// parser are tracked as M0b (rustFailLoudLints) — the 32 existing call sites are cleaned to
+// Result-based errors deliberately, not in the lint-foundation sprint, to avoid destabilizing
+// the load-bearing parser.
 
 pub mod ast;
 pub mod error;
