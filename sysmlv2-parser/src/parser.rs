@@ -19,7 +19,7 @@ impl Parser {
     }
 
     fn peek(&self) -> &TokenKind {
-        &self.tokens[self.pos].kind
+        self.tokens.get(self.pos).map_or(&TokenKind::Eof, |t| &t.kind)
     }
 
     fn peek_next(&self) -> &TokenKind {
@@ -28,10 +28,16 @@ impl Parser {
             .map_or(&TokenKind::Eof, |t| &t.kind)
     }
 
+    // INVARIANT: self.pos is always in-bounds — the lexer always appends an Eof token and
+    // advance() saturates at the last index (never steps past Eof). So indexing at self.pos
+    // cannot panic; clippy can't see the invariant, hence the localized allow (D0074 fail-loud:
+    // documented-safe indexing, not a silent unchecked access).
+    #[allow(clippy::indexing_slicing)]
     fn peek_token(&self) -> &Token {
         &self.tokens[self.pos]
     }
 
+    #[allow(clippy::indexing_slicing)]
     fn advance(&mut self) -> &Token {
         let tok = &self.tokens[self.pos];
         if self.pos + 1 < self.tokens.len() {
@@ -84,7 +90,7 @@ impl Parser {
     }
 
     fn eat(&mut self, kind: &TokenKind) -> bool {
-        if &self.tokens[self.pos].kind == kind {
+        if self.peek() == kind {
             self.advance();
             true
         } else {

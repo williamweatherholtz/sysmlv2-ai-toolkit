@@ -6,10 +6,11 @@
 //! Sprint 4 (`rustS4SpecCompat`) adds the build-time spec-pin check.
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
-// D0074 fail-loud: restriction lints (unwrap_used/expect_used/panic/indexing_slicing) for the
-// parser are tracked as M0b (rustFailLoudLints) — the 32 existing call sites are cleaned to
-// Result-based errors deliberately, not in the lint-foundation sprint, to avoid destabilizing
-// the load-bearing parser.
+// D0074 fail-loud (M0b): production parser code is already unwrap/expect/panic/index-free — the
+// parser's own `p.expect(&TokenKind, ..)?` is a fallible Result method, not Option::expect. Tests
+// may use them freely.
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing))]
 
 pub mod ast;
 pub mod error;

@@ -16,6 +16,7 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
+    clippy::indexing_slicing,
     clippy::todo,
     clippy::unimplemented
 )]
@@ -223,9 +224,10 @@ fn cmd_ls(args: &[String]) -> i32 {
 /// Parse simple `--key value` flag pairs from a flat args slice.
 fn flag(args: &[String], name: &str) -> Option<String> {
     let key = format!("--{name}");
-    args.windows(2)
-        .find(|w| w[0] == key)
-        .map(|w| w[1].clone())
+    args.windows(2).find_map(|w| match w {
+        [k, v] if *k == key => Some(v.clone()),
+        _ => None,
+    })
 }
 
 fn cmd_append_result(args: &[String]) -> i32 {
@@ -306,16 +308,17 @@ fn cmd_add_task(args: &[String]) -> i32 {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    let rest: &[String] = args.get(2..).unwrap_or(&[]);
     let code = match args.get(1).map(String::as_str) {
-        Some("validate") => cmd_validate(&args[2..]),
-        Some("check") => cmd_check(&args[2..]),
-        Some("ls") => cmd_ls(&args[2..]),
-        Some("orient") => cmd_orient(&args[2..]),
-        Some("whats-next") => cmd_whats_next(&args[2..]),
-        Some("view") => cmd_view(&args[2..]),
-        Some("append-result") => cmd_append_result(&args[2..]),
-        Some("append-gate-result") => cmd_append_gate_result(&args[2..]),
-        Some("add-task") => cmd_add_task(&args[2..]),
+        Some("validate") => cmd_validate(rest),
+        Some("check") => cmd_check(rest),
+        Some("ls") => cmd_ls(rest),
+        Some("orient") => cmd_orient(rest),
+        Some("whats-next") => cmd_whats_next(rest),
+        Some("view") => cmd_view(rest),
+        Some("append-result") => cmd_append_result(rest),
+        Some("append-gate-result") => cmd_append_gate_result(rest),
+        Some("add-task") => cmd_add_task(rest),
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");

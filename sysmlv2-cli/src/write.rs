@@ -294,7 +294,7 @@ fn find_action_def_close(lines: &[&str], def_start_line: usize) -> Option<usize>
 /// Detect the indentation prefix used for existing `action` lines inside an
 /// action def — so new lines match the file's style.
 fn detect_indent(lines: &[&str], def_start: usize, def_close: usize) -> String {
-    for line in &lines[def_start + 1..def_close] {
+    for line in lines.get(def_start + 1..def_close).unwrap_or(&[]) {
         let trimmed = line.trim();
         if trimmed.starts_with("action ") {
             let indent_len = line.len() - line.trim_start().len();
@@ -359,11 +359,9 @@ pub fn append_result(
     let insert_after = find_result_insertion(&lines, task_name)?;
 
     // Detect indentation from surrounding context.
-    let indent = {
-        let context_line = lines[insert_after].trim_start();
-        let indent_len = lines[insert_after].len() - context_line.len();
-        " ".repeat(indent_len)
-    };
+    let indent = lines.get(insert_after).map_or_else(String::new, |line| {
+        " ".repeat(line.len() - line.trim_start().len())
+    });
 
     let new_line = format!(
         "{indent}part {task_name}DoDR{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
@@ -428,11 +426,9 @@ pub fn append_gate_result(
     let insert_after = find_gate_result_insertion(&lines, gate_name)?;
 
     // Match the indentation of the line we insert after.
-    let indent = {
-        let context_line = lines[insert_after].trim_start();
-        let indent_len = lines[insert_after].len() - context_line.len();
-        " ".repeat(indent_len)
-    };
+    let indent = lines.get(insert_after).map_or_else(String::new, |line| {
+        " ".repeat(line.len() - line.trim_start().len())
+    });
 
     let new_line = format!(
         "{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"

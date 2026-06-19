@@ -11,11 +11,12 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
+    clippy::indexing_slicing,
     clippy::todo,
     clippy::unimplemented
 )]
-// Tests may use unwrap/expect/panic/asserts freely.
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+// Tests may use unwrap/expect/panic/indexing/asserts freely.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing))]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
