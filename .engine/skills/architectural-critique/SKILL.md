@@ -45,6 +45,17 @@ A claim with no evidence, or with refuting evidence, is a finding.
 | Deliverable matches its claims         | Rust orient == structural truth?          | `parity_check.py`                                     |
 | Decisions are recorded                 | any CR commit without a Decision file?    | git log `CR:` vs `.engine/decisions/`                 |
 | Docs match reality                     | any doc claim contradicted by the model?  | grep doc claims vs schema/registry/tooling            |
+| Work is chartered                      | % delivery Stories with a #CharteredBy edge?| `query.py audit` (charter_coverage, grandfather-aware)|
+| Estimation feedback kept               | sprints recording actualHours?            | `query.py audit` (estimation_discipline)              |
+| Sitting review current                 | a per-sitting review recorded (D0049)?    | `query.py audit` (sitting_review_records)             |
+
+**One-shot adherence metrics:** `python .engine/tools/query.py audit` computes the retrospective
+adherence set in one call — charter coverage, ceremony completeness, estimation discipline,
+sitting-review currency — each split ACTIONABLE vs grandfathered (charter since sprint38; ceremony
+post-issue010), so it never cries wolf on historical sprints. Pair it with the per-commit guards
+(`validate_ceremony` / `validate_sprint_coverage` / `validate_charter` / `validate_acceptance_events`
+/ `validate_process_change`), which enforce the same invariants forward. File red metrics as tracked
+Issues (below), never prose.
 
 **ATAM scenario walkthroughs** for architecture risk: build a small quality-attribute
 utility tree (e.g. legibility, evolvability, correctness, performance), then play

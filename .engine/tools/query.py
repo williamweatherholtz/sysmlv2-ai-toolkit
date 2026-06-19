@@ -690,6 +690,106 @@ def reprocess_candidates():
     return out
 
 
+# --- sprint-adherence AUDIT (D0072): the consolidated RETROSPECTIVE process audit -----------------
+# The pre-commit guards check invariants FORWARD (this commit's staged set). The audit checks the
+# whole tracked history RETROSPECTIVELY across all sprints + the dimensions no single guard covers
+# (estimation discipline, ceremony completeness, per-sitting review currency). Kernel-free.
+_CEREMONY_GATES = ("Refine", "Standup", "Implement", "Review", "CloseOut", "Retro")
+_GATE_PASS = re.compile(r'part\s+\w*(Refine|Standup|Implement|Review|CloseOut|Retro)GateR\d+\s*:\s*'
+                        r'TestResult\s*\{[^}]*VerdictKind::pass')
+
+
+def _delivery_file_texts():
+    out = {}
+    for f in sorted(glob.glob(os.path.join(TRACKING_DIR, "delivery", "*.sysml"))):
+        out[os.path.basename(f)] = open(f, encoding="utf-8").read()
+    return out
+
+
+# Grandfather cutoffs (mirror the forward guards): the charter edge began sprint38 (pglCharterEdge),
+# and the full ceremony began after issue010 (validate_ceremony.GRANDFATHERED). The audit separates
+# ACTIONABLE findings (sprints that SHOULD comply) from grandfathered history, so it never cries wolf.
+_CHARTER_SINCE = 38
+_CEREMONY_GF = {"delivery.sysml", "sprint11_nativeSpikes.sysml"}
+
+
+def _sprint_num(fname):
+    """Sprint number from a delivery filename, or None for legacy/non-numbered files."""
+    m = re.match(r'sprint(\d+)_', fname)
+    return int(m.group(1)) if m else None
+
+
+def audit_report():
+    """Retrospective sprint-process adherence audit (operationalizes the architectural-critique
+    GQM adherence metrics, D0046). Computes, across ALL delivery files, the dimensions the forward
+    guards do not aggregate: charter coverage, ceremony completeness, estimation discipline, and
+    per-sitting-review currency — each split ACTIONABLE vs grandfathered (charter since sprint%d;
+    ceremony post-issue010). Pairs with the per-commit guards (ceremony/coverage/acceptance/charter/
+    process-change), which remain the enforcers. Findings feed the architectural-critique skill's
+    judgment + become tracked Issues (D0046).""" % _CHARTER_SINCE
+    files = _delivery_file_texts()
+    chartered = {e["work"] for e in read_charter_edges()}
+
+    uncharted_actionable, uncharted_gf = [], []
+    gates_actionable, gates_gf = [], []
+    missing_points, missing_hours = [], []
+    sprint_files = 0
+    for fname, text in sorted(files.items()):
+        story_names = re.findall(r'^[ \t]*part\s+(\w+)\s*:\s*Story\b', text, re.MULTILINE)
+        if not story_names:
+            continue
+        sprint_files += 1
+        num = _sprint_num(fname)
+        charter_expected = num is not None and num >= _CHARTER_SINCE
+        for s in story_names:
+            if s not in chartered:
+                (uncharted_actionable if charter_expected else uncharted_gf).append(
+                    {"file": fname, "story": s})
+        gates_passed = {m.group(1) for m in _GATE_PASS.finditer(text)}
+        absent = [g for g in _CEREMONY_GATES if g not in gates_passed]
+        if absent:
+            (gates_gf if fname in _CEREMONY_GF else gates_actionable).append(
+                {"file": fname, "missing": absent})
+        if "estimatedPoints" not in text:
+            missing_points.append(fname)
+        if "actualHours" not in text:
+            missing_hours.append(fname)
+
+    findings = []
+    if uncharted_actionable:
+        findings.append(f"ACTIONABLE: {len(uncharted_actionable)} post-sprint{_CHARTER_SINCE} "
+                        f"Story(ies) without a #CharteredBy edge")
+    if gates_actionable:
+        findings.append(f"ACTIONABLE: {len(gates_actionable)} non-grandfathered sprint(s) missing a passed gate")
+    if missing_hours:
+        findings.append(f"{len(missing_hours)}/{sprint_files} sprint(s) record no actualHours — D0038 "
+                        f"estimation-feedback discipline is dormant project-wide (decide: retire for "
+                        f"AI-autonomous sprints, or revive) [tracked: issue022]")
+    if not (uncharted_actionable or gates_actionable):
+        findings.insert(0, "PASS: every sprint that should comply (charter since sprint%d; full ceremony) "
+                        "does — recent sprints hold to ceremony + charter." % _CHARTER_SINCE)
+
+    return {
+        "sprint_files": sprint_files,
+        "charter_coverage": {"actionable_uncharted": uncharted_actionable,
+                             "grandfathered_uncharted_count": len(uncharted_gf),
+                             "ok": len(uncharted_actionable) == 0},
+        "ceremony_completeness": {"actionable_incomplete": gates_actionable,
+                                  "grandfathered_incomplete": gates_gf,
+                                  "ok": len(gates_actionable) == 0},
+        "estimation_discipline": {"missing_estimatedPoints": missing_points,
+                                  "missing_actualHours_count": len(missing_hours)},
+        # Per-sitting-review currency (D0049) is NOT auto-detected: the review-RECORD artifact form
+        # is undefined until the sittingReviewRecord task (issue023) defines it. A loose prose grep
+        # false-positives, so this dimension stays tracked by issue023 until there's a real artifact
+        # to match — then add a precise check here.
+        "sitting_review": "not auto-detected — tracked by issue023 (record form undefined; see sittingReviewRecord)",
+        "findings": findings,
+        "note": "Operationalizes the architectural-critique GQM adherence metrics (D0046); pairs with "
+                "the per-commit guards. Findings should be filed as tracked Issues, not prose.",
+    }
+
+
 def classify(tasks, ordering_only=frozenset()):
     """D0005-honest classification (CR-4):
       - evidence: judgedAgainst SHAs must resolve (else INVALID-EVIDENCE, not done);
@@ -806,6 +906,9 @@ def main():
         return
     if sub == "reprocess-candidates":
         print(json.dumps({"reprocess_candidates": reprocess_candidates()}, indent=2))
+        return
+    if sub == "audit":
+        print(json.dumps(audit_report(), indent=2))
         return
 
     km, kc = _kernel.start()

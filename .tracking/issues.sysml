@@ -220,4 +220,24 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "pglProcessRef";
     }
+
+    part issue022 : Issue {
+        :>> id = "73940516-2c7d-4e8f-d022-516273849660";
+        :>> title = "actualHours estimation-feedback discipline (D0038) is dormant project-wide — 45/45 sprints record none; never formally retired when sprints became AI-autonomous (D0049/D0064)";
+        :>> createdAt = "2026-06-18";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Audit (query.py audit, the architectural-critique adherence metrics, D0046) found NO sprint in the project records actualHours, though D0038 (sprint estimation model) established an estimate-vs-actual feedback discipline. Root cause: when D0049/D0064 made sprints AI-autonomous, wall-clock actualHours lost meaning for an AI executor, but D0038's actualHours clause was never formally retired or replaced — silent drift, not a decision. NEEDS A DECISION (user): either (a) formally retire actualHours for AI-autonomous sprints (estimatedPoints stays for sizing/velocity; actualHours superseded), or (b) revive it with a meaningful 'actual' (e.g. tool-call count / wall-clock of the sitting). Until decided, the estimation-feedback loop is inert. Surfaced by the audit; recorded per the architectural-critique process (findings -> tracked Issue, not prose).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "actualHoursDisposition";
+    }
+
+    part issue023 : Issue {
+        :>> id = "73940516-2c7d-4e8f-d023-516273849661";
+        :>> title = "Per-sitting sprint-review (D0049 human gate) is never recorded as an artifact — no sitting-review record exists in any delivery file; the one human gate is informal";
+        :>> createdAt = "2026-06-18";
+        :>> createdBy = "claudeOpus";
+        :>> description = "D0049 defined the per-SITTING sprint review (method=confirmation, the single human gate) as what closes a sitting's work; per-sprint closeOut/retro are autonomous. Audit (query.py audit) found NO sitting-review record in any delivery file — the human gate has been satisfied INFORMALLY (the user reviewing in conversation), never recorded as a confirmation TestResult tied to the sitting's content. So there is no auditable artifact that a sitting was reviewed/accepted, and the current sitting (sprints 38-43 + D0070/D0071) has no recorded review. NEEDS (user): (1) a decision on the sitting-review RECORD mechanism (a confirmation TestResult naming the sitting's sprints, recorded on the human's explicit attestation — D0016/D0051, never inferred); (2) the current sitting's review attestation when the user is satisfied. A future guard could flag a sitting of committed sprints with no recorded review. Surfaced by the audit; recorded per the architectural-critique process.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "sittingReviewRecord";
+    }
 }
