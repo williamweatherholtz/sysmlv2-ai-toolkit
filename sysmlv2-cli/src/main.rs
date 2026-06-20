@@ -260,6 +260,30 @@ fn cmd_guard(args: &[String]) -> i32 {
     i32::from(!report.ok())
 }
 
+fn cmd_open_issues(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 open-issues [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::open_issues(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("open-issues error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_governing_version(args: &[String]) -> i32 {
     let Some(item) = args.first() else {
         eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
@@ -477,6 +501,7 @@ fn main() {
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
+        Some("open-issues") => cmd_open_issues(rest),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),

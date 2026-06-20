@@ -36,6 +36,9 @@ pub struct Output {
     pub suspect: Vec<String>,
     /// Done tasks whose `judgedAgainst` SHA cannot be resolved in git.
     pub invalid_evidence: Vec<String>,
+    /// OPEN issues (no complete `#Resolves` resolver) — D0077, surfaced so the frontier can't
+    /// read "empty" while issues are unresolved.
+    pub open_issues: Vec<String>,
     /// Number of done tasks.
     pub done: usize,
     /// Number of outstanding (not-done) tasks.
@@ -62,11 +65,12 @@ impl Output {
             format!("[{}]", sprints.join(", "))
         };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
             str_array(&self.invalid_evidence),
+            str_array(&self.open_issues),
             self.done,
             self.outstanding,
         )
@@ -359,6 +363,11 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
     let done = done_map.values().filter(|&&v| v).count();
     let outstanding = done_map.values().filter(|&&v| !v).count();
 
+    // Open issues (D0077): an issue with no complete #Resolves resolver. Reuse this orient
+    // run's done-set as the resolver-completeness authority; build the view Model for the edges.
+    let done_set: HashSet<String> = done_map.iter().filter(|(_, &v)| v).map(|(k, _)| k.clone()).collect();
+    let open_issues = crate::view::open_issue_names(repo, &done_set).unwrap_or_default();
+
     // Rank ready by backlog declaration order (D0052) — priority, not alphabetical.
     let mut ready_sorted = ready;
     ready_sorted.sort_by_key(|name| tasks.get(name).map_or(u32::MAX, |t| t.order));
@@ -371,9 +380,28 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         ready: ready_sorted,
         suspect,
         invalid_evidence,
+        open_issues,
         done,
         outstanding,
     }
+}
+
+/// Done action names: latest `DoD` result passes with a resolvable `judgedAgainst`.
+///
+/// Exposed as the single done-set authority for the issue-resolution view (D0077): a `#Resolves`
+/// action resolver is "complete" iff it is in this set.
+#[must_use]
+pub fn done_names(root: &Path) -> HashSet<String> {
+    let idx = crate::indexer::extract(&root.join(".tracking"));
+    let mut done = HashSet::new();
+    for (name, data) in &idx.tasks {
+        if let Some(latest) = data.results.last() {
+            if latest.outcome == "pass" && (latest.judged_against.is_empty() || git_sha_valid(&latest.judged_against, root)) {
+                done.insert(name.clone());
+            }
+        }
+    }
+    done
 }
 
 fn all_deps_satisfied(

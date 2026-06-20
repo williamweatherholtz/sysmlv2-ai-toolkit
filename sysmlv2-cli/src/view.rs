@@ -17,6 +17,8 @@ use serde::Deserialize;
 use sysmlv2_parser::ast::{Item, Package, Value};
 use sysmlv2_parser::{parse, tokenize};
 
+use crate::json::Json;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ViewError {
     #[error("view file not found: {0}")]
@@ -495,6 +497,101 @@ pub fn attestation_coverage(root: &Path) -> Result<String, ViewError> {
     ))
 }
 
+// ── open-issues (D0077 Issue Resolution Loop) ─────────────────────────────────────────────────
+// An Issue is RESOLVED (computed, never stored) iff a #Resolves resolver is COMPLETE — an action
+// in `done` OR a Decision with status=accepted; else OPEN. An issue with no #Resolves edge is OPEN
+// AND untriaged. `done` is supplied by orient (the single done-set authority).
+
+struct ResolverStatus {
+    name: String,
+    kind: &'static str, // "action" | "decision"
+    complete: bool,
+}
+
+struct IssueStatus {
+    issue: String,
+    resolvers: Vec<ResolverStatus>,
+    open: bool,
+}
+
+fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &HashSet<String, S>) -> Vec<IssueStatus> {
+    let mut issues: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Issue").map(|(n, _)| n).collect();
+    issues.sort();
+    issues
+        .into_iter()
+        .map(|iss| {
+            let mut resolvers: Vec<ResolverStatus> = model
+                .edges
+                .iter()
+                .filter(|e| e.kind == "resolves" && &e.to == iss)
+                .map(|e| {
+                    let is_decision = model.items.get(&e.from).is_some_and(|i| i.type_name == "Decision");
+                    let complete = if is_decision {
+                        model.items.get(&e.from).and_then(|i| i.attrs.get("status")).map(String::as_str) == Some("accepted")
+                    } else {
+                        done.contains(e.from.as_str())
+                    };
+                    ResolverStatus { name: e.from.clone(), kind: if is_decision { "decision" } else { "action" }, complete }
+                })
+                .collect();
+            resolvers.sort_by(|a, b| a.name.cmp(&b.name));
+            let open = !resolvers.iter().any(|r| r.complete);
+            IssueStatus { issue: iss.clone(), resolvers, open }
+        })
+        .collect()
+}
+
+/// Names of OPEN issues (no complete `#Resolves` resolver), sorted. Used by orient to surface
+/// `open_issues`. `done` is orient's done-set.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<String, S>) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
+}
+
+/// Open-issues view (D0077) as JSON: every OPEN issue + its resolvers + completeness, with counts.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn open_issues(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let done = crate::orient::done_names(root);
+    let all = compute_issue_resolution(&model, &done);
+    let total = all.len();
+    let open_count = all.iter().filter(|i| i.open).count();
+    let open_list: Vec<Json> = all
+        .iter()
+        .filter(|i| i.open)
+        .map(|i| {
+            let resolvers: Vec<Json> = i
+                .resolvers
+                .iter()
+                .map(|r| {
+                    Json::Obj(vec![
+                        ("name".to_string(), Json::s(r.name.clone())),
+                        ("kind".to_string(), Json::s(r.kind)),
+                        ("complete".to_string(), Json::Bool(r.complete)),
+                    ])
+                })
+                .collect();
+            Json::Obj(vec![
+                ("issue".to_string(), Json::s(i.issue.clone())),
+                ("untriaged".to_string(), Json::Bool(i.resolvers.is_empty())),
+                ("resolvers".to_string(), Json::Arr(resolvers)),
+            ])
+        })
+        .collect();
+    let out = Json::Obj(vec![
+        ("total_issues".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+        ("open".to_string(), Json::Int(i64::try_from(open_count).unwrap_or(i64::MAX))),
+        ("resolved".to_string(), Json::Int(i64::try_from(total - open_count).unwrap_or(i64::MAX))),
+        ("open_issues".to_string(), Json::Arr(open_list)),
+    ]);
+    Ok(out.dump())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,6 +612,42 @@ mod tests {
         let got = selects(&model(), &Select { type_: Some("Decision".to_string()), ..Default::default() });
         assert_eq!(got.len(), 1);
         assert!(got.contains("d1"));
+    }
+
+    #[test]
+    fn issue_resolution_open_vs_resolved() {
+        // i1 resolved by a done action; i2 open (resolver action not done); i3 untriaged (no edge).
+        let mut items = HashMap::new();
+        for n in ["i1", "i2", "i3"] {
+            items.insert(n.to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None });
+        }
+        items.insert("actDone".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("actOpen".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None });
+        let edges = vec![
+            Edge { kind: "resolves".to_string(), from: "actDone".to_string(), to: "i1".to_string() },
+            Edge { kind: "resolves".to_string(), from: "actOpen".to_string(), to: "i2".to_string() },
+        ];
+        let model = Model { items, edges };
+        let done: HashSet<String> = std::iter::once("actDone".to_string()).collect();
+        let res = compute_issue_resolution(&model, &done);
+        let open: Vec<&str> = res.iter().filter(|i| i.open).map(|i| i.issue.as_str()).collect();
+        assert_eq!(open, vec!["i2", "i3"]); // i1 resolved; i2 + i3 open
+        let i3 = res.iter().find(|i| i.issue == "i3").unwrap();
+        assert!(i3.resolvers.is_empty(), "i3 is untriaged");
+    }
+
+    #[test]
+    fn issue_resolved_by_accepted_decision() {
+        let mut items = HashMap::new();
+        items.insert("i9".to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None });
+        let mut dattrs = HashMap::new();
+        dattrs.insert("status".to_string(), "accepted".to_string());
+        items.insert("d99".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: None });
+        let edges = vec![Edge { kind: "resolves".to_string(), from: "d99".to_string(), to: "i9".to_string() }];
+        let model = Model { items, edges };
+        let res = compute_issue_resolution(&model, &HashSet::new());
+        assert!(!res[0].open, "accepted Decision resolves the issue");
+        assert_eq!(res[0].resolvers[0].kind, "decision");
     }
 
     #[test]
