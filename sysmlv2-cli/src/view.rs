@@ -551,6 +551,23 @@ pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<S
     Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
 }
 
+/// `(total_issues, untriaged)` — issues with NO `#Resolves` edge at all (D0077). Pure structure
+/// (no done-set needed); the `issues` guard fails on a non-empty untriaged list.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn untriaged_issues(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let model = Model::build(root)?;
+    let issues: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Issue").map(|(n, _)| n).collect();
+    let mut untriaged: Vec<String> = issues
+        .iter()
+        .filter(|n| !model.edges.iter().any(|e| e.kind == "resolves" && &e.to == **n))
+        .map(|n| (*n).clone())
+        .collect();
+    untriaged.sort();
+    Ok((issues.len(), untriaged))
+}
+
 /// Open-issues view (D0077) as JSON: every OPEN issue + its resolvers + completeness, with counts.
 ///
 /// # Errors

@@ -471,7 +471,28 @@ pub fn process_change(root: &Path) -> GuardReport {
     GuardReport { name: "process-change", scanned, warnings: Vec::new(), violations }
 }
 
-/// The six forward guards, in CLI/runner order.
+/// Guard: every Issue carries a `#Resolves` edge (D0077).
+///
+/// An untriaged issue (no resolver) is a violation — it has no resolving work/Decision and can
+/// never compute as resolved. Enforcement (hook wiring + inclusion in the `guard all` set) is
+/// turned on once IRL-d backfill triages the existing issues; until then the guard is runnable
+/// but not gating.
+#[must_use]
+pub fn issues(root: &Path) -> GuardReport {
+    match crate::view::untriaged_issues(root) {
+        Ok((total, untriaged)) => {
+            let violations = untriaged
+                .into_iter()
+                .map(|i| format!("{i}: untriaged — no #Resolves edge (D0077; link a resolving action or Decision)"))
+                .collect();
+            GuardReport { name: "issues", scanned: total, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "issues", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading issues: {e}")] },
+    }
+}
+
+/// The six ENFORCED forward guards, in CLI/runner order. (`issues` is runnable via `run_one` but
+/// not yet in the enforced set — it joins after IRL-d backfill triages the existing issues.)
 pub const GUARD_NAMES: [&str; 6] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
@@ -484,6 +505,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
+        "issues" => Some(issues(root)),
         _ => None,
     }
 }
