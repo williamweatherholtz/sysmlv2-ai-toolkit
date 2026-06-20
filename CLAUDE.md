@@ -32,17 +32,16 @@ Authoritative reading order: this file → `.engine/README.md` → `.engine/deci
 `docs/design-history/2026-06-04-process-model-design-retired.md` is retired —
 superseded in full by decisions 0001–0018; decisions win.)
 **Orient** (where things stand / what's next) is never read from prose — compute it.
-The **Rust toolchain is the authority (D0048)**, no kernel required:
+The **Rust toolchain is the sole authority (D0048; query.py retired at M4/D0074)**, no kernel required:
 `sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list).
-(`conda run -n sysml --no-capture-output python .engine/tools/query.py orient` is the
-secondary cross-check; it has a known done-count undercount — issue012.)
 `orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
 verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
 source changed since it was verified — re-verify at HEAD to clear it.
-Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and
-tooling reads the registry: `query.py viewpoints` lists the declared lenses + render
-status (the concern-coverage view); `query.py orphans` renders the orphans viewpoint
-(needs/requirements/tasks/issues missing required edges).
+Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
+Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (needs/requirements/
+tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
+`governing-version`, `reprocess-candidates`, `suspect` are the other computed lenses. (The
+SysML viewpoint-registry stays the concern-coverage index.)
 
 ---
 
@@ -132,7 +131,7 @@ Decision only — §4). A tooling change that alters the *meaning* of a computed
 behavior as surely as editing a gate.
 
 **§3b — EXECUTE.** The core loop:
-1. **Orient** — run `sysmlv2 orient [ROOT]` or `python .engine/tools/query.py orient` to
+1. **Orient** — run `sysmlv2 orient [ROOT]` to
    compute in-progress sprint ceremony status + ready/outstanding backlog frontier.
    (No cursor file — orientation is fully computed from delivery file TestResults, D0045.)
 2. **Act within the appropriate phase** — produce its defined artifact(s) as items + edges;
@@ -162,8 +161,8 @@ it even though it produces no action. Never a document blob.
   sprint review (a sitting = one work session, ≥1 sprint), where the human accepts the
   sitting's content (batchable, D0019). Do not pause to confirm individual sprint ends.
 - **Confirm only what tests can't (D0051).** `method=test/inspect/analyze` items are
-  self-evidencing — their automated runs (cargo test, clippy, `sysmlv2 validate`, ceremony
-  guard, `parity_check`) ARE the evidence; never ask a human to confirm a green test. The
+  self-evidencing — their automated runs (cargo test, clippy, `sysmlv2 validate`, `sysmlv2
+  guard`) ARE the evidence; never ask a human to confirm a green test. The
   only confirmation-worthy class is non-test-verifiable judgment — Decisions / direction —
   where the evidence IS the human's word (D0016). A sitting of all-tested work with
   inline-accepted decisions has nothing to confirm.
@@ -176,7 +175,7 @@ it even though it produces no action. Never a document blob.
 it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
 baseline are all views (§2.1).
 
-**§3f — ORIENT.** Compute from authored facts — `query.py orient` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
+**§3f — ORIENT.** Compute from authored facts — `sysmlv2 orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
 
 The six workflows (see the spec for detail):
 **Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →
@@ -246,7 +245,7 @@ The six workflows (see the spec for detail):
 - **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
   `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
   reproduced once even after the critique). Where things stand is COMPUTED
-  (`python .engine/tools/query.py orient` or `sysmlv2 orient [ROOT]` / `sysmlv2 whats-next [ROOT]`); what's next is the backlog's ready frontier;
+  (`sysmlv2 orient [ROOT]` / `sysmlv2 whats-next [ROOT]`); what's next is the backlog's ready frontier;
   how to work here is THIS file; mechanics live in `.tracking/README.md`,
   `.engine/docs/` and `.engine/decisions/`. Never author a status/worklist/handoff doc —
   if resuming requires knowledge, it belongs in the model, a Decision, or these docs.
@@ -260,17 +259,13 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\sysmlv2.exe guard                                                               # ALL six forward guards in Rust (D0074 M3) — actors, acceptance-events, sprint-coverage, ceremony, charter, process-change; exit≠0 on any violation
-python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel; ported → `sysmlv2 guard actors`, parity-verified; python retires at M4)
-python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering (no kernel; D0047; ported → `sysmlv2 guard ceremony`)
-python .engine\tools\validate\validate_sprint_coverage.py                                        # done work is covered by a sprint (no kernel; D0064/issue020; ported → `sysmlv2 guard sprint-coverage`)
-python .engine\tools\validate\validate_acceptance_events.py                                      # accepted Decision has an acceptance event (no kernel; D0066/D0047; ported → `sysmlv2 guard acceptance-events`)
-python .engine\tools\validate\validate_charter.py                                                # newly-added Story declares its #CharteredBy edge (no kernel; D0068; ported → `sysmlv2 guard charter`)
-python .engine\tools\validate\validate_process_change.py                                         # process-def change co-commits a marked Decision (no kernel; D0070 keystone; ported → `sysmlv2 guard process-change`)
-python .engine\tools\validate\parity_check.py                                                    # rust orient == query.py orient cross-check (D0048; retires at M4 with query.py)
+.\target\release\sysmlv2.exe guard                                                               # ALL six forward guards (no kernel) — exit≠0 on any violation
+.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change
 ```
-All six forward guards are now in Rust (`sysmlv2 guard`, D0074 M3) with byte/verdict parity vs
-the python guards; the python guards remain the wired path until M4 (`retireQueryPy`, issue012).
+The six forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
+acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
+D0068, process-change D0070 keystone). The python `validate_*.py` guards, `query.py`, and
+`parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust path is the sole gate.
 
 **`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
 SysML semantics than the Rust validator covers), and they remain the authoritative SysML
@@ -308,8 +303,8 @@ See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts befo
 - **Use absolute paths in shell commands; don't rely on cwd (issue013).** The Bash and
   PowerShell tools share one working directory, so a `cd` in one silently changes the cwd
   the other sees and breaks later relative-path commands. Pass absolute paths to scripts
-  and files (scripts like `query.py` self-locate the repo, so cwd doesn't matter to them).
+  and files (the `sysmlv2` binary takes an explicit `[ROOT]`, and the kernel validators self-locate the repo, so cwd doesn't matter to them).
 - **Validation-path tools must be kernel-free where possible (D0048).** A tool that gates
   commits or routine checks should not start the JVM kernel — it's slow and orphans JVMs
-  (the leak W1 fixed). `parity_check.py` learned this the hard way; the Rust path is the
-  fast default.
+  (the leak W1 fixed). The forward guards + views are all kernel-free Rust (`sysmlv2 guard` /
+  `sysmlv2 validate`); the JVM kernel runs only for deep `.engine` SysML semantics.

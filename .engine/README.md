@@ -33,7 +33,7 @@ contracts/       The computed-state specification (satisfaction/coverage/suspici
 processes/       Agile-for-solo+AI, DoR, DoD, architectural-critique, doc-sync.
 skills/          AI skill registrations + SKILL.md definitions.
 decisions/       Architecture decision records — why the engine is shaped this way.
-tools/           query.py, capture_user.py, whats_next.py + validate/ (4 validators).
+tools/           report.py (HTML dashboard), capture_user.py, kill_stale_kernels.py, _kernel.py + validate/ (kernel SysML validators: schema/workflows/instances/tracking). The orient/view/guard authority is the Rust `sysmlv2` binary (D0074; query.py retired at M4).
 docs/            Usage guide, syntax notes, tracking template.
 ```
 
@@ -51,8 +51,9 @@ package MyProjectNeeds {
 ```
 
 Copy authoring idioms from `docs/tracking-template.sysml` (it parses green). Query
-the tracked work with `tools/query.py`; validate with the four layer validators in
-`tools/validate/` (mandatory before commit, CLAUDE.md §5).
+the tracked work with `sysmlv2 orient` / `sysmlv2 view <name>`; validate with the Rust
+toolchain (`sysmlv2 validate` + `sysmlv2 guard`) and, for deep `.engine` SysML semantics,
+the kernel layer validators in `tools/validate/` (mandatory before commit, CLAUDE.md §5).
 
 ## Reuse model
 

@@ -57,7 +57,7 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
    - **substantive work goes through a sprint** — no raw backlog execution; the no-sprint
-     guard (`validate_sprint_coverage.py`) enforces it.
+     guard (`sysmlv2 guard sprint-coverage`) enforces it.
    - **bulk migration** (rename/split/drop/add a field across many instances/files) → invoke the
      `migration` skill (D0067): committed transform script, dry-run+reconcile control totals,
      expand/migrate/contract green at every step, backfill-before-tighten, never fabricate provenance.

@@ -8,13 +8,14 @@ tracked by the engine itself).
 ## Orient (state is computed, never prose — Decision 0018)
 
 ```
-conda run -n sysml --no-capture-output python .engine/tools/query.py orient
+./target/release/sysmlv2.exe orient .
 ```
 
-Returns the state cursor + the ready/suspect frontier. There is no status page,
+Returns in-progress sprint ceremony status + the ready/suspect frontier. There is no status page,
 roadmap doc, or handoff file: **the backlog (`.tracking/backlog.sysml`) is the only
-tracker**, and views over it are computed by `query.py`
-(`whats-next | outstanding | suspect | item | downstream | trace`).
+tracker**, and views over it are computed by the `sysmlv2` Rust toolchain
+(`orient | whats-next | suspect | orphans | audit | view <name> | attestation-coverage |
+governing-version | reprocess-candidates`).
 
 ## What this is
 

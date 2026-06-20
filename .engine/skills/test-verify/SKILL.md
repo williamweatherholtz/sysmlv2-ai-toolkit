@@ -28,53 +28,45 @@ This skill produces *evidence*; recording the TestResult itself is `test-result`
 | Unit + integration | `cargo test`                            | all green |
 | Lint             | `cargo clippy -- -D warnings`             | zero warnings |
 | BDD scenarios    | cucumber-rs scenarios (run via `cargo test`) | all green |
-| Parity           | `sysmlv2 orient .` ≡ `query.py orient`    | identical done/outstanding/ready |
+| Self-consistency | `sysmlv2 orient .` total == structural `action` count | matches |
 
-**Parity is the anti-drift gate (issue006).** The Rust CLI and the Python
-authority must agree. The 2026-06-16 regression (rustToolchainFix / issue005)
-happened because nothing compared them; once the parity check exists it is a
-first-class layer here. Until `rustToolchainFix` lands, the two diverge — when
-that is the case, report the divergence explicitly rather than masking it.
+**Rust is the sole authority (D0048; query.py + parity_check retired at M4/D0074).** There is
+no second implementation to diff against any more — verification is `cargo test` + `cargo clippy`
++ `sysmlv2` self-consistency (the orient total equals the distinct `action` declarations). When
+porting query.py logic earlier (M2.2/M3), parity vs query.py WAS the gate; post-M4 the python
+reference is gone, so a port's evidence is its tests + the deletion's green commit.
 
 **Evidence before assertion (D0016 spirit):** a DoD `method=test` result is only
 as good as the run behind it. Capture the actual command output; never record a
 pass you did not observe. `confirmation` results are the human's to give — this
 skill never fabricates one.
 
-**No-kernel default (post-rustToolchainFix):** verification should run on the
-Rust path (fast, no JVM); the kernel validators are the fallback and the parity
-oracle, not the routine path. Say which path produced each verdict.
+**No-kernel default:** verification runs on the Rust path (fast, no JVM); the kernel
+validators remain only for deep `.engine` SysML semantics, not the routine path. Say which
+path produced each verdict.
 
 ## Behavioral Instructions
 
 1. **Run the layers in order**, capturing real output:
    1. `cargo test` (repo root) — unit + integration + BDD.
    2. `cargo clippy -- -D warnings` (or the workspace deny-config) — zero warnings.
-   3. Parity: run `./target/release/sysmlv2.exe orient .` and
-      `conda run ... python .engine/tools/query.py orient`; diff
-      done/outstanding/ready. **Do not pipe `conda run` into a live cmdlet**
-      (CLAUDE.md §6 — the JVM holds the pipe and the shell hangs); run plain,
-      capture, compare.
+   3. Self-consistency: run `./target/release/sysmlv2.exe orient .`; confirm the
+      total task count equals the distinct `action <name>;` declarations in `.tracking`.
 2. **A red layer stops the verdict.** Report which layer failed with its output;
    do not proceed to "GREEN."
-3. **On parity divergence:** report the exact delta (counts + ready-set diff) and
-   route to `rustToolchainFix` (issue005). A known-divergent state is a *fail* of
-   the parity layer, reported honestly — not a skip.
-4. **Hand off the result** to `test-result` to record the appended TestResult
+3. **Hand off the result** to `test-result` to record the appended TestResult
    (outcome + judgedAgainst commit + judgedAt + judgedBy). This skill does not
    write TestResults itself.
-5. **Read-only:** runs tests + reports; never edits source or commits.
+4. **Read-only:** runs tests + reports; never edits source or commits.
 
 ## Anti-Patterns
 
 1. **Green-without-running** — claiming tests pass from reading code/CI memory.
-2. **Skipping the parity layer** — "cargo test passed" while `orient` silently
-   disagrees with `query.py` is exactly the hole that hid issue005.
-3. **Masking divergence** — reporting GREEN when parity fails because "it's a
-   known issue." Known ≠ passing; report it as a fail routed to its task.
-4. **Hanging the shell** — piping `conda run` output into `Select-String`/
+2. **Skipping self-consistency** — "cargo test passed" while `sysmlv2 orient`'s task
+   total silently disagrees with the structural `action` count.
+3. **Hanging the shell** — piping `conda run` output into `Select-String`/
    `Out-Null`/redirects (CLAUDE.md §6). Run plain.
-5. **Fabricating a confirmation** — verification evidence for `method=test` is the
+4. **Fabricating a confirmation** — verification evidence for `method=test` is the
    run; for `confirmation` it is the human's word. Never infer the latter.
 
 ## Output Format

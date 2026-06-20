@@ -18,7 +18,7 @@ choose their own policy.
 - Every item carries an immutable `:>> id` (UUID), `title`, and provenance.
 - Subdirectories are fine (`business/`, `delivery/`, ...) — tooling scans recursively.
 
-## The backlog dialect (read by `query.py`)
+## The backlog dialect (read by `sysmlv2`)
 
 An `action def` here IS a work backlog: tasks = `action`s, dependencies =
 `first A then B` successions. Each task's DoD is a method-tagged
@@ -35,7 +35,7 @@ commit, and it propagates transitively; unresolvable `judgedAgainst` SHAs land i
 ## Validate (mandatory before commit)
 
 ```
-conda run -n sysml --no-capture-output python .engine/tools/validate/validate_tracking.py
+./target/release/sysmlv2.exe validate .        # Rust authority (no kernel); guards: sysmlv2 guard
 ```
 
-Query: `python .engine/tools/query.py [whats-next|outstanding|suspect|item|downstream|trace]`.
+Query: `sysmlv2 [orient|whats-next|suspect|orphans|audit|view <name>|attestation-coverage|governing-version|reprocess-candidates]`.

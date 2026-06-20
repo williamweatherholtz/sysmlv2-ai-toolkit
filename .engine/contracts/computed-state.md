@@ -1,5 +1,5 @@
 > **IMPLEMENTATION STATUS (2026-06-15).** Partially implemented; this contract is the
-> TARGET. Implemented (query.py): done-from-appended-results, ready/blocked,
+> TARGET. Implemented (Rust `sysmlv2` authority; query.py retired at M4/D0074): done-from-appended-results, ready/blocked,
 > D0005 suspicion (material-change trigger over semantic deps, transitive, #OrderingOnly
 > excluded), evidence validation. NOT yet implemented (explicitly queued as backlog
 > items): coverageState()/satisfaction() over verify edges, whats-stale-since,

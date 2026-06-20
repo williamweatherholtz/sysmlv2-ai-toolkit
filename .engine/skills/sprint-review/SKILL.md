@@ -113,8 +113,8 @@ The single human touchpoint — but it confirms only what tests can't (D0051). S
 sitting into two buckets:
 
 1. **Test-backed work [NO confirmation].** Every `method=test/inspect/analyze` item is
-   self-evidencing — its automated run (cargo test, clippy, `sysmlv2 validate`, ceremony
-   guard, `parity_check`) IS the evidence. Recap it; do not ask the human to confirm it.
+   self-evidencing — its automated run (cargo test, clippy, `sysmlv2 validate`, `sysmlv2
+   guard`) IS the evidence. Recap it; do not ask the human to confirm it.
    A human "yes" on a green test adds nothing.
 2. **Non-test-verifiable items [the only confirmation ask].** Decisions / direction /
    acceptance calls — which framework, whether to promote X, a ceremony-model change —

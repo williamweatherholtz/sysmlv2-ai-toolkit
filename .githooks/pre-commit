@@ -3,6 +3,11 @@
 # post-commit auto-pushes to canonical main, nothing unvalidated may land.
 # Runs only the layer(s) matching staged paths; commits touching no guarded files
 # are not slowed. Escape hatch: SKIP_VALIDATE=1.
+#
+# Forward GUARDS are the Rust authority (D0074 M3/M4): `sysmlv2 guard <name>` — the python
+# validate_*.py guards + query.py were retired at M4 (sprint58). The .engine SysML SEMANTIC
+# validators (schema/workflows/instances) remain kernel-based (deep semantics the Rust validator
+# does not cover) and still run via conda.
 [ "$SKIP_VALIDATE" = "1" ] && { echo "pre-commit: SKIP_VALIDATE=1 — validation skipped"; exit 0; }
 
 all_staged=$(git diff --cached --name-only --diff-filter=ACMR || true)
@@ -11,11 +16,23 @@ rust_staged=$(echo "$all_staged" | grep -E '(\.rs$|Cargo\.toml$|Cargo\.lock$)' |
 
 CONDA="C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe"
 V=".engine/tools/validate"
+SYSMLV2="target/release/sysmlv2.exe"
 
 sysml_run() {
     echo "pre-commit: $1"
     "$CONDA" run -n sysml --no-capture-output python "$V/$1" || {
         echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+}
+
+# Rust forward guard (D0074). If the binary isn't built, warn + skip (a fresh checkout
+# can't run it); when built, a violation aborts the commit.
+guard_run() {
+    if [ ! -x "$SYSMLV2" ]; then
+        echo "pre-commit: rust binary missing — guard '$1' skipped (build target/release to enforce)"; return 0
+    fi
+    echo "pre-commit: sysmlv2 guard $1"
+    "$SYSMLV2" guard "$1" || {
+        echo "pre-commit: GUARD '$1' FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
 
 # .engine schema/workflow/instance changes: kernel validators (deep SysML semantics).
@@ -25,30 +42,23 @@ if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
 fi
 
-# Acceptance-event guard (pure-Python, no kernel) — D0066/D0047. Fails if a status=accepted
-# Decision lacks a passing acceptance event (acceptance must be a TestResult, not prose/status).
+# Acceptance-event guard (D0066/D0047) — accepted Decision needs a passing acceptance event.
 if echo "$sysml_staged" | grep -q '^\.engine/decisions/'; then
-    echo "pre-commit: validate_acceptance_events.py"
-    python "$V/validate_acceptance_events.py" || {
-        echo "pre-commit: ACCEPTANCE-EVENT GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    guard_run acceptance-events
 fi
 
-# Process-change keystone guard (pure-Python, no kernel) — D0070/D0047. Fails if a process-def
-# file (.engine/processes|workflows) is staged WITHOUT a co-committed #ProspectiveChange/
-# #SafetyChange-marked Decision — the hard lock that keeps the governing process version
-# git-computable (no per-item stamp). Typos included; no intent interpretation.
+# Process-change keystone guard (D0070/D0047) — a process-def change must co-commit a
+# #ProspectiveChange/#SafetyChange-marked Decision.
 if echo "$sysml_staged" | grep -qE '^\.engine/(processes|workflows)/'; then
-    echo "pre-commit: validate_process_change.py"
-    python "$V/validate_process_change.py" || {
-        echo "pre-commit: PROCESS-CHANGE GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    guard_run process-change
 fi
 
-# .tracking changes: validated by the Rust authority (D0048) — fast, no JVM (ends the
-# kernel-leak, issue004). Falls back to the kernel validator if the binary isn't built.
+# .tracking changes: validated by the Rust authority (D0048) — fast, no JVM. Falls back to the
+# kernel validator only if the binary isn't built.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
-    if [ -x "target/release/sysmlv2.exe" ]; then
+    if [ -x "$SYSMLV2" ]; then
         echo "pre-commit: sysmlv2 validate . (rust authority)"
-        ./target/release/sysmlv2.exe validate . || {
+        "$SYSMLV2" validate . || {
             echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     else
         echo "pre-commit: rust binary missing — falling back to kernel validate_tracking"
@@ -56,28 +66,19 @@ if echo "$sysml_staged" | grep -q '^\.tracking/'; then
     fi
 fi
 
-# Ceremony-gate ordering guard (pure-Python, no kernel; <1s) — issue010 / D0047.
-# Fails if a gate passed while an earlier-ordered gate in the same sprint is unpassed.
+# Ceremony-gate ordering + retro-scan guard (issue010/issue011 / D0047).
 if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
-    echo "pre-commit: validate_ceremony.py"
-    python "$V/validate_ceremony.py" || {
-        echo "pre-commit: CEREMONY ORDERING FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    guard_run ceremony
 fi
 
-# No-sprint guard (pure-Python, no kernel) — D0064 / issue020. Fails if a done backlog
-# task is not covered by a sprint (substantive work committed without a sprint wrapper).
+# No-sprint guard (D0064 / issue020) — a done backlog task must be covered by a sprint.
 if echo "$all_staged" | grep -qE '^\.tracking/(backlog\.sysml|delivery/)'; then
-    echo "pre-commit: validate_sprint_coverage.py"
-    python "$V/validate_sprint_coverage.py" || {
-        echo "pre-commit: SPRINT COVERAGE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    guard_run sprint-coverage
 fi
 
-# Charter-edge guard (pure-Python, no kernel) — D0068/D0069/D0047. Fails if a NEWLY ADDED
-# delivery Story has no #CharteredBy edge (work->origin charter lineage enforced at prep, not hoped).
+# Charter-edge guard (D0068/D0069/D0047) — a NEWLY ADDED delivery Story needs its #CharteredBy edge.
 if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
-    echo "pre-commit: validate_charter.py"
-    python "$V/validate_charter.py" || {
-        echo "pre-commit: CHARTER GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    guard_run charter
 fi
 
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)

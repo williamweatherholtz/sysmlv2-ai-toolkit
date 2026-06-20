@@ -576,6 +576,7 @@ package EngineBacklog {
         part portGuardKeystoneDoDR1 : TestResult { :>> id = "6c5825d6-0406-4031-bb37-901449de0c77"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "09e0c4d"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         action retireQueryPy;
         verification retireQueryPyDoD : Test { :>> id = "3c2d9315-2693-4c6c-a874-5797de26e358"; :>> method = VerificationMethod::inspect; :>> procedureText = "M4 (D0074, closes issue012): retire query.py + the python guard scripts now that all algorithmic views (M2.2) + forward guards (M3) are Rust with proven parity. Remove/redirect the python tools; retire parity_check (its job is done); update CLAUDE.md sec1/sec5 + usage.md so the Rust path (sysmlv2 validate + sysmlv2 guard) is the SOLE gate. Verify orient done-count undercount (issue012) is closed. Depends on portGuardKeystone (the unified guard runner)."; }
+        part retireQueryPyDoDR1 : TestResult { :>> id = "7c33675a-d5e6-497c-a993-bde6d859885c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0d60d03"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         first portGuardsCoverage then portGuardsCeremonyCharter;
         first portGuardsCeremonyCharter then portGuardKeystone;
         first portGuardKeystone then retireQueryPy;
