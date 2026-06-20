@@ -230,6 +230,58 @@ fn cmd_audit(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_governing_version(args: &[String]) -> i32 {
+    let Some(item) = args.first() else {
+        eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
+        return 2;
+    };
+    let root = match args.get(1) {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
+                return 2;
+            }
+        }
+    };
+    println!("{}", sysmlv2_cli::govern::governing_version(&root, item));
+    0
+}
+
+fn cmd_reprocess_candidates(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 reprocess-candidates [ROOT]");
+                return 2;
+            }
+        }
+    };
+    println!("{}", sysmlv2_cli::govern::reprocess_candidates(&root));
+    0
+}
+
+fn cmd_suspect(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 suspect [ROOT]");
+                return 2;
+            }
+        }
+    };
+    println!("{}", sysmlv2_cli::govern::suspect(&root));
+    0
+}
+
 fn cmd_view(args: &[String]) -> i32 {
     let Some(name) = args.first() else {
         eprintln!("usage: sysmlv2 view <name> [ROOT]");
@@ -391,6 +443,9 @@ fn main() {
         Some("attestation-coverage") => cmd_attestation_coverage(rest),
         Some("orphans") => cmd_orphans(rest),
         Some("audit") => cmd_audit(rest),
+        Some("governing-version") => cmd_governing_version(rest),
+        Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
+        Some("suspect") => cmd_suspect(rest),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),

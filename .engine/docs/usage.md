@@ -53,8 +53,9 @@ the layer you touched.
 | Register an AI skill | Add an `AISkill`/`Agent` to `skills-registry.sysml`. |
 | Charter work to its origin | `#CharteredBy dependency from <workItem> to <decision/need/requirement>;` (import `EngineRelationships::*`) — the charter-lineage edge (D0068). Traverse: `python .engine/tools/query.py charter [<item>]`. |
 | Record a process change | Prefix the Decision part with `#ProspectiveChange` (or `#SafetyChange` if downstream items must be reprocessed) — `#ProspectiveChange part dNNNN : Decision { ... }` (import `EngineRelationships::*`); which process + when are git-derived (D0070). List: `python .engine/tools/query.py process-changes`. |
-| Which process version governed an item | `python .engine/tools/query.py governing-version <storyName>` — the process-def state as-of the item's charter (charter-time freeze, D0068) + which process-change Decisions were in force then vs. after (D0070). |
-| What must be re-processed after a safety change | `python .engine/tools/query.py reprocess-candidates` — items chartered under a process version later superseded by a `#SafetyChange` (prospective changes never flag — D0062). |
+| Which process version governed an item | Rust-native (no kernel): `sysmlv2 governing-version <storyName> [ROOT]` — or `python .engine/tools/query.py governing-version <storyName>`. The process-def state as-of the item's charter (charter-time freeze, D0068) + which process-change Decisions were in force then vs. after (D0070). M2.2c, parity-verified vs query.py. |
+| What must be re-processed after a safety change | Rust-native (no kernel): `sysmlv2 reprocess-candidates [ROOT]` — or `python .engine/tools/query.py reprocess-candidates`. Items chartered under a process version later superseded by a `#SafetyChange` (prospective changes never flag — D0062). M2.2c, parity-verified vs query.py. |
+| List suspect (stale-evidence) tasks | `sysmlv2 suspect [ROOT]` — done tasks whose evidence is stale: criterion-text drift **and** D0050 deliverable-source drift. This is orient's authoritative suspect set (a SUPERSET of `python .engine/tools/query.py suspect`, which lacks D0050 — D0076); orient is the single source of truth. |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)
 

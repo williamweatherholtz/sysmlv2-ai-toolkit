@@ -100,7 +100,7 @@ pub fn compute(root: &Path) -> Output {
 
 // ── git helpers ───────────────────────────────────────────────────────────────
 
-fn git_sha_valid(sha: &str, repo: &Path) -> bool {
+pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
     if sha.is_empty() {
         return false;
     }

@@ -12,6 +12,7 @@ use std::fmt::Write as _;
 
 /// A JSON value with insertion-ordered object members.
 pub enum Json {
+    Null,
     Bool(bool),
     Int(i64),
     Str(String),
@@ -36,6 +37,7 @@ impl Json {
 
     fn write(&self, out: &mut String, indent: usize) {
         match self {
+            Self::Null => out.push_str("null"),
             Self::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Self::Int(n) => out.push_str(&n.to_string()),
             Self::Str(s) => write_str(out, s),

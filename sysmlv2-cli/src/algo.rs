@@ -22,11 +22,11 @@ pub enum AlgoError {
     Parse(String, String),
 }
 
-fn is_word(c: char) -> bool {
+pub(crate) fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-const fn is_space(c: char) -> bool {
+pub(crate) const fn is_space(c: char) -> bool {
     c == ' ' || c == '\t'
 }
 
@@ -169,7 +169,7 @@ fn part_ident(line: &str) -> Option<String> {
 }
 
 /// Story names declared in a file: `^[ \t]*part <ident> : Story\b`.
-fn story_names(text: &str) -> Vec<String> {
+pub(crate) fn story_names(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in text.lines() {
         let Some(ident) = part_ident(line) else { continue };

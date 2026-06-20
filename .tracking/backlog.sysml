@@ -552,6 +552,7 @@ package EngineBacklog {
         part portAttestationCoverageDoDR1 : TestResult { :>> id = "c0fdc7c2-7ce0-45a3-86a0-e7d29de3c7e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5cf2984"; :>> judgedAt = "2026-06-19"; :>> judgedBy = "claudeOpus"; }
         action portAlgorithmicViews;
         verification portAlgorithmicViewsDoD : Test { :>> id = "73940516-2c7d-4e8f-d050-516273849694"; :>> method = VerificationMethod::test; :>> procedureText = "Migration M2.2 umbrella (D0074/D0075): port the remaining ALGORITHMIC query.py views to Rust functions/subcommands (git-traversal + computation, not TOML filters). attestation-coverage = portAttestationCoverage (done, M2.2a, pattern established). REMAINING: orphans (per-type required-edge rules), audit (aggregate adherence), and the git-traversal trio governing-version/reprocess/suspect. Each matches its query.py output (parity); cargo test + clippy -D warnings green. Precedes M3 (port guards) + M4 (retire query.py, close issue012)."; }
+        part portAlgorithmicViewsDoDR1 : TestResult { :>> id = "8bb3ebc6-666a-47bb-af12-5e48b735e1b1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "967f018"; :>> judgedAt = "2026-06-19"; :>> judgedBy = "claudeOpus"; }
         first pglCharterEdge then pglProcessRef;
         first tomlViewExecutor then parserMarkerFix;
         first rustFailLoudLints then parserLintCleanup;
