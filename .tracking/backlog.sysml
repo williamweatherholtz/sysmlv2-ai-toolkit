@@ -582,6 +582,7 @@ package EngineBacklog {
         first portGuardKeystone then retireQueryPy;
         action issueResolveModel;
         verification issueResolveModelDoD : Test { :>> id = "1f99d709-f310-421f-bf33-6b55a8661be1"; :>> method = VerificationMethod::test; :>> procedureText = "IRL-a (D0077): add the #Resolves typed edge to frozen schema/core (relationships.sysml; §2.5 sign-off via D0077) + teach the Rust view engine to recognize 'resolves' as a KNOWN_EDGE (parse #Resolves dependency from <action|Decision> to <issueNNN>). Verify: kernel validate_schema + validate_instances green; rust validate clean; a view traversing #Resolves returns the edge; clippy --workspace -D warnings + cargo test green."; }
+        part issueResolveModelDoDR1 : TestResult { :>> id = "c967db9f-6936-48e5-a9a7-8e6cdaafe1f3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "766936d"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         action issueOpenView;
         verification issueOpenViewDoD : Test { :>> id = "d7dec749-6d2b-491f-bf33-6b55aec6e5a1"; :>> method = VerificationMethod::test; :>> procedureText = "IRL-b (D0077): Rust open-issues view — an Issue is RESOLVED iff a #Resolves resolver is complete (action done via the orient done-set OR Decision status=accepted), else OPEN. 'sysmlv2 open-issues' lists the OPEN issues + each resolver (or 'untriaged'); add an open_issues field (count + names) to 'sysmlv2 orient' output. Unit tests for the resolved/open compute; clippy -D warnings + cargo test green."; }
         action issueGuard;

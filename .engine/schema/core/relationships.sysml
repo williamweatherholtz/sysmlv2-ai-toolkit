@@ -33,6 +33,12 @@ package EngineRelationships {
     // lineage; the governing process VERSION is COMPUTED as-of the charter's creation commit.
     metadata def CharteredBy;
 
+    // #Resolves: a resolver (backlog action OR Decision) -> the Issue it resolves (D0077, issue
+    // resolution loop). Authored as a marked dependency: `#Resolves dependency from <resolver>
+    // to <issueNNN>;`. An Issue is RESOLVED (computed, never stored) iff a #Resolves resolver is
+    // complete — an action that is done or a Decision with status=accepted; else OPEN.
+    metadata def Resolves;
+
     // #ProspectiveChange / #SafetyChange: marks a Decision AS a process change + its RETROACTIVITY
     // (D0068/D0070, process-governance). prospective = outputs chartered under the prior version
     // stay valid (D0062 default); safety = downstream items are mandatory reprocess candidates.

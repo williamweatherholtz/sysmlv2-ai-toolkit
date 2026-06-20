@@ -150,6 +150,7 @@ const KNOWN_EDGES: &[&str] = &[
     "dependency",
     "ordering",
     "charteredby",
+    "resolves",
     "prospectivechange",
     "safetychange",
     "dependson",
@@ -565,6 +566,19 @@ mod tests {
             target: None,
         };
         assert!(validate_edges("v", &tr).is_err());
+    }
+
+    #[test]
+    fn resolves_edge_is_known() {
+        // D0077: #Resolves is a recognized edge (issue-resolution loop); a traverse over it
+        // must validate (not fail-loud as unknown). Case-insensitive, like the others.
+        let tr = Traverse {
+            edges: vec!["Resolves".to_string()],
+            direction: Direction::Both,
+            depth: Depth::default(),
+            target: None,
+        };
+        assert_eq!(validate_edges("v", &tr).unwrap(), vec!["resolves".to_string()]);
     }
 
     #[test]
