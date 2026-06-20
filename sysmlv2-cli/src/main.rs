@@ -230,32 +230,31 @@ fn cmd_audit(args: &[String]) -> i32 {
     }
 }
 
+fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
+    arg.map_or_else(find_repo_root, |p| Some(PathBuf::from(p)))
+}
+
 fn cmd_guard(args: &[String]) -> i32 {
-    let Some(name) = args.first() else {
-        eprintln!("usage: sysmlv2 guard <actors|acceptance-events|sprint-coverage|ceremony|charter> [ROOT]");
+    // `sysmlv2 guard` / `guard all [ROOT]` → run all six; `guard <name> [ROOT]` → run one.
+    let run_all = args.first().is_none_or(|a| a == "all");
+    let Some(root) = resolve_guard_root(args.get(1)) else {
+        eprintln!("error: no .engine/ directory found. usage: sysmlv2 guard [<name>] [ROOT]");
         return 2;
     };
-    let root = match args.get(1) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: sysmlv2 guard <name> [ROOT]");
-                return 2;
-            }
+    if run_all {
+        let reports = sysmlv2_cli::guards::run_all(&root);
+        let mut all_ok = true;
+        for r in &reports {
+            r.print();
+            all_ok &= r.ok();
         }
-    };
-    let report = match name.as_str() {
-        "actors" => sysmlv2_cli::guards::actors(&root),
-        "acceptance-events" => sysmlv2_cli::guards::acceptance_events(&root),
-        "sprint-coverage" => sysmlv2_cli::guards::sprint_coverage(&root),
-        "ceremony" => sysmlv2_cli::guards::ceremony(&root),
-        "charter" => sysmlv2_cli::guards::charter(&root),
-        other => {
-            eprintln!("unknown guard '{other}' (known: actors, acceptance-events, sprint-coverage, ceremony, charter)");
-            return 2;
-        }
+        println!("[guard] {}", if all_ok { "ALL PASS" } else { "FAILED" });
+        return i32::from(!all_ok);
+    }
+    let Some(name) = args.first() else { return 2 };
+    let Some(report) = sysmlv2_cli::guards::run_one(name, &root) else {
+        eprintln!("unknown guard '{name}' (known: {})", sysmlv2_cli::guards::GUARD_NAMES.join(", "));
+        return 2;
     };
     report.print();
     i32::from(!report.ok())

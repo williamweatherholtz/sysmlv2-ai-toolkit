@@ -277,18 +277,27 @@ fn ordering_violations(defined: &HashSet<&'static str>, passed: &HashSet<&'stati
 }
 
 /// True if Retro passed but its gate text records no avoidable-issue scan evidence (issue011).
+/// Anchors on the `verification …RetroGate… : Test` declaration (not any `RetroGate` substring,
+/// which can appear in other gates' prose) — mirrors `_RETRO_TEXT`.
 fn retro_scan_missing(text: &str, passed: &HashSet<&'static str>) -> bool {
     if !passed.contains("Retro") {
         return false;
     }
-    let Some(pos) = text.find("RetroGate") else { return false };
-    let after = &text[pos..];
-    let Some(pt) = after.find("procedureText") else { return false };
-    let after_pt = &after[pt..];
-    let Some(q) = after_pt.find('"') else { return false };
-    let body: String = after_pt[q + 1..].chars().take_while(|c| *c != '"').collect();
-    let b = body.to_lowercase();
-    !SCAN_EVIDENCE.iter().any(|k| b.contains(k))
+    for (idx, _) in text.match_indices("verification ") {
+        let after = &text[idx + "verification ".len()..];
+        let name: String = after.chars().take_while(|c| crate::algo::is_word(*c)).collect();
+        if !name.contains("RetroGate") {
+            continue;
+        }
+        let Some(rest) = after.strip_prefix(name.as_str()) else { return false };
+        let Some(pt) = rest.find("procedureText") else { return false };
+        let after_pt = &rest[pt..];
+        let Some(q) = after_pt.find('"') else { return false };
+        let body: String = after_pt[q + 1..].chars().take_while(|c| *c != '"').collect();
+        let b = body.to_lowercase();
+        return !SCAN_EVIDENCE.iter().any(|k| b.contains(k));
+    }
+    false // no retro verification declaration found
 }
 
 /// Guard: within a delivery file, no ceremony gate passes while an earlier DEFINED gate is
@@ -394,6 +403,97 @@ pub fn charter(root: &Path) -> GuardReport {
     GuardReport { name: "charter", scanned: added.len(), warnings: Vec::new(), violations }
 }
 
+// ── process-change keystone guard (D0070 hard lock) ────────────────────────────────────────────
+
+fn is_sysml(p: &str) -> bool {
+    std::path::Path::new(p).extension().is_some_and(|e| e == "sysml")
+}
+
+fn is_process_def(p: &str) -> bool {
+    is_sysml(p) && (p.starts_with(".engine/processes/") || p.starts_with(".engine/workflows/"))
+}
+
+fn is_decision_file(p: &str) -> bool {
+    is_sysml(p) && p.starts_with(".engine/decisions/")
+}
+
+/// True if a line-anchored `#ProspectiveChange`/`#SafetyChange` marker is present (prose mentions
+/// inside string literals start with `:>>`/`//`, so they never match). Mirrors `_MARKER`.
+fn has_process_marker(text: &str) -> bool {
+    text.lines().any(|line| {
+        let t = line.trim_start_matches(is_space);
+        ["#ProspectiveChange", "#SafetyChange"]
+            .iter()
+            .any(|kw| t.strip_prefix(kw).is_some_and(|rest| rest.chars().next().is_none_or(|c| !crate::algo::is_word(c))))
+    })
+}
+
+/// Pure core: a staged process-def change must be co-committed with a marked Decision.
+fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) -> Vec<String> {
+    let mut procdefs: Vec<&str> = changed.iter().map(String::as_str).filter(|p| is_process_def(p)).collect();
+    procdefs.sort_unstable();
+    if procdefs.is_empty() {
+        return Vec::new(); // no process-def changed — guard is silent
+    }
+    let marked = decision_texts.iter().any(|(p, t)| is_decision_file(p) && has_process_marker(t));
+    if marked {
+        return Vec::new();
+    }
+    vec![format!(
+        "process-def file(s) changed ({}) with NO co-committed process-change Decision (a #ProspectiveChange/#SafetyChange-marked .engine/decisions/*.sysml). D0070 hard lock: every process-def change — typos included — must record a process-change Decision.",
+        procdefs.join(", ")
+    )]
+}
+
+fn staged_files(root: &Path) -> Vec<String> {
+    git_stdout(root, &["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+        .lines()
+        .map(|l| l.trim().replace('\\', "/"))
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Guard: a staged process-def change must carry a co-committed marked Decision (D0070).
+///
+/// A staged change to `.engine/processes|workflows/*.sysml` MUST be co-committed with a
+/// `#ProspectiveChange`/`#SafetyChange`-marked Decision (the keystone hard lock). Mirrors
+/// `validate_process_change.py`.
+#[must_use]
+pub fn process_change(root: &Path) -> GuardReport {
+    let changed = staged_files(root);
+    let decision_texts: Vec<(String, String)> = changed
+        .iter()
+        .filter(|p| is_decision_file(p))
+        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        .collect();
+    let violations = keystone_violations(&changed, &decision_texts);
+    let scanned = changed.iter().filter(|p| is_process_def(p)).count();
+    GuardReport { name: "process-change", scanned, warnings: Vec::new(), violations }
+}
+
+/// The six forward guards, in CLI/runner order.
+pub const GUARD_NAMES: [&str; 6] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change"];
+
+/// Run a single guard by name, or `None` if the name is unknown.
+#[must_use]
+pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
+    match name {
+        "actors" => Some(actors(root)),
+        "acceptance-events" => Some(acceptance_events(root)),
+        "sprint-coverage" => Some(sprint_coverage(root)),
+        "ceremony" => Some(ceremony(root)),
+        "charter" => Some(charter(root)),
+        "process-change" => Some(process_change(root)),
+        _ => None,
+    }
+}
+
+/// Run all six guards over `root`, returning their reports in `GUARD_NAMES` order.
+#[must_use]
+pub fn run_all(root: &Path) -> Vec<GuardReport> {
+    GUARD_NAMES.iter().filter_map(|n| run_one(n, root)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,6 +543,11 @@ mod tests {
         let without = "verification xRetroGate : Test { :>> procedureText = \"rubber stamp\"; }";
         assert!(!retro_scan_missing(with, &passed));
         assert!(retro_scan_missing(without, &passed));
+
+        // Regression: "RetroGate" mentioned in an EARLIER gate's prose must not be mistaken for
+        // the retro verification (the bug the unified runner caught on sprint56).
+        let prose_then_real = "verification xStandupGate : Test { :>> procedureText = \"approach: retro_scan_missing (RetroGate prose)\"; }\nverification xRetroGate : Test { :>> procedureText = \"no avoidable issue\"; }";
+        assert!(!retro_scan_missing(prose_then_real, &passed));
     }
 
     #[test]
@@ -455,5 +560,34 @@ mod tests {
         assert_eq!(neg.len(), 1);
         assert!(neg[0].contains("s99"));
         assert!(charter_violations(&[]).is_empty());
+    }
+
+    #[test]
+    fn keystone_selftest() {
+        // Mirrors validate_process_change.selftest (incl. prose-marker-does-not-count).
+        let marked = "package D {\n    #ProspectiveChange part d99 : Decision { :>> id = \"x\"; }\n}";
+        let plain = "package D {\n    part d98 : Decision { :>> id = \"y\"; }\n}";
+        let prose = "package D {\n    part d97 : Decision {\n        :>> decision = \"example: #ProspectiveChange part dNNNN : Decision { ... }\";\n    }\n}";
+
+        let pos = keystone_violations(
+            &[".engine/workflows/delivery.sysml".to_string(), ".engine/decisions/0099-x.sysml".to_string()],
+            &[(".engine/decisions/0099-x.sysml".to_string(), marked.to_string())],
+        );
+        let neg = keystone_violations(
+            &[".engine/processes/agile-workflow.sysml".to_string(), ".engine/decisions/0098-y.sysml".to_string()],
+            &[(".engine/decisions/0098-y.sysml".to_string(), plain.to_string())],
+        );
+        let neg2 = keystone_violations(&[".engine/processes/agile-workflow.sysml".to_string()], &[]);
+        let neutral = keystone_violations(&[".tracking/backlog.sysml".to_string()], &[]);
+        let prose_only = keystone_violations(
+            &[".engine/workflows/delivery.sysml".to_string(), ".engine/decisions/0097-z.sysml".to_string()],
+            &[(".engine/decisions/0097-z.sysml".to_string(), prose.to_string())],
+        );
+
+        assert!(pos.is_empty(), "marked Decision co-committed -> pass");
+        assert_eq!(neg.len(), 1, "unmarked Decision -> fail");
+        assert_eq!(neg2.len(), 1, "no Decision -> fail");
+        assert!(neutral.is_empty(), "no process-def -> silent");
+        assert_eq!(prose_only.len(), 1, "prose marker does NOT count");
     }
 }

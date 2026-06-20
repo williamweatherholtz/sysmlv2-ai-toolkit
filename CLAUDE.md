@@ -260,12 +260,17 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel)
-python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering (no kernel; D0047)
-python .engine\tools\validate\validate_sprint_coverage.py                                        # done work is covered by a sprint (no kernel; D0064/issue020)
-python .engine\tools\validate\validate_acceptance_events.py                                      # accepted Decision has an acceptance event (no kernel; D0066/D0047)
-python .engine\tools\validate\parity_check.py                                                    # rust orient == query.py orient cross-check (D0048)
+.\target\release\sysmlv2.exe guard                                                               # ALL six forward guards in Rust (D0074 M3) — actors, acceptance-events, sprint-coverage, ceremony, charter, process-change; exit≠0 on any violation
+python .engine\tools\validate\validate_actors.py                                                 # authoredBy/judgedBy vs ProjectActors (no kernel; ported → `sysmlv2 guard actors`, parity-verified; python retires at M4)
+python .engine\tools\validate\validate_ceremony.py                                               # delivery gate ordering (no kernel; D0047; ported → `sysmlv2 guard ceremony`)
+python .engine\tools\validate\validate_sprint_coverage.py                                        # done work is covered by a sprint (no kernel; D0064/issue020; ported → `sysmlv2 guard sprint-coverage`)
+python .engine\tools\validate\validate_acceptance_events.py                                      # accepted Decision has an acceptance event (no kernel; D0066/D0047; ported → `sysmlv2 guard acceptance-events`)
+python .engine\tools\validate\validate_charter.py                                                # newly-added Story declares its #CharteredBy edge (no kernel; D0068; ported → `sysmlv2 guard charter`)
+python .engine\tools\validate\validate_process_change.py                                         # process-def change co-commits a marked Decision (no kernel; D0070 keystone; ported → `sysmlv2 guard process-change`)
+python .engine\tools\validate\parity_check.py                                                    # rust orient == query.py orient cross-check (D0048; retires at M4 with query.py)
 ```
+All six forward guards are now in Rust (`sysmlv2 guard`, D0074 M3) with byte/verdict parity vs
+the python guards; the python guards remain the wired path until M4 (`retireQueryPy`, issue012).
 
 **`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
 SysML semantics than the Rust validator covers), and they remain the authoritative SysML
