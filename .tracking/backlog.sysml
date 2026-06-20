@@ -613,5 +613,6 @@ package EngineBacklog {
         part suspectDiagnosticsDoDR1 : TestResult { :>> id = "8dcd1a03-4a19-4487-a888-020401c8e5e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "447effd"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         action readdDroppedViews;
         verification readdDroppedViewsDoD : Test { :>> id = "9d9d03e4-f3ce-4c6d-8939-c2b22059bc7b"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue025. Re-add the seven query.py subcommands dropped at M4 (workflows, trace, trace-need, item, outstanding, downstream, viewpoints-listing) as TOML views or Rust subcommands where each fits (trace/downstream = traverse; item/outstanding = select; workflows = a small Rust subcommand over the workflow action defs). Each verified vs its intended output; clippy -D warnings + cargo test green."; }
+        part readdDroppedViewsDoDR1 : TestResult { :>> id = "aeb497a1-5087-4f1a-8386-64fc1696258e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bef381a"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
     }
 }

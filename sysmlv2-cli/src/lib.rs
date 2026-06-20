@@ -30,6 +30,7 @@ pub mod guards;
 pub mod indexer;
 mod json;
 pub mod orient;
+pub mod queries;
 pub mod view;
 pub mod write;
 

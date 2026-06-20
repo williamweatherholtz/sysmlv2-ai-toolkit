@@ -260,6 +260,44 @@ fn cmd_guard(args: &[String]) -> i32 {
     i32::from(!report.ok())
 }
 
+// Root-only query: `sysmlv2 <name> [ROOT]`.
+fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 {usage} [ROOT]");
+                return 2;
+            }
+        }
+    };
+    println!("{}", f(&root));
+    0
+}
+
+// Name + optional root: `sysmlv2 <name> <arg> [ROOT]`.
+fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> String) -> i32 {
+    let Some(arg) = args.first() else {
+        eprintln!("usage: sysmlv2 {usage} <name> [ROOT]");
+        return 2;
+    };
+    let root = match args.get(1) {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 {usage} <name> [ROOT]");
+                return 2;
+            }
+        }
+    };
+    println!("{}", f(&root, arg));
+    0
+}
+
 fn cmd_open_issues(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -503,6 +541,11 @@ fn main() {
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
+        Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
+        Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
+        Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),
+        Some("trace") => cmd_query1(rest, "trace", sysmlv2_cli::queries::trace),
+        Some("trace-need") => cmd_query1(rest, "trace-need", sysmlv2_cli::queries::trace_need),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),

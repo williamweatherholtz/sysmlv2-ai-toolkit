@@ -1,0 +1,11 @@
+name = "viewpoints"
+concern = "Which lenses (viewpoints) are declared, and for whom? (the concern-coverage index, D0056/D0057)"
+audience = "maintainer / lead"
+
+# The declared viewpoint registry as a listing (re-adds query.py's `viewpoints`, issue025).
+[select]
+type = "Viewpoint"
+
+[project]
+types = ["Viewpoint"]
+fields = ["title", "concernText", "audience", "sources", "renderer"]
