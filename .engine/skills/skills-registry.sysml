@@ -172,4 +172,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to create/run a viewpoint, slice the model by a concern, or trace items along edges.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part issueResolutionSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a078-516273849612";
+        :>> title = "issue-resolution";
+        :>> purpose = "Deploy the Issue Resolution process (D0078/D0077): link every Issue to the work or Decision that resolves it via a #Resolves edge, let open/resolved state COMPUTE from resolver-completeness (never a stored status), and record decision-moots-item as a typed edge (#Resolves for an Issue, supersede for a Need/Requirement) — never prose. The deploying skill for .engine/processes/issue-resolution.sysml.";
+        :>> location = ".engine/skills/issue-resolution/SKILL.md";
+        :>> triggerCondition = "Recording/triaging an Issue; asked to resolve an issue or list open issues; a Decision moots an item; the `issues` guard fails (untriaged).";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

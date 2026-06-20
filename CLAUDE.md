@@ -147,6 +147,12 @@ behavior as surely as editing a gate.
 **§3c — RECORD.** Author one atomic item (`Decision` / `TestResult` / `Issue`) + a
 judgment. A "won't do / reduce scope" is a `Decision` that `supersede`s the Need — capture
 it even though it produces no action. Never a document blob.
+An **`Issue` must be TRIAGED** (issue-resolution process/skill, D0077/D0078): give it a
+`#Resolves` edge from a resolving **action** (create one if none) or a mooting **Decision** —
+`#Resolves dependency from <resolver> to <issueNNN>;`. Resolution is then COMPUTED (resolved
+iff the resolver is done/accepted; `sysmlv2 open-issues` / `orient` open_issues), never a prose
+"RESOLVED" note; `sysmlv2 guard issues` fails on an untriaged Issue. When a Decision moots an
+Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`) — not prose.
 
 - **Confirmation results require explicit human sign-off.** A `method=confirmation`
   verification *is* a recorded human attestation — its evidence is the human's word.
@@ -260,12 +266,13 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\sysmlv2.exe guard                                                               # ALL six forward guards (no kernel) — exit≠0 on any violation
-.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change
+.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues
 ```
-The six forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
+The seven forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
 acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
-D0068, process-change D0070 keystone). The python `validate_*.py` guards, `query.py`, and
-`parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust path is the sole gate.
+D0068, process-change D0070 keystone, issues D0077/D0078). The python `validate_*.py` guards,
+`query.py`, and `parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust path
+is the sole gate.
 
 **`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
 SysML semantics than the Rust validator covers), and they remain the authoritative SysML

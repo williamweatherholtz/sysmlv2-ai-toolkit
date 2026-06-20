@@ -594,6 +594,7 @@ package EngineBacklog {
         part issueBackfillDoDR1 : TestResult { :>> id = "2aa9ede2-95c2-45fa-a2a9-e5f4dd278a06"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3d3da35"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         action issueResolutionSkill;
         verification issueResolutionSkillDoD : Test { :>> id = "555fd538-566f-4e7c-b3c6-21c53fe804c4"; :>> method = VerificationMethod::inspect; :>> procedureText = "IRL-e (D0077/D0059): an issue-resolution PROCESS def (.engine/processes/issue-resolution.sysml) + deploying SKILL — record issue -> link #Resolves to a resolving action (create one if none) or a wontfix/by-design Decision -> resolution computes when the resolver completes. Co-commit a #ProspectiveChange-marked Decision (D0070 keystone) with the process-def. doc-sync CLAUDE.md + usage. validate green."; }
+        part issueResolutionSkillDoDR1 : TestResult { :>> id = "2070b655-8155-4466-a49f-f74892640c4a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9f7d0ec"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         first issueResolveModel then issueOpenView;
         first issueOpenView then issueGuard;
         first issueGuard then issueBackfill;
