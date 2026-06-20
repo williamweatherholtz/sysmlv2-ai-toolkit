@@ -234,6 +234,166 @@ pub fn sprint_coverage(root: &Path) -> GuardReport {
     GuardReport { name: "sprint-coverage", scanned: done.len(), warnings: Vec::new(), violations }
 }
 
+// ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
+
+const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+const CEREMONY_GRANDFATHERED: &[&str] = &["sprint11_nativeSpikes"];
+const SCAN_EVIDENCE: &[&str] = &["avoidable", "improvement", "retro held", "no avoidable", "process improvement"];
+
+/// Gate names with a `verification <…{G}Gate>` declaration in the text.
+fn gates_defined(text: &str) -> HashSet<&'static str> {
+    let mut out = HashSet::new();
+    for (idx, _) in text.match_indices("verification ") {
+        let after = &text[idx + "verification ".len()..];
+        let name: String = after.chars().take_while(|c| crate::algo::is_word(*c)).collect();
+        for g in GATE_ORDER {
+            if name.ends_with(&format!("{g}Gate")) {
+                out.insert(g);
+            }
+        }
+    }
+    out
+}
+
+/// Gate names with a passing `part <…{G}Gate…R\d+> : TestResult` (reuses `orient::gate_passed`).
+fn gates_passed(text: &str) -> HashSet<&'static str> {
+    GATE_ORDER.into_iter().filter(|g| crate::orient::gate_passed(text, g)).collect()
+}
+
+/// Ordering violations: a passed gate while an earlier DEFINED gate is unpassed.
+fn ordering_violations(defined: &HashSet<&'static str>, passed: &HashSet<&'static str>) -> Vec<(&'static str, &'static str)> {
+    let mut out = Vec::new();
+    for (i, g) in GATE_ORDER.into_iter().enumerate() {
+        if !passed.contains(g) {
+            continue;
+        }
+        for earlier in GATE_ORDER.into_iter().take(i) {
+            if defined.contains(earlier) && !passed.contains(earlier) {
+                out.push((g, earlier));
+            }
+        }
+    }
+    out
+}
+
+/// True if Retro passed but its gate text records no avoidable-issue scan evidence (issue011).
+fn retro_scan_missing(text: &str, passed: &HashSet<&'static str>) -> bool {
+    if !passed.contains("Retro") {
+        return false;
+    }
+    let Some(pos) = text.find("RetroGate") else { return false };
+    let after = &text[pos..];
+    let Some(pt) = after.find("procedureText") else { return false };
+    let after_pt = &after[pt..];
+    let Some(q) = after_pt.find('"') else { return false };
+    let body: String = after_pt[q + 1..].chars().take_while(|c| *c != '"').collect();
+    let b = body.to_lowercase();
+    !SCAN_EVIDENCE.iter().any(|k| b.contains(k))
+}
+
+/// Guard: within a delivery file, no ceremony gate passes while an earlier DEFINED gate is
+/// unpassed; a passing Retro records avoidable-issue scan evidence. Mirrors `validate_ceremony.py`.
+#[must_use]
+pub fn ceremony(root: &Path) -> GuardReport {
+    let files = crate::collect_sysml(&root.join(".tracking").join("delivery"));
+    let mut warnings = Vec::new();
+    let mut violations = Vec::new();
+    let grandfathered: HashSet<&str> = CEREMONY_GRANDFATHERED.iter().copied().collect();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let passed = gates_passed(&text);
+        let mut defined = gates_defined(&text);
+        defined.extend(passed.iter().copied());
+        let viols = ordering_violations(&defined, &passed);
+        if !viols.is_empty() {
+            let detail = viols.iter().map(|(g, e)| format!("{g} passed but {e} (earlier) unpassed")).collect::<Vec<_>>().join("; ");
+            if grandfathered.contains(stem.as_str()) {
+                warnings.push(format!("{stem}: {detail} (grandfathered, pre-issue010)"));
+            } else {
+                violations.push(format!("{stem}: {detail}"));
+            }
+        }
+        if retro_scan_missing(&text, &passed) && !grandfathered.contains(stem.as_str()) {
+            violations.push(format!("{stem}: Retro gate recorded without avoidable-issue scan evidence (issue011)"));
+        }
+    }
+    GuardReport { name: "ceremony", scanned: files.len(), warnings, violations }
+}
+
+// ── charter guard (newly-added delivery Story declares its #CharteredBy edge) ───────────────────
+
+fn git_stdout(root: &Path, args: &[&str]) -> String {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default()
+}
+
+fn added_delivery_files(root: &Path) -> Vec<String> {
+    git_stdout(root, &["diff", "--cached", "--name-only", "--diff-filter=A"])
+        .lines()
+        .map(|l| l.trim().replace('\\', "/"))
+        .filter(|l| l.starts_with(".tracking/delivery/") && std::path::Path::new(l).extension().is_some_and(|e| e == "sysml"))
+        .collect()
+}
+
+/// `#CharteredBy dependency from <work> to <_>` → the chartered work names.
+fn chartered_work(text: &str) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for chunk in text.split("#CharteredBy").skip(1) {
+        let mut it = chunk.split_whitespace();
+        if it.next() != Some("dependency") || it.next() != Some("from") {
+            continue;
+        }
+        let Some(tok) = it.next() else { continue };
+        let work: String = tok.chars().take_while(|c| crate::algo::is_word(*c)).collect();
+        if !work.is_empty() && it.next() == Some("to") {
+            out.insert(work);
+        }
+    }
+    out
+}
+
+/// Pure core: violations for newly-added delivery files `(path, staged_text)`.
+fn charter_violations(added: &[(String, String)]) -> Vec<String> {
+    let mut sorted: Vec<&(String, String)> = added.iter().collect();
+    sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut violations = Vec::new();
+    for (path, text) in sorted {
+        let chartered = chartered_work(text);
+        let mut uncharted: Vec<String> = crate::algo::story_names(text).into_iter().filter(|s| !chartered.contains(s)).collect();
+        uncharted.sort();
+        uncharted.dedup();
+        for s in uncharted {
+            violations.push(format!(
+                "{path}: Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement (D0068)"
+            ));
+        }
+    }
+    violations
+}
+
+/// Guard: every newly-added delivery Story declares its `#CharteredBy` edge (D0068).
+///
+/// Newly-added = `git diff --cached --diff-filter=A`. Forward-only — existing files are never
+/// re-checked. Mirrors `validate_charter.py`.
+#[must_use]
+pub fn charter(root: &Path) -> GuardReport {
+    let added = added_delivery_files(root);
+    let texts: Vec<(String, String)> = added
+        .iter()
+        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        .collect();
+    let violations = charter_violations(&texts);
+    GuardReport { name: "charter", scanned: added.len(), warnings: Vec::new(), violations }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,5 +422,38 @@ mod tests {
         let grandfathered: HashSet<&str> = HashSet::new();
         let uncovered: Vec<String> = done.iter().filter(|t| !blob.contains(t.as_str()) && !grandfathered.contains(t.as_str())).cloned().collect();
         assert_eq!(uncovered, vec!["fakeOrphan".to_string()]);
+    }
+
+    #[test]
+    fn ceremony_ordering_violation_detected() {
+        // Implement passed while Standup (defined) is unpassed -> violation.
+        let mut defined: HashSet<&'static str> = HashSet::new();
+        defined.extend(["Refine", "Standup", "Implement"]);
+        let mut passed: HashSet<&'static str> = HashSet::new();
+        passed.extend(["Refine", "Implement"]); // Standup skipped
+        let v = ordering_violations(&defined, &passed);
+        assert_eq!(v, vec![("Implement", "Standup")]);
+    }
+
+    #[test]
+    fn retro_scan_evidence_required() {
+        let mut passed: HashSet<&'static str> = HashSet::new();
+        passed.insert("Retro");
+        let with = "verification xRetroGate : Test { :>> procedureText = \"no avoidable issue found\"; }";
+        let without = "verification xRetroGate : Test { :>> procedureText = \"rubber stamp\"; }";
+        assert!(!retro_scan_missing(with, &passed));
+        assert!(retro_scan_missing(without, &passed));
+    }
+
+    #[test]
+    fn charter_selftest() {
+        // Mirrors validate_charter.selftest: chartered passes, uncharted flagged, none passes.
+        let good = "package S {\n    part s42 : Story { :>> id = \"x\"; }\n    #CharteredBy dependency from s42 to d0070;\n}";
+        let bad = "package S {\n    part s99 : Story { :>> id = \"y\"; }\n}";
+        assert!(charter_violations(&[(".tracking/delivery/g.sysml".to_string(), good.to_string())]).is_empty());
+        let neg = charter_violations(&[(".tracking/delivery/b.sysml".to_string(), bad.to_string())]);
+        assert_eq!(neg.len(), 1);
+        assert!(neg[0].contains("s99"));
+        assert!(charter_violations(&[]).is_empty());
     }
 }

@@ -232,7 +232,7 @@ fn cmd_audit(args: &[String]) -> i32 {
 
 fn cmd_guard(args: &[String]) -> i32 {
     let Some(name) = args.first() else {
-        eprintln!("usage: sysmlv2 guard <actors|acceptance-events|sprint-coverage> [ROOT]");
+        eprintln!("usage: sysmlv2 guard <actors|acceptance-events|sprint-coverage|ceremony|charter> [ROOT]");
         return 2;
     };
     let root = match args.get(1) {
@@ -250,8 +250,10 @@ fn cmd_guard(args: &[String]) -> i32 {
         "actors" => sysmlv2_cli::guards::actors(&root),
         "acceptance-events" => sysmlv2_cli::guards::acceptance_events(&root),
         "sprint-coverage" => sysmlv2_cli::guards::sprint_coverage(&root),
+        "ceremony" => sysmlv2_cli::guards::ceremony(&root),
+        "charter" => sysmlv2_cli::guards::charter(&root),
         other => {
-            eprintln!("unknown guard '{other}' (known: actors, acceptance-events, sprint-coverage)");
+            eprintln!("unknown guard '{other}' (known: actors, acceptance-events, sprint-coverage, ceremony, charter)");
             return 2;
         }
     };
