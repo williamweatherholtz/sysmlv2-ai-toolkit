@@ -580,5 +580,19 @@ package EngineBacklog {
         first portGuardsCoverage then portGuardsCeremonyCharter;
         first portGuardsCeremonyCharter then portGuardKeystone;
         first portGuardKeystone then retireQueryPy;
+        action issueResolveModel;
+        verification issueResolveModelDoD : Test { :>> id = "1f99d709-f310-421f-bf33-6b55a8661be1"; :>> method = VerificationMethod::test; :>> procedureText = "IRL-a (D0077): add the #Resolves typed edge to frozen schema/core (relationships.sysml; §2.5 sign-off via D0077) + teach the Rust view engine to recognize 'resolves' as a KNOWN_EDGE (parse #Resolves dependency from <action|Decision> to <issueNNN>). Verify: kernel validate_schema + validate_instances green; rust validate clean; a view traversing #Resolves returns the edge; clippy --workspace -D warnings + cargo test green."; }
+        action issueOpenView;
+        verification issueOpenViewDoD : Test { :>> id = "d7dec749-6d2b-491f-bf33-6b55aec6e5a1"; :>> method = VerificationMethod::test; :>> procedureText = "IRL-b (D0077): Rust open-issues view — an Issue is RESOLVED iff a #Resolves resolver is complete (action done via the orient done-set OR Decision status=accepted), else OPEN. 'sysmlv2 open-issues' lists the OPEN issues + each resolver (or 'untriaged'); add an open_issues field (count + names) to 'sysmlv2 orient' output. Unit tests for the resolved/open compute; clippy -D warnings + cargo test green."; }
+        action issueGuard;
+        verification issueGuardDoD : Test { :>> id = "0a8df7ec-f56f-412c-b3c6-21c535885038"; :>> method = VerificationMethod::test; :>> procedureText = "IRL-c (D0077/D0047): 'sysmlv2 guard issues' — every Issue carries a #Resolves edge (untriaged issue = violation); a prose 'RESOLVED' claim lacking a complete resolver is flagged. Wire into .githooks/pre-commit on .tracking/issues.sysml changes. Unit tests mirror the guard logic; clippy -D warnings + cargo test green."; }
+        action issueBackfill;
+        verification issueBackfillDoD : Test { :>> id = "42511a28-8e8b-4230-b3c6-21c53ab7c64c"; :>> method = VerificationMethod::inspect; :>> procedureText = "IRL-d (D0077/D0067 migration): add #Resolves edges to ALL existing issues — resolved-by-work -> their done action; resolved-by-design -> the Decision; OPEN ones (014, 025, + audit every issue) -> a new OPEN resolving action OR a wontfix Decision. Gated migration: committed reasoning, dry-run reconcile (every issue has >=1 #Resolves; the computed OPEN set matches the audit), never fabricate. 'sysmlv2 guard issues' green; 'sysmlv2 open-issues' shows the true open set; the secretly-open issues become tracked work."; }
+        action issueResolutionSkill;
+        verification issueResolutionSkillDoD : Test { :>> id = "555fd538-566f-4e7c-b3c6-21c53fe804c4"; :>> method = VerificationMethod::inspect; :>> procedureText = "IRL-e (D0077/D0059): an issue-resolution PROCESS def (.engine/processes/issue-resolution.sysml) + deploying SKILL — record issue -> link #Resolves to a resolving action (create one if none) or a wontfix/by-design Decision -> resolution computes when the resolver completes. Co-commit a #ProspectiveChange-marked Decision (D0070 keystone) with the process-def. doc-sync CLAUDE.md + usage. validate green."; }
+        first issueResolveModel then issueOpenView;
+        first issueOpenView then issueGuard;
+        first issueGuard then issueBackfill;
+        first issueBackfill then issueResolutionSkill;
     }
 }
