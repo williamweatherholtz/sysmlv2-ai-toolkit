@@ -81,6 +81,11 @@ if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
     guard_run charter
 fi
 
+# Issue-resolution guard (D0077) — every Issue must carry a #Resolves edge (untriaged = violation).
+if echo "$all_staged" | grep -q '^\.tracking/issues\.sysml$'; then
+    guard_run issues
+fi
+
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     echo "pre-commit: cargo clippy"

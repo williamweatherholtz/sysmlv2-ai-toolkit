@@ -491,9 +491,9 @@ pub fn issues(root: &Path) -> GuardReport {
     }
 }
 
-/// The six ENFORCED forward guards, in CLI/runner order. (`issues` is runnable via `run_one` but
-/// not yet in the enforced set — it joins after IRL-d backfill triages the existing issues.)
-pub const GUARD_NAMES: [&str; 6] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change"];
+/// The ENFORCED forward guards, in CLI/runner order. `issues` joined the enforced set at IRL-d
+/// (D0077) once the existing issues were triaged with `#Resolves` edges.
+pub const GUARD_NAMES: [&str; 7] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]

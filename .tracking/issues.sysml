@@ -260,4 +260,29 @@ package ProjectIssues {
         :>> discoveredInField = true;
         :>> relatedTask = "retireQueryPy";
     }
+    #Resolves dependency from authoredByRefs to issue001;
+    #Resolves dependency from baselineView to issue002;
+    #Resolves dependency from d0053 to issue003;
+    #Resolves dependency from rustToolchainFix to issue004;
+    #Resolves dependency from rustToolchainFix to issue005;
+    #Resolves dependency from deliverableSuspicion to issue006;
+    #Resolves dependency from auditSkill to issue007;
+    #Resolves dependency from deliverySkills to issue008;
+    #Resolves dependency from deliverySkills to issue009;
+    #Resolves dependency from ceremonyGateGuard to issue010;
+    #Resolves dependency from reviewInvocationGuard to issue011;
+    #Resolves dependency from rustToolchainFix to issue012;
+    #Resolves dependency from rustToolchainFix to issue013;
+    #Resolves dependency from suspectDiagnostics to issue014;
+    #Resolves dependency from writeApi to issue015;
+    #Resolves dependency from decisionAnalysis to issue016;
+    #Resolves dependency from trackedMetadataReplan to issue017;
+    #Resolves dependency from tomlViewExecutor to issue018;
+    #Resolves dependency from formalViewpoints to issue019;
+    #Resolves dependency from bootstrapExitEval to issue020;
+    #Resolves dependency from pglProcessRef to issue021;
+    #Resolves dependency from actualHoursDisposition to issue022;
+    #Resolves dependency from sittingReviewRecord to issue023;
+    #Resolves dependency from parserMarkerFix to issue024;
+    #Resolves dependency from readdDroppedViews to issue025;
 }
