@@ -61,8 +61,10 @@ if echo "$sysml_staged" | grep -q '^\.tracking/'; then
         "$SYSMLV2" validate . || {
             echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     else
-        echo "pre-commit: rust binary missing — falling back to kernel validate_tracking"
-        sysml_run validate_tracking.py
+        # NO kernel fallback (issue026/safeTrackingFallback): kernel validate_tracking validates
+        # per-file and FALSE-FAILS the #CharteredBy charter edges (.tracking -> .engine Decisions)
+        # + baselines -> schema. The Rust authority (D0048) is the sole correct .tracking validator.
+        echo "pre-commit: rust binary missing — .tracking validation SKIPPED (build target/release/sysmlv2 to enforce)"
     fi
 fi
 

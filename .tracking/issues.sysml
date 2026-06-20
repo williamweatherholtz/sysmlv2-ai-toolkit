@@ -285,4 +285,15 @@ package ProjectIssues {
     #Resolves dependency from sittingReviewRecord to issue023;
     #Resolves dependency from parserMarkerFix to issue024;
     #Resolves dependency from readdDroppedViews to issue025;
+
+    part issue026 : Issue {
+        :>> id = "5061ebfc-2d3e-4f40-5126-738495a1b2c4";
+        :>> title = "Pre-commit hook's kernel validate_tracking fallback false-fails 31 #CharteredBy charter-bearing tracking files (unsafe fallback when the rust binary is unbuilt)";
+        :>> createdAt = "2026-06-20";
+        :>> createdBy = "claudeOpus";
+        :>> description = "The sitting02 audit found the deep kernel validate_all reports tracking 44/75 while the Rust authority (sysmlv2 validate, D0048) passes all 75. Cause: kernel validate_tracking validates each .tracking file PER-FILE with only schema/core preloaded, so #CharteredBy edges (Stories -> .engine Decisions, since sprint38) and baselines.sysml (-> EngineBaseline/Release) cannot resolve — the documented per-file cross-package limitation (issue021/D0070), now also hitting charter edges. The .tracking files are CORRECT (Rust is authority + right). LATENT HAZARD: the pre-commit hook FALLS BACK to kernel validate_tracking when target/release/sysmlv2 is missing (e.g. a fresh clone before cargo build) -> it would false-fail these 31 files and BLOCK the commit. discoveredInField via the sitting02 audit.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "safeTrackingFallback";
+    }
+    #Resolves dependency from safeTrackingFallback to issue026;
 }
