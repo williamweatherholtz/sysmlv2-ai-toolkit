@@ -57,7 +57,7 @@ the layer you touched.
 | Record a process change | Prefix the Decision part with `#ProspectiveChange` (or `#SafetyChange` if downstream items must be reprocessed) — `#ProspectiveChange part dNNNN : Decision { ... }` (import `EngineRelationships::*`); which process + when are git-derived (D0070). List: `sysmlv2 view process-changes`. |
 | Which process version governed an item | Rust-native (no kernel): `sysmlv2 governing-version <storyName> [ROOT]`. The process-def state as-of the item's charter (charter-time freeze, D0068) + which process-change Decisions were in force then vs. after (D0070). M2.2c. |
 | What must be re-processed after a safety change | Rust-native (no kernel): `sysmlv2 reprocess-candidates [ROOT]`. Items chartered under a process version later superseded by a `#SafetyChange` (prospective changes never flag — D0062). M2.2c. |
-| List suspect (stale-evidence) tasks | `sysmlv2 suspect [ROOT]` — done tasks whose evidence is stale: criterion-text drift **and** D0050 deliverable-source drift. orient's authoritative suspect set (D0076; orient is the single source of truth). |
+| List suspect (stale-evidence) tasks | `sysmlv2 suspect [ROOT]` — done tasks whose evidence is stale: criterion-text drift **and** D0050 deliverable-source drift (per-task source paths, `.engine/deliverable-manifest.txt`). `sysmlv2 suspect --explain` prints WHY each is flagged (which path drifted, at which commit, vs verified-at). orient's authoritative suspect set (D0076; the single source of truth). Clear a deliverable-drift suspect by re-verifying at HEAD (`append-result --sha <HEAD>`). |
 
 ## Edge cheatsheet (pilot-confirmed syntax only)
 

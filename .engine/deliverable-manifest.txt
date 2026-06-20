@@ -1,28 +1,23 @@
-# Deliverable-source suspicion manifest (D0050, closes issue006).
-# Read by `sysmlv2 orient` (orient.rs): a listed `task:` whose latest passing
-# TestResult was judged at a commit BEFORE a commit touching any `path:` below is
-# marked SUSPECT — the deliverable changed since it was verified, so the claim is stale.
-# Re-verifying (appending a TestResult judged at HEAD) clears it.
+# Deliverable-source suspicion manifest (D0050; PER-TASK precision — suspectDiagnostics, issue014).
+# Read by `sysmlv2 orient` (orient.rs): a listed task whose latest passing TestResult was judged
+# at a commit BEFORE a commit touching ANY OF ITS OWN paths is marked SUSPECT — the deliverable
+# changed since it was verified, so the claim is stale. `sysmlv2 suspect --explain` prints WHICH
+# path drifted at WHICH commit vs the verified-at commit. Re-verifying (append a TestResult judged
+# at HEAD) clears it.
 #
-# Lines: `path: <repo-relative path>` and `task: <verification task name>`. '#' = comment.
+# Format (per-task): `task: <name> | <space-separated repo-relative paths>`. Per-task paths (not
+# one global set) so a change to e.g. the CLI does NOT flag the lexer task. '#' = comment.
 
-# --- deliverable source tree (the Rust toolchain) ---
-path: sysmlv2-parser
-path: sysmlv2-cli
-path: Cargo.toml
-path: Cargo.lock
-
-# --- verification tasks whose evidence depends on that source ---
-task: rustS1Lexer
-task: rustS2Parser
-task: rustS3Semantic
-task: rustS4SpecCompat
-task: rustS5CLI
-task: rustS6Orient
-task: rustS7QueryAlign
-task: rustS8runtimeParser
-task: rustS9writeApi
-task: runtimeParser
-task: writeApi
-task: rustToolchainFix
-task: specVersionRuntimeCheck
+task: rustS1Lexer | sysmlv2-parser/src/lexer.rs sysmlv2-parser/src/token.rs
+task: rustS2Parser | sysmlv2-parser/src/parser.rs sysmlv2-parser/src/ast.rs
+task: rustS3Semantic | sysmlv2-parser/src/registry.rs
+task: rustS4SpecCompat | sysmlv2-parser/src/spec_compat.rs
+task: rustS5CLI | sysmlv2-cli/src/main.rs sysmlv2-cli/src/lib.rs
+task: rustS6Orient | sysmlv2-cli/src/orient.rs sysmlv2-cli/src/indexer.rs
+task: rustS7QueryAlign | sysmlv2-cli/src/orient.rs sysmlv2-cli/src/lib.rs
+task: rustS8runtimeParser | sysmlv2-parser/src
+task: rustS9writeApi | sysmlv2-cli/src/write.rs
+task: runtimeParser | sysmlv2-parser/src
+task: writeApi | sysmlv2-cli/src/write.rs
+task: rustToolchainFix | sysmlv2-parser sysmlv2-cli Cargo.toml Cargo.lock
+task: specVersionRuntimeCheck | sysmlv2-parser/src/spec_compat.rs

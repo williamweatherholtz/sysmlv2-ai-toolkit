@@ -321,18 +321,19 @@ fn cmd_reprocess_candidates(args: &[String]) -> i32 {
 }
 
 fn cmd_suspect(args: &[String]) -> i32 {
-    let root = match args.first() {
+    let explain = args.iter().any(|a| a == "--explain");
+    let root = match args.iter().find(|a| !a.starts_with("--")) {
         Some(p) => PathBuf::from(p),
         None => {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 suspect [ROOT]");
+                eprintln!("usage: sysmlv2 suspect [--explain] [ROOT]");
                 return 2;
             }
         }
     };
-    println!("{}", sysmlv2_cli::govern::suspect(&root));
+    println!("{}", sysmlv2_cli::govern::suspect(&root, explain));
     0
 }
 

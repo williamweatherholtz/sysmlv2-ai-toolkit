@@ -39,6 +39,9 @@ pub struct Output {
     /// OPEN issues (no complete `#Resolves` resolver) — D0077, surfaced so the frontier can't
     /// read "empty" while issues are unresolved.
     pub open_issues: Vec<String>,
+    /// Per-suspect-task reason string (criterion-change / transitive / deliverable-drift).
+    /// Carried for `suspect --explain`; NOT emitted in the standard orient JSON.
+    pub suspect_reasons: HashMap<String, String>,
     /// Number of done tasks.
     pub done: usize,
     /// Number of outstanding (not-done) tasks.
@@ -211,63 +214,72 @@ pub(crate) fn gate_passed(text: &str, gate: &str) -> bool {
     false
 }
 
-/// Load the deliverable-suspicion manifest (D0050): `(source_paths, task_names)`.
-/// Missing manifest → empty (feature inert). Lines: `path: <p>` / `task: <t>`; `#` = comment.
-fn load_deliverable_manifest(repo: &Path) -> (Vec<String>, HashSet<String>) {
-    let mut paths = Vec::new();
-    let mut tasks = HashSet::new();
+/// Load the PER-TASK deliverable-suspicion manifest (D0050; suspectDiagnostics): a list of
+/// `(task, its source paths)`. Missing manifest → empty (feature inert).
+/// Format: `task: <name> | <space-separated paths>`; `#` = comment.
+fn load_deliverable_manifest(repo: &Path) -> Vec<(String, Vec<String>)> {
+    let mut out = Vec::new();
     let Ok(text) = std::fs::read_to_string(repo.join(".engine").join("deliverable-manifest.txt"))
     else {
-        return (paths, tasks);
+        return out;
     };
     for line in text.lines() {
         let l = line.trim();
-        if let Some(p) = l.strip_prefix("path:") {
-            paths.push(p.trim().to_owned());
-        } else if let Some(t) = l.strip_prefix("task:") {
-            tasks.insert(t.trim().to_owned());
+        if let Some(rest) = l.strip_prefix("task:") {
+            let mut parts = rest.splitn(2, '|');
+            let task = parts.next().unwrap_or("").trim().to_owned();
+            let paths: Vec<String> = parts.next().unwrap_or("").split_whitespace().map(str::to_owned).collect();
+            if !task.is_empty() {
+                out.push((task, paths));
+            }
         }
     }
-    (paths, tasks)
+    out
 }
 
-/// True if any commit touching `paths` exists strictly after `sha` (deliverable drifted
-/// since it was verified). Conservative: on git failure, returns false (don't flag).
-fn deliverable_drifted(repo: &Path, sha: &str, paths: &[String]) -> bool {
+/// The most recent commit (oneline) touching any of `paths` strictly after `sha`, or `None` if
+/// the deliverable did not drift since it was verified. Conservative: git failure → `None`.
+fn deliverable_drift_commit(repo: &Path, sha: &str, paths: &[String]) -> Option<String> {
     if sha.is_empty() || paths.is_empty() {
-        return false;
+        return None;
     }
     let mut args: Vec<String> = vec![
         "-C".into(), repo.display().to_string(),
-        "log".into(), "--oneline".into(), format!("{sha}..HEAD"), "--".into(),
+        "log".into(), "--oneline".into(), "-1".into(), format!("{sha}..HEAD"), "--".into(),
     ];
     args.extend(paths.iter().cloned());
-    Command::new("git")
-        .args(&args)
-        .output()
-        .map(|o| o.status.success() && !o.stdout.is_empty())
-        .unwrap_or(false)
+    let out = Command::new("git").args(&args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let line = String::from_utf8_lossy(&out.stdout);
+    let first = line.lines().next().map_or("", str::trim);
+    if first.is_empty() {
+        None
+    } else {
+        Some(first.to_owned())
+    }
 }
 
-/// Mark manifest deliverable tasks suspect when the source drifted since they were
-/// verified (D0050). Mutates `suspect_set` in place.
+/// Mark manifest deliverable tasks suspect when THEIR OWN source drifted since they were verified
+/// (D0050, per-task). Records a human-readable reason per flagged task (for `suspect --explain`).
 fn apply_deliverable_suspicion(
     repo: &Path,
     done_map: &HashMap<String, bool>,
     verified_at: &HashMap<String, String>,
     suspect_set: &mut HashSet<String>,
+    reasons: &mut HashMap<String, String>,
 ) {
-    let (dpaths, dtasks) = load_deliverable_manifest(repo);
-    if dpaths.is_empty() {
-        return;
-    }
-    for name in &dtasks {
-        if done_map.get(name.as_str()).copied().unwrap_or(false) {
-            if let Some(ct) = verified_at.get(name.as_str()) {
-                if deliverable_drifted(repo, ct, &dpaths) {
-                    suspect_set.insert(name.clone());
-                }
-            }
+    for (name, paths) in load_deliverable_manifest(repo) {
+        if paths.is_empty() || !done_map.get(name.as_str()).copied().unwrap_or(false) {
+            continue;
+        }
+        let Some(ct) = verified_at.get(name.as_str()) else { continue };
+        if let Some(commit) = deliverable_drift_commit(repo, ct, &paths) {
+            suspect_set.insert(name.clone());
+            reasons.entry(name.clone()).or_insert_with(|| {
+                format!("deliverable source [{}] drifted since verified at {ct} (e.g. {commit})", paths.join(", "))
+            });
         }
     }
 }
@@ -312,8 +324,9 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         }
     }
 
-    // Step 3: compute suspect (criterion text changed since verified).
+    // Step 3: compute suspect (criterion text changed since verified). Capture WHY per task.
     let mut suspect_set: HashSet<String> = HashSet::new();
+    let mut suspect_reasons: HashMap<String, String> = HashMap::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
         if !is_done {
@@ -329,6 +342,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
             if let Some(old) = git_criterion_at(ct, dep, repo) {
                 if old != cur {
                     suspect_set.insert(name.clone());
+                    suspect_reasons.insert(name.clone(), format!("criterion of dependency '{dep}' changed since verified at {ct}"));
                     break 'dep_loop;
                 }
             }
@@ -350,6 +364,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
                 }
                 if suspect_set.contains(dep.as_str()) {
                     suspect_set.insert(name.clone());
+                    suspect_reasons.insert(name.clone(), format!("transitively suspect: dependency '{dep}' is suspect"));
                     changed = true;
                     break;
                 }
@@ -357,8 +372,8 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         }
     }
 
-    // Step 5: deliverable suspicion (D0050) — manifest tasks whose source drifted since verified.
-    apply_deliverable_suspicion(repo, &done_map, &verified_at, &mut suspect_set);
+    // Step 5: deliverable suspicion (D0050) — manifest tasks whose OWN source drifted since verified.
+    apply_deliverable_suspicion(repo, &done_map, &verified_at, &mut suspect_set, &mut suspect_reasons);
 
     let done = done_map.values().filter(|&&v| v).count();
     let outstanding = done_map.values().filter(|&&v| !v).count();
@@ -381,6 +396,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         suspect,
         invalid_evidence,
         open_issues,
+        suspect_reasons,
         done,
         outstanding,
     }

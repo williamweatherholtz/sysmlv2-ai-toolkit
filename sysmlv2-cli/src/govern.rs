@@ -258,9 +258,21 @@ pub fn reprocess_candidates(root: &Path) -> String {
 /// Orient's AUTHORITATIVE suspect set (criterion-change + D0050 deliverable drift) as JSON.
 /// A deliberate SUPERSET of `query.py suspect` (NOT byte-parity), per D0076.
 #[must_use]
-pub fn suspect(root: &Path) -> String {
+pub fn suspect(root: &Path, explain: bool) -> String {
     let out = crate::orient::compute(root);
-    Json::Obj(vec![("suspect".to_string(), Json::Arr(out.suspect.iter().map(|s| Json::s(s.clone())).collect()))]).dump()
+    if !explain {
+        return Json::Obj(vec![("suspect".to_string(), Json::Arr(out.suspect.iter().map(|s| Json::s(s.clone())).collect()))]).dump();
+    }
+    // --explain (suspectDiagnostics): per suspect task, WHY it is flagged.
+    let arr: Vec<Json> = out
+        .suspect
+        .iter()
+        .map(|t| {
+            let reason = out.suspect_reasons.get(t).cloned().unwrap_or_else(|| "suspect (no recorded reason)".to_string());
+            Json::Obj(vec![("task".to_string(), Json::s(t.clone())), ("reason".to_string(), Json::s(reason))])
+        })
+        .collect();
+    Json::Obj(vec![("suspect".to_string(), Json::Arr(arr))]).dump()
 }
 
 fn all_delivery_stories(root: &Path) -> Vec<String> {
