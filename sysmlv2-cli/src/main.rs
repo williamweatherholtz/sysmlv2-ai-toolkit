@@ -230,6 +230,35 @@ fn cmd_audit(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_guard(args: &[String]) -> i32 {
+    let Some(name) = args.first() else {
+        eprintln!("usage: sysmlv2 guard <actors|acceptance-events|sprint-coverage> [ROOT]");
+        return 2;
+    };
+    let root = match args.get(1) {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 guard <name> [ROOT]");
+                return 2;
+            }
+        }
+    };
+    let report = match name.as_str() {
+        "actors" => sysmlv2_cli::guards::actors(&root),
+        "acceptance-events" => sysmlv2_cli::guards::acceptance_events(&root),
+        "sprint-coverage" => sysmlv2_cli::guards::sprint_coverage(&root),
+        other => {
+            eprintln!("unknown guard '{other}' (known: actors, acceptance-events, sprint-coverage)");
+            return 2;
+        }
+    };
+    report.print();
+    i32::from(!report.ok())
+}
+
 fn cmd_governing_version(args: &[String]) -> i32 {
     let Some(item) = args.first() else {
         eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
@@ -443,6 +472,7 @@ fn main() {
         Some("attestation-coverage") => cmd_attestation_coverage(rest),
         Some("orphans") => cmd_orphans(rest),
         Some("audit") => cmd_audit(rest),
+        Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),

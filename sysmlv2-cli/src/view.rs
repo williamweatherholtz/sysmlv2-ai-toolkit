@@ -468,6 +468,18 @@ fn compute_attestation(model: &Model) -> (usize, Vec<String>) {
     (accepted.len(), missing)
 }
 
+/// Attestation data (D0066): `(total_accepted, missing)`.
+///
+/// `missing` lists accepted Decisions lacking a passing acceptance event — the structured form
+/// behind both the `attestation-coverage` view and the `acceptance-events` guard (M3a).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn attestation_data(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let model = Model::build(root)?;
+    Ok(compute_attestation(&model))
+}
+
 /// Attestation-coverage view (D0066) as JSON: accepted Decisions lacking a passing acceptance event.
 ///
 /// # Errors

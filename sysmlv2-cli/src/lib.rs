@@ -26,6 +26,7 @@ use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod algo;
 pub mod govern;
+pub mod guards;
 pub mod indexer;
 mod json;
 pub mod orient;
