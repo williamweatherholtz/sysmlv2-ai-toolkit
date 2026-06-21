@@ -134,6 +134,41 @@ fn acceptance_judged_against(text: &str, dec: &str) -> Option<String> {
     }
 }
 
+// ── charter-time scoping for the assurance gates (D0068 freeze, D0081) ─────────────────────────
+
+/// The INTRODUCTION commit of a Decision — the first commit that added `part <decision> :` under
+/// `.engine/decisions` (when the rule landed). `None` if not yet committed (e.g. staged-only).
+#[must_use]
+pub fn decision_intro_commit(root: &Path, decision: &str) -> Option<String> {
+    git_lines(root, &["log", "--format=%H", "--reverse", "-S", &format!("part {decision} :"), "--", ".engine/decisions"])
+        .into_iter()
+        .next()
+}
+
+/// Assurance-element names (`part`/`requirement` defs in `.tracking` + `.engine/decisions`) present
+/// AS-OF `commit` — the grandfather set for charter-time scoping. Empty on git failure.
+fn names_present_at(repo: &Path, commit: &str) -> std::collections::HashSet<String> {
+    git_lines(repo, &["grep", "-hoE", "(part|requirement) [A-Za-z0-9_]+ :", commit, "--", ".tracking", ".engine/decisions"])
+        .iter()
+        .filter_map(|l| l.split_whitespace().nth(1).map(String::from))
+        .collect()
+}
+
+/// The set of element names GRANDFATHERED under `decision`.
+///
+/// Those present when the rule landed (at the decision's introduction commit), hence out of scope
+/// for its prospective requirement (charter-time freeze, D0068/D0081). New elements (created after)
+/// are NOT grandfathered.
+///
+/// `None` if the decision's introduction commit can't be resolved (not yet committed / git
+/// unavailable) — the caller then treats EVERYTHING as grandfathered so the gate never spuriously
+/// blocks (conservative; matches the D0050 git-failure stance).
+#[must_use]
+pub fn grandfathered_under(root: &Path, decision: &str) -> Option<std::collections::HashSet<String>> {
+    let commit = decision_intro_commit(root, decision)?;
+    Some(names_present_at(root, &commit))
+}
+
 // ── the resolver ──────────────────────────────────────────────────────────────
 
 struct GovernData {

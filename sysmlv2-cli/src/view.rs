@@ -760,6 +760,7 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
     let done = crate::orient::done_names(root);
     let suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
     let cov = compute_coverage(&model, &done, &suspect);
+    let gf = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
 
     // Per-type summary.
     let mut summary: Vec<Json> = Vec::new();
@@ -798,13 +799,17 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
                 ("type".to_string(), Json::s(c.type_name.clone())),
                 ("state".to_string(), Json::s(c.state)),
                 ("basis".to_string(), c.basis.map_or(Json::Null, Json::s)),
+                ("governed".to_string(), Json::Bool(governed(gf.as_ref(), &c.element))),
                 ("verifiers".to_string(), Json::Arr(verifiers)),
             ])
         })
         .collect();
 
+    // Full gap set (all uncovered, for the honest C measurement) + the GOVERNED subset the gate uses.
     let gaps: Vec<Json> =
         cov.iter().filter(|c| c.state != "covered").map(|c| Json::s(c.element.clone())).collect();
+    let governed_gaps: Vec<Json> =
+        cov.iter().filter(|c| c.state != "covered" && governed(gf.as_ref(), &c.element)).map(|c| Json::s(c.element.clone())).collect();
 
     let out = Json::Obj(vec![
         (
@@ -813,6 +818,7 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
         ),
         ("summary".to_string(), Json::Arr(summary)),
         ("gaps".to_string(), Json::Arr(gaps)),
+        ("governed_gaps".to_string(), Json::Arr(governed_gaps)),
         ("elements".to_string(), Json::Arr(elements)),
     ]);
     Ok(out.dump())
@@ -901,13 +907,33 @@ fn compute_critique_coverage(model: &Model) -> Vec<CritiqueCoverage> {
         .collect()
 }
 
-/// Names of elements MISSING >= 1 required-lens critique (the `guard critique` gap set), sorted.
+// Charter-time governance (D0068/D0081): the assurance requirements are PROSPECTIVE — they bind only
+// elements created after the governing decision landed. coverage(C) is governed by D0079; the
+// critique requirement by D0080. Pre-decision elements are grandfathered (out of the GATE's gap set,
+// though still shown in the VIEW with `governed=false` for transparency).
+const COVERAGE_DECISION: &str = "d0079";
+const CRITIQUE_DECISION: &str = "d0080";
+
+/// Whether `name` is GOVERNED (in scope) given a grandfather set: in scope iff present and not
+/// grandfathered. A `None` set (git unavailable) yields `false` — conservative: the gate never
+/// spuriously blocks when charter history can't be read.
+fn governed(grandfathered: Option<&HashSet<String>>, name: &str) -> bool {
+    grandfathered.is_some_and(|gf| !gf.contains(name))
+}
+
+/// Names of GOVERNED elements (created after D0080) missing >= 1 required-lens critique — the
+/// `guard critique` gap set (charter-time scoped, D0081), sorted.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
     let model = Model::build(root)?;
-    Ok(compute_critique_coverage(&model).into_iter().filter(|c| !c.covered).map(|c| c.element).collect())
+    let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
+    Ok(compute_critique_coverage(&model)
+        .into_iter()
+        .filter(|c| !c.covered && governed(gf.as_ref(), &c.element))
+        .map(|c| c.element)
+        .collect())
 }
 
 /// Critique-coverage view (D0080) as JSON.
@@ -920,17 +946,20 @@ pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
 pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let cov = compute_critique_coverage(&model);
+    let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
+    let in_scope = |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element);
 
+    // Summary over GOVERNED elements only (the grandfathered ones aren't required).
     let mut summary: Vec<Json> = Vec::new();
     for ty in ASSURANCE_TYPES {
-        let rows: Vec<&CritiqueCoverage> = cov.iter().filter(|c| c.type_name == ty).collect();
+        let rows: Vec<&CritiqueCoverage> = cov.iter().filter(|c| c.type_name == ty && in_scope(c)).collect();
         if rows.is_empty() {
             continue;
         }
         let covered = i64::try_from(rows.iter().filter(|c| c.covered).count()).unwrap_or(i64::MAX);
         summary.push(Json::Obj(vec![
             ("type".to_string(), Json::s(ty)),
-            ("total".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX))),
+            ("governed".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX))),
             ("covered".to_string(), Json::Int(covered)),
             ("uncovered".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX) - covered)),
         ]));
@@ -954,18 +983,20 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
             Json::Obj(vec![
                 ("element".to_string(), Json::s(c.element.clone())),
                 ("type".to_string(), Json::s(c.type_name.clone())),
+                ("governed".to_string(), Json::Bool(in_scope(c))),
                 ("covered".to_string(), Json::Bool(c.covered)),
                 ("lenses".to_string(), Json::Arr(lenses)),
             ])
         })
         .collect();
 
-    let gaps: Vec<Json> = cov.iter().filter(|c| !c.covered).map(|c| Json::s(c.element.clone())).collect();
+    // The gap set is the GATE's view: governed + uncovered (grandfathered elements never gate).
+    let gaps: Vec<Json> = cov.iter().filter(|c| !c.covered && in_scope(c)).map(|c| Json::s(c.element.clone())).collect();
 
     let out = Json::Obj(vec![
         (
             "critique".to_string(),
-            Json::s("critique-coverage: Need/SystemRequirement/Decision x required lens (Core-3, D0080) -> an independent method=critique verification #Verify-linked to the element"),
+            Json::s("critique-coverage: GOVERNED Need/SystemRequirement/Decision (created after D0080, charter-time D0081) x required lens (Core-3) -> an independent method=critique verification #Verify-linked to the element"),
         ),
         ("summary".to_string(), Json::Arr(summary)),
         ("gaps".to_string(), Json::Arr(gaps)),
@@ -998,10 +1029,12 @@ struct ReadinessBlockers {
 }
 
 impl ReadinessBlockers {
+    /// READY = all BLOCKING categories empty. `stale_verifications` is ADVISORY (the D0050
+    /// informational signal — cleared by re-verification, never a commit gate), so it does not
+    /// affect readiness; it is surfaced separately.
     const fn ready(&self) -> bool {
         self.coverage_gaps.is_empty()
             && self.critique_gaps.is_empty()
-            && self.stale_verifications.is_empty()
             && self.undispositioned_findings.is_empty()
             && self.unfixed_critical.is_empty()
             && self.invariant_violations.is_empty()
@@ -1014,10 +1047,20 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     let suspect_vec = crate::orient::compute(root).suspect;
     let suspect: HashSet<String> = suspect_vec.iter().cloned().collect();
 
-    let coverage_gaps: Vec<String> =
-        compute_coverage(&model, &done, &suspect).into_iter().filter(|c| c.state != "covered").map(|c| c.element).collect();
-    let critique_gaps: Vec<String> =
-        compute_critique_coverage(&model).into_iter().filter(|c| !c.covered).map(|c| c.element).collect();
+    // Charter-time scoping (D0081): only GOVERNED elements (created after the governing decision)
+    // count as gaps — grandfathered elements are out of the gate.
+    let gf_cov = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
+    let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
+    let coverage_gaps: Vec<String> = compute_coverage(&model, &done, &suspect)
+        .into_iter()
+        .filter(|c| c.state != "covered" && governed(gf_cov.as_ref(), &c.element))
+        .map(|c| c.element)
+        .collect();
+    let critique_gaps: Vec<String> = compute_critique_coverage(&model)
+        .into_iter()
+        .filter(|c| !c.covered && governed(gf_crit.as_ref(), &c.element))
+        .map(|c| c.element)
+        .collect();
 
     // Open finding Issues by severity (severity present => it was raised as a finding, D0080).
     let open: HashSet<String> =
@@ -1037,8 +1080,13 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     undispositioned_findings.sort();
     unfixed_critical.sort();
 
-    let invariant_violations: Vec<String> = crate::guards::run_all(root)
-        .into_iter()
+    // Base invariant guards only — EXCLUDE `assured` (would recurse) and `critique` (composed
+    // separately as critique_gaps). This is what "invariants green" means for readiness.
+    let invariant_violations: Vec<String> = crate::guards::GUARD_NAMES
+        .iter()
+        .copied()
+        .filter(|n| !matches!(*n, "assured" | "critique"))
+        .filter_map(|n| crate::guards::run_one(n, root))
         .flat_map(|r| r.violations.into_iter().map(move |v| format!("{}: {v}", r.name)))
         .collect();
 
@@ -1064,9 +1112,9 @@ pub fn assured_blockers(root: &Path) -> Result<Vec<String>, ViewError> {
             out.push(format!("{label}: {} ({})", v.len(), v.iter().take(5).cloned().collect::<Vec<_>>().join(", ")));
         }
     };
+    // BLOCKING categories only (stale_verifications is advisory — see ReadinessBlockers::ready).
     note(&mut out, "coverage gaps", &b.coverage_gaps);
     note(&mut out, "critique gaps", &b.critique_gaps);
-    note(&mut out, "stale verifications", &b.stale_verifications);
     note(&mut out, "undispositioned >=Medium findings", &b.undispositioned_findings);
     note(&mut out, "unfixed Critical findings", &b.unfixed_critical);
     note(&mut out, "invariant violations", &b.invariant_violations);
@@ -1090,18 +1138,20 @@ pub fn assured(root: &Path) -> Result<String, ViewError> {
     let blockers = Json::Arr(vec![
         cat("coverage_gaps", &b.coverage_gaps),
         cat("critique_gaps", &b.critique_gaps),
-        cat("stale_verifications", &b.stale_verifications),
         cat("undispositioned_findings", &b.undispositioned_findings),
         cat("unfixed_critical", &b.unfixed_critical),
         cat("invariant_violations", &b.invariant_violations),
     ]);
+    // Advisory: surfaced for the full picture but NOT gating (cleared by re-verification, D0050).
+    let advisories = Json::Arr(vec![cat("stale_verifications", &b.stale_verifications)]);
     let out = Json::Obj(vec![
         (
             "assured".to_string(),
-            Json::s("assurance readiness (D0079 c): READY iff coverage complete AND critique complete AND no stale verification AND every >=Medium finding dispositioned AND no Critical open AND invariants green"),
+            Json::s("assurance readiness (D0079 c; charter-time scoped, D0081): READY iff GOVERNED coverage complete AND GOVERNED critique complete AND every >=Medium finding dispositioned AND no Critical open AND invariants green. stale_verifications is advisory (re-verify; not gating)"),
         ),
         ("ready".to_string(), Json::Bool(b.ready())),
         ("blockers".to_string(), blockers),
+        ("advisories".to_string(), advisories),
     ]);
     Ok(out.dump())
 }

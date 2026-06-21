@@ -527,10 +527,12 @@ pub fn assured(root: &Path) -> GuardReport {
 
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
-/// `issues` joined the enforced set at IRL-d (D0077) once the existing issues were triaged with
-/// `#Resolves` edges. `critique` (D0080) is runnable via `run_one` but joins the enforced set only
-/// after a genuine critique pass (else it would block all commits with zero critiques recorded).
-pub const GUARD_NAMES: [&str; 7] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues"];
+/// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
+/// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
+/// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
+/// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
+pub const GUARD_NAMES: [&str; 9] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -549,7 +551,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
     }
 }
 
-/// Run all six guards over `root`, returning their reports in `GUARD_NAMES` order.
+/// Run all enforced guards over `root`, returning their reports in `GUARD_NAMES` order.
 #[must_use]
 pub fn run_all(root: &Path) -> Vec<GuardReport> {
     GUARD_NAMES.iter().filter_map(|n| run_one(n, root)).collect()

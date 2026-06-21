@@ -636,6 +636,10 @@ package EngineBacklog {
         first assuranceCoverage then critiqueMechanism;
         first critiqueMechanism then critiqueCoverage;
         first critiqueCoverage then assuranceReadiness;
+        first assuranceReadiness then charterTimeAssuranceGates;
+        action charterTimeAssuranceGates;
+        verification charterTimeAssuranceGatesDoD : Test { :>> id = "5e0a1b2c-3d4e-4f50-9617-2839a4b5c6d7"; :>> method = VerificationMethod::test; :>> procedureText = "D0081: scope the assurance gates by charter-time freeze (D0068) — coverage(D0079)/critique(D0080) bind only elements created after the governing decision's intro commit; grandfather pre-decision work. govern.rs grandfathered_under/decision_intro_commit/names_present_at; view.rs governed scoping of critique_gaps+readiness + governed flags + assured blocking/advisory split + recursion break; guards.rs GUARD_NAMES 7->9 (critique+assured ENFORCED). Dogfood: d0081 critiqued (3 lenses, independent). VERIFY: guard all (9) PASS, d0081 governed+covered, clippy -D warnings + cargo test + rust validate green."; }
+        part charterTimeAssuranceGatesDoDR1 : TestResult { :>> id = "6f1b2c3d-4e5f-4061-a728-3940b5c6d7e8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5b90663"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         action modelIngestRequirements;
         verification modelIngestRequirementsDoD : Test { :>> id = "bba06d6e-1d69-451e-9355-12a3ee3efb22"; :>> method = VerificationMethod::test; :>> procedureText = "Prerequisite for assurance-coverage + critique (D0079): teach the Rust view Model to ingest requirement/need USAGES (requirement X : T) as items — parser.rs emits Item::Part with type_name for a requirement usage (previously skipped; only requirement def -> TypeDef). Verify: the Model sees 14 Need + 14 SystemRequirement items (was 0); rust validate clean; cargo test + clippy --workspace -D warnings green."; }
         part modelIngestRequirementsDoDR1 : TestResult { :>> id = "ee9864fd-8758-4510-a128-1b73175784fc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8b7bb0b"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
