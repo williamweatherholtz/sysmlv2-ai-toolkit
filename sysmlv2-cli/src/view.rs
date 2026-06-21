@@ -634,8 +634,8 @@ struct Verifier {
 struct Coverage {
     element: String,
     type_name: String,
-    state: &'static str,        // "covered" | "suspect" | "uncovered"
-    basis: Option<&'static str>, // the covering verifier kind, when covered
+    tier: &'static str,          // D0082: verified | attested | addressed | suspect | uncovered
+    basis: Option<&'static str>, // the strongest covering verifier kind
     verifiers: Vec<Verifier>,
 }
 
@@ -650,12 +650,32 @@ fn charter_forms(from: &str) -> Vec<String> {
     forms
 }
 
-/// State + basis from a verifier set: covered if any verifier is complete & not suspect (strongest
-/// kind wins — verifiers are pushed strongest-first); suspect if the only complete evidence is
-/// stale; uncovered if no complete verifier (none at all, or chartered-but-not-yet-done).
-fn state_of(verifiers: &[Verifier]) -> (&'static str, Option<&'static str>) {
-    if let Some(v) = verifiers.iter().find(|v| v.complete && !v.suspect) {
-        return ("covered", Some(v.kind));
+/// The coverage TIER a verifier kind confers (D0082): objective evidence vs attestation vs a
+/// mere claim. `satisfy` is transitive — it is only added as a verifier when the satisfied
+/// requirement is itself verified, so it legitimately confers `verified`.
+fn tier_for_kind(kind: &str) -> &'static str {
+    match kind {
+        "explicit-test" | "satisfy" => "verified",
+        "accept-event" => "attested",
+        _ => "addressed", // charter-dod: work was done, not evidence the element holds
+    }
+}
+
+/// Coverage TIER + basis from a verifier set (D0082 three-tier model): the STRONGEST complete,
+/// non-stale verifier wins — `verified` (reproducible evidence) > `attested` (human confirmation,
+/// where judgment isn't testable) > `addressed` (work/trace only — a claim, not evidence). If the
+/// only complete evidence is a stale verify-Test → `suspect`; nothing → `uncovered`.
+/// A tier the GATE accepts as covered (D0082): objective evidence or a defensible attestation.
+/// `addressed` (claim only), `suspect` (stale), and `uncovered` are gaps.
+fn is_covered_tier(tier: &str) -> bool {
+    matches!(tier, "verified" | "attested")
+}
+
+fn tier_of(verifiers: &[Verifier]) -> (&'static str, Option<&'static str>) {
+    for want in ["verified", "attested", "addressed"] {
+        if let Some(v) = verifiers.iter().find(|v| v.complete && !v.suspect && tier_for_kind(v.kind) == want) {
+            return (want, Some(v.kind));
+        }
     }
     if verifiers.iter().any(|v| v.complete && v.suspect) {
         return ("suspect", None);
@@ -675,8 +695,19 @@ fn direct_verifiers<S: std::hash::BuildHasher>(
 ) -> Vec<Verifier> {
     let mut vs: Vec<Verifier> = Vec::new();
     for e in model.edges.iter().filter(|e| e.kind == "verify" && e.to == target) {
+        // A verify-edge Test is complete iff its own TestResult passed — read directly from the
+        // Model (a standalone `verification`/`part <name>R1 : TestResult`), NOT the action-task
+        // `done` set (these Tests aren't action DoDs). Mirrors accept-event + critique-coverage.
+        // EXCLUDE method=critique Tests: critiques are also #Verify-linked but belong to
+        // critique-coverage (an adversarial lens), not objective assurance coverage (D0082).
+        let src = model.items.get(&e.from);
+        if src.and_then(|i| i.attrs.get("method")).map(String::as_str) == Some("critique") {
+            continue;
+        }
+        let res = model.items.get(&format!("{}R1", e.from));
+        let pass = res.and_then(|r| r.attrs.get("outcome")).map(String::as_str) == Some("pass");
         vs.push(Verifier {
-            complete: done.contains(&e.from),
+            complete: pass,
             suspect: suspect.contains(&e.from),
             name: e.from.clone(),
             kind: "explicit-test",
@@ -708,7 +739,7 @@ fn compute_coverage<S: std::hash::BuildHasher>(
     suspect: &HashSet<String, S>,
 ) -> Vec<Coverage> {
     // Pass 1: requirements + decisions (their coverage is direct).
-    let mut req_state: HashMap<String, &'static str> = HashMap::new();
+    let mut req_tier: HashMap<String, &'static str> = HashMap::new();
     let mut out: Vec<Coverage> = Vec::new();
     // Assurance targets: Needs, SystemRequirements, and ACCEPTED Decisions only. Superseded /
     // rejected / proposed Decisions are not active commitments (mirrors the attestation guard's
@@ -725,24 +756,25 @@ fn compute_coverage<S: std::hash::BuildHasher>(
             continue; // pass 2
         }
         let verifiers = direct_verifiers(model, name, info.type_name == "Decision", done, suspect);
-        let (state, basis) = state_of(&verifiers);
+        let (tier, basis) = tier_of(&verifiers);
         if info.type_name == "SystemRequirement" {
-            req_state.insert((*name).clone(), state);
+            req_tier.insert((*name).clone(), tier);
         }
-        out.push(Coverage { element: (*name).clone(), type_name: info.type_name.clone(), state, basis, verifiers });
+        out.push(Coverage { element: (*name).clone(), type_name: info.type_name.clone(), tier, basis, verifiers });
     }
-    // Pass 2: needs — direct verifiers plus a transitive `satisfy` verifier per covered requirement.
+    // Pass 2: needs — direct verifiers plus a transitive `satisfy` verifier that confers `verified`
+    // ONLY when the satisfied requirement is itself verified (transitive satisfaction, the contract).
     for (name, info) in &targets {
         if info.type_name != "Need" {
             continue;
         }
         let mut verifiers = direct_verifiers(model, name, false, done, suspect);
         for e in model.edges.iter().filter(|e| e.kind == "satisfy" && &e.from == *name) {
-            let req_covered = req_state.get(&e.to).copied() == Some("covered");
-            verifiers.push(Verifier { name: e.to.clone(), kind: "satisfy", complete: req_covered, suspect: false });
+            let req_verified = req_tier.get(&e.to).copied() == Some("verified");
+            verifiers.push(Verifier { name: e.to.clone(), kind: "satisfy", complete: req_verified, suspect: false });
         }
-        let (state, basis) = state_of(&verifiers);
-        out.push(Coverage { element: (*name).clone(), type_name: info.type_name.clone(), state, basis, verifiers });
+        let (tier, basis) = tier_of(&verifiers);
+        out.push(Coverage { element: (*name).clone(), type_name: info.type_name.clone(), tier, basis, verifiers });
     }
     out.sort_by(|a, b| (a.type_name.clone(), a.element.clone()).cmp(&(b.type_name.clone(), b.element.clone())));
     out
@@ -762,18 +794,20 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
     let cov = compute_coverage(&model, &done, &suspect);
     let gf = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
 
-    // Per-type summary.
+    // Per-type summary, counted by TIER (D0082).
     let mut summary: Vec<Json> = Vec::new();
     for ty in ASSURANCE_TYPES {
         let rows: Vec<&Coverage> = cov.iter().filter(|c| c.type_name == ty).collect();
         if rows.is_empty() {
             continue;
         }
-        let count = |s: &str| i64::try_from(rows.iter().filter(|c| c.state == s).count()).unwrap_or(i64::MAX);
+        let count = |t: &str| i64::try_from(rows.iter().filter(|c| c.tier == t).count()).unwrap_or(i64::MAX);
         summary.push(Json::Obj(vec![
             ("type".to_string(), Json::s(ty)),
             ("total".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX))),
-            ("covered".to_string(), Json::Int(count("covered"))),
+            ("verified".to_string(), Json::Int(count("verified"))),
+            ("attested".to_string(), Json::Int(count("attested"))),
+            ("addressed".to_string(), Json::Int(count("addressed"))),
             ("suspect".to_string(), Json::Int(count("suspect"))),
             ("uncovered".to_string(), Json::Int(count("uncovered"))),
         ]));
@@ -797,7 +831,7 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
             Json::Obj(vec![
                 ("element".to_string(), Json::s(c.element.clone())),
                 ("type".to_string(), Json::s(c.type_name.clone())),
-                ("state".to_string(), Json::s(c.state)),
+                ("tier".to_string(), Json::s(c.tier)),
                 ("basis".to_string(), c.basis.map_or(Json::Null, Json::s)),
                 ("governed".to_string(), Json::Bool(governed(gf.as_ref(), &c.element))),
                 ("verifiers".to_string(), Json::Arr(verifiers)),
@@ -805,16 +839,17 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
         })
         .collect();
 
-    // Full gap set (all uncovered, for the honest C measurement) + the GOVERNED subset the gate uses.
+    // A tier counts as covered for the GATE iff verified or attested (D0082). addressed/suspect/
+    // uncovered are gaps. Full gap set (honest measurement) + the GOVERNED subset the gate uses.
     let gaps: Vec<Json> =
-        cov.iter().filter(|c| c.state != "covered").map(|c| Json::s(c.element.clone())).collect();
+        cov.iter().filter(|c| !is_covered_tier(c.tier)).map(|c| Json::s(c.element.clone())).collect();
     let governed_gaps: Vec<Json> =
-        cov.iter().filter(|c| c.state != "covered" && governed(gf.as_ref(), &c.element)).map(|c| Json::s(c.element.clone())).collect();
+        cov.iter().filter(|c| !is_covered_tier(c.tier) && governed(gf.as_ref(), &c.element)).map(|c| Json::s(c.element.clone())).collect();
 
     let out = Json::Obj(vec![
         (
             "assurance".to_string(),
-            Json::s("coverage: Need/SystemRequirement/Decision -> verifier (explicit-test verify edge | accept-event attestation | charter-dod done+non-stale | satisfy-covered requirement) (D0079 C)"),
+            Json::s("coverage tiers (D0082): verified (reproducible verify-edge evidence; needs transitively via a verified requirement) > attested (decision acceptance event) > addressed (charter-dod work only — a claim) > uncovered. Gate-covered = verified|attested. (D0079 C)"),
         ),
         ("summary".to_string(), Json::Arr(summary)),
         ("gaps".to_string(), Json::Arr(gaps)),
@@ -1053,7 +1088,7 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
     let coverage_gaps: Vec<String> = compute_coverage(&model, &done, &suspect)
         .into_iter()
-        .filter(|c| c.state != "covered" && governed(gf_cov.as_ref(), &c.element))
+        .filter(|c| !is_covered_tier(c.tier) && governed(gf_cov.as_ref(), &c.element))
         .map(|c| c.element)
         .collect();
     let critique_gaps: Vec<String> = compute_critique_coverage(&model)
@@ -1215,11 +1250,11 @@ mod tests {
     }
 
     #[test]
-    fn coverage_states_and_basis() {
-        // d1: chartered by a done, non-stale Story -> covered (charter-dod).
-        // d2: chartered by a Story that's done but suspect -> suspect.
-        // d3: chartered by a Story not done -> uncovered (verifier present, incomplete).
-        // sr1: no verifier -> uncovered. n1: satisfy sr2 (covered via charter) -> covered (satisfy).
+    fn coverage_tiers_and_transitive_verification() {
+        // D0082 tiers: d1 charter-dod -> ADDRESSED (work, not evidence); d2 stale charter -> suspect;
+        // d3 chartered-not-done -> uncovered; d4 accept-event -> ATTESTED; sr1 none -> uncovered;
+        // sr2 verify-edge passing -> VERIFIED; n1 satisfy sr2(verified) -> VERIFIED (transitive);
+        // n2 satisfy sr1(uncovered) -> uncovered.
         let mut items = HashMap::new();
         let accepted = || {
             let mut a = HashMap::new();
@@ -1229,32 +1264,40 @@ mod tests {
         for d in ["d1", "d2", "d3"] {
             items.insert(d.to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None });
         }
-        items.insert("sr1".to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("sr2".to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: HashMap::new(), marker: None });
+        for sr in ["sr1", "sr2"] {
+            items.insert(sr.to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: HashMap::new(), marker: None });
+        }
         items.insert("n1".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None });
-        // d4: accepted Decision with an acceptance event, no charter -> covered (accept-event).
+        items.insert("n2".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None });
         items.insert("d4".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None });
         let mut ev = HashMap::new();
         ev.insert("outcome".to_string(), "pass".to_string());
         items.insert("d4AcceptR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: ev, marker: None });
+        items.insert("vt".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: HashMap::new(), marker: None });
+        let mut vtres = HashMap::new();
+        vtres.insert("outcome".to_string(), "pass".to_string());
+        items.insert("vtR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: vtres, marker: None });
         let edges = vec![
             Edge { kind: "charteredby".to_string(), from: "aStory".to_string(), to: "d1".to_string() },
             Edge { kind: "charteredby".to_string(), from: "bStory".to_string(), to: "d2".to_string() },
             Edge { kind: "charteredby".to_string(), from: "cStory".to_string(), to: "d3".to_string() },
-            Edge { kind: "charteredby".to_string(), from: "eStory".to_string(), to: "sr2".to_string() },
+            Edge { kind: "verify".to_string(), from: "vt".to_string(), to: "sr2".to_string() },
             Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr2".to_string() },
+            Edge { kind: "satisfy".to_string(), from: "n2".to_string(), to: "sr1".to_string() },
         ];
         let model = Model { items, edges };
-        let done: HashSet<String> = ["a", "b", "e"].iter().map(|s| (*s).to_string()).collect();
+        let done: HashSet<String> = ["a", "b", "vt"].iter().map(|s| (*s).to_string()).collect();
         let suspect: HashSet<String> = std::iter::once("b".to_string()).collect();
         let cov = compute_coverage(&model, &done, &suspect);
         let get = |name: &str| cov.iter().find(|c| c.element == name).unwrap();
-        assert_eq!((get("d1").state, get("d1").basis), ("covered", Some("charter-dod")));
-        assert_eq!(get("d2").state, "suspect");
-        assert_eq!(get("d3").state, "uncovered");
-        assert_eq!(get("sr1").state, "uncovered");
-        assert_eq!((get("n1").state, get("n1").basis), ("covered", Some("satisfy")));
-        assert_eq!((get("d4").state, get("d4").basis), ("covered", Some("accept-event")));
+        assert_eq!((get("d1").tier, get("d1").basis), ("addressed", Some("charter-dod")));
+        assert_eq!(get("d2").tier, "suspect");
+        assert_eq!(get("d3").tier, "uncovered");
+        assert_eq!(get("d4").tier, "attested");
+        assert_eq!(get("sr1").tier, "uncovered");
+        assert_eq!((get("sr2").tier, get("sr2").basis), ("verified", Some("explicit-test")));
+        assert_eq!((get("n1").tier, get("n1").basis), ("verified", Some("satisfy")));
+        assert_eq!(get("n2").tier, "uncovered");
     }
 
     #[test]

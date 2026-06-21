@@ -53,4 +53,46 @@ package ProjectCritiques {
     }
     part d0081FeasibilityCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c081-516273849706"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5b90663"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from d0081FeasibilityCritique to d0081;
+
+    // ── d0082 × completeness ──────────────────────────────────────────────────
+    verification d0082CompletenessCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c082-516273849711";
+        :>> title = "Critique d0082 — completeness lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::completeness;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (uncovered cases): (1) a FAILING verify test (outcome=fail) — the five tiers fold it into 'uncovered', losing the 'tested-and-failed' vs 'never-tested' distinction. SURVIVED as a deliberate, low-risk simplification: a failing verify surfaces immediately in cargo test/CI, and none exist today; documented limitation, not a silent gap. (2) element with BOTH verify + charter — SURVIVED: strongest-wins ordering resolves it (verified). (3) non-testable requirements that also aren't decisions — SURVIVED: they land in addressed/uncovered honestly (no false 'verified'). (4) transitive depth >1 (need->req->sub-req) — SURVIVED for the current model (needs satisfy requirements directly; deeper chains would extend the same rule). No material completeness gap; the failing-fold is an accepted scope note.";
+    }
+    part d0082CompletenessCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c082-516273849712"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0082CompletenessCritique to d0082;
+
+    // ── d0082 × correctness ───────────────────────────────────────────────────
+    verification d0082CorrectnessCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c082-516273849713";
+        :>> title = "Critique d0082 — correctness lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::correctness;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (unsound logic): (1) transitive-satisfy conferring 'verified' — could it over-credit? SURVIVED: it confers verified ONLY when the satisfied requirement is itself verified (req_tier==verified), so a need can't be verified through an unverified/addressed requirement (confirmed live: n11 stays uncovered because sr11 is the gap). (2) critique edges polluting coverage — SURVIVED: method=critique verify-edges are explicitly excluded (confirmed: d0081 reverted from verified to attested after the fix). (3) completeness oracle — explicit-test reads the Test's own R1 outcome, not the action `done` set; correct for standalone verification Tests (the done-set bug that initially showed 0 verified). CAVEAT (accepted): tier reads R1 only, so a re-verified Test (R1 fail, R2 pass) would misread — same single-result assumption as accept-event; all current results are R1. No correctness defect for the current model.";
+    }
+    part d0082CorrectnessCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c082-516273849714"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0082CorrectnessCritique to d0082;
+
+    // ── d0082 × feasibility ───────────────────────────────────────────────────
+    verification d0082FeasibilityCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c082-516273849715";
+        :>> title = "Critique d0082 — feasibility lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::feasibility;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (impractical?): (1) does the tier refactor build + stay green? SURVIVED: clippy --workspace -D warnings clean, cargo test 31 lib pass (incl coverage_tiers_and_transitive_verification), live `sysmlv2 coverage` shows 13 verified reqs + 13 verified needs + 78 attested decisions + the sr11/n11 gap. (2) authoring cost for verification — SURVIVED: 13 requirement verify-chains pointing at EXISTING re-runnable evidence (clippy/cargo test/build.rs/validate), needs verified transitively for free; the one true gap (sr11 perf) is an Issue, not fabricated. (3) does it block work? SURVIVED: gate scoped to governed elements (D0081); the 28 are grandfathered. Feasible — demonstrated end to end in-sprint.";
+    }
+    part d0082FeasibilityCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c082-516273849716"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0082FeasibilityCritique to d0082;
 }
