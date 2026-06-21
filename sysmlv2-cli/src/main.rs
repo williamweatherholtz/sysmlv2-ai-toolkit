@@ -12,6 +12,7 @@
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
+//!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 // D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
@@ -350,6 +351,30 @@ fn cmd_coverage(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_diagram(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 diagram [ROOT]  (redirect to a .html file)");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::diagram_html(&root) {
+        Ok(html) => {
+            println!("{html}");
+            0
+        }
+        Err(e) => {
+            eprintln!("diagram error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_decisions(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -645,6 +670,7 @@ fn main() {
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
+        Some("diagram") => cmd_diagram(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
         Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),

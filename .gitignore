@@ -54,3 +54,7 @@ node_modules/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Generated computed-view artifacts — regenerate on demand, never commit as truth (§2.1/D0015/D0085)
+/*.html
+/orient_output.json

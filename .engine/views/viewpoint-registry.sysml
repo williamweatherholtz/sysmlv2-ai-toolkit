@@ -38,6 +38,15 @@ package EngineViewpoints {
         :>> sources = "satisfy + verify edges; sprint ceremony gate coverage; issue->decision links; process-evolution timeline";
         :>> renderer = "report.py:tab_traceability / query.py trace";
     }
+    part diagramVP : Viewpoint {
+        :>> id = "61728394-0a5b-4c6d-c085-405162738485";
+        :>> title = "diagram";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "How does the WHOLE model connect — every element, typed edge, metadata, reliance, supersession, effects — as one navigable graph explored a part at a time?";
+        :>> audience = "maintainer / reviewer / auditor";
+        :>> sources = "all elements + all typed edges + authored metadata (the full Model)";
+        :>> renderer = "sysmlv2 diagram (interactive HTML #View, D0085; regenerate-don't-commit)";
+    }
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
         :>> title = "safety";

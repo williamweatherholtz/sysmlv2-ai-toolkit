@@ -189,4 +189,13 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to critique/red-team/adversarially review a requirement/need/decision; find weaknesses/gaps/ambiguities in the model; what hasn't been critiqued; or a critique going suspect after a change.";
         :>> writePolicy = WritePolicy::direct;
     }
+
+    part diagramSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a085-516273849614";
+        :>> title = "diagram";
+        :>> purpose = "Deploy the Traceability Diagram process (D0085): generate the comprehensive traceability diagram as a regenerated, interactive, self-contained HTML view via `sysmlv2 diagram` (whole model — typed nodes + metadata + every typed edge; in-page filter/search/focus/fit); never author or commit a diagram (it's a computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/diagram.sysml.";
+        :>> location = ".engine/skills/diagram/SKILL.md";
+        :>> triggerCondition = "Asked to see/draw/visualize/diagram the model, traceability, reliance, linkage, supersession, effects, or metadata; to map how decisions/needs/requirements/work/processes connect; or to explore the graph part at a time.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

@@ -1459,6 +1459,108 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── comprehensive traceability diagram (computed view; interactive self-contained HTML, D0085) ──
+// The whole model — every element (node, typed + metadata) and every typed edge — emitted as ONE
+// interactive HTML page (cytoscape): filter by node type / edge kind, search, click-to-focus a
+// neighborhood, fit. Regenerated on demand from authored facts; never committed as truth (§2.1/D0015).
+
+const DIAGRAM_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 traceability</title>
+<meta name="generator" content="sysmlv2 diagram (computed #View; regenerate, do not commit as truth)">
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<style>
+ html,body{margin:0;height:100%;font:12px system-ui,sans-serif}
+ #cy{position:absolute;left:230px;right:0;top:0;bottom:0}
+ #panel{position:absolute;left:0;top:0;bottom:0;width:230px;overflow:auto;background:#f7f7f7;border-right:1px solid #ccc;padding:8px;box-sizing:border-box}
+ #panel h3{margin:8px 0 4px;font-size:11px;text-transform:uppercase;color:#555}
+ #panel label{display:block;font-size:11px;line-height:1.5;cursor:pointer}
+ #panel .sw{display:inline-block;width:9px;height:9px;margin-right:4px;border-radius:2px;vertical-align:middle}
+ #search{width:100%;box-sizing:border-box;margin-bottom:6px}
+ button{font-size:11px;margin:2px 2px 6px 0;cursor:pointer}
+ #info{position:absolute;right:8px;top:8px;max-width:360px;background:#fff;border:1px solid #ccc;padding:8px;font-size:11px;display:none;white-space:pre-wrap;max-height:60%;overflow:auto}
+</style></head><body>
+<div id="panel">
+ <input id="search" placeholder="search id… (Enter to fit)">
+ <button onclick="cy.fit(undefined,30)">Fit</button><button onclick="resetView()">Reset</button>
+ <h3>Node types</h3><div id="types"></div>
+ <h3>Edge kinds</h3><div id="kinds"></div>
+ <p style="color:#777;font-size:10px">Click a node = focus its neighborhood. Click background = reset. Computed view — regenerate, never commit as truth.</p>
+</div>
+<div id="cy"></div><div id="info"></div>
+<script>
+var elements = /*ELEMENTS*/;
+var typeColors={Decision:'#4e79a7',Need:'#59a14f',SystemRequirement:'#76b7b2',Story:'#f28e2b',Test:'#9c755f',TestResult:'#bab0ac',Issue:'#e15759',action:'#edc948',ActionDef:'#e6d27a',Process:'#b07aa1',ProcessStep:'#d4a6c8',AISkill:'#86bcb6'};
+var edgeColors={satisfy:'#59a14f',verify:'#4e79a7',charteredby:'#f28e2b',supersede:'#e15759',resolves:'#af7aa1',dependency:'#bab0ac',allocate:'#76b7b2',succession:'#9aa',ordering:'#ccc',prospectivechange:'#9c27b0',safetychange:'#d62728',dependson:'#888'};
+var cy=cytoscape({container:document.getElementById('cy'),elements:elements,
+ style:[{selector:'node',style:{'label':'data(label)','font-size':6,'width':11,'height':11,'background-color':function(n){return typeColors[n.data('ntype')]||'#888'},'text-wrap':'wrap','text-max-width':90,'color':'#222'}},
+  {selector:'edge',style:{'width':1,'line-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-shape':'triangle','arrow-scale':0.6,'curve-style':'bezier'}},
+  {selector:'.hidden',style:{'display':'none'}},{selector:'.faded',style:{'opacity':0.07}},{selector:'.hi',style:{'background-color':'#ffd400','border-width':2,'border-color':'#c80'}}],
+ layout:{name:'cose',animate:false,idealEdgeLength:55,nodeRepulsion:5000,componentSpacing:60}});
+var offTypes={},offKinds={};
+function refresh(){cy.batch(function(){
+ cy.nodes().forEach(function(n){n.toggleClass('hidden',!!offTypes[n.data('ntype')])});
+ cy.edges().forEach(function(e){var h=!!offKinds[e.data('kind')]||e.source().hasClass('hidden')||e.target().hasClass('hidden');e.toggleClass('hidden',h)});});}
+function resetView(){offTypes={};offKinds={};cy.elements().removeClass('hidden faded hi');document.querySelectorAll('#panel input[type=checkbox]').forEach(function(c){c.checked=true});document.getElementById('info').style.display='none';cy.fit(undefined,30);}
+function mkFilters(id,vals,colors,store,offDefault){var d=document.getElementById(id);vals.sort().forEach(function(v){var off=offDefault.indexOf(v)>=0;if(off)store[v]=true;var l=document.createElement('label');var c=document.createElement('input');c.type='checkbox';c.checked=!off;c.onchange=function(){store[v]=!c.checked;refresh()};var sw='<span class=sw style="background:'+(colors[v]||'#888')+'"></span>';l.appendChild(c);l.insertAdjacentHTML('beforeend',sw+v+(off?' (off)':''));d.appendChild(l)})}
+mkFilters('types',Array.from(new Set(cy.nodes().map(function(n){return n.data('ntype')}))),typeColors,offTypes,['Test','TestResult']);
+mkFilters('kinds',Array.from(new Set(cy.edges().map(function(e){return e.data('kind')}))),edgeColors,offKinds,[]);
+refresh();cy.fit(undefined,30);
+cy.on('tap','node',function(ev){var n=ev.target;var nb=n.closedNeighborhood();cy.elements().addClass('faded');nb.removeClass('faded');var d=n.data();var s='';Object.keys(d).forEach(function(k){if(k!=='label')s+=k+': '+d[k]+'\n'});var inf=document.getElementById('info');inf.textContent=s;inf.style.display='block'});
+cy.on('tap',function(ev){if(ev.target===cy){cy.elements().removeClass('faded');document.getElementById('info').style.display='none'}});
+document.getElementById('search').addEventListener('input',function(e){var q=e.target.value.toLowerCase();cy.nodes().removeClass('hi');if(q)cy.nodes().filter(function(n){return n.id().toLowerCase().indexOf(q)>=0}).addClass('hi')});
+document.getElementById('search').addEventListener('keydown',function(e){if(e.key==='Enter'){var hi=cy.nodes('.hi');if(hi.length)cy.fit(hi,50)}});
+</script></body></html>"#;
+
+/// Comprehensive traceability diagram as a self-contained interactive HTML page (D0085).
+///
+/// Emits the WHOLE model — every element (typed node + its authored metadata) and every typed edge
+/// (satisfy/verify/charteredby/supersede/resolves/dependency/allocate/succession/process-change/...) —
+/// into one cytoscape page with type/edge filters, search, click-to-focus, and fit. A computed
+/// `#View`: regenerate on demand (`sysmlv2 diagram . > graph.html`), never commit it as truth.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let meta_keys = ["title", "status", "severity", "lens", "kind", "priority", "outcome", "method", "critiquedBy", "createdBy"];
+    let mut items: Vec<(&String, &ItemInfo)> = model.items.iter().collect();
+    items.sort_by(|a, b| a.0.cmp(b.0));
+    let mut elements: Vec<Json> = items
+        .iter()
+        .map(|(name, info)| {
+            let mut data = vec![
+                ("id".to_string(), Json::s((*name).clone())),
+                ("label".to_string(), Json::s((*name).clone())),
+                ("ntype".to_string(), Json::s(if info.type_name.is_empty() { "unknown".to_string() } else { info.type_name.clone() })),
+            ];
+            for k in meta_keys {
+                if let Some(v) = info.attrs.get(k) {
+                    data.push((k.to_string(), Json::s(v.clone())));
+                }
+            }
+            if let Some(m) = &info.marker {
+                data.push(("marker".to_string(), Json::s(m.clone())));
+            }
+            Json::Obj(vec![("data".to_string(), Json::Obj(data))])
+        })
+        .collect();
+    // Edges: only those whose BOTH endpoints are real nodes (cytoscape errors on dangling edges).
+    for (i, e) in model.edges.iter().enumerate() {
+        if model.items.contains_key(&e.from) && model.items.contains_key(&e.to) {
+            elements.push(Json::Obj(vec![(
+                "data".to_string(),
+                Json::Obj(vec![
+                    ("id".to_string(), Json::s(format!("e{i}"))),
+                    ("source".to_string(), Json::s(e.from.clone())),
+                    ("target".to_string(), Json::s(e.to.clone())),
+                    ("kind".to_string(), Json::s(e.kind.clone())),
+                ]),
+            )]));
+        }
+    }
+    Ok(DIAGRAM_TEMPLATE.replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
