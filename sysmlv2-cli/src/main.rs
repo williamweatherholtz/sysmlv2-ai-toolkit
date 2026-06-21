@@ -8,6 +8,7 @@
 //!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
 //!   `append-gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
+//!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 // D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
@@ -322,6 +323,30 @@ fn cmd_open_issues(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_coverage(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 coverage [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::coverage(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("coverage error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_governing_version(args: &[String]) -> i32 {
     let Some(item) = args.first() else {
         eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
@@ -541,6 +566,7 @@ fn main() {
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
+        Some("coverage") => cmd_coverage(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
         Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),
