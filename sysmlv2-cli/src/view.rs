@@ -1496,7 +1496,7 @@ var elements = /*ELEMENTS*/;
 var typeColors={Decision:'#4e79a7',Need:'#59a14f',SystemRequirement:'#76b7b2',Story:'#f28e2b',Test:'#9c755f',TestResult:'#bab0ac',Issue:'#e15759',action:'#edc948',ActionDef:'#e6d27a',Process:'#b07aa1',ProcessStep:'#d4a6c8',AISkill:'#86bcb6'};
 var edgeColors={satisfy:'#59a14f',verify:'#4e79a7',charteredby:'#f28e2b',supersede:'#e15759',resolves:'#af7aa1',dependency:'#bab0ac',allocate:'#76b7b2',succession:'#9aa',ordering:'#ccc',prospectivechange:'#9c27b0',safetychange:'#d62728',dependson:'#888'};
 var cy=cytoscape({container:document.getElementById('cy'),elements:elements,
- style:[{selector:'node',style:{'label':'data(label)','font-size':6,'width':11,'height':11,'background-color':function(n){return typeColors[n.data('ntype')]||'#888'},'text-wrap':'wrap','text-max-width':90,'color':'#222'}},
+ style:[{selector:'node',style:{'label':'data(label)','font-size':6,'width':11,'height':11,'background-color':function(n){return typeColors[n.data('ntype')]||'#888'},'text-wrap':'wrap','text-max-width':130,'color':'#222'}},
   {selector:'edge',style:{'width':1,'line-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-shape':'triangle','arrow-scale':0.6,'curve-style':'bezier'}},
   {selector:'.hidden',style:{'display':'none'}},{selector:'.faded',style:{'opacity':0.07}},{selector:'.hi',style:{'background-color':'#ffd400','border-width':2,'border-color':'#c80'}}],
  layout:{name:'grid'}});
@@ -1513,7 +1513,7 @@ cy.elements(':visible').layout({name:'cose',animate:false,idealEdgeLength:55,nod
 cy.fit(undefined,30);
 cy.on('tap','node',function(ev){var n=ev.target;var nb=n.closedNeighborhood();cy.elements().addClass('faded');nb.removeClass('faded');var d=n.data();var s='';Object.keys(d).forEach(function(k){if(k!=='label')s+=k+': '+d[k]+'\n'});var inf=document.getElementById('info');inf.textContent=s;inf.style.display='block'});
 cy.on('tap',function(ev){if(ev.target===cy){cy.elements().removeClass('faded');document.getElementById('info').style.display='none'}});
-document.getElementById('search').addEventListener('input',function(e){var q=e.target.value.toLowerCase();cy.nodes().removeClass('hi');if(q)cy.nodes().filter(function(n){return n.id().toLowerCase().indexOf(q)>=0}).addClass('hi')});
+document.getElementById('search').addEventListener('input',function(e){var q=e.target.value.toLowerCase();cy.nodes().removeClass('hi');if(q)cy.nodes().filter(function(n){return (n.id()+' '+(n.data('label')||'')).toLowerCase().indexOf(q)>=0}).addClass('hi')});
 document.getElementById('search').addEventListener('keydown',function(e){if(e.key==='Enter'){var hi=cy.nodes('.hi');if(hi.length)cy.fit(hi,50)}});
 </script></body></html>"#;
 
@@ -1534,9 +1534,22 @@ pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
     let mut elements: Vec<Json> = items
         .iter()
         .map(|(name, info)| {
+            // Label with the authored `title` (human string) when present, truncated for legibility;
+            // fall back to the part name. The id stays the name (identity); full title is in the
+            // click-info panel.
+            let label = info.attrs.get("title").map_or_else(
+                || (*name).clone(),
+                |t| {
+                    if t.chars().count() > 60 {
+                        format!("{}…", t.chars().take(59).collect::<String>())
+                    } else {
+                        t.clone()
+                    }
+                },
+            );
             let mut data = vec![
                 ("id".to_string(), Json::s((*name).clone())),
-                ("label".to_string(), Json::s((*name).clone())),
+                ("label".to_string(), Json::s(label)),
                 ("ntype".to_string(), Json::s(if info.type_name.is_empty() { "unknown".to_string() } else { info.type_name.clone() })),
             ];
             for k in meta_keys {
