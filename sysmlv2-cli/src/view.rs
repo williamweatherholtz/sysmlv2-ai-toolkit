@@ -818,6 +818,162 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── critique coverage (D0080/D0079 — per-element x required-lens critique coverage) ────────────
+// An antagonistic critique is a `method=critique` Test with a `lens`, `#Verify`-linked to its
+// target (parsed as a "verify" marker-edge), with a result by an INDEPENDENT critic (the result's
+// judgedBy must differ from the target's createdBy). An element is critique-COVERED iff every
+// REQUIRED lens for its type has such a critique. Required-lens policy (Core-3, human-accepted):
+// Need/SystemRequirement -> completeness/correctness/testability; Decision -> completeness/
+// correctness/feasibility. Honest by construction: with no critiques recorded, every element is
+// uncovered. (Full git-temporal critique-staleness reuses the suspect machinery — a later step.)
+
+/// Required critique lenses per assurance-element type (Core-3, D0080). Empty for non-targets.
+fn required_lenses(type_name: &str) -> &'static [&'static str] {
+    match type_name {
+        "Need" | "SystemRequirement" => &["completeness", "correctness", "testability"],
+        "Decision" => &["completeness", "correctness", "feasibility"],
+        _ => &[],
+    }
+}
+
+struct LensStatus {
+    lens: &'static str,
+    critiqued: bool,
+    critic: Option<String>,  // result judgedBy (independent of the target author)
+    outcome: Option<String>, // pass = survived the lens; fail = a finding was raised
+}
+
+struct CritiqueCoverage {
+    element: String,
+    type_name: String,
+    lenses: Vec<LensStatus>,
+    covered: bool, // every required lens critiqued
+}
+
+fn compute_critique_coverage(model: &Model) -> Vec<CritiqueCoverage> {
+    // Same target scope as assurance coverage: Needs, SystemRequirements, accepted Decisions.
+    let is_target = |i: &ItemInfo| match i.type_name.as_str() {
+        "Need" | "SystemRequirement" => true,
+        "Decision" => i.attrs.get("status").map(String::as_str) == Some("accepted"),
+        _ => false,
+    };
+    let mut targets: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| is_target(i)).collect();
+    targets.sort_by(|a, b| a.0.cmp(b.0));
+    targets
+        .into_iter()
+        .map(|(name, info)| {
+            let author = info.attrs.get("createdBy").map_or("", String::as_str);
+            let lenses: Vec<LensStatus> = required_lenses(&info.type_name)
+                .iter()
+                .map(|&lens| {
+                    // A critique of this element via this lens: a verify-edge (critique -> element)
+                    // whose source is a method=critique Test with this lens, having an independent result.
+                    let mut critiqued = false;
+                    let mut critic = None;
+                    let mut outcome = None;
+                    for e in model.edges.iter().filter(|e| e.kind == "verify" && e.to == *name) {
+                        let Some(c) = model.items.get(&e.from) else { continue };
+                        if c.attrs.get("method").map(String::as_str) != Some("critique") {
+                            continue;
+                        }
+                        if c.attrs.get("lens").map(String::as_str) != Some(lens) {
+                            continue;
+                        }
+                        let res = model.items.get(&format!("{}R1", e.from));
+                        let by = res.and_then(|r| r.attrs.get("judgedBy")).map(String::as_str);
+                        let out = res.and_then(|r| r.attrs.get("outcome")).map(String::as_str);
+                        // Independence: the critic must differ from the target's author.
+                        if let (Some(by), Some(out)) = (by, out) {
+                            if by != author {
+                                critiqued = true;
+                                critic = Some(by.to_string());
+                                outcome = Some(out.to_string());
+                                break;
+                            }
+                        }
+                    }
+                    LensStatus { lens, critiqued, critic, outcome }
+                })
+                .collect();
+            let covered = !lenses.is_empty() && lenses.iter().all(|l| l.critiqued);
+            CritiqueCoverage { element: name.clone(), type_name: info.type_name.clone(), lenses, covered }
+        })
+        .collect()
+}
+
+/// Names of elements MISSING >= 1 required-lens critique (the `guard critique` gap set), sorted.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    Ok(compute_critique_coverage(&model).into_iter().filter(|c| !c.covered).map(|c| c.element).collect())
+}
+
+/// Critique-coverage view (D0080) as JSON.
+///
+/// Per-element required-lens matrix + per-type summary + the gap set (elements missing a required
+/// lens). Honest by construction; never stored.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let cov = compute_critique_coverage(&model);
+
+    let mut summary: Vec<Json> = Vec::new();
+    for ty in ASSURANCE_TYPES {
+        let rows: Vec<&CritiqueCoverage> = cov.iter().filter(|c| c.type_name == ty).collect();
+        if rows.is_empty() {
+            continue;
+        }
+        let covered = i64::try_from(rows.iter().filter(|c| c.covered).count()).unwrap_or(i64::MAX);
+        summary.push(Json::Obj(vec![
+            ("type".to_string(), Json::s(ty)),
+            ("total".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX))),
+            ("covered".to_string(), Json::Int(covered)),
+            ("uncovered".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX) - covered)),
+        ]));
+    }
+
+    let elements: Vec<Json> = cov
+        .iter()
+        .map(|c| {
+            let lenses: Vec<Json> = c
+                .lenses
+                .iter()
+                .map(|l| {
+                    Json::Obj(vec![
+                        ("lens".to_string(), Json::s(l.lens)),
+                        ("critiqued".to_string(), Json::Bool(l.critiqued)),
+                        ("critic".to_string(), l.critic.clone().map_or(Json::Null, Json::s)),
+                        ("outcome".to_string(), l.outcome.clone().map_or(Json::Null, Json::s)),
+                    ])
+                })
+                .collect();
+            Json::Obj(vec![
+                ("element".to_string(), Json::s(c.element.clone())),
+                ("type".to_string(), Json::s(c.type_name.clone())),
+                ("covered".to_string(), Json::Bool(c.covered)),
+                ("lenses".to_string(), Json::Arr(lenses)),
+            ])
+        })
+        .collect();
+
+    let gaps: Vec<Json> = cov.iter().filter(|c| !c.covered).map(|c| Json::s(c.element.clone())).collect();
+
+    let out = Json::Obj(vec![
+        (
+            "critique".to_string(),
+            Json::s("critique-coverage: Need/SystemRequirement/Decision x required lens (Core-3, D0080) -> an independent method=critique verification #Verify-linked to the element"),
+        ),
+        ("summary".to_string(), Json::Arr(summary)),
+        ("gaps".to_string(), Json::Arr(gaps)),
+        ("elements".to_string(), Json::Arr(elements)),
+    ]);
+    Ok(out.dump())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -917,6 +1073,44 @@ mod tests {
         assert_eq!(get("sr1").state, "uncovered");
         assert_eq!((get("n1").state, get("n1").basis), ("covered", Some("satisfy")));
         assert_eq!((get("d4").state, get("d4").basis), ("covered", Some("accept-event")));
+    }
+
+    #[test]
+    fn critique_coverage_requires_independent_lens_critiques() {
+        // sr1: completeness critiqued by an independent critic; correctness self-critiqued (author)
+        // -> NOT counted; testability uncritiqued. So sr1 is uncovered (only 1/3 required lenses).
+        let mut items = HashMap::new();
+        let mut req = HashMap::new();
+        req.insert("createdBy".to_string(), "wweatherholtz".to_string());
+        items.insert("sr1".to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: req, marker: None });
+        let crit = |lens: &str| {
+            let mut a = HashMap::new();
+            a.insert("method".to_string(), "critique".to_string());
+            a.insert("lens".to_string(), lens.to_string());
+            a
+        };
+        items.insert("c1".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("completeness"), marker: None });
+        items.insert("c2".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("correctness"), marker: None });
+        let res = |by: &str| {
+            let mut a = HashMap::new();
+            a.insert("outcome".to_string(), "pass".to_string());
+            a.insert("judgedBy".to_string(), by.to_string());
+            a
+        };
+        items.insert("c1R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("claudeOpus"), marker: None });
+        items.insert("c2R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("wweatherholtz"), marker: None });
+        let edges = vec![
+            Edge { kind: "verify".to_string(), from: "c1".to_string(), to: "sr1".to_string() },
+            Edge { kind: "verify".to_string(), from: "c2".to_string(), to: "sr1".to_string() },
+        ];
+        let model = Model { items, edges };
+        let cov = compute_critique_coverage(&model);
+        let sr1 = cov.iter().find(|c| c.element == "sr1").unwrap();
+        assert!(!sr1.covered, "only 1/3 required lenses independently critiqued");
+        let lens = |n: &str| sr1.lenses.iter().find(|l| l.lens == n).unwrap();
+        assert!(lens("completeness").critiqued, "independent critic counts");
+        assert!(!lens("correctness").critiqued, "self-critique (author) does NOT count");
+        assert!(!lens("testability").critiqued, "no critique recorded");
     }
 
     #[test]

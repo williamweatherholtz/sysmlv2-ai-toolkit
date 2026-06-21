@@ -491,8 +491,31 @@ pub fn issues(root: &Path) -> GuardReport {
     }
 }
 
-/// The ENFORCED forward guards, in CLI/runner order. `issues` joined the enforced set at IRL-d
-/// (D0077) once the existing issues were triaged with `#Resolves` edges.
+/// Guard: every assurance element carries its required-lens critiques (D0080/D0079).
+///
+/// An element missing a required-lens critique (Core-3 policy) is a violation. RUNNABLE via
+/// `sysmlv2 guard critique` but NOT yet in the enforced `GUARD_NAMES` set: with zero critiques
+/// recorded it would block every commit. It joins the enforced set (a hard pre-commit gate, the
+/// human-accepted choice) once a genuine critique pass brings the model to required-lens coverage.
+#[must_use]
+pub fn critique(root: &Path) -> GuardReport {
+    match crate::view::critique_gaps(root) {
+        Ok(gaps) => {
+            let violations = gaps
+                .into_iter()
+                .map(|e| format!("{e}: missing a required-lens critique (D0080 Core-3; run the element-critique skill)"))
+                .collect();
+            GuardReport { name: "critique", scanned: 0, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "critique", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading critique coverage: {e}")] },
+    }
+}
+
+/// The ENFORCED forward guards, in CLI/runner order.
+///
+/// `issues` joined the enforced set at IRL-d (D0077) once the existing issues were triaged with
+/// `#Resolves` edges. `critique` (D0080) is runnable via `run_one` but joins the enforced set only
+/// after a genuine critique pass (else it would block all commits with zero critiques recorded).
 pub const GUARD_NAMES: [&str; 7] = ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
@@ -506,6 +529,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
         "issues" => Some(issues(root)),
+        "critique" => Some(critique(root)),
         _ => None,
     }
 }
