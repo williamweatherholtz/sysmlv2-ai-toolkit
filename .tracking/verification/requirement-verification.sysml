@@ -58,6 +58,10 @@ package ProjectRequirementVerification {
     // realistic bars; n11FastStart verifies transitively.
     verification sr11Verify : Test { :>> id = "7a1c0011-0011-4e11-9a11-516273840011"; :>> title = "Verify sr11FastStart (D0083 revised bars)"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "FastStart, D0083 two-bar target: parse/validate < 500ms AND full orient (with git-temporal suspicion) < 1.5s. MEASURED live (5+ runs, cold, this developer laptop / Windows): `sysmlv2 validate .` ~100-117ms (< 500ms); `sysmlv2 orient .` ~0.85-1.0s (< 1.5s) after orientPerf's batched git. Both bars met. Re-run: time `sysmlv2 validate .` and `sysmlv2 orient .`."; }
     part sr11VerifyR1 : TestResult { :>> id = "7a1c0011-0011-4e11-9a11-5162738400b1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "324ab15"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R2 (D0084): re-verify after element-content suspicion flagged sr11Verify stale — sr11's statement
+    // was amended (D0083) AFTER R1's commit (324ab15). Re-judged at 96584de where the statement is
+    // stable and matches this evidence. Demonstrates the re-verify-on-change loop end to end.
+    part sr11VerifyR2 : TestResult { :>> id = "7a1c0011-0011-4e11-9a11-5162738400b2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "96584de"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr11Verify to sr11FastStart;
 
     verification sr12Verify : Test { :>> id = "7a1c0012-0012-4e12-9a12-516273840012"; :>> title = "Verify sr12DenyWarnings"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "The crates compile under #![deny(warnings, clippy::all, pedantic, nursery)] with no unwrap/expect/index-without-bounds in src/ outside tests: `cargo clippy --workspace --all-targets` is green at HEAD (the lints are declared in main.rs/lib.rs and enforced in pre-commit). Re-run: cargo clippy --workspace --all-targets -- -D warnings."; }

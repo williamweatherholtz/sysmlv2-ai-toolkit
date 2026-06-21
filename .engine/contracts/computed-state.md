@@ -1,10 +1,12 @@
-> **IMPLEMENTATION STATUS (2026-06-15).** Partially implemented; this contract is the
-> TARGET. Implemented (Rust `sysmlv2` authority; query.py retired at M4/D0074): done-from-appended-results, ready/blocked,
-> D0005 suspicion (material-change trigger over semantic deps, transitive, #OrderingOnly
-> excluded), evidence validation. NOT yet implemented (explicitly queued as backlog
-> items): coverageState()/satisfaction() over verify edges, whats-stale-since,
-> coverageGaps. Fixed (contractAlign, 2026-06-15): removed stale `currentState`
-> reference — "done" is fully computed from appended TestResults (CR-7).
+> **IMPLEMENTATION STATUS (2026-06-21).** Implemented (Rust `sysmlv2` authority; query.py retired
+> at M4/D0074): done-from-appended-results, ready/blocked, D0005 suspicion (material-change trigger,
+> transitive, #OrderingOnly excluded), evidence validation; **coverageState/satisfaction as the
+> three-tier `sysmlv2 coverage` (verified/attested/addressed, D0082) + `critique-coverage` (D0080) +
+> the `assured` composite (D0079) + element-content staleness (D0084)**. Material-change is the
+> two-tier proxy described in rule 2 (not full field-hashing — see there). `coverageGaps` = the
+> coverage/critique gap sets; `whats-stale-since` = `suspect` + element-content drift. Fixed
+> (contractAlign, 2026-06-15): removed stale `currentState` — "done" is computed from appended
+> TestResults (CR-7).
 
 # Computed-State Contract
 
@@ -62,10 +64,24 @@ Suspicion is **transitive** up the chain: a suspect leaf makes everything that
    skew and branches diverge.
 
 2. **Material-change detection.** Only changes to an element's **semantic**
-   fields bump its "last material change" commit. Cosmetic edits (whitespace,
-   doc-string typo) do **not** trigger suspicion. Implementation: hash the
-   semantic field set per element; compare across commits. Without this,
-   suspicion storms on trivial edits and people learn to ignore flags.
+   content bump its "last material change" commit; cosmetic edits (whitespace,
+   doc-string typo) should not trigger suspicion. **As implemented (two tiers,
+   D0082/D0084 — narrower + cheaper than the original "hash every semantic field"
+   design, deliberately so):**
+   - **criterion / source drift** — a task's `DoD` `procedureText` changing, and a
+     deliverable-manifest source **path** drifting in git, trigger task suspicion
+     (orient). This watches the one unambiguous material thing per task.
+   - **assurance-element-content drift (D0084)** — for a Need / SystemRequirement /
+     accepted Decision carrying a `verify`/critique edge, a change to its **primary
+     semantic field** (`statement` for needs/requirements, `decision` for decisions)
+     since the verification's latest result commit marks that verification/critique
+     **suspect** (re-verify / re-critique). Skipped when the element did **not** exist
+     at that commit (so same-commit create+verify isn't falsely flagged).
+   General per-element semantic-field **hashing** (the original D0005 wording) is the
+   aspirational superset — deferred: the targeted tiers above cover the elements that
+   carry verification, avoid the fragile semantic-vs-cosmetic field classification
+   (the storm risk), and avoid per-element historical reads (orientPerf). Revisit if a
+   concrete need for broader element suspicion appears.
 
 3. **Suspicion-carrying edges only.** Propagate along `:>`, `satisfy`,
    `verify`, `allocate`. Do **not** propagate along `dependency` tagged

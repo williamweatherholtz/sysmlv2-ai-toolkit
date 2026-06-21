@@ -240,8 +240,9 @@ fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
 }
 
 /// Read many `<rev>:<path>` blobs in ONE `git cat-file --batch` spawn (orientPerf): returns
-/// `key -> content` (None if missing). Parses the size-delimited batch protocol.
-fn batch_cat_blobs(repo: &Path, keys: &[String]) -> HashMap<String, Option<String>> {
+/// `key -> content` (None if missing). Parses the size-delimited batch protocol. `pub(crate)` so
+/// the coverage/critique element-content staleness check (D0084) can reuse the batched read.
+pub(crate) fn batch_cat_blobs(repo: &Path, keys: &[String]) -> HashMap<String, Option<String>> {
     let mut out: HashMap<String, Option<String>> = HashMap::new();
     if keys.is_empty() {
         return out;

@@ -683,32 +683,151 @@ fn tier_of(verifiers: &[Verifier]) -> (&'static str, Option<&'static str>) {
     ("uncovered", None)
 }
 
+// ── element-content staleness (D0084 — targeted suspicion: re-verify/re-critique on element change) ──
+// A verify/critique of an assurance element goes SUSPECT when the element's SEMANTIC field changed
+// since the verification's latest result commit AND the element existed then (so same-sprint
+// create+verify isn't falsely flagged). Reuses orient's batched `git cat-file`. Honors D0005's
+// material-change intent at the element grain that coverage/critique actually depend on.
+
+/// The semantic field whose change should re-suspect verification of this element type.
+fn semantic_field(type_name: &str) -> Option<&'static str> {
+    match type_name {
+        "Need" | "SystemRequirement" => Some("statement"),
+        "Decision" => Some("decision"),
+        _ => None,
+    }
+}
+
+/// `(outcome, judgedAgainst)` of the HIGHEST-numbered `<v>R<n>` result for verification `v`.
+fn latest_result(model: &Model, v: &str) -> Option<(String, String)> {
+    let mut best: Option<(u32, String, String)> = None;
+    for (name, info) in &model.items {
+        let Some(suf) = name.strip_prefix(v) else { continue };
+        let Some(digits) = suf.strip_prefix('R') else { continue };
+        if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(n) = digits.parse::<u32>() else { continue };
+        if best.as_ref().is_none_or(|(bn, _, _)| n > *bn) {
+            let outcome = info.attrs.get("outcome").cloned().unwrap_or_default();
+            let sha = info.attrs.get("judgedAgainst").cloned().unwrap_or_default();
+            best = Some((n, outcome, sha));
+        }
+    }
+    best.map(|(_, o, s)| (o, s))
+}
+
+/// Map each assurance element (`requirement <n/sr>` / `part <d> : Decision`) to its repo-relative
+/// file (one working-tree pass, no git) — to fetch its historical content for staleness.
+fn build_element_files(root: &Path) -> HashMap<String, String> {
+    let mut out: HashMap<String, String> = HashMap::new();
+    let dirs = [root.join(".tracking"), root.join(".engine").join("decisions")];
+    for path in dirs.iter().flat_map(|d| crate::collect_sysml(d)) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Some(rel) = path.strip_prefix(root).ok().and_then(std::path::Path::to_str).map(|s| s.replace('\\', "/")) else {
+            continue;
+        };
+        for line in text.lines() {
+            let t = line.trim_start();
+            let name = t.strip_prefix("requirement ").or_else(|| t.strip_prefix("part ")).and_then(|r| r.split([' ', ':']).next());
+            if let Some(name) = name {
+                if !name.is_empty() {
+                    out.entry(name.to_owned()).or_insert_with(|| rel.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Extract `element`'s `:>> <field> = "..."` value from a file blob (the FIRST occurrence inside the
+/// element's block). `None` if the element/field isn't present (e.g. it didn't exist at that commit).
+fn extract_field(blob: &str, element: &str, field: &str) -> Option<String> {
+    let decl_r = format!("requirement {element} ");
+    let decl_p = format!("part {element} ");
+    let fieldpat = format!(":>> {field} = \"");
+    let mut in_elem = false;
+    for line in blob.lines() {
+        let t = line.trim_start();
+        if !in_elem {
+            if t.starts_with(&decl_r) || t.starts_with(&decl_p) {
+                in_elem = true;
+            }
+            continue;
+        }
+        if t.starts_with("part ") || t.starts_with("requirement ") || t.starts_with("verification ") || t.starts_with("action ") {
+            break; // next top-level item — left the element's block without finding the field
+        }
+        if let Some(idx) = t.find(&fieldpat) {
+            let rest = t.get(idx + fieldpat.len()..)?;
+            let end = rest.find('"')?;
+            return rest.get(..end).map(str::to_owned);
+        }
+    }
+    None
+}
+
+/// Names of verify/critique Tests that are STALE: their target assurance element's semantic field
+/// changed since the Test's latest result commit, and the element existed at that commit (D0084).
+fn compute_stale_verifications(root: &Path, model: &Model) -> HashSet<String> {
+    let elem_files = build_element_files(root);
+    let mut work: Vec<(String, String, &'static str, String)> = Vec::new(); // (test, element, field, sha)
+    let mut keys: HashSet<String> = HashSet::new();
+    for e in model.edges.iter().filter(|e| e.kind == "verify") {
+        let Some(info) = model.items.get(&e.to) else { continue };
+        if info.type_name == "Decision" && info.attrs.get("status").map(String::as_str) != Some("accepted") {
+            continue;
+        }
+        let Some(field) = semantic_field(&info.type_name) else { continue };
+        let Some((_, sha)) = latest_result(model, &e.from) else { continue };
+        if sha.is_empty() {
+            continue;
+        }
+        let Some(rel) = elem_files.get(&e.to) else { continue };
+        keys.insert(format!("{sha}:{rel}"));
+        work.push((e.from.clone(), e.to.clone(), field, sha));
+    }
+    let blobs = crate::orient::batch_cat_blobs(root, &keys.into_iter().collect::<Vec<_>>());
+    let mut stale: HashSet<String> = HashSet::new();
+    for (test, element, field, sha) in work {
+        let Some(rel) = elem_files.get(&element) else { continue };
+        let Some(Some(blob)) = blobs.get(&format!("{sha}:{rel}")) else { continue }; // file absent at sha
+        let Some(old) = extract_field(blob, &element, field) else { continue }; // element absent then -> not stale
+        let cur = model.items.get(&element).and_then(|i| i.attrs.get(field)).map_or("", String::as_str);
+        if old != cur {
+            stale.insert(test);
+        }
+    }
+    stale
+}
+
 /// Direct verifiers of `target`, strongest first: explicit-test edge → accept-event (Decisions
 /// only) → charter-dod. Needs add a transitive `satisfy` verifier separately (it depends on
-/// requirement coverage computed first).
+/// requirement coverage computed first). `stale` (D0084) marks verify-edge Tests whose target's
+/// content drifted since they were judged.
 fn direct_verifiers<S: std::hash::BuildHasher>(
     model: &Model,
     target: &str,
     is_decision: bool,
     done: &HashSet<String, S>,
-    suspect: &HashSet<String, S>,
+    task_suspect: &HashSet<String, S>,
+    stale: &HashSet<String, S>,
 ) -> Vec<Verifier> {
     let mut vs: Vec<Verifier> = Vec::new();
     for e in model.edges.iter().filter(|e| e.kind == "verify" && e.to == target) {
-        // A verify-edge Test is complete iff its own TestResult passed — read directly from the
-        // Model (a standalone `verification`/`part <name>R1 : TestResult`), NOT the action-task
-        // `done` set (these Tests aren't action DoDs). Mirrors accept-event + critique-coverage.
+        // A verify-edge Test is complete iff its LATEST TestResult passed — read from the Model
+        // (a standalone `verification`/`part <name>R<n> : TestResult`), NOT the action-task `done`
+        // set (these Tests aren't action DoDs). Mirrors accept-event + critique-coverage.
         // EXCLUDE method=critique Tests: critiques are also #Verify-linked but belong to
         // critique-coverage (an adversarial lens), not objective assurance coverage (D0082).
         let src = model.items.get(&e.from);
         if src.and_then(|i| i.attrs.get("method")).map(String::as_str) == Some("critique") {
             continue;
         }
-        let res = model.items.get(&format!("{}R1", e.from));
-        let pass = res.and_then(|r| r.attrs.get("outcome")).map(String::as_str) == Some("pass");
+        let pass = latest_result(model, &e.from).is_some_and(|(o, _)| o == "pass");
         vs.push(Verifier {
             complete: pass,
-            suspect: suspect.contains(&e.from),
+            suspect: stale.contains(&e.from), // D0084: element-content drift since the verifying commit
             name: e.from.clone(),
             kind: "explicit-test",
         });
@@ -725,7 +844,7 @@ fn direct_verifiers<S: std::hash::BuildHasher>(
         let forms = charter_forms(&e.from);
         vs.push(Verifier {
             complete: forms.iter().any(|f| done.contains(f)),
-            suspect: forms.iter().any(|f| suspect.contains(f)),
+            suspect: forms.iter().any(|f| task_suspect.contains(f)),
             name: e.from.clone(),
             kind: "charter-dod",
         });
@@ -736,7 +855,8 @@ fn direct_verifiers<S: std::hash::BuildHasher>(
 fn compute_coverage<S: std::hash::BuildHasher>(
     model: &Model,
     done: &HashSet<String, S>,
-    suspect: &HashSet<String, S>,
+    task_suspect: &HashSet<String, S>,
+    stale: &HashSet<String, S>,
 ) -> Vec<Coverage> {
     // Pass 1: requirements + decisions (their coverage is direct).
     let mut req_tier: HashMap<String, &'static str> = HashMap::new();
@@ -755,7 +875,7 @@ fn compute_coverage<S: std::hash::BuildHasher>(
         if info.type_name == "Need" {
             continue; // pass 2
         }
-        let verifiers = direct_verifiers(model, name, info.type_name == "Decision", done, suspect);
+        let verifiers = direct_verifiers(model, name, info.type_name == "Decision", done, task_suspect, stale);
         let (tier, basis) = tier_of(&verifiers);
         if info.type_name == "SystemRequirement" {
             req_tier.insert((*name).clone(), tier);
@@ -768,7 +888,7 @@ fn compute_coverage<S: std::hash::BuildHasher>(
         if info.type_name != "Need" {
             continue;
         }
-        let mut verifiers = direct_verifiers(model, name, false, done, suspect);
+        let mut verifiers = direct_verifiers(model, name, false, done, task_suspect, stale);
         for e in model.edges.iter().filter(|e| e.kind == "satisfy" && &e.from == *name) {
             let req_verified = req_tier.get(&e.to).copied() == Some("verified");
             verifiers.push(Verifier { name: e.to.clone(), kind: "satisfy", complete: req_verified, suspect: false });
@@ -790,8 +910,9 @@ fn compute_coverage<S: std::hash::BuildHasher>(
 pub fn coverage(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let done = crate::orient::done_names(root);
-    let suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
-    let cov = compute_coverage(&model, &done, &suspect);
+    let task_suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
+    let stale = compute_stale_verifications(root, &model);
+    let cov = compute_coverage(&model, &done, &task_suspect, &stale);
     let gf = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
 
     // Per-type summary, counted by TIER (D0082).
@@ -891,7 +1012,7 @@ struct CritiqueCoverage {
     covered: bool, // every required lens critiqued
 }
 
-fn compute_critique_coverage(model: &Model) -> Vec<CritiqueCoverage> {
+fn compute_critique_coverage<S: std::hash::BuildHasher>(model: &Model, stale: &HashSet<String, S>) -> Vec<CritiqueCoverage> {
     // Same target scope as assurance coverage: Needs, SystemRequirements, accepted Decisions.
     let is_target = |i: &ItemInfo| match i.type_name.as_str() {
         "Need" | "SystemRequirement" => true,
@@ -918,6 +1039,11 @@ fn compute_critique_coverage(model: &Model) -> Vec<CritiqueCoverage> {
                             continue;
                         }
                         if c.attrs.get("lens").map(String::as_str) != Some(lens) {
+                            continue;
+                        }
+                        // D0084: a critique whose target's content drifted since it ran is STALE —
+                        // it no longer covers the lens (re-critique needed).
+                        if stale.contains(&e.from) {
                             continue;
                         }
                         let res = model.items.get(&format!("{}R1", e.from));
@@ -964,7 +1090,8 @@ fn governed(grandfathered: Option<&HashSet<String>>, name: &str) -> bool {
 pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
     let model = Model::build(root)?;
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
-    Ok(compute_critique_coverage(&model)
+    let stale = compute_stale_verifications(root, &model);
+    Ok(compute_critique_coverage(&model, &stale)
         .into_iter()
         .filter(|c| !c.covered && governed(gf.as_ref(), &c.element))
         .map(|c| c.element)
@@ -980,7 +1107,8 @@ pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
-    let cov = compute_critique_coverage(&model);
+    let stale = compute_stale_verifications(root, &model);
+    let cov = compute_critique_coverage(&model, &stale);
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
     let in_scope = |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element);
 
@@ -1080,18 +1208,19 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     let model = Model::build(root)?;
     let done = crate::orient::done_names(root);
     let suspect_vec = crate::orient::compute(root).suspect;
-    let suspect: HashSet<String> = suspect_vec.iter().cloned().collect();
+    let task_suspect: HashSet<String> = suspect_vec.iter().cloned().collect();
+    let stale = compute_stale_verifications(root, &model);
 
     // Charter-time scoping (D0081): only GOVERNED elements (created after the governing decision)
     // count as gaps — grandfathered elements are out of the gate.
     let gf_cov = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
     let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
-    let coverage_gaps: Vec<String> = compute_coverage(&model, &done, &suspect)
+    let coverage_gaps: Vec<String> = compute_coverage(&model, &done, &task_suspect, &stale)
         .into_iter()
         .filter(|c| !is_covered_tier(c.tier) && governed(gf_cov.as_ref(), &c.element))
         .map(|c| c.element)
         .collect();
-    let critique_gaps: Vec<String> = compute_critique_coverage(&model)
+    let critique_gaps: Vec<String> = compute_critique_coverage(&model, &stale)
         .into_iter()
         .filter(|c| !c.covered && governed(gf_crit.as_ref(), &c.element))
         .map(|c| c.element)
@@ -1264,7 +1393,8 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
         }
     }
     // Decisions with FULL Core-3 critique coverage (so `uncritiqued` = not in this set).
-    let critiqued: HashSet<String> = compute_critique_coverage(&model)
+    let stale = compute_stale_verifications(root, &model);
+    let critiqued: HashSet<String> = compute_critique_coverage(&model, &stale)
         .into_iter()
         .filter(|c| c.covered && c.type_name == "Decision")
         .map(|c| c.element)
@@ -1425,8 +1555,9 @@ mod tests {
         ];
         let model = Model { items, edges };
         let done: HashSet<String> = ["a", "b", "vt"].iter().map(|s| (*s).to_string()).collect();
-        let suspect: HashSet<String> = std::iter::once("b".to_string()).collect();
-        let cov = compute_coverage(&model, &done, &suspect);
+        let task_suspect: HashSet<String> = std::iter::once("b".to_string()).collect();
+        let stale: HashSet<String> = HashSet::new();
+        let cov = compute_coverage(&model, &done, &task_suspect, &stale);
         let get = |name: &str| cov.iter().find(|c| c.element == name).unwrap();
         assert_eq!((get("d1").tier, get("d1").basis), ("addressed", Some("charter-dod")));
         assert_eq!(get("d2").tier, "suspect");
@@ -1467,7 +1598,7 @@ mod tests {
             Edge { kind: "verify".to_string(), from: "c2".to_string(), to: "sr1".to_string() },
         ];
         let model = Model { items, edges };
-        let cov = compute_critique_coverage(&model);
+        let cov = compute_critique_coverage(&model, &HashSet::<String>::new());
         let sr1 = cov.iter().find(|c| c.element == "sr1").unwrap();
         assert!(!sr1.covered, "only 1/3 required lenses independently critiqued");
         let lens = |n: &str| sr1.lenses.iter().find(|l| l.lens == n).unwrap();
