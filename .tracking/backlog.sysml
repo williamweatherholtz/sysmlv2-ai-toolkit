@@ -628,8 +628,12 @@ package EngineBacklog {
         verification critiqueCoverageDoD : Test { :>> id = "07387778-86e9-4ba7-a049-1326d1378fe1"; :>> method = VerificationMethod::test; :>> procedureText = "D0079: critique-coverage analysis — per element (Need/Requirement/Decision/Architecture) which required lenses have critiqued it, by which independent critic (reuses the assuranceCoverage substrate). Required-lens policy is BROAD (needs/requirements/decisions/architecture). sysmlv2 guard critique fails an element missing a required lens. Critique STALENESS reuses suspect (target changed since the critique commit -> re-critique + re-open any accept-risk disposition). clippy + cargo test green; coverage + staleness verified live."; }
         action assuranceReadiness;
         verification assuranceReadinessDoD : Test { :>> id = "0333798b-603b-4aaf-a049-1326d740c551"; :>> method = VerificationMethod::test; :>> procedureText = "D0079 (c): composite assurance-readiness gate — sysmlv2 assured (and a guard) computing a single verdict: coverage complete (assuranceCoverage) AND no stale verification AND no stale critique AND every >=Medium finding dispositioned AND every Critical finding fixed/risk-accepted AND invariants green (guard all). Reports the exact blockers when not ready. clippy + cargo test green; verified live."; }
+        first modelIngestRequirements then assuranceCoverage;
         first assuranceCoverage then critiqueMechanism;
         first critiqueMechanism then critiqueCoverage;
         first critiqueCoverage then assuranceReadiness;
+        action modelIngestRequirements;
+        verification modelIngestRequirementsDoD : Test { :>> id = "bba06d6e-1d69-451e-9355-12a3ee3efb22"; :>> method = VerificationMethod::test; :>> procedureText = "Prerequisite for assurance-coverage + critique (D0079): teach the Rust view Model to ingest requirement/need USAGES (requirement X : T) as items — parser.rs emits Item::Part with type_name for a requirement usage (previously skipped; only requirement def -> TypeDef). Verify: the Model sees 14 Need + 14 SystemRequirement items (was 0); rust validate clean; cargo test + clippy --workspace -D warnings green."; }
+        part modelIngestRequirementsDoDR1 : TestResult { :>> id = "ee9864fd-8758-4510-a128-1b73175784fc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8b7bb0b"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
     }
 }

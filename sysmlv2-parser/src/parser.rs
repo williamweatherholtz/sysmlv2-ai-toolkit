@@ -597,7 +597,9 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             Ok(None)
         }
 
-        // `requirement def Name ...` → TypeDef
+        // `requirement def Name ...` → TypeDef; `requirement Name : Type ...` → Part instance
+        // (so Need/Requirement USAGES are ingested as items — needed by assurance-coverage +
+        // critique, which target needs/requirements; previously usages were skipped).
         TokenKind::Requirement => {
             p.advance();
             if matches!(p.peek(), TokenKind::Def) {
@@ -606,8 +608,9 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
                 skip_item(p);
                 return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
             }
-            skip_item(p);
-            Ok(None)
+            if had_abstract { skip_item(p); return Ok(None); }
+            let (n, tn, a, sp) = parse_typed_item_body(p, filename, start)?;
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: start_line })))
         }
 
         // `use case def Name ...` → TypeDef
