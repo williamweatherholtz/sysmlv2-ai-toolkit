@@ -974,6 +974,138 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── assurance readiness (D0079 c — the composite capstone gate) ───────────────────────────────
+// `assured` composes the whole assurance picture into ONE verdict: the deliverable is READY iff
+// (1) coverage complete (every Need/Requirement/Decision covered), (2) critique complete (every
+// required lens critiqued), (3) no stale verification (suspect empty), (4) every finding >= Medium
+// is dispositioned (no open >= Medium finding Issue), (5) no Critical finding left open, and
+// (6) invariants green (all enforced guards pass). NOT-READY lists the exact blockers per category.
+// Nothing stored — recomputed from authored facts + git.
+
+/// `true` if a severity string is >= Medium (the human-disposition tier, D0079).
+#[allow(clippy::missing_const_for_fn)] // cannot match on `str` in a const fn
+fn at_least_medium(sev: &str) -> bool {
+    matches!(sev, "Critical" | "High" | "Medium")
+}
+
+struct ReadinessBlockers {
+    coverage_gaps: Vec<String>,
+    critique_gaps: Vec<String>,
+    stale_verifications: Vec<String>,
+    undispositioned_findings: Vec<String>, // open finding Issues with severity >= Medium
+    unfixed_critical: Vec<String>,         // open finding Issues with severity == Critical
+    invariant_violations: Vec<String>,     // enforced-guard violations (guard all)
+}
+
+impl ReadinessBlockers {
+    const fn ready(&self) -> bool {
+        self.coverage_gaps.is_empty()
+            && self.critique_gaps.is_empty()
+            && self.stale_verifications.is_empty()
+            && self.undispositioned_findings.is_empty()
+            && self.unfixed_critical.is_empty()
+            && self.invariant_violations.is_empty()
+    }
+}
+
+fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
+    let model = Model::build(root)?;
+    let done = crate::orient::done_names(root);
+    let suspect_vec = crate::orient::compute(root).suspect;
+    let suspect: HashSet<String> = suspect_vec.iter().cloned().collect();
+
+    let coverage_gaps: Vec<String> =
+        compute_coverage(&model, &done, &suspect).into_iter().filter(|c| c.state != "covered").map(|c| c.element).collect();
+    let critique_gaps: Vec<String> =
+        compute_critique_coverage(&model).into_iter().filter(|c| !c.covered).map(|c| c.element).collect();
+
+    // Open finding Issues by severity (severity present => it was raised as a finding, D0080).
+    let open: HashSet<String> =
+        compute_issue_resolution(&model, &done).into_iter().filter(|i| i.open).map(|i| i.issue).collect();
+    let mut undispositioned_findings: Vec<String> = Vec::new();
+    let mut unfixed_critical: Vec<String> = Vec::new();
+    for name in &open {
+        if let Some(sev) = model.items.get(name).and_then(|i| i.attrs.get("severity")) {
+            if at_least_medium(sev) {
+                undispositioned_findings.push(name.clone());
+            }
+            if sev == "Critical" {
+                unfixed_critical.push(name.clone());
+            }
+        }
+    }
+    undispositioned_findings.sort();
+    unfixed_critical.sort();
+
+    let invariant_violations: Vec<String> = crate::guards::run_all(root)
+        .into_iter()
+        .flat_map(|r| r.violations.into_iter().map(move |v| format!("{}: {v}", r.name)))
+        .collect();
+
+    Ok(ReadinessBlockers {
+        coverage_gaps,
+        critique_gaps,
+        stale_verifications: suspect_vec,
+        undispositioned_findings,
+        unfixed_critical,
+        invariant_violations,
+    })
+}
+
+/// Readiness blocker summaries (the `guard assured` violation set) — empty iff READY.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn assured_blockers(root: &Path) -> Result<Vec<String>, ViewError> {
+    let b = compute_readiness(root)?;
+    let mut out = Vec::new();
+    let note = |out: &mut Vec<String>, label: &str, v: &[String]| {
+        if !v.is_empty() {
+            out.push(format!("{label}: {} ({})", v.len(), v.iter().take(5).cloned().collect::<Vec<_>>().join(", ")));
+        }
+    };
+    note(&mut out, "coverage gaps", &b.coverage_gaps);
+    note(&mut out, "critique gaps", &b.critique_gaps);
+    note(&mut out, "stale verifications", &b.stale_verifications);
+    note(&mut out, "undispositioned >=Medium findings", &b.undispositioned_findings);
+    note(&mut out, "unfixed Critical findings", &b.unfixed_critical);
+    note(&mut out, "invariant violations", &b.invariant_violations);
+    Ok(out)
+}
+
+/// Assurance-readiness view (D0079 c) as JSON: the composite READY/NOT-READY verdict + per-category
+/// blocker counts and samples. The single "is the deliverable assured?" answer; never stored.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn assured(root: &Path) -> Result<String, ViewError> {
+    let b = compute_readiness(root)?;
+    let cat = |label: &str, v: &[String]| {
+        Json::Obj(vec![
+            ("category".to_string(), Json::s(label)),
+            ("count".to_string(), Json::Int(i64::try_from(v.len()).unwrap_or(i64::MAX))),
+            ("sample".to_string(), Json::Arr(v.iter().take(10).map(|s| Json::s(s.clone())).collect())),
+        ])
+    };
+    let blockers = Json::Arr(vec![
+        cat("coverage_gaps", &b.coverage_gaps),
+        cat("critique_gaps", &b.critique_gaps),
+        cat("stale_verifications", &b.stale_verifications),
+        cat("undispositioned_findings", &b.undispositioned_findings),
+        cat("unfixed_critical", &b.unfixed_critical),
+        cat("invariant_violations", &b.invariant_violations),
+    ]);
+    let out = Json::Obj(vec![
+        (
+            "assured".to_string(),
+            Json::s("assurance readiness (D0079 c): READY iff coverage complete AND critique complete AND no stale verification AND every >=Medium finding dispositioned AND no Critical open AND invariants green"),
+        ),
+        ("ready".to_string(), Json::Bool(b.ready())),
+        ("blockers".to_string(), blockers),
+    ]);
+    Ok(out.dump())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

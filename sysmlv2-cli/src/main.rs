@@ -10,6 +10,7 @@
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
 //!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
+//!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 // D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
@@ -348,6 +349,30 @@ fn cmd_coverage(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_assured(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 assured [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::assured(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("assured error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_critique_coverage(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -593,6 +618,7 @@ fn main() {
         Some("open-issues") => cmd_open_issues(rest),
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
+        Some("assured") => cmd_assured(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
         Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),

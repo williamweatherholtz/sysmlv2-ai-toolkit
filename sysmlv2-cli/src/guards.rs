@@ -511,6 +511,20 @@ pub fn critique(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard: the composite assurance-readiness gate (D0079 c).
+///
+/// Fails with the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
+/// verification, undispositioned >= Medium findings, open Critical, invariant violations). RUNNABLE
+/// via `sysmlv2 guard assured` but NOT in the enforced `GUARD_NAMES` (it subsumes the per-commit
+/// guards and the not-yet-enforced critique gate — it is a readiness verdict, not a per-commit lock).
+#[must_use]
+pub fn assured(root: &Path) -> GuardReport {
+    match crate::view::assured_blockers(root) {
+        Ok(blockers) => GuardReport { name: "assured", scanned: 0, warnings: Vec::new(), violations: blockers },
+        Err(e) => GuardReport { name: "assured", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing readiness: {e}")] },
+    }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077) once the existing issues were triaged with
@@ -530,6 +544,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "process-change" => Some(process_change(root)),
         "issues" => Some(issues(root)),
         "critique" => Some(critique(root)),
+        "assured" => Some(assured(root)),
         _ => None,
     }
 }
