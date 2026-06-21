@@ -24,6 +24,14 @@ package EngineVerification {
         attribute method : VerificationMethod;
         attribute procedureText : String;   // how to carry it out
         attribute location : String[0..1];   // path to an automated test, if any
+        // Antagonistic critique (D0080): when method=critique, a Test is a lens-tagged
+        // verification. lens = the adversarial angle; critiquedBy = the critic KIND (the critic
+        // IDENTITY stays in the result's judgedBy, which must differ from the target's author —
+        // independence). severity = the assessed severity (a raised finding becomes an Issue
+        // carrying the same Severity; Low is surfaced not gated, >= Medium needs human disposition).
+        attribute lens : CritiqueLens[0..1];
+        attribute critiquedBy : CriticKind[0..1];
+        attribute severity : Severity[0..1];
     }
 
     // TestPlan — a suite: a verification that composes member verifications

@@ -25,7 +25,11 @@ package EngineElement {
 
     enum def ActorKind { human; ai; }
     enum def VerdictKind { pass; fail; inconclusive; error; }                    // native verification verdict
-    enum def VerificationMethod { inspect; analyze; demo; test; confirmation; }  // native set + engine confirmation
+    enum def VerificationMethod { inspect; analyze; demo; test; confirmation; critique; }  // native set + engine confirmation + antagonistic critique (D0080)
+    // Antagonistic critique (D0080): critique IS a lens-tagged verification.
+    enum def Severity { Critical; High; Medium; Low; }                          // finding/issue severity (D0079); human-disposition gate at >= Medium
+    enum def CriticKind { aiModel; human; tool; }                               // who performed the critique (identity stays in judgedBy)
+    enum def CritiqueLens { completeness; correctness; ambiguity; testability; feasibility; consistency; necessity; }  // requirement-quality canon
     enum def Priority { must; should; could; wont; }                            // MoSCoW
     enum def RequirementKind { functional; nonFunctional; safety; security; interfaceReq; }
     enum def RiskLevel { high; medium; low; }

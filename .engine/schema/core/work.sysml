@@ -55,6 +55,7 @@ package EngineWork {
         attribute description : String;
         attribute discoveredInField : Boolean;
         attribute relatedTask : String[0..1];  // backlog task name this issue should be addressed by
+        attribute severity : Severity[0..1];    // D0079/D0080: a critique finding carries its severity here (>= Medium needs human disposition)
     }
 
     // A Release is a declaration + a membership rule. The baseline, release

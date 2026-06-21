@@ -160,6 +160,9 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
   it from an instruction to "do the sign-offs," from the underlying work being done, or from
   your own judgment. (test / analysis / inspection / demonstration are recorded from their
   own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
+  A sixth method, `critique` (D0080), records an antagonistic lens-tagged verification of a
+  tracked element by an *independent* critic; its findings become severity-carrying `Issue`s,
+  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill).
 - **Sprint ceremony is autonomous; the human gate is the per-sitting review (D0049).**
   Per-sprint closeOut (`method=inspect`) and retro (`method=analysis`) are AI-recorded with
   NO human sign-off — a sprint closes when its DoD passes, and the retro autonomously turns
