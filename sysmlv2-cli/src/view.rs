@@ -1191,6 +1191,144 @@ pub fn assured(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── load-bearing decisions report (formalized; replaces ad-hoc ranking scripts) ─────────────────
+// Ranks accepted Decisions by dependence (charters-to x2 + cross-citations from other decisions)
+// and flags "antiquated" signals: uncritiqued (no full Core-3 element-critique), references-retired
+// (cites a retired mechanism), superseded-in-part (a later decision supersedes/retires/replaces it).
+// Superseded ZOMBIES (status != accepted) are out of scope here by design (handled separately).
+
+/// Mechanisms retired/superseded across the project — a decision still citing one signals its
+/// process context has moved on (the D0048 case). Curated; extend as more retire.
+const RETIRED_MECHANISMS: &[&str] =
+    &["query.py", "parity_check", "validate_all", "validate_sysml", "RESUME.md", "StateCursor", "kill_stale_kernels"];
+
+/// The `dNNNN` decision name declared in a decision file's text, if any (handles a `#Marker` prefix).
+fn find_decision_name(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let l = line.trim_start().trim_start_matches('#');
+        let Some(rest) = l
+            .strip_prefix("part ")
+            .or_else(|| l.strip_prefix("ProspectiveChange part "))
+            .or_else(|| l.strip_prefix("SafetyChange part "))
+        else {
+            continue;
+        };
+        let name = rest.split([' ', ':']).next().unwrap_or("");
+        if name.len() == 5 && name.starts_with('d') && name.get(1..).is_some_and(|d| d.chars().all(|c| c.is_ascii_digit())) {
+            return Some(name.to_owned());
+        }
+    }
+    None
+}
+
+/// Count word-ish mentions of a `dNNNN` decision name (both `d` and `D` forms) in `text`.
+fn count_mentions(text: &str, name: &str) -> usize {
+    let upper = format!("D{}", name.get(1..).unwrap_or(""));
+    text.matches(name).count() + text.matches(&upper).count()
+}
+
+/// True if any line mentions `name` alongside a supersede/retire/replace verb (a later decision
+/// revising this one).
+fn supersede_near(text: &str, name: &str) -> bool {
+    let upper = format!("D{}", name.get(1..).unwrap_or(""));
+    text.lines().any(|line| {
+        (line.contains(name) || line.contains(&upper))
+            && (line.contains("supersede") || line.contains("Supersede") || line.contains("retire") || line.contains("replace"))
+    })
+}
+
+struct DecisionRow {
+    name: String,
+    charters: usize,
+    citations: usize,
+    score: usize,
+    uncritiqued: bool,
+    references_retired: Vec<String>,
+    superseded_in_part: Vec<String>,
+}
+
+/// Load-bearing decisions report (formalized) as JSON: accepted Decisions ranked by dependence,
+/// each with critique-coverage + antiquation flags. Computed from authored facts; no stored data.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    // Decision-file texts keyed by decision name (for citation + supersede + retired scans).
+    let mut texts: Vec<(String, String)> = Vec::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        if let Ok(t) = std::fs::read_to_string(&path) {
+            if let Some(name) = find_decision_name(&t) {
+                texts.push((name, t));
+            }
+        }
+    }
+    // Decisions with FULL Core-3 critique coverage (so `uncritiqued` = not in this set).
+    let critiqued: HashSet<String> = compute_critique_coverage(&model)
+        .into_iter()
+        .filter(|c| c.covered && c.type_name == "Decision")
+        .map(|c| c.element)
+        .collect();
+
+    let mut rows: Vec<DecisionRow> = Vec::new();
+    for (name, info) in &model.items {
+        if info.type_name != "Decision" || info.attrs.get("status").map(String::as_str) != Some("accepted") {
+            continue; // accepted decisions only — zombies (non-accepted) are out of scope here
+        }
+        let charters = model.edges.iter().filter(|e| e.kind == "charteredby" && &e.to == name).count();
+        let mut citations = 0;
+        let mut superseded_in_part: Vec<String> = Vec::new();
+        let mut own_text = "";
+        for (other, t) in &texts {
+            if other == name {
+                own_text = t;
+                continue;
+            }
+            let n = count_mentions(t, name);
+            citations += n;
+            if n > 0 && supersede_near(t, name) {
+                superseded_in_part.push(other.clone());
+            }
+        }
+        superseded_in_part.sort();
+        let references_retired: Vec<String> =
+            RETIRED_MECHANISMS.iter().filter(|m| own_text.contains(**m)).map(|m| (*m).to_owned()).collect();
+        rows.push(DecisionRow {
+            charters,
+            citations,
+            score: charters * 2 + citations,
+            uncritiqued: !critiqued.contains(name),
+            references_retired,
+            superseded_in_part,
+            name: name.clone(),
+        });
+    }
+    rows.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.name.cmp(&b.name)));
+
+    let decisions: Vec<Json> = rows
+        .iter()
+        .map(|r| {
+            Json::Obj(vec![
+                ("decision".to_string(), Json::s(r.name.clone())),
+                ("score".to_string(), Json::Int(i64::try_from(r.score).unwrap_or(i64::MAX))),
+                ("charters".to_string(), Json::Int(i64::try_from(r.charters).unwrap_or(i64::MAX))),
+                ("citations".to_string(), Json::Int(i64::try_from(r.citations).unwrap_or(i64::MAX))),
+                ("uncritiqued".to_string(), Json::Bool(r.uncritiqued)),
+                ("references_retired".to_string(), Json::Arr(r.references_retired.iter().map(|s| Json::s(s.clone())).collect())),
+                ("superseded_in_part".to_string(), Json::Arr(r.superseded_in_part.iter().map(|s| Json::s(s.clone())).collect())),
+            ])
+        })
+        .collect();
+    let out = Json::Obj(vec![
+        (
+            "report".to_string(),
+            Json::s("load-bearing decisions: accepted Decisions ranked by dependence (charters x2 + cross-citations) + antiquation flags. uncritiqued = lacks full Core-3 element-critique; references_retired = cites a retired mechanism; superseded_in_part = HEURISTIC (a later decision's text mentions it near supersede/retire/replace — a hint to review, not authority). Zombies (status != accepted) are out of scope. Computed, never stored."),
+        ),
+        ("decisions".to_string(), Json::Arr(decisions)),
+    ]);
+    Ok(out.dump())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1336,6 +1474,18 @@ mod tests {
         assert!(lens("completeness").critiqued, "independent critic counts");
         assert!(!lens("correctness").critiqued, "self-critique (author) does NOT count");
         assert!(!lens("testability").critiqued, "no critique recorded");
+    }
+
+    #[test]
+    fn decision_name_and_mentions_helpers() {
+        // find_decision_name must skip the leading comment lines (the `?`-returns-None bug).
+        let text = "// header comment\n// another\npackage Decision0048 {\n    part d0048 : Decision { :>> status = DecisionStatus::accepted; }\n}\n";
+        assert_eq!(find_decision_name(text), Some("d0048".to_string()));
+        // count_mentions counts both d/D forms; supersede_near needs the name + a verb on one line.
+        let other = "D0048's parity_check is retired here.\nThis decision supersedes d0048 entirely.";
+        assert_eq!(count_mentions(other, "d0048"), 2);
+        assert!(supersede_near(other, "d0048"));
+        assert!(!supersede_near("just mentions d0048 in passing", "d0048"));
     }
 
     #[test]
