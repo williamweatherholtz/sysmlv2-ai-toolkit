@@ -199,6 +199,18 @@ impl Model {
             let pkg = parse(tokens, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
             Self::ingest(&pkg, &mut items, &mut edges);
         }
+        // `resultof` edges: a TestResult named `<test>R<n>` records a run of Test `<test>` (gate or
+        // DoD). The link is by naming convention, not a typed edge — derive it so result leaves
+        // connect to their Test (which is itself `contains`-linked to its def).
+        let resultofs: Vec<Edge> = items
+            .iter()
+            .filter(|(_, info)| info.type_name == "TestResult")
+            .filter_map(|(name, _)| {
+                let test = strip_result_suffix(name)?;
+                items.contains_key(test).then(|| Edge { kind: "resultof".to_string(), from: name.clone(), to: test.to_string() })
+            })
+            .collect();
+        edges.extend(resultofs);
         Ok(Self { items, edges })
     }
 
@@ -210,14 +222,20 @@ impl Model {
                 Item::ActionDecl(a) => add_item_typed(items, &a.name, "action"),
                 Item::ActionDef(ad) => {
                     add_item_typed(items, &ad.name, "ActionDef");
+                    // `contains` edges: a def structurally owns its nested parts/verifications/actions.
+                    // This containment is real structure the flat item map loses; the diagram draws it
+                    // so the nested children connect to their def instead of floating.
                     for p in &ad.parts {
                         add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref());
+                        edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: p.name.clone() });
                     }
                     for v in &ad.verifications {
                         add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None);
+                        edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: v.name.clone() });
                     }
                     for a in &ad.actions {
                         add_item_typed(items, &a.name, "action");
+                        edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: a.name.clone() });
                     }
                     for s in &ad.successions {
                         let kind = if s.is_ordering_only { "ordering" } else { "succession" };
@@ -234,6 +252,28 @@ impl Model {
                 Item::Import(_) | Item::TypeDef(_) | Item::EnumDef(_) => {}
             }
         }
+        // `contains` for Process -> its ProcessSteps. Steps are authored as siblings of the Process
+        // in the same package (not AST-nested), so link by co-membership: every ProcessStep in this
+        // package belongs to the Process(es) declared in it.
+        let processes: Vec<&str> = pkg
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Part(p) if p.type_name.as_deref() == Some("Process") => Some(p.name.as_str()),
+                _ => None,
+            })
+            .collect();
+        if !processes.is_empty() {
+            for item in &pkg.items {
+                if let Item::Part(p) = item {
+                    if p.type_name.as_deref() == Some("ProcessStep") {
+                        for proc in &processes {
+                            edges.push(Edge { kind: "contains".to_string(), from: (*proc).to_string(), to: p.name.clone() });
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -244,6 +284,15 @@ fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option
 
 fn add_item_typed(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: &str) {
     items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None });
+}
+
+/// Strip a `R<digits>` result suffix: `storyDiagramRenderFixDoDR1` -> `storyDiagramRenderFixDoD`.
+/// Returns `None` when the name does not end in `R` followed by one or more digits.
+fn strip_result_suffix(name: &str) -> Option<&str> {
+    let idx = name.rfind('R')?;
+    let (head, tail) = name.split_at(idx);
+    let digits = tail.get(1..)?;
+    (!head.is_empty() && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())).then_some(head)
 }
 
 // ── selection + traversal ─────────────────────────────────────────────────────
@@ -1494,7 +1543,7 @@ const DIAGRAM_TEMPLATE: &str = r#"<!DOCTYPE html>
 <script>
 var elements = /*ELEMENTS*/;
 var typeColors={Decision:'#4e79a7',Need:'#59a14f',SystemRequirement:'#76b7b2',Story:'#f28e2b',Test:'#9c755f',TestResult:'#bab0ac',Issue:'#e15759',action:'#edc948',ActionDef:'#e6d27a',Process:'#b07aa1',ProcessStep:'#d4a6c8',AISkill:'#86bcb6'};
-var edgeColors={satisfy:'#59a14f',verify:'#4e79a7',charteredby:'#f28e2b',supersede:'#e15759',resolves:'#af7aa1',dependency:'#bab0ac',allocate:'#76b7b2',succession:'#9aa',ordering:'#ccc',prospectivechange:'#9c27b0',safetychange:'#d62728',dependson:'#888'};
+var edgeColors={satisfy:'#59a14f',verify:'#4e79a7',charteredby:'#f28e2b',supersede:'#e15759',resolves:'#af7aa1',dependency:'#bab0ac',allocate:'#76b7b2',succession:'#9aa',ordering:'#ccc',prospectivechange:'#9c27b0',safetychange:'#d62728',dependson:'#888',contains:'#dcdcc8',resultof:'#e8e0d0'};
 var cy=cytoscape({container:document.getElementById('cy'),elements:elements,
  style:[{selector:'node',style:{'label':'data(label)','font-size':6,'width':11,'height':11,'background-color':function(n){return typeColors[n.data('ntype')]||'#888'},'text-wrap':'wrap','text-max-width':130,'color':'#222'}},
   {selector:'edge',style:{'width':1,'line-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-shape':'triangle','arrow-scale':0.6,'curve-style':'bezier'}},

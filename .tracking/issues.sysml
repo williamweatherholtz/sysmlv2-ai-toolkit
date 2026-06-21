@@ -36,7 +36,7 @@ package ProjectIssues {
         :>> createdBy = "claudeSonnet46";
         :>> description = "EngineWork has Release :> Element with membershipRule : String. EngineBaseline has Release :> Element (occurrence def) with commit + purpose. When both are in scope (both imported), type resolution is ambiguous and the pilot kernel picks EngineWork::Release. tracking-template.sysml omits the EngineBaseline import until these are consolidated. Fix: either merge EngineBaseline::Release into EngineWork (drop membershipRule, add commit+purpose) or rename one to avoid conflict.";
         :>> discoveredInField = false;
-        :>> relatedTask = "trackedMetadata";
+        :>> relatedTask = "trackedMetadataReplan";
     }
 
     // ---- 2026-06-16 process step-back findings (D0046 audit program) ----
