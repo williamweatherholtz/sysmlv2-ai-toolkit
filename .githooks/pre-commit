@@ -88,6 +88,16 @@ if echo "$all_staged" | grep -q '^\.tracking/issues\.sysml$'; then
     guard_run issues
 fi
 
+# Assurance gates (D0080/D0081) — every GOVERNED (created after the governing decision) Need/
+# Requirement/Decision must carry its Core-3 critiques (`critique`) and the composite readiness
+# verdict must hold (`assured`). Charter-time scoped (D0068): pre-decision work is grandfathered, so
+# these pass on historical commits and bind only NEW assurance elements. Fire when assurance
+# elements or critiques could change (.tracking/ or .engine/decisions/).
+if echo "$all_staged" | grep -qE '^\.(tracking/|engine/decisions/)'; then
+    guard_run critique
+    guard_run assured
+fi
+
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     echo "pre-commit: cargo clippy"
