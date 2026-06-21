@@ -1464,10 +1464,14 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
 // interactive HTML page (cytoscape): filter by node type / edge kind, search, click-to-focus a
 // neighborhood, fit. Regenerated on demand from authored facts; never committed as truth (§2.1/D0015).
 
+/// Vendored cytoscape.js, INLINED into every generated diagram so it is fully self-contained +
+/// offline (no CDN). ~373KB; the only third-party JS in the page.
+const CYTOSCAPE_LIB: &str = include_str!("../assets/cytoscape.min.js");
+
 const DIAGRAM_TEMPLATE: &str = r#"<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>sysmlv2 traceability</title>
 <meta name="generator" content="sysmlv2 diagram (computed #View; regenerate, do not commit as truth)">
-<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script>/*CYTOSCAPE_LIB*/</script>
 <style>
  html,body{margin:0;height:100%;font:12px system-ui,sans-serif}
  #cy{position:absolute;left:230px;right:0;top:0;bottom:0}
@@ -1495,7 +1499,7 @@ var cy=cytoscape({container:document.getElementById('cy'),elements:elements,
  style:[{selector:'node',style:{'label':'data(label)','font-size':6,'width':11,'height':11,'background-color':function(n){return typeColors[n.data('ntype')]||'#888'},'text-wrap':'wrap','text-max-width':90,'color':'#222'}},
   {selector:'edge',style:{'width':1,'line-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-color':function(e){return edgeColors[e.data('kind')]||'#bbb'},'target-arrow-shape':'triangle','arrow-scale':0.6,'curve-style':'bezier'}},
   {selector:'.hidden',style:{'display':'none'}},{selector:'.faded',style:{'opacity':0.07}},{selector:'.hi',style:{'background-color':'#ffd400','border-width':2,'border-color':'#c80'}}],
- layout:{name:'cose',animate:false,idealEdgeLength:55,nodeRepulsion:5000,componentSpacing:60}});
+ layout:{name:'grid'}});
 var offTypes={},offKinds={};
 function refresh(){cy.batch(function(){
  cy.nodes().forEach(function(n){n.toggleClass('hidden',!!offTypes[n.data('ntype')])});
@@ -1504,7 +1508,9 @@ function resetView(){offTypes={};offKinds={};cy.elements().removeClass('hidden f
 function mkFilters(id,vals,colors,store,offDefault){var d=document.getElementById(id);vals.sort().forEach(function(v){var off=offDefault.indexOf(v)>=0;if(off)store[v]=true;var l=document.createElement('label');var c=document.createElement('input');c.type='checkbox';c.checked=!off;c.onchange=function(){store[v]=!c.checked;refresh()};var sw='<span class=sw style="background:'+(colors[v]||'#888')+'"></span>';l.appendChild(c);l.insertAdjacentHTML('beforeend',sw+v+(off?' (off)':''));d.appendChild(l)})}
 mkFilters('types',Array.from(new Set(cy.nodes().map(function(n){return n.data('ntype')}))),typeColors,offTypes,['Test','TestResult']);
 mkFilters('kinds',Array.from(new Set(cy.edges().map(function(e){return e.data('kind')}))),edgeColors,offKinds,[]);
-refresh();cy.fit(undefined,30);
+refresh();
+cy.elements(':visible').layout({name:'cose',animate:false,idealEdgeLength:55,nodeRepulsion:5000,componentSpacing:60}).run();
+cy.fit(undefined,30);
 cy.on('tap','node',function(ev){var n=ev.target;var nb=n.closedNeighborhood();cy.elements().addClass('faded');nb.removeClass('faded');var d=n.data();var s='';Object.keys(d).forEach(function(k){if(k!=='label')s+=k+': '+d[k]+'\n'});var inf=document.getElementById('info');inf.textContent=s;inf.style.display='block'});
 cy.on('tap',function(ev){if(ev.target===cy){cy.elements().removeClass('faded');document.getElementById('info').style.display='none'}});
 document.getElementById('search').addEventListener('input',function(e){var q=e.target.value.toLowerCase();cy.nodes().removeClass('hi');if(q)cy.nodes().filter(function(n){return n.id().toLowerCase().indexOf(q)>=0}).addClass('hi')});
@@ -1558,7 +1564,9 @@ pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
             )]));
         }
     }
-    Ok(DIAGRAM_TEMPLATE.replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
+    Ok(DIAGRAM_TEMPLATE
+        .replace("/*CYTOSCAPE_LIB*/", CYTOSCAPE_LIB)
+        .replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
 }
 
 #[cfg(test)]
@@ -1707,6 +1715,17 @@ mod tests {
         assert!(lens("completeness").critiqued, "independent critic counts");
         assert!(!lens("correctness").critiqued, "self-critique (author) does NOT count");
         assert!(!lens("testability").critiqued, "no critique recorded");
+    }
+
+    #[test]
+    fn diagram_is_self_contained_and_layouts_visible_only() {
+        // issue028 regression: the diagram must (1) inline cytoscape (no CDN — works offline) and
+        // (2) lay out only the VISIBLE subset (cose on all ~2500 nodes froze the browser = blank).
+        let html = diagram_html(std::path::Path::new(".")).expect("diagram_html");
+        assert!(!html.contains("unpkg.com") && !html.contains("cdn"), "no CDN dependency — must be self-contained");
+        assert!(html.contains("Cytoscape Consortium"), "cytoscape.js must be inlined");
+        assert!(html.contains(":visible').layout"), "must lay out only visible nodes (no cose-on-all freeze)");
+        assert!(!html.contains("/*CYTOSCAPE_LIB*/") && !html.contains("/*ELEMENTS*/"), "all template placeholders replaced");
     }
 
     #[test]

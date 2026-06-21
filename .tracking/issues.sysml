@@ -308,4 +308,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from parserPackageGuard to issue027;
+
+    part issue028 : Issue {
+        :>> id = "5061ebfc-2d3e-4f40-5126-738495a1b2c6";
+        :>> title = "sysmlv2 diagram rendered BLANK (no data): CDN dependency + cose layout on all ~2500 nodes";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "The Sprint 82 diagram HTML showed no data when opened. Two defects: (1) the page loaded cytoscape from a unpkg CDN, so it rendered blank offline / when the CDN was blocked (the 'self-contained' claim was false); (2) the cytoscape constructor ran a force-directed cose layout over ALL ~2500 nodes at once, which freezes/blanks the browser. Fix (diagramRenderFix): INLINE cytoscape.js (vendored to sysmlv2-cli/assets, include_str! — truly self-contained, offline) and run cose only on the VISIBLE subset (~650; Test/TestResult stay hidden) with a fast grid layout in the constructor. Regression test diagram_is_self_contained_and_layouts_visible_only locks both. discoveredInField=true (the human hit the blank render).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "diagramView";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from diagramRenderFix to issue028;
 }
