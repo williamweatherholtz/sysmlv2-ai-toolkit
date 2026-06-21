@@ -296,4 +296,16 @@ package ProjectIssues {
         :>> relatedTask = "safeTrackingFallback";
     }
     #Resolves dependency from safeTrackingFallback to issue026;
+
+    part issue027 : Issue {
+        :>> id = "5061ebfc-2d3e-4f40-5126-738495a1b2c5";
+        :>> title = "Rust parser silently DROPS items after the top-level package (parse 'clean' while losing content)";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "parse() returned after parse_package WITHOUT checking the token stream was exhausted, so any item declared OUTSIDE the package — e.g. left by a stray brace that closed the package early — was silently ignored. Surfaced authoring D0083 (Sprint 75): a one-line semicolon-then-brace closed the Decision package early, exiling the d0083Accept/d0083AcceptR1 block; sysmlv2 check reported the file CLEAN while the accept event vanished from the Model (only attestation-coverage caught it). A structurally-broken file parsing 'clean' is a fail-QUIET defect — the class D0047 says must become a permanent automated guard. discoveredInField=false (found in development).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "faststartTargetRevision";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from parserPackageGuard to issue027;
 }

@@ -666,7 +666,22 @@ fn parse_package(p: &mut Parser, filename: &str) -> Result<Package, ParseError> 
 /// engine-dialect grammar.
 pub fn parse(tokens: Vec<Token>, filename: &str) -> Result<Package, ParseError> {
     let mut p = Parser::new(tokens);
-    parse_package(&mut p, filename)
+    let pkg = parse_package(&mut p, filename)?;
+    // Fail loud on anything after the top-level package (issue027): items declared OUTSIDE the
+    // package — e.g. left there by a stray `}` that closed the package early — were silently
+    // dropped, so structurally-broken files parsed "clean" while losing content. One package per
+    // file; the stream must be exhausted.
+    let tok = p.peek_token().clone();
+    if !matches!(tok.kind, TokenKind::Eof) {
+        return Err(ParseError::Expected {
+            expected: "end of file (one package per file; all items must be inside the package)".into(),
+            got: format!("{:?}", tok.kind).into(),
+            filename: filename.into(),
+            line: tok.line,
+            col: tok.col,
+        });
+    }
+    Ok(pkg)
 }
 
 #[cfg(test)]
@@ -684,6 +699,15 @@ mod tests {
         let pkg = parse_src("package Foo {}");
         assert_eq!(pkg.name, "Foo");
         assert!(pkg.items.is_empty());
+    }
+
+    #[test]
+    fn content_after_package_is_rejected() {
+        // issue027: items outside the package (e.g. left by a stray `}` closing the package early)
+        // must FAIL LOUD, not be silently dropped. One package per file; stream must be exhausted.
+        let tokens = tokenize("package P { } part Stray : T { }", "test").expect("lex failed");
+        let err = parse(tokens, "test").expect_err("trailing content must error");
+        assert!(matches!(err, ParseError::Expected { .. }), "expected a trailing-content error, got {err:?}");
     }
 
     #[test]
