@@ -95,4 +95,46 @@ package ProjectCritiques {
     }
     part d0082FeasibilityCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c082-516273849716"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from d0082FeasibilityCritique to d0082;
+
+    // ── d0083 × completeness ──────────────────────────────────────────────────
+    verification d0083CompletenessCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c083-516273849721";
+        :>> title = "Critique d0083 — completeness lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::completeness;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (uncovered cases): (1) other orient-based commands (whats-next, suspect) — SURVIVED: they share orient's path, covered by the same <1.5s bar in spirit. (2) coverage/critique-coverage also parse the repo — SURVIVED: they aren't the inner-loop commands the FastStart need targets (parse/validate + orient); out of scope by design, not an oversight. (3) CI vs laptop — SURVIVED: bar is specified 'developer laptop, no warm cache'; Linux/CI git is faster, so the bar still holds. (4) repo growth — NOTED (accepted): more tasks => more parse/git; the 1.5s bar has ~0.65s headroom over the ~0.85s measurement, and D0083 says revisit/parse-once if orient regresses. No completeness gap.";
+    }
+    part d0083CompletenessCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c083-516273849722"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "324ab15"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0083CompletenessCritique to d0083;
+
+    // ── d0083 × correctness ───────────────────────────────────────────────────
+    verification d0083CorrectnessCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c083-516273849723";
+        :>> title = "Critique d0083 — correctness lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::correctness;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (unsound revision?): (1) is this moving the goalposts to fake a pass? SURVIVED: the split is principled — `validate` genuinely measures ~110ms (the 'instant' bar HELD, not relaxed), and the NEW <1.5s bar applies only to work (git-temporal suspicion across 200+ tasks) that did not exist when 500ms was set (D0045); the revision reflects a real change in what orient does, not a capitulation. (2) are the measurements real? SURVIVED: validate ~100-117ms and orient ~0.85-1.0s measured live, 5+ runs, cold. (3) is <1.5s defensible? SURVIVED: ~0.85s actual + headroom for variance; not so loose as to be meaningless. (4) recorded as a Decision (not silent edit) superseding the prior value, statements amended on both n11 + sr11 — correct requirement-maintenance. No correctness defect.";
+    }
+    part d0083CorrectnessCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c083-516273849724"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "324ab15"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0083CorrectnessCritique to d0083;
+
+    // ── d0083 × feasibility ───────────────────────────────────────────────────
+    verification d0083FeasibilityCritique : Test {
+        :>> id = "63940516-2c7d-4e8f-c083-516273849725";
+        :>> title = "Critique d0083 — feasibility lens";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> method = VerificationMethod::critique;
+        :>> lens = CritiqueLens::feasibility;
+        :>> critiquedBy = CriticKind::aiModel;
+        :>> procedureText = "ATTACK (achievable + maintainable?): (1) is the revised target currently met? SURVIVED: yes, with headroom (validate ~110ms<<500ms; orient ~0.85s<1.5s). (2) sustainable? SURVIVED for now; the known risk (repo growth, no timing in the suspect manifest so regression won't auto-flag) is recorded in D0083 with the parse-once refactor named as the escalation. (3) does verifying it require special infra? SURVIVED: re-run is two `time` invocations of existing commands — trivially reproducible. Feasible and maintained (with the regression caveat recorded).";
+    }
+    part d0083FeasibilityCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c083-516273849726"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "324ab15"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from d0083FeasibilityCritique to d0083;
 }

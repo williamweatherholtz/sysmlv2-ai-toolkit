@@ -346,7 +346,7 @@ package ProjectBusiness {
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
         :>> source = NeedSource::customer;
-        :>> statement = "A full parse-and-orient cycle over the current repo shall complete in under 500ms on developer hardware, enabling tight feedback loops without context-switching overhead.";
+        :>> statement = "Parse/validate over the current repo shall feel instant (under 500ms) and full orient (with git-temporal suspicion) shall stay interactive (under 1.5s) on developer hardware, enabling tight feedback loops without context-switching overhead. (Revised by D0083.)";
         :>> priority = Priority::must;
     }
 

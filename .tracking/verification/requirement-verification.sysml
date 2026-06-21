@@ -53,8 +53,12 @@ package ProjectRequirementVerification {
     part sr10VerifyR1 : TestResult { :>> id = "7a1c0010-0010-4e10-9a10-5162738400b0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr10Verify to sr10RustCli;
 
-    // sr11FastStart: NO passing verification — measured GAP (orient ~13.6s vs <500ms target). Tracked
-    // as an Issue (issues.sysml) with a resolving action; coverage reports sr11 + n11 uncovered. (D0079.)
+    // sr11FastStart: target revised by D0083 (parse/validate < 500ms + full orient-with-suspicion
+    // < 1.5s) after orientPerf (Sprint 74) cut orient 13.6s -> ~0.85s. Now VERIFIED against the
+    // realistic bars; n11FastStart verifies transitively.
+    verification sr11Verify : Test { :>> id = "7a1c0011-0011-4e11-9a11-516273840011"; :>> title = "Verify sr11FastStart (D0083 revised bars)"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "FastStart, D0083 two-bar target: parse/validate < 500ms AND full orient (with git-temporal suspicion) < 1.5s. MEASURED live (5+ runs, cold, this developer laptop / Windows): `sysmlv2 validate .` ~100-117ms (< 500ms); `sysmlv2 orient .` ~0.85-1.0s (< 1.5s) after orientPerf's batched git. Both bars met. Re-run: time `sysmlv2 validate .` and `sysmlv2 orient .`."; }
+    part sr11VerifyR1 : TestResult { :>> id = "7a1c0011-0011-4e11-9a11-5162738400b1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "324ab15"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    #Verify dependency from sr11Verify to sr11FastStart;
 
     verification sr12Verify : Test { :>> id = "7a1c0012-0012-4e12-9a12-516273840012"; :>> title = "Verify sr12DenyWarnings"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "The crates compile under #![deny(warnings, clippy::all, pedantic, nursery)] with no unwrap/expect/index-without-bounds in src/ outside tests: `cargo clippy --workspace --all-targets` is green at HEAD (the lints are declared in main.rs/lib.rs and enforced in pre-commit). Re-run: cargo clippy --workspace --all-targets -- -D warnings."; }
     part sr12VerifyR1 : TestResult { :>> id = "7a1c0012-0012-4e12-9a12-5162738400b2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }

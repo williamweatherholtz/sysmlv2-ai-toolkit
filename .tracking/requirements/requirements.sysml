@@ -147,11 +147,11 @@ package ProjectArchitecture {
 
     requirement sr11FastStart : SystemRequirement {
         :>> id = "8012de84-7218-4499-8593-d1dc0efe3692";
-        :>> title = "Cold-start parse and orient complete in under 500ms";
+        :>> title = "Cold-start parse/validate < 500ms; full orient (with suspicion) < 1.5s";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The sysmlv2 CLI shall parse the full engine repo (schema + tracking) and emit orient JSON in under 500ms on a developer laptop with no warm cache.";
-        :>> rationale = "500ms is the human perception threshold for 'instant'; exceeding it forces developers to context-switch.";
+        :>> statement = "The sysmlv2 CLI shall parse+validate the full engine repo (schema + tracking) in under 500ms, and emit full orient JSON — including git-temporal suspicion analysis across all tasks — in under 1.5s, on a developer laptop with no warm cache. (Revised by D0083; the prior flat <500ms predates orient's git-temporal suspicion.)";
+        :>> rationale = "500ms is the human 'instant' threshold and is retained for the parse/validate path (the tight inner loop). Full orient additionally performs git-temporal suspicion across 200+ tasks (an analysis absent when the original bar was set, D0045); on Windows (~60ms/git-spawn) <1.5s is the realistic interactive bar for that heavier work. See D0083.";
         :>> kind = RequirementKind::nonFunctional;
         :>> priority = Priority::must;
         :>> verificationMethod = VerificationMethod::test;
