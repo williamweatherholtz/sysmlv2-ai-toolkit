@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 sysmlv2-parser = { path = "../sysmlv2-parser" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 toml = "0.8"
 thiserror = "1"
 

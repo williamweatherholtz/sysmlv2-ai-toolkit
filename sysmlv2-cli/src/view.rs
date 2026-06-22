@@ -31,6 +31,8 @@ pub enum ViewError {
     Track(String, String),
     #[error("view '{view}' references unknown edge kind '{edge}' (known: {known})")]
     UnknownEdge { view: String, edge: String, known: String },
+    #[error("unknown render mode '{0}' (expected: graph, table, review)")]
+    UnknownMode(String),
 }
 
 // ── the declared view (TOML) ────────────────────────────────────────────────
@@ -474,6 +476,17 @@ fn emit_json(spec: &ViewSpec, model: &Model, result: &HashSet<String>) -> String
 /// (unknown field, bad enum), a tracking/instance file fails to parse, or the view references
 /// an unknown edge kind.
 pub fn run(root: &Path, view_name: &str) -> Result<String, ViewError> {
+    let (spec, model, result) = run_resolved(root, view_name)?;
+    Ok(emit_json(&spec, &model, &result))
+}
+
+/// Load + execute a view, returning the resolved spec, the full model, and the selected name-set.
+/// Shared by [`run`] (JSON emit) and the [`render_html`] table/review/graph-of-view modes.
+///
+/// # Errors
+/// Returns [`ViewError`] if the view file is missing, the TOML is invalid, a tracking/instance file
+/// fails to parse, or the view references an unknown edge kind.
+fn run_resolved(root: &Path, view_name: &str) -> Result<(ViewSpec, Model, HashSet<String>), ViewError> {
     let path = root.join(".engine").join("views").join(format!("{view_name}.view.toml"));
     if !path.exists() {
         return Err(ViewError::NotFound(path.display().to_string()));
@@ -494,7 +507,7 @@ pub fn run(root: &Path, view_name: &str) -> Result<String, ViewError> {
             result.retain(|n| model.items.get(n).is_some_and(|i| keep.contains(i.type_name.as_str())));
         }
     }
-    Ok(emit_json(&spec, &model, &result))
+    Ok((spec, model, result))
 }
 
 // ── attestation-coverage (M2.2: first algorithmic view ported from query.py) ─────────────────
@@ -1147,6 +1160,38 @@ pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
         .collect())
 }
 
+/// Elements rendered SUSPECT by an unresolved failing critique (D0086).
+///
+/// An element with a `method=critique` Test (`#Verify`-linked to it) whose latest result is `fail`
+/// "induces suspicion" — computed from the authored critique, nothing stored; re-clear by appending
+/// a passing result to that critique (or a later passing critique). Returns the sorted element set.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn critique_suspect(root: &Path) -> Result<Vec<String>, ViewError> {
+    Ok(critique_suspect_set(&Model::build(root)?))
+}
+
+/// Pure core of [`critique_suspect`]: the sorted set of elements with an unresolved failing critique.
+fn critique_suspect_set(model: &Model) -> Vec<String> {
+    let mut suspect: HashSet<String> = HashSet::new();
+    for e in &model.edges {
+        if e.kind != "verify" {
+            continue;
+        }
+        let Some(src) = model.items.get(&e.from) else { continue };
+        if src.attrs.get("method").map(String::as_str) != Some("critique") {
+            continue;
+        }
+        if matches!(latest_result(model, &e.from), Some((ref o, _)) if o == "fail") {
+            suspect.insert(e.to.clone());
+        }
+    }
+    let mut out: Vec<String> = suspect.into_iter().collect();
+    out.sort();
+    out
+}
+
 /// Critique-coverage view (D0080) as JSON.
 ///
 /// Per-element required-lens matrix + per-type summary + the gap set (elements missing a required
@@ -1566,6 +1611,84 @@ document.getElementById('search').addEventListener('input',function(e){var q=e.t
 document.getElementById('search').addEventListener('keydown',function(e){if(e.key==='Enter'){var hi=cy.nodes('.hi');if(hi.length)cy.fit(hi,50)}});
 </script></body></html>"#;
 
+const TABLE_STYLE: &str = r"<style>
+ body{margin:0;font:13px system-ui,sans-serif;color:#222}
+ header{padding:10px 14px;background:#f7f7f7;border-bottom:1px solid #ccc}
+ header h1{margin:0;font-size:15px} header p{margin:3px 0 0;color:#666;font-size:12px}
+ #bar{padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ input,select{padding:3px 4px;font:12px system-ui,sans-serif}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border:1px solid #ddd;padding:4px 7px;text-align:left;vertical-align:top}
+ th{background:#eee;cursor:pointer;position:sticky;top:0}
+ tbody tr:nth-child(even){background:#fafafa}
+ td.name{font-family:ui-monospace,monospace;white-space:nowrap}
+ .count{color:#666;font-size:12px} button{cursor:pointer;padding:4px 9px}
+ textarea{width:100%;box-sizing:border-box;font:12px system-ui,sans-serif;min-height:30px}
+</style>";
+
+const TABLE_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 view</title>
+<meta name="generator" content="sysmlv2 render --mode table (computed #View; regenerate, do not commit as truth)">
+/*STYLE*/</head><body>
+<header><h1>sysmlv2 · <span id="vn"></span></h1><p id="cn"></p></header>
+<div id="bar"><input id="q" placeholder="filter rows…" size="36"><span class="count" id="ct"></span></div>
+<table id="t"><thead></thead><tbody></tbody></table>
+<script>
+var VIEW="/*VIEW*/",CONCERN="/*CONCERN*/",COLS=/*COLS*/,ROWS=/*ROWS*/;
+document.getElementById('vn').textContent=VIEW;document.getElementById('cn').textContent=CONCERN;
+var allCols=['name','type'].concat(COLS),sortCol=null,sortDir=1,filter='';
+function visible(){var rows=ROWS.filter(function(r){return !filter||allCols.some(function(c){return (''+(r[c]||'')).toLowerCase().indexOf(filter)>=0})});
+ if(sortCol)rows.sort(function(a,b){var x=''+(a[sortCol]||''),y=''+(b[sortCol]||'');return x<y?-sortDir:x>y?sortDir:0});return rows}
+function render(){var th=document.querySelector('#t thead');th.innerHTML='';var tr=document.createElement('tr');
+ allCols.forEach(function(c){var h=document.createElement('th');h.textContent=c+(sortCol===c?(sortDir>0?' ▲':' ▼'):'');h.onclick=function(){if(sortCol===c)sortDir=-sortDir;else{sortCol=c;sortDir=1}render()};tr.appendChild(h)});
+ th.appendChild(tr);var rows=visible(),tb=document.querySelector('#t tbody');tb.innerHTML='';
+ rows.forEach(function(r){var t=document.createElement('tr');allCols.forEach(function(c){var d=document.createElement('td');if(c==='name')d.className='name';d.textContent=r[c]||'';t.appendChild(d)});tb.appendChild(t)});
+ document.getElementById('ct').textContent=rows.length+' / '+ROWS.length+' rows';}
+document.getElementById('q').addEventListener('input',function(e){filter=e.target.value.toLowerCase();render()});render();
+</script></body></html>"#;
+
+const REVIEW_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 review</title>
+<meta name="generator" content="sysmlv2 render --mode review (computed #View; capture is exported to JSON for apply-review)">
+/*STYLE*/</head><body>
+<header><h1>sysmlv2 review · <span id="vn"></span></h1><p id="cn"></p></header>
+<div id="bar">
+ reviewer <input id="who" placeholder="your id" size="12">
+ commit <input id="sha" placeholder="judgedAgainst (optional)" size="12">
+ <input id="q" placeholder="filter rows…" size="22">
+ <button onclick="exportJSON()">Export JSON</button>
+ <span class="count" id="ct"></span>
+</div>
+<table id="t"><thead></thead><tbody></tbody></table>
+<script>
+var VIEW="/*VIEW*/",CONCERN="/*CONCERN*/",COLS=/*COLS*/,ROWS=/*ROWS*/;
+document.getElementById('vn').textContent=VIEW;document.getElementById('cn').textContent=CONCERN;
+var LENSES=['correctness','completeness','ambiguity','testability','feasibility','consistency','necessity'];
+var SEV=['Medium','High','Critical','Low'];
+var infoCols=['name','type'].concat(COLS),disp={};
+function st(n){if(!disp[n])disp[n]={verdict:'',lens:'correctness',severity:'Medium',rationale:'',actionable:false};return disp[n]}
+function visible(){return ROWS.filter(function(r){return !filter||infoCols.some(function(c){return (''+(r[c]||'')).toLowerCase().indexOf(filter)>=0})})}
+var filter='';
+function sel(opts,val){var s=document.createElement('select');opts.forEach(function(o){var e=document.createElement('option');e.value=o;e.textContent=o;if(o===val)e.selected=true;s.appendChild(e)});return s}
+function render(){var th=document.querySelector('#t thead');th.innerHTML='';var tr=document.createElement('tr');
+ infoCols.concat(['verdict','lens','severity','actionable?','rationale']).forEach(function(c){var h=document.createElement('th');h.textContent=c;tr.appendChild(h)});th.appendChild(tr);
+ var rows=visible(),tb=document.querySelector('#t tbody');tb.innerHTML='';
+ rows.forEach(function(r){var n=r.name,s=st(n),t=document.createElement('tr');
+  infoCols.forEach(function(c){var d=document.createElement('td');if(c==='name')d.className='name';d.textContent=r[c]||'';t.appendChild(d)});
+  var dv=document.createElement('td');var v=sel(['','accept','finding'],s.verdict);v.onchange=function(){s.verdict=v.value};dv.appendChild(v);t.appendChild(dv);
+  var dl=document.createElement('td');var l=sel(LENSES,s.lens);l.onchange=function(){s.lens=l.value};dl.appendChild(l);t.appendChild(dl);
+  var ds=document.createElement('td');var sv=sel(SEV,s.severity);sv.onchange=function(){s.severity=sv.value};ds.appendChild(sv);t.appendChild(ds);
+  var da=document.createElement('td');var a=document.createElement('input');a.type='checkbox';a.checked=s.actionable;a.onchange=function(){s.actionable=a.checked};da.appendChild(a);t.appendChild(da);
+  var dr=document.createElement('td');var ta=document.createElement('textarea');ta.value=s.rationale;ta.oninput=function(){s.rationale=ta.value};dr.appendChild(ta);t.appendChild(dr);
+  tb.appendChild(t)});
+ document.getElementById('ct').textContent=rows.length+' rows';}
+function exportJSON(){var out={view:VIEW,judgedBy:document.getElementById('who').value,judgedAgainst:document.getElementById('sha').value,dispositions:[]};
+ Object.keys(disp).forEach(function(n){var d=disp[n];if(d&&d.verdict){out.dispositions.push({element:n,verdict:d.verdict,lens:d.lens,severity:d.severity,rationale:d.rationale,actionable:d.actionable})}});
+ if(!out.dispositions.length){alert('No dispositions set — choose a verdict on at least one row.');return}
+ var b=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='review-batch.json';a.click();}
+document.getElementById('q').addEventListener('input',function(e){filter=e.target.value.toLowerCase();render()});render();
+</script></body></html>"#;
+
 /// Comprehensive traceability diagram as a self-contained interactive HTML page (D0085).
 ///
 /// Emits the WHOLE model — every element (typed node + its authored metadata) and every typed edge
@@ -1577,8 +1700,19 @@ document.getElementById('search').addEventListener('keydown',function(e){if(e.ke
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
+    let elements = graph_elements(&model, None);
+    Ok(DIAGRAM_TEMPLATE
+        .replace("/*CYTOSCAPE_LIB*/", CYTOSCAPE_LIB)
+        .replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
+}
+
+/// Build the cytoscape element array (typed nodes + their metadata, then edges with both endpoints
+/// present) for a model. When `only` is `Some`, restrict to that name-set (a view-scoped subgraph);
+/// `None` renders the whole model.
+fn graph_elements(model: &Model, only: Option<&HashSet<String>>) -> Vec<Json> {
     let meta_keys = ["title", "status", "severity", "lens", "kind", "priority", "outcome", "method", "critiquedBy", "createdBy"];
-    let mut items: Vec<(&String, &ItemInfo)> = model.items.iter().collect();
+    let included = |n: &str| only.is_none_or(|s| s.contains(n));
+    let mut items: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(n, _)| included(n)).collect();
     items.sort_by(|a, b| a.0.cmp(b.0));
     let mut elements: Vec<Json> = items
         .iter()
@@ -1612,9 +1746,10 @@ pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
             Json::Obj(vec![("data".to_string(), Json::Obj(data))])
         })
         .collect();
-    // Edges: only those whose BOTH endpoints are real nodes (cytoscape errors on dangling edges).
+    // Edges: only those whose BOTH endpoints are present nodes (cytoscape errors on dangling edges);
+    // when scoped, both endpoints must also be in the name-set.
     for (i, e) in model.edges.iter().enumerate() {
-        if model.items.contains_key(&e.from) && model.items.contains_key(&e.to) {
+        if model.items.contains_key(&e.from) && model.items.contains_key(&e.to) && included(&e.from) && included(&e.to) {
             elements.push(Json::Obj(vec![(
                 "data".to_string(),
                 Json::Obj(vec![
@@ -1626,9 +1761,83 @@ pub fn diagram_html(root: &Path) -> Result<String, ViewError> {
             )]));
         }
     }
-    Ok(DIAGRAM_TEMPLATE
-        .replace("/*CYTOSCAPE_LIB*/", CYTOSCAPE_LIB)
-        .replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
+    elements
+}
+
+/// Modular interactive-artifact renderer (D0086).
+///
+/// Renders a declared view as self-contained HTML in one of three modes — `graph` (cytoscape; the
+/// whole model when `view` is `model`/`all`, else the view's selected subgraph), `table`
+/// (sortable/searchable rows), or `review` (table + per-row accept/finding + rationale capture with
+/// a JSON export for `apply-review`). A computed `#View`: regenerate on demand, never commit as truth.
+///
+/// # Errors
+/// Returns [`ViewError`] for an unknown mode, a missing/invalid view, or a parse failure.
+pub fn render_html(root: &Path, view: &str, mode: &str) -> Result<String, ViewError> {
+    match mode {
+        "graph" => {
+            if matches!(view, "model" | "all" | "whole") {
+                return diagram_html(root);
+            }
+            let (_, model, result) = run_resolved(root, view)?;
+            let elements = graph_elements(&model, Some(&result));
+            Ok(DIAGRAM_TEMPLATE
+                .replace("/*CYTOSCAPE_LIB*/", CYTOSCAPE_LIB)
+                .replace("/*ELEMENTS*/", &Json::Arr(elements).dump()))
+        }
+        "table" | "review" => {
+            let (spec, model, result) = run_resolved(root, view)?;
+            Ok(table_or_review_html(&spec, &model, &result, mode == "review"))
+        }
+        other => Err(ViewError::UnknownMode(other.to_string())),
+    }
+}
+
+/// Columns rendered for a view's rows: `name`, `type`, then the view's projected fields (or a small
+/// default set of common authored fields when the view declares no projection).
+fn view_columns(spec: &ViewSpec, model: &Model, result: &HashSet<String>) -> Vec<String> {
+    if let Some(p) = &spec.project {
+        if !p.fields.is_empty() {
+            return p.fields.clone();
+        }
+    }
+    let defaults = ["title", "status", "severity", "outcome", "lens", "method", "kind", "priority"];
+    defaults
+        .iter()
+        .filter(|f| result.iter().any(|n| model.items.get(n).is_some_and(|i| i.attrs.contains_key(**f))))
+        .map(|f| (*f).to_string())
+        .collect()
+}
+
+/// Render a view's rows as either a read-only table or a review surface (extra capture columns +
+/// an Export-JSON button that emits a batch consumable by `sysmlv2 apply-review`).
+fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>, review: bool) -> String {
+    let cols = view_columns(spec, model, result);
+    let mut names: Vec<&String> = result.iter().collect();
+    names.sort();
+    let rows: Vec<Json> = names
+        .iter()
+        .filter_map(|n| {
+            model.items.get(*n).map(|info| {
+                let mut o = vec![
+                    ("name".to_string(), Json::s((*n).clone())),
+                    ("type".to_string(), Json::s(info.type_name.clone())),
+                ];
+                for c in &cols {
+                    let v = if c == "marker" { info.marker.clone().unwrap_or_default() } else { info.attrs.get(c).cloned().unwrap_or_default() };
+                    o.push((c.clone(), Json::s(v)));
+                }
+                Json::Obj(o)
+            })
+        })
+        .collect();
+    let template = if review { REVIEW_TEMPLATE } else { TABLE_TEMPLATE };
+    template
+        .replace("/*STYLE*/", TABLE_STYLE)
+        .replace("/*VIEW*/", &json_esc(&spec.name))
+        .replace("/*CONCERN*/", &json_esc(&spec.concern))
+        .replace("/*COLS*/", &Json::Arr(cols.iter().map(|c| Json::s(c.clone())).collect()).dump())
+        .replace("/*ROWS*/", &Json::Arr(rows).dump())
 }
 
 #[cfg(test)]
@@ -1777,6 +1986,48 @@ mod tests {
         assert!(lens("completeness").critiqued, "independent critic counts");
         assert!(!lens("correctness").critiqued, "self-critique (author) does NOT count");
         assert!(!lens("testability").critiqued, "no critique recorded");
+    }
+
+    #[test]
+    fn critique_suspect_flags_unresolved_failing_critique() {
+        // D0086: an element with a failing critique is suspect; a passing critique is not.
+        let mut items = HashMap::new();
+        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("d2".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None });
+        let crit = || {
+            let mut a = HashMap::new();
+            a.insert("method".to_string(), "critique".to_string());
+            a
+        };
+        items.insert("cFail".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None });
+        items.insert("cPass".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None });
+        let res = |o: &str| {
+            let mut a = HashMap::new();
+            a.insert("outcome".to_string(), o.to_string());
+            a
+        };
+        items.insert("cFailR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("fail"), marker: None });
+        items.insert("cPassR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("pass"), marker: None });
+        let edges = vec![
+            Edge { kind: "verify".to_string(), from: "cFail".to_string(), to: "d1".to_string() },
+            Edge { kind: "verify".to_string(), from: "cPass".to_string(), to: "d2".to_string() },
+        ];
+        let model = Model { items, edges };
+        assert_eq!(critique_suspect_set(&model), vec!["d1".to_string()], "only the failing-critique element is suspect");
+    }
+
+    #[test]
+    fn render_dispatches_modes_and_rejects_unknown() {
+        // D0086: graph/table/review render; unknown mode errors. (cwd = crate dir in tests; the
+        // declared view files live one level up at the repo root.)
+        let root = std::path::Path::new("..");
+        let g = render_html(root, "model", "graph").expect("graph");
+        assert!(g.contains("Cytoscape Consortium"), "graph uses the inlined cytoscape lib");
+        let t = render_html(root, "decisions", "table").expect("table");
+        assert!(t.contains("<table") && !t.contains("/*ROWS*/") && !t.contains("/*STYLE*/"), "table rows + style injected");
+        let r = render_html(root, "decisions", "review").expect("review");
+        assert!(r.contains("exportJSON") && r.contains("apply-review"), "review mode has capture/export");
+        assert!(render_html(root, "decisions", "bogus").is_err(), "unknown mode errors");
     }
 
     #[test]

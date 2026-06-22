@@ -7,6 +7,7 @@
 //! - **writePolicy**: `append_result` requires the task to exist; `add_task`
 //!   rejects duplicate task names.
 
+use std::fmt::Write as _;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -379,6 +380,100 @@ pub fn append_result(
 
     std::fs::write(path, new_content)?;
     Ok(uuid)
+}
+
+/// Inputs for [`append_critique`] — a human/independent review recorded as a linked critique
+/// (D0086). The human reviewing an element IS an independent critic (D0080).
+pub struct Critique<'a> {
+    /// The reviewed element's part name (the `#Verify` target).
+    pub element: &'a str,
+    /// `"critique"` (a review judgment) or `"test"` (a downstream test result).
+    pub method: &'a str,
+    /// `CritiqueLens` member (critique only): correctness/completeness/ambiguity/…
+    pub lens: &'a str,
+    /// `CriticKind` member (critique only): human/aiModel/tool.
+    pub critiqued_by: &'a str,
+    /// `Severity` member, emitted on a failing critique: Critical/High/Medium/Low.
+    pub severity: Option<&'a str>,
+    /// Free-text rationale (sanitized into a single-line, quote-safe `procedureText`).
+    pub rationale: &'a str,
+    /// `"pass"` (accept) or `"fail"` (a finding — induces computed suspicion, D0086).
+    pub outcome: &'a str,
+    /// Commit the judgment was made against (`judgedAgainst`).
+    pub sha: &'a str,
+    /// ISO-8601 attestation date.
+    pub judged_at: &'a str,
+    /// Reviewer id (`judgedBy`).
+    pub judged_by: &'a str,
+}
+
+/// Append a human/independent critique (or downstream test result) as NEW LINKED items (D0086).
+///
+/// Writes a `verification <element>HRev<n> : Test` + its `TestResult` + a `#Verify` edge to the
+/// reviewed element, inserted before the package's closing brace. A failing outcome induces computed
+/// suspicion (no element mutation, no parallel store). Reuses UUID generation; the index `<n>` is
+/// the next free slot so repeated reviews never collide (append-only).
+///
+/// Returns the new verification name (`<element>HRev<n>`).
+///
+/// # Errors
+/// `WriteError::InvalidVerdict` if `outcome` is not `"pass"`/`"fail"`;
+/// `WriteError::InsertionPointNotFound` if the file has no package-closing brace;
+/// `WriteError::Io` on filesystem errors.
+pub fn append_critique(path: &Path, c: &Critique) -> Result<String, WriteError> {
+    if c.outcome != "pass" && c.outcome != "fail" {
+        return Err(WriteError::InvalidVerdict(c.outcome.to_owned()));
+    }
+    let content = std::fs::read_to_string(path)?;
+
+    // Next free index for `<element>HRev<n>` — append-only, collision-free across re-reviews.
+    let prefix = format!("{}HRev", c.element);
+    let mut n = 1u32;
+    while content.contains(&format!("{prefix}{n} ")) || content.contains(&format!("{prefix}{n}R")) {
+        n += 1;
+    }
+
+    // Sanitize the rationale into a single-line, quote-safe string literal.
+    let safe: String = c
+        .rationale
+        .replace('\\', "/")
+        .replace('"', "'")
+        .replace(['\n', '\r', '\t'], " ");
+
+    let uuid_v = gen_uuid();
+    let uuid_r = gen_uuid();
+    let mut attrs = format!(":>> id = \"{uuid_v}\"; :>> method = VerificationMethod::{};", c.method);
+    if c.method == "critique" {
+        let _ = write!(attrs, " :>> lens = CritiqueLens::{}; :>> critiquedBy = CriticKind::{};", c.lens, c.critiqued_by);
+        if c.outcome == "fail" {
+            if let Some(sev) = c.severity {
+                let _ = write!(attrs, " :>> severity = Severity::{sev};");
+            }
+        }
+    }
+    let _ = write!(attrs, " :>> procedureText = \"{safe}\";");
+
+    let block = format!(
+        "    verification {prefix}{n} : Test {{ {attrs} }}\n    part {prefix}{n}R1 : TestResult {{ :>> id = \"{uuid_r}\"; :>> outcome = VerdictKind::{}; :>> judgedAgainst = \"{}\"; :>> judgedAt = \"{}\"; :>> judgedBy = \"{}\"; }}\n    #Verify dependency from {prefix}{n} to {};\n",
+        c.outcome, c.sha, c.judged_at, c.judged_by, c.element
+    );
+
+    let lines: Vec<&str> = content.lines().collect();
+    let close = lines
+        .iter()
+        .rposition(|l| l.trim() == "}")
+        .ok_or_else(|| WriteError::InsertionPointNotFound(c.element.to_owned()))?;
+
+    let mut out = String::with_capacity(content.len() + block.len() + 1);
+    for (i, line) in lines.iter().enumerate() {
+        if i == close {
+            out.push_str(&block);
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(path, out)?;
+    Ok(format!("{prefix}{n}"))
 }
 
 /// Append a `part <gate>R<N+1> : TestResult { ... }` for a ceremony gate to `path`.

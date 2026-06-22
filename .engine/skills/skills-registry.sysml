@@ -198,4 +198,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to see/draw/visualize/diagram the model, traceability, reliance, linkage, supersession, effects, or metadata; to map how decisions/needs/requirements/work/processes connect; or to explore the graph part at a time.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part renderSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a086-516273849615";
+        :>> title = "render";
+        :>> purpose = "Deploy the Modular Render + Review process (D0086): render ANY declared view as a self-contained interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (graph generalizes the D0085 diagram; table = sortable rows; review = accept/finding + rationale capture), and round-trip a human review back via `sysmlv2 apply-review` as new linked critique items that attest state + induce suspicion. Never author or commit a rendered artifact (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/render.sysml.";
+        :>> location = ".engine/skills/render/SKILL.md";
+        :>> triggerCondition = "Asked to render/tabulate/explore a specific view as an artifact, build a table from a view, review/disposition elements (accept/reject + rationale), capture critique findings, or export a review batch; or to apply a review batch back into the model.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

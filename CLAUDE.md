@@ -5,7 +5,7 @@ building things — and is being built using its own discipline. Read this befor
 
 > **Status: sprint discipline in force (D0064).** The tracking engine exists and is the
 > authority (D0048): the Rust toolchain computes views (`sysmlv2 orient`/`whats-next`/`suspect`)
-> and the write API records facts (`append-result`/`add-task`/`append-gate-result`); four layer
+> and the write API records facts (`append-result`/`add-task`/`append-gate-result`/`apply-review`); four layer
 > validators gate every change. (The indexer and GUI don't exist yet; neither is needed for the
 > discipline.) **All substantive work — CHANGE, delivery, and engine work — goes through a sprint**
 > (refine→standup→implement→review→closeOut→retro); only trivial one-off edits are exempt, and
@@ -40,8 +40,12 @@ source changed since it was verified — re-verify at HEAD to clear it.
 Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
 Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (needs/requirements/
 tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
-`governing-version`, `reprocess-candidates`, `suspect` are the other computed lenses. (The
-SysML viewpoint-registry stays the concern-coverage index.)
+`governing-version`, `reprocess-candidates`, `suspect` are the other computed lenses (`suspect` also
+flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
+renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
+the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
+critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). (The SysML
+viewpoint-registry stays the concern-coverage index.)
 
 ---
 

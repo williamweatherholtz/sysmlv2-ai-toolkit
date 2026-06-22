@@ -648,6 +648,144 @@ fn cmd_add_task(args: &[String]) -> i32 {
     }
 }
 
+/// `render <view> [--mode graph|table|review] [--root ROOT]` — modular interactive-artifact
+/// renderer over the view layer (D0086). Emits self-contained HTML to stdout (redirect to a file).
+fn cmd_render(args: &[String]) -> i32 {
+    let Some(view) = args.first().filter(|v| !v.starts_with("--")) else {
+        eprintln!("usage: sysmlv2 render <view> [--mode graph|table|review] [--root ROOT]");
+        eprintln!("  <view> = a declared view name (e.g. decisions, issues), or 'model' for the whole-model graph");
+        return 2;
+    };
+    let mode = flag(args, "mode").unwrap_or_else(|| "graph".to_owned());
+    let root = match flag(args, "root") {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::render_html(&root, view, &mode) {
+        Ok(html) => {
+            println!("{html}");
+            0
+        }
+        Err(e) => {
+            eprintln!("render error: {e}");
+            1
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewBatch {
+    #[serde(default)]
+    dispositions: Vec<ReviewDisp>,
+    #[serde(default, rename = "judgedBy")]
+    judged_by: String,
+    #[serde(default, rename = "judgedAgainst")]
+    judged_against: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewDisp {
+    element: String,
+    verdict: String,
+    #[serde(default)]
+    lens: String,
+    #[serde(default)]
+    severity: String,
+    #[serde(default)]
+    rationale: String,
+    #[serde(default)]
+    actionable: bool,
+}
+
+/// `apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]` —
+/// ingest a review batch exported by `render --mode review` and write each disposition back as a new
+/// linked critique (D0086) via the write path. `accept`->pass, `finding`/`reject`->fail (a finding,
+/// which induces computed suspicion). Writes into `.tracking/critiques.sysml`.
+fn cmd_apply_review(args: &[String]) -> i32 {
+    let Some(batch_str) = flag(args, "batch") else {
+        eprintln!("usage: sysmlv2 apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]");
+        return 2;
+    };
+    let root = match flag(args, "root") {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
+                return 2;
+            }
+        }
+    };
+    let text = match std::fs::read_to_string(&batch_str) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error reading batch {batch_str}: {e}");
+            return 2;
+        }
+    };
+    let batch: ReviewBatch = match serde_json::from_str(&text) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("error: invalid review batch JSON: {e}");
+            return 2;
+        }
+    };
+    let judged_by = flag(args, "judged-by").filter(|s| !s.is_empty()).or_else(|| Some(batch.judged_by.clone()).filter(|s| !s.is_empty())).unwrap_or_else(|| "human".to_owned());
+    let sha = flag(args, "sha").filter(|s| !s.is_empty()).or_else(|| Some(batch.judged_against.clone()).filter(|s| !s.is_empty())).unwrap_or_else(|| "uncommitted".to_owned());
+    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let critiques = root.join(".tracking").join("critiques.sysml");
+
+    let mut count = 0u32;
+    for d in &batch.dispositions {
+        let outcome = match d.verdict.as_str() {
+            "accept" => "pass",
+            "finding" | "reject" => "fail",
+            other => {
+                eprintln!("skip {}: unknown verdict '{other}'", d.element);
+                continue;
+            }
+        };
+        let severity = (outcome == "fail" && !d.severity.is_empty()).then_some(d.severity.as_str());
+        let lens = if d.lens.is_empty() { "correctness" } else { d.lens.as_str() };
+        let mut rationale = d.rationale.clone();
+        if d.actionable {
+            rationale.push_str(" [actionable: warrants new implementation]");
+        }
+        let c = w::Critique {
+            element: &d.element,
+            method: "critique",
+            lens,
+            critiqued_by: "human",
+            severity,
+            rationale: &rationale,
+            outcome,
+            sha: &sha,
+            judged_at: &judged_at,
+            judged_by: &judged_by,
+        };
+        match w::append_critique(&critiques, &c) {
+            Ok(name) => {
+                println!("{name}  ({} {})", d.element, outcome);
+                count += 1;
+            }
+            Err(e) => {
+                eprintln!("error on {}: {e}", d.element);
+                return 1;
+            }
+        }
+    }
+    println!("applied {count} disposition(s) to {}", critiques.display());
+    0
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
@@ -671,6 +809,8 @@ fn main() {
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
+        Some("render") => cmd_render(rest),
+        Some("apply-review") => cmd_apply_review(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
         Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),
@@ -687,6 +827,9 @@ fn main() {
             eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
             eprintln!("  orient [ROOT]                print orient state as JSON");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
+            eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
+            eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");
+            eprintln!("  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)");
             eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
             eprintln!("  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
             eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");

@@ -295,8 +295,15 @@ pub fn reprocess_candidates(root: &Path) -> String {
 #[must_use]
 pub fn suspect(root: &Path, explain: bool) -> String {
     let out = crate::orient::compute(root);
+    // D0086: elements rendered suspect by an unresolved failing critique (a human review's finding).
+    let crit = crate::view::critique_suspect(root).unwrap_or_default();
+    let crit_json = Json::Arr(crit.iter().map(|s| Json::s(s.clone())).collect());
     if !explain {
-        return Json::Obj(vec![("suspect".to_string(), Json::Arr(out.suspect.iter().map(|s| Json::s(s.clone())).collect()))]).dump();
+        return Json::Obj(vec![
+            ("suspect".to_string(), Json::Arr(out.suspect.iter().map(|s| Json::s(s.clone())).collect())),
+            ("critique_suspect".to_string(), crit_json),
+        ])
+        .dump();
     }
     // --explain (suspectDiagnostics): per suspect task, WHY it is flagged.
     let arr: Vec<Json> = out
@@ -307,7 +314,11 @@ pub fn suspect(root: &Path, explain: bool) -> String {
             Json::Obj(vec![("task".to_string(), Json::s(t.clone())), ("reason".to_string(), Json::s(reason))])
         })
         .collect();
-    Json::Obj(vec![("suspect".to_string(), Json::Arr(arr))]).dump()
+    Json::Obj(vec![
+        ("suspect".to_string(), Json::Arr(arr)),
+        ("critique_suspect".to_string(), crit_json),
+    ])
+    .dump()
 }
 
 fn all_delivery_stories(root: &Path) -> Vec<String> {

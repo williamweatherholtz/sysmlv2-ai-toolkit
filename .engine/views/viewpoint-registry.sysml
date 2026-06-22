@@ -47,6 +47,15 @@ package EngineViewpoints {
         :>> sources = "all elements + all typed edges + authored metadata (the full Model)";
         :>> renderer = "sysmlv2 diagram (interactive HTML #View, D0085; regenerate-don't-commit)";
     }
+    part renderVP : Viewpoint {
+        :>> id = "61728394-0a5b-4c6d-c086-405162738486";
+        :>> title = "render";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "How do I explore, tabulate, or REVIEW any declared view as an interactive artifact — and disposition elements (accept/finding + rationale) so the judgment lands back in the model as linked critiques that attest state and induce suspicion?";
+        :>> audience = "maintainer / reviewer / auditor";
+        :>> sources = "any declared view (D0056/D0057) over the Model — graph (elements + typed edges), table/review (selected rows + projected fields); review dispositions round-trip via apply-review into .tracking/critiques.sysml";
+        :>> renderer = "sysmlv2 render <view> --mode graph|table|review (interactive HTML #View, D0086; regenerate-don't-commit) + sysmlv2 apply-review";
+    }
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
         :>> title = "safety";
