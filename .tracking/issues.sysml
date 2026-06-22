@@ -319,5 +319,38 @@ package ProjectIssues {
         :>> relatedTask = "diagramView";
         :>> severity = Severity::Medium;
     }
+    part issue029 : Issue {
+        :>> id = "e0290029-0029-4e29-9029-516273840029";
+        :>> title = "D0054 finding: adoption-friction is a first-class requirement with NO verification (no friction metric)";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 1, d0054 completeness (Medium): D0054 declares adoption friction the #1 risk and makes 'the write path must beat a spreadsheet' a first-class requirement, but there is no verification of it — no friction metric (steps/keystrokes/seconds to record a fact via the write API vs a spreadsheet baseline). sr11/faststart measures tool latency, not authoring friction. ACT disposition (human, 2026-06-21): track a friction metric. Resolver: frictionMetric.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "frictionMetric";
+        :>> severity = Severity::Medium;
+    }
+    part issue030 : Issue {
+        :>> id = "e0300030-0030-4e30-9030-516273840030";
+        :>> title = "D0080 finding: critique QUALITY is unchecked (coverage enforced, rigor not) — the mechanism is gameable";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 1, d0080 completeness (Medium): guard critique + critique-coverage enforce that a required-lens critique EXISTS, not that it is rigorous — a shallow 'SURVIVED' counts identical to a genuine attack, so the mechanism is gameable by going-through-the-motions. No second-order rigor/meta check exists. ACT disposition (human, 2026-06-21): add a critique-rigor check. Resolver: critiqueRigorCheck.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "critiqueRigorCheck";
+        :>> severity = Severity::Medium;
+    }
+    part issue031 : Issue {
+        :>> id = "e0310031-0031-4e31-9031-516273840031";
+        :>> title = "D0080 finding: critique independence is identity-distinct, not cognition-distinct (AI-vs-AI shares blind spots)";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 1, d0080 correctness (Medium): independence is enforced as judgedBy != author (identity), not cognition — an aiModel critiquing another aiModel's (or the same model line's) work shares training blind spots, so 'adversarial' is weaker than the human independence the lenses imply. The mechanism does not require a human/tool critic for high-stakes elements. ACT disposition (human, 2026-06-21): require a non-aiModel critic for the high-stakes set. Resolver: criticIndependenceRule.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "criticIndependenceRule";
+        :>> severity = Severity::Medium;
+    }
     #Resolves dependency from diagramRenderFix to issue028;
+    #Resolves dependency from frictionMetric to issue029;
+    #Resolves dependency from critiqueRigorCheck to issue030;
+    #Resolves dependency from criticIndependenceRule to issue031;
 }

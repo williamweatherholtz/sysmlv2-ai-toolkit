@@ -1300,6 +1300,31 @@ impl ReadinessBlockers {
     }
 }
 
+/// Readiness finding-blockers from issue resolution (D0079/D0080), as `(undispositioned_ge_medium,
+/// open_critical)`. A finding is UNDISPOSITIONED iff it is open AND has no `#Resolves` resolver —
+/// D0079 requires every >= Medium finding be DISPOSITIONED (ACT/ACCEPT-RISK/DISMISS), not resolved,
+/// so an ACT'd finding whose resolver is still in flight does NOT block readiness. An open Critical
+/// always blocks until fixed/resolved (D0080), regardless of disposition.
+fn finding_blockers(resolution: &[IssueStatus], model: &Model) -> (Vec<String>, Vec<String>) {
+    let mut undisp: Vec<String> = Vec::new();
+    let mut critical: Vec<String> = Vec::new();
+    for i in resolution {
+        if !i.open {
+            continue;
+        }
+        let Some(sev) = model.items.get(&i.issue).and_then(|x| x.attrs.get("severity")) else { continue };
+        if at_least_medium(sev) && i.resolvers.is_empty() {
+            undisp.push(i.issue.clone());
+        }
+        if sev == "Critical" {
+            critical.push(i.issue.clone());
+        }
+    }
+    undisp.sort();
+    critical.sort();
+    (undisp, critical)
+}
+
 fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     let model = Model::build(root)?;
     let done = crate::orient::done_names(root);
@@ -1322,23 +1347,7 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
         .map(|c| c.element)
         .collect();
 
-    // Open finding Issues by severity (severity present => it was raised as a finding, D0080).
-    let open: HashSet<String> =
-        compute_issue_resolution(&model, &done).into_iter().filter(|i| i.open).map(|i| i.issue).collect();
-    let mut undispositioned_findings: Vec<String> = Vec::new();
-    let mut unfixed_critical: Vec<String> = Vec::new();
-    for name in &open {
-        if let Some(sev) = model.items.get(name).and_then(|i| i.attrs.get("severity")) {
-            if at_least_medium(sev) {
-                undispositioned_findings.push(name.clone());
-            }
-            if sev == "Critical" {
-                unfixed_critical.push(name.clone());
-            }
-        }
-    }
-    undispositioned_findings.sort();
-    unfixed_critical.sort();
+    let (undispositioned_findings, unfixed_critical) = finding_blockers(&compute_issue_resolution(&model, &done), &model);
 
     // Base invariant guards only — EXCLUDE `assured` (would recurse) and `critique` (composed
     // separately as critique_gaps). This is what "invariants green" means for readiness.
@@ -2402,6 +2411,31 @@ mod tests {
         ];
         let model = Model { items, edges };
         assert_eq!(critique_suspect_set(&model), vec!["d1".to_string()], "only the failing-critique element is suspect");
+    }
+
+    #[test]
+    fn dispositioned_finding_does_not_block_readiness() {
+        // Regression (D0047): assured must treat a >= Medium finding WITH a resolver (ACT'd) as
+        // dispositioned, not undispositioned; only a resolver-less open finding blocks. Open
+        // Critical always blocks regardless of disposition.
+        let mk = |sev: &str| {
+            let mut a = HashMap::new();
+            a.insert("severity".to_string(), sev.to_string());
+            ItemInfo { type_name: "Issue".to_string(), attrs: a, marker: None }
+        };
+        let mut items = HashMap::new();
+        items.insert("iActed".to_string(), mk("Medium"));
+        items.insert("iRaw".to_string(), mk("Medium"));
+        items.insert("iCrit".to_string(), mk("Critical"));
+        let model = Model { items, edges: Vec::new() };
+        let res = vec![
+            IssueStatus { issue: "iActed".to_string(), resolvers: vec![ResolverStatus { name: "act".to_string(), kind: "action", complete: false }], open: true },
+            IssueStatus { issue: "iRaw".to_string(), resolvers: Vec::new(), open: true },
+            IssueStatus { issue: "iCrit".to_string(), resolvers: vec![ResolverStatus { name: "act2".to_string(), kind: "action", complete: false }], open: true },
+        ];
+        let (undisp, critical) = finding_blockers(&res, &model);
+        assert_eq!(undisp, vec!["iRaw".to_string()], "only the resolver-less Medium finding is undispositioned");
+        assert_eq!(critical, vec!["iCrit".to_string()], "open Critical blocks even when dispositioned");
     }
 
     #[test]
