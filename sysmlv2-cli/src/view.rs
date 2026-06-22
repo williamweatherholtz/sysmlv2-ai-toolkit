@@ -1716,14 +1716,15 @@ pub fn report(root: &Path, name: &str, trend: bool) -> Result<String, ViewError>
     Ok(Json::Obj(obj).dump())
 }
 
-/// The headline metric's git-derived series `{label, series:[{commit,value}]}` over recent commits.
-fn trend_json(root: &Path, name: &str) -> Json {
-    let series: Vec<Json> = trend_series(root, name)
+/// A report's headline metric git-derived series `{label, series:[{commit,value}]}` over recent
+/// commits (the report's primary scalar, via [`metric_value`]).
+fn trend_json(root: &Path, report: &str) -> Json {
+    let series: Vec<Json> = trend_series(root, report_headline_key(report))
         .into_iter()
-        .map(|(sha, v)| Json::Obj(vec![("commit".to_string(), Json::s(sha)), ("value".to_string(), Json::Int(v))]))
+        .map(|(sha, v)| Json::Obj(vec![("commit".to_string(), Json::s(sha)), ("value".to_string(), Json::s(format!("{v:.2}")))]))
         .collect();
     Json::Obj(vec![
-        ("label".to_string(), Json::s(headline_label(name).to_string())),
+        ("label".to_string(), Json::s(headline_label(report).to_string())),
         ("series".to_string(), Json::Arr(series)),
     ])
 }
@@ -1754,40 +1755,79 @@ const fn headline_label(name: &str) -> &str {
     }
 }
 
-/// The headline scalar for a report at `root` (the worktree of a sampled commit). `None` on any
-/// failure (an unparseable historical commit is skipped, not fatal).
-fn headline_at(root: &Path, name: &str) -> Option<i64> {
+/// The single shared computation for a canonical scalar metric (D0090).
+///
+/// Both the report cards and the computed Indicators source their numeric value from this keyed
+/// registry, so each metric is computed in exactly one place. `None` if the key is unknown or the
+/// model fails to build.
+#[must_use]
+pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
     let model = Model::build(root).ok()?;
-    match name {
-        "assurance" | "traceability" => {
-            // Full pipeline at this commit (tier coverage, the heavy true trend the human asked for).
+    let cnt = |n: usize| -> f64 { f64::from(u32::try_from(n).unwrap_or(u32::MAX)) };
+    match key {
+        // coverage-family (the full tier pipeline)
+        "coverage_pct" | "req_verified_pct" | "needs_verified_pct" => {
             let done = crate::orient::done_names(root);
             let task_suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
             let stale = compute_stale_verifications(root, &model);
             let cov = compute_coverage(&model, &done, &task_suspect, &stale);
-            let ty = if name == "traceability" { "SystemRequirement" } else { "" };
+            let ty = match key {
+                "req_verified_pct" => "SystemRequirement",
+                "needs_verified_pct" => "Need",
+                _ => "",
+            };
             let rows: Vec<&Coverage> = cov.iter().filter(|c| ty.is_empty() || c.type_name == ty).collect();
-            let covered = rows.iter().filter(|c| is_covered_tier(c.tier)).count();
-            Some(i64::from(pct(covered, rows.len())))
+            let covered = rows.iter().filter(|c| if key == "coverage_pct" { is_covered_tier(c.tier) } else { c.tier == "verified" }).count();
+            Some(f64::from(pct(covered, rows.len())))
         }
-        "quality-debt" => Some(i64::try_from(model.edges.iter().filter(|e| e.kind == "supersede").count()).unwrap_or(0)),
-        "friction" => Some(4), // the 4 one-command write-API verbs (a fixed benchmark, not a trend)
-        "governance" => Some(i64::try_from(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count()).unwrap_or(0)),
-        _ => {
-            // flow → burnup: cumulative delivered story points.
-            let pts: i64 = crate::collect_sysml(&root.join(".tracking").join("delivery"))
+        "critique_pct" => {
+            let stale = compute_stale_verifications(root, &model);
+            let crit = compute_critique_coverage(&model, &stale);
+            Some(f64::from(pct(crit.iter().filter(|c| c.covered).count(), crit.len())))
+        }
+        "attestation_pct" => {
+            let (total, missing) = compute_attestation(&model);
+            Some(f64::from(pct(total - missing.len(), total)))
+        }
+        "volatility" => Some(cnt(model.edges.iter().filter(|e| e.kind == "supersede").count())),
+        "accepted_decisions" => Some(cnt(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count())),
+        "open_findings" => {
+            let done = crate::orient::done_names(root);
+            let (undisp, crit) = finding_blockers(&compute_issue_resolution(&model, &done), &model);
+            Some(cnt(undisp.len() + crit.len()))
+        }
+        "friction_verbs" => Some(4.0), // the 4 one-command write-API verbs (a fixed benchmark)
+        "velocity" | "burnup" | "throughput" => {
+            let flows: Vec<SprintFlow> = crate::collect_sysml(&root.join(".tracking").join("delivery"))
                 .iter()
-                .filter_map(|p| std::fs::read_to_string(p).ok())
-                .map(|t| sprint_flow(&t).points)
-                .sum();
-            Some(pts)
+                .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| sprint_flow(&t)))
+                .collect();
+            let points: i64 = flows.iter().map(|f| f.points).sum();
+            match key {
+                "throughput" => Some(cnt(flows.len())),
+                "burnup" => Some(f64::from(i32::try_from(points).unwrap_or(i32::MAX))),
+                _ => Some(if flows.is_empty() { 0.0 } else { f64::from(i32::try_from(points).unwrap_or(i32::MAX)) / cnt(flows.len()) }),
+            }
         }
+        _ => None,
     }
 }
 
-/// Compute the headline scalar at each sampled commit via a throwaway git worktree (reuses the whole
-/// pipeline unchanged at that commit). Commits that fail to check out or compute are skipped.
-fn trend_series(root: &Path, name: &str) -> Vec<(String, i64)> {
+/// The headline metric key a report's `--trend` tracks (the report's primary scalar).
+fn report_headline_key(report: &str) -> &str {
+    match report {
+        "assurance" => "coverage_pct",
+        "traceability" => "req_verified_pct",
+        "quality-debt" => "volatility",
+        "governance" => "accepted_decisions",
+        "friction" => "friction_verbs",
+        _ => "burnup", // flow
+    }
+}
+
+/// Compute a keyed metric ([`metric_value`]) at each sampled commit via a throwaway git worktree
+/// (reuses the whole pipeline unchanged at that commit). Commits that fail to check out are skipped.
+fn trend_series(root: &Path, key: &str) -> Vec<(String, f64)> {
     let mut out = Vec::new();
     // 12 recent commits balances a readable trendline against the per-commit worktree+pipeline cost.
     for sha in sampled_commits(root, 12) {
@@ -1796,7 +1836,7 @@ fn trend_series(root: &Path, name: &str) -> Vec<(String, i64)> {
         // Best-effort clean, then add a detached worktree at the commit.
         let _ = git_out(root, &["worktree", "remove", "--force", &wt]);
         if git_out(root, &["worktree", "add", "--detach", &wt, &sha]).is_some() {
-            if let Some(v) = headline_at(Path::new(&wt), name) {
+            if let Some(v) = metric_value(Path::new(&wt), key) {
                 out.push((short, v));
             }
             let _ = git_out(root, &["worktree", "remove", "--force", &wt]);
@@ -2061,11 +2101,11 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
         let binding = info.attrs.get("collectionRef").cloned().unwrap_or_default();
         // Build the numeric series per method.
         let series: Vec<f64> = if method == "computed" {
-            let i64_to_f64 = |v: i64| f64::from(i32::try_from(v).unwrap_or(i32::MAX));
+            // `collectionRef` is a metric key (D0090); value/series come from the shared metric_value.
             if trend {
-                trend_series(root, &binding).into_iter().map(|(_, v)| i64_to_f64(v)).collect()
+                trend_series(root, &binding).into_iter().map(|(_, v)| v).collect()
             } else {
-                headline_at(root, &binding).map(|v| vec![i64_to_f64(v)]).unwrap_or_default()
+                metric_value(root, &binding).map(|v| vec![v]).unwrap_or_default()
             }
         } else {
             measurement_series(&model, name)

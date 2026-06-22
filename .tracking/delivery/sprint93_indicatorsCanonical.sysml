@@ -1,0 +1,50 @@
+// =====================================================================
+// ProjectDeliveryS93 — Sprint 93: indicatorsCanonical (D0090). Make indicators the canonical
+// monitored-measure layer: a single shared computation (metric_value) feeds both the computed
+// indicators and the report --trend, so each scalar metric is computed once; expand the indicator
+// set to the canonical watchlist (8 computed + pulled + manual). Reports render; none are requirements.
+// Total: 3 pts  Ceremony: AUTONOMOUS (D0049).
+// =====================================================================
+package ProjectDeliveryS93 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from indicatorsCanonicalStory to d0090;
+
+    part indicatorsCanonicalStory : Story {
+        :>> id = "63940516-2c7d-4e8f-b093-51627384be01";
+        :>> title = "Sprint 93: indicatorsCanonical (3 pts) — shared metric_value + canonical indicator watchlist; reports render indicators, not requirements (D0090)";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "wweatherholtz";
+        :>> kind = WorkKind::refactor;
+        :>> priority = WorkPriority::p2;
+        :>> owner = "claudeOpus";
+        :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS93 {
+        action storyIndicatorsCanonical;
+        verification storyIndicatorsCanonicalDoD : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be02"; :>> method = VerificationMethod::test; :>> procedureText = "D0090: indicators become the canonical monitored-measure layer; one shared computation feeds both indicators + reports. view.rs: metric_value(root,key) (the keyed scalar registry: coverage_pct/req_verified_pct/needs_verified_pct/critique_pct/attestation_pct/velocity/burnup/throughput/volatility/accepted_decisions/open_findings/friction_verbs) REPLACES per-report headline_at; trend_series + indicators() + the report --trend (report_headline_key) all source from metric_value (f64). .tracking/indicators.sysml re-pointed + expanded to 10 canonical indicators (8 computed bound to metric-keys + avRegulationCount pulled + authoringFriction manual). Reports continue to render their scorecards; the per-card scalar de-dup is tracked (reportIndicatorRender). NONE are requirements (D0088; excluded from assurance/orphan required-edge sets). VERIFY (live): `sysmlv2 indicators` = the 10-indicator watchlist with real values from metric_value (coverage 100% / critique 22% / attestation 100% / req-verified 100% / velocity 3.07 / throughput 94 / volatility 0 / open-findings 0 / avRegulation 47 observed / authoringFriction 2 improving); clippy --workspace --all-targets -D warnings + cargo test (43 lib) + rust validate (106) + guard all (12) green; D0090 + Core-3 critiques; doc-sync CLAUDE.md."; }
+        part storyIndicatorsCanonicalDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be03"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification indicatorsCanonicalRefineGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be04"; :>> title = "Sprint 93 refine gate (DoR)"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the human asked to 'move all relevant reports into indicators (then to a report?)' + confirmed 'they shouldn't be requirements, right?' — chose 'indicators canonical; reports render them'. The duplication: report metrics computed inline AND re-declared as indicators. Plan: one shared metric_value computation + the canonical indicator watchlist + reports source from it. estimatedPoints=3. #CharteredBy d0090. DoD accepted."; }
+    part indicatorsCanonicalRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be05"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+
+    verification indicatorsCanonicalStandupGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be06"; :>> title = "Sprint 93 standup gate"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: generalize headline_at -> metric_value(root,key) (keyed scalar registry); rewire trend_series + indicators() + report --trend (report_headline_key) to it; re-point computed indicators' collectionRef to metric-keys + expand to 8 computed; D0090 + critiques + reportIndicatorRender backlog action + doc-sync. Watch: f64 trend values (Json has no Float -> emit as string, JS coerces); orphaned headline_at doc; the per-card report de-dup is deferred (tracked), not attempted now. No blockers."; }
+    part indicatorsCanonicalStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be07"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+
+    verification indicatorsCanonicalImplementGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be08"; :>> title = "Sprint 93 implement gate"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "Implemented metric_value + report_headline_key; trend_series/indicators/report --trend source from metric_value; indicators.sysml = 10 canonical indicators (re-pointed to metric-keys + 5 new). VERIFY (live): `sysmlv2 indicators` shows the watchlist with metric_value-sourced values; clippy --workspace --all-targets -D warnings green (fixed orphaned headline_at doc + #[must_use]); cargo test 43 lib pass; rust validate 106 clean; guard all (12) PASS; D0090 Core-3 critiqued. reportIndicatorRender tracked for the per-card de-dup."; }
+    part indicatorsCanonicalImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be09"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+
+    verification indicatorsCanonicalReviewGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be0a"; :>> title = "Sprint 93 review gate"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Diff reviewed. metric_value is the single source of truth for each canonical scalar (both indicators + report --trend source from it — no metric defined twice); the indicator SET is the canonical watchlist of what we monitor. Reaffirms D0088 (indicators watched by direction, not requirements; excluded from assurance/orphan required-edge sets) — directly answering the human's 'they shouldn't be requirements'. Honest scope: the report SCALAR cards still compute inline (they also show breakdowns); full per-card sourcing from metric_value is tracked (reportIndicatorRender), recorded in D0090 as an explicit incremental boundary, not hidden. compute-don't-store holds (metric_value recomputes; indicators declare). No bare-dependency edges."; }
+    part indicatorsCanonicalReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be0b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+
+    verification indicatorsCanonicalCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be0c"; :>> title = "Sprint 93 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): storyIndicatorsCanonical DoD recorded pass; metric_value single-source + 10-indicator canonical watchlist live; reports source the headline from metric_value; D0090 accepted + Core-3 critiqued; doc-sync done; clippy + cargo test (43) + rust validate (106) + guard all (12) green. Self-evidencing (D0051). Indicators are now the canonical monitored-measure layer; the per-card report de-dup is the tracked remainder (reportIndicatorRender)."; }
+    part indicatorsCanonicalCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be0d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+
+    verification indicatorsCanonicalRetroGate : Test { :>> id = "63940516-2c7d-4e8f-b093-51627384be0e"; :>> title = "Sprint 93 retro gate (autonomous, D0049)"; :>> createdAt = "2026-06-22"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the existing per-report headline_at was already the seed of a shared computation — generalizing it to a keyed metric_value made indicators + reports source the same number with modest churn, and expanding the indicator set to the canonical watchlist directly delivered the human's 'move relevant reports into indicators'. Reaffirming 'not requirements' (D0088) kept the model coherent. CAUGHT (avoidable-issue candidates, pre-commit): the headline_at->metric_value replacement left an ORPHANED doc comment (clippy long-doc) — the same extract/replace-above-a-documented-fn slip as Sprint 91; and Json has no Float so f64 trend values needed string emission (JS coerces). HONEST SCOPE: I did NOT do the full per-card report de-dup (the scalar cards still compute inline, since they also render breakdowns) — tracked as reportIndicatorRender + recorded in D0090 as an explicit incremental boundary rather than rushed at the tail of a very long session. Lesson: when replacing a documented fn, delete its doc with it; and a big refactor's last mile (per-card sourcing) is better as its own focused step than crammed. Estimate 3 pts held. Indicators are canonical; the watchlist is the single source of truth for monitored measures."; }
+    part indicatorsCanonicalRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-b093-51627384be0f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a75f9c5"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
+}

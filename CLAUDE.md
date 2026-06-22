@@ -84,7 +84,10 @@ viewpoint-registry stays the concern-coverage index.)
    the §2 invariants are constraints stated in prose + enforced by guards. A **requirement** is a
    constraint elevated to a verified stakeholder contract (Need/SystemRequirement + satisfy/verify).
    An **indicator** is a *monitored* measure with no enforced threshold — a first-class `Indicator`
-   item (D0089) that informs by DIRECTION (goal), viewed via `sysmlv2 indicators [--trend]`. Its data
+   item (D0089) that informs by DIRECTION (goal), viewed via `sysmlv2 indicators [--trend]`. The
+   indicator set is the CANONICAL monitored-measure watchlist (D0090); a single shared computation
+   (`metric_value`) feeds both the indicators and the reports, so each scalar metric is computed once,
+   and reports *render* the indicators (+ point-in-time structure) rather than re-defining the metrics. Its data
    arrives by a measurement METHOD: `computed` (objective, repo-derived — series via the report/trend
    engine, no stored datapoints), `pulled` (objective, external API/scraper — recorded `Measurement`
    datapoints via `sysmlv2 record-measurement`), or `manual` (subjective, e.g. a survey — recorded).
