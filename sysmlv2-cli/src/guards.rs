@@ -525,14 +525,76 @@ pub fn assured(root: &Path) -> GuardReport {
     }
 }
 
+// ── viewpoint-renderer guard (every declared viewpoint names a real renderer) ──────────────────
+
+/// View-ish `sysmlv2` subcommands a viewpoint renderer may legitimately name.
+const VIEW_SUBCOMMANDS: &[&str] = &[
+    "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
+    "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
+    "assured", "open-issues", "audit", "validate", "guard",
+];
+
+/// The quoted value of `:>> {key} = "..."` on a line.
+fn quoted_attr(line: &str, key: &str) -> Option<String> {
+    let needle = format!(":>> {key} = \"");
+    line.split(needle.as_str()).nth(1)?.split('"').next().map(str::to_string)
+}
+
+/// Classify a viewpoint renderer string: `"retired"` (query.py/report.py, a violation), `"planned"`
+/// (a tolerated warning), `"ok"` (names a real `sysmlv2` subcommand), or `"unknown"` (a violation).
+fn classify_renderer(r: &str) -> &'static str {
+    if r.contains("query.py") || r.contains("report.py") {
+        "retired"
+    } else if r.starts_with("(planned") {
+        "planned"
+    } else if r.strip_prefix("sysmlv2 ").and_then(|s| s.split([' ', '(']).next()).is_some_and(|c| VIEW_SUBCOMMANDS.contains(&c)) {
+        "ok"
+    } else {
+        "unknown"
+    }
+}
+
+/// Guard (D0056/issue034): every declared Viewpoint's renderer names a real current command
+/// (a `sysmlv2 <subcommand>`), or is explicitly `(planned ...)`.
+///
+/// A renderer referencing a RETIRED tool (query.py / report.py, D0074) or an unknown command is a
+/// violation — it stops the viewpoint registry from drifting to dead renderers (the d0056 finding).
+/// A `(planned ...)` renderer is a tolerated WARNING (a declared-but-unbuilt concern).
+#[must_use]
+pub fn viewpoint_renderer(root: &Path) -> GuardReport {
+    let path = root.join(".engine").join("views").join("viewpoint-registry.sysml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return GuardReport { name: "viewpoint-renderer", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &path))] };
+    };
+    let mut scanned = 0;
+    let mut warnings = Vec::new();
+    let mut violations = Vec::new();
+    let mut title = String::new();
+    for line in text.lines() {
+        let t = line.trim_start();
+        if let Some(v) = quoted_attr(t, "title") {
+            title = v;
+        } else if let Some(r) = quoted_attr(t, "renderer") {
+            scanned += 1;
+            match classify_renderer(&r) {
+                "retired" => violations.push(format!("{title}: renderer references a RETIRED tool (query.py/report.py, D0074) — '{r}'")),
+                "unknown" => violations.push(format!("{title}: renderer names no known sysmlv2 command — '{r}'")),
+                "planned" => warnings.push(format!("{title}: viewpoint declared but renderer is planned/unbuilt — '{r}'")),
+                _ => {}
+            }
+        }
+    }
+    GuardReport { name: "viewpoint-renderer", scanned, warnings, violations }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
 /// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
 /// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
 /// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
-pub const GUARD_NAMES: [&str; 9] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured"];
+pub const GUARD_NAMES: [&str; 10] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -547,6 +609,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "issues" => Some(issues(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
+        "viewpoint-renderer" => Some(viewpoint_renderer(root)),
         _ => None,
     }
 }
@@ -565,6 +628,20 @@ mod tests {
     fn actor_refs_extracted() {
         let line = "    part x { :>> authoredBy = \"ana\"; :>> judgedBy = \"bob\"; :>> title = \"z\"; }";
         assert_eq!(scan_actor_refs(line), vec!["ana".to_string(), "bob".to_string()]);
+    }
+
+    #[test]
+    fn viewpoint_renderer_classification() {
+        // D0056/issue034: retired-tool refs + unknown commands are violations; planned is a warning;
+        // a real sysmlv2 subcommand is ok.
+        assert_eq!(classify_renderer("query.py governing-version <item>"), "retired");
+        assert_eq!(classify_renderer("report.py:tab_decisions"), "retired");
+        assert_eq!(classify_renderer("(planned) baselines view — not yet rendered"), "planned");
+        assert_eq!(classify_renderer("sysmlv2 diagram (interactive HTML #View)"), "ok");
+        assert_eq!(classify_renderer("sysmlv2 report <assurance|...> [--html]"), "ok");
+        assert_eq!(classify_renderer("sysmlv2 frobnicate"), "unknown");
+        assert_eq!(classify_renderer("some hand-wave"), "unknown");
+        assert_eq!(quoted_attr("    :>> renderer = \"sysmlv2 orient\";", "renderer").as_deref(), Some("sysmlv2 orient"));
     }
 
     #[test]

@@ -709,5 +709,6 @@ package EngineBacklog {
 
         action viewpointRendererGuard; // D0056 finding (issue034): guard viewpoint<->renderer correspondence.
         verification viewpointRendererGuardDoD : Test { :>> id = "a1c70034-0034-4034-9034-516273840005"; :>> method = VerificationMethod::test; :>> procedureText = "D0056 completeness finding (issue034): the viewpoint registry is descriptive, not generative — registry entries + bespoke renderers can drift. Add a check that every declared viewpoint has a renderer (a subcommand or TOML view) and every renderer/subcommand has a viewpoint entry (no orphan either way). VERIFY: the check flags a viewpoint with no renderer and a renderer with no viewpoint in a self-test; runs in the guard set."; }
+        part viewpointRendererGuardDoDR1 : TestResult { :>> id = "683c78a2-8d02-4f1d-891e-f1baa73c2cef"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ff4a54d"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
     }
 }
