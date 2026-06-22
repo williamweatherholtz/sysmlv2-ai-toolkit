@@ -1585,16 +1585,6 @@ fn card(label: &str, value: String, detail: String, tone: &str) -> Json {
     ])
 }
 
-fn report_json(report: &str, title: &str, cards: Vec<Json>) -> String {
-    Json::Obj(vec![
-        ("report".to_string(), Json::s(report.to_string())),
-        ("title".to_string(), Json::s(title.to_string())),
-        ("note".to_string(), Json::s("computed aggregate (D0087) — regenerate, never commit as truth".to_string())),
-        ("cards".to_string(), Json::Arr(cards)),
-    ])
-    .dump()
-}
-
 /// Compute a report's `(title, cards)`; shared by the JSON emitter and the HTML scorecard.
 fn report_cards(root: &Path, name: &str) -> Result<(String, Vec<Json>), ViewError> {
     let model = Model::build(root)?;
@@ -1612,24 +1602,116 @@ fn report_cards(root: &Path, name: &str) -> Result<(String, Vec<Json>), ViewErro
     }
 }
 
-/// Computed report as JSON (D0087).
+/// Computed report as JSON (D0087); `trend` adds a git-derived time-series for the headline metric.
 ///
 /// # Errors
 /// Returns [`ViewError`] for an unknown report name or a parse failure.
-pub fn report(root: &Path, name: &str) -> Result<String, ViewError> {
+pub fn report(root: &Path, name: &str, trend: bool) -> Result<String, ViewError> {
     let (title, cards) = report_cards(root, name)?;
-    Ok(report_json(name, &title, cards))
+    let mut obj = vec![
+        ("report".to_string(), Json::s(name.to_string())),
+        ("title".to_string(), Json::s(title)),
+        ("note".to_string(), Json::s("computed aggregate (D0087) — regenerate, never commit as truth".to_string())),
+        ("cards".to_string(), Json::Arr(cards)),
+    ];
+    if trend {
+        obj.push(("trend".to_string(), trend_json(root, name)));
+    }
+    Ok(Json::Obj(obj).dump())
+}
+
+/// The headline metric's git-derived series `{label, series:[{commit,value}]}` over recent commits.
+fn trend_json(root: &Path, name: &str) -> Json {
+    let series: Vec<Json> = trend_series(root, name)
+        .into_iter()
+        .map(|(sha, v)| Json::Obj(vec![("commit".to_string(), Json::s(sha)), ("value".to_string(), Json::Int(v))]))
+        .collect();
+    Json::Obj(vec![
+        ("label".to_string(), Json::s(headline_label(name).to_string())),
+        ("series".to_string(), Json::Arr(series)),
+    ])
+}
+
+/// Recent commits touching the model (chronological: oldest → newest), capped at `n`.
+fn sampled_commits(root: &Path, n: usize) -> Vec<String> {
+    let out = git_out(root, &["log", &format!("-n{n}"), "--format=%H", "--", ".tracking", ".engine"]).unwrap_or_default();
+    let mut v: Vec<String> = out.lines().map(str::to_string).collect();
+    v.reverse();
+    v
+}
+
+/// Run `git -C root <args>` and capture stdout, or `None` on non-zero exit / failure.
+fn git_out(root: &Path, args: &[&str]) -> Option<String> {
+    let out = std::process::Command::new("git").arg("-C").arg(root).args(args).output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The headline metric's display label per report.
+const fn headline_label(name: &str) -> &str {
+    match name.as_bytes() {
+        b"assurance" => "Verification coverage %",
+        b"traceability" => "Requirements verified %",
+        b"quality-debt" => "Supersede edges (volatility)",
+        _ => "Delivery sprints (throughput)",
+    }
+}
+
+/// The headline scalar for a report at `root` (the worktree of a sampled commit). `None` on any
+/// failure (an unparseable historical commit is skipped, not fatal).
+fn headline_at(root: &Path, name: &str) -> Option<i64> {
+    let model = Model::build(root).ok()?;
+    match name {
+        "assurance" | "traceability" => {
+            // Full pipeline at this commit (tier coverage, the heavy true trend the human asked for).
+            let done = crate::orient::done_names(root);
+            let task_suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
+            let stale = compute_stale_verifications(root, &model);
+            let cov = compute_coverage(&model, &done, &task_suspect, &stale);
+            let ty = if name == "traceability" { "SystemRequirement" } else { "" };
+            let rows: Vec<&Coverage> = cov.iter().filter(|c| ty.is_empty() || c.type_name == ty).collect();
+            let covered = rows.iter().filter(|c| is_covered_tier(c.tier)).count();
+            Some(i64::from(pct(covered, rows.len())))
+        }
+        "quality-debt" => Some(i64::try_from(model.edges.iter().filter(|e| e.kind == "supersede").count()).unwrap_or(0)),
+        _ => {
+            let sprints = crate::collect_sysml(&root.join(".tracking").join("delivery")).len();
+            Some(i64::try_from(sprints).unwrap_or(0))
+        }
+    }
+}
+
+/// Compute the headline scalar at each sampled commit via a throwaway git worktree (reuses the whole
+/// pipeline unchanged at that commit). Commits that fail to check out or compute are skipped.
+fn trend_series(root: &Path, name: &str) -> Vec<(String, i64)> {
+    let mut out = Vec::new();
+    // 12 recent commits balances a readable trendline against the per-commit worktree+pipeline cost.
+    for sha in sampled_commits(root, 12) {
+        let short: String = sha.chars().take(8).collect();
+        let Some(wt) = std::env::temp_dir().join(format!("sysmlv2-trend-{short}")).to_str().map(str::to_string) else { continue };
+        // Best-effort clean, then add a detached worktree at the commit.
+        let _ = git_out(root, &["worktree", "remove", "--force", &wt]);
+        if git_out(root, &["worktree", "add", "--detach", &wt, &sha]).is_some() {
+            if let Some(v) = headline_at(Path::new(&wt), name) {
+                out.push((short, v));
+            }
+            let _ = git_out(root, &["worktree", "remove", "--force", &wt]);
+        }
+    }
+    let _ = git_out(root, &["worktree", "prune"]);
+    out
 }
 
 /// Computed report rendered as a human-digestible HTML scorecard (D0087).
 ///
 /// # Errors
 /// Returns [`ViewError`] for an unknown report name or a parse failure.
-pub fn report_html(root: &Path, name: &str) -> Result<String, ViewError> {
+pub fn report_html(root: &Path, name: &str, trend: bool) -> Result<String, ViewError> {
     let (title, cards) = report_cards(root, name)?;
+    let trend_data = if trend { trend_json(root, name) } else { Json::Null };
     Ok(REPORT_TEMPLATE
         .replace("/*STYLE*/", TABLE_STYLE)
         .replace("/*TITLE*/", &json_esc(&title))
+        .replace("/*TREND*/", &trend_data.dump())
         .replace("/*CARDS*/", &Json::Arr(cards).dump()))
 }
 
@@ -1750,14 +1832,20 @@ const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
  .c.good .v{color:#3d7a34} .c.warn .v{color:#b07a00} .c.bad .v{color:#b03a3c}
 </style></head><body>
 <header><h1>sysmlv2 · <span id="t"></span></h1><p>computed aggregate report (D0087) — regenerate, never commit as truth</p></header>
+<div id="trend" style="padding:0 14px"></div>
 <div class="cards" id="cards"></div>
 <script>
-var TITLE="/*TITLE*/",CARDS=/*CARDS*/;
+var TITLE="/*TITLE*/",CARDS=/*CARDS*/,TREND=/*TREND*/;
 document.getElementById('t').textContent=TITLE;
 var box=document.getElementById('cards');
 CARDS.forEach(function(c){var d=document.createElement('div');d.className='c '+(c.tone||'');
  d.innerHTML='<div class=l></div><div class=v></div><div class=d></div>';
  d.querySelector('.l').textContent=c.label;d.querySelector('.v').textContent=c.value;d.querySelector('.d').textContent=c.detail;box.appendChild(d)});
+if(TREND&&TREND.series&&TREND.series.length){var s=TREND.series.map(function(p){return p.value});
+ var lo=Math.min.apply(null,s),hi=Math.max.apply(null,s),bl='▁▂▃▄▅▆▇█';
+ var spark=s.map(function(v){var i=hi===lo?0:Math.round((v-lo)/(hi-lo)*7);return bl.charAt(i)}).join('');
+ var first=s[0],last=s[s.length-1],delta=last-first,arrow=delta>0?'▲ +'+delta:delta<0?'▼ '+delta:'→ 0';
+ document.getElementById('trend').innerHTML='<div class="c" style="border-left:5px solid #4e79a7"><div class=l>Trend · '+TREND.label+' ('+s.length+' commits)</div><div class=v style="font-family:monospace;font-size:22px">'+spark+'</div><div class=d>'+first+' → '+last+'  ('+arrow+'); range '+lo+'–'+hi+'. Computed from git history (worktree per commit); never stored.</div></div>'}
 </script></body></html>"#;
 
 /// Vendored cytoscape.js, INLINED into every generated diagram so it is fully self-contained +
@@ -2219,6 +2307,15 @@ mod tests {
     }
 
     #[test]
+    fn headline_labels_are_stable() {
+        // D0087 Stage 2: each report's git-trend headline metric has a fixed label.
+        assert_eq!(headline_label("assurance"), "Verification coverage %");
+        assert_eq!(headline_label("traceability"), "Requirements verified %");
+        assert_eq!(headline_label("quality-debt"), "Supersede edges (volatility)");
+        assert_eq!(headline_label("flow"), "Delivery sprints (throughput)");
+    }
+
+    #[test]
     fn pct_handles_empty_denominator() {
         assert_eq!(pct(0, 0), 100, "nothing to measure = vacuously complete");
         assert_eq!(pct(1, 2), 50);
@@ -2233,12 +2330,12 @@ mod tests {
         // D0087: each report yields a non-empty cards array; unknown report errors. (cwd = crate dir.)
         let root = std::path::Path::new("..");
         for name in ["assurance", "traceability", "quality-debt", "flow"] {
-            let json = report(root, name).unwrap_or_else(|e| panic!("report {name}: {e}"));
+            let json = report(root, name, false).unwrap_or_else(|e| panic!("report {name}: {e}"));
             assert!(json.contains("\"cards\""), "{name} has cards");
             assert!(json.contains("\"tone\""), "{name} cards carry a tone");
         }
-        assert!(report(root, "bogus").is_err(), "unknown report errors");
-        let html = report_html(root, "assurance").expect("assurance html");
+        assert!(report(root, "bogus", false).is_err(), "unknown report errors");
+        let html = report_html(root, "assurance", false).expect("assurance html");
         assert!(html.contains("class=\"cards\"") && !html.contains("/*CARDS*/"), "scorecard cards injected");
     }
 

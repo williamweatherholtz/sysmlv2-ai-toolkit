@@ -699,7 +699,8 @@ fn cmd_report(args: &[String]) -> i32 {
         }
     };
     let html = args.iter().any(|a| a == "--html");
-    let result = if html { sysmlv2_cli::view::report_html(&root, name) } else { sysmlv2_cli::view::report(&root, name) };
+    let trend = args.iter().any(|a| a == "--trend");
+    let result = if html { sysmlv2_cli::view::report_html(&root, name, trend) } else { sysmlv2_cli::view::report(&root, name, trend) };
     match result {
         Ok(out) => {
             println!("{out}");

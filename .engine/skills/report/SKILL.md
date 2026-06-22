@@ -39,6 +39,12 @@ Engineering Measurement Framework + SE Leading Indicators + the model-quality ca
 **The two numbers to watch:** verification coverage % (the headline leading indicator) and
 requirements volatility (the documented early-warning sign, ties to the D0054 adoption-friction risk).
 
+**`--trend`** adds a git-derived time-series for each report's headline metric (assurance →
+verification coverage %, traceability → requirements verified %, quality-debt → supersede volatility,
+flow → throughput), rendered as a sparkline with first→last delta. It recomputes the FULL pipeline at
+each of ~12 recent commits via a throwaway git worktree — accurate but **slow (minutes)** and
+COMPUTED FROM GIT, never a stored metric history. Use it for "are we getting healthier?", not routine checks.
+
 **Generate, don't commit:** `sysmlv2 report assurance --html > scorecard.html` then open it.
 Generated `*.html` is git-ignored (D0085/D0086/D0087). It's the `report` viewpoint (D0056/D0057).
 
