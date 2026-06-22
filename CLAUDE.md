@@ -78,6 +78,16 @@ viewpoint-registry stays the concern-coverage index.)
    be cached/rendered for legibility, performance, or tool interop, *provided* it is clearly
    marked as derived (`#View`) and regenerable from authored facts + git. Materializing a view
    is not authoring truth; only *irreducible* facts and recorded judgments are authored.
+6. **Requirement vs constraint vs indicator (the measure spectrum, D0088).** A **constraint** is an
+   executable true/false predicate over the model — our **guards** ARE the engine's constraint layer
+   (SysML-v2-style "requirements-as-evaluable-constraints," realized as CI-enforced Rust predicates);
+   the §2 invariants are constraints stated in prose + enforced by guards. A **requirement** is a
+   constraint elevated to a verified stakeholder contract (Need/SystemRequirement + satisfy/verify).
+   An **indicator** is a *monitored* measure with no enforced threshold (a `sysmlv2 report` card).
+   When a metric's "good enough" boundary can't yet be defensibly set, it stays an **indicator
+   (report)** — promote it to a requirement/guard only when a justified boundary emerges (D0088;
+   avoid the Goodhart trap). Parametric constraints (mass/power budgets, MoEs) are *deliverable-domain*
+   (D0054), not modeled in the work/process engine.
 
 ---
 
