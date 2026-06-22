@@ -476,6 +476,43 @@ pub fn append_critique(path: &Path, c: &Critique) -> Result<String, WriteError> 
     Ok(format!("{prefix}{n}"))
 }
 
+/// Append a `Measurement` datapoint for an Indicator (D0089) as new linked items.
+///
+/// Writes a `part <indicator>M<n> : Measurement { value, measuredAt, source, createdBy }` + a
+/// `dependency` edge to the indicator, before the package's closing brace. For pulled/manual
+/// indicators (irreducible, non-recomputable observations); computed indicators store none.
+///
+/// Returns the new measurement's name (`<indicator>M<n>`).
+///
+/// # Errors
+/// `WriteError::InsertionPointNotFound` if the file has no package-closing brace; `WriteError::Io`.
+pub fn append_measurement(path: &Path, indicator: &str, value: &str, measured_at: &str, source: &str, by: &str) -> Result<String, WriteError> {
+    let content = std::fs::read_to_string(path)?;
+    let prefix = format!("{indicator}M");
+    let mut n = 1u32;
+    while content.contains(&format!("{prefix}{n} ")) {
+        n += 1;
+    }
+    let uuid = gen_uuid();
+    let sv = value.replace(['"', '\n', '\r'], "'");
+    let ss = source.replace(['"', '\n', '\r'], "'");
+    let block = format!(
+        "    part {prefix}{n} : Measurement {{ :>> id = \"{uuid}\"; :>> value = \"{sv}\"; :>> measuredAt = \"{measured_at}\"; :>> source = \"{ss}\"; :>> createdBy = \"{by}\"; }}\n    #Measures dependency from {prefix}{n} to {indicator};\n"
+    );
+    let lines: Vec<&str> = content.lines().collect();
+    let close = lines.iter().rposition(|l| l.trim() == "}").ok_or_else(|| WriteError::InsertionPointNotFound(indicator.to_owned()))?;
+    let mut out = String::with_capacity(content.len() + block.len() + 1);
+    for (i, line) in lines.iter().enumerate() {
+        if i == close {
+            out.push_str(&block);
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(path, out)?;
+    Ok(format!("{prefix}{n}"))
+}
+
 /// Append a `part <gate>R<N+1> : TestResult { ... }` for a ceremony gate to `path`.
 ///
 /// Records the result of a phase gate (refine/standup/implement/review/closeOut/retro),

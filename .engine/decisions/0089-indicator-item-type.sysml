@@ -1,0 +1,41 @@
+// =====================================================================
+// D0089 — INDICATOR + MEASUREMENT item types (monitored measures; ISO/IEC/IEEE 15939 + PSM + OMG
+// SMM measurement information model). An Indicator informs a need/decision by DIRECTION (goal), not a
+// threshold (a threshold-gated measure is a requirement, D0088). Data arrives by a measurement METHOD:
+// computed (objective, repo-derived; series via the report/trend engine, no stored datapoints),
+// pulled (objective, external; recorded Measurements with provenance), manual (subjective; recorded).
+// `sysmlv2 indicators` (direction-aware status) + `record-measurement` (write path). Generalizes the
+// git-only first cut (the human's correction). #ProspectiveChange (schema unfreeze + process-def keystone).
+// Accepted 2026-06-22.
+// =====================================================================
+package Decision0089 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #ProspectiveChange part d0089 : Decision {
+        :>> id = "63940516-2c7d-4e8f-a089-516273849700";
+        :>> title = "D0089: Indicator + Measurement item types (monitored measures; computed/pulled/manual method; `sysmlv2 indicators` + record-measurement) — generalizes the git-only indicator";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "wweatherholtz";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "D0088 established the measure spectrum (indicator -> requirement -> constraint) but left 'indicator' as a computed REPORT only, with no item type — so monitored measures kept being forced into the Requirement/verification frame (the friction awkwardness: a Requirement demands a verify edge/Test, but a measure with no defensible threshold has nothing to verify). The human asked to first-class the Indicator, and crucially demanded GENERALITY: not just git — also published-regulation counts, market share, gross revenue, Twitter analyses, employee-feedback surveys; some programmatic, some bespoke; 'maybe indicators just need downstream tasks to complete to get their data'. Research found the established model: ISO/IEC/IEEE 15939 + PSM Measurement Information Model (base measure -> derived -> indicator; measurement method OBJECTIVE or SUBJECTIVE) and OMG SMM (measures = reusable definitions vs measurements = recorded observations; examples include GDP/net-profit). My first cut (a git-computed indicator) was the human's flagged misstep: a SPECIALIZED objective indicator, not the general one. schema/core is frozen, so the type addition needs explicit sign-off.";
+        :>> decision = "Add INDICATOR + MEASUREMENT item types (schema/core/indicator.sysml; frozen-schema unfreeze, human sign-off 2026-06-22, re-frozen after; SCHEMA_ORDER + _ID_TYPES updated; kernel-validated 15/15). An `Indicator` is a monitored measure that INFORMS a need/decision by DIRECTION (goal: minimize/maximize/observe), NOT a threshold-gated requirement (D0088) — it carries measures/unit/method/collectionRef and is EXCLUDED from the assurance/orphan required-edge sets (no verify/satisfy expected). Its data arrives by a measurement METHOD: `computed` (objective, repo-derived — the series is computed on demand via the report/trend engine, compute-don't-store, no stored datapoints), `pulled` (objective, external API/scraper — each observation is a RECORDED `Measurement` with provenance, because a market-share/regulation value can't be recomputed from the repo), `manual` (subjective, e.g. a periodic survey/assessment — recorded). A `Measurement` is one datapoint (value @ measuredAt + source). Data collection is via TASKS: a programmatic collection skill for `pulled`, a human procedure for `manual`, nothing for `computed`. `sysmlv2 indicators [--trend]` is the SOURCE-AGNOSTIC view: per indicator a value + baseline->latest + direction-aware status (improving/degrading/flat by goal) — from the computed series or the recorded Measurements alike. `sysmlv2 record-measurement` is the write path for pulled/manual datapoints (UUID + #Measures edge). An indicator process-def + deploying skill (D0059) + an 'indicators' viewpoint.";
+        :>> rationale = "Grounded in the 25-year measurement-information-model standard (ISO-15939/PSM) + OMG SMM: the objective/subjective measurement-method split is exactly the human's git-vs-survey axis, and measures-vs-measurements is Indicator-vs-Measurement. Respects compute-don't-store HONESTLY: compute repo-derived series (git), AUTHOR the irreducible external/manual observations (a recorded point-in-time fact with provenance — like a TestResult but carrying a value not a verdict; it cannot be faked or recomputed). First-classing Indicator gives the monitored measure its home — instead of mis-modeling it as an un-verifiable Requirement that false-flags as a coverage/orphan gap — and fits the existing soft-signal type family (Assumption/Risk/Mitigation). The direction-aware status is automatable for ALL methods (it just needs a (value,at) series), which answers the human's 'if it's just prose it might as well not be there' — nothing quantitative is authored on the Indicator; the value/baseline/trend/status are computed. ALTERNATIVES: (A) git-computed indicator only — REJECTED (the human: not general; can't model stock/survey/regulation); (B) indicator-as-report-only (D0088 status quo) — REJECTED (no authored item; the verification-frame awkwardness recurs); (C) store all datapoints incl. computed — REJECTED (compute-don't-store; recompute git series); (D CHOSEN) Indicator + Measurement + computed/pulled/manual, compute-or-author per method. CRITERIA: general-across-sources x ISO-15939-grounded x compute-don't-store x not-a-premature-requirement(D0088) x automatable-status.";
+        :>> consequences = "schema/core/indicator.sysml: part def Indicator (measures/goal/unit/method/collectionRef) + part def Measurement (value/measuredAt/source) + enums IndicatorGoal{minimize,maximize,observe} + MeasurementMethod{computed,pulled,manual}; _schema_files SCHEMA_ORDER + validate_instances/_tracking _ID_TYPES updated. New `sysmlv2 indicators [--trend]` view (view.rs: indicator_status + measurement_series + indicators, reusing headline_at/trend_series for computed series) + `sysmlv2 record-measurement` write command (write.rs append_measurement; #Measures edge). New #Measures + #Informs edge markers. indicator process-def (.engine/processes/indicator.sysml) + deploying skill + skills-registry + 'indicators' viewpoint. Instances (.tracking/indicators.sysml): 3 computed (coverage/velocity/volatility bound to report headlines), 1 pulled demonstrator (avRegulationCount + seed Measurements), 1 manual demonstrator (authoringFriction + seed Measurements — the friction case, now a first-class indicator showing 'improving'). doc-sync: CLAUDE.md measure spectrum (Indicator first-class) + usage.md. #ProspectiveChange keystone (process-def co-commit). Pairs with D0088 (measure spectrum), D0087 (report/trend engine reused), D0054 (friction), D0057 (Viewpoint schema-add precedent), D0059 (deploying skill), D0001/D0018 (compute-don't-store).";
+    }
+
+    verification d0089Accept : Test {
+        :>> id = "63940516-2c7d-4e8f-a089-516273849701";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz attests acceptance of d0089 (Indicator + Measurement item types — monitored measures with computed/pulled/manual methods, ISO-15939/SMM-grounded, direction-aware status, generalizing the git-only first cut) by directing on 2026-06-22: 'introduce a new item type - the indicator', then correcting toward generality ('I should be able to define non-git related indicators ... GitIndicator is a specialized automateable indicator, but isn't the general purpose one ... some will be programmatic tasks to make the indicator, some might be more bespoke'), and selecting 'Yes — build the general model' + 'Framework + all 3 methods demonstrated'.";
+    }
+    part d0089AcceptR1 : TestResult {
+        :>> id = "63940516-2c7d-4e8f-a089-516273849702";
+        :>> outcome = VerdictKind::pass;
+        :>> judgedAgainst = "e35674d";
+        :>> judgedAt = "2026-06-22";
+        :>> judgedBy = "wweatherholtz";
+    }
+}

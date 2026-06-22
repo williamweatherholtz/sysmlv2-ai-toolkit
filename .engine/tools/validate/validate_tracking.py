@@ -25,7 +25,7 @@ TRACKING = sorted(glob.glob(os.path.join(REPO, ".tracking", "**", "*.sysml"), re
 
 _ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
              "Brief", "Persona", "Need", "Issue", "Story", "Release", "ChangeRequest",
-             "Component", "DesignElement", "Test")
+             "Component", "DesignElement", "Test", "Indicator", "Measurement")
 
 
 def warn_missing_ids(path, text):

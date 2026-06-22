@@ -713,6 +713,64 @@ fn cmd_report(args: &[String]) -> i32 {
     }
 }
 
+/// `indicators [--trend] [--root ROOT]` — monitored measures (D0089) with direction-aware status.
+/// Computed indicators show current value (full series with `--trend`); pulled/manual show their
+/// recorded-Measurement series + status.
+fn cmd_indicators(args: &[String]) -> i32 {
+    let root = match flag(args, "root") {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
+                return 2;
+            }
+        }
+    };
+    let trend = args.iter().any(|a| a == "--trend");
+    match sysmlv2_cli::view::indicators(&root, trend) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("indicators error: {e}");
+            1
+        }
+    }
+}
+
+/// `record-measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]` —
+/// record a Measurement datapoint (D0089) for a pulled/manual indicator (write path).
+fn cmd_record_measurement(args: &[String]) -> i32 {
+    let Some(indicator) = flag(args, "indicator") else {
+        eprintln!("usage: sysmlv2 record-measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]");
+        return 2;
+    };
+    let Some(value) = flag(args, "value") else {
+        eprintln!("error: --value required");
+        return 2;
+    };
+    let file = flag(args, "file").map_or_else(
+        || find_repo_root().map_or_else(|| PathBuf::from(".tracking/indicators.sysml"), |r| r.join(".tracking").join("indicators.sysml")),
+        PathBuf::from,
+    );
+    let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let source = flag(args, "source").unwrap_or_default();
+    let by = flag(args, "by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    match w::append_measurement(&file, &indicator, &value, &at, &source, &by) {
+        Ok(name) => {
+            println!("{name}");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct ReviewBatch {
     #[serde(default)]
@@ -844,6 +902,8 @@ fn main() {
         Some("diagram") => cmd_diagram(rest),
         Some("render") => cmd_render(rest),
         Some("report") => cmd_report(rest),
+        Some("indicators") => cmd_indicators(rest),
+        Some("record-measurement") => cmd_record_measurement(rest),
         Some("apply-review") => cmd_apply_review(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),

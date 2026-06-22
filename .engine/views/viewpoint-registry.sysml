@@ -65,6 +65,15 @@ package EngineViewpoints {
         :>> sources = "aggregation of the per-element computed views (coverage 3-tier, critique-coverage, attestation, assured/readiness, decisions, orphans, open-issues, suspect) + delivery Stories (velocity) + git history (trends); grounded in the INCOSE DE Measurement Framework + SE Leading Indicators";
         :>> renderer = "sysmlv2 report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] (computed scorecard #View, D0087; regenerate-don't-commit)";
     }
+    part indicatorsVP : Viewpoint {
+        :>> id = "61728394-0a5b-4c6d-c089-405162738489";
+        :>> title = "indicators";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which monitored measures (Indicators) inform our needs/decisions, and which way are they trending — improving, degrading, or flat — by their goal (D0089)?";
+        :>> audience = "maintainer / lead / program";
+        :>> sources = "Indicator items + their measurement method (computed series via the report/trend engine; pulled/manual series from recorded Measurement datapoints, #Measures edges); direction-aware status by goal (D0088 measure spectrum)";
+        :>> renderer = "sysmlv2 indicators [--trend] (+ sysmlv2 record-measurement for pulled/manual datapoints, D0089)";
+    }
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
         :>> title = "safety";

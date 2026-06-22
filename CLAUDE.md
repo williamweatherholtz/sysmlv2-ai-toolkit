@@ -83,11 +83,16 @@ viewpoint-registry stays the concern-coverage index.)
    (SysML-v2-style "requirements-as-evaluable-constraints," realized as CI-enforced Rust predicates);
    the §2 invariants are constraints stated in prose + enforced by guards. A **requirement** is a
    constraint elevated to a verified stakeholder contract (Need/SystemRequirement + satisfy/verify).
-   An **indicator** is a *monitored* measure with no enforced threshold (a `sysmlv2 report` card).
-   When a metric's "good enough" boundary can't yet be defensibly set, it stays an **indicator
-   (report)** — promote it to a requirement/guard only when a justified boundary emerges (D0088;
-   avoid the Goodhart trap). Parametric constraints (mass/power budgets, MoEs) are *deliverable-domain*
-   (D0054), not modeled in the work/process engine.
+   An **indicator** is a *monitored* measure with no enforced threshold — a first-class `Indicator`
+   item (D0089) that informs by DIRECTION (goal), viewed via `sysmlv2 indicators [--trend]`. Its data
+   arrives by a measurement METHOD: `computed` (objective, repo-derived — series via the report/trend
+   engine, no stored datapoints), `pulled` (objective, external API/scraper — recorded `Measurement`
+   datapoints via `sysmlv2 record-measurement`), or `manual` (subjective, e.g. a survey — recorded).
+   `Measurement`s are irreducible point-in-time observations (authored, with provenance) for pulled/
+   manual; computed series recompute from the repo. When a metric's "good enough" boundary can't yet
+   be defensibly set, it stays an **indicator** — promote to a requirement/guard only when a justified
+   boundary emerges (D0088; avoid the Goodhart trap). Parametric constraints (mass/power budgets, MoEs)
+   are *deliverable-domain* (D0054), not modeled in the work/process engine.
 
 ---
 

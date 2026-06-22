@@ -22,6 +22,7 @@ SCHEMA_ORDER = [
     "schema/core/process.sysml",
     "schema/core/skills.sysml",
     "schema/core/risk.sysml",
+    "schema/core/indicator.sysml",
     "schema/core/baseline.sysml",
     "schema/safety/stpa.sysml",
 ]

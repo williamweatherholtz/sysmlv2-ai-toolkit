@@ -2008,6 +2008,95 @@ fn friction_cards() -> Vec<Json> {
     ]
 }
 
+// ── indicators (D0089: monitored measures; computed/pulled/manual; source-agnostic status) ──────
+
+/// Direction-aware status of an indicator given its `goal` and its baseline->latest movement.
+fn indicator_status(goal: &str, baseline: f64, latest: f64) -> &'static str {
+    let d = latest - baseline;
+    match goal {
+        "maximize" => {
+            if d > 0.0 { "improving" } else if d < 0.0 { "degrading" } else { "flat" }
+        }
+        "minimize" => {
+            if d < 0.0 { "improving" } else if d > 0.0 { "degrading" } else { "flat" }
+        }
+        _ => "observed",
+    }
+}
+
+/// The numeric series (oldest->newest) of recorded Measurements for a pulled/manual indicator —
+/// items typed `Measurement` with a `dependency` edge to the indicator, sorted by `measuredAt`.
+fn measurement_series(model: &Model, indicator: &str) -> Vec<f64> {
+    let mut pts: Vec<(String, f64)> = model
+        .edges
+        .iter()
+        .filter(|e| e.kind == "measures" && e.to == indicator)
+        .filter_map(|e| model.items.get(&e.from).filter(|i| i.type_name == "Measurement").map(|i| (e.from.clone(), i)))
+        .filter_map(|(_, i)| {
+            let at = i.attrs.get("measuredAt").cloned().unwrap_or_default();
+            let v = i.attrs.get("value").and_then(|s| s.parse::<f64>().ok())?;
+            Some((at, v))
+        })
+        .collect();
+    pts.sort_by(|a, b| a.0.cmp(&b.0));
+    pts.into_iter().map(|(_, v)| v).collect()
+}
+
+/// Indicators view (D0089): each declared `Indicator`'s value + direction-aware status.
+///
+/// Source-agnostic over the measurement method — computed series come from the report/trend engine
+/// (current value only unless `trend`), pulled/manual series from recorded `Measurement`s.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut names: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Indicator").map(|(n, _)| n).collect();
+    names.sort();
+    let mut out: Vec<Json> = Vec::new();
+    for name in names {
+        let Some(info) = model.items.get(name) else { continue };
+        let method = info.attrs.get("method").map_or("manual", String::as_str);
+        let goal = info.attrs.get("goal").map_or("observe", String::as_str);
+        let binding = info.attrs.get("collectionRef").cloned().unwrap_or_default();
+        // Build the numeric series per method.
+        let series: Vec<f64> = if method == "computed" {
+            let i64_to_f64 = |v: i64| f64::from(i32::try_from(v).unwrap_or(i32::MAX));
+            if trend {
+                trend_series(root, &binding).into_iter().map(|(_, v)| i64_to_f64(v)).collect()
+            } else {
+                headline_at(root, &binding).map(|v| vec![i64_to_f64(v)]).unwrap_or_default()
+            }
+        } else {
+            measurement_series(&model, name)
+        };
+        let latest = series.last().copied();
+        let baseline = series.first().copied();
+        let status = match (baseline, latest) {
+            (Some(b), Some(l)) if series.len() > 1 => indicator_status(goal, b, l),
+            (Some(_), Some(_)) => "single-point",
+            _ => "no-data",
+        };
+        let fmt = |o: Option<f64>| o.map_or_else(|| Json::Null, |v| Json::s(format!("{v:.2}")));
+        out.push(Json::Obj(vec![
+            ("indicator".to_string(), Json::s(name.clone())),
+            ("measures".to_string(), Json::s(info.attrs.get("measures").cloned().unwrap_or_default())),
+            ("method".to_string(), Json::s(method.to_string())),
+            ("goal".to_string(), Json::s(goal.to_string())),
+            ("unit".to_string(), Json::s(info.attrs.get("unit").cloned().unwrap_or_default())),
+            ("latest".to_string(), fmt(latest)),
+            ("baseline".to_string(), fmt(baseline)),
+            ("points".to_string(), Json::Int(i64::try_from(series.len()).unwrap_or(0))),
+            ("status".to_string(), Json::s(status.to_string())),
+        ]));
+    }
+    Ok(Json::Obj(vec![
+        ("view".to_string(), Json::s("indicators (D0089): monitored measures, direction-aware status; computed series need --trend".to_string())),
+        ("indicators".to_string(), Json::Arr(out)),
+    ])
+    .dump())
+}
+
 fn governance_cards(model: &Model) -> Vec<Json> {
     let decisions: Vec<&ItemInfo> = model.items.values().filter(|i| i.type_name == "Decision").collect();
     let total = decisions.len();
@@ -2536,6 +2625,17 @@ mod tests {
         let (undisp, critical) = finding_blockers(&res, &model);
         assert_eq!(undisp, vec!["iRaw".to_string()], "only the resolver-less Medium finding is undispositioned");
         assert_eq!(critical, vec!["iCrit".to_string()], "open Critical blocks even when dispositioned");
+    }
+
+    #[test]
+    fn indicator_status_is_direction_aware() {
+        // D0089: "better" depends on goal — maximize wants up, minimize wants down, observe is neutral.
+        assert_eq!(indicator_status("maximize", 73.0, 100.0), "improving");
+        assert_eq!(indicator_status("maximize", 100.0, 73.0), "degrading");
+        assert_eq!(indicator_status("minimize", 4.0, 2.0), "improving");
+        assert_eq!(indicator_status("minimize", 2.0, 4.0), "degrading");
+        assert_eq!(indicator_status("maximize", 5.0, 5.0), "flat");
+        assert_eq!(indicator_status("observe", 42.0, 47.0), "observed");
     }
 
     #[test]

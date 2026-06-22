@@ -37,7 +37,7 @@ INSTANCES = (sorted(glob.glob(os.path.join(ENGINE, "decisions", "*.sysml")))
 
 _ID_TYPES = ("Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult",
              "Brief", "Persona", "Need", "Issue", "Story", "Release", "ChangeRequest",
-             "Component", "DesignElement", "Test", "Viewpoint")
+             "Component", "DesignElement", "Test", "Viewpoint", "Indicator", "Measurement")
 
 
 def warn_missing_ids(path, text):
