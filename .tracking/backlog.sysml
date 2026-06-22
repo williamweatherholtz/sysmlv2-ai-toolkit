@@ -702,5 +702,12 @@ package EngineBacklog {
 
         action criticIndependenceRule; // D0080 finding (issue031): cognition-distinct independence for high-stakes elements.
         verification criticIndependenceRuleDoD : Test { :>> id = "a1c70031-0031-4031-9031-516273840003"; :>> method = VerificationMethod::analyze; :>> procedureText = "D0080 correctness finding (issue031): independence is identity-distinct (judgedBy != author), not cognition-distinct (aiModel-vs-aiModel shares blind spots). Require a human or tool critic (not only aiModel) for high-stakes elements (Critical-severity targets and/or the most load-bearing decisions), so independence is cognition-distinct where it matters most. VERIFY: a guard/check requires a non-aiModel critic for the high-stakes set; aiModel-only critique of such an element is flagged."; }
+
+        // ── load-bearing critique campaign batch-2 ACT dispositions (resolve issue033/034) ──
+        action manifestCoverageGuard; // D0050 finding (issue033): guard deliverable-manifest completeness.
+        verification manifestCoverageGuardDoD : Test { :>> id = "a1c70033-0033-4033-9033-516273840004"; :>> method = VerificationMethod::test; :>> procedureText = "D0050 completeness finding (issue033): deliverable-suspicion only guards manifest-listed tasks (a hand-maintained allow-list). Add a check that every deliverable-dependent Rust-verification task is listed in .engine/deliverable-manifest.txt (or flag the unlisted), so the allow-list cannot silently miss a task. VERIFY: the check flags a deliverable-verification task absent from the manifest in a self-test; runs in the guard set."; }
+
+        action viewpointRendererGuard; // D0056 finding (issue034): guard viewpoint<->renderer correspondence.
+        verification viewpointRendererGuardDoD : Test { :>> id = "a1c70034-0034-4034-9034-516273840005"; :>> method = VerificationMethod::test; :>> procedureText = "D0056 completeness finding (issue034): the viewpoint registry is descriptive, not generative — registry entries + bespoke renderers can drift. Add a check that every declared viewpoint has a renderer (a subcommand or TOML view) and every renderer/subcommand has a viewpoint entry (no orphan either way). VERIFY: the check flags a viewpoint with no renderer and a renderer with no viewpoint in a self-test; runs in the guard set."; }
     }
 }

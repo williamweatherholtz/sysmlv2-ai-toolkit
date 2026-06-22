@@ -350,7 +350,29 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from diagramRenderFix to issue028;
+    part issue033 : Issue {
+        :>> id = "e0330033-0033-4e33-9033-516273840033";
+        :>> title = "D0050 finding: deliverable-suspicion manifest is a hand-maintained allow-list (unlisted task silently unguarded)";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 2, d0050 completeness (Medium): deliverable-suspicion guards only verification tasks listed in .engine/deliverable-manifest.txt; a deliverable-dependent task not added is silently unguarded (its 'verified' stays green across source drift). No check enforces manifest completeness. ACT disposition (human, 2026-06-21): guard manifest completeness. Resolver: manifestCoverageGuard.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "manifestCoverageGuard";
+        :>> severity = Severity::Medium;
+    }
+    part issue034 : Issue {
+        :>> id = "e0340034-0034-4e34-9034-516273840034";
+        :>> title = "D0056 finding: viewpoint registry is descriptive, not generative (registry<->renderer can drift)";
+        :>> createdAt = "2026-06-21";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 2, d0056 completeness (Medium): only TOML views are declaration-driven; bespoke subcommands are hand-coded with a descriptive registry entry, so 'declaration drives renderer' is only partially realized and a viewpoint without a renderer (or vice versa) is not caught. ACT disposition (human, 2026-06-21): guard viewpoint<->renderer correspondence. Resolver: viewpointRendererGuard.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "viewpointRendererGuard";
+        :>> severity = Severity::Medium;
+    }
     #Resolves dependency from frictionMetric to issue029;
     #Resolves dependency from critiqueRigorCheck to issue030;
     #Resolves dependency from criticIndependenceRule to issue031;
+    #Resolves dependency from manifestCoverageGuard to issue033;
+    #Resolves dependency from viewpointRendererGuard to issue034;
 }
