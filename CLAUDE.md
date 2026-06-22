@@ -44,8 +44,10 @@ tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestati
 flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
 renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
-critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). (The SysML
-viewpoint-registry stays the concern-coverage index.)
+critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). Human-digestible
+AGGREGATE scorecards (coverage %, critique %, traceability, debt, volatility, flow) come from
+`sysmlv2 report <assurance|traceability|quality-debt|flow> [--html]` (D0087, the `report` viewpoint;
+health vs opportunity). (The SysML viewpoint-registry stays the concern-coverage index.)
 
 ---
 

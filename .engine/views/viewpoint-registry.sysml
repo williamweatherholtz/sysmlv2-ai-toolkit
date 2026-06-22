@@ -56,6 +56,15 @@ package EngineViewpoints {
         :>> sources = "any declared view (D0056/D0057) over the Model — graph (elements + typed edges), table/review (selected rows + projected fields); review dispositions round-trip via apply-review into .tracking/critiques.sysml";
         :>> renderer = "sysmlv2 render <view> --mode graph|table|review (interactive HTML #View, D0086; regenerate-don't-commit) + sysmlv2 apply-review";
     }
+    part reportVP : Viewpoint {
+        :>> id = "61728394-0a5b-4c6d-c087-405162738487";
+        :>> title = "report";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "How are we doing, and where can we improve — aggregate HEALTH (verification coverage %, critique %, attestation %, findings, traceability completeness, readiness) and OPPORTUNITY (charter debt, requirements volatility, suspect+stale, flow/velocity) metrics rolled up from the per-element views, with git-derived trends?";
+        :>> audience = "maintainer / reviewer / program lead";
+        :>> sources = "aggregation of the per-element computed views (coverage 3-tier, critique-coverage, attestation, assured/readiness, decisions, orphans, open-issues, suspect) + delivery Stories (velocity) + git history (trends); grounded in the INCOSE DE Measurement Framework + SE Leading Indicators";
+        :>> renderer = "sysmlv2 report <assurance|traceability|quality-debt|flow> [--html] (computed scorecard #View, D0087; regenerate-don't-commit)";
+    }
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
         :>> title = "safety";

@@ -206,4 +206,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to render/tabulate/explore a specific view as an artifact, build a table from a view, review/disposition elements (accept/reject + rationale), capture critique findings, or export a review batch; or to apply a review batch back into the model.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part reportSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a087-516273849616";
+        :>> title = "report";
+        :>> purpose = "Deploy the Computed Report / Scorecard process (D0087): generate human-digestible aggregate reports via `sysmlv2 report <assurance|traceability|quality-debt|flow> [--html]` — coverage %, critique %, attestation %, findings, traceability completeness, debt, volatility, flow/velocity — rolled up from the per-element views and split into HEALTH vs OPPORTUNITY; never author a metric or commit a snapshot (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/report.sysml.";
+        :>> location = ".engine/skills/report/SKILL.md";
+        :>> triggerCondition = "Asked for a status/health report, coverage or test totals/%, a scorecard, metrics/KPIs, model health, technical debt, velocity, or 'how are we doing / where can we improve'.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

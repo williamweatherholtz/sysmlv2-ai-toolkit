@@ -680,6 +680,38 @@ fn cmd_render(args: &[String]) -> i32 {
     }
 }
 
+/// `report <name> [--html] [--root ROOT]` — computed aggregate scorecard (D0087): assurance |
+/// traceability | quality-debt | flow. JSON by default; `--html` emits a human-digestible scorecard.
+fn cmd_report(args: &[String]) -> i32 {
+    let Some(name) = args.first().filter(|v| !v.starts_with("--")) else {
+        eprintln!("usage: sysmlv2 report <assurance|traceability|quality-debt|flow> [--html] [--root ROOT]");
+        return 2;
+    };
+    let root = match flag(args, "root") {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
+                return 2;
+            }
+        }
+    };
+    let html = args.iter().any(|a| a == "--html");
+    let result = if html { sysmlv2_cli::view::report_html(&root, name) } else { sysmlv2_cli::view::report(&root, name) };
+    match result {
+        Ok(out) => {
+            println!("{out}");
+            0
+        }
+        Err(e) => {
+            eprintln!("report error: {e}");
+            1
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct ReviewBatch {
     #[serde(default)]
@@ -810,6 +842,7 @@ fn main() {
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
         Some("render") => cmd_render(rest),
+        Some("report") => cmd_report(rest),
         Some("apply-review") => cmd_apply_review(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),

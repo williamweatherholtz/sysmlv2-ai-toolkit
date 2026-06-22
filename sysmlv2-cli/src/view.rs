@@ -33,6 +33,8 @@ pub enum ViewError {
     UnknownEdge { view: String, edge: String, known: String },
     #[error("unknown render mode '{0}' (expected: graph, table, review)")]
     UnknownMode(String),
+    #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow)")]
+    UnknownReport(String),
 }
 
 // ── the declared view (TOML) ────────────────────────────────────────────────
@@ -1558,6 +1560,206 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
 // interactive HTML page (cytoscape): filter by node type / edge kind, search, click-to-focus a
 // neighborhood, fit. Regenerated on demand from authored facts; never committed as truth (§2.1/D0015).
 
+// ── computed report / scorecard layer (D0087) ─────────────────────────────────────────────────
+// Human-digestible AGGREGATE reports rolling up the per-element views into totals/percentages +
+// a health/opportunity read. Each report emits a `cards` array (label/value/detail/tone) so ONE
+// HTML template renders all of them. Computed on demand; never authored, never committed (§2.1).
+
+/// Integer percentage `n/d` (vacuously 100% when there is nothing to measure).
+fn pct(n: usize, d: usize) -> u32 {
+    if d == 0 { 100 } else { u32::try_from(n.saturating_mul(100) / d).unwrap_or(0) }
+}
+
+/// Tone for a coverage-style percentage (higher is better).
+const fn cov_tone(p: u32) -> &'static str {
+    if p >= 90 { "good" } else if p >= 70 { "warn" } else { "bad" }
+}
+
+/// One scorecard metric card.
+fn card(label: &str, value: String, detail: String, tone: &str) -> Json {
+    Json::Obj(vec![
+        ("label".to_string(), Json::s(label.to_string())),
+        ("value".to_string(), Json::s(value)),
+        ("detail".to_string(), Json::s(detail)),
+        ("tone".to_string(), Json::s(tone.to_string())),
+    ])
+}
+
+fn report_json(report: &str, title: &str, cards: Vec<Json>) -> String {
+    Json::Obj(vec![
+        ("report".to_string(), Json::s(report.to_string())),
+        ("title".to_string(), Json::s(title.to_string())),
+        ("note".to_string(), Json::s("computed aggregate (D0087) — regenerate, never commit as truth".to_string())),
+        ("cards".to_string(), Json::Arr(cards)),
+    ])
+    .dump()
+}
+
+/// Compute a report's `(title, cards)`; shared by the JSON emitter and the HTML scorecard.
+fn report_cards(root: &Path, name: &str) -> Result<(String, Vec<Json>), ViewError> {
+    let model = Model::build(root)?;
+    let orient = crate::orient::compute(root);
+    let done = crate::orient::done_names(root);
+    let task_suspect: HashSet<String> = orient.suspect.iter().cloned().collect();
+    let stale = compute_stale_verifications(root, &model);
+    let cov = compute_coverage(&model, &done, &task_suspect, &stale);
+    match name {
+        "assurance" => Ok(("Assurance Scorecard".to_string(), assurance_cards(root, &model, &cov, &stale, &done, &task_suspect)?)),
+        "traceability" => Ok(("Traceability / V&V Coverage".to_string(), traceability_cards(&model, &cov))),
+        "quality-debt" => Ok(("Quality & Debt".to_string(), quality_debt_cards(root, &model, &cov, &stale, &task_suspect))),
+        "flow" => Ok(("Flow / Velocity".to_string(), flow_cards(root, &model, &orient))),
+        other => Err(ViewError::UnknownReport(other.to_string())),
+    }
+}
+
+/// Computed report as JSON (D0087).
+///
+/// # Errors
+/// Returns [`ViewError`] for an unknown report name or a parse failure.
+pub fn report(root: &Path, name: &str) -> Result<String, ViewError> {
+    let (title, cards) = report_cards(root, name)?;
+    Ok(report_json(name, &title, cards))
+}
+
+/// Computed report rendered as a human-digestible HTML scorecard (D0087).
+///
+/// # Errors
+/// Returns [`ViewError`] for an unknown report name or a parse failure.
+pub fn report_html(root: &Path, name: &str) -> Result<String, ViewError> {
+    let (title, cards) = report_cards(root, name)?;
+    Ok(REPORT_TEMPLATE
+        .replace("/*STYLE*/", TABLE_STYLE)
+        .replace("/*TITLE*/", &json_esc(&title))
+        .replace("/*CARDS*/", &Json::Arr(cards).dump()))
+}
+
+fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet<String>, done: &HashSet<String>, task_suspect: &HashSet<String>) -> Result<Vec<Json>, ViewError> {
+    let total = cov.len();
+    let ct = |t: &str| cov.iter().filter(|c| c.tier == t).count();
+    let (verified, attested) = (ct("verified"), ct("attested"));
+    let covered_pct = pct(verified + attested, total);
+    let crit = compute_critique_coverage(model, stale);
+    let crit_cov = crit.iter().filter(|c| c.covered).count();
+    let crit_pct = pct(crit_cov, crit.len());
+    let (att_total, att_missing) = compute_attestation(model);
+    let att_pct = pct(att_total - att_missing.len(), att_total);
+    // Open finding Issues by severity.
+    let open: HashSet<String> = compute_issue_resolution(model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect();
+    let sev_count = |s: &str| open.iter().filter(|n| model.items.get(*n).and_then(|i| i.attrs.get("severity")).map(String::as_str) == Some(s)).count();
+    let (crit_f, high_f, med_f, low_f) = (sev_count("Critical"), sev_count("High"), sev_count("Medium"), sev_count("Low"));
+    let undisp = crit_f + high_f + med_f;
+    let suspect_load = task_suspect.len() + critique_suspect_set(model).len();
+    let rb = compute_readiness(root)?;
+    let ready = rb.ready();
+    Ok(vec![
+        card("Verification coverage", format!("{covered_pct}%"), format!("{verified} verified + {attested} attested of {total} (gate-covered)"), cov_tone(covered_pct)),
+        card("Critique coverage", format!("{crit_pct}%"), format!("{crit_cov} of {} elements Core-3 critiqued", crit.len()), cov_tone(crit_pct)),
+        card("Acceptance integrity", format!("{att_pct}%"), format!("{} of {att_total} accepted decisions attested", att_total - att_missing.len()), cov_tone(att_pct)),
+        card("Open findings (\u{2265}Medium)", undisp.to_string(), format!("{crit_f} Critical / {high_f} High / {med_f} Medium / {low_f} Low open"), if crit_f > 0 { "bad" } else if undisp > 0 { "warn" } else { "good" }),
+        card("Suspect load", suspect_load.to_string(), format!("{} drift/criterion + {} failing-critique; {} stale verifications", task_suspect.len(), critique_suspect_set(model).len(), stale.len()), if suspect_load == 0 { "good" } else { "warn" }),
+        card("Assurance readiness", if ready { "READY".to_string() } else { "NOT READY".to_string() }, format!("{} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()), if ready { "good" } else { "bad" }),
+    ])
+}
+
+fn traceability_cards(model: &Model, cov: &[Coverage]) -> Vec<Json> {
+    let by_type = |ty: &str| -> Vec<&Coverage> { cov.iter().filter(|c| c.type_name == ty).collect() };
+    let verified_pct = |rows: &[&Coverage]| pct(rows.iter().filter(|c| c.tier == "verified").count(), rows.len());
+    let needs = by_type("Need");
+    let reqs = by_type("SystemRequirement");
+    let n_pct = verified_pct(&needs);
+    let r_pct = verified_pct(&reqs);
+    // Edge completeness. A Need is satisfied by an OUTGOING satisfy edge (need -> requirement); a
+    // requirement is verified by an INCOMING verify edge (test/critique -> requirement, #Verify).
+    let names_of = |ty: &str| -> Vec<&String> { model.items.iter().filter(|(_, i)| i.type_name == ty).map(|(n, _)| n).collect() };
+    let needs_names = names_of("Need");
+    let n_tot = needs_names.len();
+    let n_sat = needs_names.iter().filter(|n| has_outgoing(&model.edges, n, "satisfy")).count();
+    let req_names = names_of("SystemRequirement");
+    let r_tot = req_names.len();
+    let r_ver = req_names
+        .iter()
+        .filter(|n| model.edges.iter().any(|e| e.kind == "verify" && &e.to == **n))
+        .count();
+    let r_tier = |t: &str| reqs.iter().filter(|c| c.tier == t).count();
+    vec![
+        card("Needs verified", format!("{n_pct}%"), format!("{} of {} needs reach a verified requirement", needs.iter().filter(|c| c.tier == "verified").count(), needs.len()), cov_tone(n_pct)),
+        card("Requirements verified", format!("{r_pct}%"), format!("{} verified / {} attested / {} addressed / {} uncovered of {}", r_tier("verified"), r_tier("attested"), r_tier("addressed"), r_tier("uncovered") + r_tier("suspect"), reqs.len()), cov_tone(r_pct)),
+        card("Needs with satisfy edge", format!("{}%", pct(n_sat, n_tot)), format!("{n_sat} of {n_tot} needs carry a satisfy edge"), cov_tone(pct(n_sat, n_tot))),
+        card("Requirements with verify edge", format!("{}%", pct(r_ver, r_tot)), format!("{r_ver} of {r_tot} requirements carry a verify edge (DO-178C-style traceability)"), cov_tone(pct(r_ver, r_tot))),
+    ]
+}
+
+fn quality_debt_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet<String>, task_suspect: &HashSet<String>) -> Vec<Json> {
+    // Charter debt: grandfathered elements (pre-rigor) that are still not gate-covered or not critiqued.
+    let gf_cov = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
+    let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
+    let cov_debt = cov.iter().filter(|c| !is_covered_tier(c.tier) && gf_cov.as_ref().is_some_and(|g| g.contains(&c.element))).count();
+    let crit_debt = compute_critique_coverage(model, stale).into_iter().filter(|c| !c.covered && gf_crit.as_ref().is_some_and(|g| g.contains(&c.element))).count();
+    // Requirements volatility: supersede edges (churn signal).
+    let supersedes = model.edges.iter().filter(|e| e.kind == "supersede").count();
+    let decisions = model.items.values().filter(|i| i.type_name == "Decision").count();
+    let vol_pct = pct(supersedes, decisions);
+    let suspect_total = task_suspect.len() + critique_suspect_set(model).len();
+    vec![
+        card("Charter debt (coverage)", cov_debt.to_string(), format!("{cov_debt} grandfathered elements still not gate-covered (pre-D0079 rigor backlog)"), if cov_debt == 0 { "good" } else { "warn" }),
+        card("Charter debt (critique)", crit_debt.to_string(), format!("{crit_debt} grandfathered elements still missing Core-3 critique (pre-D0080)"), if crit_debt == 0 { "good" } else { "warn" }),
+        card("Requirements volatility", format!("{vol_pct}%"), format!("{supersedes} supersede edges across {decisions} decisions (churn / early-warning signal)"), if vol_pct >= 30 { "warn" } else { "good" }),
+        card("Suspect + stale", suspect_total.to_string(), format!("{suspect_total} elements suspect; {} stale verifications to re-run", stale.len()), if suspect_total == 0 { "good" } else { "warn" }),
+    ]
+}
+
+fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec<Json> {
+    let ready = orient.ready.len();
+    let wip = orient.in_progress_sprints.len();
+    let open_issues = orient.open_issues.len();
+    // Throughput + velocity from delivery Stories.
+    let mut sprints = 0usize;
+    let mut points = 0i64;
+    for path in crate::collect_sysml(&root.join(".tracking").join("delivery")) {
+        if let Ok(text) = std::fs::read_to_string(&path) {
+            sprints += 1;
+            for line in text.lines() {
+                if let Some(rest) = line.trim_start().strip_prefix(":>> estimatedPoints = ") {
+                    points += rest.trim_end_matches(';').trim().parse::<i64>().unwrap_or(0);
+                }
+            }
+        }
+    }
+    let velocity = if sprints == 0 { 0 } else { points / i64::try_from(sprints).unwrap_or(1) };
+    let _ = model;
+    vec![
+        card("Ready frontier", ready.to_string(), format!("{ready} task(s) ready to start now"), if ready == 0 { "warn" } else { "good" }),
+        card("Work in progress", wip.to_string(), format!("{wip} sprint(s) with ceremony in progress"), if wip <= 2 { "good" } else { "warn" }),
+        card("Throughput", sprints.to_string(), format!("{sprints} delivery sprints recorded; {points} points total"), "good"),
+        card("Velocity", velocity.to_string(), format!("~{velocity} points/sprint (mean across {sprints} sprints)"), "good"),
+        card("Open issues", open_issues.to_string(), format!("{open_issues} open issue(s) on the board"), if open_issues == 0 { "good" } else { "warn" }),
+    ]
+}
+
+const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 report</title>
+<meta name="generator" content="sysmlv2 report (computed #View; regenerate, do not commit as truth)">
+/*STYLE*/
+<style>
+ .cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
+ .c{flex:1 1 220px;min-width:200px;border:1px solid #ddd;border-radius:8px;padding:12px;background:#fff}
+ .c .l{font-size:11px;text-transform:uppercase;color:#666;letter-spacing:.03em}
+ .c .v{font-size:30px;font-weight:600;margin:4px 0}
+ .c .d{font-size:11px;color:#555;line-height:1.4}
+ .c.good{border-left:5px solid #59a14f} .c.warn{border-left:5px solid #f2a900} .c.bad{border-left:5px solid #e15759}
+ .c.good .v{color:#3d7a34} .c.warn .v{color:#b07a00} .c.bad .v{color:#b03a3c}
+</style></head><body>
+<header><h1>sysmlv2 · <span id="t"></span></h1><p>computed aggregate report (D0087) — regenerate, never commit as truth</p></header>
+<div class="cards" id="cards"></div>
+<script>
+var TITLE="/*TITLE*/",CARDS=/*CARDS*/;
+document.getElementById('t').textContent=TITLE;
+var box=document.getElementById('cards');
+CARDS.forEach(function(c){var d=document.createElement('div');d.className='c '+(c.tone||'');
+ d.innerHTML='<div class=l></div><div class=v></div><div class=d></div>';
+ d.querySelector('.l').textContent=c.label;d.querySelector('.v').textContent=c.value;d.querySelector('.d').textContent=c.detail;box.appendChild(d)});
+</script></body></html>"#;
+
 /// Vendored cytoscape.js, INLINED into every generated diagram so it is fully self-contained +
 /// offline (no CDN). ~373KB; the only third-party JS in the page.
 const CYTOSCAPE_LIB: &str = include_str!("../assets/cytoscape.min.js");
@@ -2014,6 +2216,30 @@ mod tests {
         ];
         let model = Model { items, edges };
         assert_eq!(critique_suspect_set(&model), vec!["d1".to_string()], "only the failing-critique element is suspect");
+    }
+
+    #[test]
+    fn pct_handles_empty_denominator() {
+        assert_eq!(pct(0, 0), 100, "nothing to measure = vacuously complete");
+        assert_eq!(pct(1, 2), 50);
+        assert_eq!(pct(9, 10), 90);
+        assert_eq!(cov_tone(90), "good");
+        assert_eq!(cov_tone(80), "warn");
+        assert_eq!(cov_tone(50), "bad");
+    }
+
+    #[test]
+    fn report_produces_cards_and_rejects_unknown() {
+        // D0087: each report yields a non-empty cards array; unknown report errors. (cwd = crate dir.)
+        let root = std::path::Path::new("..");
+        for name in ["assurance", "traceability", "quality-debt", "flow"] {
+            let json = report(root, name).unwrap_or_else(|e| panic!("report {name}: {e}"));
+            assert!(json.contains("\"cards\""), "{name} has cards");
+            assert!(json.contains("\"tone\""), "{name} cards carry a tone");
+        }
+        assert!(report(root, "bogus").is_err(), "unknown report errors");
+        let html = report_html(root, "assurance").expect("assurance html");
+        assert!(html.contains("class=\"cards\"") && !html.contains("/*CARDS*/"), "scorecard cards injected");
     }
 
     #[test]
