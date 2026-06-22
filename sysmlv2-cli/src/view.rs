@@ -33,7 +33,7 @@ pub enum ViewError {
     UnknownEdge { view: String, edge: String, known: String },
     #[error("unknown render mode '{0}' (expected: graph, table, review)")]
     UnknownMode(String),
-    #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow)")]
+    #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow, governance)")]
     UnknownReport(String),
 }
 
@@ -1598,6 +1598,7 @@ fn report_cards(root: &Path, name: &str) -> Result<(String, Vec<Json>), ViewErro
         "traceability" => Ok(("Traceability / V&V Coverage".to_string(), traceability_cards(&model, &cov))),
         "quality-debt" => Ok(("Quality & Debt".to_string(), quality_debt_cards(root, &model, &cov, &stale, &task_suspect))),
         "flow" => Ok(("Flow / Velocity".to_string(), flow_cards(root, &model, &orient))),
+        "governance" => Ok(("Governance / Decisions".to_string(), governance_cards(&model))),
         other => Err(ViewError::UnknownReport(other.to_string())),
     }
 }
@@ -1652,7 +1653,8 @@ const fn headline_label(name: &str) -> &str {
         b"assurance" => "Verification coverage %",
         b"traceability" => "Requirements verified %",
         b"quality-debt" => "Supersede edges (volatility)",
-        _ => "Delivery sprints (throughput)",
+        b"governance" => "Accepted decisions",
+        _ => "Delivered points (burnup)",
     }
 }
 
@@ -1673,9 +1675,15 @@ fn headline_at(root: &Path, name: &str) -> Option<i64> {
             Some(i64::from(pct(covered, rows.len())))
         }
         "quality-debt" => Some(i64::try_from(model.edges.iter().filter(|e| e.kind == "supersede").count()).unwrap_or(0)),
+        "governance" => Some(i64::try_from(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count()).unwrap_or(0)),
         _ => {
-            let sprints = crate::collect_sysml(&root.join(".tracking").join("delivery")).len();
-            Some(i64::try_from(sprints).unwrap_or(0))
+            // flow → burnup: cumulative delivered story points.
+            let pts: i64 = crate::collect_sysml(&root.join(".tracking").join("delivery"))
+                .iter()
+                .filter_map(|p| std::fs::read_to_string(p).ok())
+                .map(|t| sprint_flow(&t).points)
+                .sum();
+            Some(pts)
         }
     }
 }
@@ -1790,31 +1798,121 @@ fn quality_debt_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &Hash
     ]
 }
 
-fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec<Json> {
-    let ready = orient.ready.len();
-    let wip = orient.in_progress_sprints.len();
-    let open_issues = orient.open_issues.len();
-    // Throughput + velocity from delivery Stories.
-    let mut sprints = 0usize;
-    let mut points = 0i64;
-    for path in crate::collect_sysml(&root.join(".tracking").join("delivery")) {
-        if let Ok(text) = std::fs::read_to_string(&path) {
-            sprints += 1;
-            for line in text.lines() {
-                if let Some(rest) = line.trim_start().strip_prefix(":>> estimatedPoints = ") {
-                    points += rest.trim_end_matches(';').trim().parse::<i64>().unwrap_or(0);
-                }
+/// Days since 1970-01-01 for a civil date (Hinnant's algorithm; exact, no deps).
+const fn days_from_civil(y0: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y0 - 1 } else { y0 };
+    let era = (if y >= 0 { y } else { y - 399 }) / 400;
+    let yoe = y - era * 400;
+    let mp = if m > 2 { m - 3 } else { m + 9 };
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// Parse `"YYYY-MM-DD"` to days-since-epoch.
+fn parse_ymd(s: &str) -> Option<i64> {
+    let mut it = s.trim().splitn(3, '-');
+    let y: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next()?.parse().ok()?;
+    let d: i64 = it.next()?.chars().take_while(char::is_ascii_digit).collect::<String>().parse().ok()?;
+    Some(days_from_civil(y, m, d))
+}
+
+/// The quoted value immediately after `key` on a line (`key` includes the opening quote).
+fn quoted_after(line: &str, key: &str) -> Option<String> {
+    line.split(key).nth(1)?.split('"').next().map(str::to_string)
+}
+
+/// Per-sprint flow facts pulled from one delivery file.
+struct SprintFlow {
+    points: i64,
+    created: Option<i64>,
+    refine: Option<i64>,
+    retro: Option<i64>,
+}
+
+fn sprint_flow(text: &str) -> SprintFlow {
+    let mut sf = SprintFlow { points: 0, created: None, refine: None, retro: None };
+    for line in text.lines() {
+        let t = line.trim_start();
+        if sf.points == 0 {
+            if let Some(p) = t.split("estimatedPoints = ").nth(1).and_then(|x| x.trim().trim_end_matches(';').trim().parse::<i64>().ok()) {
+                sf.points = p;
+            }
+        }
+        if sf.created.is_none() {
+            if let Some(c) = quoted_after(t, "createdAt = \"") {
+                sf.created = parse_ymd(&c);
+            }
+        }
+        if t.contains("RefineGateR") {
+            if let Some(d) = quoted_after(t, "judgedAt = \"") {
+                sf.refine = parse_ymd(&d);
+            }
+        }
+        if t.contains("RetroGateR") {
+            if let Some(d) = quoted_after(t, "judgedAt = \"") {
+                sf.retro = parse_ymd(&d);
             }
         }
     }
-    let velocity = if sprints == 0 { 0 } else { points / i64::try_from(sprints).unwrap_or(1) };
+    sf
+}
+
+fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec<Json> {
     let _ = model;
+    let ready = orient.ready.len();
+    let wip = orient.in_progress_sprints.len();
+    let open_issues = orient.open_issues.len();
+    let flows: Vec<SprintFlow> = crate::collect_sysml(&root.join(".tracking").join("delivery"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| sprint_flow(&t)))
+        .collect();
+    let sprints = flows.len();
+    let total_points: i64 = flows.iter().map(|f| f.points).sum();
+    let velocity = if sprints == 0 { 0 } else { total_points / i64::try_from(sprints).unwrap_or(1) };
+    // Cycle time (refine→retro) + lead time (created→retro), in days, over sprints with both dates.
+    let cycles: Vec<i64> = flows.iter().filter_map(|f| Some(f.retro? - f.refine?)).collect();
+    let cycle_mean = if cycles.is_empty() { 0 } else { cycles.iter().sum::<i64>() / i64::try_from(cycles.len()).unwrap_or(1) };
+    let cycle_pts: i64 = flows.iter().filter(|f| f.retro.is_some() && f.refine.is_some()).map(|f| f.points).sum();
+    let cycle_days_total: i64 = cycles.iter().sum();
+    let per_point = if cycle_pts == 0 { 0.0 } else { f64::from(i32::try_from(cycle_days_total).unwrap_or(0)) / f64::from(i32::try_from(cycle_pts).unwrap_or(1)) };
+    let leads: Vec<i64> = flows.iter().filter_map(|f| Some(f.retro? - f.created?)).collect();
+    let lead_mean = if leads.is_empty() { 0 } else { leads.iter().sum::<i64>() / i64::try_from(leads.len()).unwrap_or(1) };
+    // Predictability: spread of per-sprint points.
+    let pts: Vec<i64> = flows.iter().map(|f| f.points).filter(|p| *p > 0).collect();
+    let (pmin, pmax) = (pts.iter().min().copied().unwrap_or(0), pts.iter().max().copied().unwrap_or(0));
+    // Aging WIP: as-of (latest recorded date) minus the refine date of any started-but-unfinished sprint.
+    let as_of = flows.iter().filter_map(|f| f.retro.or(f.refine)).max().unwrap_or(0);
+    let aging = flows.iter().filter(|f| f.refine.is_some() && f.retro.is_none()).filter_map(|f| Some(as_of - f.refine?)).max().unwrap_or(0);
     vec![
         card("Ready frontier", ready.to_string(), format!("{ready} task(s) ready to start now"), if ready == 0 { "warn" } else { "good" }),
-        card("Work in progress", wip.to_string(), format!("{wip} sprint(s) with ceremony in progress"), if wip <= 2 { "good" } else { "warn" }),
-        card("Throughput", sprints.to_string(), format!("{sprints} delivery sprints recorded; {points} points total"), "good"),
-        card("Velocity", velocity.to_string(), format!("~{velocity} points/sprint (mean across {sprints} sprints)"), "good"),
+        card("Work in progress", wip.to_string(), format!("{wip} sprint(s) with ceremony in progress (low WIP is healthy)"), if wip <= 2 { "good" } else { "warn" }),
+        card("Velocity", velocity.to_string(), format!("~{velocity} points/sprint (mean across {sprints} sprints, {total_points} pts total)"), "good"),
+        card("Cycle time", format!("{cycle_mean}d"), format!("mean refine→retro across {} sprints (same-day autonomous = ~0)", cycles.len()), "good"),
+        card("Time / story point", format!("{per_point:.2}d"), format!("{cycle_days_total} cycle-days / {cycle_pts} points (lower = faster delivery)"), "good"),
+        card("Lead time", format!("{lead_mean}d"), format!("mean created→retro across {} sprints (DORA-style lead time)", leads.len()), "good"),
+        card("Predictability", format!("{pmin}–{pmax} pts"), format!("per-sprint point spread (velocity {})", if pmax - pmin <= 4 { "consistent" } else { "variable" }), if pmax - pmin <= 4 { "good" } else { "warn" }),
+        card("Throughput", sprints.to_string(), format!("{sprints} delivery sprints recorded"), "good"),
+        card("Aging WIP", format!("{aging}d"), format!("oldest unfinished sprint age (as-of latest recorded date); {wip} in progress"), if aging <= 7 { "good" } else { "warn" }),
         card("Open issues", open_issues.to_string(), format!("{open_issues} open issue(s) on the board"), if open_issues == 0 { "good" } else { "warn" }),
+    ]
+}
+
+fn governance_cards(model: &Model) -> Vec<Json> {
+    let decisions: Vec<&ItemInfo> = model.items.values().filter(|i| i.type_name == "Decision").collect();
+    let total = decisions.len();
+    let accepted = decisions.iter().filter(|i| i.attrs.get("status").map(String::as_str) == Some("accepted")).count();
+    let superseded = decisions.iter().filter(|i| i.attrs.get("status").map(String::as_str) == Some("superseded")).count();
+    let proc_change = decisions.iter().filter(|i| matches!(i.marker.as_deref(), Some("ProspectiveChange" | "SafetyChange"))).count();
+    let (att_total, att_missing) = compute_attestation(model);
+    let att_pct = pct(att_total - att_missing.len(), att_total);
+    let supersede_edges = model.edges.iter().filter(|e| e.kind == "supersede").count();
+    vec![
+        card("Decisions", total.to_string(), format!("{accepted} accepted / {superseded} superseded of {total} total"), "good"),
+        card("Acceptance integrity", format!("{att_pct}%"), format!("{} of {att_total} accepted decisions carry an attestation event", att_total - att_missing.len()), cov_tone(att_pct)),
+        card("Process-change decisions", proc_change.to_string(), format!("{proc_change} #ProspectiveChange/#SafetyChange (governed process edits, D0070)"), "good"),
+        card("Supersession", supersede_edges.to_string(), format!("{supersede_edges} supersede edges (decision evolution / churn)"), if supersede_edges <= total / 3 { "good" } else { "warn" }),
     ]
 }
 
@@ -2312,7 +2410,8 @@ mod tests {
         assert_eq!(headline_label("assurance"), "Verification coverage %");
         assert_eq!(headline_label("traceability"), "Requirements verified %");
         assert_eq!(headline_label("quality-debt"), "Supersede edges (volatility)");
-        assert_eq!(headline_label("flow"), "Delivery sprints (throughput)");
+        assert_eq!(headline_label("flow"), "Delivered points (burnup)");
+        assert_eq!(headline_label("governance"), "Accepted decisions");
     }
 
     #[test]
@@ -2329,7 +2428,7 @@ mod tests {
     fn report_produces_cards_and_rejects_unknown() {
         // D0087: each report yields a non-empty cards array; unknown report errors. (cwd = crate dir.)
         let root = std::path::Path::new("..");
-        for name in ["assurance", "traceability", "quality-debt", "flow"] {
+        for name in ["assurance", "traceability", "quality-debt", "flow", "governance"] {
             let json = report(root, name, false).unwrap_or_else(|e| panic!("report {name}: {e}"));
             assert!(json.contains("\"cards\""), "{name} has cards");
             assert!(json.contains("\"tone\""), "{name} cards carry a tone");

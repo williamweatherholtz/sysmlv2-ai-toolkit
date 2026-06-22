@@ -34,7 +34,11 @@ Engineering Measurement Framework + SE Leading Indicators + the model-quality ca
   and requirements-with-verify edge completeness (DO-178C/ISO-26262-style end-to-end traceability).
 - **`quality-debt`** [OPPORTUNITY] — charter debt (grandfathered elements still uncovered/uncritiqued),
   requirements volatility (supersession churn — the early-warning signal), suspect + stale set.
-- **`flow`** [OPPORTUNITY] — ready frontier, WIP, throughput, velocity (points/sprint), open issues.
+- **`flow`** [OPPORTUNITY] — ready frontier, WIP, velocity (points/sprint), cycle time (refine→retro),
+  time / story point, lead time (created→retro, DORA-style), predictability (point spread), throughput,
+  aging WIP, open issues. (`--trend` headline = delivered-points burnup.)
+- **`governance`** [HEALTH] — decisions (accepted/superseded), acceptance integrity %, process-change
+  decisions (#ProspectiveChange/#SafetyChange), supersession churn.
 
 **The two numbers to watch:** verification coverage % (the headline leading indicator) and
 requirements volatility (the documented early-warning sign, ties to the D0054 adoption-friction risk).

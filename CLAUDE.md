@@ -46,8 +46,9 @@ renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
 critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). Human-digestible
 AGGREGATE scorecards (coverage %, critique %, traceability, debt, volatility, flow) come from
-`sysmlv2 report <assurance|traceability|quality-debt|flow> [--html]` (D0087, the `report` viewpoint;
-health vs opportunity). (The SysML viewpoint-registry stays the concern-coverage index.)
+`sysmlv2 report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend]` (D0087,
+the `report` viewpoint; health vs opportunity; `--trend` = git-derived sparklines). (The SysML
+viewpoint-registry stays the concern-coverage index.)
 
 ---
 

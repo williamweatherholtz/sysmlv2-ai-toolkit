@@ -684,7 +684,7 @@ fn cmd_render(args: &[String]) -> i32 {
 /// traceability | quality-debt | flow. JSON by default; `--html` emits a human-digestible scorecard.
 fn cmd_report(args: &[String]) -> i32 {
     let Some(name) = args.first().filter(|v| !v.starts_with("--")) else {
-        eprintln!("usage: sysmlv2 report <assurance|traceability|quality-debt|flow> [--html] [--root ROOT]");
+        eprintln!("usage: sysmlv2 report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] [--root ROOT]");
         return 2;
     };
     let root = match flag(args, "root") {
