@@ -375,4 +375,26 @@ package ProjectIssues {
     #Resolves dependency from criticIndependenceRule to issue031;
     #Resolves dependency from manifestCoverageGuard to issue033;
     #Resolves dependency from viewpointRendererGuard to issue034;
+    part issue035 : Issue {
+        :>> id = "e0350035-0035-4e35-9035-516273840035";
+        :>> title = "D0057 finding: the promised concern-coverage view (which stakeholder concerns lack a viewpoint) was never built";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 3, d0057 completeness (Medium): d0057 delivered increment 1 (Viewpoint schema + registry) but queued increment 2 (declaration-driven renderers + a concern-coverage view flagging which stakeholder concerns lack a viewpoint), which never landed. issue034 added a renderer-validity guard but not the concern-coverage audit. ACT disposition (human, 2026-06-22): build the concern-coverage audit. Resolver: coverageAudits (unified with issue036).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "coverageAudits";
+        :>> severity = Severity::Medium;
+    }
+    part issue036 : Issue {
+        :>> id = "e0360036-0036-4e36-9036-516273840036";
+        :>> title = "D0059 finding: the claimed process<->skill coverage audit ('orphans generalized to processes') does not exist";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 3, d0059 completeness (Medium): d0059 claims process->skill coverage is 'auditable as a view (orphans/coverage generalized to processes)', but no such audit exists — no guard/view flags a process lacking a deploying skill, so 'no inert process' relies on vigilance (the failure mode d0059 itself rejects). ACT disposition (human, 2026-06-22): build the process<->skill coverage audit. Resolver: coverageAudits (unified with issue035).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "coverageAudits";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from coverageAudits to issue035;
+    #Resolves dependency from coverageAudits to issue036;
 }
