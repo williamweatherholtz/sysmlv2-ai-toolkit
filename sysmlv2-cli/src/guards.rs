@@ -587,14 +587,104 @@ pub fn viewpoint_renderer(root: &Path) -> GuardReport {
     GuardReport { name: "viewpoint-renderer", scanned, warnings, violations }
 }
 
+// ── manifest-coverage guard (deliverable-suspicion manifest stays valid + complete) ────────────
+
+/// Name fragments that mark a task as likely deliverable-source-dependent (a verification whose
+/// evidence is the Rust deliverable behaving correctly) — used for the unlisted-task WARNING.
+const DELIVERABLE_TASK_HINTS: &[&str] = &["rust", "Parser", "writeApi", "runtimeParser", "specVersion"];
+
+/// All `action <name>;` task names declared in .tracking/{backlog,delivery} (not `action def`).
+fn declared_task_names(root: &Path) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for sub in ["backlog.sysml", "delivery"] {
+        let base = root.join(".tracking").join(sub);
+        let files = if base.is_dir() { crate::collect_sysml(&base) } else { vec![base] };
+        for f in files {
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            for line in text.lines() {
+                let t = line.trim_start();
+                if let Some(rest) = t.strip_prefix("action ") {
+                    if rest.starts_with("def ") {
+                        continue;
+                    }
+                    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                    if !name.is_empty() {
+                        names.insert(name);
+                    }
+                }
+            }
+        }
+    }
+    names
+}
+
+/// Parse the deliverable manifest into `(task, paths)` entries (`task: NAME | p1 p2`; `#` comments).
+fn parse_manifest(text: &str) -> Vec<(String, Vec<String>)> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        let Some(rest) = t.strip_prefix("task:") else { continue };
+        let mut parts = rest.splitn(2, '|');
+        let Some(name) = parts.next().map(str::trim) else { continue };
+        let paths: Vec<String> = parts.next().unwrap_or("").split_whitespace().map(str::to_string).collect();
+        if !name.is_empty() {
+            out.push((name.to_string(), paths));
+        }
+    }
+    out
+}
+
+/// Guard (D0050/issue033): the deliverable-suspicion manifest stays VALID + complete.
+///
+/// VIOLATION: a manifest entry names a task that no longer exists, or lists a path that no longer
+/// exists (a dead entry silently drops deliverable-suspicion coverage — the d0050 finding).
+/// WARNING: a declared task whose name looks deliverable-dependent but is not manifest-listed
+/// (a possible unguarded verification — the manifest is a hand-maintained allow-list).
+#[must_use]
+pub fn manifest_coverage(root: &Path) -> GuardReport {
+    let path = root.join(".engine").join("deliverable-manifest.txt");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return GuardReport { name: "manifest-coverage", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &path))] };
+    };
+    let entries = parse_manifest(&text);
+    let tasks = declared_task_names(root);
+    let listed: HashSet<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
+    let mut warnings = Vec::new();
+    let mut violations = Vec::new();
+    for (name, paths) in &entries {
+        if !tasks.contains(name) {
+            violations.push(format!("manifest entry '{name}' names a task that no longer exists (dead entry — deliverable-suspicion coverage silently lost)"));
+        }
+        for p in paths {
+            if !root.join(p).exists() {
+                violations.push(format!("manifest entry '{name}' lists path '{p}' which no longer exists"));
+            }
+        }
+    }
+    // Exclude sprint-wrapper actions (story*) — the manifest is about BACKLOG deliverable tasks, and
+    // a "storyParser*" wrapper matching the "Parser" hint is a false positive, not a manifest gap.
+    let mut unlisted: Vec<&String> = tasks
+        .iter()
+        .filter(|t| !t.starts_with("story") && !listed.contains(t.as_str()) && DELIVERABLE_TASK_HINTS.iter().any(|h| t.contains(h)))
+        .collect();
+    unlisted.sort();
+    for t in unlisted {
+        warnings.push(format!("task '{t}' looks deliverable-dependent (name) but is NOT in deliverable-manifest.txt — confirm it needs no source-drift suspicion"));
+    }
+    GuardReport { name: "manifest-coverage", scanned: entries.len(), warnings, violations }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
 /// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
 /// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
 /// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
-pub const GUARD_NAMES: [&str; 10] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer"];
+pub const GUARD_NAMES: [&str; 11] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -610,6 +700,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
+        "manifest-coverage" => Some(manifest_coverage(root)),
         _ => None,
     }
 }
@@ -642,6 +733,17 @@ mod tests {
         assert_eq!(classify_renderer("sysmlv2 frobnicate"), "unknown");
         assert_eq!(classify_renderer("some hand-wave"), "unknown");
         assert_eq!(quoted_attr("    :>> renderer = \"sysmlv2 orient\";", "renderer").as_deref(), Some("sysmlv2 orient"));
+    }
+
+    #[test]
+    fn manifest_parses_per_task_entries() {
+        // D0050/issue033: `task: NAME | p1 p2` lines parse to (name, paths); comments/blanks skipped.
+        let text = "# header comment\n\ntask: rustS1Lexer | sysmlv2-parser/src/lexer.rs sysmlv2-parser/src/token.rs\ntask: writeApi | sysmlv2-cli/src/write.rs\n";
+        let entries = parse_manifest(text);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].0, "rustS1Lexer");
+        assert_eq!(entries[0].1, vec!["sysmlv2-parser/src/lexer.rs".to_string(), "sysmlv2-parser/src/token.rs".to_string()]);
+        assert_eq!(entries[1], ("writeApi".to_string(), vec!["sysmlv2-cli/src/write.rs".to_string()]));
     }
 
     #[test]

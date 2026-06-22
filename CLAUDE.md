@@ -276,13 +276,14 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\sysmlv2.exe guard                                                               # ALL six forward guards (no kernel) — exit≠0 on any violation
-.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer
+.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage
 ```
-The ten forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
+The eleven forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
 acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
 D0068, process-change D0070 keystone, issues D0077/D0078, critique D0080/D0079, assured D0079c
 [both enforced at D0081 under charter-time scoping], viewpoint-renderer D0056/issue034 [renderers
-must name a real `sysmlv2` command, no retired query.py/report.py]). The python `validate_*.py`
+must name a real `sysmlv2` command, no retired query.py/report.py], manifest-coverage D0050/issue033
+[the deliverable-suspicion manifest stays valid — no dead task/path entries]). The python `validate_*.py`
 guards, `query.py`, and `parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust
 path is the sole gate.
 
