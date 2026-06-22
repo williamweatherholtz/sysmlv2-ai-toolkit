@@ -33,7 +33,7 @@ pub enum ViewError {
     UnknownEdge { view: String, edge: String, known: String },
     #[error("unknown render mode '{0}' (expected: graph, table, review)")]
     UnknownMode(String),
-    #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow, governance)")]
+    #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow, governance, friction)")]
     UnknownReport(String),
 }
 
@@ -1194,6 +1194,91 @@ fn critique_suspect_set(model: &Model) -> Vec<String> {
     out
 }
 
+/// Critical-finding targets lacking a non-aiModel critic (D0080/issue031 independence).
+///
+/// An element verified by a `method=critique` Test with `severity=Critical` whose latest result is
+/// `fail` (a Critical finding) MUST also carry a critique by a human/tool critic — aiModel-vs-aiModel
+/// shares blind spots, so the highest-stakes findings require cognition-distinct independence. Returns
+/// the gap set (vacuous until a Critical finding exists).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn critical_independence_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    let mut critical_targets: HashSet<String> = HashSet::new();
+    let mut non_ai_covered: HashSet<String> = HashSet::new();
+    for e in &model.edges {
+        if e.kind != "verify" {
+            continue;
+        }
+        let Some(src) = model.items.get(&e.from) else { continue };
+        if src.attrs.get("method").map(String::as_str) != Some("critique") {
+            continue;
+        }
+        if src.attrs.get("severity").map(String::as_str) == Some("Critical") && matches!(latest_result(&model, &e.from), Some((ref o, _)) if o == "fail") {
+            critical_targets.insert(e.to.clone());
+        }
+        if matches!(src.attrs.get("critiquedBy").map(String::as_str), Some("human" | "tool")) {
+            non_ai_covered.insert(e.to.clone());
+        }
+    }
+    let mut gaps: Vec<String> = critical_targets.into_iter().filter(|t| !non_ai_covered.contains(t)).collect();
+    gaps.sort();
+    Ok(gaps)
+}
+
+/// Why a critique's `procedureText` reads as low-rigor (D0080/issue030), or `None` if it passes.
+fn low_rigor_reason(pt: &str) -> Option<&'static str> {
+    if pt.chars().count() < 120 {
+        return Some("below the 120-char substance floor");
+    }
+    let up = pt.to_uppercase();
+    if up.contains("ATTACK") || up.contains("FINDING") || up.contains("SURVIVED") {
+        None
+    } else {
+        Some("no ATTACK/FINDING/SURVIVED adversarial structure")
+    }
+}
+
+/// Critique-rigor diagnostics (D0080/issue030): low-rigor critiques + affirming-only critics.
+///
+/// A critique is low-rigor if its `procedureText` lacks adversarial structure (no ATTACK/FINDING/
+/// SURVIVED reasoning) or is below a substance floor (120 chars). A critic (result `judgedBy`) with
+/// many critiques and zero findings is flagged as suspiciously affirming. A diagnostic, not a gate.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn critique_rigor(root: &Path) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    let mut out = Vec::new();
+    let mut tally: HashMap<String, (u32, u32)> = HashMap::new();
+    for (name, info) in &model.items {
+        if info.attrs.get("method").map(String::as_str) != Some("critique") {
+            continue;
+        }
+        if let Some(why) = low_rigor_reason(info.attrs.get("procedureText").map_or("", String::as_str)) {
+            out.push(format!("low-rigor critique '{name}': {why}"));
+        }
+        if let Some(res) = model.items.get(&format!("{name}R1")) {
+            let by = res.attrs.get("judgedBy").cloned().unwrap_or_default();
+            let entry = tally.entry(by).or_insert((0, 0));
+            entry.0 += 1;
+            if res.attrs.get("outcome").map(String::as_str) == Some("fail") {
+                entry.1 += 1;
+            }
+        }
+    }
+    let mut critics: Vec<(&String, &(u32, u32))> = tally.iter().collect();
+    critics.sort();
+    for (by, (total, fails)) in critics {
+        if *total >= 5 && *fails == 0 {
+            out.push(format!("affirming-only critic '{by}': {total} critiques, 0 findings — verify rigor (D0080)"));
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
 /// Critique-coverage view (D0080) as JSON.
 ///
 /// Per-element required-lens matrix + per-type summary + the gap set (elements missing a required
@@ -1608,6 +1693,7 @@ fn report_cards(root: &Path, name: &str) -> Result<(String, Vec<Json>), ViewErro
         "quality-debt" => Ok(("Quality & Debt".to_string(), quality_debt_cards(root, &model, &cov, &stale, &task_suspect))),
         "flow" => Ok(("Flow / Velocity".to_string(), flow_cards(root, &model, &orient))),
         "governance" => Ok(("Governance / Decisions".to_string(), governance_cards(&model))),
+        "friction" => Ok(("Authoring Friction (vs spreadsheet)".to_string(), friction_cards())),
         other => Err(ViewError::UnknownReport(other.to_string())),
     }
 }
@@ -1663,6 +1749,7 @@ const fn headline_label(name: &str) -> &str {
         b"traceability" => "Requirements verified %",
         b"quality-debt" => "Supersede edges (volatility)",
         b"governance" => "Accepted decisions",
+        b"friction" => "Write-API verbs (1-command facts)",
         _ => "Delivered points (burnup)",
     }
 }
@@ -1684,6 +1771,7 @@ fn headline_at(root: &Path, name: &str) -> Option<i64> {
             Some(i64::from(pct(covered, rows.len())))
         }
         "quality-debt" => Some(i64::try_from(model.edges.iter().filter(|e| e.kind == "supersede").count()).unwrap_or(0)),
+        "friction" => Some(4), // the 4 one-command write-API verbs (a fixed benchmark, not a trend)
         "governance" => Some(i64::try_from(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count()).unwrap_or(0)),
         _ => {
             // flow → burnup: cumulative delivered story points.
@@ -1905,6 +1993,18 @@ fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec
         card("Throughput", sprints.to_string(), format!("{sprints} delivery sprints recorded"), "good"),
         card("Aging WIP", format!("{aging}d"), format!("oldest unfinished sprint age (as-of latest recorded date); {wip} in progress"), if aging <= 7 { "good" } else { "warn" }),
         card("Open issues", open_issues.to_string(), format!("{open_issues} open issue(s) on the board"), if open_issues == 0 { "good" } else { "warn" }),
+    ]
+}
+
+/// Authoring-friction benchmark (D0054/issue029): record one canonical fact (a passing test result)
+/// via the write API vs the hand-edit and spreadsheet baselines. Makes the D0054 first-class friction
+/// requirement VERIFIABLE — "the write path beats a spreadsheet" becomes a checkable claim.
+fn friction_cards() -> Vec<Json> {
+    vec![
+        card("Write API: record a fact", "1 command".to_string(), "append-result / append-gate-result / add-task / apply-review — one invocation, with auto UUID + who/when/commit provenance + append-only enforcement".to_string(), "good"),
+        card("Hand-edit .sysml", "~6 steps".to_string(), "open file, locate the DoD, author the TestResult line, generate a UUID, find the insertion point, save — error-prone, no enforcement".to_string(), "warn"),
+        card("Spreadsheet (baseline)", "1 row".to_string(), "fast to type, but NO provenance, NO validation, NO computed resolution/suspicion — the JPL friction trap (D0054)".to_string(), "warn"),
+        card("Verdict vs spreadsheet", "beats it".to_string(), "the write path ties the spreadsheet on steps (1 command) and dominates on provenance + validation + computed state — satisfies the D0054 first-class friction requirement".to_string(), "good"),
     ]
 }
 
@@ -2449,6 +2549,17 @@ mod tests {
     }
 
     #[test]
+    fn low_rigor_reason_flags_shallow_critiques() {
+        // D0080/issue030: too-short or structure-less critiques are low-rigor; a substantive
+        // adversarial one passes.
+        assert!(low_rigor_reason("too short").is_some());
+        let no_struct = "x".repeat(200);
+        assert_eq!(low_rigor_reason(&no_struct), Some("no ATTACK/FINDING/SURVIVED adversarial structure"));
+        let good = format!("ATTACK: is the edge direction right? SURVIVED: verified against the schema. {}", "y".repeat(80));
+        assert_eq!(low_rigor_reason(&good), None);
+    }
+
+    #[test]
     fn pct_handles_empty_denominator() {
         assert_eq!(pct(0, 0), 100, "nothing to measure = vacuously complete");
         assert_eq!(pct(1, 2), 50);
@@ -2462,7 +2573,7 @@ mod tests {
     fn report_produces_cards_and_rejects_unknown() {
         // D0087: each report yields a non-empty cards array; unknown report errors. (cwd = crate dir.)
         let root = std::path::Path::new("..");
-        for name in ["assurance", "traceability", "quality-debt", "flow", "governance"] {
+        for name in ["assurance", "traceability", "quality-debt", "flow", "governance", "friction"] {
             let json = report(root, name, false).unwrap_or_else(|e| panic!("report {name}: {e}"));
             assert!(json.contains("\"cards\""), "{name} has cards");
             assert!(json.contains("\"tone\""), "{name} cards carry a tone");

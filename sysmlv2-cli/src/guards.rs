@@ -677,14 +677,45 @@ pub fn manifest_coverage(root: &Path) -> GuardReport {
     GuardReport { name: "manifest-coverage", scanned: entries.len(), warnings, violations }
 }
 
+/// Guard (D0080/issue031): a Critical-severity finding's target must carry a non-aiModel critic.
+///
+/// ENFORCED (vacuous until a Critical finding exists). aiModel-vs-aiModel critique shares blind spots,
+/// so the highest-stakes elements require cognition-distinct (human/tool) independence.
+#[must_use]
+pub fn critic_independence(root: &Path) -> GuardReport {
+    match crate::view::critical_independence_gaps(root) {
+        Ok(gaps) => {
+            let violations = gaps
+                .into_iter()
+                .map(|e| format!("{e}: target of a Critical-severity finding but has only aiModel critiques — requires a human/tool critic (D0080 independence, issue031)"))
+                .collect();
+            GuardReport { name: "critic-independence", scanned: 0, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "critic-independence", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading critique independence: {e}")] },
+    }
+}
+
+/// Diagnostic (D0080/issue030): low-rigor critiques + affirming-only critics, as WARNINGS.
+///
+/// RUNNABLE via `sysmlv2 guard critique-rigor` but NOT in the enforced `GUARD_NAMES` — rigor is a
+/// heuristic signal for human attention, not a hard gate (a shallow-but-honest critique is not a
+/// commit-blocker). Surfaces critiques lacking adversarial structure / substance and never-find critics.
+#[must_use]
+pub fn critique_rigor(root: &Path) -> GuardReport {
+    match crate::view::critique_rigor(root) {
+        Ok(findings) => GuardReport { name: "critique-rigor", scanned: findings.len(), warnings: findings, violations: Vec::new() },
+        Err(e) => GuardReport { name: "critique-rigor", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading critique rigor: {e}")] },
+    }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
 /// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
 /// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
 /// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
-pub const GUARD_NAMES: [&str; 11] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage"];
+pub const GUARD_NAMES: [&str; 12] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage", "critic-independence"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -701,6 +732,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
         "manifest-coverage" => Some(manifest_coverage(root)),
+        "critic-independence" => Some(critic_independence(root)),
+        "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         _ => None,
     }
 }
