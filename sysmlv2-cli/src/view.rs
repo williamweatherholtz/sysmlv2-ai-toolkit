@@ -793,6 +793,22 @@ fn is_covered_tier(tier: &str) -> bool {
     matches!(tier, "verified" | "attested")
 }
 
+/// Gate-covered % over `cov`, optionally restricted to type `ty` (empty = all): the fraction whose
+/// tier is gate-covered (verified|attested). The single coverage-ratio formula (D0090) — `metric_value`
+/// AND the report scalar cards both source from here, so the number is computed in exactly one place.
+fn coverage_pct_of(cov: &[Coverage], ty: &str) -> u32 {
+    let rows: Vec<&Coverage> = cov.iter().filter(|c| ty.is_empty() || c.type_name == ty).collect();
+    pct(rows.iter().filter(|c| is_covered_tier(c.tier)).count(), rows.len())
+}
+
+/// Verified % over `cov` restricted to type `ty` (empty = all): the fraction at the strongest
+/// (`verified`) tier — V&V traceability. Shared by `metric_value` (`req_verified_pct`/
+/// `needs_verified_pct`) and the traceability scorecard (D0090; single-source).
+fn verified_pct_of(cov: &[Coverage], ty: &str) -> u32 {
+    let rows: Vec<&Coverage> = cov.iter().filter(|c| ty.is_empty() || c.type_name == ty).collect();
+    pct(rows.iter().filter(|c| c.tier == "verified").count(), rows.len())
+}
+
 fn tier_of(verifiers: &[Verifier]) -> (&'static str, Option<&'static str>) {
     for want in ["verified", "attested", "addressed"] {
         if let Some(v) = verifiers.iter().find(|v| v.complete && !v.suspect && tier_for_kind(v.kind) == want) {
@@ -1829,14 +1845,11 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
             let task_suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
             let stale = compute_stale_verifications(root, &model);
             let cov = compute_coverage(&model, &done, &task_suspect, &stale);
-            let ty = match key {
-                "req_verified_pct" => "SystemRequirement",
-                "needs_verified_pct" => "Need",
-                _ => "",
-            };
-            let rows: Vec<&Coverage> = cov.iter().filter(|c| ty.is_empty() || c.type_name == ty).collect();
-            let covered = rows.iter().filter(|c| if key == "coverage_pct" { is_covered_tier(c.tier) } else { c.tier == "verified" }).count();
-            Some(f64::from(pct(covered, rows.len())))
+            Some(f64::from(match key {
+                "req_verified_pct" => verified_pct_of(&cov, "SystemRequirement"),
+                "needs_verified_pct" => verified_pct_of(&cov, "Need"),
+                _ => coverage_pct_of(&cov, ""),
+            }))
         }
         "critique_pct" => {
             let stale = compute_stale_verifications(root, &model);
@@ -1856,15 +1869,11 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
         }
         "friction_verbs" => Some(4.0), // the 4 one-command write-API verbs (a fixed benchmark)
         "velocity" | "burnup" | "throughput" => {
-            let flows: Vec<SprintFlow> = crate::collect_sysml(&root.join(".tracking").join("delivery"))
-                .iter()
-                .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| sprint_flow(&t)))
-                .collect();
-            let points: i64 = flows.iter().map(|f| f.points).sum();
+            let flows = collect_flows(root);
             match key {
                 "throughput" => Some(cnt(flows.len())),
-                "burnup" => Some(f64::from(i32::try_from(points).unwrap_or(i32::MAX))),
-                _ => Some(if flows.is_empty() { 0.0 } else { f64::from(i32::try_from(points).unwrap_or(i32::MAX)) / cnt(flows.len()) }),
+                "burnup" => Some(f64::from(i32::try_from(flows.iter().map(|f| f.points).sum::<i64>()).unwrap_or(i32::MAX))),
+                _ => Some(velocity_of(&flows)),
             }
         }
         _ => None,
@@ -1922,7 +1931,9 @@ fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet
     let total = cov.len();
     let ct = |t: &str| cov.iter().filter(|c| c.tier == t).count();
     let (verified, attested) = (ct("verified"), ct("attested"));
-    let covered_pct = pct(verified + attested, total);
+    // Headline from the shared coverage-ratio formula (D0090) — computed in exactly one place
+    // (`coverage_pct_of`); verified/attested/total below are the structural breakdown for the detail.
+    let covered_pct = coverage_pct_of(cov, "");
     let crit = compute_critique_coverage(model, stale);
     let crit_cov = crit.iter().filter(|c| c.covered).count();
     let crit_pct = pct(crit_cov, crit.len());
@@ -1948,11 +1959,12 @@ fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet
 
 fn traceability_cards(model: &Model, cov: &[Coverage]) -> Vec<Json> {
     let by_type = |ty: &str| -> Vec<&Coverage> { cov.iter().filter(|c| c.type_name == ty).collect() };
-    let verified_pct = |rows: &[&Coverage]| pct(rows.iter().filter(|c| c.tier == "verified").count(), rows.len());
     let needs = by_type("Need");
     let reqs = by_type("SystemRequirement");
-    let n_pct = verified_pct(&needs);
-    let r_pct = verified_pct(&reqs);
+    // Headlines from the shared verified-ratio formula (D0090; single-source with metric_value); the
+    // per-tier breakdown below stays local for the detail text.
+    let n_pct = verified_pct_of(cov, "Need");
+    let r_pct = verified_pct_of(cov, "SystemRequirement");
     // Edge completeness. A Need is satisfied by an OUTGOING satisfy edge (need -> requirement); a
     // requirement is verified by an INCOMING verify edge (test/critique -> requirement, #Verify).
     let names_of = |ty: &str| -> Vec<&String> { model.items.iter().filter(|(_, i)| i.type_name == ty).map(|(n, _)| n).collect() };
@@ -2054,18 +2066,35 @@ fn sprint_flow(text: &str) -> SprintFlow {
     sf
 }
 
+/// Per-sprint flow facts for every delivery file. Shared by `metric_value` (velocity/throughput/
+/// burnup) and the flow scorecard (D0090) so the sprint set is parsed in exactly one place.
+fn collect_flows(root: &Path) -> Vec<SprintFlow> {
+    crate::collect_sysml(&root.join(".tracking").join("delivery"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| sprint_flow(&t)))
+        .collect()
+}
+
+/// Mean delivered points per sprint (the canonical velocity, f64) over `flows`. The single velocity
+/// formula — shared by the velocity Indicator/metric and the flow scorecard card (D0090).
+fn velocity_of(flows: &[SprintFlow]) -> f64 {
+    if flows.is_empty() {
+        return 0.0;
+    }
+    let points: i64 = flows.iter().map(|f| f.points).sum();
+    f64::from(i32::try_from(points).unwrap_or(i32::MAX)) / f64::from(u32::try_from(flows.len()).unwrap_or(u32::MAX))
+}
+
 fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec<Json> {
     let _ = model;
     let ready = orient.ready.len();
     let wip = orient.in_progress_sprints.len();
     let open_issues = orient.open_issues.len();
-    let flows: Vec<SprintFlow> = crate::collect_sysml(&root.join(".tracking").join("delivery"))
-        .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| sprint_flow(&t)))
-        .collect();
+    let flows = collect_flows(root);
     let sprints = flows.len();
     let total_points: i64 = flows.iter().map(|f| f.points).sum();
-    let velocity = if sprints == 0 { 0 } else { total_points / i64::try_from(sprints).unwrap_or(1) };
+    // Canonical velocity from the shared formula (D0090) — same number the velocity Indicator shows.
+    let velocity = velocity_of(&flows);
     // Cycle time (refine→retro) + lead time (created→retro), in days, over sprints with both dates.
     let cycles: Vec<i64> = flows.iter().filter_map(|f| Some(f.retro? - f.refine?)).collect();
     let cycle_mean = if cycles.is_empty() { 0 } else { cycles.iter().sum::<i64>() / i64::try_from(cycles.len()).unwrap_or(1) };
@@ -2083,7 +2112,7 @@ fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec
     vec![
         card("Ready frontier", ready.to_string(), format!("{ready} task(s) ready to start now"), if ready == 0 { "warn" } else { "good" }),
         card("Work in progress", wip.to_string(), format!("{wip} sprint(s) with ceremony in progress (low WIP is healthy)"), if wip <= 2 { "good" } else { "warn" }),
-        card("Velocity", velocity.to_string(), format!("~{velocity} points/sprint (mean across {sprints} sprints, {total_points} pts total)"), "good"),
+        card("Velocity", format!("{velocity:.2}"), format!("~{velocity:.1} points/sprint (mean across {sprints} sprints, {total_points} pts total)"), "good"),
         card("Cycle time", format!("{cycle_mean}d"), format!("mean refine→retro across {} sprints (same-day autonomous = ~0)", cycles.len()), "good"),
         card("Time / story point", format!("{per_point:.2}d"), format!("{cycle_days_total} cycle-days / {cycle_pts} points (lower = faster delivery)"), "good"),
         card("Lead time", format!("{lead_mean}d"), format!("mean created→retro across {} sprints (DORA-style lead time)", leads.len()), "good"),
