@@ -456,6 +456,18 @@ package ProjectIssues {
     }
     #Resolves dependency from serveItemActions to issue041;
 
+    part issue042 : Issue {
+        :>> id = "e0420042-0042-4e42-9042-516273840042";
+        :>> title = "cargo test is not in the automated commit gate — a failing test can reach main (n14 test-gating clause unrealized)";
+        :>> createdAt = "2026-06-23";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (Sprint 118, n14TddBdd x testability, Medium): n14 requires 'CI shall reject PRs where cargo test or cargo clippy -D warnings fails.' The active commit gate (.githooks/pre-commit) runs `keel validate` + guards + `cargo clippy --workspace --all-targets -D warnings`, but does NOT run `cargo test`; and there is no CI pipeline (no .github/workflows; main-only, no PRs). So a failing cargo test (a parser/orient/write logic regression) can land on main, caught only by per-sprint manual `cargo test` — which D0047 explicitly classifies as 'not a control' (manual vigilance). The clippy half of n14's gate clause is enforced; the cargo-test half is not. Candidate resolver (if ACT): cargoTestGate — add `cargo test` to the pre-commit hook for staged Rust (or a CI workflow), accepting the ~15s latency tradeoff (weigh vs n11/D0054 friction) OR revise n14 to reference the actual main-only gate. PENDING human disposition (ACT / ACCEPT-RISK / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "cargoTestGate";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from cargoTestGate to issue042;
+
     // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
     //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
     //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections
