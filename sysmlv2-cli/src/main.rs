@@ -162,18 +162,31 @@ fn cmd_check(args: &[String]) -> i32 {
 }
 
 fn cmd_orient(args: &[String]) -> i32 {
-    let root = match args.first() {
+    let html = args.iter().any(|a| a == "--html");
+    let root = match args.iter().find(|a| !a.starts_with("--")) {
         Some(p) => PathBuf::from(p),
         None => {
             if let Some(r) = find_repo_root() {
                 r
             } else {
                 eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: sysmlv2 orient [ROOT]");
+                eprintln!("usage: sysmlv2 orient [ROOT] [--html]");
                 return 2;
             }
         }
     };
+    if html {
+        return match sysmlv2_cli::view::orient_html(&root) {
+            Ok(h) => {
+                println!("{h}");
+                0
+            }
+            Err(e) => {
+                eprintln!("orient --html error: {e}");
+                1
+            }
+        };
+    }
     println!("{}", orient::compute(&root).to_json());
     0
 }
@@ -1169,7 +1182,7 @@ fn main() {
             eprintln!("  check FILE...                parse-check one or more .sysml files");
         eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
             eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
-            eprintln!("  orient [ROOT]                print orient state as JSON");
+            eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
             eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
             eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");

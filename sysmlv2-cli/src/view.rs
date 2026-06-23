@@ -2064,6 +2064,52 @@ pub fn report_html(root: &Path, name: &str, trend: bool) -> Result<String, ViewE
         .replace("/*CARDS*/", &Json::Arr(cards).dump()))
 }
 
+/// The orient DASHBOARD as a self-contained HTML scorecard (D0093) — the human's recurring home.
+///
+/// Cards: where things stand + what's ready + open issues + suspect/stale + assurance readiness,
+/// reusing the report card template. A computed #View (regenerate-don't-commit), drilling down to the
+/// `sysmlv2 orient` JSON authority.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn orient_html(root: &Path) -> Result<String, ViewError> {
+    let o = crate::orient::compute(root);
+    let preview = |items: &[String], n: usize| -> String {
+        if items.is_empty() {
+            return "\u{2014}".to_string();
+        }
+        let shown: Vec<&str> = items.iter().take(n).map(String::as_str).collect();
+        let more = items.len().saturating_sub(n);
+        if more > 0 { format!("{} \u{2026} +{more} more", shown.join(", ")) } else { shown.join(", ") }
+    };
+    let rb = compute_readiness(root)?;
+    let ready = rb.ready();
+    let wip: Vec<String> = o
+        .in_progress_sprints
+        .iter()
+        .map(|s| format!("{} (pending {})", s.sprint, s.pending.clone().unwrap_or_else(|| "\u{2014}".to_string())))
+        .collect();
+    let suspect_total = o.suspect.len() + o.invalid_evidence.len();
+    let cards = vec![
+        card("Progress", format!("{} / {}", o.done, o.outstanding), "completed vs outstanding tasks".to_string(), "good"),
+        card("Ready to start", o.ready.len().to_string(), format!("unblocked now: {}", preview(&o.ready, 6)), if o.ready.is_empty() { "warn" } else { "good" }),
+        card("Sprints in progress", o.in_progress_sprints.len().to_string(), if wip.is_empty() { "none".to_string() } else { preview(&wip, 4) }, if o.in_progress_sprints.len() <= 2 { "good" } else { "warn" }),
+        card("Open issues", o.open_issues.len().to_string(), format!("unresolved: {}", preview(&o.open_issues, 6)), if o.open_issues.is_empty() { "good" } else { "warn" }),
+        card("Suspect / stale", suspect_total.to_string(), format!("{} drift/criterion + {} invalid-evidence \u{2014} re-verify", o.suspect.len(), o.invalid_evidence.len()), if suspect_total == 0 { "good" } else { "warn" }),
+        card(
+            "Assurance readiness",
+            if ready { "READY".to_string() } else { "NOT READY".to_string() },
+            format!("{} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()),
+            if ready { "good" } else { "bad" },
+        ),
+    ];
+    Ok(REPORT_TEMPLATE
+        .replace("/*STYLE*/", TABLE_STYLE)
+        .replace("/*TITLE*/", &json_esc("Orient \u{00b7} where things stand"))
+        .replace("/*TREND*/", "null")
+        .replace("/*CARDS*/", &Json::Arr(cards).dump()))
+}
+
 fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet<String>, done: &HashSet<String>, task_suspect: &HashSet<String>) -> Result<Vec<Json>, ViewError> {
     let total = cov.len();
     let ct = |t: &str| cov.iter().filter(|c| c.tier == t).count();

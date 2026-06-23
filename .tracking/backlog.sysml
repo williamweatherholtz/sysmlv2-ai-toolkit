@@ -763,5 +763,6 @@ package EngineBacklog {
 
         action orientDashboard; // D0093: `sysmlv2 orient --html` — the human's recurring oversight dashboard.
         verification orientDashboardDoD : Test { :>> id = "a1c70097-0097-4097-9097-516273840097"; :>> method = VerificationMethod::test; :>> procedureText = "D0093 human home: `sysmlv2 orient --html` emits a self-contained HTML dashboard (status + ready frontier + open findings + assurance readiness) extending the render/report HTML emitter (D0086/D0087) — a computed #View (regenerate-don't-commit), drilling down to the CLI/JSON authority. HTML renders views only (never a second store; the dual-surface invariant). VERIFY: `sysmlv2 orient --html > x.html` is self-contained + opens offline; values match `sysmlv2 orient` JSON; orient viewpoint gains the html renderer (viewpoint-renderer guard PASS); clippy + cargo test + guard all green."; }
+        part orientDashboardDoDR1 : TestResult { :>> id = "cac634c0-6c94-499a-a315-6487ee138dea"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5a8d9fb"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }

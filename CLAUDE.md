@@ -103,6 +103,14 @@ viewpoint-registry stays the concern-coverage index.)
    be defensibly set, it stays an **indicator** — promote to a requirement/guard only when a justified
    boundary emerges (D0088; avoid the Goodhart trap). Parametric constraints (mass/power budgets, MoEs)
    are *deliverable-domain* (D0054), not modeled in the work/process engine.
+7. **Dual surface, one truth (D0093).** The **CLI/JSON is the authority + automation substrate** (the
+   AI agent's surface — every fact authored via the write API, every state computed by the Rust
+   toolchain); **HTML is the human's ergonomic oversight lens** (orient/review/decide). HTML NEVER
+   stores truth — it renders computed `#View`s (`diagram`, `render`, `report`, `orient --html`) and
+   wraps the write API (`apply-review`); it never becomes a second store or a second authority. The
+   engine **spins up** on a new project via `sysmlv2 init DIR` (binary-embedded; engine architecture
+   decisions ship as read-only `.engine/reference/`, the new project authors its own fresh), and a
+   newcomer is onboarded by the guided, project-based `introduction` skill (D0093).
 
 ---
 

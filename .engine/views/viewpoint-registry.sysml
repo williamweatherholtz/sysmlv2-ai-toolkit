@@ -18,7 +18,7 @@ package EngineViewpoints {
         :>> concernText = "Where do things stand and what is ready to work next?";
         :>> audience = "maintainer / lead";
         :>> sources = "backlog action defs + latest TestResults + succession DAG + delivery-file ceremony gates";
-        :>> renderer = "sysmlv2 orient";
+        :>> renderer = "sysmlv2 orient [--html] (JSON authority; --html = the human dashboard #View, D0093)";
     }
     part whatsNextVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-2619-405162738411";
