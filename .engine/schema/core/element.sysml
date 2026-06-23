@@ -30,6 +30,7 @@ package EngineElement {
     enum def Severity { Critical; High; Medium; Low; }                          // finding/issue severity (D0079); human-disposition gate at >= Medium
     enum def CriticKind { aiModel; human; tool; }                               // who performed the critique (identity stays in judgedBy)
     enum def CritiqueLens { completeness; correctness; ambiguity; testability; feasibility; consistency; necessity; }  // requirement-quality canon
+    enum def DispositionKind { act; acceptRisk; dismiss; }                      // D0092: a human's recorded verdict on a >= Medium finding (act=resolve / acceptRisk=knowingly accept / dismiss=moot)
     enum def Priority { must; should; could; wont; }                            // MoSCoW
     enum def RequirementKind { functional; nonFunctional; safety; security; interfaceReq; }
     enum def RiskLevel { high; medium; low; }

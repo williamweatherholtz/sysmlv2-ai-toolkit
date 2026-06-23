@@ -32,6 +32,12 @@ package EngineVerification {
         attribute lens : CritiqueLens[0..1];
         attribute critiquedBy : CriticKind[0..1];
         attribute severity : Severity[0..1];
+        // Finding disposition (D0092): when this Test is a method=confirmation DISPOSITION of a
+        // >= Medium finding (#Dispositions-linked to the finding Issue), `disposition` carries the
+        // human's verdict (act/acceptRisk/dismiss). The rationale lives in procedureText; provenance
+        // (who/when/commit) in the result. Reuses the verification substrate so dispositions inherit
+        // staleness (suspect -> re-disposition when the finding changes, D0080).
+        attribute disposition : DispositionKind[0..1];
     }
 
     // TestPlan — a suite: a verification that composes member verifications
