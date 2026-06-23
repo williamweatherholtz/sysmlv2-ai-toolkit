@@ -864,5 +864,9 @@ package EngineBacklog {
         action critiqueBatch11; // D0080: Decisions d0037,d0039,d0040,d0041,d0042 (Core-3 each).
         verification critiqueBatch11DoD : Test { :>> id = "a1c70129-0129-4129-9129-516273840129"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 11 (5 items): Core-3 critiques for d0037 (validated authorship), d0039 (ceremony skills), d0040 (recurring-task-skill rule), d0041 (defer 3 toolchain features), d0042 (Release occurrence def) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 94->99/120; keel validate clean; guard all (13) green."; }
         part critiqueBatch11DoDR1 : TestResult { :>> id = "1275ecdd-ca4e-49b5-a67f-8457279a0477"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "82f42ea"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+
+        action critiqueBatch12; // D0080: Decisions d0043,d0044,d0045,d0046,d0051 (Core-3 each).
+        verification critiqueBatch12DoD : Test { :>> id = "a1c70130-0130-4130-9130-516273840130"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 12 (5 items): Core-3 critiques for d0043 (anti-drift validator guards), d0044 (cap ≤8 pts), d0045 (drop StateCursor, compute ceremony status), d0046 (CAE+GQM+ATAM audit framework), d0051 (per-sitting confirms non-test-verifiable only) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 99->104/120; keel validate clean; guard all (13) green."; }
+        part critiqueBatch12DoDR1 : TestResult { :>> id = "08857c3c-978b-4bc1-8b50-fcf1692ec09b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "de46c58"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }
