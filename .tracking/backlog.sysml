@@ -872,5 +872,9 @@ package EngineBacklog {
         action critiqueBatch13; // D0080: Decisions d0052,d0053,d0055,d0058,d0060 (Core-3 each).
         verification critiqueBatch13DoD : Test { :>> id = "a1c70131-0131-4131-9131-516273840131"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 13 (5 items): Core-3 critiques for d0052 (ordered backlog), d0053 (defer trackedMetadata, re-freeze), d0055 (engine IS systems modeling), d0058 (Decision Analysis convention), d0060 (settled item model) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 104->109/120; keel validate clean; guard all (13) green."; }
         part critiqueBatch13DoDR1 : TestResult { :>> id = "cfc418e2-9a0c-431c-b264-58200623867c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "41a9743"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+
+        action critiqueBatch14; // D0080: Decisions d0061,d0063,d0064,d0065,d0067 (Core-3 each).
+        verification critiqueBatch14DoD : Test { :>> id = "a1c70132-0132-4132-9132-516273840132"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 14 (5 items): Core-3 critiques for d0061 (Decision field set), d0063 (attr-model migration), d0064 (bootstrap over, sprint discipline), d0065 (attr-model contract), d0067 (safe-migration process) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 109->114/120; keel validate clean; guard all (13) green."; }
+        part critiqueBatch14DoDR1 : TestResult { :>> id = "c38265a5-27b7-4cc7-abc2-8d0d8c9eb429"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a316942"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }
