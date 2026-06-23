@@ -24,7 +24,14 @@ Three outputs:
 1. **Sitting summary** — the sprints completed this sitting + what shipped.
 2. **Metrics snapshot** — velocity, efficiency, accuracy + trailing trend.
 3. **Improvement queue** — transcript-scan findings (feeds the autonomous retro).
-4. **Human confirmation** — the human accepts the sitting's content (the one gate).
+4. **Human confirmation + coverage** — the human accepts the sitting's content (the one gate),
+   recorded as a `method=confirmation` review whose `#Covers` edges name the sprint `Story` items it
+   attests (D0049/issue040). Coverage is then COMPUTED: `sysmlv2 sitting-coverage` reports which
+   delivery sprints have a covering review vs await one (a VIEW, not a gate — never fabricate a
+   review; the confirmation is the human's explicit word, D0016). Record shape:
+   `verification sittingRev<id> : Test { :>> method = VerificationMethod::confirmation; ... }` +
+   a `TestResult` (judgedBy = the human) + `#Covers dependency from sittingRev<id> to <sprintStory>;`
+   for each covered sprint.
 
 ## Expert Vocabulary Payload
 

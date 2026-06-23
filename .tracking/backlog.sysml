@@ -749,5 +749,6 @@ package EngineBacklog {
 
         action sittingModel; // D0049 (issue040): model the sitting + review->sprints coverage so the human gate's unit is computable.
         verification sittingModelDoD : Test { :>> id = "a1c70040-0040-4040-9040-516273840040"; :>> method = VerificationMethod::test; :>> procedureText = "D0049 finding (issue040): 'sitting' (the unit of the sole human gate) has no model representation; review->sprints coverage is uncomputable. CANDIDATE resolution (pending ACT): record a per-sitting review's coverage as an authored edge (review -> the sprints it attests) + a computed view that surfaces sprints with no covering sitting-review (the human-gate analogue of coverage). VERIFY: the view computes which sprints a given review covers and flags any closed sprint with no covering review; green on the current model. (Design open: Sitting item vs marker-edge — to be settled at disposition.)"; }
+        part sittingModelDoDR1 : TestResult { :>> id = "74b0e555-fda2-49fb-a1c9-9e2c9e11313d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fa18c22"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
     }
 }

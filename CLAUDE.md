@@ -42,7 +42,8 @@ Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (nee
 tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
 `governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
 declared viewpoint concerns are served vs planned), `dispositions` (D0092 — which ≥Medium findings
-carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned) are the other computed lenses
+carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned), `sitting-coverage` (D0049/issue040
+— which delivery sprints have a covering per-sitting review via `#Covers` vs await one) are the other computed lenses
 (`suspect` also flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
 renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked

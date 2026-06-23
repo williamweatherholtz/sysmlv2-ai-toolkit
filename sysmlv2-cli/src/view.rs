@@ -793,6 +793,50 @@ pub fn dispositions(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+/// The set of sprint Story names covered by a `#Covers` edge (review -> sprint). Pure (for self-test).
+fn covered_sprints(model: &Model) -> HashSet<&str> {
+    model.edges.iter().filter(|e| e.kind == "covers").map(|e| e.to.as_str()).collect()
+}
+
+/// Sitting-coverage view (D0049/D0092 issue040): which delivery sprints are covered by a review.
+///
+/// A "sitting review" attests its sprints via `#Covers` edges (review -> sprint `Story`); a sprint is
+/// covered iff some `#Covers` edge points to it. Makes the previously-unmodeled "sitting" UNIT
+/// computable (the human gate's coverage). A VIEW, not a gate — the human reviews per sitting at their
+/// own cadence (batchable, D0019); an uncovered sprint is surfaced, not blocked.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut sprints: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
+    sprints.sort();
+    let covered: HashSet<&str> = covered_sprints(&model);
+    let uncovered: Vec<Json> = sprints.iter().filter(|s| !covered.contains(s.as_str())).map(|s| Json::s((*s).clone())).collect();
+    // Each per-sitting review (a source of #Covers edges) + the sprints it attests.
+    let mut review_names: Vec<&String> = model.edges.iter().filter(|e| e.kind == "covers").map(|e| &e.from).collect();
+    review_names.sort_unstable();
+    review_names.dedup();
+    let reviews: Vec<Json> = review_names
+        .iter()
+        .map(|r| {
+            let mut covers: Vec<String> = model.edges.iter().filter(|e| e.kind == "covers" && &e.from == *r).map(|e| e.to.clone()).collect();
+            covers.sort();
+            Json::Obj(vec![("review".to_string(), Json::s((*r).clone())), ("covers".to_string(), Json::Arr(covers.into_iter().map(Json::s).collect()))])
+        })
+        .collect();
+    let total = sprints.len();
+    let uncovered_n = uncovered.len();
+    let out = Json::Obj(vec![
+        ("sprints".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+        ("covered".to_string(), Json::Int(i64::try_from(total - uncovered_n).unwrap_or(i64::MAX))),
+        ("uncovered".to_string(), Json::Int(i64::try_from(uncovered_n).unwrap_or(i64::MAX))),
+        ("sitting_reviews".to_string(), Json::Arr(reviews)),
+        ("uncovered_sprints".to_string(), Json::Arr(uncovered)),
+    ]);
+    Ok(out.dump())
+}
+
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
 // For each Need / SystemRequirement / Decision: is there COMPLETE + PASSING + NON-STALE evidence
 // it has been addressed? Verifier kinds, strongest first:
@@ -2862,6 +2906,22 @@ mod tests {
         let (undisp, critical) = finding_blockers(&res, &model);
         assert_eq!(undisp, vec!["iRaw".to_string()], "only the un-dispositioned Medium finding blocks (iActed has a typed verdict)");
         assert_eq!(critical, vec!["iCrit".to_string()], "open Critical blocks even when dispositioned");
+    }
+
+    #[test]
+    fn sitting_coverage_detects_covered_sprints() {
+        // D0049/issue040: a #Covers edge (review -> sprint Story) marks that sprint covered.
+        let mut items = HashMap::new();
+        let story = |t: &str| ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None };
+        items.insert("s1".to_string(), story("Story"));
+        items.insert("s2".to_string(), story("Story"));
+        items.insert("sittingRev1".to_string(), story("Test"));
+        let edges = vec![Edge { kind: "covers".to_string(), from: "sittingRev1".to_string(), to: "s1".to_string() }];
+        let model = Model { items, edges };
+        let covered = covered_sprints(&model);
+        assert!(covered.contains("s1"), "s1 is covered by the sitting review");
+        assert!(!covered.contains("s2"), "s2 has no covering review");
+        assert_eq!(covered.len(), 1);
     }
 
     #[test]

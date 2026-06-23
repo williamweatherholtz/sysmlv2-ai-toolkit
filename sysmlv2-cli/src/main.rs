@@ -12,6 +12,7 @@
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
 //!   `concern-coverage [ROOT]` — which declared viewpoint concerns are served vs planned (D0057)
 //!   `dispositions [ROOT]`     — >= Medium findings + their typed disposition verdict (D0092)
+//!   `sitting-coverage [ROOT]` — which delivery sprints are covered by a per-sitting review (D0049)
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
 //!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
@@ -348,6 +349,30 @@ fn cmd_dispositions(args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("dispositions error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_sitting_coverage(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 sitting-coverage [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::sitting_coverage(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("sitting-coverage error: {e}");
             1
         }
     }
@@ -1013,6 +1038,7 @@ fn main() {
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
         Some("dispositions") => cmd_dispositions(rest),
+        Some("sitting-coverage") => cmd_sitting_coverage(rest),
         Some("concern-coverage") => cmd_concern_coverage(rest),
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
