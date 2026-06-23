@@ -38,10 +38,21 @@ fn write_sysml(root: &Path, tasks: &[(String, bool)], succs: &[(String, String)]
     std::fs::write(tracking.join("tasks.sysml"), content).unwrap();
 }
 
+/// `git init` a directory so SHA validation runs inside a real (empty) repo where a fake
+/// 40-hex SHA deterministically resolves to `missing` — making this test hermetic regardless
+/// of whether the system temp dir happens to sit inside another git repo.
+fn git_init(dir: &Path) {
+    let _ = std::process::Command::new("git")
+        .arg("-C").arg(dir).arg("init").arg("-q")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .status();
+}
+
 /// Write a task with a NON-EMPTY invalid SHA so it lands in `invalidEvidence`.
 fn write_sysml_invalid_sha(root: &Path, name: &str) {
     let tracking = root.join(".tracking");
     std::fs::create_dir_all(&tracking).unwrap();
+    git_init(root);
     let body = format!(
         "        action {name};\n        part {name}DoDR1 : TestResult {{ :>> id = \"ffffffff-0000-4000-8000-000000000001\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"deadbeef00000000000000000000000000000001\"; :>> judgedAt = \"2026-06-15\"; :>> judgedBy = \"test\"; }}\n"
     );

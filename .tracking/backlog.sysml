@@ -789,6 +789,7 @@ package EngineBacklog {
 
         action serveItemActions; // D0094: per-item action panel — Critique (agent), Add TestResult downstream, Disposition.
         verification serveItemActionsDoD : Test { :>> id = "a1c70094-0094-4694-9694-516273840694"; :>> method = VerificationMethod::test; :>> procedureText = "D0094 generic actions: the expanded item detail (serveItemIntrospect) gains an action panel wiring the write-API verbs to THAT item — Critique (agent-bridge target=item), Add TestResult downstream (append-result on a chosen action/DoD), Disposition (for a finding). Same discipline (write API + guards + >=Medium human-disposition; agent never auto-commits). VERIFY: from an item, a critique streams + lands as a tracked critique; a downstream TestResult is appended via the write path; clippy + cargo test + guard green."; }
+        part serveItemActionsDoDR1 : TestResult { :>> id = "51e2f2f1-11d0-4e24-8900-afebc93dc440"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7642f1c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
 
         // ── D0095 deferred rename (its own gated D0067 migration) ──
         action engineRename; // D0095: rename sysmlv2 -> keel (binary/package/docs/scaffold/CLAUDE.md) as a gated bulk migration.

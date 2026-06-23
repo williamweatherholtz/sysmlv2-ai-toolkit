@@ -444,6 +444,18 @@ package ProjectIssues {
     }
     #Resolves dependency from sittingModel to issue040;
 
+    part issue041 : Issue {
+        :>> id = "e0410041-0041-4e41-9041-516273840041";
+        :>> title = "Non-hermetic BDD test: orient_bdd 'unresolvable SHA' depended on the system temp dir sitting inside a git repo";
+        :>> createdAt = "2026-06-23";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Found mid-work (Sprint 112): the orient_bdd scenario 'task with unresolvable SHA appears in invalidEvidence' wrote its fixture to std::env::temp_dir(), which on this machine is NOT inside any git repo. orient's SHA validation is conservative-on-git-failure (orient.rs valid_commits / line ~519 unwrap_or(true)): when `git -C <temp> cat-file --batch-check` errors out entirely (no repo) it emits no per-SHA line, so the fake SHA is absent from the map and defaults to VALID -> done=1, failing the test (expected invalidEvidence/done=0). The test only passed when temp happened to live inside a real repo. Recurrable class: non-hermetic tests that depend on ambient git state. Resolver: serveItemActions carries the fix -- git_init() the fixture's temp root so the fake 40-hex SHA deterministically resolves to `missing` regardless of where temp lives; the now-hermetic test IS the permanent check. orient semantics unchanged. Severity Low (test-hygiene, no production impact).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "serveItemActions";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from serveItemActions to issue041;
+
     // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
     //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
     //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections

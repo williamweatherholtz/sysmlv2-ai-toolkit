@@ -78,6 +78,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/events", get(api_events))
         // serveItemIntrospect — generic any-item detail
         .route("/api/item/:name", get(api_item))
+        // serveItemActions — append a downstream TestResult to a task
+        .route("/api/testresult", post(api_testresult))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -354,6 +356,39 @@ async fn api_history(State(s): State<AppState>) -> Response {
 /// GET /api/item/:name (D0094 serveItemIntrospect) — any item's detail (attrs + edges + neighbors).
 async fn api_item(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
     cached(&s, &format!("item:{name}"), |r| crate::view::item_detail(r, &name))
+}
+
+/// The .tracking file declaring `action <task>;` (so a downstream `TestResult` can be appended to it).
+fn find_task_file(root: &Path, task: &str) -> Option<PathBuf> {
+    let needle = format!("action {task};");
+    crate::collect_sysml(&root.join(".tracking")).into_iter().find(|f| std::fs::read_to_string(f).is_ok_and(|t| t.contains(&needle)))
+}
+
+/// A request to append a downstream `TestResult` to an action task (D0094 serveItemActions).
+#[derive(serde::Deserialize)]
+struct TrReq {
+    task: String,
+    verdict: Option<String>,
+    judged_at: String,
+    judged_by: Option<String>,
+}
+
+/// POST /api/testresult (D0094 serveItemActions) — append a `TestResult` downstream of an action task via
+/// the write API (`append_result`). `judgedAgainst` = git HEAD; never auto-commits.
+async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrReq>) -> Response {
+    let verdict = b.verdict.unwrap_or_else(|| "pass".to_string());
+    if verdict != "pass" && verdict != "fail" {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"verdict must be pass or fail\"}".to_string()).into_response();
+    }
+    let Some(file) = find_task_file(&s.root, &b.task) else {
+        return (StatusCode::NOT_FOUND, format!("{{\"error\":\"no `action {}` found in .tracking\"}}", b.task.replace('"', "'"))).into_response();
+    };
+    let by = b.judged_by.filter(|x| !x.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let sha = git_head(&s.root);
+    match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by) {
+        Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
 }
 
 /// GET /api/events (D0094 serveLiveCache) — SSE change-push: poll the content fingerprint server-side

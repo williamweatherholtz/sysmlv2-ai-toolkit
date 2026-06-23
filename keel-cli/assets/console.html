@@ -67,18 +67,50 @@ async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
 function itemLink(name){return name?`<span class=il data-i="${esc(name)}">${esc(name)}</span>`:'<span class=muted>—</span>'}
 function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';n=n||12;const sh=arr.slice(0,n).map(itemLink).join(' · ');return sh+(arr.length>n?` <span class=muted>…+${arr.length-n} more</span>`:'')}
-function closeItem(){document.getElementById('modal').classList.remove('on')}
+let mes=null;
+function stopModalAgent(){if(mes){mes.close();mes=null}}
+function closeItem(){stopModalAgent();document.getElementById('modal').classList.remove('on')}
+function mlog(s){const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent+=s;l.scrollTop=l.scrollHeight}}
+function runAgentModal(action,target){
+ stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${target} ===\n`}
+ mes=new EventSource('/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target));
+ mes.addEventListener('status',e=>mlog('· '+e.data+'\n\n'));
+ mes.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)mlog(t)});
+ mes.addEventListener('done',e=>{mlog('\n\n'+e.data+'\n');stopModalAgent()});
+ mes.addEventListener('error',e=>{if(e.data)mlog('\n[error] '+e.data+'\n')});
+}
+async function addTestResult(task){
+ const v=(document.getElementById('trv')||{}).value||'pass';
+ try{const r=await fetch('/api/testresult',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,verdict:v,judged_at:new Date().toISOString().slice(0,10),judged_by:'wweatherholtz'})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  mlog('recorded TestResult '+j.name+' ('+j.verdict+') on '+task+'\n');
+ }catch(e){mlog('error: '+e.message+'\n')}
+}
+const ACTLOG='<pre id=mlog style="background:#0f1720;color:#cfe3f0;padding:10px;border-radius:6px;max-height:42vh;overflow:auto;white-space:pre-wrap;font-size:11px;line-height:1.45;margin-top:8px;display:none"></pre>';
 async function openItem(name){
- const m=document.getElementById('modal');m.classList.add('on');
+ const m=document.getElementById('modal');m.classList.add('on');stopModalAgent();
  m.innerHTML='<span class=x onclick="closeItem()">✕</span><p class=muted>loading '+esc(name)+'…</p>';
  try{const d=await get('/api/item/'+encodeURIComponent(name));
-  if(!d||!d.found){m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>'+esc(name)+'</h2><p class=muted>not an authored model item (could be a task or a file).</p>';return}
+  if(!d||!d.found){
+   // likely a task/action (not an authored part) — offer: critique it, or append a downstream TestResult
+   m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>'+esc(name)+' <span class=pill>task?</span></h2>'+
+    '<p class=muted>Not an authored model item — likely an action/task. You can critique it or append a downstream TestResult.</p>'+
+    '<div style="margin:8px 0"><button class=rb id=mcrit>Critique ▶</button><button class=rb id=minv>Investigate ▶</button> &nbsp; verdict <select id=trv><option>pass</option><option>fail</option></select> <button class=rb id=trbtn>Add TestResult</button></div>'+ACTLOG;
+   document.getElementById('mcrit').onclick=()=>runAgentModal('critique',name);
+   document.getElementById('minv').onclick=()=>runAgentModal('investigate',name);
+   document.getElementById('trbtn').onclick=()=>addTestResult(name);
+   return;
+  }
   const attrs=(d.attrs||[]).map(a=>`<tr><td class=k>${esc(a.key)}</td><td>${esc(a.value)}</td></tr>`).join('')||'<tr><td class=muted colspan=2>no authored attrs</td></tr>';
   const edges=(arr,label)=>arr&&arr.length?('<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:11px 0 3px">'+label+' ('+arr.length+')</h3>'+arr.map(e=>`<div style="font-size:11px;margin:2px 0"><span class=pill>${esc(e.kind)}</span> ${itemLink(e.node)}</div>`).join('')):'';
+  const disp=d.type==='Issue'?'<button class=rb data-dv=act>Act</button><button class=rb data-dv=accept-risk>Accept-risk</button><button class=rb data-dv=dismiss>Dismiss</button>':'';
   m.innerHTML='<span class=x onclick="closeItem()">✕</span>'+
    '<h2>'+esc(d.name)+' <span class=pill>'+esc(d.type)+'</span>'+(d.marker?' <span class=pill>#'+esc(d.marker)+'</span>':'')+'</h2>'+
-   '<table>'+attrs+'</table>'+edges(d.outgoing,'Outgoing →')+edges(d.incoming,'Incoming ←')+
-   '<p class=muted style="margin-top:12px">Per-item actions (critique / add test result / disposition) arrive with serveItemActions.</p>';
+   '<div style="margin:6px 0"><button class=rb id=mcrit>Critique ▶</button><button class=rb id=minv>Investigate ▶</button> '+disp+'</div>'+ACTLOG+
+   '<table>'+attrs+'</table>'+edges(d.outgoing,'Outgoing →')+edges(d.incoming,'Incoming ←');
+  document.getElementById('mcrit').onclick=()=>runAgentModal('critique',d.name);
+  document.getElementById('minv').onclick=()=>runAgentModal('investigate',d.name);
+  [...m.querySelectorAll('.rb[data-dv]')].forEach(b=>b.onclick=()=>disposition(d.name,b.dataset.dv));
  }catch(e){m.innerHTML='<span class=x onclick="closeItem()">✕</span><p>error: '+esc(e.message)+'</p>'}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('.il');if(a)openItem(a.dataset.i)});
