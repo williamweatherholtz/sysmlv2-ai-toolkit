@@ -121,5 +121,13 @@ async function render(){
  }catch(e){status.textContent='error: '+e.message}
 }
 draw();render();
-setInterval(()=>{if(active!=='agent')render()},6000);
+// pre-load the light views to warm the server-side cache so tab-switches are instant
+['orient','decisions','dispositions','processes'].forEach(k=>fetch('/api/'+k).catch(()=>{}));
+// event-driven refresh: the server pushes `changed` only when the model's content fingerprint flips
+let evs=new EventSource('/api/events');
+evs.addEventListener('hello',()=>{if(active!=='agent')status.textContent='live (event-driven)'});
+evs.addEventListener('changed',()=>{if(active!=='agent')render()});
+evs.onerror=()=>{status.textContent='live: reconnecting…'};
+// slow safety-net refresh in case the event stream drops (NOT the primary path)
+setInterval(()=>{if(active!=='agent')render()},30000);
 </script></body></html>

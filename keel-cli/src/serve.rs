@@ -6,10 +6,12 @@
 //! store). A request-logging middleware makes the server observable. Localhost-only; the agent-bridge
 //! (m3) builds on this. Tiers degrade gracefully.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::extract::{Path as AxPath, Query, Request, State};
 use axum::http::StatusCode;
@@ -35,6 +37,9 @@ struct AppState {
     root: Arc<PathBuf>,
     /// In-flight agent-bridge runs (concurrency guardrail, D0094).
     agents: Arc<AtomicUsize>,
+    /// Per-view JSON cache keyed `view -> (fingerprint, json)` (D0094 serveLiveCache): recompute a view
+    /// only when the model's content fingerprint changes; a materialized #View cache (regenerable, §2.1).
+    cache: Arc<Mutex<HashMap<String, (u64, String)>>>,
 }
 
 /// Run the console server on `127.0.0.1:port` over `root`. Blocks until interrupted.
@@ -54,7 +59,7 @@ pub fn run(root: PathBuf, port: u16) -> i32 {
 }
 
 async fn serve_async(root: PathBuf, port: u16) -> i32 {
-    let state = AppState { root: Arc::new(root), agents: Arc::new(AtomicUsize::new(0)) };
+    let state = AppState { root: Arc::new(root), agents: Arc::new(AtomicUsize::new(0)), cache: Arc::new(Mutex::new(HashMap::new())) };
     let app = Router::new()
         .route("/", get(index))
         .route("/api/orient", get(api_orient))
@@ -69,6 +74,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/view/diagram", get(view_diagram))
         // m3 — agent-bridge (headless claude -> SSE)
         .route("/api/agent/stream", get(api_agent_stream))
+        // serveLiveCache — event-driven change push (SSE)
+        .route("/api/events", get(api_events))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -83,7 +90,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
     println!("  act:   POST /api/disposition · /view/report/<name> · /view/diagram");
     println!("  agent: /api/agent/stream?action=<critique|investigate|report>&target=<x> (SSE; local `claude` CLI)");
-    println!("  (requests logged below)");
+    println!("  live:  /api/events (SSE change-push; views cached per content fingerprint)");
+    println!("  (requests logged to the terminal + keel-serve.log)");
     if let Err(e) = axum::serve(listener, app).await {
         eprintln!("serve: {e}");
         return 1;
@@ -102,7 +110,13 @@ async fn log_request(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     let start = std::time::Instant::now();
     let resp = next.run(req).await;
-    eprintln!("[keel serve] {method} {path} -> {} ({}ms)", resp.status().as_u16(), start.elapsed().as_millis());
+    let line = format!("[keel serve] {method} {path} -> {} ({}ms)", resp.status().as_u16(), start.elapsed().as_millis());
+    eprintln!("{line}");
+    // Also append to keel-serve.log (best-effort; gitignored via *.log) so slow loads are inspectable.
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("keel-serve.log") {
+        use std::io::Write as _;
+        let _ = writeln!(f, "{line}");
+    }
     resp
 }
 
@@ -264,36 +278,97 @@ fn ok_json(body: String) -> Response {
     ([("content-type", "application/json")], body).into_response()
 }
 
-/// Wrap a `ViewError`-fallible JSON computation into a response (500 + message on error).
-fn view_json(r: Result<String, crate::view::ViewError>) -> Response {
-    match r {
-        Ok(body) => ok_json(body),
+/// Cheap content fingerprint of the model files (.tracking + .engine `.sysml`): folds (path, len,
+/// mtime). Drives BOTH the view cache and the change-detection SSE (D0094 serveLiveCache) — "if the
+/// fingerprint is unchanged, the files didn't change". Catches out-of-purview edits (e.g. git checkout
+/// rewrites mtime). ~stat-only, fast enough to poll server-side.
+fn fingerprint(root: &Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for base in [".tracking", ".engine"] {
+        for f in crate::collect_sysml(&root.join(base)) {
+            if let Ok(m) = std::fs::metadata(&f) {
+                f.to_string_lossy().hash(&mut h);
+                m.len().hash(&mut h);
+                if let Ok(t) = m.modified() {
+                    if let Ok(d) = t.duration_since(std::time::UNIX_EPOCH) {
+                        d.as_nanos().hash(&mut h);
+                    }
+                }
+            }
+        }
+    }
+    h.finish()
+}
+
+/// Serve a view's JSON from the per-fingerprint cache, recomputing ONLY when the model changed
+/// (D0094 serveLiveCache) — this is what kills the per-request 2s recompute on unchanged data.
+fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>) -> Response {
+    let fp = fingerprint(&state.root);
+    let hit = {
+        let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        guard.get(key).and_then(|(cfp, json)| (*cfp == fp).then(|| json.clone()))
+    };
+    if let Some(json) = hit {
+        return ok_json(json);
+    }
+    match compute(&state.root) {
+        Ok(json) => {
+            {
+                let mut guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                guard.insert(key.to_string(), (fp, json.clone()));
+            }
+            ok_json(json)
+        }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }
 
 async fn api_orient(State(s): State<AppState>) -> Response {
-    ok_json(crate::orient::compute(&s.root).to_json())
+    cached(&s, "orient", |r| Ok(crate::orient::compute(r).to_json()))
 }
 
 async fn api_decisions(State(s): State<AppState>) -> Response {
-    view_json(crate::view::decisions_report(&s.root))
+    cached(&s, "decisions", crate::view::decisions_report)
 }
 
 async fn api_dispositions(State(s): State<AppState>) -> Response {
-    view_json(crate::view::dispositions(&s.root))
+    cached(&s, "dispositions", crate::view::dispositions)
 }
 
 async fn api_processes(State(s): State<AppState>) -> Response {
-    ok_json(processes_json(&s.root))
+    cached(&s, "processes", |r| Ok(processes_json(r)))
 }
 
 async fn api_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
-    view_json(crate::view::report(&s.root, &name, false))
+    cached(&s, &format!("report:{name}"), |r| crate::view::report(r, &name, false))
 }
 
+/// History reads ~/.claude transcripts (outside the fingerprint), so it is computed fresh (uncached).
 async fn api_history(State(s): State<AppState>) -> Response {
     ok_json(interaction_history(&s.root))
+}
+
+/// GET /api/events (D0094 serveLiveCache) — SSE change-push: poll the content fingerprint server-side
+/// (~1.5s) and emit a `changed` event only when it flips, so the UI refetches event-driven (not blind
+/// polling). `ping` keepalives in between; `hello` carries the initial fingerprint.
+async fn api_events(State(s): State<AppState>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let root = (*s.root).clone();
+    let stream = async_stream::stream! {
+        let mut last = fingerprint(&root);
+        yield Ok(Event::default().event("hello").data(last.to_string()));
+        loop {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            let now = fingerprint(&root);
+            if now == last {
+                yield Ok(Event::default().event("ping").data(""));
+            } else {
+                last = now;
+                yield Ok(Event::default().event("changed").data(now.to_string()));
+            }
+        }
+    };
+    Sse::new(stream)
 }
 
 /// The engine's processes-in-use: each `.engine/processes/*.sysml` + its `Process` title/purpose.
