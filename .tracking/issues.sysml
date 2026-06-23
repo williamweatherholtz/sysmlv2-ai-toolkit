@@ -493,6 +493,18 @@ package ProjectIssues {
     #Resolves dependency from staleUnescapeFix to issue044;
     #ProcessDefect dependency from issue044 to d0047;
 
+    part issue045 : Issue {
+        :>> id = "e0450045-0045-4e45-9045-516273840045";
+        :>> title = "d0003's 'writePolicy ENFORCED by the API, no self-promotion' is unrealized/superseded by the human commit-gate (D0093/D0094)";
+        :>> createdAt = "2026-06-23";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (Sprint 133, d0003 x correctness, Medium): d0003 claims authorization differs via a per-skill writePolicy (read-only|pr-only|direct) ENFORCED by the API, and that a skill cannot self-promote its policy. NOT realized in code: write.rs has no per-skill authz (writePolicy is only a doc-comment); one CLI write path is callable regardless of any skill's declared policy, and nothing reads a skill's policy or blocks self-promotion. The dual-surface decisions reframed authorization as the HUMAN COMMIT-GATE (D0093: CLI is authority + automation substrate; D0094: the agent never auto-commits, no new permission policy), effectively superseding d0003's API-enforcement model without a recorded supersede. Candidate resolver (if ACT): writePolicyResolve — either implement per-skill writePolicy enforcement in the write path, OR formally revise/supersede d0003 to state the commit-gate authz model (likely the latter, since D0093/D0094 already chose it). PENDING human disposition (ACT / ACCEPT-RISK / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "writePolicyResolve";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from writePolicyResolve to issue045;
+
     // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
     //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
     //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections
