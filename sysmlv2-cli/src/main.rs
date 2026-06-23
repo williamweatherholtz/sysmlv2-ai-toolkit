@@ -17,6 +17,7 @@
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
 //!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
 //!   `init DIR`                 — scaffold the engine into a new project (D0093 cold start)
+//!   `serve [--port N] [ROOT]`  — the interactive console: localhost read dashboard (D0094 m1)
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 // D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
@@ -159,6 +160,35 @@ fn cmd_check(args: &[String]) -> i32 {
         );
         1
     }
+}
+
+fn cmd_serve(args: &[String]) -> i32 {
+    let mut port: u16 = 7777;
+    let mut root_arg: Option<String> = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        if a == "--port" {
+            if let Some(v) = it.next() {
+                if let Ok(p) = v.parse::<u16>() {
+                    port = p;
+                }
+            }
+        } else if !a.starts_with("--") {
+            root_arg = Some(a.clone());
+        }
+    }
+    let root = match root_arg {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 serve [--port N] [ROOT]");
+                return 2;
+            }
+        }
+    };
+    sysmlv2_cli::serve::run(root, port)
 }
 
 fn cmd_orient(args: &[String]) -> i32 {
@@ -1139,6 +1169,7 @@ fn main() {
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
     let code = match args.get(1).map(String::as_str) {
         Some("init") => cmd_init(rest),
+        Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
         Some("check") => cmd_check(rest),
         Some("ls") => cmd_ls(rest),
@@ -1178,6 +1209,7 @@ fn main() {
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
             eprintln!("  check FILE...                parse-check one or more .sysml files");
         eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");

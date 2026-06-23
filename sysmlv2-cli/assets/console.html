@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel console</title>
+<meta name="generator" content="keel serve (D0094) — computed live; the model is the only truth">
+<style>
+ :root{--bg:#f7f7f7;--bd:#ddd;--mut:#666;--good:#3d7a34;--warn:#b07a00;--bad:#b03a3c;--ac:#4e79a7}
+ *{box-sizing:border-box} body{margin:0;font:13px system-ui,sans-serif;color:#222}
+ header{padding:10px 16px;background:#1f2933;color:#fff} header h1{margin:0;font-size:16px;letter-spacing:.02em}
+ header .sub{font-size:11px;color:#aeb9c4;margin-top:2px}
+ nav{display:flex;gap:2px;background:var(--bg);border-bottom:1px solid var(--bd);padding:0 8px;flex-wrap:wrap}
+ nav button{border:0;background:transparent;padding:9px 12px;font:12px system-ui;cursor:pointer;color:#444;border-bottom:2px solid transparent}
+ nav button.on{color:#000;border-bottom-color:var(--ac);font-weight:600}
+ main{padding:14px 16px}
+ .cards{display:flex;flex-wrap:wrap;gap:12px}
+ .c{flex:1 1 200px;min-width:190px;border:1px solid var(--bd);border-radius:8px;padding:12px;background:#fff;border-left:5px solid #ccc}
+ .c.good{border-left-color:#59a14f} .c.warn{border-left-color:#f2a900} .c.bad{border-left-color:#e15759}
+ .c .l{font-size:11px;text-transform:uppercase;color:var(--mut);letter-spacing:.03em}
+ .c .v{font-size:26px;font-weight:600;margin:3px 0} .c .d{font-size:11px;color:#555;line-height:1.4}
+ .row{border:1px solid var(--bd);border-radius:6px;padding:9px 11px;margin:6px 0;background:#fff}
+ .row .t{font-weight:600} .row .m{font-size:11px;color:var(--mut);margin-top:2px;white-space:pre-wrap}
+ .pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:9px;background:#eef;margin-left:6px;color:#446}
+ .turn{border-left:3px solid var(--bd);padding:6px 10px;margin:7px 0;white-space:pre-wrap;font-size:12px;line-height:1.45}
+ .turn.user{border-left-color:var(--ac);background:#f4f8fc} .turn.assistant{border-left-color:#59a14f;background:#f5faf3}
+ .turn .who{font-size:10px;text-transform:uppercase;color:var(--mut);letter-spacing:.04em;margin-bottom:3px}
+ .muted{color:var(--mut)} button.rb{border:1px solid var(--bd);background:#fff;border-radius:5px;padding:4px 9px;margin:0 5px 8px 0;cursor:pointer;font:12px system-ui}
+ #status{font-size:11px;color:var(--mut);padding:4px 16px}
+</style></head><body>
+<header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
+ <div class="sub">computed live from the model — the read console (D0094 m1). The CLI is the authority; this is the human's lens.</div></header>
+<nav id="nav"></nav>
+<div id="status">loading…</div>
+<main id="main"></main>
+<script>
+const TABS=[["orient","Orient"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"]];
+let active="orient", reportName="assurance";
+const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
+TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;draw();render()};nav.appendChild(b)});
+function draw(){[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===active))}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${esc(d)}</div></div>`}
+async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
+function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
+
+async function render(){
+ status.textContent='refreshing…';
+ try{
+  if(active==='orient'){const o=await get('/api/orient');
+   main.innerHTML='<div class=cards>'+
+    card('Progress',`${o.counts.done} / ${o.counts.outstanding}`,'done / outstanding tasks','good')+
+    card('Ready to start',(o.ready||[]).length,list(o.ready,6),(o.ready||[]).length?'good':'warn')+
+    card('Sprints in progress',(o.in_progress_sprints||[]).length,(o.in_progress_sprints||[]).map(s=>s.sprint+' (pending '+(s.pending||'—')+')').join('; ')||'none',(o.in_progress_sprints||[]).length<=2?'good':'warn')+
+    card('Open issues',(o.open_issues||[]).length,list(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
+    card('Suspect / stale',(o.suspect||[]).length,list(o.suspect,8),(o.suspect||[]).length?'warn':'good')+
+   '</div>';
+  } else if(active==='decisions'){const d=await get('/api/decisions');
+   const arr=d.decisions||[];
+   main.innerHTML='<p class=muted>'+esc(d.report||'')+'</p>'+arr.map(x=>`<div class=row><div class=t>${esc(x.id||x.name||'')} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
+  } else if(active==='processes'){const p=await get('/api/processes');
+   main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${esc(x.title||x.file)}</div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
+  } else if(active==='dispositions'){const d=await get('/api/dispositions');
+   main.innerHTML='<div class=cards>'+card('≥Medium findings',d.ge_medium_findings,'total','')+card('Dispositioned',d.dispositioned,'have a typed verdict','good')+card('Undispositioned',d.undispositioned,'awaiting a verdict',d.undispositioned?'warn':'good')+'</div>'+
+    (d.findings||[]).map(f=>`<div class=row><div class=t>${esc(f.finding)} <span class=pill>${esc(f.severity)}</span> <span class=pill>${esc(f.disposition)}</span></div></div>`).join('');
+  } else if(active==='reports'){
+   const names=['assurance','traceability','quality-debt','flow','governance'];
+   const r=await get('/api/report/'+reportName);
+   main.innerHTML='<div>'+names.map(n=>`<button class=rb data-r="${n}" ${n===reportName?'style="border-color:var(--ac);font-weight:600"':''}>${n}</button>`).join('')+'</div>'+
+    '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,c.detail,c.tone)).join('')+'</div>';
+   [...main.querySelectorAll('.rb')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
+  } else if(active==='history'){const h=await get('/api/history');
+   if(!h.available){main.innerHTML='<p class=muted>'+esc(h.note||'no transcripts found')+'</p>';}
+   else{main.innerHTML='<p class=muted>'+(h.sessions||[]).length+' session(s) · showing latest ('+esc(h.current_id)+'). Source: '+esc(h.dir)+' (read-only lens; never copied into the model).</p>'+
+    (h.current||[]).map(t=>`<div class="turn ${esc(t.role)}"><div class=who>${esc(t.role)}</div>${esc(t.text)}</div>`).join('')||'<span class=muted>empty</span>';}
+  }
+  status.textContent='live · updated '+new Date().toLocaleTimeString();
+ }catch(e){status.textContent='error: '+e.message}
+}
+draw();render();
+setInterval(()=>render(),6000);
+</script></body></html>
