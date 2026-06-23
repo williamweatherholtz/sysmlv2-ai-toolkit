@@ -11,6 +11,7 @@
 //!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
 //!   `concern-coverage [ROOT]` — which declared viewpoint concerns are served vs planned (D0057)
+//!   `dispositions [ROOT]`     — >= Medium findings + their typed disposition verdict (D0092)
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
 //!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
@@ -323,6 +324,30 @@ fn cmd_open_issues(args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("open-issues error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_dispositions(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 dispositions [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::dispositions(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("dispositions error: {e}");
             1
         }
     }
@@ -907,6 +932,27 @@ fn cmd_apply_review(args: &[String]) -> i32 {
 
     let mut count = 0u32;
     for d in &batch.dispositions {
+        // Finding disposition (D0092): act / accept-risk / dismiss target a finding ISSUE, written as a
+        // method=confirmation disposition (#Dispositions-linked), not a critique.
+        if let Some(verdict) = match d.verdict.as_str() {
+            "act" => Some("act"),
+            "accept-risk" | "acceptRisk" => Some("acceptRisk"),
+            "dismiss" => Some("dismiss"),
+            _ => None,
+        } {
+            let disp = w::Disposition { finding: &d.element, verdict, rationale: &d.rationale, sha: &sha, judged_at: &judged_at, judged_by: &judged_by };
+            match w::append_disposition(&critiques, &disp) {
+                Ok(name) => {
+                    println!("{name}  ({} disposition:{verdict})", d.element);
+                    count += 1;
+                }
+                Err(e) => {
+                    eprintln!("error on {}: {e}", d.element);
+                    return 1;
+                }
+            }
+            continue;
+        }
         let outcome = match d.verdict.as_str() {
             "accept" => "pass",
             "finding" | "reject" => "fail",
@@ -966,6 +1012,7 @@ fn main() {
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
+        Some("dispositions") => cmd_dispositions(rest),
         Some("concern-coverage") => cmd_concern_coverage(rest),
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),

@@ -579,6 +579,18 @@ struct IssueStatus {
     open: bool,
 }
 
+/// The latest recorded disposition verdict on a finding Issue (D0092): the `disposition` attr of a
+/// `#Dispositions`-linked confirmation Test (`act` | `acceptRisk` | `dismiss`), or `None` if
+/// undispositioned. Reads the TYPED verdict — not a prose/proxy inference.
+fn issue_disposition(model: &Model, issue: &str) -> Option<String> {
+    model
+        .edges
+        .iter()
+        .filter(|e| e.kind == "dispositions" && e.to == issue)
+        .filter_map(|e| model.items.get(&e.from).and_then(|t| t.attrs.get("disposition")).cloned())
+        .next_back()
+}
+
 fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &HashSet<String, S>) -> Vec<IssueStatus> {
     let mut issues: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Issue").map(|(n, _)| n).collect();
     issues.sort();
@@ -599,6 +611,13 @@ fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &Has
                     ResolverStatus { name: e.from.clone(), kind: if is_decision { "decision" } else { "action" }, complete }
                 })
                 .collect();
+            // D0092: an ACCEPT-RISK or DISMISS disposition CLOSES the issue on its own (the verdict IS
+            // the resolution); ACT does not — it still needs its #Resolves resolver done.
+            if let Some(v) = issue_disposition(model, iss) {
+                if v == "acceptRisk" || v == "dismiss" {
+                    resolvers.push(ResolverStatus { name: format!("disposition:{v}"), kind: "disposition", complete: true });
+                }
+            }
             resolvers.sort_by(|a, b| a.name.cmp(&b.name));
             let open = !resolvers.iter().any(|r| r.complete);
             IssueStatus { issue: iss.clone(), resolvers, open }
@@ -728,6 +747,48 @@ pub fn concern_coverage(root: &Path) -> Result<String, ViewError> {
         ("coverage_pct".to_string(), Json::s(format!("{}", pct(served.len(), total)))),
         ("unserved_concerns".to_string(), Json::Arr(to_json(&unserved))),
         ("served_concerns".to_string(), Json::Arr(to_json(&served))),
+    ]);
+    Ok(out.dump())
+}
+
+/// Dispositions view (D0092): every >= Medium finding + its typed disposition verdict.
+///
+/// Each verdict is `act`/`acceptRisk`/`dismiss` or `undispositioned` — the computed read of the
+/// human-judgment gate (reads the typed verdict, not prose/proxy). `undispositioned` is what `assured`
+/// enforces.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn dispositions(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut findings: Vec<(&String, &ItemInfo)> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Issue" && i.attrs.get("severity").is_some_and(|s| at_least_medium(s)))
+        .collect();
+    findings.sort_by(|a, b| a.0.cmp(b.0));
+    let mut undisp = 0usize;
+    let rows: Vec<Json> = findings
+        .iter()
+        .map(|(name, info)| {
+            let verdict = issue_disposition(&model, name);
+            if verdict.is_none() {
+                undisp += 1;
+            }
+            Json::Obj(vec![
+                ("finding".to_string(), Json::s((*name).clone())),
+                ("severity".to_string(), Json::s(info.attrs.get("severity").cloned().unwrap_or_default())),
+                ("dispositioned".to_string(), Json::Bool(verdict.is_some())),
+                ("disposition".to_string(), verdict.map_or_else(|| Json::s("undispositioned".to_string()), Json::s)),
+            ])
+        })
+        .collect();
+    let total = rows.len();
+    let out = Json::Obj(vec![
+        ("ge_medium_findings".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+        ("dispositioned".to_string(), Json::Int(i64::try_from(total - undisp).unwrap_or(i64::MAX))),
+        ("undispositioned".to_string(), Json::Int(i64::try_from(undisp).unwrap_or(i64::MAX))),
+        ("findings".to_string(), Json::Arr(rows)),
     ]);
     Ok(out.dump())
 }
@@ -1459,11 +1520,11 @@ impl ReadinessBlockers {
     }
 }
 
-/// Readiness finding-blockers from issue resolution (D0079/D0080), as `(undispositioned_ge_medium,
-/// open_critical)`. A finding is UNDISPOSITIONED iff it is open AND has no `#Resolves` resolver —
-/// D0079 requires every >= Medium finding be DISPOSITIONED (ACT/ACCEPT-RISK/DISMISS), not resolved,
-/// so an ACT'd finding whose resolver is still in flight does NOT block readiness. An open Critical
-/// always blocks until fixed/resolved (D0080), regardless of disposition.
+/// Readiness finding-blockers from issue resolution (D0079/D0080/D0092), as `(undispositioned_ge_medium,
+/// open_critical)`. A finding is UNDISPOSITIONED iff it is open AND carries NO typed `#Dispositions`
+/// verdict (D0092 retires the prior `resolvers.is_empty()` proxy — D0079 requires every >= Medium
+/// finding be DISPOSITIONED (ACT/ACCEPT-RISK/DISMISS), so an ACT'd finding whose resolver is still in
+/// flight is dispositioned and does NOT block). An open Critical always blocks until fixed (D0080).
 fn finding_blockers(resolution: &[IssueStatus], model: &Model) -> (Vec<String>, Vec<String>) {
     let mut undisp: Vec<String> = Vec::new();
     let mut critical: Vec<String> = Vec::new();
@@ -1472,7 +1533,7 @@ fn finding_blockers(resolution: &[IssueStatus], model: &Model) -> (Vec<String>, 
             continue;
         }
         let Some(sev) = model.items.get(&i.issue).and_then(|x| x.attrs.get("severity")) else { continue };
-        if at_least_medium(sev) && i.resolvers.is_empty() {
+        if at_least_medium(sev) && issue_disposition(model, &i.issue).is_none() {
             undisp.push(i.issue.clone());
         }
         if sev == "Critical" {
@@ -2767,26 +2828,39 @@ mod tests {
 
     #[test]
     fn dispositioned_finding_does_not_block_readiness() {
-        // Regression (D0047): assured must treat a >= Medium finding WITH a resolver (ACT'd) as
-        // dispositioned, not undispositioned; only a resolver-less open finding blocks. Open
-        // Critical always blocks regardless of disposition.
+        // Regression (D0047/D0092): assured must treat a >= Medium finding carrying a TYPED
+        // #Dispositions verdict (ACT'd) as dispositioned, not undispositioned; only a finding with
+        // NO disposition blocks. Open Critical always blocks regardless of disposition. D0092 reads
+        // the typed verdict (not the prior resolver-presence proxy).
         let mk = |sev: &str| {
             let mut a = HashMap::new();
             a.insert("severity".to_string(), sev.to_string());
             ItemInfo { type_name: "Issue".to_string(), attrs: a, marker: None }
         };
+        let disp = |verdict: &str| {
+            let mut a = HashMap::new();
+            a.insert("disposition".to_string(), verdict.to_string());
+            ItemInfo { type_name: "Test".to_string(), attrs: a, marker: None }
+        };
         let mut items = HashMap::new();
         items.insert("iActed".to_string(), mk("Medium"));
+        items.insert("iActedDisp1".to_string(), disp("act"));
         items.insert("iRaw".to_string(), mk("Medium"));
         items.insert("iCrit".to_string(), mk("Critical"));
-        let model = Model { items, edges: Vec::new() };
+        items.insert("iCritDisp1".to_string(), disp("act"));
+        // iActed + iCrit carry a typed ACT disposition; only iRaw is undispositioned.
+        let edges = vec![
+            Edge { kind: "dispositions".to_string(), from: "iActedDisp1".to_string(), to: "iActed".to_string() },
+            Edge { kind: "dispositions".to_string(), from: "iCritDisp1".to_string(), to: "iCrit".to_string() },
+        ];
+        let model = Model { items, edges };
         let res = vec![
             IssueStatus { issue: "iActed".to_string(), resolvers: vec![ResolverStatus { name: "act".to_string(), kind: "action", complete: false }], open: true },
             IssueStatus { issue: "iRaw".to_string(), resolvers: Vec::new(), open: true },
-            IssueStatus { issue: "iCrit".to_string(), resolvers: vec![ResolverStatus { name: "act2".to_string(), kind: "action", complete: false }], open: true },
+            IssueStatus { issue: "iCrit".to_string(), resolvers: Vec::new(), open: true },
         ];
         let (undisp, critical) = finding_blockers(&res, &model);
-        assert_eq!(undisp, vec!["iRaw".to_string()], "only the resolver-less Medium finding is undispositioned");
+        assert_eq!(undisp, vec!["iRaw".to_string()], "only the un-dispositioned Medium finding blocks (iActed has a typed verdict)");
         assert_eq!(critical, vec!["iCrit".to_string()], "open Critical blocks even when dispositioned");
     }
 

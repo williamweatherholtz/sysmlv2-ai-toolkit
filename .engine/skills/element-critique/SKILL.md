@@ -74,8 +74,11 @@ at HEAD. Read state from tooling, not memory.
    judgedAgainst HEAD), `#Verify`-linked to the target.
 3. **Findings:** every `fail` → an `Issue { description; severity }` triaged via the issue-resolution
    skill (`#Resolves` to a resolving action or mooting Decision).
-4. **Disposition:** for every >= Medium finding, get the human's ACT / ACCEPT-RISK / DISMISS. Critical
-   must be fixed or risk-accepted. Low is AI-dispositioned.
+4. **Disposition (D0092):** for every >= Medium finding, get the human's TYPED verdict and record it
+   via `sysmlv2 apply-review` (batch verdict `act`/`accept-risk`/`dismiss` on the finding Issue) — a
+   `#Dispositions`-linked `method=confirmation` verification carrying `disposition : DispositionKind`,
+   never prose. ACCEPT-RISK/DISMISS close the finding; ACT also needs a `#Resolves` resolver. Critical
+   must be fixed or risk-accepted. Low is AI-dispositioned. Read state via `sysmlv2 dispositions`.
 5. **Staleness:** if a target changed, its critiques are suspect — re-critique at HEAD and re-open any
    accept-risk disposition whose basis changed.
 6. **Verify:** validate green; read the critique coverage + open findings from tooling before committing.

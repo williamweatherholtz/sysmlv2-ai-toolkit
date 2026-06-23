@@ -476,6 +476,67 @@ pub fn append_critique(path: &Path, c: &Critique) -> Result<String, WriteError> 
     Ok(format!("{prefix}{n}"))
 }
 
+/// A human's disposition of a >= Medium finding (D0092): the verdict + rationale + provenance.
+pub struct Disposition<'a> {
+    /// The finding Issue being dispositioned (the `#Dispositions` target).
+    pub finding: &'a str,
+    /// `DispositionKind` member: `act` | `acceptRisk` | `dismiss`.
+    pub verdict: &'a str,
+    /// Free-text rationale (sanitized into a single-line, quote-safe `procedureText`).
+    pub rationale: &'a str,
+    /// Commit the disposition was made against (`judgedAgainst`).
+    pub sha: &'a str,
+    /// ISO-8601 attestation date.
+    pub judged_at: &'a str,
+    /// The human who dispositioned (`judgedBy`).
+    pub judged_by: &'a str,
+}
+
+/// Append a finding DISPOSITION (D0092) as NEW LINKED items.
+///
+/// Writes a `method=confirmation` verification carrying `disposition : DispositionKind`, its
+/// `TestResult` (the human's attestation, outcome=pass), and a `#Dispositions` edge to the finding
+/// Issue. Reuses the verification substrate, so the disposition inherits provenance + staleness
+/// (suspect -> re-disposition). Append-only; `<n>` is the next free slot. Returns `<finding>Disp<n>`.
+///
+/// # Errors
+/// `WriteError::InvalidVerdict` if `verdict` is not `act`/`acceptRisk`/`dismiss`;
+/// `WriteError::InsertionPointNotFound` if the file has no package-closing brace;
+/// `WriteError::Io` on filesystem errors.
+pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteError> {
+    if !matches!(d.verdict, "act" | "acceptRisk" | "dismiss") {
+        return Err(WriteError::InvalidVerdict(d.verdict.to_owned()));
+    }
+    let content = std::fs::read_to_string(path)?;
+
+    let prefix = format!("{}Disp", d.finding);
+    let mut n = 1u32;
+    while content.contains(&format!("{prefix}{n} ")) || content.contains(&format!("{prefix}{n}R")) {
+        n += 1;
+    }
+
+    let safe: String = d.rationale.replace('\\', "/").replace('"', "'").replace(['\n', '\r', '\t'], " ");
+    let uuid_v = gen_uuid();
+    let uuid_r = gen_uuid();
+    let block = format!(
+        "    verification {prefix}{n} : Test {{ :>> id = \"{uuid_v}\"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::{}; :>> procedureText = \"{safe}\"; }}\n    part {prefix}{n}R1 : TestResult {{ :>> id = \"{uuid_r}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{}\"; :>> judgedAt = \"{}\"; :>> judgedBy = \"{}\"; }}\n    #Dispositions dependency from {prefix}{n} to {};\n",
+        d.verdict, d.sha, d.judged_at, d.judged_by, d.finding
+    );
+
+    let lines: Vec<&str> = content.lines().collect();
+    let close = lines.iter().rposition(|l| l.trim() == "}").ok_or_else(|| WriteError::InsertionPointNotFound(d.finding.to_owned()))?;
+    let mut out = String::with_capacity(content.len() + block.len() + 1);
+    for (i, line) in lines.iter().enumerate() {
+        if i == close {
+            out.push_str(&block);
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(path, out)?;
+    Ok(format!("{prefix}{n}"))
+}
+
 /// Append a `Measurement` datapoint for an Indicator (D0089) as new linked items.
 ///
 /// Writes a `part <indicator>M<n> : Measurement { value, measuredAt, source, createdBy }` + a

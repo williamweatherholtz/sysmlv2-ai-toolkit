@@ -53,8 +53,8 @@ package EngineElementCritique {
         :>> title = "Disposition — human gate at >= Medium";
         :>> order = 4;
         :>> triggerCondition = "A finding Issue has severity >= Medium (Critical / High / Medium).";
-        :>> actionText = "A human dispositions every >= Medium finding: ACT (resolve it via the #Resolves action), ACCEPT-RISK (a confirmation-method attestation that the risk is knowingly accepted), or DISMISS (a Decision that moots it, #Resolves from the Decision). A Critical finding MUST be fixed or explicitly risk-accepted — it cannot be left open. Low findings are AI-dispositioned (surfaced, not gated). The disposition is the human's word (D0016/D0051) — never inferred.";
-        :>> producedArtifact = "A recorded disposition: a resolving action, a confirmation attestation (accept-risk), or a mooting Decision.";
+        :>> actionText = "A human dispositions every >= Medium finding with a TYPED verdict (D0092), recorded via `sysmlv2 apply-review` as a method=confirmation disposition carrying `disposition : DispositionKind` (#Dispositions-linked to the finding Issue): ACT (also add a #Resolves resolver action to do the fix), ACCEPT-RISK (the verdict closes the finding — knowingly accepted), or DISMISS (the verdict moots it). A Critical finding MUST be fixed or explicitly risk-accepted — it cannot be left open. Low findings are AI-dispositioned (surfaced, not gated). The disposition is the human's word (D0016/D0051) — never inferred. State is COMPUTED: `sysmlv2 dispositions` (dispositioned vs not) + `assured` read the typed verdict, never prose.";
+        :>> producedArtifact = "A typed disposition (D0092): a #Dispositions-linked method=confirmation verification carrying the DispositionKind verdict (act/acceptRisk/dismiss) + rationale + provenance; ACT additionally has a #Resolves resolver.";
         :>> owner = Owner::human;
     }
     part ecStaleness : ProcessStep {

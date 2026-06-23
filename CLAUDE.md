@@ -41,8 +41,9 @@ Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysm
 Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (needs/requirements/
 tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
 `governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
-declared viewpoint concerns are served vs planned) are the other computed lenses (`suspect` also
-flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
+declared viewpoint concerns are served vs planned), `dispositions` (D0092 — which ≥Medium findings
+carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned) are the other computed lenses
+(`suspect` also flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
 renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
 critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). Human-digestible
@@ -193,7 +194,11 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
   own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
   A sixth method, `critique` (D0080), records an antagonistic lens-tagged verification of a
   tracked element by an *independent* critic; its findings become severity-carrying `Issue`s,
-  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill).
+  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill). A
+  disposition is itself a TYPED recorded judgment (D0092): a `method=confirmation` verification
+  carrying `disposition : DispositionKind` (`act`/`acceptRisk`/`dismiss`), `#Dispositions`-linked
+  to the finding, written via `sysmlv2 apply-review` — never prose. ACCEPT-RISK/DISMISS close the
+  finding; ACT also needs a `#Resolves` resolver. `sysmlv2 dispositions` + `assured` read the verdict.
 - **Sprint ceremony is autonomous; the human gate is the per-sitting review (D0049).**
   Per-sprint closeOut (`method=inspect`) and retro (`method=analysis`) are AI-recorded with
   NO human sign-off — a sprint closes when its DoD passes, and the retro autonomously turns
