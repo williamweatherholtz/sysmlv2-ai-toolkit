@@ -1076,11 +1076,37 @@ fn extract_field(blob: &str, element: &str, field: &str) -> Option<String> {
         }
         if let Some(idx) = t.find(&fieldpat) {
             let rest = t.get(idx + fieldpat.len()..)?;
-            let end = rest.find('"')?;
-            return rest.get(..end).map(str::to_owned);
+            return Some(decode_string_body(rest));
         }
     }
     None
+}
+
+/// Decode a string-literal body (the text after the opening quote) up to the first unescaped quote,
+/// applying the SAME escape rules as the lexer's `lex_string` (backslash-backslash, backslash-quote,
+/// `\n`, `\t`). Without this, a raw git-blob read of an escaped field (e.g. a regex containing a
+/// backslash) compares unequal to the parsed model value and the element's critiques are falsely
+/// flagged stale (issue044) — undercounting critique coverage. Keeps blob-extract == model-attr.
+fn decode_string_body(rest: &str) -> String {
+    let mut out = String::new();
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => break,
+            '\\' => match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('"') => out.push('"'),
+                Some('\\') | None => out.push('\\'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+            },
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 /// Names of verify/critique Tests that are STALE: their target assurance element's semantic field
@@ -2816,6 +2842,21 @@ fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extract_field_unescapes_like_the_lexer() {
+        // issue044 regression: a field with backslash escapes must extract to the SAME value the
+        // parser stores, or its critiques false-flag stale. `\\s` (raw blob) -> `\s` (model value).
+        let blob = "    part d0023 : Decision {\n        :>> decision = \"regex r'part\\\\s+(\\\\w+?)' and a quote \\\" inside\";\n    }\n";
+        let got = extract_field(blob, "d0023", "decision");
+        assert_eq!(got.as_deref(), Some("regex r'part\\s+(\\w+?)' and a quote \" inside"));
+    }
+
+    #[test]
+    fn extract_field_plain_value() {
+        let blob = "    part d1 : Decision {\n        :>> decision = \"plain text\";\n    }\n";
+        assert_eq!(extract_field(blob, "d1", "decision").as_deref(), Some("plain text"));
+    }
 
     fn model() -> Model {
         let mut items = HashMap::new();

@@ -480,6 +480,19 @@ package ProjectIssues {
     }
     #Resolves dependency from refreshRequirementText to issue043;
 
+    part issue044 : Issue {
+        :>> id = "e0440044-0044-4e44-9044-516273840044";
+        :>> title = "Staleness false-positive: extract_field read raw git blobs without the lexer's string-unescaping, false-flagging escaped-content critiques stale";
+        :>> createdAt = "2026-06-23";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (Sprint 124, Medium): the critique-coverage discrepancy (84 vs expected 85) traced to a real engine bug. compute_stale_verifications/extract_field (view.rs) read an element's semantic field from the RAW git blob and did NOT replicate the lexer's string-unescaping (lex_string: backslash-backslash -> backslash, backslash-quote -> quote, \\n, \\t), nor detect the end quote as an UNESCAPED quote. So an element whose `decision`/`statement` field contains backslash escapes (e.g. d0023's regex `\\s`/`\\w`/`\\d`, d0076's escaped `\\\"`) compared unequal (blob backslash-backslash vs model single-backslash) -> false 'changed' -> the element's critiques were wrongly excluded from coverage as STALE (D0084 path, view.rs ~line 1362). Impact: 2 decisions (d0023, d0076) undercounted; could also mislead readiness staleness for any escaped semantic field. FIX (this sprint, staleUnescapeFix): a decode_string_body helper that unescapes exactly like the lexer + stops at the first unescaped quote, so blob-extract == model-attr. Permanent guard (D0047): unit tests extract_field_unescapes_like_the_lexer + extract_field_plain_value. RESOLVED — d0023 + d0076 now count.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "staleUnescapeFix";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from staleUnescapeFix to issue044;
+    #ProcessDefect dependency from issue044 to d0047;
+
     // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
     //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
     //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections
