@@ -2116,27 +2116,34 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
         let method = info.attrs.get("method").map_or("manual", String::as_str);
         let goal = info.attrs.get("goal").map_or("observe", String::as_str);
         let binding = info.attrs.get("collectionRef").cloned().unwrap_or_default();
-        // The (measuredAt, value) series. BANK-FIRST (D0091): recorded Measurements (pulled/manual
-        // observations AND computed snapshots) are the durable series. With no bank, a computed
-        // indicator falls back to the git-replay (--trend) or its current live value.
+        // The banked (measuredAt, value) datapoint series (recorded observations + computed snapshots).
+        // A snapshot stores only value + timestamp — no "latest" label; latest is CALCULATED (issue037).
         let banked = measurement_series(&model, name);
-        let series: Vec<(String, f64)> = if !banked.is_empty() {
-            banked
-        } else if method == "computed" {
+        // LIVE current value (computed indicators only) — authoritative + never stale (issue037/038):
+        // the live recompute is the source of truth; the bank is historical record, never overrides it.
+        let live: Option<f64> = if method == "computed" { metric_value(root, &binding) } else { None };
+        // The displayed series: the bank; or, for a computed indicator with no bank, --trend / the live point.
+        let series: Vec<(String, f64)> = if banked.is_empty() && method == "computed" {
             if trend {
                 trend_series(root, &binding)
             } else {
-                metric_value(root, &binding).map(|v| vec![("now".to_string(), v)]).unwrap_or_default()
+                live.map(|v| vec![("live".to_string(), v)]).unwrap_or_default()
             }
         } else {
-            Vec::new()
+            banked.clone()
         };
-        let latest = series.last().map(|(_, v)| *v);
         let baseline = series.first().map(|(_, v)| *v);
-        let status = match (baseline, latest) {
-            (Some(b), Some(l)) if series.len() > 1 => indicator_status(goal, b, l),
-            (Some(_), Some(_)) => "single-point",
-            _ => "no-data",
+        // latest is computed: live current for a computed indicator; else the most recent datapoint.
+        let latest = live.or_else(|| series.last().map(|(_, v)| *v));
+        let banked_latest = banked.last().map(|(_, v)| *v);
+        // Drift guardrail (issue038): for a computed indicator, has the live value moved off the last snapshot?
+        let drift = matches!((live, banked_latest), (Some(l), Some(b)) if (l - b).abs() > 0.001);
+        let status = if baseline.is_some() && latest.is_some() && (series.len() > 1 || live.is_some()) {
+            indicator_status(goal, baseline.unwrap_or(0.0), latest.unwrap_or(0.0))
+        } else if latest.is_some() {
+            "single-point"
+        } else {
+            "no-data"
         };
         let fmt = |o: Option<f64>| o.map_or_else(|| Json::Null, |v| Json::s(format!("{v:.2}")));
         let series_json: Vec<Json> = series
@@ -2149,15 +2156,18 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
             ("method".to_string(), Json::s(method.to_string())),
             ("goal".to_string(), Json::s(goal.to_string())),
             ("unit".to_string(), Json::s(info.attrs.get("unit").cloned().unwrap_or_default())),
-            ("latest".to_string(), fmt(latest)),
+            ("latest".to_string(), fmt(latest)),       // calculated: live for computed, last datapoint otherwise
+            ("live".to_string(), fmt(live)),           // authoritative current recompute (computed only)
             ("baseline".to_string(), fmt(baseline)),
+            ("banked_latest".to_string(), fmt(banked_latest)),
+            ("drift".to_string(), Json::Bool(drift)),  // computed: live has moved off the last snapshot
             ("points".to_string(), Json::Int(i64::try_from(series.len()).unwrap_or(0))),
             ("status".to_string(), Json::s(status.to_string())),
             ("series".to_string(), Json::Arr(series_json)),
         ]));
     }
     Ok(Json::Obj(vec![
-        ("view".to_string(), Json::s("indicators (D0089/D0091): monitored measures, direction-aware status + the full banked datapoint series. Bank-first (recorded Measurements incl. computed snapshots); computed with no bank uses --trend git-replay or the live value.".to_string())),
+        ("view".to_string(), Json::s("indicators (D0089/D0091): monitored measures + direction-aware status + the banked datapoint series. `latest` is CALCULATED (live recompute for computed indicators — authoritative, never stale; last datapoint otherwise); the bank stores value+timestamp only; `drift`=true when a computed indicator's live value has moved off its last snapshot (the bank is historical record, never overrides live).".to_string())),
         ("indicators".to_string(), Json::Arr(out)),
     ])
     .dump())

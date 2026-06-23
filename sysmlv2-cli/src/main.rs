@@ -802,7 +802,7 @@ fn cmd_snapshot_indicators(args: &[String]) -> i32 {
             eprintln!("skip {indicator}: metric '{key}' not computable");
             continue;
         };
-        match w::append_measurement(&file, indicator, &format!("{v:.2}"), &at, "snapshot (computed reading)", &by) {
+        match w::append_measurement(&file, indicator, &format!("{v:.6}"), &at, "snapshot (computed reading)", &by) {
             Ok(name) => {
                 println!("{name}  ({indicator} = {v:.2})");
                 count += 1;

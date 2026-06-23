@@ -397,4 +397,26 @@ package ProjectIssues {
     }
     #Resolves dependency from coverageAudits to issue035;
     #Resolves dependency from coverageAudits to issue036;
+    part issue037 : Issue {
+        :>> id = "e0370037-0037-4e37-9037-516273840037";
+        :>> title = "D0091 finding: bank-first 'latest' goes stale vs the live value for computed indicators";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "D0091 completeness (Medium): once a computed indicator has any snapshot, the view showed the last snapshot as 'latest' (could be months stale), with the live value not surfaced. ACT disposition (human, 2026-06-22): snapshots save a timestamp not a label; 'latest' is CALCULATED (live recompute for computed). Resolver: indicatorBankGuardrail.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "indicatorBankGuardrail";
+        :>> severity = Severity::Medium;
+    }
+    part issue038 : Issue {
+        :>> id = "e0380038-0038-4e38-9038-516273840038";
+        :>> title = "D0091 finding: snapshotting computed metrics is a compute-don't-store exception with no mechanical guardrail";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "D0091 correctness (Medium): storing a computed-metric snapshot is a controlled exception to compute-don't-store; the observation-vs-cache framing is interpretive with no guardrail. ACT disposition (human, 2026-06-22): add a guardrail — live recompute is authoritative (never overridden by the bank), snapshots source-tagged, a drift check flags live-vs-snapshot divergence. Resolver: indicatorBankGuardrail.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "indicatorBankGuardrail";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from indicatorBankGuardrail to issue037;
+    #Resolves dependency from indicatorBankGuardrail to issue038;
 }
