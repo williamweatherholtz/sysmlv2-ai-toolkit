@@ -876,5 +876,9 @@ package EngineBacklog {
         action critiqueBatch14; // D0080: Decisions d0061,d0063,d0064,d0065,d0067 (Core-3 each).
         verification critiqueBatch14DoD : Test { :>> id = "a1c70132-0132-4132-9132-516273840132"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 14 (5 items): Core-3 critiques for d0061 (Decision field set), d0063 (attr-model migration), d0064 (bootstrap over, sprint discipline), d0065 (attr-model contract), d0067 (safe-migration process) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 109->114/120; keel validate clean; guard all (13) green."; }
         part critiqueBatch14DoDR1 : TestResult { :>> id = "c38265a5-27b7-4cc7-abc2-8d0d8c9eb429"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a316942"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+
+        action critiqueBatch15; // D0080: Decisions d0072,d0073,d0078 (the last 3 normal decisions; Core-3 each).
+        verification critiqueBatch15DoD : Test { :>> id = "a1c70133-0133-4133-9133-516273840133"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 15 (3 items — the last NORMAL decisions): Core-3 critiques for d0072 (actualHours=AI time), d0073 (per-sitting review confirmation), d0078 (issue-resolution process) — 9 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. After this, only the 3 SPECIAL items remain: d0023+d0076 (need the staleUnescape fix to count) + d0003 (writePolicy human disposition). VERIFY: critique-coverage 114->117/120; keel validate clean; guard all (13) green."; }
+        part critiqueBatch15DoDR1 : TestResult { :>> id = "22e3ffdb-396f-4b8c-851a-c7de968da660"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c5e48db"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }
