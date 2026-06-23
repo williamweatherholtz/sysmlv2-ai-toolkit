@@ -733,6 +733,7 @@ package EngineBacklog {
         // ── load-bearing critique campaign batch-4 findings (CANDIDATE resolvers — PENDING human disposition) ──
         action correctionGuardCoverage; // D0047 (issue039): a meta-audit that recurrable-defect Issues carry a resolving guard.
         verification correctionGuardCoverageDoD : Test { :>> id = "a1c70039-0039-4039-9039-516273840039"; :>> method = VerificationMethod::test; :>> procedureText = "D0047 finding (issue039): the corrections-become-guards rule is enforced by vigilance — no meta-audit links a recurrable process-defect Issue to a resolving guard. CANDIDATE resolution (pending ACT): an audit/view that, for each Issue tagged as a recurrable process defect, flags the absence of a resolving guard (a #Resolves to a guard/check), so 'defect => guard' becomes machine-checkable rather than vigilance. VERIFY: the audit flags a deliberately-introduced unresolved process-defect; runs in the guard/view set; green on the current model. (Design open: how a process-defect Issue is marked — to be settled at disposition.)"; }
+        part correctionGuardCoverageDoDR1 : TestResult { :>> id = "5bbcb44b-f43a-4ba0-aa0d-cd04bf5d3d60"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "46f0a5a"; :>> judgedAt = "2026-06-22"; :>> judgedBy = "claudeOpus"; }
 
         // ── D0092 formalize-disposition-lifecycle milestones ──
         action dispositionSchema; // D0092 m1: DispositionKind enum + optional Test.disposition attr (frozen-core, human-accepted, re-frozen).

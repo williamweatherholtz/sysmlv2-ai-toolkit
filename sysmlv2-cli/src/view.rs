@@ -837,6 +837,38 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+/// True if an action name looks like it produces a permanent automated GUARD/check (D0047/issue039).
+/// Heuristic (this feeds a WARN diagnostic, not a hard gate): the resolver naming convention in use.
+fn is_guard_producing(name: &str) -> bool {
+    let n = name.to_lowercase();
+    ["guard", "check", "rule", "audit", "lint", "validat"].iter().any(|k| n.contains(k))
+}
+
+/// Defect-guard-coverage diagnostic (D0047/issue039): every `#ProcessDefect` finding must resolve to
+/// a guard-producing action.
+///
+/// The meta-audit that "corrections become guards" is actually followed (previously enforced only by
+/// vigilance). Returns `(examined, warnings)` — each warning is a process-defect whose `#Resolves`
+/// resolver is not guard-producing.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn defect_guard_coverage(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let model = Model::build(root)?;
+    let mut defects: Vec<&String> = model.edges.iter().filter(|e| e.kind == "processdefect").map(|e| &e.from).collect();
+    defects.sort_unstable();
+    defects.dedup();
+    let mut warns = Vec::new();
+    for d in &defects {
+        let resolvers: Vec<&String> = model.edges.iter().filter(|e| e.kind == "resolves" && &e.to == *d).map(|e| &e.from).collect();
+        if !resolvers.iter().any(|r| is_guard_producing(r)) {
+            let names = if resolvers.is_empty() { "none".to_string() } else { resolvers.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ") };
+            warns.push(format!("{d}: #ProcessDefect finding (D0047) with no guard-producing resolver (resolver(s): {names}) — a recurrable process defect must become a permanent automated guard"));
+        }
+    }
+    Ok((defects.len(), warns))
+}
+
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
 // For each Need / SystemRequirement / Decision: is there COMPLETE + PASSING + NON-STALE evidence
 // it has been addressed? Verifier kinds, strongest first:
@@ -2906,6 +2938,17 @@ mod tests {
         let (undisp, critical) = finding_blockers(&res, &model);
         assert_eq!(undisp, vec!["iRaw".to_string()], "only the un-dispositioned Medium finding blocks (iActed has a typed verdict)");
         assert_eq!(critical, vec!["iCrit".to_string()], "open Critical blocks even when dispositioned");
+    }
+
+    #[test]
+    fn guard_producing_heuristic() {
+        // D0047/issue039: the resolver naming convention the defect-guard-coverage diagnostic keys on.
+        for ok in ["ceremonyGateGuard", "critiqueRigorCheck", "criticIndependenceRule", "coverageAudits", "manifestCoverageGuard"] {
+            assert!(is_guard_producing(ok), "{ok} should read as guard-producing");
+        }
+        for not in ["frictionMetric", "sittingModel", "reportIndicatorRender"] {
+            assert!(!is_guard_producing(not), "{not} should NOT read as guard-producing");
+        }
     }
 
     #[test]

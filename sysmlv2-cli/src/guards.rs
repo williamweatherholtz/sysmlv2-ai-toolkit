@@ -768,6 +768,20 @@ pub fn process_skill(root: &Path) -> GuardReport {
     GuardReport { name: "process-skill", scanned: processes.len(), warnings: Vec::new(), violations }
 }
 
+/// Diagnostic (D0047/issue039): a `#ProcessDefect` finding must resolve to a guard-producing action.
+///
+/// RUNNABLE via `sysmlv2 guard defect-guard-coverage` but NOT in the enforced `GUARD_NAMES` — whether
+/// a defect class "needs a guard" is judgment-bound (a shallow heuristic on the resolver name), so it
+/// is a WARN for human attention, not a commit gate. Closes issue039: the "corrections become guards"
+/// rule (D0047) now has an audit instead of relying purely on vigilance.
+#[must_use]
+pub fn defect_guard_coverage(root: &Path) -> GuardReport {
+    match crate::view::defect_guard_coverage(root) {
+        Ok((examined, warnings)) => GuardReport { name: "defect-guard-coverage", scanned: examined, warnings, violations: Vec::new() },
+        Err(e) => GuardReport { name: "defect-guard-coverage", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading defect-guard coverage: {e}")] },
+    }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
@@ -795,6 +809,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "critic-independence" => Some(critic_independence(root)),
         "process-skill" => Some(process_skill(root)),
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
+        "defect-guard-coverage" => Some(defect_guard_coverage(root)), // runnable-only (D0047/issue039)
         _ => None,
     }
 }

@@ -443,4 +443,20 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from sittingModel to issue040;
+
+    // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
+    //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
+    //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections
+    //    become guards" is followed (the rule was previously enforced only by vigilance). Edge -> d0047
+    //    (the governing rule). All current entries resolve to a guard/check/rule/audit, so the audit is
+    //    clean; a future un-guarded process-defect would be flagged. ──
+    #ProcessDefect dependency from issue010 to d0047;
+    #ProcessDefect dependency from issue011 to d0047;
+    #ProcessDefect dependency from issue027 to d0047;
+    #ProcessDefect dependency from issue030 to d0047;
+    #ProcessDefect dependency from issue031 to d0047;
+    #ProcessDefect dependency from issue033 to d0047;
+    #ProcessDefect dependency from issue034 to d0047;
+    #ProcessDefect dependency from issue036 to d0047;
+    #ProcessDefect dependency from issue039 to d0047;
 }
