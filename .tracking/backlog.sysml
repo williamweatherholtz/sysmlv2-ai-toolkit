@@ -856,5 +856,9 @@ package EngineBacklog {
         action critiqueBatch9; // D0080: Decisions d0027-d0031 (Core-3 each).
         verification critiqueBatch9DoD : Test { :>> id = "a1c70127-0127-4127-9127-516273840127"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 9 (5 items): Core-3 critiques for d0027 (write API), d0028 (S9 docSync), d0029 (Issue.relatedTask), d0030 (S10 docSync), d0031 (stateDef spike NOT GREEN) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived (CR/spike/docSync records; d0029 relatedTask noted as later elevated to #Resolves by D0077). No findings. VERIFY: critique-coverage 84->89/120; keel validate clean; guard all (13) green."; }
         part critiqueBatch9DoDR1 : TestResult { :>> id = "195fa0b0-3ac5-4e5b-b3c3-1a7c4c842f4d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f88158"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+
+        action critiqueBatch10; // D0080: Decisions d0032-d0036 (Core-3 each).
+        verification critiqueBatch10DoD : Test { :>> id = "a1c70128-0128-4128-9128-516273840128"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 10 (5 items): Core-3 critiques for d0032 (TestResult->occurrence def), d0033 (S11 docSync), d0034 (CR versioning via git), d0035 (Need/Requirement by type), d0036 (safety-case views, no new types) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 89->94/120; keel validate clean; guard all (13) green."; }
+        part critiqueBatch10DoDR1 : TestResult { :>> id = "770d7f95-6561-448d-8ad9-72b9000b4777"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "85bc93c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }
