@@ -4,7 +4,7 @@ This repo **is a work-tracking engine** built on SysML v2 text files. It tracks 
 building things — and is being built using its own discipline. Read this before doing anything.
 
 > **Status: sprint discipline in force (D0064).** The tracking engine exists and is the
-> authority (D0048): the Rust toolchain computes views (`sysmlv2 orient`/`whats-next`/`suspect`)
+> authority (D0048): the Rust toolchain computes views (`keel orient`/`whats-next`/`suspect`)
 > and the write API records facts (`append-result`/`add-task`/`append-gate-result`/`apply-review`); four layer
 > validators gate every change. (The indexer and GUI don't exist yet; neither is needed for the
 > discipline.) **All substantive work — CHANGE, delivery, and engine work — goes through a sprint**
@@ -33,23 +33,23 @@ Authoritative reading order: this file → `.engine/README.md` → `.engine/deci
 superseded in full by decisions 0001–0018; decisions win.)
 **Orient** (where things stand / what's next) is never read from prose — compute it.
 The **Rust toolchain is the sole authority (D0048; query.py retired at M4/D0074)**, no kernel required:
-`sysmlv2 orient [ROOT]` (JSON) / `sysmlv2 whats-next [ROOT]` (ready list).
+`keel orient [ROOT]` (JSON) / `keel whats-next [ROOT]` (ready list).
 `orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
 verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
 source changed since it was verified — re-verify at HEAD to clear it.
 Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
-Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (needs/requirements/
-tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
+Rust tooling computes them: `keel orphans` renders the orphans viewpoint (needs/requirements/
+tasks/issues missing required edges); `keel view <name>`, `audit`, `attestation-coverage`,
 `governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
 declared viewpoint concerns are served vs planned), `dispositions` (D0092 — which ≥Medium findings
 carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned), `sitting-coverage` (D0049/issue040
 — which delivery sprints have a covering per-sitting review via `#Covers` vs await one) are the other computed lenses
 (`suspect` also flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
-renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
+renders as an interactive artifact via `keel render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
-critiques via `sysmlv2 apply-review` (the review viewpoint + render skill). Human-digestible
+critiques via `keel apply-review` (the review viewpoint + render skill). Human-digestible
 AGGREGATE scorecards (coverage %, critique %, traceability, debt, volatility, flow) come from
-`sysmlv2 report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`
+`keel report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`
 (D0087, the `report` viewpoint; health vs opportunity; `--trend` = git-derived sparklines; `friction`
 is the D0054/issue029 write-path-vs-spreadsheet benchmark). (The SysML
 viewpoint-registry stays the concern-coverage index.)
@@ -87,17 +87,17 @@ viewpoint-registry stays the concern-coverage index.)
    the §2 invariants are constraints stated in prose + enforced by guards. A **requirement** is a
    constraint elevated to a verified stakeholder contract (Need/SystemRequirement + satisfy/verify).
    An **indicator** is a *monitored* measure with no enforced threshold — a first-class `Indicator`
-   item (D0089) that informs by DIRECTION (goal), viewed via `sysmlv2 indicators [--trend]`. The
+   item (D0089) that informs by DIRECTION (goal), viewed via `keel indicators [--trend]`. The
    indicator set is the CANONICAL monitored-measure watchlist (D0090); a single shared computation
    (`metric_value`) feeds both the indicators and the reports, so each scalar metric is computed once,
    and reports *render* the indicators (+ point-in-time structure) rather than re-defining the metrics.
    Datapoints accumulate in a `Measurement` BANK: pulled/manual observations via `record-measurement`,
-   and computed readings via `sysmlv2 snapshot-indicators` (a recorded *observation*, not a cache —
-   D0091, a controlled compute-don't-store exception). `sysmlv2 indicators` is bank-first + emits the
+   and computed readings via `keel snapshot-indicators` (a recorded *observation*, not a cache —
+   D0091, a controlled compute-don't-store exception). `keel indicators` is bank-first + emits the
    full series. Its data
    arrives by a measurement METHOD: `computed` (objective, repo-derived — series via the report/trend
    engine, no stored datapoints), `pulled` (objective, external API/scraper — recorded `Measurement`
-   datapoints via `sysmlv2 record-measurement`), or `manual` (subjective, e.g. a survey — recorded).
+   datapoints via `keel record-measurement`), or `manual` (subjective, e.g. a survey — recorded).
    `Measurement`s are irreducible point-in-time observations (authored, with provenance) for pulled/
    manual; computed series recompute from the repo. When a metric's "good enough" boundary can't yet
    be defensibly set, it stays an **indicator** — promote to a requirement/guard only when a justified
@@ -108,7 +108,7 @@ viewpoint-registry stays the concern-coverage index.)
    toolchain); **HTML is the human's ergonomic oversight lens** (orient/review/decide). HTML NEVER
    stores truth — it renders computed `#View`s (`diagram`, `render`, `report`, `orient --html`) and
    wraps the write API (`apply-review`); it never becomes a second store or a second authority. The
-   engine **spins up** on a new project via `sysmlv2 init DIR` (binary-embedded; engine architecture
+   engine **spins up** on a new project via `keel init DIR` (binary-embedded; engine architecture
    decisions ship as read-only `.engine/reference/`, the new project authors its own fresh), and a
    newcomer is onboarded by the guided, project-based `introduction` skill (D0093).
 
@@ -172,7 +172,7 @@ Decision only — §4). A tooling change that alters the *meaning* of a computed
 behavior as surely as editing a gate.
 
 **§3b — EXECUTE.** The core loop:
-1. **Orient** — run `sysmlv2 orient [ROOT]` to
+1. **Orient** — run `keel orient [ROOT]` to
    compute in-progress sprint ceremony status + ready/outstanding backlog frontier.
    (No cursor file — orientation is fully computed from delivery file TestResults, D0045.)
 2. **Act within the appropriate phase** — produce its defined artifact(s) as items + edges;
@@ -191,8 +191,8 @@ it even though it produces no action. Never a document blob.
 An **`Issue` must be TRIAGED** (issue-resolution process/skill, D0077/D0078): give it a
 `#Resolves` edge from a resolving **action** (create one if none) or a mooting **Decision** —
 `#Resolves dependency from <resolver> to <issueNNN>;`. Resolution is then COMPUTED (resolved
-iff the resolver is done/accepted; `sysmlv2 open-issues` / `orient` open_issues), never a prose
-"RESOLVED" note; `sysmlv2 guard issues` fails on an untriaged Issue. When a Decision moots an
+iff the resolver is done/accepted; `keel open-issues` / `orient` open_issues), never a prose
+"RESOLVED" note; `keel guard issues` fails on an untriaged Issue. When a Decision moots an
 Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`) — not prose.
 
 - **Confirmation results require explicit human sign-off.** A `method=confirmation`
@@ -206,8 +206,8 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
   and any finding ≥ Medium needs a human disposition (run the `element-critique` skill). A
   disposition is itself a TYPED recorded judgment (D0092): a `method=confirmation` verification
   carrying `disposition : DispositionKind` (`act`/`acceptRisk`/`dismiss`), `#Dispositions`-linked
-  to the finding, written via `sysmlv2 apply-review` — never prose. ACCEPT-RISK/DISMISS close the
-  finding; ACT also needs a `#Resolves` resolver. `sysmlv2 dispositions` + `assured` read the verdict.
+  to the finding, written via `keel apply-review` — never prose. ACCEPT-RISK/DISMISS close the
+  finding; ACT also needs a `#Resolves` resolver. `keel dispositions` + `assured` read the verdict.
 - **Sprint ceremony is autonomous; the human gate is the per-sitting review (D0049).**
   Per-sprint closeOut (`method=inspect`) and retro (`method=analysis`) are AI-recorded with
   NO human sign-off — a sprint closes when its DoD passes, and the retro autonomously turns
@@ -215,7 +215,7 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
   sprint review (a sitting = one work session, ≥1 sprint), where the human accepts the
   sitting's content (batchable, D0019). Do not pause to confirm individual sprint ends.
 - **Confirm only what tests can't (D0051).** `method=test/inspect/analyze` items are
-  self-evidencing — their automated runs (cargo test, clippy, `sysmlv2 validate`, `sysmlv2
+  self-evidencing — their automated runs (cargo test, clippy, `keel validate`, `keel
   guard`) ARE the evidence; never ask a human to confirm a green test. The
   only confirmation-worthy class is non-test-verifiable judgment — Decisions / direction —
   where the evidence IS the human's word (D0016). A sitting of all-tested work with
@@ -229,7 +229,7 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
 it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
 baseline are all views (§2.1).
 
-**§3f — ORIENT.** Compute from authored facts — `sysmlv2 orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
+**§3f — ORIENT.** Compute from authored facts — `keel orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
 
 The six workflows (see the spec for detail):
 **Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →
@@ -240,10 +240,10 @@ The six workflows (see the spec for detail):
 
 ## 4. Working rules (sprint discipline in force, D0064)
 
-- **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `sysmlv2 append-result`
-  to append a `TestResult` to an action task, `sysmlv2 append-gate-result` to append a `TestResult`
+- **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `keel append-result`
+  to append a `TestResult` to an action task, `keel append-gate-result` to append a `TestResult`
   to a ceremony gate (`verification` — the `{gate}R{n}` form, used by sprint closeOut/retro), and
-  `sysmlv2 add-task` to add a task + `DoD` to an action def — all enforce UUID generation and
+  `keel add-task` to add a task + `DoD` to an action def — all enforce UUID generation and
   append-only semantics automatically. Direct editing of `.sysml` / instance files is still possible
   but is no longer the primary path; use it only when the write API does not yet cover the operation
   (schema changes, decision files).
@@ -299,7 +299,7 @@ The six workflows (see the spec for detail):
 - **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
   `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
   reproduced once even after the critique). Where things stand is COMPUTED
-  (`sysmlv2 orient [ROOT]` / `sysmlv2 whats-next [ROOT]`); what's next is the backlog's ready frontier;
+  (`keel orient [ROOT]` / `keel whats-next [ROOT]`); what's next is the backlog's ready frontier;
   how to work here is THIS file; mechanics live in `.tracking/README.md`,
   `.engine/docs/` and `.engine/decisions/`. Never author a status/worklist/handoff doc —
   if resuming requires knowledge, it belongs in the model, a Decision, or these docs.
@@ -312,15 +312,15 @@ A change is not done until it parses with zero `ERROR:`. **The Rust toolchain is
 canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
-.\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\sysmlv2.exe guard                                                               # ALL thirteen forward guards (no kernel) — exit≠0 on any violation
-.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage | critic-independence | process-skill  (+ runnable-only: critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
+.\target\release\keel.exe guard                                                               # ALL thirteen forward guards (no kernel) — exit≠0 on any violation
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage | critic-independence | process-skill  (+ runnable-only: critique-rigor, defect-guard-coverage)
 ```
-The thirteen forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
+The thirteen forward guards are the Rust authority (D0074 M3/M4): `keel guard` (actors D0037,
 acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
 D0068, process-change D0070 keystone, issues D0077/D0078, critique D0080/D0079, assured D0079c
 [both enforced at D0081 under charter-time scoping], viewpoint-renderer D0056/issue034 [renderers
-must name a real `sysmlv2` command, no retired query.py/report.py], manifest-coverage D0050/issue033
+must name a real `keel` command, no retired query.py/report.py], manifest-coverage D0050/issue033
 [the deliverable-suspicion manifest stays valid — no dead task/path entries], critic-independence
 D0080/issue031 [a Critical-severity finding's target needs a human/tool critic, not only aiModel],
 process-skill D0059/issue036 [no inert process — every `.engine/processes/*.sysml` is named by a
@@ -347,7 +347,7 @@ $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
 (Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.
 The kernel calls bare `java`. Sandbox must be disabled. The legacy `validate_sysml.py` was
 retired 2026-06-11 — it predates the flat-package split.)
-See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts before authoring.
+See `.engine/docs/keel-syntax-notes.md` for confirmed syntax do's/don'ts before authoring.
 
 ---
 
@@ -368,8 +368,8 @@ See `.engine/docs/sysmlv2-syntax-notes.md` for confirmed syntax do's/don'ts befo
 - **Use absolute paths in shell commands; don't rely on cwd (issue013).** The Bash and
   PowerShell tools share one working directory, so a `cd` in one silently changes the cwd
   the other sees and breaks later relative-path commands. Pass absolute paths to scripts
-  and files (the `sysmlv2` binary takes an explicit `[ROOT]`, and the kernel validators self-locate the repo, so cwd doesn't matter to them).
+  and files (the `keel` binary takes an explicit `[ROOT]`, and the kernel validators self-locate the repo, so cwd doesn't matter to them).
 - **Validation-path tools must be kernel-free where possible (D0048).** A tool that gates
   commits or routine checks should not start the JVM kernel — it's slow and orphans JVMs
-  (the leak W1 fixed). The forward guards + views are all kernel-free Rust (`sysmlv2 guard` /
-  `sysmlv2 validate`); the JVM kernel runs only for deep `.engine` SysML semantics.
+  (the leak W1 fixed). The forward guards + views are all kernel-free Rust (`keel guard` /
+  `keel validate`); the JVM kernel runs only for deep `.engine` SysML semantics.

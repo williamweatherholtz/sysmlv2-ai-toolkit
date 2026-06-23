@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [audit, critique, assurance-case, CAE, GQM, ATAM, adversarial, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # architectural-critique
@@ -39,17 +39,17 @@ A claim with no evidence, or with refuting evidence, is a finding.
 
 | Goal                                   | Question                                  | Metric (how to compute)                              |
 |----------------------------------------|-------------------------------------------|------------------------------------------------------|
-| Ceremonies are actually run            | % sprints with all gates, in order?       | `sysmlv2 guard ceremony` + `sysmlv2 orient` in_progress |
+| Ceremonies are actually run            | % sprints with all gates, in order?       | `keel guard ceremony` + `keel orient` in_progress |
 | Needs are covered                      | % Needs with a satisfy edge?              | `traceability-audit` skill                            |
-| Done means verified                    | any done task with stale/invalid evidence?| `sysmlv2 orient` suspect + invalidEvidence            |
+| Done means verified                    | any done task with stale/invalid evidence?| `keel orient` suspect + invalidEvidence            |
 | Deliverable matches its claims         | Rust orient == structural truth?          | inherent — Rust is the sole authority (D0048/M4)      |
 | Decisions are recorded                 | any CR commit without a Decision file?    | git log `CR:` vs `.engine/decisions/`                 |
 | Docs match reality                     | any doc claim contradicted by the model?  | grep doc claims vs schema/registry/tooling            |
-| Work is chartered                      | % delivery Stories with a #CharteredBy edge?| `sysmlv2 audit` (charter_coverage, grandfather-aware) |
-| Estimation feedback kept               | sprints recording actualHours?            | `sysmlv2 audit` (estimation_discipline)               |
-| Sitting review current                 | a per-sitting review recorded (D0049)?    | `sysmlv2 audit` (sitting_review)                      |
+| Work is chartered                      | % delivery Stories with a #CharteredBy edge?| `keel audit` (charter_coverage, grandfather-aware) |
+| Estimation feedback kept               | sprints recording actualHours?            | `keel audit` (estimation_discipline)               |
+| Sitting review current                 | a per-sitting review recorded (D0049)?    | `keel audit` (sitting_review)                      |
 
-**One-shot adherence metrics:** `sysmlv2 audit` computes the retrospective
+**One-shot adherence metrics:** `keel audit` computes the retrospective
 adherence set in one call — charter coverage, ceremony completeness, estimation discipline,
 sitting-review currency — each split ACTIONABLE vs grandfathered (charter since sprint38; ceremony
 post-issue010), so it never cries wolf on historical sprints. Pair it with the per-commit guards

@@ -1,14 +1,14 @@
 [package]
-name = "sysmlv2-cli"
+name = "keel-cli"
 version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "sysmlv2"
+name = "keel"
 path = "src/main.rs"
 
 [dependencies]
-sysmlv2-parser = { path = "../sysmlv2-parser" }
+keel-parser = { path = "../keel-parser" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"

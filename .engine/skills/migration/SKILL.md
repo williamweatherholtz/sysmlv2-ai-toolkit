@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [migration, schema-evolution, refactoring, expand-migrate-contract, data-integrity, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # migration — safe bulk migration (expand / migrate / contract)

@@ -1,13 +1,13 @@
 #![allow(unused, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use cucumber::{given, then, when, World};
-use sysmlv2_parser::token::TokenKind;
-use sysmlv2_parser::tokenize;
+use keel_parser::token::TokenKind;
+use keel_parser::tokenize;
 
 #[derive(Debug, Default, World)]
 pub struct LexerWorld {
     source: String,
-    result: Vec<sysmlv2_parser::token::Token>,
+    result: Vec<keel_parser::token::Token>,
     error_msg: Option<String>,
 }
 

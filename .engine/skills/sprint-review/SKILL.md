@@ -10,7 +10,7 @@ metadata:
   version: 0.2.0
   domain: [agile, sprint-review, sitting, human-confirmation, metrics, process-improvement, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # sprint-review (per-sitting, human-confirmed)
@@ -26,7 +26,7 @@ Three outputs:
 3. **Improvement queue** — transcript-scan findings (feeds the autonomous retro).
 4. **Human confirmation + coverage** — the human accepts the sitting's content (the one gate),
    recorded as a `method=confirmation` review whose `#Covers` edges name the sprint `Story` items it
-   attests (D0049/issue040). Coverage is then COMPUTED: `sysmlv2 sitting-coverage` reports which
+   attests (D0049/issue040). Coverage is then COMPUTED: `keel sitting-coverage` reports which
    delivery sprints have a covering review vs await one (a VIEW, not a gate — never fabricate a
    review; the confirmation is the human's explicit word, D0016). Record shape:
    `verification sittingRev<id> : Test { :>> method = VerificationMethod::confirmation; ... }` +
@@ -120,7 +120,7 @@ The single human touchpoint — but it confirms only what tests can't (D0051). S
 sitting into two buckets:
 
 1. **Test-backed work [NO confirmation].** Every `method=test/inspect/analyze` item is
-   self-evidencing — its automated run (cargo test, clippy, `sysmlv2 validate`, `sysmlv2
+   self-evidencing — its automated run (cargo test, clippy, `keel validate`, `keel
    guard`) IS the evidence. Recap it; do not ask the human to confirm it.
    A human "yes" on a green test adds nothing.
 2. **Non-test-verifiable items [the only confirmation ask].** Decisions / direction /

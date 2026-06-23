@@ -29,7 +29,7 @@ package EngineRenderView {
         :>> title = "Render — never author";
         :>> order = 2;
         :>> triggerCondition = "A (view, mode) is chosen.";
-        :>> actionText = "Run `sysmlv2 render <view> --mode graph|table|review [ROOT] > <name>.html` to COMPUTE the artifact fresh from authored facts. Never hand-build an artifact and never edit the generated HTML as truth — it is a derived #View (§2.1/D0015). Every node type + edge kind is a toggle; the dense derived edges (contains/resultof) default off.";
+        :>> actionText = "Run `keel render <view> --mode graph|table|review [ROOT] > <name>.html` to COMPUTE the artifact fresh from authored facts. Never hand-build an artifact and never edit the generated HTML as truth — it is a derived #View (§2.1/D0015). Every node type + edge kind is a toggle; the dense derived edges (contains/resultof) default off.";
         :>> producedArtifact = "A self-contained interactive HTML artifact (graph / table / review).";
         :>> owner = Owner::ai;
     }
@@ -38,7 +38,7 @@ package EngineRenderView {
         :>> title = "Review round-trip — attest, induce suspicion";
         :>> order = 3;
         :>> triggerCondition = "A review-mode artifact was used to disposition elements (accept / finding + rationale).";
-        :>> actionText = "Export the review batch (the in-page Export-JSON button) and run `sysmlv2 apply-review --batch <batch.json> --sha <commit> --judged-by <you> --judged-at <date>`. The human is an INDEPENDENT critic (D0080): each disposition enters as a NEW LINKED `method=critique` verification + result + `#Verify` edge in .tracking/critiques.sysml — accept attests state (pass); a finding (fail) carries severity + lens and INDUCES SUSPICION (`sysmlv2 suspect` critique_suspect) until cleared. The JSON is transport; .tracking is the only truth. Never paste the JSON in as a stored artifact, and never edit an element to record a review — append the critique.";
+        :>> actionText = "Export the review batch (the in-page Export-JSON button) and run `keel apply-review --batch <batch.json> --sha <commit> --judged-by <you> --judged-at <date>`. The human is an INDEPENDENT critic (D0080): each disposition enters as a NEW LINKED `method=critique` verification + result + `#Verify` edge in .tracking/critiques.sysml — accept attests state (pass); a finding (fail) carries severity + lens and INDUCES SUSPICION (`keel suspect` critique_suspect) until cleared. The JSON is transport; .tracking is the only truth. Never paste the JSON in as a stored artifact, and never edit an element to record a review — append the critique.";
         :>> producedArtifact = "New linked critique items (verification + TestResult + #Verify) in the model; computed suspicion on findings; nothing else stored.";
         :>> owner = Owner::human;
     }

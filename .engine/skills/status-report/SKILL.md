@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [view, materialized-view, status, dashboard, HTML, SysMLv2]
   writePolicy: readOnly
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # status-report
@@ -47,7 +47,7 @@ python .engine\tools\report.py --output docs\status.html
 python .engine\tools\report.py --stdout
 ```
 
-The script requires only Python standard library + the `target\release\sysmlv2.exe`
+The script requires only Python standard library + the `target\release\keel.exe`
 binary for orient JSON. It does NOT require the conda/sysml kernel.
 
 ## Rules for This Skill
@@ -55,7 +55,7 @@ binary for orient JSON. It does NOT require the conda/sysml kernel.
 - **Never commit the generated HTML** unless saving to `docs/` as a tagged snapshot
   explicitly requested by the user, and clearly labelled with the generation date.
 - **Never use a prior HTML report as authored truth.** Always regenerate from source.
-- **If sysmlv2.exe is absent**, report.py falls back to direct tracking-file parsing for
+- **If keel.exe is absent**, report.py falls back to direct tracking-file parsing for
   done/outstanding counts. The output will note the fallback.
 - **If actualHours is missing** for a sprint, the efficiency cell is rendered as "—"
   and the trailing average skips that sprint.

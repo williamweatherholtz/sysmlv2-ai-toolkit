@@ -2,7 +2,7 @@
 name: report
 description: |
   Deploys the Computed Report / Scorecard process (D0087): generate human-digestible AGGREGATE
-  reports via `sysmlv2 report <assurance|traceability|quality-debt|flow> [--html]` — totals,
+  reports via `keel report <assurance|traceability|quality-debt|flow> [--html]` — totals,
   percentages, and ratios rolled up from the per-element views, split into HEALTH (is it sound now?)
   and OPPORTUNITY (where to improve / leading signals). Use when asked for a status/health report,
   coverage %, a scorecard, metrics/KPIs, debt, velocity, or "how are we doing". A report is a
@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [report, scorecard, metrics, KPI, coverage, health, MBSE-measurement, computed-view, D0087]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # report
@@ -23,7 +23,7 @@ stored (the compute-don't-store guarantee of `coverage`/`assured`/`render`).
 
 ## Expert Vocabulary Payload
 
-**`sysmlv2 report <name> [--html] [--root ROOT]`** → JSON aggregates (or, with `--html`, a
+**`keel report <name> [--html] [--root ROOT]`** → JSON aggregates (or, with `--html`, a
 self-contained scorecard of metric cards with good/warn/bad tone). Grounded in the INCOSE Digital
 Engineering Measurement Framework + SE Leading Indicators + the model-quality canon
 (consistency/completeness/correctness via human rigour + automated tools = our critique + guards).
@@ -49,7 +49,7 @@ flow → throughput), rendered as a sparkline with first→last delta. It recomp
 each of ~12 recent commits via a throwaway git worktree — accurate but **slow (minutes)** and
 COMPUTED FROM GIT, never a stored metric history. Use it for "are we getting healthier?", not routine checks.
 
-**Generate, don't commit:** `sysmlv2 report assurance --html > scorecard.html` then open it.
+**Generate, don't commit:** `keel report assurance --html > scorecard.html` then open it.
 Generated `*.html` is git-ignored (D0085/D0086/D0087). It's the `report` viewpoint (D0056/D0057).
 
 ## Anti-Pattern Watchlist

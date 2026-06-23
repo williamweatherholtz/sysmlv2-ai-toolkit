@@ -33,7 +33,7 @@ package EngineDocSync {
         :>> title = "Sweep the documentation set";
         :>> order = 2;
         :>> actionText = "Check each member of the DOC SET for invalidated claims: CLAUDE.md; "
-                       + ".engine/README.md; .engine/docs/usage.md; .engine/docs/sysmlv2-syntax-notes.md; "
+                       + ".engine/README.md; .engine/docs/usage.md; .engine/docs/keel-syntax-notes.md; "
                        + ".engine/docs/tracking-template.sysml; .tracking/README.md; "
                        + "validator READMEs; and comments ADJACENT to the changed code/model.";
         :>> producedArtifact = "Set of stale claims to fix.";

@@ -11,7 +11,7 @@ metadata:
   version: 0.2.0
   domain: [agile, retrospective, avoidable-issues, continuous-improvement, autonomous, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # sprint-retro (autonomous)
@@ -55,7 +55,7 @@ manufacture items.
      `action def` (the change to make).
    - If a guard is cheap and obvious, building it now is in-scope (per D0047 the
      correction must become a permanent guard, not a note).
-4. **Record the retro gate** TestResult via `sysmlv2 append-gate-result --file <delivery file>
+4. **Record the retro gate** TestResult via `keel append-gate-result --file <delivery file>
    --gate <sprintRetroGate> --sha <HEAD> --judged-by <AI actor> --judged-at <today>` (auto-UUID,
    append-only `{gate}R{n}`). The gate is `method = analysis`, AI-judged: NO human confirmation (D0049).
 5. **Do NOT ask the human to accept.** Acceptance is the per-sitting sprint review.

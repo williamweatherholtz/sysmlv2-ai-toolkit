@@ -9,8 +9,8 @@
 use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 
-use sysmlv2_parser::ast::{Item, Package, Part, Value};
-use sysmlv2_parser::{parse, tokenize};
+use keel_parser::ast::{Item, Package, Part, Value};
+use keel_parser::{parse, tokenize};
 
 use crate::json::Json;
 

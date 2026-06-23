@@ -1,4 +1,4 @@
-//! Core logic for the `sysmlv2` CLI — validate, check, and orient commands.
+//! Core logic for the `keel` CLI — validate, check, and orient commands.
 //!
 //! - [`validate_root`]: register schema packages, semantic-validate all `.tracking/` files.
 //! - [`check_files`]: parse-only check for one or more files.
@@ -21,8 +21,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use sysmlv2_parser::ast::{ActionDef, Item, Package, Part, Value};
-use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
+use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
+use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod algo;
 pub mod govern;

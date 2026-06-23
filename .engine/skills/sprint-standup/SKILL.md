@@ -9,7 +9,7 @@ metadata:
   version: 0.1.0
   domain: [agile, standup, orient, blockers, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # sprint-standup
@@ -25,7 +25,7 @@ lightweight — the goal is a 2-minute orient, not a planning session.
 
 ## Behavioral Instructions
 
-1. **Run orient.** Execute `sysmlv2 orient [root]` (or query orient). Report:
+1. **Run orient.** Execute `keel orient [root]` (or query orient). Report:
    - Active sprint + current phase
    - Done count / suspect count
    - Ready frontier items

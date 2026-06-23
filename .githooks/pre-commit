@@ -4,7 +4,7 @@
 # Runs only the layer(s) matching staged paths; commits touching no guarded files
 # are not slowed. Escape hatch: SKIP_VALIDATE=1.
 #
-# Forward GUARDS are the Rust authority (D0074 M3/M4): `sysmlv2 guard <name>` — the python
+# Forward GUARDS are the Rust authority (D0074 M3/M4): `keel guard <name>` — the python
 # validate_*.py guards + query.py were retired at M4 (sprint58). The .engine SysML SEMANTIC
 # validators (schema/workflows/instances) remain kernel-based (deep semantics the Rust validator
 # does not cover) and still run via conda.
@@ -16,7 +16,7 @@ rust_staged=$(echo "$all_staged" | grep -E '(\.rs$|Cargo\.toml$|Cargo\.lock$)' |
 
 CONDA="C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe"
 V=".engine/tools/validate"
-SYSMLV2="target/release/sysmlv2.exe"
+SYSMLV2="target/release/keel.exe"
 
 sysml_run() {
     echo "pre-commit: $1"
@@ -30,7 +30,7 @@ guard_run() {
     if [ ! -x "$SYSMLV2" ]; then
         echo "pre-commit: rust binary missing — guard '$1' skipped (build target/release to enforce)"; return 0
     fi
-    echo "pre-commit: sysmlv2 guard $1"
+    echo "pre-commit: keel guard $1"
     "$SYSMLV2" guard "$1" || {
         echo "pre-commit: GUARD '$1' FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
@@ -57,14 +57,14 @@ fi
 # kernel validator only if the binary isn't built.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
     if [ -x "$SYSMLV2" ]; then
-        echo "pre-commit: sysmlv2 validate . (rust authority)"
+        echo "pre-commit: keel validate . (rust authority)"
         "$SYSMLV2" validate . || {
             echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     else
         # NO kernel fallback (issue026/safeTrackingFallback): kernel validate_tracking validates
         # per-file and FALSE-FAILS the #CharteredBy charter edges (.tracking -> .engine Decisions)
         # + baselines -> schema. The Rust authority (D0048) is the sole correct .tracking validator.
-        echo "pre-commit: rust binary missing — .tracking validation SKIPPED (build target/release/sysmlv2 to enforce)"
+        echo "pre-commit: rust binary missing — .tracking validation SKIPPED (build target/release/keel to enforce)"
     fi
 fi
 

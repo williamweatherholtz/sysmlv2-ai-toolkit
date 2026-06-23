@@ -2,7 +2,7 @@
 
 Drives the SysML v2 pilot-implementation Jupyter kernel to parse/validate the
 engine's `.sysml` files. Confirmed findings live in
-`.engine/docs/sysmlv2-syntax-notes.md`.
+`.engine/docs/keel-syntax-notes.md`.
 
 ## Prerequisites (already set up on this machine)
 

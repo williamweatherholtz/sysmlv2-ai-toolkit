@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [rust, cargo-test, clippy, BDD, cucumber, parity, verification, SysMLv2]
   writePolicy: readOnly
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # test-verify
@@ -28,11 +28,11 @@ This skill produces *evidence*; recording the TestResult itself is `test-result`
 | Unit + integration | `cargo test`                            | all green |
 | Lint             | `cargo clippy -- -D warnings`             | zero warnings |
 | BDD scenarios    | cucumber-rs scenarios (run via `cargo test`) | all green |
-| Self-consistency | `sysmlv2 orient .` total == structural `action` count | matches |
+| Self-consistency | `keel orient .` total == structural `action` count | matches |
 
 **Rust is the sole authority (D0048; query.py + parity_check retired at M4/D0074).** There is
 no second implementation to diff against any more — verification is `cargo test` + `cargo clippy`
-+ `sysmlv2` self-consistency (the orient total equals the distinct `action` declarations). When
++ `keel` self-consistency (the orient total equals the distinct `action` declarations). When
 porting query.py logic earlier (M2.2/M3), parity vs query.py WAS the gate; post-M4 the python
 reference is gone, so a port's evidence is its tests + the deletion's green commit.
 
@@ -50,7 +50,7 @@ path produced each verdict.
 1. **Run the layers in order**, capturing real output:
    1. `cargo test` (repo root) — unit + integration + BDD.
    2. `cargo clippy -- -D warnings` (or the workspace deny-config) — zero warnings.
-   3. Self-consistency: run `./target/release/sysmlv2.exe orient .`; confirm the
+   3. Self-consistency: run `./target/release/keel.exe orient .`; confirm the
       total task count equals the distinct `action <name>;` declarations in `.tracking`.
 2. **A red layer stops the verdict.** Report which layer failed with its output;
    do not proceed to "GREEN."
@@ -62,7 +62,7 @@ path produced each verdict.
 ## Anti-Patterns
 
 1. **Green-without-running** — claiming tests pass from reading code/CI memory.
-2. **Skipping self-consistency** — "cargo test passed" while `sysmlv2 orient`'s task
+2. **Skipping self-consistency** — "cargo test passed" while `keel orient`'s task
    total silently disagrees with the structural `action` count.
 3. **Hanging the shell** — piping `conda run` output into `Select-String`/
    `Out-Null`/redirects (CLAUDE.md §6). Run plain.

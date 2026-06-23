@@ -14,8 +14,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 use serde::Deserialize;
-use sysmlv2_parser::ast::{Item, Package, Value};
-use sysmlv2_parser::{parse, tokenize};
+use keel_parser::ast::{Item, Package, Value};
+use keel_parser::{parse, tokenize};
 
 use crate::json::Json;
 
@@ -281,7 +281,7 @@ impl Model {
     }
 }
 
-fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[sysmlv2_parser::ast::Attribute], marker: Option<&str>) {
+fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[keel_parser::ast::Attribute], marker: Option<&str>) {
     let attrs = attributes.iter().map(|a| (a.name.clone(), value_to_string(&a.value))).collect();
     items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string) });
 }
@@ -699,7 +699,7 @@ pub fn open_issues(root: &Path) -> Result<String, ViewError> {
 /// d0057 delivered the Viewpoint registry but its promised payoff — an audit of which concerns lack
 /// a working viewpoint — was never built. This is that audit, as a VIEW (not a guard): a `(planned)`
 /// viewpoint is a legitimately-deferred concern, not a violation, so it is reported, not failed.
-/// `served` = renderer names a `sysmlv2` command; `unserved` = renderer is `(planned ...)`.
+/// `served` = renderer names a `keel` command; `unserved` = renderer is `(planned ...)`.
 ///
 /// # Errors
 /// Returns `ViewError::Io` if the viewpoint registry cannot be read.
@@ -2036,7 +2036,7 @@ fn trend_series(root: &Path, key: &str) -> Vec<(String, f64)> {
     // 12 recent commits balances a readable trendline against the per-commit worktree+pipeline cost.
     for sha in sampled_commits(root, 12) {
         let short: String = sha.chars().take(8).collect();
-        let Some(wt) = std::env::temp_dir().join(format!("sysmlv2-trend-{short}")).to_str().map(str::to_string) else { continue };
+        let Some(wt) = std::env::temp_dir().join(format!("keel-trend-{short}")).to_str().map(str::to_string) else { continue };
         // Best-effort clean, then add a detached worktree at the commit.
         let _ = git_out(root, &["worktree", "remove", "--force", &wt]);
         if git_out(root, &["worktree", "add", "--detach", &wt, &sha]).is_some() {
@@ -2068,7 +2068,7 @@ pub fn report_html(root: &Path, name: &str, trend: bool) -> Result<String, ViewE
 ///
 /// Cards: where things stand + what's ready + open issues + suspect/stale + assurance readiness,
 /// reusing the report card template. A computed #View (regenerate-don't-commit), drilling down to the
-/// `sysmlv2 orient` JSON authority.
+/// `keel orient` JSON authority.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
@@ -2461,8 +2461,8 @@ fn governance_cards(model: &Model) -> Vec<Json> {
 }
 
 const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 report</title>
-<meta name="generator" content="sysmlv2 report (computed #View; regenerate, do not commit as truth)">
+<html lang="en"><head><meta charset="utf-8"><title>keel report</title>
+<meta name="generator" content="keel report (computed #View; regenerate, do not commit as truth)">
 /*STYLE*/
 <style>
  .cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
@@ -2473,7 +2473,7 @@ const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
  .c.good{border-left:5px solid #59a14f} .c.warn{border-left:5px solid #f2a900} .c.bad{border-left:5px solid #e15759}
  .c.good .v{color:#3d7a34} .c.warn .v{color:#b07a00} .c.bad .v{color:#b03a3c}
 </style></head><body>
-<header><h1>sysmlv2 · <span id="t"></span></h1><p>computed aggregate report (D0087) — regenerate, never commit as truth</p></header>
+<header><h1>keel · <span id="t"></span></h1><p>computed aggregate report (D0087) — regenerate, never commit as truth</p></header>
 <div id="trend" style="padding:0 14px"></div>
 <div class="cards" id="cards"></div>
 <script>
@@ -2495,8 +2495,8 @@ if(TREND&&TREND.series&&TREND.series.length){var s=TREND.series.map(function(p){
 const CYTOSCAPE_LIB: &str = include_str!("../assets/cytoscape.min.js");
 
 const DIAGRAM_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 traceability</title>
-<meta name="generator" content="sysmlv2 diagram (computed #View; regenerate, do not commit as truth)">
+<html lang="en"><head><meta charset="utf-8"><title>keel traceability</title>
+<meta name="generator" content="keel diagram (computed #View; regenerate, do not commit as truth)">
 <script>/*CYTOSCAPE_LIB*/</script>
 <style>
  html,body{margin:0;height:100%;font:12px system-ui,sans-serif}
@@ -2559,10 +2559,10 @@ const TABLE_STYLE: &str = r"<style>
 </style>";
 
 const TABLE_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 view</title>
-<meta name="generator" content="sysmlv2 render --mode table (computed #View; regenerate, do not commit as truth)">
+<html lang="en"><head><meta charset="utf-8"><title>keel view</title>
+<meta name="generator" content="keel render --mode table (computed #View; regenerate, do not commit as truth)">
 /*STYLE*/</head><body>
-<header><h1>sysmlv2 · <span id="vn"></span></h1><p id="cn"></p></header>
+<header><h1>keel · <span id="vn"></span></h1><p id="cn"></p></header>
 <div id="bar"><input id="q" placeholder="filter rows…" size="36"><span class="count" id="ct"></span></div>
 <table id="t"><thead></thead><tbody></tbody></table>
 <script>
@@ -2580,10 +2580,10 @@ document.getElementById('q').addEventListener('input',function(e){filter=e.targe
 </script></body></html>"#;
 
 const REVIEW_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>sysmlv2 review</title>
-<meta name="generator" content="sysmlv2 render --mode review (computed #View; capture is exported to JSON for apply-review)">
+<html lang="en"><head><meta charset="utf-8"><title>keel review</title>
+<meta name="generator" content="keel render --mode review (computed #View; capture is exported to JSON for apply-review)">
 /*STYLE*/</head><body>
-<header><h1>sysmlv2 review · <span id="vn"></span></h1><p id="cn"></p></header>
+<header><h1>keel review · <span id="vn"></span></h1><p id="cn"></p></header>
 <div id="bar">
  reviewer <input id="who" placeholder="your id" size="12">
  commit <input id="sha" placeholder="judgedAgainst (optional)" size="12">
@@ -2626,7 +2626,7 @@ document.getElementById('q').addEventListener('input',function(e){filter=e.targe
 /// Emits the WHOLE model — every element (typed node + its authored metadata) and every typed edge
 /// (satisfy/verify/charteredby/supersede/resolves/dependency/allocate/succession/process-change/...) —
 /// into one cytoscape page with type/edge filters, search, click-to-focus, and fit. A computed
-/// `#View`: regenerate on demand (`sysmlv2 diagram . > graph.html`), never commit it as truth.
+/// `#View`: regenerate on demand (`keel diagram . > graph.html`), never commit it as truth.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
@@ -2742,7 +2742,7 @@ fn view_columns(spec: &ViewSpec, model: &Model, result: &HashSet<String>) -> Vec
 }
 
 /// Render a view's rows as either a read-only table or a review surface (extra capture columns +
-/// an Export-JSON button that emits a batch consumable by `sysmlv2 apply-review`).
+/// an Export-JSON button that emits a batch consumable by `keel apply-review`).
 fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>, review: bool) -> String {
     let cols = view_columns(spec, model, result);
     let mut names: Vec<&String> = result.iter().collect();

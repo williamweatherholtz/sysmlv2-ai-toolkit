@@ -1,4 +1,4 @@
-# sysmlv2-ai-toolkit
+# keel-ai-toolkit
 
 A reusable, AI-complemented **work-tracking engine** built on SysML v2 text files,
 with strict discipline. It tracks the work of building anything — and is built
@@ -8,12 +8,12 @@ tracked by the engine itself).
 ## Orient (state is computed, never prose — Decision 0018)
 
 ```
-./target/release/sysmlv2.exe orient .
+./target/release/keel.exe orient .
 ```
 
 Returns in-progress sprint ceremony status + the ready/suspect frontier. There is no status page,
 roadmap doc, or handoff file: **the backlog (`.tracking/backlog.sysml`) is the only
-tracker**, and views over it are computed by the `sysmlv2` Rust toolchain
+tracker**, and views over it are computed by the `keel` Rust toolchain
 (`orient | whats-next | suspect | orphans | audit | view <name> | attestation-coverage |
 governing-version | reprocess-candidates`).
 
@@ -53,7 +53,7 @@ post-commit hook pushes to `main` — the only branch).
 
 The OMG pilot Jupyter SysML kernel (conda env `sysml`) drives validation and the
 typed graph; scalar values are read from text (the kernel won't render them — see
-`.engine/docs/sysmlv2-syntax-notes.md` for pilot-verified do's/don'ts). All 47
+`.engine/docs/keel-syntax-notes.md` for pilot-verified do's/don'ts). All 47
 model files validate green. A standalone parser/runtime is queued work
 (`runtimeParser` in the backlog).
 

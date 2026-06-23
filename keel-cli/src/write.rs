@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sysmlv2_parser::ast::{Item, Package};
+use keel_parser::ast::{Item, Package};
 
 // ── error type ────────────────────────────────────────────────────────────────
 
@@ -310,9 +310,9 @@ fn detect_indent(lines: &[&str], def_start: usize, def_close: usize) -> String {
 fn parse_file(path: &Path) -> Result<Package, WriteError> {
     let src = std::fs::read_to_string(path)?;
     let fname = path.to_string_lossy();
-    let tokens = sysmlv2_parser::tokenize(&src, &fname)
+    let tokens = keel_parser::tokenize(&src, &fname)
         .map_err(|e| WriteError::Parse(e.to_string()))?;
-    sysmlv2_parser::parse(tokens, &fname)
+    keel_parser::parse(tokens, &fname)
         .map_err(|e| WriteError::Parse(e.to_string()))
 }
 

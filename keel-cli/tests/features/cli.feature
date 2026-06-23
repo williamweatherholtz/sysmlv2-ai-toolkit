@@ -1,4 +1,4 @@
-Feature: sysmlv2-cli library
+Feature: keel-cli library
 
   Scenario: check a valid SysML file reports clean
     Given a SysML file with content "package ValidPkg {}"

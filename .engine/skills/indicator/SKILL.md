@@ -3,7 +3,7 @@ name: indicator
 description: |
   Deploys the Indicator Monitoring process (D0089): declare monitored MEASURES (Indicators) that
   inform a need/decision by DIRECTION (not a threshold — that's a requirement, D0088), and collect
-  their data by method — computed (repo-derived, `sysmlv2 indicators`), pulled (external/programmatic,
+  their data by method — computed (repo-derived, `keel indicators`), pulled (external/programmatic,
   `record-measurement`), or manual (subjective survey/assessment, `record-measurement`). Use when
   asked to track/watch/monitor a metric or KPI over time, add an indicator, record a measurement,
   pull an external signal (market/regulation/social), or see how a measure is trending. An Indicator
@@ -12,7 +12,7 @@ metadata:
   version: 0.1.0
   domain: [indicator, measurement, metric, KPI, monitoring, ISO-15939, PSM, SMM, D0089]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # indicator
@@ -34,11 +34,11 @@ serves. **No verify/satisfy edges** — it's excluded from the assurance/orphan 
 - **computed** (objective, repo-derived): `collectionRef` = a report name; the series is computed on
   demand via the report/trend engine — **no stored Measurements** (compute-don't-store).
 - **pulled** (objective, external): a collection skill/command queries an API/scraper (web/MCP tools),
-  then `sysmlv2 record-measurement --indicator I --value V --at DATE --source ...` records the
+  then `keel record-measurement --indicator I --value V --at DATE --source ...` records the
   observation (external values can't be recomputed, so they're recorded with provenance).
 - **manual** (subjective): a human gathers the value (survey/assessment) and records it the same way.
 
-**View:** `sysmlv2 indicators [--trend]` — per indicator: value, baseline→latest, and direction-aware
+**View:** `keel indicators [--trend]` — per indicator: value, baseline→latest, and direction-aware
 **status** (improving/degrading/flat by goal). Computed series need `--trend` (git replay, slow);
 pulled/manual series come from the recorded Measurements (cheap).
 

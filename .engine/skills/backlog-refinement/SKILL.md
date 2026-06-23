@@ -14,7 +14,7 @@ metadata:
   version: 0.2.0
   domain: [agile, INVEST, BDD, Gherkin, definition-of-ready, SysMLv2]
   writePolicy: pr-only
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # backlog-refinement

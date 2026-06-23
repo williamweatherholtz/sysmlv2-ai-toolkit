@@ -12,12 +12,12 @@ domain: [views, viewpoints, query, TOML, traceability, SysMLv2]
 # view — lightweight query-driven viewpoints (D0075)
 
 The deploying skill for D0075. A view is a concise, trivially-editable TOML declaration, executed
-by the Rust authority (`sysmlv2 view`), not per-view code (resolves issue018). Presentation is a
+by the Rust authority (`keel view`), not per-view code (resolves issue018). Presentation is a
 separate layer — the view's output is data (items + edges as JSON).
 
 ## Execute (x)
 ```
-sysmlv2 view <name> [ROOT]      # reads .engine/views/<name>.view.toml, prints the subgraph JSON
+keel view <name> [ROOT]      # reads .engine/views/<name>.view.toml, prints the subgraph JSON
 ```
 Fail-loud (D0074): an unknown TOML field or an unknown edge kind is a hard error — fix the view file.
 
@@ -58,4 +58,4 @@ depth     = "closure"         # an integer (hops) OR "closure"
   suspect, governing-version) are enrichment functions, not TOML — they populate computed columns.
 - M1 scope: AUTHORED attributes + the edges the AST extracts. COMPUTED attrs (done/ready/
   governingVersion), `verify`/`:>` edges, and temporal predicates are M1b (tracked).
-- New recurring view → add a `.view.toml` here (don't write code); run it with `sysmlv2 view`.
+- New recurring view → add a `.view.toml` here (don't write code); run it with `keel view`.

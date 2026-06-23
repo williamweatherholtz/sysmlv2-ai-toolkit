@@ -1,23 +1,23 @@
 # Deliverable-source suspicion manifest (D0050; PER-TASK precision — suspectDiagnostics, issue014).
-# Read by `sysmlv2 orient` (orient.rs): a listed task whose latest passing TestResult was judged
+# Read by `keel orient` (orient.rs): a listed task whose latest passing TestResult was judged
 # at a commit BEFORE a commit touching ANY OF ITS OWN paths is marked SUSPECT — the deliverable
-# changed since it was verified, so the claim is stale. `sysmlv2 suspect --explain` prints WHICH
+# changed since it was verified, so the claim is stale. `keel suspect --explain` prints WHICH
 # path drifted at WHICH commit vs the verified-at commit. Re-verifying (append a TestResult judged
 # at HEAD) clears it.
 #
 # Format (per-task): `task: <name> | <space-separated repo-relative paths>`. Per-task paths (not
 # one global set) so a change to e.g. the CLI does NOT flag the lexer task. '#' = comment.
 
-task: rustS1Lexer | sysmlv2-parser/src/lexer.rs sysmlv2-parser/src/token.rs
-task: rustS2Parser | sysmlv2-parser/src/parser.rs sysmlv2-parser/src/ast.rs
-task: rustS3Semantic | sysmlv2-parser/src/registry.rs
-task: rustS4SpecCompat | sysmlv2-parser/src/spec_compat.rs
-task: rustS5CLI | sysmlv2-cli/src/main.rs sysmlv2-cli/src/lib.rs
-task: rustS6Orient | sysmlv2-cli/src/orient.rs sysmlv2-cli/src/indexer.rs
-task: rustS7QueryAlign | sysmlv2-cli/src/orient.rs sysmlv2-cli/src/lib.rs
-task: rustS8runtimeParser | sysmlv2-parser/src
-task: rustS9writeApi | sysmlv2-cli/src/write.rs
-task: runtimeParser | sysmlv2-parser/src
-task: writeApi | sysmlv2-cli/src/write.rs
-task: rustToolchainFix | sysmlv2-parser sysmlv2-cli Cargo.toml Cargo.lock
-task: specVersionRuntimeCheck | sysmlv2-parser/src/spec_compat.rs
+task: rustS1Lexer | keel-parser/src/lexer.rs keel-parser/src/token.rs
+task: rustS2Parser | keel-parser/src/parser.rs keel-parser/src/ast.rs
+task: rustS3Semantic | keel-parser/src/registry.rs
+task: rustS4SpecCompat | keel-parser/src/spec_compat.rs
+task: rustS5CLI | keel-cli/src/main.rs keel-cli/src/lib.rs
+task: rustS6Orient | keel-cli/src/orient.rs keel-cli/src/indexer.rs
+task: rustS7QueryAlign | keel-cli/src/orient.rs keel-cli/src/lib.rs
+task: rustS8runtimeParser | keel-parser/src
+task: rustS9writeApi | keel-cli/src/write.rs
+task: runtimeParser | keel-parser/src
+task: writeApi | keel-cli/src/write.rs
+task: rustToolchainFix | keel-parser keel-cli Cargo.toml Cargo.lock
+task: specVersionRuntimeCheck | keel-parser/src/spec_compat.rs

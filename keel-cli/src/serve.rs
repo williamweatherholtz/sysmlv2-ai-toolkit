@@ -134,7 +134,7 @@ fn processes_json(root: &Path) -> String {
 // the model (compute-don't-store, §2.1) — the transcript is Claude Code's artifact; this is a view.
 
 /// Claude Code encodes the launch cwd into the projects-dir name by mapping every non-alphanumeric
-/// character to `-` (e.g. `C:\Users\...\sysmlv2-ai-toolkit` -> `C--Users-...-sysmlv2-ai-toolkit`).
+/// character to `-` (e.g. `C:\Users\...\keel-ai-toolkit` -> `C--Users-...-keel-ai-toolkit`).
 fn encoded_project_dir(root: &Path) -> Option<PathBuf> {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
     let abs = std::fs::canonicalize(root).ok()?;

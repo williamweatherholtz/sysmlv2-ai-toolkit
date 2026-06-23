@@ -20,7 +20,7 @@ package EngineReportView {
         :>> title = "Compute — never store the number";
         :>> order = 1;
         :>> triggerCondition = "Someone wants a health/opportunity read of the project (coverage totals, %, debt, velocity, trend).";
-        :>> actionText = "Run `sysmlv2 report <assurance|traceability|quality-debt|flow>` (JSON) or `... --html` (a scorecard). Every metric is COMPUTED fresh by aggregating the per-element views (coverage/critique/assured/decisions/orphans/issues); trends recompute scalar metrics at sampled git commits. NEVER author a metric, commit a CSV/snapshot, or hand-maintain a dashboard — a stored number drifts (§2.1/D0018).";
+        :>> actionText = "Run `keel report <assurance|traceability|quality-debt|flow>` (JSON) or `... --html` (a scorecard). Every metric is COMPUTED fresh by aggregating the per-element views (coverage/critique/assured/decisions/orphans/issues); trends recompute scalar metrics at sampled git commits. NEVER author a metric, commit a CSV/snapshot, or hand-maintain a dashboard — a stored number drifts (§2.1/D0018).";
         :>> producedArtifact = "A computed scorecard (JSON, or a self-contained HTML page of metric cards).";
         :>> owner = Owner::ai;
     }

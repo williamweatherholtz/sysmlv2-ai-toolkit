@@ -15,7 +15,7 @@ metadata:
   version: 0.1.0
   domain: [requirements-engineering, INCOSE-GtWR, EARS, MBSE, SysMLv2]
   writePolicy: pr-only
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # requirement-quality

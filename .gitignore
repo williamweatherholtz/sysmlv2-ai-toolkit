@@ -21,7 +21,7 @@ target
 #.idea/
 
 # ----------------------------------------------------------------------
-# sysmlv2-ai-toolkit additions
+# keel-ai-toolkit additions
 # ----------------------------------------------------------------------
 
 # Derived indexes (rebuilt from .sysml files — never source of truth)

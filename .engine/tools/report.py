@@ -59,7 +59,7 @@ def parse_sprint_metrics():
     return sprints
 
 def orient_data():
-    cli = ROOT / "target" / "release" / "sysmlv2.exe"
+    cli = ROOT / "target" / "release" / "keel.exe"
     default = {"cursor": {}, "ready": [], "suspect": [], "counts": {"done": "?", "outstanding": "?"},
                "_fallback": not cli.exists()}
     if not cli.exists():
@@ -300,7 +300,7 @@ def tab_current(sprints, orient, commits):
         msg_part = esc(parts[1]) if len(parts) > 1 else ""
         commit_rows += f'<div class="commit"><span class="sha">{sha_part}</span> {msg_part}</div>'
 
-    fallback = ('<p class="warn-note">&#9888; sysmlv2.exe not found &mdash; counts unavailable</p>'
+    fallback = ('<p class="warn-note">&#9888; keel.exe not found &mdash; counts unavailable</p>'
                 if o.get("_fallback") else "")
 
     if in_progress:

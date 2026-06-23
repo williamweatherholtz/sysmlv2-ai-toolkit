@@ -29,7 +29,7 @@ package EngineIndicatorMonitoring {
         :>> title = "Collect data by the method";
         :>> order = 2;
         :>> triggerCondition = "An indicator exists and a fresh datapoint is due (cadence) or first needed.";
-        :>> actionText = "computed: nothing to record — the series is computed on demand from the repo (the report/trend engine). pulled: run the collection skill/command (an API/scraper, e.g. via web/MCP tools) and `sysmlv2 record-measurement --indicator I --value V --at DATE --source ...` (a recorded observation, because external values can't be recomputed). manual: gather the value (survey/assessment) and record it the same way. NEVER fabricate or back-date an external/manual observation — record what was actually observed, with provenance.";
+        :>> actionText = "computed: nothing to record — the series is computed on demand from the repo (the report/trend engine). pulled: run the collection skill/command (an API/scraper, e.g. via web/MCP tools) and `keel record-measurement --indicator I --value V --at DATE --source ...` (a recorded observation, because external values can't be recomputed). manual: gather the value (survey/assessment) and record it the same way. NEVER fabricate or back-date an external/manual observation — record what was actually observed, with provenance.";
         :>> producedArtifact = "For pulled/manual: a recorded Measurement datapoint (value @ measuredAt + source). For computed: nothing stored.";
         :>> owner = Owner::ai;
     }
@@ -38,7 +38,7 @@ package EngineIndicatorMonitoring {
         :>> title = "Interpret — direction, not a gate";
         :>> order = 3;
         :>> triggerCondition = "Someone wants to read the indicators.";
-        :>> actionText = "Run `sysmlv2 indicators [--trend]` (computed series need --trend). Read each indicator's value + baseline->latest + direction-aware status (improving/degrading/flat by its goal). An indicator never PASSES or FAILS — it informs. If a real, defensible boundary emerges (a baseline + a stakeholder commitment), THEN promote it to a requirement/guard (D0088); until then, watch the direction.";
+        :>> actionText = "Run `keel indicators [--trend]` (computed series need --trend). Read each indicator's value + baseline->latest + direction-aware status (improving/degrading/flat by its goal). An indicator never PASSES or FAILS — it informs. If a real, defensible boundary emerges (a baseline + a stakeholder commitment), THEN promote it to a requirement/guard (D0088); until then, watch the direction.";
         :>> producedArtifact = "An ephemeral read (no stored artifact); possibly a decision to act on a degrading signal.";
         :>> owner = Owner::human;
     }

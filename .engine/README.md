@@ -33,7 +33,7 @@ contracts/       The computed-state specification (satisfaction/coverage/suspici
 processes/       Agile-for-solo+AI, DoR, DoD, architectural-critique, doc-sync.
 skills/          AI skill registrations + SKILL.md definitions.
 decisions/       Architecture decision records — why the engine is shaped this way.
-tools/           report.py (HTML dashboard), capture_user.py, kill_stale_kernels.py, _kernel.py + validate/ (kernel SysML validators: schema/workflows/instances/tracking). The orient/view/guard authority is the Rust `sysmlv2` binary (D0074; query.py retired at M4).
+tools/           report.py (HTML dashboard), capture_user.py, kill_stale_kernels.py, _kernel.py + validate/ (kernel SysML validators: schema/workflows/instances/tracking). The orient/view/guard authority is the Rust `keel` binary (D0074; query.py retired at M4).
 docs/            Usage guide, syntax notes, tracking template.
 ```
 
@@ -51,8 +51,8 @@ package MyProjectNeeds {
 ```
 
 Copy authoring idioms from `docs/tracking-template.sysml` (it parses green). Query
-the tracked work with `sysmlv2 orient` / `sysmlv2 view <name>`; validate with the Rust
-toolchain (`sysmlv2 validate` + `sysmlv2 guard`) and, for deep `.engine` SysML semantics,
+the tracked work with `keel orient` / `keel view <name>`; validate with the Rust
+toolchain (`keel validate` + `keel guard`) and, for deep `.engine` SysML semantics,
 the kernel layer validators in `tools/validate/` (mandatory before commit, CLAUDE.md §5).
 
 ## Reuse model
@@ -65,7 +65,7 @@ project's work uniformly.
 ## Status
 
 The schema and instance files parse green against the OMG pilot kernel (see
-`docs/sysmlv2-syntax-notes.md` for confirmed do's/don'ts). The Rust toolchain (`sysmlv2`) is
+`docs/keel-syntax-notes.md` for confirmed do's/don'ts). The Rust toolchain (`keel`) is
 the authority for `.tracking` — `validate` / `orient` / `whats-next` / `suspect` — and the
 write API (`append-result` / `add-task` / `append-gate-result`) records facts. The indexer and
 GUI don't exist yet. Substantive work goes through a sprint (CLAUDE.md §3/§4, D0064).

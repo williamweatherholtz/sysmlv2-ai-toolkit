@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cucumber::{given, then, when, World};
-use sysmlv2_cli::{
+use keel_cli::{
     check_files, collect_sysml, compute_orient_state, parse_cursor, Cursor, OrientReport, Report,
 };
-use sysmlv2_parser::ast::Package;
-use sysmlv2_parser::{parse, tokenize};
+use keel_parser::ast::Package;
+use keel_parser::{parse, tokenize};
 
 static FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -30,7 +30,7 @@ pub struct CliWorld {
 
 #[given(expr = "a SysML file with content {string}")]
 fn given_sysml_file(world: &mut CliWorld, content: String) {
-    let dir = std::env::temp_dir().join("sysmlv2_cli_bdd");
+    let dir = std::env::temp_dir().join("keel_cli_bdd");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let idx = FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = dir.join(format!("test_{idx}.sysml"));
@@ -41,7 +41,7 @@ fn given_sysml_file(world: &mut CliWorld, content: String) {
 #[given(expr = "a temporary directory containing {int} SysML files")]
 fn given_dir_with_files(world: &mut CliWorld, count: usize) {
     let run = FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("sysmlv2_cli_bdd_collect_{run}"));
+    let dir = std::env::temp_dir().join(format!("keel_cli_bdd_collect_{run}"));
     std::fs::create_dir_all(&dir).expect("create temp dir");
     for i in 0..count {
         let path = dir.join(format!("collect_{i}.sysml"));

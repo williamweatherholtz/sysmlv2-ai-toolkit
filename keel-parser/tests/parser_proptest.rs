@@ -1,6 +1,6 @@
 use proptest::prelude::*;
-use sysmlv2_parser::ast::{Item, Value};
-use sysmlv2_parser::{parse, tokenize};
+use keel_parser::ast::{Item, Value};
+use keel_parser::{parse, tokenize};
 
 fn arb_identifier() -> impl Strategy<Value = String> {
     "[a-zA-Z_][a-zA-Z0-9_]{0,31}".prop_map(std::convert::identity)
@@ -10,7 +10,7 @@ fn arb_simple_string() -> impl Strategy<Value = String> {
     "[a-zA-Z0-9 _]{0,32}".prop_map(std::convert::identity)
 }
 
-fn parse_src(src: &str) -> Result<sysmlv2_parser::ast::Package, String> {
+fn parse_src(src: &str) -> Result<keel_parser::ast::Package, String> {
     let tokens = tokenize(src, "prop-test").map_err(|e| e.to_string())?;
     parse(tokens, "prop-test").map_err(|e| e.to_string())
 }

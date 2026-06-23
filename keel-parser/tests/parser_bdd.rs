@@ -1,13 +1,13 @@
 #![allow(unused, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use cucumber::{given, then, when, World};
-use sysmlv2_parser::{ast::{Item, Value}, parse, tokenize};
-use sysmlv2_parser::ast::Item::TypeDef as ItemTypeDef;
+use keel_parser::{ast::{Item, Value}, parse, tokenize};
+use keel_parser::ast::Item::TypeDef as ItemTypeDef;
 
 #[derive(Debug, Default, World)]
 pub struct ParserWorld {
     source: String,
-    package: Option<sysmlv2_parser::ast::Package>,
+    package: Option<keel_parser::ast::Package>,
     error_msg: Option<String>,
 }
 

@@ -12,7 +12,7 @@ metadata:
   version: 0.1.0
   domain: [test-design, BDD, Gherkin, VerificationMethod, DoD, SysMLv2]
   writePolicy: pr-only
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # test-design

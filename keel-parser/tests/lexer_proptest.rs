@@ -1,6 +1,6 @@
 use proptest::prelude::*;
-use sysmlv2_parser::token::TokenKind;
-use sysmlv2_parser::tokenize;
+use keel_parser::token::TokenKind;
+use keel_parser::tokenize;
 
 /// Strategy: syntactically valid identifiers (start letter/underscore, continue alphanumeric/_).
 fn arb_identifier() -> impl Strategy<Value = String> {

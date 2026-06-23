@@ -1,4 +1,4 @@
-//! `sysmlv2` — CLI entry point.
+//! `keel` — CLI entry point.
 //!
 //! Subcommands:
 //!   `validate [ROOT]`         — semantic-validate all `.tracking/` files
@@ -34,19 +34,19 @@
 use std::{path::{Path, PathBuf}, process};
 
 use include_dir::{include_dir, Dir};
-use sysmlv2_cli::{check_files, collect_sysml, validate_root};
-use sysmlv2_cli::orient;
-use sysmlv2_cli::write as w;
+use keel_cli::{check_files, collect_sysml, validate_root};
+use keel_cli::orient;
+use keel_cli::write as w;
 
 // ── engine scaffold payload (D0093 `init`): the reusable engine tree + operating manual, embedded at
-//    compile time so `sysmlv2 init` is self-contained (no external fetch — the cytoscape precedent). ──
+//    compile time so `keel init` is self-contained (no external fetch — the cytoscape precedent). ──
 static ENGINE_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../.engine");
 const CLAUDE_MD: &str = include_str!("../../CLAUDE.md");
-const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `sysmlv2 orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
+const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `keel orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
 /// A fresh project's deliverable-suspicion manifest is EMPTY — the shipped one lists the ENGINE's own
 /// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
 /// engine/instance boundary). The new project adds entries as it builds source-dependent verifications.
-const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE\n# files (D0050), so `sysmlv2 suspect` flags a task suspect when its source changed since it was\n# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...\n# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.\n";
+const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE\n# files (D0050), so `keel suspect` flags a task suspect when its source changed since it was\n# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...\n# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.\n";
 
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ fn cmd_validate(args: &[String]) -> i32 {
         Some(p) => PathBuf::from(p),
         None => if let Some(r) = find_repo_root() { r } else {
             eprintln!("error: no .engine/ directory found from the current directory upward.");
-            eprintln!("usage: sysmlv2 validate [ROOT]");
+            eprintln!("usage: keel validate [ROOT]");
             return 2;
         },
     };
@@ -101,7 +101,7 @@ fn cmd_validate(args: &[String]) -> i32 {
 }
 
 fn cmd_spec_version(args: &[String]) -> i32 {
-    use sysmlv2_parser::spec_compat as sc;
+    use keel_parser::spec_compat as sc;
     println!("grammar version (baked): {}", sc::SYSML_V2_GRAMMAR_VERSION);
     println!("pinned sha:              {}", sc::SYSML_V2_GRAMMAR_SHA);
     println!("spec url:                {}", sc::SYSML_V2_SPEC_URL);
@@ -140,7 +140,7 @@ fn cmd_check(args: &[String]) -> i32 {
         return cmd_spec_version(args);
     }
     if args.is_empty() {
-        eprintln!("usage: sysmlv2 check FILE [FILE...]  |  sysmlv2 check --spec-version [--no-fetch]");
+        eprintln!("usage: keel check FILE [FILE...]  |  keel check --spec-version [--no-fetch]");
         return 2;
     }
     let files: Vec<PathBuf> = args.iter().map(PathBuf::from).collect();
@@ -183,12 +183,12 @@ fn cmd_serve(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 serve [--port N] [ROOT]");
+                eprintln!("usage: keel serve [--port N] [ROOT]");
                 return 2;
             }
         }
     };
-    sysmlv2_cli::serve::run(root, port)
+    keel_cli::serve::run(root, port)
 }
 
 fn cmd_orient(args: &[String]) -> i32 {
@@ -200,13 +200,13 @@ fn cmd_orient(args: &[String]) -> i32 {
                 r
             } else {
                 eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: sysmlv2 orient [ROOT] [--html]");
+                eprintln!("usage: keel orient [ROOT] [--html]");
                 return 2;
             }
         }
     };
     if html {
-        return match sysmlv2_cli::view::orient_html(&root) {
+        return match keel_cli::view::orient_html(&root) {
             Ok(h) => {
                 println!("{h}");
                 0
@@ -228,12 +228,12 @@ fn cmd_attestation_coverage(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 attestation-coverage [ROOT]");
+                eprintln!("usage: keel attestation-coverage [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::attestation_coverage(&root) {
+    match keel_cli::view::attestation_coverage(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -252,12 +252,12 @@ fn cmd_orphans(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 orphans [ROOT]");
+                eprintln!("usage: keel orphans [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::algo::orphans(&root) {
+    match keel_cli::algo::orphans(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -276,12 +276,12 @@ fn cmd_audit(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 audit [ROOT]");
+                eprintln!("usage: keel audit [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::algo::audit(&root) {
+    match keel_cli::algo::audit(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -298,14 +298,14 @@ fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
 }
 
 fn cmd_guard(args: &[String]) -> i32 {
-    // `sysmlv2 guard` / `guard all [ROOT]` → run all six; `guard <name> [ROOT]` → run one.
+    // `keel guard` / `guard all [ROOT]` → run all six; `guard <name> [ROOT]` → run one.
     let run_all = args.first().is_none_or(|a| a == "all");
     let Some(root) = resolve_guard_root(args.get(1)) else {
-        eprintln!("error: no .engine/ directory found. usage: sysmlv2 guard [<name>] [ROOT]");
+        eprintln!("error: no .engine/ directory found. usage: keel guard [<name>] [ROOT]");
         return 2;
     };
     if run_all {
-        let reports = sysmlv2_cli::guards::run_all(&root);
+        let reports = keel_cli::guards::run_all(&root);
         let mut all_ok = true;
         for r in &reports {
             r.print();
@@ -315,15 +315,15 @@ fn cmd_guard(args: &[String]) -> i32 {
         return i32::from(!all_ok);
     }
     let Some(name) = args.first() else { return 2 };
-    let Some(report) = sysmlv2_cli::guards::run_one(name, &root) else {
-        eprintln!("unknown guard '{name}' (known: {})", sysmlv2_cli::guards::GUARD_NAMES.join(", "));
+    let Some(report) = keel_cli::guards::run_one(name, &root) else {
+        eprintln!("unknown guard '{name}' (known: {})", keel_cli::guards::GUARD_NAMES.join(", "));
         return 2;
     };
     report.print();
     i32::from(!report.ok())
 }
 
-// Root-only query: `sysmlv2 <name> [ROOT]`.
+// Root-only query: `keel <name> [ROOT]`.
 fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -331,7 +331,7 @@ fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 {usage} [ROOT]");
+                eprintln!("usage: keel {usage} [ROOT]");
                 return 2;
             }
         }
@@ -340,10 +340,10 @@ fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -
     0
 }
 
-// Name + optional root: `sysmlv2 <name> <arg> [ROOT]`.
+// Name + optional root: `keel <name> <arg> [ROOT]`.
 fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> String) -> i32 {
     let Some(arg) = args.first() else {
-        eprintln!("usage: sysmlv2 {usage} <name> [ROOT]");
+        eprintln!("usage: keel {usage} <name> [ROOT]");
         return 2;
     };
     let root = match args.get(1) {
@@ -352,7 +352,7 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 {usage} <name> [ROOT]");
+                eprintln!("usage: keel {usage} <name> [ROOT]");
                 return 2;
             }
         }
@@ -368,12 +368,12 @@ fn cmd_open_issues(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 open-issues [ROOT]");
+                eprintln!("usage: keel open-issues [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::open_issues(&root) {
+    match keel_cli::view::open_issues(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -392,12 +392,12 @@ fn cmd_dispositions(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 dispositions [ROOT]");
+                eprintln!("usage: keel dispositions [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::dispositions(&root) {
+    match keel_cli::view::dispositions(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -416,12 +416,12 @@ fn cmd_sitting_coverage(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 sitting-coverage [ROOT]");
+                eprintln!("usage: keel sitting-coverage [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::sitting_coverage(&root) {
+    match keel_cli::view::sitting_coverage(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -440,12 +440,12 @@ fn cmd_concern_coverage(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 concern-coverage [ROOT]");
+                eprintln!("usage: keel concern-coverage [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::concern_coverage(&root) {
+    match keel_cli::view::concern_coverage(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -464,12 +464,12 @@ fn cmd_coverage(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 coverage [ROOT]");
+                eprintln!("usage: keel coverage [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::coverage(&root) {
+    match keel_cli::view::coverage(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -488,12 +488,12 @@ fn cmd_diagram(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 diagram [ROOT]  (redirect to a .html file)");
+                eprintln!("usage: keel diagram [ROOT]  (redirect to a .html file)");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::diagram_html(&root) {
+    match keel_cli::view::diagram_html(&root) {
         Ok(html) => {
             println!("{html}");
             0
@@ -512,12 +512,12 @@ fn cmd_decisions(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 decisions [ROOT]");
+                eprintln!("usage: keel decisions [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::decisions_report(&root) {
+    match keel_cli::view::decisions_report(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -536,12 +536,12 @@ fn cmd_assured(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 assured [ROOT]");
+                eprintln!("usage: keel assured [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::assured(&root) {
+    match keel_cli::view::assured(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -560,12 +560,12 @@ fn cmd_critique_coverage(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 critique-coverage [ROOT]");
+                eprintln!("usage: keel critique-coverage [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::critique_coverage(&root) {
+    match keel_cli::view::critique_coverage(&root) {
         Ok(json) => {
             println!("{json}");
             0
@@ -579,7 +579,7 @@ fn cmd_critique_coverage(args: &[String]) -> i32 {
 
 fn cmd_governing_version(args: &[String]) -> i32 {
     let Some(item) = args.first() else {
-        eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
+        eprintln!("usage: keel governing-version <delivery Story name> [ROOT]");
         return 2;
     };
     let root = match args.get(1) {
@@ -588,12 +588,12 @@ fn cmd_governing_version(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 governing-version <delivery Story name> [ROOT]");
+                eprintln!("usage: keel governing-version <delivery Story name> [ROOT]");
                 return 2;
             }
         }
     };
-    println!("{}", sysmlv2_cli::govern::governing_version(&root, item));
+    println!("{}", keel_cli::govern::governing_version(&root, item));
     0
 }
 
@@ -604,12 +604,12 @@ fn cmd_reprocess_candidates(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 reprocess-candidates [ROOT]");
+                eprintln!("usage: keel reprocess-candidates [ROOT]");
                 return 2;
             }
         }
     };
-    println!("{}", sysmlv2_cli::govern::reprocess_candidates(&root));
+    println!("{}", keel_cli::govern::reprocess_candidates(&root));
     0
 }
 
@@ -621,18 +621,18 @@ fn cmd_suspect(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: sysmlv2 suspect [--explain] [ROOT]");
+                eprintln!("usage: keel suspect [--explain] [ROOT]");
                 return 2;
             }
         }
     };
-    println!("{}", sysmlv2_cli::govern::suspect(&root, explain));
+    println!("{}", keel_cli::govern::suspect(&root, explain));
     0
 }
 
 fn cmd_view(args: &[String]) -> i32 {
     let Some(name) = args.first() else {
-        eprintln!("usage: sysmlv2 view <name> [ROOT]");
+        eprintln!("usage: keel view <name> [ROOT]");
         return 2;
     };
     let root = match args.get(1) {
@@ -642,12 +642,12 @@ fn cmd_view(args: &[String]) -> i32 {
                 r
             } else {
                 eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: sysmlv2 view <name> [ROOT]");
+                eprintln!("usage: keel view <name> [ROOT]");
                 return 2;
             }
         }
     };
-    match sysmlv2_cli::view::run(&root, name) {
+    match keel_cli::view::run(&root, name) {
         Ok(json) => {
             println!("{json}");
             0
@@ -667,7 +667,7 @@ fn cmd_whats_next(args: &[String]) -> i32 {
                 r
             } else {
                 eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: sysmlv2 whats-next [ROOT]");
+                eprintln!("usage: keel whats-next [ROOT]");
                 return 2;
             }
         }
@@ -704,7 +704,7 @@ fn flag(args: &[String], name: &str) -> Option<String> {
 
 fn cmd_append_result(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: sysmlv2 append-result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        eprintln!("usage: keel append-result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
         return 2;
     };
     let Some(task) = flag(args, "task") else {
@@ -717,7 +717,7 @@ fn cmd_append_result(args: &[String]) -> i32 {
     };
     let file = PathBuf::from(file_str);
     let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
-    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "keel-cli".to_owned());
     // Callers should pass --judged-at for determinism; this is a safe fallback.
     let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
 
@@ -729,7 +729,7 @@ fn cmd_append_result(args: &[String]) -> i32 {
 
 fn cmd_append_gate_result(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: sysmlv2 append-gate-result --file FILE --gate GATE --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        eprintln!("usage: keel append-gate-result --file FILE --gate GATE --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
         return 2;
     };
     let Some(gate) = flag(args, "gate") else {
@@ -742,7 +742,7 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     };
     let file = PathBuf::from(file_str);
     let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
-    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "keel-cli".to_owned());
     // Callers should pass --judged-at for determinism; this is a safe fallback.
     let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
 
@@ -754,7 +754,7 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
 
 fn cmd_add_task(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: sysmlv2 add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
+        eprintln!("usage: keel add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
         return 2;
     };
     let Some(def_name) = flag(args, "def") else {
@@ -782,7 +782,7 @@ fn cmd_add_task(args: &[String]) -> i32 {
 /// renderer over the view layer (D0086). Emits self-contained HTML to stdout (redirect to a file).
 fn cmd_render(args: &[String]) -> i32 {
     let Some(view) = args.first().filter(|v| !v.starts_with("--")) else {
-        eprintln!("usage: sysmlv2 render <view> [--mode graph|table|review] [--root ROOT]");
+        eprintln!("usage: keel render <view> [--mode graph|table|review] [--root ROOT]");
         eprintln!("  <view> = a declared view name (e.g. decisions, issues), or 'model' for the whole-model graph");
         return 2;
     };
@@ -798,7 +798,7 @@ fn cmd_render(args: &[String]) -> i32 {
             }
         }
     };
-    match sysmlv2_cli::view::render_html(&root, view, &mode) {
+    match keel_cli::view::render_html(&root, view, &mode) {
         Ok(html) => {
             println!("{html}");
             0
@@ -814,7 +814,7 @@ fn cmd_render(args: &[String]) -> i32 {
 /// traceability | quality-debt | flow. JSON by default; `--html` emits a human-digestible scorecard.
 fn cmd_report(args: &[String]) -> i32 {
     let Some(name) = args.first().filter(|v| !v.starts_with("--")) else {
-        eprintln!("usage: sysmlv2 report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] [--root ROOT]");
+        eprintln!("usage: keel report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] [--root ROOT]");
         return 2;
     };
     let root = match flag(args, "root") {
@@ -830,7 +830,7 @@ fn cmd_report(args: &[String]) -> i32 {
     };
     let html = args.iter().any(|a| a == "--html");
     let trend = args.iter().any(|a| a == "--trend");
-    let result = if html { sysmlv2_cli::view::report_html(&root, name, trend) } else { sysmlv2_cli::view::report(&root, name, trend) };
+    let result = if html { keel_cli::view::report_html(&root, name, trend) } else { keel_cli::view::report(&root, name, trend) };
     match result {
         Ok(out) => {
             println!("{out}");
@@ -859,7 +859,7 @@ fn cmd_indicators(args: &[String]) -> i32 {
         }
     };
     let trend = args.iter().any(|a| a == "--trend");
-    match sysmlv2_cli::view::indicators(&root, trend) {
+    match keel_cli::view::indicators(&root, trend) {
         Ok(json) => {
             println!("{json}");
             0
@@ -875,7 +875,7 @@ fn cmd_indicators(args: &[String]) -> i32 {
 /// record a Measurement datapoint (D0089) for a pulled/manual indicator (write path).
 fn cmd_record_measurement(args: &[String]) -> i32 {
     let Some(indicator) = flag(args, "indicator") else {
-        eprintln!("usage: sysmlv2 record-measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]");
+        eprintln!("usage: keel record-measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]");
         return 2;
     };
     let Some(value) = flag(args, "value") else {
@@ -888,7 +888,7 @@ fn cmd_record_measurement(args: &[String]) -> i32 {
     );
     let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
     let source = flag(args, "source").unwrap_or_default();
-    let by = flag(args, "by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    let by = flag(args, "by").unwrap_or_else(|| "keel-cli".to_owned());
     match w::append_measurement(&file, &indicator, &value, &at, &source, &by) {
         Ok(name) => {
             println!("{name}");
@@ -918,8 +918,8 @@ fn cmd_snapshot_indicators(args: &[String]) -> i32 {
     };
     let file = flag(args, "file").map_or_else(|| root.join(".tracking").join("indicators.sysml"), PathBuf::from);
     let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
-    let by = flag(args, "by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
-    let keys = match sysmlv2_cli::view::computed_indicator_keys(&root) {
+    let by = flag(args, "by").unwrap_or_else(|| "keel-cli".to_owned());
+    let keys = match keel_cli::view::computed_indicator_keys(&root) {
         Ok(k) => k,
         Err(e) => {
             eprintln!("error: {e}");
@@ -928,7 +928,7 @@ fn cmd_snapshot_indicators(args: &[String]) -> i32 {
     };
     let mut count = 0u32;
     for (indicator, key) in &keys {
-        let Some(v) = sysmlv2_cli::view::metric_value(&root, key) else {
+        let Some(v) = keel_cli::view::metric_value(&root, key) else {
             eprintln!("skip {indicator}: metric '{key}' not computable");
             continue;
         };
@@ -977,7 +977,7 @@ struct ReviewDisp {
 /// which induces computed suspicion). Writes into `.tracking/critiques.sysml`.
 fn cmd_apply_review(args: &[String]) -> i32 {
     let Some(batch_str) = flag(args, "batch") else {
-        eprintln!("usage: sysmlv2 apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]");
+        eprintln!("usage: keel apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]");
         return 2;
     };
     let root = match flag(args, "root") {
@@ -1113,12 +1113,12 @@ fn scaffold_engine(dir: &Dir, dst_engine: &Path, count: &mut u32) -> std::io::Re
     Ok(())
 }
 
-/// `sysmlv2 init DIR` (D0093) — scaffold a fresh project: the embedded engine (`.engine/`, with the
+/// `keel init DIR` (D0093) — scaffold a fresh project: the embedded engine (`.engine/`, with the
 /// architecture decisions remapped to read-only `reference/`), `CLAUDE.md`, and a starter `.tracking/`.
 /// Self-contained cold start; refuses to overwrite an existing `.engine/`.
 fn cmd_init(args: &[String]) -> i32 {
     let Some(target) = args.first() else {
-        eprintln!("usage: sysmlv2 init DIR");
+        eprintln!("usage: keel init DIR");
         return 2;
     };
     let dir = PathBuf::from(target);
@@ -1157,7 +1157,7 @@ fn cmd_init(args: &[String]) -> i32 {
     println!("  1. cd {}", dir.display());
     println!("  2. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
     println!("  3. Run the `introduction` skill (guided onboarding) — capture your first need + run your first sprint.");
-    println!("     Or: sysmlv2 orient .   (where things stand)");
+    println!("     Or: keel orient .   (where things stand)");
     println!();
     println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
     println!("your project authors its OWN decisions fresh in .engine/decisions/.");
@@ -1198,16 +1198,16 @@ fn main() {
         Some("record-measurement") => cmd_record_measurement(rest),
         Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
         Some("apply-review") => cmd_apply_review(rest),
-        Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
-        Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),
-        Some("item") => cmd_query1(rest, "item", sysmlv2_cli::queries::item),
-        Some("trace") => cmd_query1(rest, "trace", sysmlv2_cli::queries::trace),
-        Some("trace-need") => cmd_query1(rest, "trace-need", sysmlv2_cli::queries::trace_need),
+        Some("outstanding") => cmd_query0(rest, "outstanding", keel_cli::queries::outstanding),
+        Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
+        Some("item") => cmd_query1(rest, "item", keel_cli::queries::item),
+        Some("trace") => cmd_query1(rest, "trace", keel_cli::queries::trace),
+        Some("trace-need") => cmd_query1(rest, "trace-need", keel_cli::queries::trace_need),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
         _ => {
-            eprintln!("sysmlv2 <subcommand> [args]");
+            eprintln!("keel <subcommand> [args]");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
             eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");

@@ -1000,6 +1000,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "keel-cli"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "cucumber",
+ "include_dir",
+ "keel-parser",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "keel-parser"
+version = "0.1.0"
+dependencies = [
+ "cucumber",
+ "hex",
+ "proptest",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "ureq",
+]
+
+[[package]]
 name = "lazy-regex"
 version = "3.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1687,34 +1715,6 @@ dependencies = [
  "quote",
  "sealed",
  "syn",
-]
-
-[[package]]
-name = "sysmlv2-cli"
-version = "0.1.0"
-dependencies = [
- "axum",
- "cucumber",
- "include_dir",
- "serde",
- "serde_json",
- "sysmlv2-parser",
- "thiserror",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "sysmlv2-parser"
-version = "0.1.0"
-dependencies = [
- "cucumber",
- "hex",
- "proptest",
- "sha2",
- "thiserror",
- "tokio",
- "ureq",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "sysmlv2-parser",
-    "sysmlv2-cli",
+    "keel-parser",
+    "keel-cli",
 ]
 resolver = "2"
 

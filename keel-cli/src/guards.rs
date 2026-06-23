@@ -494,7 +494,7 @@ pub fn issues(root: &Path) -> GuardReport {
 /// Guard: every assurance element carries its required-lens critiques (D0080/D0079).
 ///
 /// An element missing a required-lens critique (Core-3 policy) is a violation. RUNNABLE via
-/// `sysmlv2 guard critique` but NOT yet in the enforced `GUARD_NAMES` set: with zero critiques
+/// `keel guard critique` but NOT yet in the enforced `GUARD_NAMES` set: with zero critiques
 /// recorded it would block every commit. It joins the enforced set (a hard pre-commit gate, the
 /// human-accepted choice) once a genuine critique pass brings the model to required-lens coverage.
 #[must_use]
@@ -515,7 +515,7 @@ pub fn critique(root: &Path) -> GuardReport {
 ///
 /// Fails with the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
 /// verification, undispositioned >= Medium findings, open Critical, invariant violations). RUNNABLE
-/// via `sysmlv2 guard assured` but NOT in the enforced `GUARD_NAMES` (it subsumes the per-commit
+/// via `keel guard assured` but NOT in the enforced `GUARD_NAMES` (it subsumes the per-commit
 /// guards and the not-yet-enforced critique gate — it is a readiness verdict, not a per-commit lock).
 #[must_use]
 pub fn assured(root: &Path) -> GuardReport {
@@ -527,7 +527,7 @@ pub fn assured(root: &Path) -> GuardReport {
 
 // ── viewpoint-renderer guard (every declared viewpoint names a real renderer) ──────────────────
 
-/// View-ish `sysmlv2` subcommands a viewpoint renderer may legitimately name.
+/// View-ish `keel` subcommands a viewpoint renderer may legitimately name.
 const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
@@ -542,13 +542,13 @@ fn quoted_attr(line: &str, key: &str) -> Option<String> {
 }
 
 /// Classify a viewpoint renderer string: `"retired"` (query.py/report.py, a violation), `"planned"`
-/// (a tolerated warning), `"ok"` (names a real `sysmlv2` subcommand), or `"unknown"` (a violation).
+/// (a tolerated warning), `"ok"` (names a real `keel` subcommand), or `"unknown"` (a violation).
 fn classify_renderer(r: &str) -> &'static str {
     if r.contains("query.py") || r.contains("report.py") {
         "retired"
     } else if r.starts_with("(planned") {
         "planned"
-    } else if r.strip_prefix("sysmlv2 ").and_then(|s| s.split([' ', '(']).next()).is_some_and(|c| VIEW_SUBCOMMANDS.contains(&c)) {
+    } else if r.strip_prefix("keel ").and_then(|s| s.split([' ', '(']).next()).is_some_and(|c| VIEW_SUBCOMMANDS.contains(&c)) {
         "ok"
     } else {
         "unknown"
@@ -556,7 +556,7 @@ fn classify_renderer(r: &str) -> &'static str {
 }
 
 /// Guard (D0056/issue034): every declared Viewpoint's renderer names a real current command
-/// (a `sysmlv2 <subcommand>`), or is explicitly `(planned ...)`.
+/// (a `keel <subcommand>`), or is explicitly `(planned ...)`.
 ///
 /// A renderer referencing a RETIRED tool (query.py / report.py, D0074) or an unknown command is a
 /// violation — it stops the viewpoint registry from drifting to dead renderers (the d0056 finding).
@@ -579,7 +579,7 @@ pub fn viewpoint_renderer(root: &Path) -> GuardReport {
             scanned += 1;
             match classify_renderer(&r) {
                 "retired" => violations.push(format!("{title}: renderer references a RETIRED tool (query.py/report.py, D0074) — '{r}'")),
-                "unknown" => violations.push(format!("{title}: renderer names no known sysmlv2 command — '{r}'")),
+                "unknown" => violations.push(format!("{title}: renderer names no known keel command — '{r}'")),
                 "planned" => warnings.push(format!("{title}: viewpoint declared but renderer is planned/unbuilt — '{r}'")),
                 _ => {}
             }
@@ -698,7 +698,7 @@ pub fn critic_independence(root: &Path) -> GuardReport {
 
 /// Diagnostic (D0080/issue030): low-rigor critiques + affirming-only critics, as WARNINGS.
 ///
-/// RUNNABLE via `sysmlv2 guard critique-rigor` but NOT in the enforced `GUARD_NAMES` — rigor is a
+/// RUNNABLE via `keel guard critique-rigor` but NOT in the enforced `GUARD_NAMES` — rigor is a
 /// heuristic signal for human attention, not a hard gate (a shallow-but-honest critique is not a
 /// commit-blocker). Surfaces critiques lacking adversarial structure / substance and never-find critics.
 #[must_use]
@@ -770,7 +770,7 @@ pub fn process_skill(root: &Path) -> GuardReport {
 
 /// Diagnostic (D0047/issue039): a `#ProcessDefect` finding must resolve to a guard-producing action.
 ///
-/// RUNNABLE via `sysmlv2 guard defect-guard-coverage` but NOT in the enforced `GUARD_NAMES` — whether
+/// RUNNABLE via `keel guard defect-guard-coverage` but NOT in the enforced `GUARD_NAMES` — whether
 /// a defect class "needs a guard" is judgment-bound (a shallow heuristic on the resolver name), so it
 /// is a WARN for human attention, not a commit gate. Closes issue039: the "corrections become guards"
 /// rule (D0047) now has an audit instead of relying purely on vigilance.
@@ -833,26 +833,26 @@ mod tests {
     #[test]
     fn viewpoint_renderer_classification() {
         // D0056/issue034: retired-tool refs + unknown commands are violations; planned is a warning;
-        // a real sysmlv2 subcommand is ok.
+        // a real keel subcommand is ok.
         assert_eq!(classify_renderer("query.py governing-version <item>"), "retired");
         assert_eq!(classify_renderer("report.py:tab_decisions"), "retired");
         assert_eq!(classify_renderer("(planned) baselines view — not yet rendered"), "planned");
-        assert_eq!(classify_renderer("sysmlv2 diagram (interactive HTML #View)"), "ok");
-        assert_eq!(classify_renderer("sysmlv2 report <assurance|...> [--html]"), "ok");
-        assert_eq!(classify_renderer("sysmlv2 frobnicate"), "unknown");
+        assert_eq!(classify_renderer("keel diagram (interactive HTML #View)"), "ok");
+        assert_eq!(classify_renderer("keel report <assurance|...> [--html]"), "ok");
+        assert_eq!(classify_renderer("keel frobnicate"), "unknown");
         assert_eq!(classify_renderer("some hand-wave"), "unknown");
-        assert_eq!(quoted_attr("    :>> renderer = \"sysmlv2 orient\";", "renderer").as_deref(), Some("sysmlv2 orient"));
+        assert_eq!(quoted_attr("    :>> renderer = \"keel orient\";", "renderer").as_deref(), Some("keel orient"));
     }
 
     #[test]
     fn manifest_parses_per_task_entries() {
         // D0050/issue033: `task: NAME | p1 p2` lines parse to (name, paths); comments/blanks skipped.
-        let text = "# header comment\n\ntask: rustS1Lexer | sysmlv2-parser/src/lexer.rs sysmlv2-parser/src/token.rs\ntask: writeApi | sysmlv2-cli/src/write.rs\n";
+        let text = "# header comment\n\ntask: rustS1Lexer | keel-parser/src/lexer.rs keel-parser/src/token.rs\ntask: writeApi | keel-cli/src/write.rs\n";
         let entries = parse_manifest(text);
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].0, "rustS1Lexer");
-        assert_eq!(entries[0].1, vec!["sysmlv2-parser/src/lexer.rs".to_string(), "sysmlv2-parser/src/token.rs".to_string()]);
-        assert_eq!(entries[1], ("writeApi".to_string(), vec!["sysmlv2-cli/src/write.rs".to_string()]));
+        assert_eq!(entries[0].1, vec!["keel-parser/src/lexer.rs".to_string(), "keel-parser/src/token.rs".to_string()]);
+        assert_eq!(entries[1], ("writeApi".to_string(), vec!["keel-cli/src/write.rs".to_string()]));
     }
 
     #[test]

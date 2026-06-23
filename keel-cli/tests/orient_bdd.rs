@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cucumber::{given, then, when, World};
-use sysmlv2_cli::orient;
+use keel_cli::orient;
 
 static DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

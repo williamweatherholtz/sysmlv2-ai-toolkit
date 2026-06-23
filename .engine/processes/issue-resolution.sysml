@@ -31,7 +31,7 @@ package EngineIssueResolution {
         :>> id = "63940516-2c7d-4e8f-c078-516273849702";
         :>> title = "Triage — link to a resolver (#Resolves)";
         :>> order = 2;
-        :>> triggerCondition = "An Issue exists with no #Resolves edge (untriaged — `sysmlv2 guard issues` fails).";
+        :>> triggerCondition = "An Issue exists with no #Resolves edge (untriaged — `keel guard issues` fails).";
         :>> actionText = "Give the Issue a resolver via `#Resolves dependency from <resolver> to <issueNNN>;` (import EngineRelationships::*). The resolver is EITHER a backlog ACTION that will fix it (create the action first if none exists) OR an accepted DECISION that moots/wontfixes it. Never leave an Issue untriaged.";
         :>> producedArtifact = "A #Resolves edge from a resolving action or Decision to the Issue.";
         :>> owner = Owner::ai;
@@ -41,7 +41,7 @@ package EngineIssueResolution {
         :>> title = "Resolve — computed, never prose";
         :>> order = 3;
         :>> triggerCondition = "A resolver completes (its action becomes done, or its Decision is accepted).";
-        :>> actionText = "Do NOTHING to 'close' the Issue by hand: resolution is COMPUTED (D0001/D0018). An Issue is RESOLVED iff a #Resolves resolver is complete; otherwise OPEN. Read it with `sysmlv2 open-issues` (open set + resolvers) and `sysmlv2 orient` (open_issues). A prose 'RESOLVED' note in the description is informational only, never the source of truth.";
+        :>> actionText = "Do NOTHING to 'close' the Issue by hand: resolution is COMPUTED (D0001/D0018). An Issue is RESOLVED iff a #Resolves resolver is complete; otherwise OPEN. Read it with `keel open-issues` (open set + resolvers) and `keel orient` (open_issues). A prose 'RESOLVED' note in the description is informational only, never the source of truth.";
         :>> producedArtifact = "Computed open/resolved state (no stored status); the open frontier surfaced in orient.";
         :>> owner = Owner::ai;
     }

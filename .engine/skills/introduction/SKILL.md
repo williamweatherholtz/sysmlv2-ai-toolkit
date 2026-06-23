@@ -2,17 +2,17 @@
 name: introduction
 description: |
   Deploys the guided, project-based onboarding process (D0093): take a newcomer on a freshly
-  `sysmlv2 init`-ed project from zero to FIRST VALUE in one session — a 1-minute mental model,
+  `keel init`-ed project from zero to FIRST VALUE in one session — a 1-minute mental model,
   capture the project's first business Need, derive a first requirement + work item, run the first
   sprint to a real artifact, then show `orient`. Learn by DOING the first real item, not a doc dump.
   Use when a human says "introduce me to the engine", "how do I start", "set up a new project",
-  "onboard me", or right after `sysmlv2 init`. Do NOT use for steady-state work (that's the normal
+  "onboard me", or right after `keel init`. Do NOT use for steady-state work (that's the normal
   loop) or for re-explaining a single concept (just answer).
 metadata:
   version: 0.1.0
   domain: [onboarding, spin-up, introduction, first-value, dual-surface, adoption, SysMLv2, D0093]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # introduction (guided, project-based onboarding)
@@ -56,16 +56,16 @@ command** (the friction win, lower than a spreadsheet, D0054).
 2. **First Need** — elicit the project's single first business need; author ONE `Need` item (human
    states, AI records).
 3. **Refine** — derive ONE `SystemRequirement` (`satisfy` the Need) + one work item; refine to DoR
-   (DoD as a verifiable Test) via `sysmlv2 add-task` + typed edges. Show: recording = one command.
+   (DoD as a verifiable Test) via `keel add-task` + typed edges. Show: recording = one command.
 4. **First sprint** — run the agile-workflow ceremony (autonomous, D0049) to the artifact + a recorded
    passing DoD TestResult. The loop closes once, on their own work.
-5. **Show value + hand off** — `sysmlv2 orient` (+ `orient --html` / `report` / `render` review) over
+5. **Show value + hand off** — `keel orient` (+ `orient --html` / `report` / `render` review) over
    their one chain; then transition to the steady-state loop (CLAUDE.md §3). Onboarding done = one
    closed item + can read orient.
 
 ## Questions This Skill Answers
 
 - "Introduce me to the engine / onboard me / how do I start?"
-- "I just ran `sysmlv2 init` — what now?"
+- "I just ran `keel init` — what now?"
 - "Set up / spin up a new project with the engine."
 - "Walk me through recording my first need / running my first sprint."

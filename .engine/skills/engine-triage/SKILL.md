@@ -15,7 +15,7 @@ metadata:
   version: 0.2.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # engine-triage — classify before you act
@@ -57,7 +57,7 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
    - **substantive work goes through a sprint** — no raw backlog execution; the no-sprint
-     guard (`sysmlv2 guard sprint-coverage`) enforces it.
+     guard (`keel guard sprint-coverage`) enforces it.
    - **bulk migration** (rename/split/drop/add a field across many instances/files) → invoke the
      `migration` skill (D0067): committed transform script, dry-run+reconcile control totals,
      expand/migrate/contract green at every step, backfill-before-tighten, never fabricate provenance.

@@ -1,7 +1,7 @@
 use proptest::prelude::*;
-use sysmlv2_parser::{parse, tokenize, PackageRegistry};
+use keel_parser::{parse, tokenize, PackageRegistry};
 
-fn parse_src(src: &str) -> Option<sysmlv2_parser::ast::Package> {
+fn parse_src(src: &str) -> Option<keel_parser::ast::Package> {
     let tokens = tokenize(src, "prop-reg").ok()?;
     parse(tokens, "prop-reg").ok()
 }

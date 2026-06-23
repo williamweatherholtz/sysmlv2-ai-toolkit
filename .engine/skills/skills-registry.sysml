@@ -85,7 +85,7 @@ package EngineSkillRegistry {
     part build : AISkill {
         :>> id = "a3c8e1f0-5b9d-4e2a-8f6c-1d7b3e9a2c50";
         :>> title = "build";
-        :>> purpose = "Compile the deliverable (Rust sysmlv2 workspace) with warnings-as-errors and confirm the engine model still validates; report binary path + validation verdict. Prerequisite for test-verify; does not test or commit.";
+        :>> purpose = "Compile the deliverable (Rust keel workspace) with warnings-as-errors and confirm the engine model still validates; report binary path + validation verdict. Prerequisite for test-verify; does not test or commit.";
         :>> location = ".engine/skills/build/SKILL.md";
         :>> triggerCondition = "Asked to build/compile, or before claiming the toolchain works.";
         :>> writePolicy = WritePolicy::readOnly;
@@ -173,7 +173,7 @@ package EngineSkillRegistry {
     part viewSkill : AISkill {
         :>> id = "67940516-2c7d-4e8f-a075-516273849611";
         :>> title = "view";
-        :>> purpose = "Deploy query-driven viewpoints (D0075): read/write/execute lightweight TOML view files (.engine/views/*.view.toml) — a select + optional traverse + project filter over the tracking model, run by `sysmlv2 view <name>` (Rust authority, fail-loud). The deploying skill for D0075; resolves issue018.";
+        :>> purpose = "Deploy query-driven viewpoints (D0075): read/write/execute lightweight TOML view files (.engine/views/*.view.toml) — a select + optional traverse + project filter over the tracking model, run by `keel view <name>` (Rust authority, fail-loud). The deploying skill for D0075; resolves issue018.";
         :>> location = ".engine/skills/view/SKILL.md";
         :>> triggerCondition = "Asked to create/run a viewpoint, slice the model by a concern, or trace items along edges.";
         :>> writePolicy = WritePolicy::direct;
@@ -190,7 +190,7 @@ package EngineSkillRegistry {
     part elementCritiqueSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a080-516273849613";
         :>> title = "element-critique";
-        :>> purpose = "Deploy the Antagonistic Element Critique process (D0080/D0079): adversarially verify each tracked Need/SystemRequirement/Decision/Architecture element through required adversarial lenses by an INDEPENDENT critic, recording each critique as a method=critique verification + result #Verify-linked to the target; raise findings as severity-carrying Issues (#Resolves loop); let critique coverage + staleness COMPUTE from the assurance substrate (sysmlv2 coverage, suspect). The deploying skill for .engine/processes/element-critique.sysml.";
+        :>> purpose = "Deploy the Antagonistic Element Critique process (D0080/D0079): adversarially verify each tracked Need/SystemRequirement/Decision/Architecture element through required adversarial lenses by an INDEPENDENT critic, recording each critique as a method=critique verification + result #Verify-linked to the target; raise findings as severity-carrying Issues (#Resolves loop); let critique coverage + staleness COMPUTE from the assurance substrate (keel coverage, suspect). The deploying skill for .engine/processes/element-critique.sysml.";
         :>> location = ".engine/skills/element-critique/SKILL.md";
         :>> triggerCondition = "Asked to critique/red-team/adversarially review a requirement/need/decision; find weaknesses/gaps/ambiguities in the model; what hasn't been critiqued; or a critique going suspect after a change.";
         :>> writePolicy = WritePolicy::direct;
@@ -199,7 +199,7 @@ package EngineSkillRegistry {
     part diagramSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a085-516273849614";
         :>> title = "diagram";
-        :>> purpose = "Deploy the Traceability Diagram process (D0085): generate the comprehensive traceability diagram as a regenerated, interactive, self-contained HTML view via `sysmlv2 diagram` (whole model — typed nodes + metadata + every typed edge; in-page filter/search/focus/fit); never author or commit a diagram (it's a computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/diagram.sysml.";
+        :>> purpose = "Deploy the Traceability Diagram process (D0085): generate the comprehensive traceability diagram as a regenerated, interactive, self-contained HTML view via `keel diagram` (whole model — typed nodes + metadata + every typed edge; in-page filter/search/focus/fit); never author or commit a diagram (it's a computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/diagram.sysml.";
         :>> location = ".engine/skills/diagram/SKILL.md";
         :>> triggerCondition = "Asked to see/draw/visualize/diagram the model, traceability, reliance, linkage, supersession, effects, or metadata; to map how decisions/needs/requirements/work/processes connect; or to explore the graph part at a time.";
         :>> writePolicy = WritePolicy::direct;
@@ -207,7 +207,7 @@ package EngineSkillRegistry {
     part renderSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a086-516273849615";
         :>> title = "render";
-        :>> purpose = "Deploy the Modular Render + Review process (D0086): render ANY declared view as a self-contained interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (graph generalizes the D0085 diagram; table = sortable rows; review = accept/finding + rationale capture), and round-trip a human review back via `sysmlv2 apply-review` as new linked critique items that attest state + induce suspicion. Never author or commit a rendered artifact (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/render.sysml.";
+        :>> purpose = "Deploy the Modular Render + Review process (D0086): render ANY declared view as a self-contained interactive artifact via `keel render <view> --mode graph|table|review` (graph generalizes the D0085 diagram; table = sortable rows; review = accept/finding + rationale capture), and round-trip a human review back via `keel apply-review` as new linked critique items that attest state + induce suspicion. Never author or commit a rendered artifact (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/render.sysml.";
         :>> location = ".engine/skills/render/SKILL.md";
         :>> triggerCondition = "Asked to render/tabulate/explore a specific view as an artifact, build a table from a view, review/disposition elements (accept/reject + rationale), capture critique findings, or export a review batch; or to apply a review batch back into the model.";
         :>> writePolicy = WritePolicy::direct;
@@ -215,7 +215,7 @@ package EngineSkillRegistry {
     part reportSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a087-516273849616";
         :>> title = "report";
-        :>> purpose = "Deploy the Computed Report / Scorecard process (D0087): generate human-digestible aggregate reports via `sysmlv2 report <assurance|traceability|quality-debt|flow> [--html]` — coverage %, critique %, attestation %, findings, traceability completeness, debt, volatility, flow/velocity — rolled up from the per-element views and split into HEALTH vs OPPORTUNITY; never author a metric or commit a snapshot (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/report.sysml.";
+        :>> purpose = "Deploy the Computed Report / Scorecard process (D0087): generate human-digestible aggregate reports via `keel report <assurance|traceability|quality-debt|flow> [--html]` — coverage %, critique %, attestation %, findings, traceability completeness, debt, volatility, flow/velocity — rolled up from the per-element views and split into HEALTH vs OPPORTUNITY; never author a metric or commit a snapshot (computed #View, §2.1/D0015 — git-ignored). The deploying skill for .engine/processes/report.sysml.";
         :>> location = ".engine/skills/report/SKILL.md";
         :>> triggerCondition = "Asked for a status/health report, coverage or test totals/%, a scorecard, metrics/KPIs, model health, technical debt, velocity, or 'how are we doing / where can we improve'.";
         :>> writePolicy = WritePolicy::direct;
@@ -223,7 +223,7 @@ package EngineSkillRegistry {
     part indicatorSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a089-516273849617";
         :>> title = "indicator";
-        :>> purpose = "Deploy the Indicator Monitoring process (D0089): declare monitored measures (Indicators) that inform by DIRECTION not threshold (D0088), and collect data by method — computed (repo-derived, `sysmlv2 indicators`), pulled (external programmatic) or manual (subjective), recorded via `sysmlv2 record-measurement`. A Measurement is one datapoint; never fabricate an external/manual observation. ISO-15939/PSM/SMM-grounded. The deploying skill for .engine/processes/indicator.sysml.";
+        :>> purpose = "Deploy the Indicator Monitoring process (D0089): declare monitored measures (Indicators) that inform by DIRECTION not threshold (D0088), and collect data by method — computed (repo-derived, `keel indicators`), pulled (external programmatic) or manual (subjective), recorded via `keel record-measurement`. A Measurement is one datapoint; never fabricate an external/manual observation. ISO-15939/PSM/SMM-grounded. The deploying skill for .engine/processes/indicator.sysml.";
         :>> location = ".engine/skills/indicator/SKILL.md";
         :>> triggerCondition = "Asked to track/watch/monitor a metric or KPI over time, add an indicator, record a measurement, pull an external signal (market/regulation/social), or see how a measure is trending.";
         :>> writePolicy = WritePolicy::direct;
@@ -231,9 +231,9 @@ package EngineSkillRegistry {
     part introductionSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a093-516273849618";
         :>> title = "introduction";
-        :>> purpose = "Deploy the guided project-based Onboarding process (D0093): take a newcomer on a freshly `sysmlv2 init`-ed project from zero to FIRST VALUE in one session — 1-minute mental model, capture the first business Need, derive a first requirement + work item, run the first sprint to a real artifact, show `orient`. Learn by DOING the first real item, not a doc dump; dual-surface (AI drives CLI, human supervises). The deploying skill for .engine/processes/introduction.sysml.";
+        :>> purpose = "Deploy the guided project-based Onboarding process (D0093): take a newcomer on a freshly `keel init`-ed project from zero to FIRST VALUE in one session — 1-minute mental model, capture the first business Need, derive a first requirement + work item, run the first sprint to a real artifact, show `orient`. Learn by DOING the first real item, not a doc dump; dual-surface (AI drives CLI, human supervises). The deploying skill for .engine/processes/introduction.sysml.";
         :>> location = ".engine/skills/introduction/SKILL.md";
-        :>> triggerCondition = "A human asks to be introduced/onboarded, 'how do I start', 'set up / spin up a new project', or right after `sysmlv2 init`.";
+        :>> triggerCondition = "A human asks to be introduced/onboarded, 'how do I start', 'set up / spin up a new project', or right after `keel init`.";
         :>> writePolicy = WritePolicy::direct;
     }
 }

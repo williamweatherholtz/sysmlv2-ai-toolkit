@@ -19,7 +19,7 @@ package EngineDiagramView {
         :>> title = "Regenerate — never author";
         :>> order = 1;
         :>> triggerCondition = "Someone wants to see/analyze traceability, reliance, supersession, effects, or metadata linkage across the model.";
-        :>> actionText = "Run `sysmlv2 diagram [ROOT] > <name>.html` to COMPUTE the diagram fresh from the authored facts. Never hand-draw a diagram and never edit the generated HTML as if it were truth — it is a derived #View (§2.1/D0015). The authored .sysml model + the tool are the source.";
+        :>> actionText = "Run `keel diagram [ROOT] > <name>.html` to COMPUTE the diagram fresh from the authored facts. Never hand-draw a diagram and never edit the generated HTML as if it were truth — it is a derived #View (§2.1/D0015). The authored .sysml model + the tool are the source.";
         :>> producedArtifact = "A self-contained interactive HTML diagram (cytoscape): typed nodes + metadata + every typed edge.";
         :>> owner = Owner::ai;
     }

@@ -10,7 +10,7 @@ metadata:
   version: 0.1.0
   domain: [agile, sprint-planning, Fibonacci, estimation, definition-of-ready, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # sprint-planning
@@ -45,7 +45,7 @@ dependency unresolved; DoD criteria exist or are authored during refine.
 
 ## Behavioral Instructions
 
-1. **Orient first.** Run `sysmlv2 whats-next [root]` (or query orient) to get the
+1. **Orient first.** Run `keel whats-next [root]` (or query orient) to get the
    current ready frontier. Identify which items are unblocked and available.
 
 2. **Select scope.** Prefer a single focused story. Multiple items in one sprint
@@ -68,7 +68,7 @@ dependency unresolved; DoD criteria exist or are authored during refine.
    `#CharteredBy` edge from the sprint Story to the originating backlog item / Decision / Need /
    Requirement that chartered the work: `#CharteredBy dependency from <story> to <dNNNN|need|req>;`
    (import `EngineRelationships::*`). This is the work→origin lineage the governing-process VERSION
-   is computed from (pglViews). The charter guard (`sysmlv2 guard charter`) FAILS any newly-added
+   is computed from (pglViews). The charter guard (`keel guard charter`) FAILS any newly-added
    sprint whose Story has no `#CharteredBy` edge — so set it now.
 
 5. **Run the DoR checklist:**

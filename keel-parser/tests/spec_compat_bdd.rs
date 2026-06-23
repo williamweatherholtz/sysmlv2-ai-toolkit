@@ -1,7 +1,7 @@
 #![allow(unused, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use cucumber::{given, then, when, World};
-use sysmlv2_parser::spec_compat::{sha256_hex, verify_sha, ShaMismatch};
+use keel_parser::spec_compat::{sha256_hex, verify_sha, ShaMismatch};
 
 #[derive(Debug, Default, World)]
 pub struct SpecCompatWorld {
@@ -44,7 +44,7 @@ fn when_version(_world: &mut SpecCompatWorld) {}
 #[then(expr = "the grammar version is {string}")]
 fn then_version(_world: &mut SpecCompatWorld, expected: String) {
     assert_eq!(
-        sysmlv2_parser::spec_compat::SYSML_V2_GRAMMAR_VERSION,
+        keel_parser::spec_compat::SYSML_V2_GRAMMAR_VERSION,
         expected.as_str(),
         "grammar version mismatch"
     );

@@ -779,5 +779,6 @@ package EngineBacklog {
         // ── D0095 deferred rename (its own gated D0067 migration) ──
         action engineRename; // D0095: rename sysmlv2 -> keel (binary/package/docs/scaffold/CLAUDE.md) as a gated bulk migration.
         verification engineRenameDoD : Test { :>> id = "a1c70095-0095-4195-9195-516273840195"; :>> method = VerificationMethod::test; :>> procedureText = "D0095: rename the engine `sysmlv2` -> `keel` across the binary name, the cargo package, all docs, the engineInit embedded scaffold, and CLAUDE.md, as a D0067 expand/migrate/contract bulk migration with reconciled control totals (count of `sysmlv2` references before == references migrated + intentionally-retained), green at every step. 'sysmlv2' (the methodology) stays referenced where it denotes SysML v2 the language; only the PRODUCT name changes. VERIFY: `keel <subcommand>` works; the scaffold + docs say Keel; control totals reconcile; clippy + cargo test + validate + guard all green. (Deferred — chartered as its own sprint, not part of the D0094 arc.)"; }
+        part engineRenameDoDR1 : TestResult { :>> id = "3860a987-5bcd-4c80-bf02-8866ac5259fc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "98d2c74"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }

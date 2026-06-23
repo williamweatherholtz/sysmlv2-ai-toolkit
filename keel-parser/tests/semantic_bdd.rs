@@ -1,7 +1,7 @@
 #![allow(unused, clippy::all, clippy::pedantic, clippy::nursery)]
 
 use cucumber::{given, then, when, World};
-use sysmlv2_parser::{parse, tokenize, Diagnostic, PackageRegistry};
+use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 #[derive(Debug, Default, World)]
 pub struct SemanticWorld {
@@ -9,7 +9,7 @@ pub struct SemanticWorld {
     diagnostics: Vec<Diagnostic>,
 }
 
-fn parse_source(src: &str) -> sysmlv2_parser::ast::Package {
+fn parse_source(src: &str) -> keel_parser::ast::Package {
     let tokens = tokenize(src, "bdd-test").expect("lex error in test source");
     parse(tokens, "bdd-test").expect("parse error in test source")
 }

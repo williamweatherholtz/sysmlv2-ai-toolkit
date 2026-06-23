@@ -1,13 +1,13 @@
 //! AST-driven project indexer — replaces orient.rs text-scan for data extraction.
 //!
-//! Parses all `.sysml` files under `.tracking/` using `sysmlv2_parser` and builds
+//! Parses all `.sysml` files under `.tracking/` using `keel_parser` and builds
 //! a typed in-memory index used by the orient and query commands.  Git validation
 //! (suspect, invalid-evidence) is NOT done here; that lives in `orient.rs`.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use sysmlv2_parser::ast::{Attribute, Item, Package, Value};
+use keel_parser::ast::{Attribute, Item, Package, Value};
 
 use crate::collect_sysml;
 
@@ -211,8 +211,8 @@ pub fn extract(tracking: &Path) -> ExtractedIndex {
         .filter_map(|p| {
             let src = std::fs::read_to_string(p).ok()?;
             let fname = p.to_string_lossy();
-            let tokens = sysmlv2_parser::tokenize(&src, &fname).ok()?;
-            sysmlv2_parser::parse(tokens, &fname).ok()
+            let tokens = keel_parser::tokenize(&src, &fname).ok()?;
+            keel_parser::parse(tokens, &fname).ok()
         })
         .collect();
 

@@ -2,7 +2,7 @@
 //! plus registry validation: all .tracking/ files validate semantically clean.
 
 use std::path::{Path, PathBuf};
-use sysmlv2_parser::{parse, tokenize, PackageRegistry};
+use keel_parser::{parse, tokenize, PackageRegistry};
 
 fn repo_root() -> PathBuf {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
@@ -53,7 +53,7 @@ fn parse_all_tracking_files() {
     }
 }
 
-fn parse_pkg(path: &Path) -> sysmlv2_parser::ast::Package {
+fn parse_pkg(path: &Path) -> keel_parser::ast::Package {
     let src = std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let filename = path.to_string_lossy();

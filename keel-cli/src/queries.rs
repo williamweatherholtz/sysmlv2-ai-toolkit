@@ -3,13 +3,13 @@
 //! `outstanding`, `item`, `trace` (up + downstream), `trace-need`, `workflows` — query.py
 //! subcommands dropped at M4, re-implemented over the Rust authority: the indexer's action DAG,
 //! the parser's satisfy/allocate edges, and the workflow action defs. The `viewpoints` listing
-//! is a TOML view (`sysmlv2 view viewpoints`), not here.
+//! is a TOML view (`keel view viewpoints`), not here.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
-use sysmlv2_parser::ast::Item;
-use sysmlv2_parser::{parse, tokenize};
+use keel_parser::ast::Item;
+use keel_parser::{parse, tokenize};
 
 use crate::json::Json;
 
@@ -17,7 +17,7 @@ fn idx(root: &Path) -> crate::indexer::ExtractedIndex {
     crate::indexer::extract(&root.join(".tracking"))
 }
 
-/// `sysmlv2 outstanding` — backlog tasks that are not done.
+/// `keel outstanding` — backlog tasks that are not done.
 #[must_use]
 pub fn outstanding(root: &Path) -> String {
     let tasks = idx(root).tasks;
@@ -27,7 +27,7 @@ pub fn outstanding(root: &Path) -> String {
     Json::Obj(vec![("outstanding".to_string(), Json::Arr(out.into_iter().map(Json::s).collect()))]).dump()
 }
 
-/// `sysmlv2 item <name>` — one task's detail (done, deps, `DoD` text, results).
+/// `keel item <name>` — one task's detail (done, deps, `DoD` text, results).
 #[must_use]
 pub fn item(root: &Path, name: &str) -> String {
     let index = idx(root);
@@ -74,7 +74,7 @@ fn reach(start: &str, adj: &HashMap<String, Vec<String>>) -> Vec<String> {
     out
 }
 
-/// `sysmlv2 trace <name>` — transitive upstream (deps) + downstream (dependents) over the
+/// `keel trace <name>` — transitive upstream (deps) + downstream (dependents) over the
 /// succession DAG. Covers the dropped `trace`, `upstream`, and `downstream`.
 #[must_use]
 pub fn trace(root: &Path, name: &str) -> String {
@@ -94,7 +94,7 @@ pub fn trace(root: &Path, name: &str) -> String {
     .dump()
 }
 
-fn parse_dir(dir: &Path) -> Vec<sysmlv2_parser::ast::Package> {
+fn parse_dir(dir: &Path) -> Vec<keel_parser::ast::Package> {
     crate::collect_sysml(dir)
         .iter()
         .filter_map(|p| {
@@ -106,7 +106,7 @@ fn parse_dir(dir: &Path) -> Vec<sysmlv2_parser::ast::Package> {
         .collect()
 }
 
-/// `sysmlv2 trace-need <name>` — forward closure over satisfy/allocate edges from a Need
+/// `keel trace-need <name>` — forward closure over satisfy/allocate edges from a Need
 /// (need -satisfy-> requirement -allocate-> component).
 #[must_use]
 pub fn trace_need(root: &Path, name: &str) -> String {
@@ -127,7 +127,7 @@ pub fn trace_need(root: &Path, name: &str) -> String {
     .dump()
 }
 
-/// `sysmlv2 workflows` — each workflow action def's phases as Kahn topological waves over its
+/// `keel workflows` — each workflow action def's phases as Kahn topological waves over its
 /// succession edges.
 #[must_use]
 pub fn workflows(root: &Path) -> String {

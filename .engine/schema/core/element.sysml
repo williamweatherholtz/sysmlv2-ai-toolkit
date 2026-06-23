@@ -2,7 +2,7 @@
 // EngineElement — the universal tracked-element base + minimal actor model.
 //
 // One flat package per file (Engine<Concern>); siblings cross-reference via
-// `private import`. See .engine/docs/sysmlv2-syntax-notes.md.
+// `private import`. See .engine/docs/keel-syntax-notes.md.
 //
 // Element is the base every authored, tracked item specializes (:>).
 //  - id          immutable UUID identity  -> items NEVER collide on name

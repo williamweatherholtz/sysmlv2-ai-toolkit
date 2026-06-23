@@ -1,7 +1,7 @@
-> **IMPLEMENTATION STATUS (2026-06-21).** Implemented (Rust `sysmlv2` authority; query.py retired
+> **IMPLEMENTATION STATUS (2026-06-21).** Implemented (Rust `keel` authority; query.py retired
 > at M4/D0074): done-from-appended-results, ready/blocked, D0005 suspicion (material-change trigger,
 > transitive, #OrderingOnly excluded), evidence validation; **coverageState/satisfaction as the
-> three-tier `sysmlv2 coverage` (verified/attested/addressed, D0082) + `critique-coverage` (D0080) +
+> three-tier `keel coverage` (verified/attested/addressed, D0082) + `critique-coverage` (D0080) +
 > the `assured` composite (D0079) + element-content staleness (D0084)**. Material-change is the
 > two-tier proxy described in rule 2 (not full field-hashing — see there). `coverageGaps` = the
 > coverage/critique gap sets; `whats-stale-since` = `suspect` + element-content drift. Fixed

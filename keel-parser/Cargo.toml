@@ -1,5 +1,5 @@
 [package]
-name = "sysmlv2-parser"
+name = "keel-parser"
 version.workspace = true
 edition.workspace = true
 

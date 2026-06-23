@@ -12,7 +12,7 @@ metadata:
   version: 0.2.0
   domain: [git, main-only, commit-craft, hooks, release-engineering, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # repo-push

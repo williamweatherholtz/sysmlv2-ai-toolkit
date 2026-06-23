@@ -12,7 +12,7 @@ metadata:
   version: 0.1.0
   domain: [traceability, coverage, verification, suspicion, SysMLv2]
   writePolicy: readOnly
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # traceability-audit

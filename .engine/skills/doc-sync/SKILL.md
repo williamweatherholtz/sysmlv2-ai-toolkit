@@ -11,7 +11,7 @@ metadata:
   version: 0.1.0
   domain: [documentation, doc-sync, consistency, change-management, SysMLv2]
   writePolicy: direct
-  engine: sysmlv2-ai-toolkit
+  engine: keel-ai-toolkit
 ---
 
 # doc-sync
