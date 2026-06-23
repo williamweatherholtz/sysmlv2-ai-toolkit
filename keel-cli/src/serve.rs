@@ -1,18 +1,19 @@
 //! `serve` (D0094 m1) — the Keel interactive console: a LOCALHOST tokio+axum server over the engine.
 //!
-//! The human's ACTING surface (D0094) — m1 is the live READ console: recent decisions, processes,
-//! test-results/dispositions, the orient dashboard, reports, and a read-only AI<->user INTERACTION
-//! HISTORY (rendered from the Claude Code session transcripts, never copied into the model). ONE truth:
-//! every endpoint computes from the existing view authority; the server stores nothing. Deterministic
-//! actions (m2) and the agent-bridge (m3) build on this. Localhost-only; tiers degrade gracefully.
+//! The human's ACTING surface (D0094). m1 = the live READ console; m2 = DETERMINISTIC ACTIONS: record
+//! a disposition (POST -> the write API) and open a full HTML report/diagram. Every read computes from
+//! the existing view authority; every write goes through the write API + guards (ONE truth, no second
+//! store). A request-logging middleware makes the server observable. Localhost-only; the agent-bridge
+//! (m3) builds on this. Tiers degrade gracefully.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use axum::extract::{Path as AxPath, State};
+use axum::extract::{Path as AxPath, Request, State};
 use axum::http::StatusCode;
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 
 use crate::json::Json;
@@ -51,6 +52,11 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/processes", get(api_processes))
         .route("/api/report/:name", get(api_report))
         .route("/api/history", get(api_history))
+        // m2 — deterministic actions
+        .route("/api/disposition", post(api_disposition))
+        .route("/view/report/:name", get(view_report))
+        .route("/view/diagram", get(view_diagram))
+        .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
     let listener = match tokio::net::TcpListener::bind(&addr).await {
@@ -60,7 +66,10 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
             return 1;
         }
     };
-    println!("Keel console (D0094) on http://{addr}  \u{2014} read-only m1; Ctrl-C to stop");
+    println!("Keel console (D0094 m1+m2) on http://{addr}  \u{2014} Ctrl-C to stop");
+    println!("  read: / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
+    println!("  act:  POST /api/disposition · /view/report/<name> · /view/diagram");
+    println!("  (requests logged below)");
     if let Err(e) = axum::serve(listener, app).await {
         eprintln!("serve: {e}");
         return 1;
@@ -70,6 +79,77 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
 
 async fn index() -> Html<&'static str> {
     Html(CONSOLE_HTML)
+}
+
+/// Request-logging middleware (D0094 m2 observability): logs method, path, status, and elapsed ms to
+/// the terminal so the server is debuggable.
+async fn log_request(req: Request, next: Next) -> Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
+    let resp = next.run(req).await;
+    eprintln!("[keel serve] {method} {path} -> {} ({}ms)", resp.status().as_u16(), start.elapsed().as_millis());
+    resp
+}
+
+/// Current short HEAD of `root` (for a disposition's `judgedAgainst`); `"uncommitted"` if git fails.
+fn git_head(root: &Path) -> String {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map_or_else(|| "uncommitted".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+}
+
+/// A disposition request from the console (the human's explicit verdict on a >= Medium finding).
+#[derive(serde::Deserialize)]
+struct DispReq {
+    finding: String,
+    verdict: String,
+    rationale: String,
+    judged_at: String,
+    judged_by: Option<String>,
+}
+
+/// POST /api/disposition (D0094 m2) — record a finding disposition via the write API (D0092). The
+/// human clicking + entering rationale IS their explicit attestation (D0016); the agent does not infer
+/// it. Writes a #Dispositions confirmation; never auto-commits.
+async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json<DispReq>) -> Response {
+    let verdict = match body.verdict.as_str() {
+        "act" => "act",
+        "accept-risk" | "acceptRisk" => "acceptRisk",
+        "dismiss" => "dismiss",
+        other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}'\"}}")).into_response(),
+    };
+    let sha = git_head(&s.root);
+    let judged_by = body.judged_by.filter(|b| !b.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let critiques = s.root.join(".tracking").join("critiques.sysml");
+    let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
+    match crate::write::append_disposition(&critiques, &d) {
+        Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// Wrap a `ViewError`-fallible HTML computation into a response (500 + message on error).
+fn view_html(r: Result<String, crate::view::ViewError>) -> Response {
+    match r {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("render error: {e}")).into_response(),
+    }
+}
+
+/// GET /view/report/:name (D0094 m2) — the full computed HTML report (instantiate/render action).
+async fn view_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
+    view_html(crate::view::report_html(&s.root, &name, false))
+}
+
+/// GET /view/diagram (D0094 m2) — the whole-model interactive diagram HTML (render action).
+async fn view_diagram(State(s): State<AppState>) -> Response {
+    view_html(crate::view::diagram_html(&s.root))
 }
 
 /// Wrap a raw JSON string body in a 200 response with the right content type.

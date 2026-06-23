@@ -25,7 +25,7 @@
  #status{font-size:11px;color:var(--mut);padding:4px 16px}
 </style></head><body>
 <header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
- <div class="sub">computed live from the model — the read console (D0094 m1). The CLI is the authority; this is the human's lens.</div></header>
+ <div class="sub">Smooth sailing with AI</div></header>
 <nav id="nav"></nav>
 <div id="status">loading…</div>
 <main id="main"></main>
@@ -39,6 +39,19 @@ function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;',
 function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${esc(d)}</div></div>`}
 async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
+async function disposition(finding,verdict){
+ const rationale=prompt(`Rationale for "${verdict}" on ${finding}:`,'');
+ if(rationale===null)return;
+ const by=prompt('Your name (judgedBy):','wweatherholtz')||'';
+ status.textContent='recording disposition…';
+ try{
+  const r=await fetch('/api/disposition',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({finding,verdict,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent='recorded '+j.name+' ('+j.verdict+') — refresh views';
+  render();
+ }catch(e){status.textContent='disposition error: '+e.message}
+}
 
 async function render(){
  status.textContent='refreshing…';
@@ -58,13 +71,16 @@ async function render(){
    main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${esc(x.title||x.file)}</div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
   } else if(active==='dispositions'){const d=await get('/api/dispositions');
    main.innerHTML='<div class=cards>'+card('≥Medium findings',d.ge_medium_findings,'total','')+card('Dispositioned',d.dispositioned,'have a typed verdict','good')+card('Undispositioned',d.undispositioned,'awaiting a verdict',d.undispositioned?'warn':'good')+'</div>'+
-    (d.findings||[]).map(f=>`<div class=row><div class=t>${esc(f.finding)} <span class=pill>${esc(f.severity)}</span> <span class=pill>${esc(f.disposition)}</span></div></div>`).join('');
+    '<p class=muted>Disposition a finding — your click + rationale is your explicit verdict (recorded via the write API; not committed).</p>'+
+    (d.findings||[]).map(f=>`<div class=row><div class=t>${esc(f.finding)} <span class=pill>${esc(f.severity)}</span> <span class=pill>${esc(f.disposition)}</span></div><div style="margin-top:5px"><button class=rb data-f="${esc(f.finding)}" data-v="act">Act</button><button class=rb data-f="${esc(f.finding)}" data-v="accept-risk">Accept-risk</button><button class=rb data-f="${esc(f.finding)}" data-v="dismiss">Dismiss</button></div></div>`).join('');
+   [...main.querySelectorAll('.rb[data-v]')].forEach(b=>b.onclick=()=>disposition(b.dataset.f,b.dataset.v));
   } else if(active==='reports'){
    const names=['assurance','traceability','quality-debt','flow','governance'];
    const r=await get('/api/report/'+reportName);
    main.innerHTML='<div>'+names.map(n=>`<button class=rb data-r="${n}" ${n===reportName?'style="border-color:var(--ac);font-weight:600"':''}>${n}</button>`).join('')+'</div>'+
+    '<p class=muted><a href="/view/report/'+reportName+'" target=_blank>Open full HTML report ↗</a> &nbsp;·&nbsp; <a href="/view/diagram" target=_blank>Open model diagram ↗</a></p>'+
     '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,c.detail,c.tone)).join('')+'</div>';
-   [...main.querySelectorAll('.rb')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
+   [...main.querySelectorAll('.rb[data-r]')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
   } else if(active==='history'){const h=await get('/api/history');
    if(!h.available){main.innerHTML='<p class=muted>'+esc(h.note||'no transcripts found')+'</p>';}
    else{main.innerHTML='<p class=muted>'+(h.sessions||[]).length+' session(s) · showing latest ('+esc(h.current_id)+'). Source: '+esc(h.dir)+' (read-only lens; never copied into the model).</p>'+
