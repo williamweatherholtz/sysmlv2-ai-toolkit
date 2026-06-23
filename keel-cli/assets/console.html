@@ -30,7 +30,27 @@
 <div id="status">loading…</div>
 <main id="main"></main>
 <script>
-const TABS=[["orient","Orient"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"]];
+const TABS=[["orient","Orient"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["agent","Agent"]];
+let es=null;
+function stopAgent(){if(es){es.close();es=null}}
+function renderAgentEvent(data){
+ try{const o=JSON.parse(data);
+  if(o.type==='assistant'&&o.message&&o.message.content)return o.message.content.map(b=>b.type==='text'?b.text:(b.type==='tool_use'?`\n[tool: ${b.name}]`:'')).join('');
+  if(o.type==='stream_event'&&o.event&&o.event.delta&&o.event.delta.text)return o.event.delta.text;
+  if(o.type==='result')return `\n[result: ${o.subtype||''} ${o.total_cost_usd!=null?('$'+o.total_cost_usd):''}]\n`;
+  return '';
+ }catch(_){return ''}
+}
+function runAgent(action,target,log){
+ stopAgent();
+ if(!target){log('(enter a target first)\n');return}
+ log(`\n=== ${action}: ${target} ===\n`);
+ es=new EventSource('/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target));
+ es.addEventListener('status',e=>log('· '+e.data+'\n\n'));
+ es.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)log(t)});
+ es.addEventListener('done',e=>{log('\n\n'+e.data+'\n');stopAgent()});
+ es.addEventListener('error',e=>{if(e.data)log('\n[error] '+e.data+'\n')});
+}
 let active="orient", reportName="assurance";
 const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
 TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;draw();render()};nav.appendChild(b)});
@@ -81,6 +101,17 @@ async function render(){
     '<p class=muted><a href="/view/report/'+reportName+'" target=_blank>Open full HTML report ↗</a> &nbsp;·&nbsp; <a href="/view/diagram" target=_blank>Open model diagram ↗</a></p>'+
     '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,c.detail,c.tone)).join('')+'</div>';
    [...main.querySelectorAll('.rb[data-r]')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
+  } else if(active==='agent'){
+   if(!document.getElementById('alog')){
+    main.innerHTML='<div class=row><label>Action <select id=aact><option value=critique>critique</option><option value=investigate>investigate</option><option value=report>report</option></select></label> '+
+     '<input id=atgt placeholder="target — e.g. d0094, a decision/process/finding" style="width:300px;margin:0 6px"> '+
+     '<button class=rb id=arun>Run agent ▶</button><button class=rb id=astop>Stop</button> '+
+     '<span class=muted>drives your local <code>claude</code> (enterprise seat; no API key) under the engine’s discipline; never auto-commits.</span></div>'+
+     '<pre id=alog style="background:#0f1720;color:#cfe3f0;padding:11px;border-radius:6px;max-height:62vh;overflow:auto;white-space:pre-wrap;font-size:11px;line-height:1.45;margin-top:8px">ready.\n</pre>';
+    const log=s=>{const l=document.getElementById('alog');l.textContent+=s;l.scrollTop=l.scrollHeight};
+    document.getElementById('arun').onclick=()=>runAgent(document.getElementById('aact').value,document.getElementById('atgt').value.trim(),log);
+    document.getElementById('astop').onclick=()=>{stopAgent();log('\n(stopped)\n')};
+   }
   } else if(active==='history'){const h=await get('/api/history');
    if(!h.available){main.innerHTML='<p class=muted>'+esc(h.note||'no transcripts found')+'</p>';}
    else{main.innerHTML='<p class=muted>'+(h.sessions||[]).length+' session(s) · showing latest ('+esc(h.current_id)+'). Source: '+esc(h.dir)+' (read-only lens; never copied into the model).</p>'+
@@ -90,5 +121,5 @@ async function render(){
  }catch(e){status.textContent='error: '+e.message}
 }
 draw();render();
-setInterval(()=>render(),6000);
+setInterval(()=>{if(active!=='agent')render()},6000);
 </script></body></html>

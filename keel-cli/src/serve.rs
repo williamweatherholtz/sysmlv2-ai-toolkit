@@ -6,24 +6,35 @@
 //! store). A request-logging middleware makes the server observable. Localhost-only; the agent-bridge
 //! (m3) builds on this. Tiers degrade gracefully.
 
+use std::convert::Infallible;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use axum::extract::{Path as AxPath, Request, State};
+use axum::extract::{Path as AxPath, Query, Request, State};
 use axum::http::StatusCode;
 use axum::middleware::{self, Next};
+use axum::response::sse::{Event, Sse};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Router;
+use tokio::io::AsyncBufReadExt;
+use tokio_stream::Stream;
 
 use crate::json::Json;
 
 /// The embedded single-page console frontend (self-contained, no CDN — the cytoscape precedent).
 const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 
+/// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
+const AGENT_MAX_TURNS: &str = "30";
+const AGENT_MAX_CONCURRENT: usize = 2;
+
 #[derive(Clone)]
 struct AppState {
     root: Arc<PathBuf>,
+    /// In-flight agent-bridge runs (concurrency guardrail, D0094).
+    agents: Arc<AtomicUsize>,
 }
 
 /// Run the console server on `127.0.0.1:port` over `root`. Blocks until interrupted.
@@ -43,7 +54,7 @@ pub fn run(root: PathBuf, port: u16) -> i32 {
 }
 
 async fn serve_async(root: PathBuf, port: u16) -> i32 {
-    let state = AppState { root: Arc::new(root) };
+    let state = AppState { root: Arc::new(root), agents: Arc::new(AtomicUsize::new(0)) };
     let app = Router::new()
         .route("/", get(index))
         .route("/api/orient", get(api_orient))
@@ -56,6 +67,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/disposition", post(api_disposition))
         .route("/view/report/:name", get(view_report))
         .route("/view/diagram", get(view_diagram))
+        // m3 — agent-bridge (headless claude -> SSE)
+        .route("/api/agent/stream", get(api_agent_stream))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -66,9 +79,10 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
             return 1;
         }
     };
-    println!("Keel console (D0094 m1+m2) on http://{addr}  \u{2014} Ctrl-C to stop");
-    println!("  read: / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
-    println!("  act:  POST /api/disposition · /view/report/<name> · /view/diagram");
+    println!("Keel console (D0094 m1+m2+m3) on http://{addr}  \u{2014} Ctrl-C to stop");
+    println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
+    println!("  act:   POST /api/disposition · /view/report/<name> · /view/diagram");
+    println!("  agent: /api/agent/stream?action=<critique|investigate|report>&target=<x> (SSE; local `claude` CLI)");
     println!("  (requests logged below)");
     if let Err(e) = axum::serve(listener, app).await {
         eprintln!("serve: {e}");
@@ -150,6 +164,99 @@ async fn view_report(State(s): State<AppState>, AxPath(name): AxPath<String>) ->
 /// GET /view/diagram (D0094 m2) — the whole-model interactive diagram HTML (render action).
 async fn view_diagram(State(s): State<AppState>) -> Response {
     view_html(crate::view::diagram_html(&s.root))
+}
+
+// ── m3 agent-bridge — drive the LOCALLY-AUTHENTICATED `claude` CLI, stream its work over SSE ───────
+// The UI launches a headless Claude Code agent in the repo (so it loads CLAUDE.md + the skills) and
+// streams events to the browser. Auth = the user's `claude` CLI subscription/ENTERPRISE session — the
+// server NEVER sets ANTHROPIC_API_KEY (that would force pricier API-rate billing, D0094). The agent
+// runs under the engine's EXISTING discipline; the prompt forbids auto-commit (the human commits).
+
+/// Concurrency guard: decrements the in-flight agent counter when the stream ends or the client drops.
+struct AgentSlot(Arc<AtomicUsize>);
+impl Drop for AgentSlot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct AgentReq {
+    action: String,
+    target: String,
+}
+
+/// Build the agent prompt for a console action. The agent inherits CLAUDE.md discipline from the cwd;
+/// every prompt forbids committing (commits/acceptance stay the human's gate, D0016).
+fn build_agent_prompt(action: &str, target: &str) -> String {
+    match action {
+        "critique" => format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process. Do NOT git commit; the human commits."),
+        "investigate" => format!("Investigate the merits of `{target}`: read its context and linked items, judge whether it is sound or low-value, and explain your reasoning plus any recommendation. Read-only analysis: do not modify the model and do NOT git commit."),
+        "report" => format!("Run `keel report {target}` and summarize its health and opportunities in a few sentences. Read-only; do NOT git commit."),
+        other => format!("{other}: {target}. Follow CLAUDE.md discipline; do NOT git commit."),
+    }
+}
+
+/// GET /api/agent/stream?action=&target= (D0094 m3) — spawn a headless `claude` agent in the repo and
+/// stream its `stream-json` events to the browser over SSE (not polling). Degrades gracefully if the
+/// `claude` CLI is absent; rejects past the concurrency cap; never sets `ANTHROPIC_API_KEY`.
+async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let root = (*s.root).clone();
+    let prompt = build_agent_prompt(&q.action, &q.target);
+    let counter = Arc::clone(&s.agents);
+    let prev = counter.fetch_add(1, Ordering::SeqCst);
+    let over_cap = prev >= AGENT_MAX_CONCURRENT;
+    // Hold the slot for the stream's lifetime; on over-cap we release immediately below.
+    let slot = AgentSlot(Arc::clone(&counter));
+
+    let stream = async_stream::stream! {
+        let _slot = slot; // dropped (counter--) when the stream finishes or the client disconnects
+        if over_cap {
+            yield Ok(Event::default().event("error").data(format!("busy: {AGENT_MAX_CONCURRENT} agent runs already in flight \u{2014} try again shortly")));
+            return;
+        }
+        yield Ok(Event::default().event("status").data(format!("launching `claude` (turn cap {AGENT_MAX_TURNS}): {prompt}")));
+        // Windows: `claude` is a `.cmd` npm shim that CreateProcess cannot spawn directly, so route via
+        // `cmd /C` (which resolves claude.cmd on PATH). Unix: spawn `claude` directly. Either way the
+        // CLI uses the user's own subscription/enterprise auth (we never set ANTHROPIC_API_KEY).
+        let mut command = if cfg!(windows) {
+            let mut c = tokio::process::Command::new("cmd");
+            c.arg("/C").arg("claude");
+            c
+        } else {
+            tokio::process::Command::new("claude")
+        };
+        let spawned = command
+            .args(["-p", &prompt, "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--max-turns", AGENT_MAX_TURNS])
+            .current_dir(&root)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true) // client disconnect / stream end -> kill the agent (cancellation)
+            .spawn();
+        let mut child = match spawned {
+            Ok(c) => c,
+            Err(e) => {
+                yield Ok(Event::default().event("error").data(format!("cannot launch the `claude` CLI ({e}). Install Claude Code + ensure it is on PATH and logged in to your Claude subscription/enterprise (do NOT set ANTHROPIC_API_KEY — that forces API-rate billing).")));
+                return;
+            }
+        };
+        if let Some(out) = child.stdout.take() {
+            let mut lines = tokio::io::BufReader::new(out).lines();
+            loop {
+                match lines.next_line().await {
+                    Ok(Some(line)) => yield Ok(Event::default().event("agent").data(line)),
+                    Ok(None) => break,
+                    Err(e) => {
+                        yield Ok(Event::default().event("error").data(format!("read error: {e}")));
+                        break;
+                    }
+                }
+            }
+        }
+        let code = child.wait().await.ok().and_then(|st| st.code());
+        yield Ok(Event::default().event("done").data(format!("agent finished (exit {code:?})")));
+    };
+    Sse::new(stream)
 }
 
 /// Wrap a raw JSON string body in a 200 response with the right content type.
