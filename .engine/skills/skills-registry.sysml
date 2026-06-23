@@ -228,4 +228,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Asked to track/watch/monitor a metric or KPI over time, add an indicator, record a measurement, pull an external signal (market/regulation/social), or see how a measure is trending.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part introductionSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a093-516273849618";
+        :>> title = "introduction";
+        :>> purpose = "Deploy the guided project-based Onboarding process (D0093): take a newcomer on a freshly `sysmlv2 init`-ed project from zero to FIRST VALUE in one session — 1-minute mental model, capture the first business Need, derive a first requirement + work item, run the first sprint to a real artifact, show `orient`. Learn by DOING the first real item, not a doc dump; dual-surface (AI drives CLI, human supervises). The deploying skill for .engine/processes/introduction.sysml.";
+        :>> location = ".engine/skills/introduction/SKILL.md";
+        :>> triggerCondition = "A human asks to be introduced/onboarded, 'how do I start', 'set up / spin up a new project', or right after `sysmlv2 init`.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

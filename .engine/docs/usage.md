@@ -12,6 +12,13 @@ recomputed from the text + git history — never stored or authored.
 
 ## Starting a project on the engine
 
+**Onboarding (guided, recommended):** run the **`introduction`** skill (deploys
+`.engine/processes/introduction.sysml`, D0093) — a guided, project-based first session that takes a
+newcomer from zero to first value: a 1-minute mental model → capture the project's first business
+`Need` → derive a first requirement + work item → run the first sprint → show `orient`. Learn by
+doing the first real item, not by reading the decision log. (Cold-start scaffolding via `sysmlv2 init`
++ the `orient --html` dashboard are the sibling D0093 milestones.)
+
 Instance data lives in **`.tracking/`** (see `.tracking/README.md`). Copy authoring
 idioms from `.engine/docs/tracking-template.sysml` — it parses green. A typical file:
 
