@@ -468,6 +468,18 @@ package ProjectIssues {
     }
     #Resolves dependency from cargoTestGate to issue042;
 
+    part issue043 : Issue {
+        :>> id = "e0430043-0043-4e43-9043-516273840043";
+        :>> title = "Living SystemRequirement statements name retired/renamed artifacts (sr07 validate_all.py; sr10/sr11 binary 'sysmlv2')";
+        :>> createdAt = "2026-06-23";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (Sprint 119, sr07 + sr10 x correctness, Low): three LIVING requirement statements name artifacts that were renamed/retired, so the text misstates the current system. sr07AgentLoop names the validator toolchain as 'validate_all.py' (the python validators were retired at M4/D0074; the gate is now `keel validate`/`guard` via the .githooks pre-commit hook). sr10RustCli specifies 'a Rust CLI binary (sysmlv2)' and sr11FastStart says 'The sysmlv2 CLI' (the binary was renamed `keel`, D0095). The CAPABILITIES are fully met by keel; only the named artifacts are stale — the D0095 rename completed docs but missed these living requirement statements (historical sprint records correctly preserve 'sysmlv2' as point-in-time fact). Resolver: refreshRequirementText (update the 3 living statements to current names; will re-suspect the sr07/sr10 critiques -> re-critique-pass, the normal D0084 cycle). Low severity (doc-accuracy, no functional impact) -> AI-dispositioned.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "refreshRequirementText";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from refreshRequirementText to issue043;
+
     // ── #ProcessDefect (D0047/issue039): a recurrable PROCESS-defect finding whose D0047 obligation is a
     //    permanent automated guard. `sysmlv2 guard defect-guard-coverage` (runnable diagnostic) WARNS if
     //    such a finding's #Resolves resolver is NOT guard-producing — the meta-audit that "corrections
