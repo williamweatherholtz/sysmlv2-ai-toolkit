@@ -21,3 +21,4 @@ task: runtimeParser | keel-parser/src
 task: writeApi | keel-cli/src/write.rs
 task: rustToolchainFix | keel-parser keel-cli Cargo.toml Cargo.lock
 task: specVersionRuntimeCheck | keel-parser/src/spec_compat.rs
+task: serveItemActions | keel-cli/src/serve.rs keel-cli/assets/console.html
