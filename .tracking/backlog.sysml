@@ -860,5 +860,9 @@ package EngineBacklog {
         action critiqueBatch10; // D0080: Decisions d0032-d0036 (Core-3 each).
         verification critiqueBatch10DoD : Test { :>> id = "a1c70128-0128-4128-9128-516273840128"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 10 (5 items): Core-3 critiques for d0032 (TestResult->occurrence def), d0033 (S11 docSync), d0034 (CR versioning via git), d0035 (Need/Requirement by type), d0036 (safety-case views, no new types) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 89->94/120; keel validate clean; guard all (13) green."; }
         part critiqueBatch10DoDR1 : TestResult { :>> id = "770d7f95-6561-448d-8ad9-72b9000b4777"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "85bc93c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+
+        action critiqueBatch11; // D0080: Decisions d0037,d0039,d0040,d0041,d0042 (Core-3 each).
+        verification critiqueBatch11DoD : Test { :>> id = "a1c70129-0129-4129-9129-516273840129"; :>> method = VerificationMethod::critique; :>> procedureText = "D0080 backfill pass 11 (5 items): Core-3 critiques for d0037 (validated authorship), d0039 (ceremony skills), d0040 (recurring-task-skill rule), d0041 (defer 3 toolchain features), d0042 (Release occurrence def) — 15 method=critique verifications, critic claudeOpus, each #Verify-linked. All survived. No findings. VERIFY: critique-coverage 94->99/120; keel validate clean; guard all (13) green."; }
+        part critiqueBatch11DoDR1 : TestResult { :>> id = "1275ecdd-ca4e-49b5-a67f-8457279a0477"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "82f42ea"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     }
 }
