@@ -869,6 +869,47 @@ pub fn defect_guard_coverage(root: &Path) -> Result<(usize, Vec<String>), ViewEr
     Ok((defects.len(), warns))
 }
 
+/// Generic item-detail view (D0094 serveItemIntrospect): any item's type, attrs, and edges.
+///
+/// Returns the item's type + authored attrs + its incoming/outgoing typed edges (with the neighbor on
+/// each) — one computation for every type (Decision/Issue/Process/Need/Story/...). `found:false` if unknown.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn item_detail(root: &Path, name: &str) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let Some(info) = model.items.get(name) else {
+        return Ok(Json::Obj(vec![("found".to_string(), Json::Bool(false)), ("name".to_string(), Json::s(name.to_string()))]).dump());
+    };
+    let mut attr_keys: Vec<&String> = info.attrs.keys().collect();
+    attr_keys.sort();
+    let attrs: Vec<Json> = attr_keys
+        .iter()
+        .filter_map(|k| info.attrs.get(*k).map(|v| Json::Obj(vec![("key".to_string(), Json::s((*k).clone())), ("value".to_string(), Json::s(v.clone()))])))
+        .collect();
+    let edges_for = |outgoing: bool| -> Vec<Json> {
+        let mut pairs: Vec<(String, String)> = model
+            .edges
+            .iter()
+            .filter(|e| if outgoing { e.from == name } else { e.to == name })
+            .map(|e| (e.kind.clone(), if outgoing { e.to.clone() } else { e.from.clone() }))
+            .collect();
+        pairs.sort();
+        pairs.dedup();
+        pairs.into_iter().map(|(kind, node)| Json::Obj(vec![("kind".to_string(), Json::s(kind)), ("node".to_string(), Json::s(node))])).collect()
+    };
+    let out = Json::Obj(vec![
+        ("found".to_string(), Json::Bool(true)),
+        ("name".to_string(), Json::s(name.to_string())),
+        ("type".to_string(), Json::s(info.type_name.clone())),
+        ("marker".to_string(), info.marker.clone().map_or(Json::Null, Json::s)),
+        ("attrs".to_string(), Json::Arr(attrs)),
+        ("outgoing".to_string(), Json::Arr(edges_for(true))),
+        ("incoming".to_string(), Json::Arr(edges_for(false))),
+    ]);
+    Ok(out.dump())
+}
+
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
 // For each Need / SystemRequirement / Decision: is there COMPLETE + PASSING + NON-STALE evidence
 // it has been addressed? Verifier kinds, strongest first:

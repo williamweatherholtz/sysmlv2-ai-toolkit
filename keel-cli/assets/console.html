@@ -22,6 +22,11 @@
  .turn.user{border-left-color:var(--ac);background:#f4f8fc} .turn.assistant{border-left-color:#59a14f;background:#f5faf3}
  .turn .who{font-size:10px;text-transform:uppercase;color:var(--mut);letter-spacing:.04em;margin-bottom:3px}
  .muted{color:var(--mut)} button.rb{border:1px solid var(--bd);background:#fff;border-radius:5px;padding:4px 9px;margin:0 5px 8px 0;cursor:pointer;font:12px system-ui}
+ .il{color:var(--ac);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+ #modal{position:fixed;right:0;top:0;bottom:0;width:min(580px,48vw);background:#fff;border-left:1px solid var(--bd);box-shadow:-4px 0 16px rgba(0,0,0,.10);padding:14px 18px;overflow:auto;display:none;z-index:30}
+ #modal.on{display:block} #modal .x{float:right;cursor:pointer;color:var(--mut);font-size:20px;line-height:1}
+ #modal h2{margin:2px 0 8px;font-size:15px} #modal table{width:100%;border-collapse:collapse;font-size:11px;margin-top:4px}
+ #modal td{border-top:1px solid #eee;padding:3px 5px;vertical-align:top} #modal td.k{color:var(--mut);width:135px;white-space:nowrap}
  #status{font-size:11px;color:var(--mut);padding:4px 16px}
 </style></head><body>
 <header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
@@ -29,6 +34,7 @@
 <nav id="nav"></nav>
 <div id="status">loading…</div>
 <main id="main"></main>
+<div id="modal"></div>
 <script>
 const TABS=[["orient","Orient"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["agent","Agent"]];
 let es=null;
@@ -56,9 +62,26 @@ const main=document.getElementById('main'), nav=document.getElementById('nav'), 
 TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;draw();render()};nav.appendChild(b)});
 function draw(){[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===active))}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
-function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${esc(d)}</div></div>`}
+function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${d||''}</div></div>`}
 async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
+function itemLink(name){return name?`<span class=il data-i="${esc(name)}">${esc(name)}</span>`:'<span class=muted>—</span>'}
+function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';n=n||12;const sh=arr.slice(0,n).map(itemLink).join(' · ');return sh+(arr.length>n?` <span class=muted>…+${arr.length-n} more</span>`:'')}
+function closeItem(){document.getElementById('modal').classList.remove('on')}
+async function openItem(name){
+ const m=document.getElementById('modal');m.classList.add('on');
+ m.innerHTML='<span class=x onclick="closeItem()">✕</span><p class=muted>loading '+esc(name)+'…</p>';
+ try{const d=await get('/api/item/'+encodeURIComponent(name));
+  if(!d||!d.found){m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>'+esc(name)+'</h2><p class=muted>not an authored model item (could be a task or a file).</p>';return}
+  const attrs=(d.attrs||[]).map(a=>`<tr><td class=k>${esc(a.key)}</td><td>${esc(a.value)}</td></tr>`).join('')||'<tr><td class=muted colspan=2>no authored attrs</td></tr>';
+  const edges=(arr,label)=>arr&&arr.length?('<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:11px 0 3px">'+label+' ('+arr.length+')</h3>'+arr.map(e=>`<div style="font-size:11px;margin:2px 0"><span class=pill>${esc(e.kind)}</span> ${itemLink(e.node)}</div>`).join('')):'';
+  m.innerHTML='<span class=x onclick="closeItem()">✕</span>'+
+   '<h2>'+esc(d.name)+' <span class=pill>'+esc(d.type)+'</span>'+(d.marker?' <span class=pill>#'+esc(d.marker)+'</span>':'')+'</h2>'+
+   '<table>'+attrs+'</table>'+edges(d.outgoing,'Outgoing →')+edges(d.incoming,'Incoming ←')+
+   '<p class=muted style="margin-top:12px">Per-item actions (critique / add test result / disposition) arrive with serveItemActions.</p>';
+ }catch(e){m.innerHTML='<span class=x onclick="closeItem()">✕</span><p>error: '+esc(e.message)+'</p>'}
+}
+document.addEventListener('click',e=>{const a=e.target.closest('.il');if(a)openItem(a.dataset.i)});
 async function disposition(finding,verdict){
  const rationale=prompt(`Rationale for "${verdict}" on ${finding}:`,'');
  if(rationale===null)return;
@@ -79,27 +102,27 @@ async function render(){
   if(active==='orient'){const o=await get('/api/orient');
    main.innerHTML='<div class=cards>'+
     card('Progress',`${o.counts.done} / ${o.counts.outstanding}`,'done / outstanding tasks','good')+
-    card('Ready to start',(o.ready||[]).length,list(o.ready,6),(o.ready||[]).length?'good':'warn')+
-    card('Sprints in progress',(o.in_progress_sprints||[]).length,(o.in_progress_sprints||[]).map(s=>s.sprint+' (pending '+(s.pending||'—')+')').join('; ')||'none',(o.in_progress_sprints||[]).length<=2?'good':'warn')+
-    card('Open issues',(o.open_issues||[]).length,list(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
-    card('Suspect / stale',(o.suspect||[]).length,list(o.suspect,8),(o.suspect||[]).length?'warn':'good')+
+    card('Ready to start',(o.ready||[]).length,linkList(o.ready,6),(o.ready||[]).length?'good':'warn')+
+    card('Sprints in progress',(o.in_progress_sprints||[]).length,(o.in_progress_sprints||[]).map(s=>itemLink(s.sprint)+' (pending '+(s.pending||'—')+')').join('; ')||'none',(o.in_progress_sprints||[]).length<=2?'good':'warn')+
+    card('Open issues',(o.open_issues||[]).length,linkList(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
+    card('Suspect / stale',(o.suspect||[]).length,linkList(o.suspect,10),(o.suspect||[]).length?'warn':'good')+
    '</div>';
   } else if(active==='decisions'){const d=await get('/api/decisions');
    const arr=d.decisions||[];
-   main.innerHTML='<p class=muted>'+esc(d.report||'')+'</p>'+arr.map(x=>`<div class=row><div class=t>${esc(x.id||x.name||'')} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
+   main.innerHTML='<p class=muted>'+esc(d.report||'')+'</p>'+arr.map(x=>`<div class=row><div class=t>${itemLink(x.id||x.name)} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
   } else if(active==='processes'){const p=await get('/api/processes');
-   main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${esc(x.title||x.file)}</div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
+   main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${x.name?itemLink(x.name):esc(x.file)} <span class=muted>${esc(x.title||'')}</span></div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
   } else if(active==='dispositions'){const d=await get('/api/dispositions');
    main.innerHTML='<div class=cards>'+card('≥Medium findings',d.ge_medium_findings,'total','')+card('Dispositioned',d.dispositioned,'have a typed verdict','good')+card('Undispositioned',d.undispositioned,'awaiting a verdict',d.undispositioned?'warn':'good')+'</div>'+
     '<p class=muted>Disposition a finding — your click + rationale is your explicit verdict (recorded via the write API; not committed).</p>'+
-    (d.findings||[]).map(f=>`<div class=row><div class=t>${esc(f.finding)} <span class=pill>${esc(f.severity)}</span> <span class=pill>${esc(f.disposition)}</span></div><div style="margin-top:5px"><button class=rb data-f="${esc(f.finding)}" data-v="act">Act</button><button class=rb data-f="${esc(f.finding)}" data-v="accept-risk">Accept-risk</button><button class=rb data-f="${esc(f.finding)}" data-v="dismiss">Dismiss</button></div></div>`).join('');
+    (d.findings||[]).map(f=>`<div class=row><div class=t>${itemLink(f.finding)} <span class=pill>${esc(f.severity)}</span> <span class=pill>${esc(f.disposition)}</span></div><div style="margin-top:5px"><button class=rb data-f="${esc(f.finding)}" data-v="act">Act</button><button class=rb data-f="${esc(f.finding)}" data-v="accept-risk">Accept-risk</button><button class=rb data-f="${esc(f.finding)}" data-v="dismiss">Dismiss</button></div></div>`).join('');
    [...main.querySelectorAll('.rb[data-v]')].forEach(b=>b.onclick=()=>disposition(b.dataset.f,b.dataset.v));
   } else if(active==='reports'){
    const names=['assurance','traceability','quality-debt','flow','governance'];
    const r=await get('/api/report/'+reportName);
    main.innerHTML='<div>'+names.map(n=>`<button class=rb data-r="${n}" ${n===reportName?'style="border-color:var(--ac);font-weight:600"':''}>${n}</button>`).join('')+'</div>'+
     '<p class=muted><a href="/view/report/'+reportName+'" target=_blank>Open full HTML report ↗</a> &nbsp;·&nbsp; <a href="/view/diagram" target=_blank>Open model diagram ↗</a></p>'+
-    '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,c.detail,c.tone)).join('')+'</div>';
+    '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,esc(c.detail),c.tone)).join('')+'</div>';
    [...main.querySelectorAll('.rb[data-r]')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
   } else if(active==='agent'){
    if(!document.getElementById('alog')){

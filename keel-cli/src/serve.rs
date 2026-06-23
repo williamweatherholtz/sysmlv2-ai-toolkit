@@ -76,6 +76,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/agent/stream", get(api_agent_stream))
         // serveLiveCache — event-driven change push (SSE)
         .route("/api/events", get(api_events))
+        // serveItemIntrospect — generic any-item detail
+        .route("/api/item/:name", get(api_item))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -349,6 +351,11 @@ async fn api_history(State(s): State<AppState>) -> Response {
     ok_json(interaction_history(&s.root))
 }
 
+/// GET /api/item/:name (D0094 serveItemIntrospect) — any item's detail (attrs + edges + neighbors).
+async fn api_item(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
+    cached(&s, &format!("item:{name}"), |r| crate::view::item_detail(r, &name))
+}
+
 /// GET /api/events (D0094 serveLiveCache) — SSE change-push: poll the content fingerprint server-side
 /// (~1.5s) and emit a `changed` event only when it flips, so the UI refetches event-driven (not blind
 /// polling). `ping` keepalives in between; `hello` carries the initial fingerprint.
@@ -382,8 +389,14 @@ fn processes_json(root: &Path) -> String {
             let needle = format!(":>> {key} = \"");
             text.split(needle.as_str()).nth(1).and_then(|s| s.split('"').next()).unwrap_or("").to_string()
         };
+        // The `part <name> : Process` item name (so the console can introspect it via /api/item).
+        let item = text
+            .lines()
+            .find_map(|l| l.trim_start().strip_prefix("part ").filter(|r| r.contains(": Process")).map(|r| r.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<String>()))
+            .unwrap_or_default();
         rows.push(Json::Obj(vec![
             ("file".to_string(), Json::s(name)),
+            ("name".to_string(), Json::s(item)),
             ("title".to_string(), Json::s(attr("title"))),
             ("purpose".to_string(), Json::s(attr("purpose"))),
         ]));
