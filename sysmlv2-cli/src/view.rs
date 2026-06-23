@@ -2064,22 +2064,39 @@ fn indicator_status(goal: &str, baseline: f64, latest: f64) -> &'static str {
     }
 }
 
-/// The numeric series (oldest->newest) of recorded Measurements for a pulled/manual indicator —
-/// items typed `Measurement` with a `dependency` edge to the indicator, sorted by `measuredAt`.
-fn measurement_series(model: &Model, indicator: &str) -> Vec<f64> {
+/// The recorded-Measurement series `(measuredAt, value)` (oldest->newest) banked for an indicator —
+/// items typed `Measurement` with a `#Measures` edge to the indicator, sorted by `measuredAt`. Works
+/// for any method: pulled/manual observations AND computed-indicator snapshots (D0091).
+fn measurement_series(model: &Model, indicator: &str) -> Vec<(String, f64)> {
     let mut pts: Vec<(String, f64)> = model
         .edges
         .iter()
         .filter(|e| e.kind == "measures" && e.to == indicator)
-        .filter_map(|e| model.items.get(&e.from).filter(|i| i.type_name == "Measurement").map(|i| (e.from.clone(), i)))
-        .filter_map(|(_, i)| {
+        .filter_map(|e| model.items.get(&e.from).filter(|i| i.type_name == "Measurement"))
+        .filter_map(|i| {
             let at = i.attrs.get("measuredAt").cloned().unwrap_or_default();
             let v = i.attrs.get("value").and_then(|s| s.parse::<f64>().ok())?;
             Some((at, v))
         })
         .collect();
     pts.sort_by(|a, b| a.0.cmp(&b.0));
-    pts.into_iter().map(|(_, v)| v).collect()
+    pts
+}
+
+/// `(name, metric-key)` for every `computed` Indicator — the snapshot worklist (D0091).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn computed_indicator_keys(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let mut out: Vec<(String, String)> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Indicator" && i.attrs.get("method").map(String::as_str) == Some("computed"))
+        .filter_map(|(n, i)| i.attrs.get("collectionRef").map(|k| (n.clone(), k.clone())))
+        .collect();
+    out.sort();
+    Ok(out)
 }
 
 /// Indicators view (D0089): each declared `Indicator`'s value + direction-aware status.
@@ -2099,25 +2116,33 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
         let method = info.attrs.get("method").map_or("manual", String::as_str);
         let goal = info.attrs.get("goal").map_or("observe", String::as_str);
         let binding = info.attrs.get("collectionRef").cloned().unwrap_or_default();
-        // Build the numeric series per method.
-        let series: Vec<f64> = if method == "computed" {
-            // `collectionRef` is a metric key (D0090); value/series come from the shared metric_value.
+        // The (measuredAt, value) series. BANK-FIRST (D0091): recorded Measurements (pulled/manual
+        // observations AND computed snapshots) are the durable series. With no bank, a computed
+        // indicator falls back to the git-replay (--trend) or its current live value.
+        let banked = measurement_series(&model, name);
+        let series: Vec<(String, f64)> = if !banked.is_empty() {
+            banked
+        } else if method == "computed" {
             if trend {
-                trend_series(root, &binding).into_iter().map(|(_, v)| v).collect()
+                trend_series(root, &binding)
             } else {
-                metric_value(root, &binding).map(|v| vec![v]).unwrap_or_default()
+                metric_value(root, &binding).map(|v| vec![("now".to_string(), v)]).unwrap_or_default()
             }
         } else {
-            measurement_series(&model, name)
+            Vec::new()
         };
-        let latest = series.last().copied();
-        let baseline = series.first().copied();
+        let latest = series.last().map(|(_, v)| *v);
+        let baseline = series.first().map(|(_, v)| *v);
         let status = match (baseline, latest) {
             (Some(b), Some(l)) if series.len() > 1 => indicator_status(goal, b, l),
             (Some(_), Some(_)) => "single-point",
             _ => "no-data",
         };
         let fmt = |o: Option<f64>| o.map_or_else(|| Json::Null, |v| Json::s(format!("{v:.2}")));
+        let series_json: Vec<Json> = series
+            .iter()
+            .map(|(at, v)| Json::Obj(vec![("at".to_string(), Json::s(at.clone())), ("value".to_string(), Json::s(format!("{v:.2}")))]))
+            .collect();
         out.push(Json::Obj(vec![
             ("indicator".to_string(), Json::s(name.clone())),
             ("measures".to_string(), Json::s(info.attrs.get("measures").cloned().unwrap_or_default())),
@@ -2128,10 +2153,11 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
             ("baseline".to_string(), fmt(baseline)),
             ("points".to_string(), Json::Int(i64::try_from(series.len()).unwrap_or(0))),
             ("status".to_string(), Json::s(status.to_string())),
+            ("series".to_string(), Json::Arr(series_json)),
         ]));
     }
     Ok(Json::Obj(vec![
-        ("view".to_string(), Json::s("indicators (D0089): monitored measures, direction-aware status; computed series need --trend".to_string())),
+        ("view".to_string(), Json::s("indicators (D0089/D0091): monitored measures, direction-aware status + the full banked datapoint series. Bank-first (recorded Measurements incl. computed snapshots); computed with no bank uses --trend git-replay or the live value.".to_string())),
         ("indicators".to_string(), Json::Arr(out)),
     ])
     .dump())

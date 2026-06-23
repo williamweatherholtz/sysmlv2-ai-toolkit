@@ -771,6 +771,52 @@ fn cmd_record_measurement(args: &[String]) -> i32 {
     }
 }
 
+/// `snapshot-indicators [--at DATE] [--by ACTOR] [--file F] [--root ROOT]` — take a reading of every
+/// COMPUTED indicator (its current `metric_value`) and bank it as a `Measurement` (D0091). Run per
+/// sprint/quarter to build a durable, fast series alongside the pulled/manual observations.
+fn cmd_snapshot_indicators(args: &[String]) -> i32 {
+    let root = match flag(args, "root") {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
+                return 2;
+            }
+        }
+    };
+    let file = flag(args, "file").map_or_else(|| root.join(".tracking").join("indicators.sysml"), PathBuf::from);
+    let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let by = flag(args, "by").unwrap_or_else(|| "sysmlv2-cli".to_owned());
+    let keys = match sysmlv2_cli::view::computed_indicator_keys(&root) {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return 1;
+        }
+    };
+    let mut count = 0u32;
+    for (indicator, key) in &keys {
+        let Some(v) = sysmlv2_cli::view::metric_value(&root, key) else {
+            eprintln!("skip {indicator}: metric '{key}' not computable");
+            continue;
+        };
+        match w::append_measurement(&file, indicator, &format!("{v:.2}"), &at, "snapshot (computed reading)", &by) {
+            Ok(name) => {
+                println!("{name}  ({indicator} = {v:.2})");
+                count += 1;
+            }
+            Err(e) => {
+                eprintln!("error on {indicator}: {e}");
+                return 1;
+            }
+        }
+    }
+    println!("banked {count} computed-indicator snapshot(s) @ {at} into {}", file.display());
+    0
+}
+
 #[derive(serde::Deserialize)]
 struct ReviewBatch {
     #[serde(default)]
@@ -904,6 +950,7 @@ fn main() {
         Some("report") => cmd_report(rest),
         Some("indicators") => cmd_indicators(rest),
         Some("record-measurement") => cmd_record_measurement(rest),
+        Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
         Some("apply-review") => cmd_apply_review(rest),
         Some("outstanding") => cmd_query0(rest, "outstanding", sysmlv2_cli::queries::outstanding),
         Some("workflows") => cmd_query0(rest, "workflows", sysmlv2_cli::queries::workflows),

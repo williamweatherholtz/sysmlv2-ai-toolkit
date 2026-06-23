@@ -87,7 +87,11 @@ viewpoint-registry stays the concern-coverage index.)
    item (D0089) that informs by DIRECTION (goal), viewed via `sysmlv2 indicators [--trend]`. The
    indicator set is the CANONICAL monitored-measure watchlist (D0090); a single shared computation
    (`metric_value`) feeds both the indicators and the reports, so each scalar metric is computed once,
-   and reports *render* the indicators (+ point-in-time structure) rather than re-defining the metrics. Its data
+   and reports *render* the indicators (+ point-in-time structure) rather than re-defining the metrics.
+   Datapoints accumulate in a `Measurement` BANK: pulled/manual observations via `record-measurement`,
+   and computed readings via `sysmlv2 snapshot-indicators` (a recorded *observation*, not a cache —
+   D0091, a controlled compute-don't-store exception). `sysmlv2 indicators` is bank-first + emits the
+   full series. Its data
    arrives by a measurement METHOD: `computed` (objective, repo-derived — series via the report/trend
    engine, no stored datapoints), `pulled` (objective, external API/scraper — recorded `Measurement`
    datapoints via `sysmlv2 record-measurement`), or `manual` (subjective, e.g. a survey — recorded).

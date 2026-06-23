@@ -118,4 +118,20 @@ package ProjectIndicators {
     #Measures dependency from authoringFrictionM1 to authoringFriction;
     part authoringFrictionM2 : Measurement { :>> id = "1d1c0005-0005-4005-9005-5162738400b2"; :>> value = "2"; :>> measuredAt = "2026-06-01"; :>> source = "maintainer assessment (post append-result/add-task/apply-review)"; :>> createdBy = "wweatherholtz"; }
     #Measures dependency from authoringFrictionM2 to authoringFriction;
+    part attestationIndicatorM1 : Measurement { :>> id = "45f00359-4bb5-40df-b470-fc6582c26085"; :>> value = "100.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from attestationIndicatorM1 to attestationIndicator;
+    part coverageIndicatorM1 : Measurement { :>> id = "b2522a87-5370-4229-aa83-719aa48c4fc6"; :>> value = "100.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from coverageIndicatorM1 to coverageIndicator;
+    part critiqueCoverageIndicatorM1 : Measurement { :>> id = "1eb451b5-5b2b-436b-bc00-3351d2ed8cd3"; :>> value = "23.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from critiqueCoverageIndicatorM1 to critiqueCoverageIndicator;
+    part openFindingsIndicatorM1 : Measurement { :>> id = "8b1678e3-62e6-44b4-bd7f-f2172975ccb9"; :>> value = "0.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from openFindingsIndicatorM1 to openFindingsIndicator;
+    part reqVerifiedIndicatorM1 : Measurement { :>> id = "f778a011-6aa1-45fe-b392-674c31aed31a"; :>> value = "100.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from reqVerifiedIndicatorM1 to reqVerifiedIndicator;
+    part throughputIndicatorM1 : Measurement { :>> id = "63dac73f-725c-4740-850f-29035c3e642b"; :>> value = "95.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from throughputIndicatorM1 to throughputIndicator;
+    part velocityIndicatorM1 : Measurement { :>> id = "d03cee6d-7a17-4882-968b-eaba87b6b920"; :>> value = "3.07"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from velocityIndicatorM1 to velocityIndicator;
+    part volatilityIndicatorM1 : Measurement { :>> id = "3c9f159b-81d2-49c4-a808-ac71b3738f95"; :>> value = "0.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
+    #Measures dependency from volatilityIndicatorM1 to volatilityIndicator;
 }
