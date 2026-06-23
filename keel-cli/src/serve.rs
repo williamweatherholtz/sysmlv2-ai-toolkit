@@ -198,6 +198,31 @@ impl Drop for AgentSlot {
     }
 }
 
+/// Best-effort process-TREE killer for a spawned agent (serveAgentCancel, D0094). On Windows the
+/// agent is `cmd /C claude` → `claude.exe`, and `kill_on_drop` reaps only the direct `cmd` child,
+/// orphaning the `claude.exe` grandchild; this guard `taskkill /T`-kills the whole tree when the
+/// SSE stream is dropped (client disconnect / Stop button / normal end). It is DISARMED once the
+/// child exits normally, so it never targets a reaped (and possibly recycled) PID. On Unix the agent
+/// is spawned as `claude` directly, so `kill_on_drop` already reaps it and this guard is a no-op.
+struct TreeKiller(Option<u32>);
+impl TreeKiller {
+    const fn disarm(&mut self) {
+        self.0 = None;
+    }
+}
+impl Drop for TreeKiller {
+    fn drop(&mut self) {
+        let Some(pid) = self.0 else { return };
+        if cfg!(windows) {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &pid.to_string()])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct AgentReq {
     action: String,
@@ -258,6 +283,10 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
                 return;
             }
         };
+        // Arm a process-TREE killer (serveAgentCancel): if the client disconnects / hits Stop, the
+        // SSE stream is dropped, dropping `killer` BEFORE `child` (reverse decl order) so the whole
+        // `cmd`+`claude.exe` tree is reaped, not just the direct child. Disarmed on normal exit below.
+        let mut killer = TreeKiller(child.id());
         if let Some(out) = child.stdout.take() {
             let mut lines = tokio::io::BufReader::new(out).lines();
             loop {
@@ -272,6 +301,7 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
             }
         }
         let code = child.wait().await.ok().and_then(|st| st.code());
+        killer.disarm(); // normal exit — the child is already reaped; don't taskkill a dead/recycled PID
         yield Ok(Event::default().event("done").data(format!("agent finished (exit {code:?})")));
     };
     Sse::new(stream)
