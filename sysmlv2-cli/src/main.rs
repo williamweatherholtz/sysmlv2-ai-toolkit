@@ -10,6 +10,7 @@
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
 //!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
+//!   `concern-coverage [ROOT]` — which declared viewpoint concerns are served vs planned (D0057)
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
 //!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
@@ -322,6 +323,30 @@ fn cmd_open_issues(args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("open-issues error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_concern_coverage(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: sysmlv2 concern-coverage [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match sysmlv2_cli::view::concern_coverage(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("concern-coverage error: {e}");
             1
         }
     }
@@ -941,6 +966,7 @@ fn main() {
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
+        Some("concern-coverage") => cmd_concern_coverage(rest),
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("assured") => cmd_assured(rest),

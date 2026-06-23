@@ -674,6 +674,64 @@ pub fn open_issues(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+/// Concern-coverage view (D0057/issue035): which declared stakeholder concerns (Viewpoints) are
+/// SERVED by a real computed renderer, and which are still unserved (renderer `(planned ...)`).
+///
+/// d0057 delivered the Viewpoint registry but its promised payoff — an audit of which concerns lack
+/// a working viewpoint — was never built. This is that audit, as a VIEW (not a guard): a `(planned)`
+/// viewpoint is a legitimately-deferred concern, not a violation, so it is reported, not failed.
+/// `served` = renderer names a `sysmlv2` command; `unserved` = renderer is `(planned ...)`.
+///
+/// # Errors
+/// Returns `ViewError::Io` if the viewpoint registry cannot be read.
+pub fn concern_coverage(root: &Path) -> Result<String, ViewError> {
+    let path = root.join(".engine").join("views").join("viewpoint-registry.sysml");
+    let text = std::fs::read_to_string(&path).map_err(|e| ViewError::Io(path.display().to_string(), e))?;
+    let quoted = |line: &str, key: &str| -> Option<String> {
+        let needle = format!(":>> {key} = \"");
+        line.split(needle.as_str()).nth(1)?.split('"').next().map(str::to_string)
+    };
+    let (mut title, mut concern) = (String::new(), String::new());
+    let mut served: Vec<(String, String, String)> = Vec::new();
+    let mut unserved: Vec<(String, String, String)> = Vec::new();
+    for line in text.lines() {
+        let t = line.trim_start();
+        if let Some(v) = quoted(t, "title") {
+            title = v;
+        } else if let Some(v) = quoted(t, "concernText") {
+            concern = v;
+        } else if let Some(r) = quoted(t, "renderer") {
+            let row = (title.clone(), concern.clone(), r.clone());
+            if r.starts_with("(planned") {
+                unserved.push(row);
+            } else {
+                served.push(row);
+            }
+        }
+    }
+    let total = served.len() + unserved.len();
+    let to_json = |rows: &[(String, String, String)]| -> Vec<Json> {
+        rows.iter()
+            .map(|(t, c, r)| {
+                Json::Obj(vec![
+                    ("viewpoint".to_string(), Json::s(t.clone())),
+                    ("concern".to_string(), Json::s(c.clone())),
+                    ("renderer".to_string(), Json::s(r.clone())),
+                ])
+            })
+            .collect()
+    };
+    let out = Json::Obj(vec![
+        ("total_concerns".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+        ("served".to_string(), Json::Int(i64::try_from(served.len()).unwrap_or(i64::MAX))),
+        ("unserved".to_string(), Json::Int(i64::try_from(unserved.len()).unwrap_or(i64::MAX))),
+        ("coverage_pct".to_string(), Json::s(format!("{}", pct(served.len(), total)))),
+        ("unserved_concerns".to_string(), Json::Arr(to_json(&unserved))),
+        ("served_concerns".to_string(), Json::Arr(to_json(&served))),
+    ]);
+    Ok(out.dump())
+}
+
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
 // For each Need / SystemRequirement / Decision: is there COMPLETE + PASSING + NON-STALE evidence
 // it has been addressed? Verifier kinds, strongest first:

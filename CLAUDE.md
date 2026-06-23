@@ -40,7 +40,8 @@ source changed since it was verified — re-verify at HEAD to clear it.
 Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
 Rust tooling computes them: `sysmlv2 orphans` renders the orphans viewpoint (needs/requirements/
 tasks/issues missing required edges); `sysmlv2 view <name>`, `audit`, `attestation-coverage`,
-`governing-version`, `reprocess-candidates`, `suspect` are the other computed lenses (`suspect` also
+`governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
+declared viewpoint concerns are served vs planned) are the other computed lenses (`suspect` also
 flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
 renders as an interactive artifact via `sysmlv2 render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
@@ -298,16 +299,18 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\sysmlv2.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\sysmlv2.exe guard                                                               # ALL six forward guards (no kernel) — exit≠0 on any violation
-.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage | critic-independence  (+ runnable-only: critique-rigor)
+.\target\release\sysmlv2.exe guard                                                               # ALL thirteen forward guards (no kernel) — exit≠0 on any violation
+.\target\release\sysmlv2.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage | critic-independence | process-skill  (+ runnable-only: critique-rigor)
 ```
-The twelve forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
+The thirteen forward guards are the Rust authority (D0074 M3/M4): `sysmlv2 guard` (actors D0037,
 acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
 D0068, process-change D0070 keystone, issues D0077/D0078, critique D0080/D0079, assured D0079c
 [both enforced at D0081 under charter-time scoping], viewpoint-renderer D0056/issue034 [renderers
 must name a real `sysmlv2` command, no retired query.py/report.py], manifest-coverage D0050/issue033
 [the deliverable-suspicion manifest stays valid — no dead task/path entries], critic-independence
-D0080/issue031 [a Critical-severity finding's target needs a human/tool critic, not only aiModel]).
+D0080/issue031 [a Critical-severity finding's target needs a human/tool critic, not only aiModel],
+process-skill D0059/issue036 [no inert process — every `.engine/processes/*.sysml` is named by a
+deploying skill's purpose]).
 Plus RUNNABLE-ONLY diagnostics (not in the enforced set): `critique-rigor` D0080/issue030 [low-rigor
 critiques + affirming-only critics]. The python `validate_*.py`
 guards, `query.py`, and `parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust

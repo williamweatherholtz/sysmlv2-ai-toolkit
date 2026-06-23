@@ -158,4 +158,14 @@ package EngineViewpoints {
         :>> sources = "governing-version per item x process-change Decisions whose retroactivity=safety and whose effective commit post-dates the item's charter (git ancestry, D0070)";
         :>> renderer = "sysmlv2 reprocess-candidates";
     }
+
+    part concernCoverageVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a071-516273849632";
+        :>> title = "concern-coverage";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which declared stakeholder concerns (Viewpoints) are SERVED by a working computed renderer, and which are still unserved (renderer planned/unbuilt) — i.e. the registry's own coverage of the concerns it declares (D0057/issue035)?";
+        :>> audience = "maintainer / reviewer / auditor";
+        :>> sources = "this viewpoint registry: each Viewpoint's renderer classified served (names a sysmlv2 command) vs unserved (planned), with a coverage %";
+        :>> renderer = "sysmlv2 concern-coverage";
+    }
 }

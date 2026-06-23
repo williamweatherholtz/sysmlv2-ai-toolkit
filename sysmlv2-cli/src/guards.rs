@@ -532,6 +532,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
+    "concern-coverage",
 ];
 
 /// The quoted value of `:>> {key} = "..."` on a line.
@@ -708,14 +709,73 @@ pub fn critique_rigor(root: &Path) -> GuardReport {
     }
 }
 
+// ── process-skill guard (D0059/issue036: no inert process — every process has a deploying skill) ──
+
+/// Every `.engine/processes/<file>.sysml` path referenced anywhere in the skills-registry text.
+fn referenced_processes(reg: &str) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for tok in reg.split(|c: char| c.is_whitespace() || c == '"') {
+        if let Some(rest) = tok.strip_prefix(".engine/processes/") {
+            if let Some(idx) = rest.find(".sysml") {
+                out.insert(rest[..idx + ".sysml".len()].to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Coverage logic for the process-skill guard (pure, for self-test): every process file must be
+/// referenced by ≥1 skill, and every referenced path must name an existing process.
+fn process_skill_violations(processes: &[String], reg: &str) -> Vec<String> {
+    let referenced = referenced_processes(reg);
+    let mut violations = Vec::new();
+    for p in processes {
+        if !referenced.contains(p) {
+            violations.push(format!("process '.engine/processes/{p}' has NO deploying skill (inert process — D0059; a deploying skill's purpose must name the process .sysml it deploys)"));
+        }
+    }
+    let proc_set: HashSet<&str> = processes.iter().map(String::as_str).collect();
+    let mut dangling: Vec<&String> = referenced.iter().filter(|r| !proc_set.contains(r.as_str())).collect();
+    dangling.sort();
+    for r in dangling {
+        violations.push(format!("skill registry references '.engine/processes/{r}' which does not exist (dangling deploying claim — orphan skill edge)"));
+    }
+    violations
+}
+
+/// Guard (D0059/issue036): every process definition has a DEPLOYING skill ("no inert process").
+///
+/// D0059 establishes that a process with no deploying skill is applied by inconsistent vigilance (a
+/// HIGH finding that recurred); the d0059 critique found the claimed coverage audit never existed.
+/// The correspondence is a uniform CONVENTION — a deploying skill's `purpose` names the
+/// `.engine/processes/<name>.sysml` it deploys — and this guard makes it machine-checkable.
+///
+/// VIOLATION: a process file referenced by NO skill (inert), or a skill referencing a process that
+/// does not exist (a dangling deploying claim). A view-only skill that deploys no process is fine
+/// (the audit is process→skill, not the reverse).
+#[must_use]
+pub fn process_skill(root: &Path) -> GuardReport {
+    let proc_dir = root.join(".engine").join("processes");
+    let processes: Vec<String> = crate::collect_sysml(&proc_dir)
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(str::to_string))
+        .collect();
+    let reg_path = root.join(".engine").join("skills").join("skills-registry.sysml");
+    let Ok(reg) = std::fs::read_to_string(&reg_path) else {
+        return GuardReport { name: "process-skill", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &reg_path))] };
+    };
+    let violations = process_skill_violations(&processes, &reg);
+    GuardReport { name: "process-skill", scanned: processes.len(), warnings: Vec::new(), violations }
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
 /// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
 /// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
 /// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
-pub const GUARD_NAMES: [&str; 12] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage", "critic-independence"];
+pub const GUARD_NAMES: [&str; 13] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -733,6 +793,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
         "manifest-coverage" => Some(manifest_coverage(root)),
         "critic-independence" => Some(critic_independence(root)),
+        "process-skill" => Some(process_skill(root)),
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         _ => None,
     }
@@ -864,5 +925,19 @@ mod tests {
         assert_eq!(neg2.len(), 1, "no Decision -> fail");
         assert!(neutral.is_empty(), "no process-def -> silent");
         assert_eq!(prose_only.len(), 1, "prose marker does NOT count");
+    }
+
+    #[test]
+    fn process_skill_flags_inert_and_dangling() {
+        let procs = vec!["doc-sync.sysml".to_string(), "lonely.sysml".to_string()];
+        let reg = "purpose = \"deploying skill for .engine/processes/doc-sync.sysml.\"\npurpose = \"for .engine/processes/ghost.sysml (dangling)\"";
+        let v = process_skill_violations(&procs, reg);
+        assert!(v.iter().any(|m| m.contains("lonely.sysml") && m.contains("NO deploying skill")), "inert process flagged");
+        assert!(v.iter().any(|m| m.contains("ghost.sysml") && m.contains("dangling")), "dangling claim flagged");
+        // doc-sync.sysml is referenced -> not flagged as inert.
+        assert!(!v.iter().any(|m| m.contains("doc-sync.sysml") && m.contains("NO deploying skill")));
+        // All real -> clean.
+        let clean = process_skill_violations(&["doc-sync.sysml".to_string()], "x .engine/processes/doc-sync.sysml, y");
+        assert!(clean.is_empty(), "every process referenced -> clean");
     }
 }

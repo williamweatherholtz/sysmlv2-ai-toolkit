@@ -7,6 +7,12 @@
 // skills D0039; build + test-verify D0046/issue008). writePolicy is the INTENDED
 // write boundary — enforcement arrives with the write API (D0003); until then it
 // binds by discipline (CLAUDE.md §4).
+//
+// CONVENTION (D0059/issue036, process-skill guard): a skill that DEPLOYS a process MUST name the
+// `.engine/processes/<name>.sysml` it deploys in its `purpose` — that path reference is what the
+// "every process has a deploying skill (no inert process)" audit checks. Ceremony processes
+// (definition-of-ready / definition-of-done / agile-workflow) are deployed by the sprint-* skills
+// (D0059); their purposes name those process files too.
 // =====================================================================
 package EngineSkillRegistry {
     private import EngineElement::*;     // WritePolicy enum
@@ -95,7 +101,7 @@ package EngineSkillRegistry {
     part sprintPlanning : AISkill {
         :>> id = "d375af1a-8c23-4f5d-e968-8c15c2f1e888";
         :>> title = "sprint-planning";
-        :>> purpose = "Orient on ready frontier, select scope, apply Fibonacci sizing to set estimatedPoints, pass DoR gate before sprint work begins.";
+        :>> purpose = "Orient on ready frontier, select scope, apply Fibonacci sizing to set estimatedPoints, pass DoR gate before sprint work begins. Deploys the ceremony process .engine/processes/definition-of-ready.sysml (DoR, D0059).";
         :>> location = ".engine/skills/sprint-planning/SKILL.md";
         :>> triggerCondition = "Sprint refine gate; asked to plan next sprint, size a story, or select scope.";
         :>> writePolicy = WritePolicy::direct;
@@ -103,7 +109,7 @@ package EngineSkillRegistry {
     part sprintStandup : AISkill {
         :>> id = "e486bg2b-9d34-4a6e-fa79-9d26d3g2f999";
         :>> title = "sprint-standup";
-        :>> purpose = "Orient on current status, surface blockers, confirm active phase alignment, state next action — lightweight 2-minute ceremony.";
+        :>> purpose = "Orient on current status, surface blockers, confirm active phase alignment, state next action — lightweight 2-minute ceremony. Runs the overall sprint loop .engine/processes/agile-workflow.sysml (deployed by the sprint-* skills, D0059).";
         :>> location = ".engine/skills/sprint-standup/SKILL.md";
         :>> triggerCondition = "Sprint standup gate; start of work session; asked for status or blockers.";
         :>> writePolicy = WritePolicy::direct;
@@ -119,7 +125,7 @@ package EngineSkillRegistry {
     part sprintCloseout : AISkill {
         :>> id = "a608di4d-1f56-4c8a-bc91-1f48f5i4h111";
         :>> title = "sprint-closeout";
-        :>> purpose = "Autonomously close a sprint (D0049): verify DoD passes, record actualHours, record the closeOut gate (method=inspect, AI-judged) with NO human confirmation, hand off to the autonomous retro.";
+        :>> purpose = "Autonomously close a sprint (D0049): verify DoD passes, record actualHours, record the closeOut gate (method=inspect, AI-judged) with NO human confirmation, hand off to the autonomous retro. Deploys the ceremony process .engine/processes/definition-of-done.sysml (DoD, D0059).";
         :>> location = ".engine/skills/sprint-closeout/SKILL.md";
         :>> triggerCondition = "Sprint closeOut gate; asked to close or accept a sprint.";
         :>> writePolicy = WritePolicy::direct;
@@ -135,7 +141,7 @@ package EngineSkillRegistry {
     part architecturalCritique : AISkill {
         :>> id = "c5f0a2b1-6d3e-4f8a-9b1c-2e7d4a0c8e61";
         :>> title = "architectural-critique";
-        :>> purpose = "Run the antagonistic architecture/process audit with the CAE+GQM+ATAM framework (D0046): attack each claim for refuting evidence, compute the GQM metric set, play ATAM scenarios; record findings as tracked Issue/Decision items (not prose). Operationalizes the architectural-critique process.";
+        :>> purpose = "Run the antagonistic architecture/process audit with the CAE+GQM+ATAM framework (D0046): attack each claim for refuting evidence, compute the GQM metric set, play ATAM scenarios; record findings as tracked Issue/Decision items (not prose). The deploying skill for .engine/processes/architectural-critique.sysml.";
         :>> location = ".engine/skills/architectural-critique/SKILL.md";
         :>> triggerCondition = "Asked to audit/critique the engine or processes; on the architectural-critique process; periodic stress-test.";
         :>> writePolicy = WritePolicy::direct;
