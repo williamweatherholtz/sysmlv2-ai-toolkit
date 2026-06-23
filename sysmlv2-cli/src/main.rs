@@ -16,6 +16,7 @@
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
 //!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
+//!   `init DIR`                 — scaffold the engine into a new project (D0093 cold start)
 #![forbid(unsafe_code)]
 #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 // D0074 fail-loud: authority-bearing CLI code has no silent failure paths.
@@ -29,11 +30,22 @@
     clippy::unimplemented
 )]
 
-use std::{path::PathBuf, process};
+use std::{path::{Path, PathBuf}, process};
 
+use include_dir::{include_dir, Dir};
 use sysmlv2_cli::{check_files, collect_sysml, validate_root};
 use sysmlv2_cli::orient;
 use sysmlv2_cli::write as w;
+
+// ── engine scaffold payload (D0093 `init`): the reusable engine tree + operating manual, embedded at
+//    compile time so `sysmlv2 init` is self-contained (no external fetch — the cytoscape precedent). ──
+static ENGINE_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../.engine");
+const CLAUDE_MD: &str = include_str!("../../CLAUDE.md");
+const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `sysmlv2 orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
+/// A fresh project's deliverable-suspicion manifest is EMPTY — the shipped one lists the ENGINE's own
+/// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
+/// engine/instance boundary). The new project adds entries as it builds source-dependent verifications.
+const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE\n# files (D0050), so `sysmlv2 suspect` flags a task suspect when its source changed since it was\n# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...\n# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.\n";
 
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
@@ -1019,10 +1031,101 @@ fn cmd_apply_review(args: &[String]) -> i32 {
     0
 }
 
+/// Write one embedded engine file into `dst_engine`, remapping `decisions/*` -> `reference/decisions/*`
+/// (read-only reference, NOT instance — the engine's architecture decisions must not enter the new
+/// project's computed views, which scan `.engine/decisions`; D0093 engine/instance boundary).
+/// Remap an embedded engine-relative path for scaffolding: `decisions/*` -> `reference/decisions/*`
+/// (read-only reference, not instance — D0093 boundary); everything else is unchanged.
+fn remap_engine_path(rel: &Path) -> PathBuf {
+    rel.strip_prefix("decisions")
+        .map_or_else(|_| rel.to_path_buf(), |rest| Path::new("reference").join("decisions").join(rest))
+}
+
+fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
+    let rel = f.path();
+    let dst = dst_engine.join(remap_engine_path(rel));
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    // The deliverable-suspicion manifest is instance-specific (lists the ENGINE's own tasks) — reset it
+    // to a starter so a fresh project passes manifest-coverage (D0093 engine/instance boundary).
+    if rel == Path::new("deliverable-manifest.txt") {
+        std::fs::write(&dst, STARTER_MANIFEST)?;
+    } else {
+        std::fs::write(&dst, f.contents())?;
+    }
+    *count += 1;
+    Ok(())
+}
+
+/// Recursively scaffold the embedded engine tree into `dst_engine`. `include_dir`'s `File::path()` is
+/// root-relative, so the remap in `write_engine_file` sees the full path regardless of nesting.
+fn scaffold_engine(dir: &Dir, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
+    for f in dir.files() {
+        write_engine_file(f, dst_engine, count)?;
+    }
+    for d in dir.dirs() {
+        scaffold_engine(d, dst_engine, count)?;
+    }
+    Ok(())
+}
+
+/// `sysmlv2 init DIR` (D0093) — scaffold a fresh project: the embedded engine (`.engine/`, with the
+/// architecture decisions remapped to read-only `reference/`), `CLAUDE.md`, and a starter `.tracking/`.
+/// Self-contained cold start; refuses to overwrite an existing `.engine/`.
+fn cmd_init(args: &[String]) -> i32 {
+    let Some(target) = args.first() else {
+        eprintln!("usage: sysmlv2 init DIR");
+        return 2;
+    };
+    let dir = PathBuf::from(target);
+    let engine_dst = dir.join(".engine");
+    if engine_dst.exists() {
+        eprintln!("error: {} already contains a .engine/ — refusing to overwrite", dir.display());
+        return 2;
+    }
+    let mut count = 0u32;
+    if let Err(e) = scaffold_engine(&ENGINE_DIR, &engine_dst, &mut count) {
+        eprintln!("error scaffolding engine: {e}");
+        return 1;
+    }
+    // Empty .engine/decisions/ — where the NEW project authors its own decisions (the engine's ship
+    // as read-only reference under .engine/reference/decisions/).
+    if let Err(e) = std::fs::create_dir_all(engine_dst.join("decisions")) {
+        eprintln!("error creating .engine/decisions: {e}");
+        return 1;
+    }
+    if let Err(e) = std::fs::write(dir.join("CLAUDE.md"), CLAUDE_MD) {
+        eprintln!("error writing CLAUDE.md: {e}");
+        return 1;
+    }
+    let tracking = dir.join(".tracking");
+    if let Err(e) = std::fs::create_dir_all(&tracking) {
+        eprintln!("error creating .tracking: {e}");
+        return 1;
+    }
+    if let Err(e) = std::fs::write(tracking.join("README.md"), TRACKING_STARTER) {
+        eprintln!("error writing .tracking/README.md: {e}");
+        return 1;
+    }
+    println!("Scaffolded the engine into {} ({count} engine file(s)).", dir.display());
+    println!();
+    println!("Next:");
+    println!("  1. cd {}", dir.display());
+    println!("  2. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
+    println!("  3. Run the `introduction` skill (guided onboarding) — capture your first need + run your first sprint.");
+    println!("     Or: sysmlv2 orient .   (where things stand)");
+    println!();
+    println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
+    println!("your project authors its OWN decisions fresh in .engine/decisions/.");
+    0
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
     let code = match args.get(1).map(String::as_str) {
+        Some("init") => cmd_init(rest),
         Some("validate") => cmd_validate(rest),
         Some("check") => cmd_check(rest),
         Some("ls") => cmd_ls(rest),
@@ -1061,6 +1164,7 @@ fn main() {
         Some("add-task") => cmd_add_task(rest),
         _ => {
             eprintln!("sysmlv2 <subcommand> [args]");
+            eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
             eprintln!("  check FILE...                parse-check one or more .sysml files");
         eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
@@ -1077,4 +1181,18 @@ fn main() {
         }
     };
     process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{remap_engine_path, Path};
+
+    #[test]
+    fn engine_path_remap_isolates_decisions() {
+        // D0093 boundary: decisions ship as read-only reference, never as the new project's instance.
+        assert_eq!(remap_engine_path(Path::new("decisions/0001-x.sysml")), Path::new("reference/decisions/0001-x.sysml"));
+        // Everything else is scaffolded unchanged.
+        assert_eq!(remap_engine_path(Path::new("schema/core/element.sysml")), Path::new("schema/core/element.sysml"));
+        assert_eq!(remap_engine_path(Path::new("processes/introduction.sysml")), Path::new("processes/introduction.sysml"));
+    }
 }
