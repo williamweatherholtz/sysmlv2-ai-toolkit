@@ -419,4 +419,28 @@ package ProjectIssues {
     }
     #Resolves dependency from indicatorBankGuardrail to issue037;
     #Resolves dependency from indicatorBankGuardrail to issue038;
+
+    part issue039 : Issue {
+        :>> id = "e0390039-0039-4e39-9039-516273840039";
+        :>> title = "D0047 finding: the corrections-become-guards rule is itself enforced only by vigilance (no meta-audit that a recurrable-defect Issue carries a resolving guard)";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 4, d0047 completeness (Medium): D0047 mandates a recurrable defect MUST be logged as an Issue AND given a permanent automated guard, but nothing enforces the mandate — no meta-guard checks that a process-defect Issue has a resolving guard, so the rule is applied by AI/retro vigilance (the failure mode D0047 itself rejects). Candidate resolver: correctionGuardCoverage (a meta-audit). PENDING human disposition (ACT / ACCEPT-RISK / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "correctionGuardCoverage";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from correctionGuardCoverage to issue039;
+
+    part issue040 : Issue {
+        :>> id = "e0400040-0040-4e40-9040-516273840040";
+        :>> title = "D0049 finding: 'sitting' (the unit of the sole human gate) has no model representation — review->sprints coverage is uncomputable";
+        :>> createdAt = "2026-06-22";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Load-bearing critique campaign batch 4, d0049 completeness (Medium): D0049 makes the per-sitting sprint review the sole human gate and defines SITTING = one continuous work session of >=1 sprints, but 'sitting' is not modeled — no Sitting item/marker, no recorded boundary, no computed link from a review confirmation to the sprints it attests. So which sprints a given review covers is neither auditable nor computable in the model meant to be the sole tracker (D0018). Candidate resolver: sittingModel (authored review->sprint coverage edge + computed view). PENDING human disposition (ACT / ACCEPT-RISK / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "sittingModel";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from sittingModel to issue040;
 }
