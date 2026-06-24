@@ -68,6 +68,13 @@ A single Rust binary is the authority for the routine path — no kernel, conda,
 | Gate | `validate` · `guard [name]` · `check` |
 | Console / spin-up | `init DIR` · `serve [--port N]` (localhost oversight console) |
 
+> **`serve` agent bridge is optional.** The read console, views, and reports work with the `keel`
+> binary alone. The in-console *actions* (critique / investigate / report an element) shell out to a
+> local `claude` CLI, so they need [Claude Code](https://claude.com/claude-code) installed, on `PATH`,
+> and logged in to your Claude subscription/enterprise — **never** set `ANTHROPIC_API_KEY` (that forces
+> API-rate billing). Without it the console degrades gracefully: a clear "not installed" message, not a
+> failure. The agent never commits — your commit is the gate (D0096).
+
 ## Where things live
 
 ```

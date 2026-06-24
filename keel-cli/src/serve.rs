@@ -240,6 +240,36 @@ fn build_agent_prompt(action: &str, target: &str) -> String {
     }
 }
 
+/// Probe `PATH` for a `claude` executable WITHOUT spawning it (serveDownstreamDegrade). The agent
+/// bridge is optional: a downstream consumer who never installs Claude Code must get a CLEAR message,
+/// not a cryptic exit code. On Windows the CLI is an npm shim resolved via `cmd /C` — which always
+/// succeeds even when `claude` is absent (cmd exists), so spawn-failure detection misses it. Probing
+/// PATH first makes the "not installed" path uniform across platforms. Honors `PATHEXT` on Windows.
+fn claude_on_path() -> bool {
+    let Some(path) = std::env::var_os("PATH") else { return false };
+    let pathext = std::env::var_os("PATHEXT");
+    claude_in_dirs(&path, pathext.as_deref())
+}
+
+/// Pure core of [`claude_on_path`] (testable without mutating process env). Scans `path` (an
+/// `OsStr` in `PATH` syntax) for a `claude` executable. On Windows a bare name resolves via
+/// `pathext` (`.CMD`/`.EXE`/`.BAT`/...); on Unix the literal name. `pathext` is honored only on
+/// Windows (`cfg!(windows)`); falls back to the default extension set when absent.
+fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> bool {
+    let candidates: Vec<String> = if cfg!(windows) {
+        let exts = pathext
+            .and_then(|p| p.to_str())
+            .filter(|s| !s.is_empty())
+            .map_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string(), str::to_string);
+        std::iter::once("claude".to_string())
+            .chain(exts.split(';').filter(|e| !e.is_empty()).map(|e| format!("claude{}", e.to_ascii_lowercase())))
+            .collect()
+    } else {
+        vec!["claude".to_string()]
+    };
+    std::env::split_paths(path).any(|dir| candidates.iter().any(|c| dir.join(c).is_file()))
+}
+
 /// GET /api/agent/stream?action=&target= (D0094 m3) — spawn a headless `claude` agent in the repo and
 /// stream its `stream-json` events to the browser over SSE (not polling). Degrades gracefully if the
 /// `claude` CLI is absent; rejects past the concurrency cap; never sets `ANTHROPIC_API_KEY`.
@@ -256,6 +286,12 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         let _slot = slot; // dropped (counter--) when the stream finishes or the client disconnects
         if over_cap {
             yield Ok(Event::default().event("error").data(format!("busy: {AGENT_MAX_CONCURRENT} agent runs already in flight \u{2014} try again shortly")));
+            return;
+        }
+        // serveDownstreamDegrade: clear, uniform message when the optional agent bridge isn't installed
+        // (on Windows a missing `claude` would otherwise spawn `cmd` fine and exit 1 \u{2014} cryptic).
+        if !claude_on_path() {
+            yield Ok(Event::default().event("error").data("the `claude` CLI is not on PATH \u{2014} the agent bridge is optional. Install Claude Code and log in to your Claude subscription/enterprise to enable in-console actions (do NOT set ANTHROPIC_API_KEY \u{2014} that forces API-rate billing). The read console, views, and reports work without it."));
             return;
         }
         yield Ok(Event::default().event("status").data(format!("launching `claude` (turn cap {AGENT_MAX_TURNS}): {prompt}")));
@@ -588,4 +624,33 @@ pub fn interaction_history(root: &Path) -> String {
         ("current".to_string(), current),
     ])
     .dump()
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::claude_in_dirs;
+    use std::ffi::OsString;
+
+    /// serveDownstreamDegrade: the agent bridge is OPTIONAL. `claude_in_dirs` must report absent
+    /// when no `claude` executable sits on PATH — so the console can emit a clear "not installed"
+    /// message instead of a cryptic exit code. Empty dir -> false; dropping the right-named file
+    /// in -> true. The executable basename differs by platform (`claude.cmd` on Windows shims).
+    #[test]
+    fn detects_claude_presence_on_path() {
+        let dir = std::env::temp_dir().join(format!("keel_claude_probe_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path: OsString = dir.clone().into_os_string();
+
+        // No claude anywhere on this one-entry PATH.
+        assert!(!claude_in_dirs(&path, None), "should report absent in an empty dir");
+
+        // Drop a claude executable named the way the platform resolves it.
+        let name = if cfg!(windows) { "claude.cmd" } else { "claude" };
+        std::fs::write(dir.join(name), b"").unwrap();
+        assert!(claude_in_dirs(&path, None), "should detect {name} on PATH");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
