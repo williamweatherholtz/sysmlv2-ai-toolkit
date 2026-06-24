@@ -38,7 +38,7 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"]];
+const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"]];
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
   if(o.type==='assistant'&&o.message&&o.message.content)return o.message.content.map(b=>b.type==='text'?b.text:(b.type==='tool_use'?`\n[tool: ${b.name}]`:'')).join('');
@@ -127,9 +127,12 @@ async function render(){
     card('Open issues',(o.open_issues||[]).length,linkList(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
     card('Suspect / stale',(o.suspect||[]).length,linkList(o.suspect,10),(o.suspect||[]).length?'warn':'good')+
    '</div>';
+  } else if(active==='recent'){const r=await get('/api/recent');
+   main.innerHTML='<p class=muted>'+esc(r.recent||'')+'</p>'+(r.commits||[]).map(c=>`<div class=row><div class=t><span class=pill>${esc(c.date)}</span> ${esc(c.subject)} <span class=muted>${esc(c.sha)}</span></div><div class=m>${linkList((c.files||[]).map(f=>f.split('/').pop().replace(/\.sysml$/,'')),8)}</div></div>`).join('')||'<span class=muted>no recent activity</span>';
   } else if(active==='decisions'){const d=await get('/api/decisions');
-   const arr=d.decisions||[];
-   main.innerHTML='<p class=muted>'+esc(d.report||'')+'</p>'+arr.map(x=>`<div class=row><div class=t>${itemLink(x.id||x.name)} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
+   // sr15: decisions newest-first (dNNNN is sequential ~ chronological); the score order stays as a tiebreak from the API.
+   const arr=(d.decisions||[]).slice().sort((a,b)=>String(b.decision||b.name||'').localeCompare(String(a.decision||a.name||'')));
+   main.innerHTML='<p class=muted>'+esc(d.report||'')+' · newest-first</p>'+arr.map(x=>`<div class=row><div class=t>${itemLink(x.id||x.decision||x.name)} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
   } else if(active==='processes'){const p=await get('/api/processes');
    main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${x.name?itemLink(x.name):esc(x.file)} <span class=muted>${esc(x.title||'')}</span></div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
   } else if(active==='dispositions'){const d=await get('/api/dispositions');

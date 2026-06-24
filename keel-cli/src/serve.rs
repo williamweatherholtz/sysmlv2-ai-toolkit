@@ -63,6 +63,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     let app = Router::new()
         .route("/", get(index))
         .route("/api/orient", get(api_orient))
+        .route("/api/recent", get(api_recent))
         .route("/api/decisions", get(api_decisions))
         .route("/api/dispositions", get(api_dispositions))
         .route("/api/processes", get(api_processes))
@@ -422,6 +423,15 @@ async fn api_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> 
 /// History reads ~/.claude transcripts (outside the fingerprint), so it is computed fresh (uncached).
 async fn api_history(State(s): State<AppState>) -> Response {
     ok_json(interaction_history(&s.root))
+}
+
+/// GET /api/recent (sr15) — the git-derived recent-activity timeline. Reads git history (outside the
+/// model fingerprint), so it is computed fresh (uncached); a git failure yields an empty timeline.
+async fn api_recent(State(s): State<AppState>) -> Response {
+    match crate::view::recent(&s.root) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("recent error: {e}")).into_response(),
+    }
 }
 
 /// GET /api/item/:name (D0094 serveItemIntrospect) — any item's detail (attrs + edges + neighbors).

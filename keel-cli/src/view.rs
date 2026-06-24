@@ -1948,6 +1948,56 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
     .dump())
 }
 
+/// Append a parsed commit to the recent-activity timeline (helper for [`recent`]).
+fn recent_flush(cur: Option<&(String, String, String)>, files: &[String], out: &mut Vec<Json>) {
+    if let Some((sha, date, subj)) = cur {
+        out.push(Json::Obj(vec![
+            ("sha".to_string(), Json::s(sha.clone())),
+            ("date".to_string(), Json::s(date.clone())),
+            ("subject".to_string(), Json::s(subj.clone())),
+            ("files".to_string(), Json::Arr(files.iter().map(|f| Json::s(f.clone())).collect())),
+        ]));
+    }
+}
+
+/// Git-derived recent-activity timeline (sr15) — the introspection "what changed recently" lens.
+///
+/// The latest commits touching `.tracking`/`.engine` and the element files each changed, newest first;
+/// computed from git, nothing stored.
+///
+/// # Errors
+/// Returns [`ViewError`] only on JSON assembly; a git failure yields an empty timeline (best-effort).
+pub fn recent(root: &Path) -> Result<String, ViewError> {
+    let raw = git_out(
+        root,
+        &["log", "--no-merges", "-n", "25", "--date=short", "--format=__C__%h\u{1f}%ad\u{1f}%s", "--name-only", "--", ".tracking", ".engine"],
+    )
+    .unwrap_or_default();
+    let mut commits: Vec<Json> = Vec::new();
+    let mut cur: Option<(String, String, String)> = None;
+    let mut files: Vec<String> = Vec::new();
+    for line in raw.lines() {
+        if let Some(rest) = line.strip_prefix("__C__") {
+            recent_flush(cur.as_ref(), &files, &mut commits);
+            files.clear();
+            let p: Vec<&str> = rest.splitn(3, '\u{1f}').collect();
+            cur = Some((
+                (*p.first().unwrap_or(&"")).to_string(),
+                (*p.get(1).unwrap_or(&"")).to_string(),
+                (*p.get(2).unwrap_or(&"")).to_string(),
+            ));
+        } else if !line.trim().is_empty() {
+            files.push(line.trim().to_string());
+        }
+    }
+    recent_flush(cur.as_ref(), &files, &mut commits);
+    Ok(Json::Obj(vec![
+        ("recent".to_string(), Json::s("git-derived recent-activity timeline (sr15): the latest commits touching .tracking/.engine + the element files each changed; newest first")),
+        ("commits".to_string(), Json::Arr(commits)),
+    ])
+    .dump())
+}
+
 // ── assurance readiness (D0079 c — the composite capstone gate) ───────────────────────────────
 // `assured` composes the whole assurance picture into ONE verdict: the deliverable is READY iff
 // (1) coverage complete (every Need/Requirement/Decision covered), (2) critique complete (every

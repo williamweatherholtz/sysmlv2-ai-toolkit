@@ -1271,6 +1271,7 @@ fn main() {
         Some("critique-policy") => cmd_critique_policy(rest),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+        Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
