@@ -81,6 +81,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/events", get(api_events))
         // serveItemIntrospect — generic any-item detail
         .route("/api/item/:name", get(api_item))
+        // sr18 — bounded section render (a declared view, or an element + its 1-hop neighbourhood)
+        .route("/api/section", get(api_section))
         // serveItemActions — append a downstream TestResult to a task
         .route("/api/testresult", post(api_testresult))
         // sr16 — on ACT, attach a tracked #Resolves resolver task to a finding
@@ -232,14 +234,39 @@ impl Drop for TreeKiller {
 struct AgentReq {
     action: String,
     target: String,
+    /// sr18 — optional section seed (`view:NAME` or `element:NAME`) scoping the critique to a bounded
+    /// neighbourhood: the prompt names the section's members so the AI critiques `target` IN CONTEXT.
+    #[serde(default)]
+    section: Option<String>,
+}
+
+/// Parse a section seed string (`view:NAME` / `element:NAME`) into the `(view, element)` pair
+/// [`crate::view::section_json`] expects. A bare string with no prefix is treated as an element seed.
+fn parse_section_seed(seed: &str) -> (Option<String>, Option<String>) {
+    seed.strip_prefix("view:").map_or_else(
+        || (None, Some(seed.strip_prefix("element:").unwrap_or(seed).to_string())),
+        |v| (Some(v.to_string()), None),
+    )
 }
 
 /// The only AI bridge action (sr17/D0098 directed-only): an antagonistic, RECORDING critique of a
 /// named element. There is deliberately no free-form / investigate / chat action — every AI action is
 /// directed at a named target and produces a recorded artifact (Issues). The agent inherits CLAUDE.md
 /// discipline from the cwd; the prompt forbids committing (commits/acceptance stay the human's gate, D0016).
-fn build_agent_prompt(target: &str) -> String {
-    format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process. Do NOT git commit; the human commits.")
+///
+/// sr18 — when `section_members` is supplied, the critique is SECTION-SCOPED: the prompt names the
+/// bounded local neighbourhood so the AI judges `target` in its context (whole-model views are too
+/// coarse for local "does X make sense here" critique), still recording findings against the elements.
+fn build_agent_prompt(target: &str, section_members: Option<&[String]>) -> String {
+    use std::fmt::Write as _;
+    let mut prompt = format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process.");
+    if let Some(members) = section_members {
+        if !members.is_empty() {
+            let _ = write!(prompt, " Scope the critique to this bounded SECTION (its local neighbourhood): {}. Judge whether `{target}` is coherent, necessary, and well-formed WITHIN that local context; record findings against the section's elements.", members.join(", "));
+        }
+    }
+    prompt.push_str(" Do NOT git commit; the human commits.");
+    prompt
 }
 
 /// Persistent serve settings file (`<root>/.keel-serve.json`, gitignored). Project-local runtime
@@ -318,7 +345,12 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = (*s.root).clone();
     let action_ok = q.action == "critique";
-    let prompt = build_agent_prompt(&q.target);
+    // sr18 — if a section seed was supplied, resolve its members so the critique is section-scoped.
+    let section_members = q.section.as_deref().and_then(|seed| {
+        let (view, element) = parse_section_seed(seed);
+        crate::view::section_member_names(&root, view.as_deref(), element.as_deref()).ok()
+    });
+    let prompt = build_agent_prompt(&q.target, section_members.as_deref());
     let counter = Arc::clone(&s.agents);
     let prev = counter.fetch_add(1, Ordering::SeqCst);
     let over_cap = prev >= AGENT_MAX_CONCURRENT;
@@ -517,6 +549,23 @@ async fn api_recent(State(s): State<AppState>) -> Response {
 /// GET /api/item/:name (D0094 serveItemIntrospect) — any item's detail (attrs + edges + neighbors).
 async fn api_item(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
     cached(&s, &format!("item:{name}"), |r| crate::view::item_detail(r, &name))
+}
+
+/// A bounded-section request (sr18ServeSectionCritique): exactly one of `view` (a declared view name)
+/// or `element` (an element + its 1-hop typed-edge neighbourhood).
+#[derive(serde::Deserialize)]
+struct SectionReq {
+    view: Option<String>,
+    element: Option<String>,
+}
+
+/// GET /api/section?view=NAME | ?element=NAME (sr18) — render a bounded section as JSON
+/// (`{seed, kind, count, items[], edges[]}`) for local, section-scoped critique. A computed `#View`.
+async fn api_section(State(s): State<AppState>, Query(q): Query<SectionReq>) -> Response {
+    match crate::view::section_json(&s.root, q.view.as_deref(), q.element.as_deref()) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
 }
 
 /// The .tracking file declaring `action <task>;` (so a downstream `TestResult` can be appended to it).
@@ -747,5 +796,36 @@ mod tests {
         assert!(claude_in_dirs(&path, None), "should detect {name} on PATH");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// sr18 — a section seed parses to the `(view, element)` pair `section_json` expects: an explicit
+    /// `view:`/`element:` prefix routes accordingly; a bare name defaults to an element seed.
+    #[test]
+    fn section_seed_parses_view_element_and_bare() {
+        use super::parse_section_seed;
+        assert_eq!(parse_section_seed("view:orphans"), (Some("orphans".to_string()), None));
+        assert_eq!(parse_section_seed("element:sr18ServeSectionCritique"), (None, Some("sr18ServeSectionCritique".to_string())));
+        assert_eq!(parse_section_seed("d0098"), (None, Some("d0098".to_string())));
+    }
+
+    /// sr18 — without a section the critique prompt is the plain element critique; WITH section members
+    /// it becomes section-scoped (names the bounded neighbourhood + asks for in-context judgment). Both
+    /// forms forbid committing (the human's gate, D0016).
+    #[test]
+    fn agent_prompt_is_section_scoped_only_when_members_given() {
+        use super::build_agent_prompt;
+        let plain = build_agent_prompt("sr18", None);
+        assert!(plain.contains("critique `sr18`"));
+        assert!(!plain.contains("bounded SECTION"));
+        assert!(plain.contains("Do NOT git commit"));
+
+        let scoped = build_agent_prompt("sr18", Some(&["sr18".to_string(), "n17ServeGranularWhitebox".to_string()]));
+        assert!(scoped.contains("bounded SECTION"));
+        assert!(scoped.contains("n17ServeGranularWhitebox"));
+        assert!(scoped.contains("Do NOT git commit"));
+
+        // An empty member set must not fabricate a section clause.
+        let empty = build_agent_prompt("sr18", Some(&[]));
+        assert!(!empty.contains("bounded SECTION"));
     }
 }

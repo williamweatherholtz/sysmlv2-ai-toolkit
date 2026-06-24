@@ -37,6 +37,10 @@ pub enum ViewError {
     UnknownReport(String),
     #[error("invalid critique policy: {0}")]
     Policy(String),
+    #[error("unknown element '{0}' (no authored item by that name)")]
+    UnknownElement(String),
+    #[error("section needs exactly one seed: a view name or an element name")]
+    BadSection,
 }
 
 // ── the declared view (TOML) ────────────────────────────────────────────────
@@ -312,6 +316,120 @@ fn attr_matches(info: &ItemInfo, key: &str, pred: &AttrPred) -> bool {
 
 fn has_outgoing(edges: &[Edge], name: &str, kind: &str) -> bool {
     edges.iter().any(|e| e.from == name && e.kind == kind)
+}
+
+/// The local neighbourhood of `element` (sr18ServeSectionCritique): the element itself plus every
+/// element exactly one typed edge away, in either direction. This is the element-seeded section bound
+/// — a subgraph small enough for local "does X make sense in its context" critique, where whole-model
+/// views are too coarse (the requirement's rationale).
+fn element_neighbourhood(model: &Model, element: &str) -> HashSet<String> {
+    let mut set = HashSet::new();
+    set.insert(element.to_string());
+    for e in &model.edges {
+        if e.from == element {
+            set.insert(e.to.clone());
+        } else if e.to == element {
+            set.insert(e.from.clone());
+        }
+    }
+    set
+}
+
+/// Emit a bounded section (`names`) of `model` as JSON: `{seed, kind, count, items[], edges[]}`. Items
+/// carry name + type (+ title/marker when authored); edges are the INDUCED subgraph — only those whose
+/// both endpoints are inside the section. Presentation-agnostic (the console renders it).
+fn section_subgraph_json(model: &Model, names: &HashSet<String>, seed: &str, kind: &str) -> String {
+    let mut sorted: Vec<&String> = names.iter().collect();
+    sorted.sort();
+    let items: Vec<Json> = sorted
+        .iter()
+        .filter_map(|n| {
+            model.items.get(*n).map(|info| {
+                let mut o = vec![
+                    ("name".to_string(), Json::s((*n).clone())),
+                    ("type".to_string(), Json::s(info.type_name.clone())),
+                ];
+                if let Some(t) = info.attrs.get("title") {
+                    o.push(("title".to_string(), Json::s(t.clone())));
+                }
+                if let Some(m) = &info.marker {
+                    o.push(("marker".to_string(), Json::s(m.clone())));
+                }
+                Json::Obj(o)
+            })
+        })
+        .collect();
+    let count = items.len();
+    let edges: Vec<Json> = model
+        .edges
+        .iter()
+        .filter(|e| names.contains(&e.from) && names.contains(&e.to))
+        .map(|e| {
+            Json::Obj(vec![
+                ("kind".to_string(), Json::s(e.kind.clone())),
+                ("from".to_string(), Json::s(e.from.clone())),
+                ("to".to_string(), Json::s(e.to.clone())),
+            ])
+        })
+        .collect();
+    Json::Obj(vec![
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("kind".to_string(), Json::s(kind.to_string())),
+        ("count".to_string(), Json::Int(i64::try_from(count).unwrap_or(0))),
+        ("items".to_string(), Json::Arr(items)),
+        ("edges".to_string(), Json::Arr(edges)),
+    ])
+    .dump()
+}
+
+/// Resolve a section seed to its bounded model + element set (sr18). Either a declared view's element
+/// set (`view`), or an element plus its 1-hop typed-edge neighbourhood (`element`); exactly one seed.
+/// Returns `(model, kind, seed, names)`.
+fn resolve_section(root: &Path, view: Option<&str>, element: Option<&str>) -> Result<(Model, &'static str, String, HashSet<String>), ViewError> {
+    match (view, element) {
+        (Some(v), None) => {
+            let (_, model, result) = run_resolved(root, v)?;
+            Ok((model, "view", v.to_string(), result))
+        }
+        (None, Some(el)) => {
+            let model = Model::build(root)?;
+            if !model.items.contains_key(el) {
+                return Err(ViewError::UnknownElement(el.to_string()));
+            }
+            let names = element_neighbourhood(&model, el);
+            Ok((model, "element", el.to_string(), names))
+        }
+        _ => Err(ViewError::BadSection),
+    }
+}
+
+/// Compute a bounded SECTION of the model as JSON (sr18ServeSectionCritique).
+///
+/// Either a declared view's element set (`view`), or an element plus its 1-hop typed-edge
+/// neighbourhood (`element`). Exactly one seed must be supplied. A computed `#View`: regenerate on
+/// demand, never store.
+///
+/// # Errors
+/// Returns [`ViewError`] for a missing/invalid view, an unknown element, a parse failure, or a
+/// malformed request (neither or both seeds supplied).
+pub fn section_json(root: &Path, view: Option<&str>, element: Option<&str>) -> Result<String, ViewError> {
+    let (model, kind, seed, names) = resolve_section(root, view, element)?;
+    Ok(section_subgraph_json(&model, &names, &seed, kind))
+}
+
+/// The element names composing a section (sr18).
+///
+/// Same seed semantics as [`section_json`], returning the sorted bounded name set for callers that
+/// need just the membership (e.g. section-scoped critique context — giving the AI the local
+/// neighbourhood instead of a single isolated element).
+///
+/// # Errors
+/// As [`section_json`].
+pub fn section_member_names(root: &Path, view: Option<&str>, element: Option<&str>) -> Result<Vec<String>, ViewError> {
+    let (_, _, _, names) = resolve_section(root, view, element)?;
+    let mut v: Vec<String> = names.into_iter().collect();
+    v.sort();
+    Ok(v)
 }
 
 fn selects(model: &Model, sel: &Select) -> HashSet<String> {
@@ -3291,6 +3409,68 @@ mod tests {
         let got = selects(&model(), &Select { type_: Some("Decision".to_string()), ..Default::default() });
         assert_eq!(got.len(), 1);
         assert!(got.contains("d1"));
+    }
+
+    #[test]
+    fn element_section_is_element_plus_one_hop_neighbours() {
+        // sr18: an element-seeded section = the element + every element one typed edge away (the local
+        // neighbourhood), and no further. model(): r1 --satisfy--> c1; d1 is isolated. Section(r1) =
+        // {r1, c1}; d1 (unconnected) is NOT in the section.
+        let got = element_neighbourhood(&model(), "r1");
+        assert_eq!(got.len(), 2);
+        assert!(got.contains("r1"));
+        assert!(got.contains("c1"));
+        assert!(!got.contains("d1"));
+    }
+
+    #[test]
+    fn element_section_includes_incoming_neighbours() {
+        // The neighbourhood is direction-agnostic: c1 is reached only via an INCOMING satisfy edge
+        // (r1 -> c1), so Section(c1) must still include r1.
+        let got = element_neighbourhood(&model(), "c1");
+        assert_eq!(got.len(), 2);
+        assert!(got.contains("c1"));
+        assert!(got.contains("r1"));
+    }
+
+    #[test]
+    fn section_json_emits_items_and_induced_edges() {
+        // The section emit carries the seed + kind and each element's name+type; an edge is emitted
+        // only when BOTH endpoints are inside the section (an induced subgraph).
+        let set: HashSet<String> = ["r1", "c1"].iter().map(|s| (*s).to_string()).collect();
+        let out = section_subgraph_json(&model(), &set, "r1", "element");
+        assert!(out.contains("\"seed\": \"r1\""));
+        assert!(out.contains("\"kind\": \"element\""));
+        assert!(out.contains("\"name\": \"r1\""));
+        assert!(out.contains("\"name\": \"c1\""));
+        assert!(out.contains("\"satisfy\"")); // r1 --satisfy--> c1: both endpoints in-section
+    }
+
+    #[test]
+    fn section_json_excludes_edges_leaving_the_section() {
+        // Section = {r1} only; the r1 --satisfy--> c1 edge has c1 OUTSIDE the bound, so it is dropped.
+        let set: HashSet<String> = std::iter::once("r1".to_string()).collect();
+        let out = section_subgraph_json(&model(), &set, "r1", "element");
+        assert!(!out.contains("\"satisfy\""));
+        assert!(!out.contains("\"name\": \"c1\""));
+    }
+
+    #[test]
+    fn element_section_stops_at_one_hop() {
+        // a -> b -> c chain; Section(a) = {a, b} only — c is two hops away, beyond the local section.
+        let mut items = HashMap::new();
+        for n in ["a", "b", "c"] {
+            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None });
+        }
+        let edges = vec![
+            Edge { kind: "dependency".to_string(), from: "a".to_string(), to: "b".to_string() },
+            Edge { kind: "dependency".to_string(), from: "b".to_string(), to: "c".to_string() },
+        ];
+        let got = element_neighbourhood(&Model { items, edges }, "a");
+        assert_eq!(got.len(), 2);
+        assert!(got.contains("a"));
+        assert!(got.contains("b"));
+        assert!(!got.contains("c"));
     }
 
     #[test]

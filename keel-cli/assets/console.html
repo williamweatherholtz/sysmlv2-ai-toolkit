@@ -38,7 +38,7 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
 let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
@@ -62,9 +62,11 @@ let mes=null;
 function stopModalAgent(){if(mes){mes.close();mes=null}}
 function closeItem(){stopModalAgent();document.getElementById('modal').classList.remove('on')}
 function mlog(s){const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent+=s;l.scrollTop=l.scrollHeight}}
-function runAgentModal(action,target){
- stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${target} ===\n`}
- mes=new EventSource('/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target));
+function runAgentModal(action,target,section){
+ stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${target}${section?(' @ '+section):''} ===\n`}
+ let url='/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target);
+ if(section)url+='&section='+encodeURIComponent(section); // sr18: section-scoped critique
+ mes=new EventSource(url);
  mes.addEventListener('status',e=>mlog('· '+e.data+'\n\n'));
  mes.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)mlog(t)});
  mes.addEventListener('done',e=>{mlog('\n\n'+e.data+'\n');stopModalAgent()});
@@ -103,6 +105,24 @@ async function openItem(name){
  }catch(e){m.innerHTML='<span class=x onclick="closeItem()">✕</span><p>error: '+esc(e.message)+'</p>'}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('.il');if(a)openItem(a.dataset.i)});
+// sr18 — bounded section: render a declared view OR an element + its 1-hop neighbourhood, then run a
+// SECTION-SCOPED critique (the AI judges an element within its local context; findings -> Issues).
+let secSeed='', secKind='element', secData=null;
+async function loadSection(){
+ secKind=document.getElementById('secKind').value;secSeed=document.getElementById('secSeed').value.trim();
+ if(!secSeed){secData=null;render();return}
+ status.textContent='loading section…';
+ try{const q=secKind==='view'?('view='+encodeURIComponent(secSeed)):('element='+encodeURIComponent(secSeed));
+  secData=await get('/api/section?'+q);
+ }catch(e){secData={error:'no such '+secKind+': '+secSeed};}
+ render();
+}
+function openSectionCritique(target,sectionSeed){
+ const m=document.getElementById('modal');m.classList.add('on');stopModalAgent();
+ m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>Critique '+esc(target)+' <span class=pill>section</span></h2>'+
+  '<p class=muted>Section-scoped critique within <b>'+esc(sectionSeed)+'</b> — the AI judges it in its local context; findings recorded as Issues (not committed).</p>'+ACTLOG;
+ runAgentModal('critique',target,sectionSeed);
+}
 async function disposition(finding,verdict){
  const rationale=prompt(`Rationale for "${verdict}" on ${finding}:`,'');
  if(rationale===null)return;
@@ -141,6 +161,25 @@ async function render(){
    main.innerHTML='<p class=muted>'+esc(d.report||'')+' · newest-first</p>'+arr.map(x=>`<div class=row><div class=t>${itemLink(x.id||x.decision||x.name)} ${esc(x.title||'')}</div><div class=m>${esc([x.uncritiqued?'uncritiqued':'',x.references_retired?'references-retired':'',x.superseded_in_part?'superseded-in-part?':''].filter(Boolean).join(' · '))}</div></div>`).join('')||'<span class=muted>no decisions</span>';
   } else if(active==='processes'){const p=await get('/api/processes');
    main.innerHTML=(p.processes||[]).map(x=>`<div class=row><div class=t>${x.name?itemLink(x.name):esc(x.file)} <span class=muted>${esc(x.title||'')}</span></div><div class=m>${esc(x.file)} — ${esc(x.purpose)}</div></div>`).join('')||'<span class=muted>none</span>';
+  } else if(active==='section'){
+   const seedParam=secKind+':'+secSeed;
+   let body='<div class=row><div class=t>Bounded section — local render + section-scoped critique</div>'+
+    '<div class=m>Render a declared <b>view</b>, or an <b>element</b> with its 1-hop typed-edge neighbourhood. Whole-model views are too coarse for local "does X make sense here" critique (sr18) — critique runs scoped to this section.</div>'+
+    '<div style="margin-top:8px">'+
+     '<select id=secKind><option value=element'+(secKind==='element'?' selected':'')+'>element + neighbourhood</option><option value=view'+(secKind==='view'?' selected':'')+'>declared view</option></select> '+
+     '<input id=secSeed placeholder="element or view name" value="'+esc(secSeed)+'" style="padding:4px 7px;border:1px solid var(--bd);border-radius:5px;min-width:240px"> '+
+     '<button class=rb id=secGo>Render section ▶</button>'+
+    '</div></div>';
+   if(secData&&secData.error){body+='<p class=muted style="color:var(--bad)">'+esc(secData.error)+'</p>';}
+   else if(secData){
+    body+='<p class=muted>section <b>'+esc(secData.seed)+'</b> <span class=pill>'+esc(secData.kind)+'</span> · '+secData.count+' element(s) · '+(secData.edges||[]).length+' edge(s)</p>'+
+     (secData.items||[]).map(it=>`<div class=row><div class=t>${itemLink(it.name)} <span class=pill>${esc(it.type)}</span>${it.marker?' <span class=pill>#'+esc(it.marker)+'</span>':''}</div>${it.title?'<div class=m>'+esc(it.title)+'</div>':''}${aiBridge?`<div style="margin-top:5px"><button class=rb data-sc="${esc(it.name)}">Critique in section ▶</button></div>`:''}</div>`).join('');
+    if((secData.edges||[]).length)body+='<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:11px 0 3px">Edges ('+secData.edges.length+')</h3>'+secData.edges.map(e=>`<div style="font-size:11px;margin:2px 0">${itemLink(e.from)} <span class=pill>${esc(e.kind)}</span> ${itemLink(e.to)}</div>`).join('');
+   } else {body+='<p class=muted>Enter a name and press <b>Render section ▶</b>.</p>';}
+   main.innerHTML=body;
+   document.getElementById('secGo').onclick=loadSection;
+   document.getElementById('secSeed').addEventListener('keydown',ev=>{if(ev.key==='Enter')loadSection()});
+   [...main.querySelectorAll('.rb[data-sc]')].forEach(b=>b.onclick=()=>openSectionCritique(b.dataset.sc,seedParam));
   } else if(active==='dispositions'){const d=await get('/api/dispositions');
    main.innerHTML='<div class=cards>'+card('≥Medium findings',d.ge_medium_findings,'total','')+card('Dispositioned',d.dispositioned,'have a typed verdict','good')+card('Undispositioned',d.undispositioned,'awaiting a verdict',d.undispositioned?'warn':'good')+'</div>'+
     '<p class=muted>Disposition a finding — your click + rationale is your explicit verdict (recorded via the write API; not committed).</p>'+
