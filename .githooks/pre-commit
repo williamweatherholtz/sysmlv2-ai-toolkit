@@ -88,6 +88,12 @@ if echo "$all_staged" | grep -q '^\.tracking/issues\.sysml$'; then
     guard_run issues
 fi
 
+# Requirement-rootedness honesty gate (D0098/D0099) — a #Capability with no #DerivedFrom->Need fails.
+# Fire when a #Capability marker or its Need link could change (.tracking/ or .engine/decisions/).
+if echo "$all_staged" | grep -qE '^\.(tracking/|engine/decisions/)'; then
+    guard_run requirement-rootedness
+fi
+
 # Assurance is a NON-BLOCKING BURNDOWN, not a hard gate (honest-state doctrine, D0098): critique-
 # COVERAGE (`keel guard critique` / `keel critique-coverage`) and the composite readiness verdict
 # (`keel guard assured` / `keel assured`) are COMPLETENESS measures, surfaced in orient and run on
