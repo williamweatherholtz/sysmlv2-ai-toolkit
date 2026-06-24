@@ -100,7 +100,7 @@ package ProjectArchitecture {
         :>> title = "CLAUDE.md + validator toolchain enables autonomous agent execution";
         :>> createdAt = "2026-06-11";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall provide a CLAUDE.md discipline guide and a validator toolchain (pre-commit hook + validate_all.py) that allows an AI agent to orient, execute a phase, validate green, record results, and commit without human intervention at each micro-step.";
+        :>> statement = "The system shall provide a CLAUDE.md discipline guide and a validator toolchain (the .githooks pre-commit hook + `keel validate`/`keel guard`) that allows an AI agent to orient, execute a phase, validate green, record results, and commit without human intervention at each micro-step.";
         :>> rationale = "Human-in-the-loop at every micro-step defeats the purpose of AI-assisted engineering; the discipline should be in the process, not the approval chain.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::should;
@@ -138,7 +138,7 @@ package ProjectArchitecture {
         :>> title = "Rust CLI replaces JVM kernel for all parse/validate/query operations";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall provide a Rust CLI binary (sysmlv2) that performs all operations currently requiring the pilot kernel — parse, validate, orient, workflows, trace-need — without JVM, conda, or Jupyter.";
+        :>> statement = "The system shall provide a Rust CLI binary (keel) that performs all operations currently requiring the pilot kernel — parse, validate, orient, workflows, trace-need — without JVM, conda, or Jupyter.";
         :>> rationale = "JVM cold start (~20s) is unacceptable for CI and tight feedback loops; a Rust binary delivers sub-second startup and removes the conda environment dependency.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
@@ -150,7 +150,7 @@ package ProjectArchitecture {
         :>> title = "Cold-start parse/validate < 500ms; full orient (with suspicion) < 1.5s";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The sysmlv2 CLI shall parse+validate the full engine repo (schema + tracking) in under 500ms, and emit full orient JSON — including git-temporal suspicion analysis across all tasks — in under 1.5s, on a developer laptop with no warm cache. (Revised by D0083; the prior flat <500ms predates orient's git-temporal suspicion.)";
+        :>> statement = "The keel CLI shall parse+validate the full engine repo (schema + tracking) in under 500ms, and emit full orient JSON — including git-temporal suspicion analysis across all tasks — in under 1.5s, on a developer laptop with no warm cache. (Revised by D0083; the prior flat <500ms predates orient's git-temporal suspicion.)";
         :>> rationale = "500ms is the human 'instant' threshold and is retained for the parse/validate path (the tight inner loop). Full orient additionally performs git-temporal suspicion across 200+ tasks (an analysis absent when the original bar was set, D0045); on Windows (~60ms/git-spawn) <1.5s is the realistic interactive bar for that heavier work. See D0083.";
         :>> kind = RequirementKind::nonFunctional;
         :>> priority = Priority::must;
@@ -162,7 +162,7 @@ package ProjectArchitecture {
         :>> title = "Production Rust code enforces deny(warnings) and zero-unwrap policy";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The sysmlv2-parser and sysmlv2-cli crates shall compile with #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]; no .unwrap(), .expect(), or index-without-bounds shall appear in src/ outside #[cfg(test)] blocks.";
+        :>> statement = "The keel-parser and keel-cli crates shall compile with #![deny(warnings, clippy::all, clippy::pedantic, clippy::nursery)]; no .unwrap(), .expect(), or index-without-bounds shall appear in src/ outside #[cfg(test)] blocks.";
         :>> rationale = "Unwrap panics are production bugs; clippy::pedantic surfaces logic issues before they manifest; deny(warnings) prevents warning accumulation.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
@@ -174,7 +174,7 @@ package ProjectArchitecture {
         :>> title = "build.rs pins grammar to canonical SysML v2 spec URL";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "The sysmlv2-parser crate's build.rs shall embed the canonical SysML v2 spec URL (https://github.com/Systems-Modeling/SysML-v2-Release) and the pinned grammar commit SHA as compile-time constants; the build shall fail if the fetched manifest hash diverges.";
+        :>> statement = "The keel-parser crate's build.rs shall embed the canonical SysML v2 spec URL (https://github.com/Systems-Modeling/SysML-v2-Release) and the pinned grammar commit SHA as compile-time constants; the build shall fail if the fetched manifest hash diverges.";
         :>> rationale = "Without a spec pin, grammar drift is silent; a build-time check makes divergence visible and actionable.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
@@ -249,18 +249,18 @@ package ProjectArchitecture {
 
     part rustParserComp : Component {
         :>> id = "c75fd116-86d8-475c-9c3c-459a6a3e6235";
-        :>> title = "sysmlv2-parser — Rust parser/indexer library crate";
+        :>> title = "keel-parser — Rust parser/indexer library crate";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> description = "The sysmlv2-parser crate. Implements the lexer, recursive-descent parser, package registry, cross-package reference resolver, and type checker for the engine's SysML v2 dialect. Produces a typed AST and index structure. No .unwrap() in src/; full thiserror error hierarchy; proptest-covered.";
+        :>> description = "The keel-parser crate. Implements the lexer, recursive-descent parser, package registry, cross-package reference resolver, and type checker for the engine's SysML v2 dialect. Produces a typed AST and index structure. No .unwrap() in src/; full thiserror error hierarchy; proptest-covered.";
     }
 
     part rustCliComp : Component {
         :>> id = "1e1719d4-ca14-4892-9065-65228829d02d";
-        :>> title = "sysmlv2-cli — Rust CLI binary crate";
+        :>> title = "keel-cli — Rust CLI binary crate";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> description = "The sysmlv2-cli crate. Wraps sysmlv2-parser and implements the orient, workflows, trace-need, validate, and item subcommands. Produces JSON output parity with query.py. Replaces the JVM kernel calls in validate_*.py and query.py.";
+        :>> description = "The keel-cli crate. Wraps keel-parser and implements the orient, workflows, trace-need, validate, and item subcommands. Produces JSON output parity with query.py. Replaces the JVM kernel calls in validate_*.py and query.py.";
     }
 
     // ====================================================================
@@ -319,10 +319,10 @@ package ProjectArchitecture {
 
     requirement ssr05Workspace : SubsystemRequirement {
         :>> id = "751ebac0-f86e-42e4-a279-892b44e3402a";
-        :>> title = "Cargo workspace at repo root with sysmlv2-parser and sysmlv2-cli crates";
+        :>> title = "Cargo workspace at repo root with keel-parser and keel-cli crates";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "A Cargo.toml workspace shall exist at the repo root containing sysmlv2-parser (library) and sysmlv2-cli (binary) crates; the workspace shall enforce edition = '2021' and resolver = '2'.";
+        :>> statement = "A Cargo.toml workspace shall exist at the repo root containing keel-parser (library) and keel-cli (binary) crates; the workspace shall enforce edition = '2021' and resolver = '2'.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
         :>> verificationMethod = VerificationMethod::test;
@@ -330,10 +330,10 @@ package ProjectArchitecture {
 
     requirement ssr06NoUnwrap : SubsystemRequirement {
         :>> id = "aa707cd5-3dc4-473b-b06c-bfe18da8434d";
-        :>> title = "All error types use thiserror; no panic paths in sysmlv2-parser/src/";
+        :>> title = "All error types use thiserror; no panic paths in keel-parser/src/";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "Every error type in sysmlv2-parser shall derive thiserror::Error; all Result return types shall use a typed error enum; no panic!, unwrap(), or expect() shall appear in src/ outside test modules; clippy::panics_disallowed shall be enabled.";
+        :>> statement = "Every error type in keel-parser shall derive thiserror::Error; all Result return types shall use a typed error enum; no panic!, unwrap(), or expect() shall appear in src/ outside test modules; clippy::panics_disallowed shall be enabled.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
         :>> verificationMethod = VerificationMethod::test;
@@ -344,7 +344,7 @@ package ProjectArchitecture {
         :>> title = "build.rs fetches grammar manifest; build fails on hash mismatch";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "sysmlv2-parser/build.rs shall define SYSML_V2_SPEC_URL pointing to the SysML v2 Release repo grammar manifest; on build, it shall verify the SHA256 of the grammar files matches the pinned SYSML_V2_GRAMMAR_SHA constant; SYSML_V2_SPEC_OFFLINE=1 skips the check.";
+        :>> statement = "keel-parser/build.rs shall define SYSML_V2_SPEC_URL pointing to the SysML v2 Release repo grammar manifest; on build, it shall verify the SHA256 of the grammar files matches the pinned SYSML_V2_GRAMMAR_SHA constant; SYSML_V2_SPEC_OFFLINE=1 skips the check.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::must;
         :>> verificationMethod = VerificationMethod::test;
@@ -355,7 +355,7 @@ package ProjectArchitecture {
         :>> title = "proptest strategies cover lexer and parser; cucumber BDD scenarios cover subcommands";
         :>> createdAt = "2026-06-12";
         :>> createdBy = "wweatherholtz";
-        :>> statement = "sysmlv2-parser shall have proptest-based property tests for all token types and parser productions; sysmlv2-cli shall have cucumber-rs BDD feature files for orient, validate, trace-need, and workflows subcommands; minimum 50 proptest cases per strategy.";
+        :>> statement = "keel-parser shall have proptest-based property tests for all token types and parser productions; keel-cli shall have cucumber-rs BDD feature files for orient, validate, trace-need, and workflows subcommands; minimum 50 proptest cases per strategy.";
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::should;
         :>> verificationMethod = VerificationMethod::test;
