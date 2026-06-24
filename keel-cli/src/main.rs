@@ -1084,8 +1084,23 @@ fn remap_engine_path(rel: &Path) -> PathBuf {
         .map_or_else(|_| rel.to_path_buf(), |rest| Path::new("reference").join("decisions").join(rest))
 }
 
+/// Engine-DEV-only embedded paths EXCLUDED from the `keel init` scaffold (D0093 boundary): the kernel/
+/// Python toolchain (`.engine/tools/` — validators, spikes, probes, migrations) + any compiled-Python
+/// cache. Downstream projects use the Rust path (`keel validate`/`guard`, D0048) and never need these;
+/// shipping them would baffle a conda-less consumer. The reusable engine (schema/workflows/processes/
+/// skills/decisions->reference/docs/views/contracts) still scaffolds.
+fn is_engine_dev_only(rel: &Path) -> bool {
+    rel.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy();
+        s == "tools" || s == "__pycache__"
+    }) || rel.extension().is_some_and(|e| e == "pyc")
+}
+
 fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
     let rel = f.path();
+    if is_engine_dev_only(rel) {
+        return Ok(()); // engine-dev-only (kernel/python toolchain) — not shipped to downstream projects
+    }
     let dst = dst_engine.join(remap_engine_path(rel));
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent)?;

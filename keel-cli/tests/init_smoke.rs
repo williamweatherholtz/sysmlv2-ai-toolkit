@@ -5,7 +5,7 @@
 //! console-arc retros flagged as missing (initSmokeTest).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -28,6 +28,22 @@ impl Drop for TmpProject {
     }
 }
 
+/// Count files under `dir` (recursively) matching `pred`.
+fn walk_count(dir: &Path, pred: &dyn Fn(&Path) -> bool) -> usize {
+    let mut n = 0;
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                n += walk_count(&p, pred);
+            } else if pred(&p) {
+                n += 1;
+            }
+        }
+    }
+    n
+}
+
 #[test]
 fn init_scaffolds_a_working_project() {
     let dir = unique_dir();
@@ -44,6 +60,10 @@ fn init_scaffolds_a_working_project() {
     // the new project's OWN decisions dir is created fresh + empty.
     assert!(dir.join(".engine").join("reference").join("decisions").is_dir(), "reference/decisions/ missing");
     assert!(dir.join(".engine").join("decisions").is_dir(), "fresh decisions/ missing");
+    // scaffoldEngineDevExclude: the engine-DEV-only kernel/Python toolchain must NOT ship downstream.
+    assert!(!dir.join(".engine").join("tools").exists(), ".engine/tools/ leaked into the scaffold (engine-dev only)");
+    let py = walk_count(&dir.join(".engine"), &|p| p.extension().is_some_and(|e| e == "py" || e == "pyc"));
+    assert_eq!(py, 0, "{py} python file(s) leaked into the scaffold (engine-dev only)");
 
     // 2. the fresh scaffold validates clean.
     let out = keel().args(["validate", proj]).output().expect("run keel validate");
