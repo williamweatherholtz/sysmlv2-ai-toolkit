@@ -38,7 +38,8 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"]];
+const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
   if(o.type==='assistant'&&o.message&&o.message.content)return o.message.content.map(b=>b.type==='text'?b.text:(b.type==='tool_use'?`\n[tool: ${b.name}]`:'')).join('');
@@ -85,8 +86,8 @@ async function openItem(name){
    // likely a task/action (not an authored part) — offer: critique it, or append a downstream TestResult
    m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>'+esc(name)+' <span class=pill>task?</span></h2>'+
     '<p class=muted>Not an authored model item — likely an action/task. You can critique it or append a downstream TestResult.</p>'+
-    '<div style="margin:8px 0"><button class=rb id=mcrit>Critique ▶</button> &nbsp; verdict <select id=trv><option>pass</option><option>fail</option></select> <button class=rb id=trbtn>Add TestResult</button></div>'+ACTLOG;
-   document.getElementById('mcrit').onclick=()=>runAgentModal('critique',name);
+    '<div style="margin:8px 0">'+(aiBridge?'<button class=rb id=mcrit>Critique ▶</button>':'<span class=muted>AI critique off — Settings</span>')+' &nbsp; verdict <select id=trv><option>pass</option><option>fail</option></select> <button class=rb id=trbtn>Add TestResult</button></div>'+ACTLOG;
+   if(aiBridge)document.getElementById('mcrit').onclick=()=>runAgentModal('critique',name);
    document.getElementById('trbtn').onclick=()=>addTestResult(name);
    return;
   }
@@ -95,9 +96,9 @@ async function openItem(name){
   const disp=d.type==='Issue'?'<button class=rb data-dv=act>Act</button><button class=rb data-dv=accept-risk>Accept-risk</button><button class=rb data-dv=dismiss>Dismiss</button>':'';
   m.innerHTML='<span class=x onclick="closeItem()">✕</span>'+
    '<h2>'+esc(d.name)+' <span class=pill>'+esc(d.type)+'</span>'+(d.marker?' <span class=pill>#'+esc(d.marker)+'</span>':'')+'</h2>'+
-   '<div style="margin:6px 0"><button class=rb id=mcrit>Critique ▶</button> '+disp+'</div>'+ACTLOG+
+   '<div style="margin:6px 0">'+(aiBridge?'<button class=rb id=mcrit>Critique ▶</button>':'<span class=muted>AI critique off — Settings</span>')+' '+disp+'</div>'+ACTLOG+
    '<table>'+attrs+'</table>'+edges(d.outgoing,'Outgoing →')+edges(d.incoming,'Incoming ←');
-  document.getElementById('mcrit').onclick=()=>runAgentModal('critique',d.name);
+  if(aiBridge)document.getElementById('mcrit').onclick=()=>runAgentModal('critique',d.name);
   [...m.querySelectorAll('.rb[data-dv]')].forEach(b=>b.onclick=()=>disposition(d.name,b.dataset.dv));
  }catch(e){m.innerHTML='<span class=x onclick="closeItem()">✕</span><p>error: '+esc(e.message)+'</p>'}
 }
@@ -147,6 +148,10 @@ async function render(){
     '<p class=muted><a href="/view/report/'+reportName+'" target=_blank>Open full HTML report ↗</a> &nbsp;·&nbsp; <a href="/view/diagram" target=_blank>Open model diagram ↗</a></p>'+
     '<h3 style="margin:6px 0">'+esc(r.title||reportName)+'</h3><div class=cards>'+(r.cards||[]).map(c=>card(c.label,c.value,esc(c.detail),c.tone)).join('')+'</div>';
    [...main.querySelectorAll('.rb[data-r]')].forEach(b=>b.onclick=()=>{reportName=b.dataset.r;render()});
+  } else if(active==='settings'){const s=await get('/api/settings');aiBridge=!!s.agentBridge;
+   main.innerHTML='<div class=row><div class=t><label><input type=checkbox id=abtog '+(aiBridge?'checked':'')+'> Enable AI agent bridge (in-console Critique)</label></div>'+
+    '<div class=m>Drives your local <code>claude -p</code> (headless). Auth = your subscription/enterprise login; never sets ANTHROPIC_API_KEY. CAVEAT (D0094): <code>claude -p</code> headless billing has been in flux and may bill as API — turn OFF if you want to avoid that. When OFF, the console is read/oversight-only and AI critique runs in your own Claude Code session. Persists to .keel-serve.json.</div></div>';
+   document.getElementById('abtog').onchange=async e=>{const v=e.target.checked;try{const r=await fetch('/api/settings',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agentBridge:v})});const j=await r.json();aiBridge=!!j.agentBridge;status.textContent='settings saved (agent bridge '+(aiBridge?'ON':'OFF')+')'}catch(err){status.textContent='settings error: '+err.message}};
   } else if(active==='history'){const h=await get('/api/history');
    if(!h.available){main.innerHTML='<p class=muted>'+esc(h.note||'no transcripts found')+'</p>';}
    else{main.innerHTML='<p class=muted>'+(h.sessions||[]).length+' session(s) · showing latest ('+esc(h.current_id)+'). Source: '+esc(h.dir)+' (read-only lens; never copied into the model).</p>'+
@@ -155,7 +160,8 @@ async function render(){
   status.textContent='live · updated '+new Date().toLocaleTimeString();
  }catch(e){status.textContent='error: '+e.message}
 }
-draw();render();
+// load the agent-bridge setting up front so Critique buttons reflect it (serveSettings), then draw
+fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).catch(()=>{}).finally(()=>{draw();render()});
 // pre-load the light views to warm the server-side cache so tab-switches are instant
 ['orient','decisions','dispositions','processes'].forEach(k=>fetch('/api/'+k).catch(()=>{}));
 // event-driven refresh: the server pushes `changed` only when the model's content fingerprint flips

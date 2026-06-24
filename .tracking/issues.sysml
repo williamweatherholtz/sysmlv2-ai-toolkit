@@ -562,4 +562,17 @@ package ProjectIssues {
     }
     #Resolves dependency from localGateMatchesCi to issue048;
     #ProcessDefect dependency from issue048 to d0047;
+
+    // ── serve agent-bridge billing risk (raised 2026-06-24) ──
+    part issue049 : Issue {
+        :>> id = "e0490049-0049-4e49-9049-516273840049";
+        :>> title = "serve agent-bridge drives `claude -p` (headless), whose billing has been in flux and may bill as API rather than the subscription";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "The serve agent-bridge (/api/agent/stream) spawns `claude -p` (headless print mode) for in-console Critique. We never set ANTHROPIC_API_KEY (so it uses the user's subscription/enterprise login, not API-key billing), but D0094 flagged that headless `claude -p` billing is IN FLUX with a history of mis-billing as API (a separate Agent-SDK credit pool was announced then paused). So in-console AI critique carries a real billing-uncertainty risk the user wants to be able to avoid. MITIGATION (resolver serveSettings): a PERSISTENT settings toggle (.keel-serve.json, default ON) to disable the agent bridge; when OFF, the console spawns no `claude -p` (read/oversight only) and AI critique runs in the user's own Claude Code session (subscription-billed). 'Fine for now, maybe not later' — the toggle lets the user turn it off if Anthropic's billing settles unfavorably. (External-dependency risk, not a process defect.)";
+        :>> discoveredInField = false;
+        :>> relatedTask = "serveSettings";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from serveSettings to issue049;
 }

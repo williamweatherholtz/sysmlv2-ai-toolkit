@@ -73,6 +73,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/disposition", post(api_disposition))
         .route("/view/report/:name", get(view_report))
         .route("/view/diagram", get(view_diagram))
+        // persistent serve settings (e.g. the agent-bridge toggle — claude -p billing control)
+        .route("/api/settings", get(api_settings_get).post(api_settings_post))
         // m3 — agent-bridge (headless claude -> SSE)
         .route("/api/agent/stream", get(api_agent_stream))
         // serveLiveCache — event-driven change push (SSE)
@@ -238,6 +240,44 @@ fn build_agent_prompt(target: &str) -> String {
     format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process. Do NOT git commit; the human commits.")
 }
 
+/// Persistent serve settings file (`<root>/.keel-serve.json`, gitignored). Project-local runtime
+/// preferences for `keel serve`; absent file => defaults.
+fn settings_path(root: &Path) -> PathBuf {
+    root.join(".keel-serve.json")
+}
+
+/// Whether the AI agent bridge (`claude -p`) is enabled (serveSettings).
+///
+/// DEFAULT ON ("fine for now") — a persistent toggle so a user wary of `claude -p` billing (the D0094
+/// caveat) can turn it OFF; when off, the console is pure read/oversight (no `claude -p` ever spawned).
+fn agent_bridge_enabled(root: &Path) -> bool {
+    std::fs::read_to_string(settings_path(root))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("agentBridge").and_then(serde_json::Value::as_bool))
+        .unwrap_or(true)
+}
+
+/// GET /api/settings — the persisted serve settings (defaults applied).
+async fn api_settings_get(State(s): State<AppState>) -> Response {
+    ok_json(format!("{{\"agentBridge\":{}}}", agent_bridge_enabled(&s.root)))
+}
+
+#[derive(serde::Deserialize)]
+struct SettingsReq {
+    #[serde(rename = "agentBridge")]
+    agent_bridge: bool,
+}
+
+/// POST /api/settings — persist serve settings (currently the agent-bridge toggle) to `.keel-serve.json`.
+async fn api_settings_post(State(s): State<AppState>, axum::Json(b): axum::Json<SettingsReq>) -> Response {
+    let body = format!("{{\"agentBridge\": {}}}\n", b.agent_bridge);
+    match std::fs::write(settings_path(&s.root), body) {
+        Ok(()) => ok_json(format!("{{\"ok\":true,\"agentBridge\":{}}}", b.agent_bridge)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
 /// Probe `PATH` for a `claude` executable WITHOUT spawning it (serveDownstreamDegrade). The agent
 /// bridge is optional: a downstream consumer who never installs Claude Code must get a CLEAR message,
 /// not a cryptic exit code. On Windows the CLI is an npm shim resolved via `cmd /C` — which always
@@ -285,6 +325,12 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
 
     let stream = async_stream::stream! {
         let _slot = slot; // dropped (counter--) when the stream finishes or the client disconnects
+        if !agent_bridge_enabled(&root) {
+            // serveSettings: the user disabled the `claude -p` bridge (billing control, D0094) — the
+            // console is read/oversight-only; AI critique runs in the user's own CLI/Claude Code session.
+            yield Ok(Event::default().event("error").data("the AI agent bridge is OFF in settings (it drives `claude -p`, whose billing is in flux \u{2014} D0094). Enable it in Settings, or run the critique in your own Claude Code session. The read console, views, and reports are unaffected."));
+            return;
+        }
         if !action_ok {
             // sr17 directed-only: the bridge serves exactly one recording action — critique.
             yield Ok(Event::default().event("error").data("only the `critique` action is supported \u{2014} the console has no free-form AI surface (sr17/D0098): every AI action is a directed, recorded critique of a named element. For free-form AI, open a terminal."));

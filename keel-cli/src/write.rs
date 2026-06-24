@@ -533,6 +533,35 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
     Ok(format!("{prefix}{n}"))
 }
 
+/// Append a `#Resolves` edge (`from` resolves `to`) before the file's package-closing brace (sr16/D0078).
+///
+/// Idempotent: a no-op if the exact edge already exists. Used when the console ACT-dispositions a finding
+/// and attaches a resolver task (the tracked-resolver half of the critique loop).
+///
+/// # Errors
+/// `WriteError::InsertionPointNotFound` if the file has no closing brace; `WriteError::Io`.
+pub fn append_resolves_edge(path: &Path, from: &str, to: &str) -> Result<(), WriteError> {
+    let content = std::fs::read_to_string(path)?;
+    let edge = format!("#Resolves dependency from {from} to {to};");
+    if content.contains(&edge) {
+        return Ok(()); // already linked
+    }
+    let lines: Vec<&str> = content.lines().collect();
+    let close = lines.iter().rposition(|l| l.trim() == "}").ok_or_else(|| WriteError::InsertionPointNotFound(to.to_owned()))?;
+    let mut out = String::with_capacity(content.len() + edge.len() + 6);
+    for (i, line) in lines.iter().enumerate() {
+        if i == close {
+            out.push_str("    ");
+            out.push_str(&edge);
+            out.push('\n');
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    std::fs::write(path, out)?;
+    Ok(())
+}
+
 /// Append a `Measurement` datapoint for an Indicator (D0089) as new linked items.
 ///
 /// Writes a `part <indicator>M<n> : Measurement { value, measuredAt, source, createdBy }` + a

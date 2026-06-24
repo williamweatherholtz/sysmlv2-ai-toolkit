@@ -51,6 +51,9 @@ node_modules/
 # Logs
 *.log
 
+# keel serve local runtime settings (per-clone preferences, e.g. the agent-bridge toggle)
+.keel-serve.json
+
 # Python bytecode cache
 __pycache__/
 *.pyc
