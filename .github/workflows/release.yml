@@ -1,0 +1,51 @@
+# Release pipeline (releaseWorkflow, D0093 deployment-readiness): on a `v*` tag, build the `keel`
+# binary natively on each OS (linux x86_64, macOS arm64, windows x86_64) and attach the binaries to a
+# GitHub Release, so downstream users get a prebuilt `keel` with NO Rust toolchain (D0093 spin-up).
+# The tag is the trigger (releaseTag010, human-signed); this workflow does the build + publish.
+# The build commands mirror the proven ci.yml gate (cargo --release). Rust-only; no conda/kernel.
+name: release
+on:
+  push:
+    tags: ['v*']
+  # manual smoke (build-only; no tag context => the publish step is skipped, see its `if`)
+  workflow_dispatch:
+
+permissions:
+  contents: write # required to create/update the GitHub Release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: keel-linux-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: keel-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: keel-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: build keel (release)
+        run: cargo build --release --target ${{ matrix.target }} --bin keel
+      - name: stage binary (unix)
+        if: runner.os != 'Windows'
+        run: cp "target/${{ matrix.target }}/release/keel" "${{ matrix.artifact }}"
+      - name: stage binary (windows)
+        if: runner.os == 'Windows'
+        run: copy "target\${{ matrix.target }}\release\keel.exe" "${{ matrix.artifact }}"
+      - name: attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}
+          generate_release_notes: true
