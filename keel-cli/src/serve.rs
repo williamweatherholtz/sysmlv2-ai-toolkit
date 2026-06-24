@@ -93,7 +93,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     println!("Keel console (D0094 m1+m2+m3) on http://{addr}  \u{2014} Ctrl-C to stop");
     println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
     println!("  act:   POST /api/disposition · /view/report/<name> · /view/diagram");
-    println!("  agent: /api/agent/stream?action=<critique|investigate|report>&target=<x> (SSE; local `claude` CLI)");
+    println!("  agent: /api/agent/stream?action=critique&target=<x> (SSE; local `claude` CLI; directed-only — sr17)");
     println!("  live:  /api/events (SSE change-push; views cached per content fingerprint)");
     println!("  (requests logged to the terminal + keel-serve.log)");
     if let Err(e) = axum::serve(listener, app).await {
@@ -229,15 +229,12 @@ struct AgentReq {
     target: String,
 }
 
-/// Build the agent prompt for a console action. The agent inherits CLAUDE.md discipline from the cwd;
-/// every prompt forbids committing (commits/acceptance stay the human's gate, D0016).
-fn build_agent_prompt(action: &str, target: &str) -> String {
-    match action {
-        "critique" => format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process. Do NOT git commit; the human commits."),
-        "investigate" => format!("Investigate the merits of `{target}`: read its context and linked items, judge whether it is sound or low-value, and explain your reasoning plus any recommendation. Read-only analysis: do not modify the model and do NOT git commit."),
-        "report" => format!("Run `keel report {target}` and summarize its health and opportunities in a few sentences. Read-only; do NOT git commit."),
-        other => format!("{other}: {target}. Follow CLAUDE.md discipline; do NOT git commit."),
-    }
+/// The only AI bridge action (sr17/D0098 directed-only): an antagonistic, RECORDING critique of a
+/// named element. There is deliberately no free-form / investigate / chat action — every AI action is
+/// directed at a named target and produces a recorded artifact (Issues). The agent inherits CLAUDE.md
+/// discipline from the cwd; the prompt forbids committing (commits/acceptance stay the human's gate, D0016).
+fn build_agent_prompt(target: &str) -> String {
+    format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process. Do NOT git commit; the human commits.")
 }
 
 /// Probe `PATH` for a `claude` executable WITHOUT spawning it (serveDownstreamDegrade). The agent
@@ -270,12 +267,15 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
     std::env::split_paths(path).any(|dir| candidates.iter().any(|c| dir.join(c).is_file()))
 }
 
-/// GET /api/agent/stream?action=&target= (D0094 m3) — spawn a headless `claude` agent in the repo and
-/// stream its `stream-json` events to the browser over SSE (not polling). Degrades gracefully if the
-/// `claude` CLI is absent; rejects past the concurrency cap; never sets `ANTHROPIC_API_KEY`.
+/// GET /api/agent/stream?action=critique&target= (D0094 m3; sr17 directed-only) — spawn a headless
+/// `claude` agent in the repo and stream its `stream-json` events to the browser over SSE. The ONLY
+/// accepted action is `critique` (the directed, RECORDING AI action — D0098/sr17: no free-form/chat/
+/// investigate); any other action is rejected. Degrades gracefully if `claude` is absent; rejects past
+/// the concurrency cap; never sets `ANTHROPIC_API_KEY`.
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = (*s.root).clone();
-    let prompt = build_agent_prompt(&q.action, &q.target);
+    let action_ok = q.action == "critique";
+    let prompt = build_agent_prompt(&q.target);
     let counter = Arc::clone(&s.agents);
     let prev = counter.fetch_add(1, Ordering::SeqCst);
     let over_cap = prev >= AGENT_MAX_CONCURRENT;
@@ -284,6 +284,11 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
 
     let stream = async_stream::stream! {
         let _slot = slot; // dropped (counter--) when the stream finishes or the client disconnects
+        if !action_ok {
+            // sr17 directed-only: the bridge serves exactly one recording action — critique.
+            yield Ok(Event::default().event("error").data("only the `critique` action is supported \u{2014} the console has no free-form AI surface (sr17/D0098): every AI action is a directed, recorded critique of a named element. For free-form AI, open a terminal."));
+            return;
+        }
         if over_cap {
             yield Ok(Event::default().event("error").data(format!("busy: {AGENT_MAX_CONCURRENT} agent runs already in flight \u{2014} try again shortly")));
             return;
