@@ -520,4 +520,32 @@ package ProjectIssues {
     #ProcessDefect dependency from issue034 to d0047;
     #ProcessDefect dependency from issue036 to d0047;
     #ProcessDefect dependency from issue039 to d0047;
+
+    // ── Requirement-rootedness gap (raised 2026-06-24): keel serve was built decision-first with no
+    //    driving Need, and nothing in the process catches that class. issue046 = the specific instance;
+    //    issue047 = the general process defect (its D0047 obligation is a permanent guard). ──
+    part issue046 : Issue {
+        :>> id = "e0460046-0046-4e46-9046-516273840046";
+        :>> title = "keel serve (D0094) was built decision-first with NO driving Need/SystemRequirement — the feature is untraceable + invisible to coverage/orphans/trace-need";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Assessing keel serve against 3 stakeholder use cases surfaced that NONE of the 14 Needs / 15 SystemRequirements concern serve/console/introspection/critique-UI, and D0094 carries no satisfy/charter edge from any Need. serve was chartered straight from D0094 (a Decision) -> backlog milestones (#CharteredBy d0094) -> ~12 delivery sprints, SKIPPING the Business->Architecture requirement layer. Consequence: the flagship oversight feature has zero Need/SystemRequirement nodes, so it is invisible to keel coverage / trace-need / orphans (nothing to be an orphan OF) and violates invariant #1 (requirement-driven, text-is-truth). It also forced an implementation-archaeology 'assessment' (reading console.html) instead of a requirement-conformance computation. FIX: author the 3 serve Needs + derived SystemRequirements (+ satisfy/verify) and retro-charter the existing serve work (serveRequirementsTrace).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "serveRequirementsTrace";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from serveRequirementsTrace to issue046;
+
+    part issue047 : Issue {
+        :>> id = "e0470047-0047-4e47-9047-516273840047";
+        :>> title = "No control ensures chartered work / shipped capabilities trace to a driving Need — requirement-rootedness is enforced only by vigilance";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "claudeOpus";
+        :>> description = "GENERAL process defect behind issue046: the engine has no forward control that a Decision which charters delivery work, or a shipped user-facing capability, traces (satisfy/derive) to a Need. The orphans view flags a Need with no Requirement, but NOTHING flags a capability with NO Need at all — so a whole feature (serve, issue046) can be built requirement-less and the engine cannot see it. Requirement-rootedness should be a KEY, un-ignorable element of the process, not something accidentally skippable (human directive, 2026-06-24). Per D0047 (corrections become guards) the obligation is a PERMANENT AUTOMATED GUARD, not vigilance. Resolver requirementRootednessGuard: record a Decision on the rule + scope (incl. exemptions like pure engine-internal refactors), then build it into keel guard (and/or an orphans-style view) that fails on an un-rooted capability.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "requirementRootednessGuard";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from requirementRootednessGuard to issue047;
+    #ProcessDefect dependency from issue047 to d0047;
 }
