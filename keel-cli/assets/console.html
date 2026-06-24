@@ -112,7 +112,12 @@ async function disposition(finding,verdict){
   const r=await fetch('/api/disposition',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({finding,verdict,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));
   if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
-  status.textContent='recorded '+j.name+' ('+j.verdict+') — refresh views';
+  status.textContent='recorded '+j.name+' ('+j.verdict+')';
+  // sr16: ACT attaches a tracked resolver (the fix is then done by the process-aware agent / you; re-verify = re-Critique).
+  if(verdict==='act'){
+   const title=prompt('ACT — describe the resolver (what the fix is):','');
+   if(title){try{const rr=await fetch('/api/resolver',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({finding,title})});const rj=await rr.json().catch(()=>({}));if(!rr.ok||rj.error)throw new Error(rj.error||('HTTP '+rr.status));status.textContent='ACT recorded + resolver '+rj.resolver+' attached'}catch(re){status.textContent='resolver error: '+re.message}}
+  }
   render();
  }catch(e){status.textContent='disposition error: '+e.message}
 }

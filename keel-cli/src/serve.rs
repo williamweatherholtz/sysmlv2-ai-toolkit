@@ -83,6 +83,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/item/:name", get(api_item))
         // serveItemActions — append a downstream TestResult to a task
         .route("/api/testresult", post(api_testresult))
+        // sr16 — on ACT, attach a tracked #Resolves resolver task to a finding
+        .route("/api/resolver", post(api_resolver))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -393,6 +395,38 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         yield Ok(Event::default().event("done").data(format!("agent finished (exit {code:?})")));
     };
     Sse::new(stream)
+}
+
+/// A request to attach a resolver to a finding (sr16): on ACT, create a tracked `#Resolves` task.
+#[derive(serde::Deserialize)]
+struct ResolverReq {
+    finding: String,
+    title: String,
+}
+
+/// POST /api/resolver (sr16) — the tracked-resolver half of the critique loop. Creates a resolver
+/// action in the backlog (`NextWork`) + a `#Resolves` edge from it to the finding, via the write API.
+/// Idempotent on re-click (existing task / edge are no-ops). The actual fix is then done by the
+/// process-aware agent / human; re-verify = re-run Critique on the element. Never auto-commits.
+async fn api_resolver(State(s): State<AppState>, axum::Json(b): axum::Json<ResolverReq>) -> Response {
+    // Resolver name = <finding-as-identifier>Fix (findings are SysML identifiers, e.g. issue046).
+    let base: String = b.finding.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+    if base.is_empty() {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"empty finding\"}".to_string()).into_response();
+    }
+    let resolver = format!("{base}Fix");
+    let title = b.title.replace('\\', "/").replace('"', "'").replace(['\n', '\r', '\t'], " ");
+    let backlog = s.root.join(".tracking").join("backlog.sysml");
+    let issues = s.root.join(".tracking").join("issues.sysml");
+    match crate::write::add_task(&backlog, "NextWork", &resolver, &title, "inspect") {
+        // Ok = created; TaskAlreadyExists = re-click (resolver exists) — both proceed to ensure the edge.
+        Ok(_) | Err(crate::write::WriteError::TaskAlreadyExists(_)) => {}
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+    match crate::write::append_resolves_edge(&issues, &resolver, &b.finding) {
+        Ok(()) => ok_json(format!("{{\"ok\":true,\"resolver\":\"{resolver}\"}}")),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
 }
 
 /// Wrap a raw JSON string body in a 200 response with the right content type.
