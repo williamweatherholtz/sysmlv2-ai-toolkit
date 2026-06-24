@@ -403,6 +403,27 @@ pub fn charter(root: &Path) -> GuardReport {
     GuardReport { name: "charter", scanned: added.len(), warnings: Vec::new(), violations }
 }
 
+/// Guard: requirement-rootedness (D0098/D0099, issue047).
+///
+/// A declared `#Capability` (a user-facing feature) must carry a `#DerivedFrom` edge to a Need. An
+/// HONESTY gate: shipping a capability whose driving Need is unstated is a traceability lie-of-omission.
+/// UNMARKED work is exempt — decision-driven engine evolution is legitimate (D0064), so this never
+/// floods (it binds only what is opted-in via the marker). The full charter-source balance is the
+/// non-blocking `keel rootedness` burndown.
+#[must_use]
+pub fn requirement_rootedness(root: &Path) -> GuardReport {
+    match crate::view::rootedness_gaps(root) {
+        Ok(gaps) => {
+            let violations = gaps
+                .into_iter()
+                .map(|c| format!("{c}: #Capability with no #DerivedFrom edge to a Need — state the driving Need (D0099)"))
+                .collect();
+            GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing rootedness: {e}")] },
+    }
+}
+
 // ── process-change keystone guard (D0070 hard lock) ────────────────────────────────────────────
 
 fn is_sysml(p: &str) -> bool {
@@ -536,7 +557,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
-    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy",
+    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness",
 ];
 
 /// The quoted value of `:>> {key} = "..."` on a line.
@@ -796,8 +817,8 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 11] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill"];
+pub const GUARD_NAMES: [&str; 12] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -816,6 +837,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "manifest-coverage" => Some(manifest_coverage(root)),
         "critic-independence" => Some(critic_independence(root)),
         "process-skill" => Some(process_skill(root)),
+        "requirement-rootedness" => Some(requirement_rootedness(root)),
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         "defect-guard-coverage" => Some(defect_guard_coverage(root)), // runnable-only (D0047/issue039)
         _ => None,

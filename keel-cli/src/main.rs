@@ -1269,6 +1269,7 @@ fn main() {
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("critique-policy") => cmd_critique_policy(rest),
+        Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),

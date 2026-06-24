@@ -1755,6 +1755,99 @@ pub fn critique_policy(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── requirement rootedness (D0098/issue047 — every chartered capability traces to a driving Need) ──
+// UPWARD integrity (an HONESTY check, not completeness): a delivery Story must reach a Need through its
+// #CharteredBy chain — directly (#CharteredBy a Need), via a SystemRequirement it charters to (the SR
+// `satisfy`-traces to a Need), or via a Decision carrying a #DerivedFrom edge to a Need. A Story that
+// reaches NO Need is UNROOTED: it ships work whose stakeholder justification is unstated (the serve
+// class, issue046). Computed from authored edges; nothing stored.
+
+fn rd_is_need(model: &Model, n: &str) -> bool {
+    model.items.get(n).is_some_and(|i| i.type_name == "Need")
+}
+/// A `SystemRequirement` reaches a Need iff some Need `satisfy`-traces to it (satisfy edge Need->SR).
+fn rd_sr_rooted(model: &Model, sr: &str) -> bool {
+    model.edges.iter().any(|e| e.kind == "satisfy" && e.to == sr && rd_is_need(model, &e.from))
+}
+/// An item reaches a Need iff it carries a `#DerivedFrom`/`derive` edge to a Need.
+fn rd_derives_need(model: &Model, item: &str) -> bool {
+    model.edges.iter().any(|e| matches!(e.kind.as_str(), "derivedfrom" | "derive") && e.from == item && rd_is_need(model, &e.to))
+}
+/// Whether an item carries the `#Capability` marker (a user-facing feature — D0099).
+fn rd_is_capability(model: &Model, item: &str) -> bool {
+    model.items.get(item).and_then(|i| i.marker.as_deref()).is_some_and(|m| m.trim_start_matches('#').eq_ignore_ascii_case("capability"))
+}
+
+/// Charter class of a delivery Story (D0098 rootedness burndown).
+///
+/// `need` = its charter reaches a Need (directly, via a satisfy'd `SystemRequirement`, or via a
+/// Decision `#DerivedFrom` a Need); `decision` = chartered by a Decision (legitimate decision-driven
+/// engine evolution, D0064); `orphan` = no `#CharteredBy` edge at all.
+fn rd_charter_class(model: &Model, story: &str) -> &'static str {
+    let charters: Vec<&String> =
+        model.edges.iter().filter(|e| e.kind == "charteredby" && e.from == story).map(|e| &e.to).collect();
+    if charters.is_empty() {
+        return "orphan";
+    }
+    let reaches_need = charters.iter().any(|t| {
+        let tk = model.items.get(*t).map_or("", |i| i.type_name.as_str());
+        tk == "Need" || (tk == "SystemRequirement" && rd_sr_rooted(model, t)) || rd_derives_need(model, t)
+    });
+    if reaches_need {
+        "need"
+    } else {
+        "decision"
+    }
+}
+
+/// `#Capability` items lacking a `#DerivedFrom` edge to a Need — the requirement-rootedness HARD gate
+/// set (D0099): a declared user-facing capability whose driving Need is unstated. Sorted. (Unmarked
+/// work is exempt — decision-driven engine evolution is legitimate, D0064.)
+fn capability_root_violations(model: &Model) -> Vec<String> {
+    let mut out: Vec<String> = model
+        .items
+        .keys()
+        .filter(|name| rd_is_capability(model, name) && !rd_derives_need(model, name))
+        .cloned()
+        .collect();
+    out.sort();
+    out
+}
+
+/// `#Capability` items with no `#DerivedFrom`->Need link (the rootedness gap set for `guard requirement-rootedness`).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn rootedness_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
+    Ok(capability_root_violations(&Model::build(root)?))
+}
+
+/// Requirement-rootedness view (D0098/D0099, issue047): the charter-source BURNDOWN (need-rooted vs
+/// decision-driven vs orphan) over all delivery Stories, plus the `#Capability` gate set.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn rootedness(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut stories: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
+    stories.sort();
+    let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
+    let class_of: Vec<(&String, &str)> = stories.iter().map(|s| (*s, rd_charter_class(&model, s))).collect();
+    let count = |k: &str| class_of.iter().filter(|(_, c)| *c == k).count();
+    let orphans: Vec<Json> = class_of.iter().filter(|(_, c)| *c == "orphan").map(|(s, _)| Json::s((*s).clone())).collect();
+    let gate: Vec<Json> = capability_root_violations(&model).into_iter().map(Json::s).collect();
+    let out = Json::Obj(vec![
+        ("rootedness".to_string(), Json::s("requirement rootedness (D0098/D0099, issue047): charter-source burndown over delivery Stories — `need` reaches a Need, `decision` is legitimate decision-driven engine evolution (D0064), `orphan` has no charter. The HARD gate (`guard requirement-rootedness`) fires only on a #Capability item with no #DerivedFrom->Need.")),
+        ("total".to_string(), n(stories.len())),
+        ("need_rooted".to_string(), n(count("need"))),
+        ("decision_chartered".to_string(), n(count("decision"))),
+        ("orphan".to_string(), n(count("orphan"))),
+        ("orphans".to_string(), Json::Arr(orphans)),
+        ("capability_violations".to_string(), Json::Arr(gate)),
+    ]);
+    Ok(out.dump())
+}
+
 // ── assurance readiness (D0079 c — the composite capstone gate) ───────────────────────────────
 // `assured` composes the whole assurance picture into ONE verdict: the deliverable is READY iff
 // (1) coverage complete (every Need/Requirement/Decision covered), (2) critique complete (every

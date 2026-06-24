@@ -159,6 +159,15 @@ package EngineViewpoints {
         :>> renderer = "keel reprocess-candidates";
     }
 
+    part rootednessVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a099-516273849699";
+        :>> title = "rootedness";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Is every chartered capability rooted in a driving Need — and what is the charter-source balance (need-rooted vs legitimate decision-driven evolution vs orphan)? (D0098/D0099/issue047)";
+        :>> audience = "maintainer / reviewer / auditor";
+        :>> sources = "delivery Story #CharteredBy chains -> Need (direct / via satisfy'd SystemRequirement / via a Decision #DerivedFrom a Need); the #Capability marker + its #DerivedFrom->Need link (the hard-gate set)";
+        :>> renderer = "keel rootedness (+ the requirement-rootedness guard for the #Capability hard gate)";
+    }
     part critiquePolicyVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a097-516273849697";
         :>> title = "critique-policy";
