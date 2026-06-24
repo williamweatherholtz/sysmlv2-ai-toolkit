@@ -362,6 +362,67 @@ package ProjectArchitecture {
     }
 
     // ====================================================================
+    // serve console SystemRequirements (serveRequirementsTrace / issue046) — derived from the serve
+    // Needs (n15-n17). Authored requirement-first (D0098): currently UNVERIFIED — the burndown shows
+    // them as the serve-redesign backlog (no fake passes). verificationMethod names the intended method.
+    // ====================================================================
+    requirement sr15ServeIntrospect : SystemRequirement {
+        :>> id = "5e150015-1015-4015-9015-516273845115";
+        :>> title = "Live introspection: current state + recent decisions with full context";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> statement = "The console shall present current state computed live (ready / blocked / suspect / open-issues), decisions ordered newest-first each with full context / decision / rationale / consequences, and a git-derived recent-activity timeline of changed elements.";
+        :>> rationale = "Introspection with recency is the maintainer's primary oversight lens; without newest-first + a change timeline, 'what happened recently and why' requires reading source.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement sr16ServeCritiqueLoop : SystemRequirement {
+        :>> id = "5e160016-1016-4016-9016-516273845116";
+        :>> title = "Recorded critique loop: finding -> disposition -> implement -> re-verify";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> statement = "A directed Critique on a named element shall record each finding as a severity-carrying Issue linked to the element; a >= Medium finding shall require a typed human disposition, and ACT shall attach a resolver the console can drive to implementation and re-verification; an unresolved or failed critique shall induce suspicion on its target until resolved.";
+        :>> rationale = "Critique is only valuable if it persists and closes the loop; transient analysis that is read and lost cannot be reviewed, implemented, or remembered.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement sr17ServeDirectedNoChat : SystemRequirement {
+        :>> id = "5e170017-1017-4017-9017-516273845117";
+        :>> title = "Directed actions only — no free-form AI chat surface";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> statement = "The console shall provide no free-form AI chat surface; every AI action shall be directed at a named target or section and shall produce a recorded artifact.";
+        :>> rationale = "A clean, directed experience: an ad-hoc AI terminal muddies the waters and yields unrecorded output; if free-form AI is wanted, a terminal already exists. (A constraint-style quality requirement, D0088.)";
+        :>> kind = RequirementKind::nonFunctional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::inspect;
+    }
+    requirement sr18ServeSectionCritique : SystemRequirement {
+        :>> id = "5e180018-1018-4018-9018-516273845118";
+        :>> title = "Section-local rendering + recorded section-scoped critique";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> statement = "The console shall render a bounded section (a declared view, or an element plus its typed-edge neighbourhood) and record section-scoped critique findings against that section's elements.";
+        :>> rationale = "Granular refinement of small perfected sections compounds into best-in-class quality; whole-model views are too coarse for local 'does X make sense' critique.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement sr19ServeWhiteboxBoundary : SystemRequirement {
+        :>> id = "5e190019-1019-4019-9019-516273845119";
+        :>> title = "AI white-box analysis over definable system boundaries";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> statement = "The engine shall support AI white-box analysis over a defined system boundary — boundaries definable both as AI-proposed clusters and as human-declared views — critiquing each subsystem for concision, requirement purity, and indicator quality, and recording per-boundary findings; the tier-satisfaction (driver) analysis is a first such boundary sweep.";
+        :>> rationale = "Driving each bounded subsystem toward purer requirements/better indicators is a force-multiplier; tier-satisfaction comprehensiveness (D0098) is the first chained white-box target.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::demo;
+    }
+
+    // ====================================================================
     // Phase: allocIface — satisfy edges + allocate edges
     //
     // satisfy <need> by <systemRequirement>: SR satisfies the upstream Need.
@@ -383,6 +444,13 @@ package ProjectArchitecture {
     satisfy n12PanicFree by sr12DenyWarnings;
     satisfy n13SpecPin by sr13SpecPin;
     satisfy n14TddBdd by sr14TddBdd;
+
+    // serve console (serveRequirementsTrace / issue046) — a Need may be satisfied by multiple SRs.
+    satisfy n15ServeIntrospect by sr15ServeIntrospect;
+    satisfy n16ServeCritiqueLoop by sr16ServeCritiqueLoop;
+    satisfy n16ServeCritiqueLoop by sr17ServeDirectedNoChat;
+    satisfy n17ServeGranularWhitebox by sr18ServeSectionCritique;
+    satisfy n17ServeGranularWhitebox by sr19ServeWhiteboxBoundary;
 
     allocate sr01TypedItems to schemaCoreComp;
     allocate sr02DecisionRecord to trackingData;

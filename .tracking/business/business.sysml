@@ -431,4 +431,47 @@ package ProjectBusiness {
     #DependsOn dependency from n12PanicFree to projectBrief;
     #DependsOn dependency from n13SpecPin to projectBrief;
     #DependsOn dependency from n14TddBdd to projectBrief;
+
+    // ====================================================================
+    // serve console Needs (serveRequirementsTrace / issue046) — the driving Needs the `keel serve`
+    // capability (D0094) was built decision-first WITHOUT (a traceability gap). Authored requirement-
+    // first (D0098: an uncovered/unverified Need is honest burndown, not a blocker); d0094 #DerivedFrom
+    // these, so serve's work reclassifies need-rooted in the rootedness burndown (D0099). Accepted by
+    // wweatherholtz (Need 3 = must; boundaries = AI-proposed + human-declared).
+    // ====================================================================
+    requirement n15ServeIntrospect : Need {
+        :>> id = "5e150015-0015-4015-9015-516273845015";
+        :>> title = "Strong introspection into work state, especially recent decisions with context";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "A maintainer can, at a glance, understand the current state of the work and the recent reasoning behind it — especially what was decided recently and why (full context) — without reading source files or prose status.";
+        :>> priority = Priority::must;
+    }
+    requirement n16ServeCritiqueLoop : Need {
+        :>> id = "5e160016-0016-4016-9016-516273845016";
+        :>> title = "Ad-hoc element critique that is recorded, implemented, and remembered";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "A maintainer can critique any project element ad-hoc and trust the critique is recorded as a durable finding, driven to implementation, and remembered (re-surfaced until resolved) — never lost as transient chat.";
+        :>> priority = Priority::must;
+    }
+    requirement n17ServeGranularWhitebox : Need {
+        :>> id = "5e170017-0017-4017-9017-516273845017";
+        :>> title = "Concise section-local critique + AI white-box system-boundary analysis";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "A maintainer can examine and critique a small bounded section of the model locally (an element plus its immediate I/O neighbours) to drive granular refinement toward concision, purer requirements, and better indicators — and can have AI perform this white-box analysis system-by-system over defined boundaries.";
+        :>> priority = Priority::must;
+    }
+
+    // Root serve to its Needs (issue046): d0094 (the decision that built serve) #DerivedFrom these
+    // Needs. (d0094 already carries #ProspectiveChange; the model allows one marker per item, so the
+    // #Capability hard-gate marker — for greenfield capabilities — is not stacked here; serve's
+    // rootedness is established by these derive edges, reclassifying its work need-rooted.)
+    #DerivedFrom dependency from d0094 to n15ServeIntrospect;
+    #DerivedFrom dependency from d0094 to n16ServeCritiqueLoop;
+    #DerivedFrom dependency from d0094 to n17ServeGranularWhitebox;
 }
