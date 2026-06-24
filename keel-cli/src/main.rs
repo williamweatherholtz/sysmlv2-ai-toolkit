@@ -47,6 +47,11 @@ const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\
 /// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
 /// engine/instance boundary). The new project adds entries as it builds source-dependent verifications.
 const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE\n# files (D0050), so `keel suspect` flags a task suspect when its source changed since it was\n# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...\n# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.\n";
+/// A starter actor registry scaffolded into a fresh project (`.tracking/actors.sysml`). Without it
+/// the newcomer's FIRST recorded fact (any `createdBy`/`judgedBy`) fails the actors guard (D0037) —
+/// there'd be no `ProjectActors` to reference. Ships placeholder actors (a human + the AI) the newcomer
+/// edits to their real identities; the declared part name is the id that `createdBy`/`judgedBy` reference.
+const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry (INSTANCE data). EDIT to your real actors.\n// The declared part name is the id that createdBy/judgedBy reference (enforced by `keel guard actors`).\npackage ProjectActors {\n    private import EngineElement::*;\n\n    part you : Person { :>> name = \"Your Name\"; :>> email = \"you@example.com\"; }\n    part ai : Actor { :>> name = \"AI assistant\"; :>> kind = ActorKind::ai; }\n}\n";
 /// A RUST-ONLY pre-commit gate scaffolded into a fresh project (`.githooks/pre-commit`). Runs
 /// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
 /// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
@@ -1169,6 +1174,12 @@ fn cmd_init(args: &[String]) -> i32 {
     }
     if let Err(e) = std::fs::write(tracking.join("README.md"), TRACKING_STARTER) {
         eprintln!("error writing .tracking/README.md: {e}");
+        return 1;
+    }
+    // A starter actor registry so the newcomer's first recorded fact (createdBy/judgedBy) passes the
+    // actors guard (D0037) — they edit it to their real identities.
+    if let Err(e) = std::fs::write(tracking.join("actors.sysml"), STARTER_ACTORS) {
+        eprintln!("error writing .tracking/actors.sysml: {e}");
         return 1;
     }
     // Scaffold a RUST-ONLY commit gate (.githooks/pre-commit) so the project has an automated

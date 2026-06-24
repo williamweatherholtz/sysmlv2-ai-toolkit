@@ -19,7 +19,6 @@ package TrackingTemplate {
 
     // -- a Business-phase artifact: the project brief --
     part exampleBrief : Brief {
-        :>> id = "8b072149-43ca-430f-89d7-e9acf8773bf4";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000001";
         :>> title = "Example project brief";
         :>> createdAt = "2026-06-11";
@@ -30,7 +29,6 @@ package TrackingTemplate {
 
     // -- a Need, traced to by later requirements via native `satisfy` --
     requirement exampleNeed : Need {
-        :>> id = "4104b609-8d64-49d1-b795-c9651b22b5e4";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000002";
         :>> title = "Example need";
         :>> source = NeedSource::customer;
@@ -40,7 +38,6 @@ package TrackingTemplate {
 
     // -- a scope-cut Decision (captured even though it produces no action) --
     part exampleDecision : Decision {
-        :>> id = "584746d4-7277-4b07-ac30-c5153debee57";
         :>> id = "3f1c9a2e-0000-4000-8000-000000000003";
         :>> title = "Example: we will not pursue X";
         :>> status = DecisionStatus::accepted;

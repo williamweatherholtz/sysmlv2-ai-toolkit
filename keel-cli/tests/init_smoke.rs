@@ -68,6 +68,8 @@ fn init_scaffolds_a_working_project() {
     let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
     assert!(hook.contains("keel") && hook.contains("validate") && hook.contains("guard"), "pre-commit gate missing keel validate/guard");
     assert!(!hook.contains("conda") && !hook.contains("python") && !hook.contains(".py"), "pre-commit gate must be kernel-free (no conda/python)");
+    // introductionDryRun: a starter actor registry must ship so the newcomer's first recorded fact passes the actors guard.
+    assert!(dir.join(".tracking").join("actors.sysml").is_file(), ".tracking/actors.sysml not scaffolded (newcomer can't record facts)");
 
     // 2. the fresh scaffold validates clean.
     let out = keel().args(["validate", proj]).output().expect("run keel validate");
