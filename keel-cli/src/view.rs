@@ -10,7 +10,7 @@
 //! dependency-markers / succession). COMPUTED attrs (done/ready/governingVersion), `verify`/`:>`
 //! edges, temporal predicates are M1b (tracked).
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 use serde::Deserialize;
@@ -35,6 +35,8 @@ pub enum ViewError {
     UnknownMode(String),
     #[error("unknown report '{0}' (expected: assurance, traceability, quality-debt, flow, governance, friction)")]
     UnknownReport(String),
+    #[error("invalid critique policy: {0}")]
+    Policy(String),
 }
 
 // ── the declared view (TOML) ────────────────────────────────────────────────
@@ -1326,22 +1328,100 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
 // An antagonistic critique is a `method=critique` Test with a `lens`, `#Verify`-linked to its
 // target (parsed as a "verify" marker-edge), with a result by an INDEPENDENT critic (the result's
 // judgedBy must differ from the target's createdBy). An element is critique-COVERED iff every
-// REQUIRED lens for its type has such a critique. Required-lens policy (Core-3, human-accepted):
-// Need/SystemRequirement -> completeness/correctness/testability; Decision -> completeness/
-// correctness/feasibility. Honest by construction: with no critiques recorded, every element is
-// uncovered. (Full git-temporal critique-staleness reuses the suspect machinery — a later step.)
+// REQUIRED lens for its type has such a critique. The required-lens policy is DECLARED, not hardcoded
+// (D0097): read from `.engine/contracts/critique-policy.toml` (downstream-overridable), with the
+// "Core-3" default (Need/SystemRequirement -> completeness/correctness/testability; Decision ->
+// completeness/correctness/feasibility) as the built-in fallback when the file is absent. Honest by
+// construction: with no critiques recorded, every element is uncovered. (Git-temporal critique-
+// staleness reuses the suspect machinery.)
 
-/// Required critique lenses per assurance-element type (Core-3, D0080). Empty for non-targets.
-fn required_lenses(type_name: &str) -> &'static [&'static str] {
-    match type_name {
-        "Need" | "SystemRequirement" => &["completeness", "correctness", "testability"],
-        "Decision" => &["completeness", "correctness", "feasibility"],
-        _ => &[],
+/// The seven `CritiqueLens` variants (schema/core `element.sysml`) — the requirement-quality canon.
+/// A declared policy lens MUST be one of these (fail-loud otherwise).
+const CANON_LENSES: [&str; 7] =
+    ["completeness", "correctness", "ambiguity", "testability", "feasibility", "consistency", "necessity"];
+
+/// The declared critique policy (D0097): required critique lenses per assurance-element type.
+///
+/// Read from `.engine/contracts/critique-policy.toml`. A type with a non-empty lens list is a critique
+/// TARGET; each listed lens needs an independent `method=critique` verification for an element of that
+/// type to be critique-covered. Downstream projects override the file; absent it, the built-in Core-3
+/// applies.
+pub struct CritiquePolicy {
+    lenses: BTreeMap<String, Vec<String>>,
+    from_file: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CritiquePolicyFile {
+    #[serde(default)]
+    lenses: BTreeMap<String, Vec<String>>,
+}
+
+impl CritiquePolicy {
+    /// The built-in Core-3 default (D0080) — identical to the shipped `critique-policy.toml`, used as
+    /// the fallback when no policy file is present so behavior is unchanged with or without the file.
+    fn core3() -> Self {
+        let mut lenses = BTreeMap::new();
+        let req = || vec!["completeness".to_string(), "correctness".to_string(), "testability".to_string()];
+        lenses.insert("Need".to_string(), req());
+        lenses.insert("SystemRequirement".to_string(), req());
+        lenses.insert(
+            "Decision".to_string(),
+            vec!["completeness".to_string(), "correctness".to_string(), "feasibility".to_string()],
+        );
+        Self { lenses, from_file: false }
+    }
+
+    /// Load the declared policy from `.engine/contracts/critique-policy.toml`, falling back to the
+    /// built-in Core-3 default when the file is absent. Validates every lens name against the canon.
+    ///
+    /// # Errors
+    /// Returns [`ViewError::Toml`] if the file is malformed, or [`ViewError::Policy`] if it lists an
+    /// unknown lens name.
+    pub fn load(root: &Path) -> Result<Self, ViewError> {
+        let path = root.join(".engine").join("contracts").join("critique-policy.toml");
+        let Ok(text) = std::fs::read_to_string(&path) else { return Ok(Self::core3()) };
+        let parsed: CritiquePolicyFile =
+            toml::from_str(&text).map_err(|e| ViewError::Toml(path.display().to_string(), Box::new(e)))?;
+        for (ty, lenses) in &parsed.lenses {
+            for l in lenses {
+                if !CANON_LENSES.contains(&l.as_str()) {
+                    return Err(ViewError::Policy(format!(
+                        "type '{ty}' lists unknown lens '{l}' (valid: {})",
+                        CANON_LENSES.join(" | ")
+                    )));
+                }
+            }
+        }
+        Ok(Self { lenses: parsed.lenses, from_file: true })
+    }
+
+    /// Lenient load for ADVISORY aggregate reports: falls back to the Core-3 default on any error. A
+    /// malformed policy is surfaced loudly by `critique-coverage` / `guard critique` (same gate), so the
+    /// report cards needn't re-raise it.
+    fn load_or_core3(root: &Path) -> Self {
+        Self::load(root).unwrap_or_else(|_| Self::core3())
+    }
+
+    /// Required critique lenses for an element type (empty slice for non-targets).
+    fn required_lenses(&self, type_name: &str) -> &[String] {
+        self.lenses.get(type_name).map_or(&[], Vec::as_slice)
+    }
+
+    /// Whether an element TYPE is a critique target (has >= 1 required lens declared).
+    fn is_target_type(&self, type_name: &str) -> bool {
+        self.lenses.get(type_name).is_some_and(|v| !v.is_empty())
+    }
+
+    /// The declared target types, sorted (the `BTreeMap` keeps them ordered).
+    fn target_types(&self) -> impl Iterator<Item = &String> {
+        self.lenses.iter().filter(|(_, v)| !v.is_empty()).map(|(k, _)| k)
     }
 }
 
 struct LensStatus {
-    lens: &'static str,
+    lens: String,
     critiqued: bool,
     critic: Option<String>,  // result judgedBy (independent of the target author)
     outcome: Option<String>, // pass = survived the lens; fail = a finding was raised
@@ -1354,12 +1434,21 @@ struct CritiqueCoverage {
     covered: bool, // every required lens critiqued
 }
 
-fn compute_critique_coverage<S: std::hash::BuildHasher>(model: &Model, stale: &HashSet<String, S>) -> Vec<CritiqueCoverage> {
-    // Same target scope as assurance coverage: Needs, SystemRequirements, accepted Decisions.
-    let is_target = |i: &ItemInfo| match i.type_name.as_str() {
-        "Need" | "SystemRequirement" => true,
-        "Decision" => i.attrs.get("status").map(String::as_str) == Some("accepted"),
-        _ => false,
+fn compute_critique_coverage<S: std::hash::BuildHasher>(
+    model: &Model,
+    stale: &HashSet<String, S>,
+    policy: &CritiquePolicy,
+) -> Vec<CritiqueCoverage> {
+    // Targets = the policy's declared types (D0097). Decisions are critiqued only once accepted (an
+    // accepted Decision is a final commitment) — that accepted-only rule is intrinsic, not config.
+    let is_target = |i: &ItemInfo| {
+        if !policy.is_target_type(&i.type_name) {
+            return false;
+        }
+        if i.type_name == "Decision" {
+            return i.attrs.get("status").map(String::as_str) == Some("accepted");
+        }
+        true
     };
     let mut targets: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| is_target(i)).collect();
     targets.sort_by(|a, b| a.0.cmp(b.0));
@@ -1367,9 +1456,11 @@ fn compute_critique_coverage<S: std::hash::BuildHasher>(model: &Model, stale: &H
         .into_iter()
         .map(|(name, info)| {
             let author = info.attrs.get("createdBy").map_or("", String::as_str);
-            let lenses: Vec<LensStatus> = required_lenses(&info.type_name)
+            let lenses: Vec<LensStatus> = policy
+                .required_lenses(&info.type_name)
                 .iter()
-                .map(|&lens| {
+                .map(|lens| {
+                    let lens = lens.as_str();
                     // A critique of this element via this lens: a verify-edge (critique -> element)
                     // whose source is a method=critique Test with this lens, having an independent result.
                     let mut critiqued = false;
@@ -1401,7 +1492,7 @@ fn compute_critique_coverage<S: std::hash::BuildHasher>(model: &Model, stale: &H
                             }
                         }
                     }
-                    LensStatus { lens, critiqued, critic, outcome }
+                    LensStatus { lens: lens.to_string(), critiqued, critic, outcome }
                 })
                 .collect();
             let covered = !lenses.is_empty() && lenses.iter().all(|l| l.critiqued);
@@ -1431,9 +1522,10 @@ fn governed(grandfathered: Option<&HashSet<String>>, name: &str) -> bool {
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
     let model = Model::build(root)?;
+    let policy = CritiquePolicy::load(root)?;
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
     let stale = compute_stale_verifications(root, &model);
-    Ok(compute_critique_coverage(&model, &stale)
+    Ok(compute_critique_coverage(&model, &stale, &policy)
         .into_iter()
         .filter(|c| !c.covered && governed(gf.as_ref(), &c.element))
         .map(|c| c.element)
@@ -1566,21 +1658,23 @@ pub fn critique_rigor(root: &Path) -> Result<Vec<String>, ViewError> {
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
+    let policy = CritiquePolicy::load(root)?;
     let stale = compute_stale_verifications(root, &model);
-    let cov = compute_critique_coverage(&model, &stale);
+    let cov = compute_critique_coverage(&model, &stale, &policy);
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
     let in_scope = |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element);
 
-    // Summary over GOVERNED elements only (the grandfathered ones aren't required).
+    // Summary over GOVERNED elements only (the grandfathered ones aren't required); per the policy's
+    // DECLARED target types (D0097), so a downstream-added target type is summarized too.
     let mut summary: Vec<Json> = Vec::new();
-    for ty in ASSURANCE_TYPES {
-        let rows: Vec<&CritiqueCoverage> = cov.iter().filter(|c| c.type_name == ty && in_scope(c)).collect();
+    for ty in policy.target_types() {
+        let rows: Vec<&CritiqueCoverage> = cov.iter().filter(|c| &c.type_name == ty && in_scope(c)).collect();
         if rows.is_empty() {
             continue;
         }
         let covered = i64::try_from(rows.iter().filter(|c| c.covered).count()).unwrap_or(i64::MAX);
         summary.push(Json::Obj(vec![
-            ("type".to_string(), Json::s(ty)),
+            ("type".to_string(), Json::s(ty.clone())),
             ("governed".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX))),
             ("covered".to_string(), Json::Int(covered)),
             ("uncovered".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(i64::MAX) - covered)),
@@ -1595,7 +1689,7 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
                 .iter()
                 .map(|l| {
                     Json::Obj(vec![
-                        ("lens".to_string(), Json::s(l.lens)),
+                        ("lens".to_string(), Json::s(l.lens.clone())),
                         ("critiqued".to_string(), Json::Bool(l.critiqued)),
                         ("critic".to_string(), l.critic.clone().map_or(Json::Null, Json::s)),
                         ("outcome".to_string(), l.outcome.clone().map_or(Json::Null, Json::s)),
@@ -1618,11 +1712,45 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let out = Json::Obj(vec![
         (
             "critique".to_string(),
-            Json::s("critique-coverage: GOVERNED Need/SystemRequirement/Decision (created after D0080, charter-time D0081) x required lens (Core-3) -> an independent method=critique verification #Verify-linked to the element"),
+            Json::s("critique-coverage: GOVERNED elements (created after D0080, charter-time D0081) of each declared target type (critique-policy.toml, D0097) x required lens -> an independent method=critique verification #Verify-linked to the element"),
         ),
         ("summary".to_string(), Json::Arr(summary)),
         ("gaps".to_string(), Json::Arr(gaps)),
         ("elements".to_string(), Json::Arr(elements)),
+    ]);
+    Ok(out.dump())
+}
+
+/// The ACTIVE critique policy (D0097) as JSON: the source (declared file vs built-in default) + the
+/// required lenses per target type. Lets a project confirm an override took effect. Honest, computed.
+///
+/// # Errors
+/// Returns [`ViewError::Toml`]/[`ViewError::Policy`] if the policy file is malformed or names an
+/// unknown lens.
+pub fn critique_policy(root: &Path) -> Result<String, ViewError> {
+    let policy = CritiquePolicy::load(root)?;
+    let types: Vec<Json> = policy
+        .lenses
+        .iter()
+        .map(|(ty, lenses)| {
+            Json::Obj(vec![
+                ("type".to_string(), Json::s(ty.clone())),
+                ("lenses".to_string(), Json::Arr(lenses.iter().map(|l| Json::s(l.clone())).collect())),
+                ("target".to_string(), Json::Bool(!lenses.is_empty())),
+            ])
+        })
+        .collect();
+    let out = Json::Obj(vec![
+        (
+            "critique_policy".to_string(),
+            Json::s("required antagonistic critique lenses per assurance-element type (D0097); a type with >=1 lens is a critique target"),
+        ),
+        (
+            "source".to_string(),
+            Json::s(if policy.from_file { ".engine/contracts/critique-policy.toml" } else { "built-in Core-3 default (no policy file)" }),
+        ),
+        ("canon".to_string(), Json::Arr(CANON_LENSES.iter().map(|l| Json::s(*l)).collect())),
+        ("types".to_string(), Json::Arr(types)),
     ]);
     Ok(out.dump())
 }
@@ -1704,7 +1832,7 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
         .filter(|c| !is_covered_tier(c.tier) && governed(gf_cov.as_ref(), &c.element))
         .map(|c| c.element)
         .collect();
-    let critique_gaps: Vec<String> = compute_critique_coverage(&model, &stale)
+    let critique_gaps: Vec<String> = compute_critique_coverage(&model, &stale, &CritiquePolicy::load(root)?)
         .into_iter()
         .filter(|c| !c.covered && governed(gf_crit.as_ref(), &c.element))
         .map(|c| c.element)
@@ -1862,7 +1990,7 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
     }
     // Decisions with FULL Core-3 critique coverage (so `uncritiqued` = not in this set).
     let stale = compute_stale_verifications(root, &model);
-    let critiqued: HashSet<String> = compute_critique_coverage(&model, &stale)
+    let critiqued: HashSet<String> = compute_critique_coverage(&model, &stale, &CritiquePolicy::load(root)?)
         .into_iter()
         .filter(|c| c.covered && c.type_name == "Decision")
         .map(|c| c.element)
@@ -2057,7 +2185,7 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
         }
         "critique_pct" => {
             let stale = compute_stale_verifications(root, &model);
-            let crit = compute_critique_coverage(&model, &stale);
+            let crit = compute_critique_coverage(&model, &stale, &CritiquePolicy::load_or_core3(root));
             Some(f64::from(pct(crit.iter().filter(|c| c.covered).count(), crit.len())))
         }
         "attestation_pct" => {
@@ -2184,7 +2312,7 @@ fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet
     // Headline from the shared coverage-ratio formula (D0090) — computed in exactly one place
     // (`coverage_pct_of`); verified/attested/total below are the structural breakdown for the detail.
     let covered_pct = coverage_pct_of(cov, "");
-    let crit = compute_critique_coverage(model, stale);
+    let crit = compute_critique_coverage(model, stale, &CritiquePolicy::load(root)?);
     let crit_cov = crit.iter().filter(|c| c.covered).count();
     let crit_pct = pct(crit_cov, crit.len());
     let (att_total, att_missing) = compute_attestation(model);
@@ -2241,7 +2369,7 @@ fn quality_debt_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &Hash
     let gf_cov = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
     let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
     let cov_debt = cov.iter().filter(|c| !is_covered_tier(c.tier) && gf_cov.as_ref().is_some_and(|g| g.contains(&c.element))).count();
-    let crit_debt = compute_critique_coverage(model, stale).into_iter().filter(|c| !c.covered && gf_crit.as_ref().is_some_and(|g| g.contains(&c.element))).count();
+    let crit_debt = compute_critique_coverage(model, stale, &CritiquePolicy::load_or_core3(root)).into_iter().filter(|c| !c.covered && gf_crit.as_ref().is_some_and(|g| g.contains(&c.element))).count();
     // Requirements volatility: supersede edges (churn signal).
     let supersedes = model.edges.iter().filter(|e| e.kind == "supersede").count();
     let decisions = model.items.values().filter(|i| i.type_name == "Decision").count();
@@ -2844,6 +2972,52 @@ mod tests {
     use super::*;
 
     #[test]
+    fn critique_policy_default_is_core3() {
+        // Absent a policy file, the built-in Core-3 default applies (D0097) — identical to the shipped
+        // critique-policy.toml, so behavior is unchanged whether or not a project authors an override.
+        let p = CritiquePolicy::core3();
+        assert!(p.is_target_type("Need"));
+        assert!(p.is_target_type("Decision"));
+        assert!(!p.is_target_type("Issue"));
+        assert_eq!(p.required_lenses("Need"), ["completeness", "correctness", "testability"]);
+        assert_eq!(p.required_lenses("Decision"), ["completeness", "correctness", "feasibility"]);
+        assert!(p.required_lenses("Issue").is_empty());
+        assert_eq!(p.target_types().count(), 3);
+    }
+
+    #[test]
+    fn critique_policy_load_validates_and_overrides() {
+        // load() reads .engine/contracts/critique-policy.toml when present: an unknown lens fails loud,
+        // a valid override (extra lens / extra type) takes effect, and a missing file falls back.
+        let dir = std::env::temp_dir().join(format!("keel_cpol_{}", std::process::id()));
+        let contracts = dir.join(".engine").join("contracts");
+        std::fs::create_dir_all(&contracts).unwrap();
+        let policy_file = contracts.join("critique-policy.toml");
+
+        // Missing file -> built-in default.
+        std::fs::remove_file(&policy_file).ok();
+        let empty = dir.join("no-such-engine-root-xyz");
+        assert!(!CritiquePolicy::load(&empty).unwrap().from_file);
+
+        // Unknown lens -> fail-loud Policy error.
+        std::fs::write(&policy_file, "[lenses]\nNeed = [\"completeness\", \"bogus\"]\n").unwrap();
+        assert!(matches!(CritiquePolicy::load(&dir), Err(ViewError::Policy(_))));
+
+        // Valid override: add a lens to Need + gate a new type.
+        std::fs::write(
+            &policy_file,
+            "[lenses]\nNeed = [\"completeness\", \"necessity\"]\nArchitecture = [\"feasibility\"]\n",
+        )
+        .unwrap();
+        let p = CritiquePolicy::load(&dir).unwrap();
+        assert!(p.from_file);
+        assert_eq!(p.required_lenses("Need"), ["completeness", "necessity"]);
+        assert!(p.is_target_type("Architecture"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn extract_field_unescapes_like_the_lexer() {
         // issue044 regression: a field with backslash escapes must extract to the SAME value the
         // parser stores, or its critiques false-flag stale. `\\s` (raw blob) -> `\s` (model value).
@@ -2993,7 +3167,7 @@ mod tests {
             Edge { kind: "verify".to_string(), from: "c2".to_string(), to: "sr1".to_string() },
         ];
         let model = Model { items, edges };
-        let cov = compute_critique_coverage(&model, &HashSet::<String>::new());
+        let cov = compute_critique_coverage(&model, &HashSet::<String>::new(), &CritiquePolicy::core3());
         let sr1 = cov.iter().find(|c| c.element == "sr1").unwrap();
         assert!(!sr1.covered, "only 1/3 required lenses independently critiqued");
         let lens = |n: &str| sr1.lenses.iter().find(|l| l.lens == n).unwrap();

@@ -203,7 +203,12 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
   own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
   A sixth method, `critique` (D0080), records an antagonistic lens-tagged verification of a
   tracked element by an *independent* critic; its findings become severity-carrying `Issue`s,
-  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill). A
+  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill). The
+  REQUIRED lenses per element type are a DECLARED, downstream-overridable policy
+  (`.engine/contracts/critique-policy.toml`, D0097 — default Core-3: Need/SystemRequirement →
+  completeness/correctness/testability, Decision → completeness/correctness/feasibility); the
+  lens vocabulary itself (`CritiqueLens`) is the generic requirement-quality canon in schema/core.
+  `keel critique-policy` shows the active policy; `keel critique-coverage` + `guard critique` read it. A
   disposition is itself a TYPED recorded judgment (D0092): a `method=confirmation` verification
   carrying `disposition : DispositionKind` (`act`/`acceptRisk`/`dismiss`), `#Dispositions`-linked
   to the finding, written via `keel apply-review` — never prose. ACCEPT-RISK/DISMISS close the

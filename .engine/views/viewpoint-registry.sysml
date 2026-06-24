@@ -159,6 +159,15 @@ package EngineViewpoints {
         :>> renderer = "keel reprocess-candidates";
     }
 
+    part critiquePolicyVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a097-516273849697";
+        :>> title = "critique-policy";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Which antagonistic critique lenses are REQUIRED per assurance-element type, and is that policy the built-in default or a project override (D0097)?";
+        :>> audience = "maintainer / reviewer / auditor";
+        :>> sources = "the declared .engine/contracts/critique-policy.toml ([lenses] type -> required CritiqueLens list); the built-in Core-3 default when the file is absent; the CritiqueLens canon (schema/core)";
+        :>> renderer = "keel critique-policy";
+    }
     part concernCoverageVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a071-516273849632";
         :>> title = "concern-coverage";

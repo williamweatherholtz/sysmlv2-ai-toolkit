@@ -70,6 +70,9 @@ fn init_scaffolds_a_working_project() {
     assert!(!hook.contains("conda") && !hook.contains("python") && !hook.contains(".py"), "pre-commit gate must be kernel-free (no conda/python)");
     // introductionDryRun: a starter actor registry must ship so the newcomer's first recorded fact passes the actors guard.
     assert!(dir.join(".tracking").join("actors.sysml").is_file(), ".tracking/actors.sysml not scaffolded (newcomer can't record facts)");
+    // D0097: the declared critique-policy ships so a downstream project can tune its critique bar (and `keel critique-policy` reads a file, not a built-in fallback).
+    let policy = std::fs::read_to_string(dir.join(".engine").join("contracts").join("critique-policy.toml")).expect(".engine/contracts/critique-policy.toml not scaffolded");
+    assert!(policy.contains("[lenses]") && policy.contains("Need"), "critique-policy.toml missing the [lenses] default");
 
     // 2. the fresh scaffold validates clean.
     let out = keel().args(["validate", proj]).output().expect("run keel validate");

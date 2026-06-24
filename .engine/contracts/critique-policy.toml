@@ -1,0 +1,26 @@
+# =====================================================================
+# Critique policy (D0097) — the REQUIRED antagonistic critique lenses per assurance-element TYPE.
+# This is the declared, downstream-OVERRIDABLE form of the D0080 "Core-3" policy that was previously
+# hardcoded in the Rust toolchain. `keel critique-coverage`, `keel critique-policy`, and
+# `guard critique` READ this file (not a baked-in map).
+#
+# SEMANTICS:
+#   - A type with a NON-EMPTY lens list is a critique TARGET. A type absent here (or with an empty
+#     list) is not gated for critique at all.
+#   - Each listed lens must have an INDEPENDENT method=critique verification (#Verify-linked to the
+#     element, judgedBy != the element's author) for an element of that type to be critique-COVERED.
+#   - Lenses MUST be CritiqueLens variants (the requirement-quality canon, schema/core element.sysml):
+#       completeness | correctness | ambiguity | testability | feasibility | consistency | necessity
+#     An unknown lens name is a fail-loud error (keel critique-coverage / guard critique).
+#   - Decisions are critiqued only once status = accepted (an accepted Decision is a final commitment;
+#     proposed/superseded/rejected ones are not gated). This accepted-only rule is intrinsic, not config.
+#
+# These lenses are GENERIC deficit-classes, not industry-specific — they apply whatever the deliverable
+# domain is. Different PROJECTS may merit a different required SET (e.g. add a `safety` lens on every
+# requirement, or gate more element types): EDIT this file. The shipped Core-3 is a sound default, so
+# overriding is OPT-IN — a fresh `keel init` project gets sensible critique coverage with no config.
+# =====================================================================
+[lenses]
+Need = ["completeness", "correctness", "testability"]
+SystemRequirement = ["completeness", "correctness", "testability"]
+Decision = ["completeness", "correctness", "feasibility"]

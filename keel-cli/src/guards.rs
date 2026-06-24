@@ -493,7 +493,8 @@ pub fn issues(root: &Path) -> GuardReport {
 
 /// Guard: every assurance element carries its required-lens critiques (D0080/D0079).
 ///
-/// An element missing a required-lens critique (Core-3 policy) is a violation. RUNNABLE via
+/// An element missing a required-lens critique (per the declared critique policy, D0097 — default
+/// Core-3) is a violation. RUNNABLE via
 /// `keel guard critique` but NOT yet in the enforced `GUARD_NAMES` set: with zero critiques
 /// recorded it would block every commit. It joins the enforced set (a hard pre-commit gate, the
 /// human-accepted choice) once a genuine critique pass brings the model to required-lens coverage.
@@ -503,7 +504,7 @@ pub fn critique(root: &Path) -> GuardReport {
         Ok(gaps) => {
             let violations = gaps
                 .into_iter()
-                .map(|e| format!("{e}: missing a required-lens critique (D0080 Core-3; run the element-critique skill)"))
+                .map(|e| format!("{e}: missing a required-lens critique (D0080/D0097 policy; run the element-critique skill)"))
                 .collect();
             GuardReport { name: "critique", scanned: 0, warnings: Vec::new(), violations }
         }
@@ -532,7 +533,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
-    "concern-coverage", "dispositions", "sitting-coverage",
+    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy",
 ];
 
 /// The quoted value of `:>> {key} = "..."` on a line.

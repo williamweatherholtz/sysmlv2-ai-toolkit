@@ -26,7 +26,7 @@ package EngineElementCritique {
         :>> title = "Scope — pick targets + required lenses";
         :>> order = 1;
         :>> triggerCondition = "An assurance element lacks a required-lens critique (computed gap), OR a target changed and its critique is suspect, OR critique is requested.";
-        :>> actionText = "Pick the target element(s): prioritize the `keel coverage` gap set (uncovered requirements/needs first), then accepted Decisions and Architecture. Required lenses are BROAD (D0079): apply the requirement-quality canon lenses (CritiqueLens: completeness, correctness, ambiguity, testability, feasibility, consistency, necessity) relevant to the element type. Fix the (element x lens) work-list before critiquing.";
+        :>> actionText = "Pick the target element(s): prioritize the `keel coverage` gap set (uncovered requirements/needs first), then accepted Decisions and Architecture. The GATED required lenses per element type are the DECLARED critique policy (`.engine/contracts/critique-policy.toml`, D0097 — default Core-3; `keel critique-policy` shows the active set); lenses are drawn from the requirement-quality canon (CritiqueLens: completeness, correctness, ambiguity, testability, feasibility, consistency, necessity) and a critique may apply BROADER lenses than the gate requires (D0079). Fix the (element x lens) work-list before critiquing.";
         :>> producedArtifact = "The (element x lens) critique work-list (ephemeral input to ecCritique).";
         :>> owner = Owner::ai;
     }

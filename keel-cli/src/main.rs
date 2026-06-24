@@ -10,6 +10,7 @@
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
 //!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
+//!   `critique-policy [ROOT]`   — the active declared critique policy: required lenses per type (D0097)
 //!   `concern-coverage [ROOT]` — which declared viewpoint concerns are served vs planned (D0057)
 //!   `dispositions [ROOT]`     — >= Medium findings + their typed disposition verdict (D0092)
 //!   `sitting-coverage [ROOT]` — which delivery sprints are covered by a per-sitting review (D0049)
@@ -582,6 +583,30 @@ fn cmd_critique_coverage(args: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("critique-coverage error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_critique_policy(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: keel critique-policy [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match keel_cli::view::critique_policy(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("critique-policy error: {e}");
             1
         }
     }
@@ -1240,6 +1265,7 @@ fn main() {
         Some("concern-coverage") => cmd_concern_coverage(rest),
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
+        Some("critique-policy") => cmd_critique_policy(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),

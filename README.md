@@ -62,7 +62,7 @@ A single Rust binary is the authority for the routine path — no kernel, conda,
 |---|---|
 | Orient / flow | `orient` · `whats-next` · `suspect` · `outstanding` |
 | Author (write API) | `append-result` · `append-gate-result` · `add-task` · `apply-review` |
-| Assurance | `assured` · `coverage` · `critique-coverage` · `attestation-coverage` · `concern-coverage` · `dispositions` · `open-issues` |
+| Assurance | `assured` · `coverage` · `critique-coverage` · `critique-policy` · `attestation-coverage` · `concern-coverage` · `dispositions` · `open-issues` |
 | Views / reports | `view <name>` · `render <view>` · `diagram` · `report <kind> [--html]` · `indicators` |
 | Trace / govern | `trace` · `trace-need` · `governing-version` · `reprocess-candidates` · `audit` · `orphans` |
 | Gate | `validate` · `guard [name]` · `check` |
