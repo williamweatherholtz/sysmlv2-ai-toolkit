@@ -1608,4 +1608,24 @@ package ProjectCritiques {
     verification d0096FeasibilityCritique : Test { :>> id = "63940516-2c7d-4e8f-ed96-5162738e9605"; :>> title = "Critique d0096 — feasibility"; :>> createdAt = "2026-06-23"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::feasibility; :>> critiquedBy = CriticKind::aiModel; :>> procedureText = "ATTACK (impractical?): SURVIVED — zero code change needed: write.rs already has no per-skill authz and the agent already never auto-commits (the commit-gate is the live model), so d0096 records reality rather than mandating new work; the skill writePolicy field stays a followed convention. Trivially realized — in force on commit. Feasible."; }
     part d0096FeasibilityCritiqueR1 : TestResult { :>> id = "63940516-2c7d-4e8f-ed96-5162738e9606"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "64d2135"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from d0096FeasibilityCritique to d0096;
+
+    // ═══ Re-critique (D0084 cycle) after refreshRequirementText fixed sr07/10/11/12/13's statements
+    //     (commit 8c49b9c). Append-new-result per the element-critique skill (never edit a stale critique).
+    //     The 4 correctness critiques that FAILED on stale artifact names (sr07/10/12/13) now PASS — the
+    //     names are corrected; sr11 + all completeness/testability re-verify pass at the fixed text. ═══
+    part sr07AgentLoopCompletenessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0001"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr07AgentLoopCorrectnessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0002"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr07AgentLoopTestabilityCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr10RustCliCompletenessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0004"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr10RustCliCorrectnessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr10RustCliTestabilityCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0006"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr11FastStartCompletenessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr11FastStartCorrectnessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0008"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr11FastStartTestabilityCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f0009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr12DenyWarningsCompletenessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr12DenyWarningsCorrectnessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr12DenyWarningsTestabilityCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr13SpecPinCompletenessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr13SpecPinCorrectnessCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
+    part sr13SpecPinTestabilityCritiqueR2 : TestResult { :>> id = "63940516-2c7d-4e8f-f201-5162738f000f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "8c49b9c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
 }
