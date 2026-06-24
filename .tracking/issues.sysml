@@ -548,4 +548,18 @@ package ProjectIssues {
     }
     #Resolves dependency from requirementRootednessGuard to issue047;
     #ProcessDefect dependency from issue047 to d0047;
+
+    // ── CI/local-gate divergence (Sprint 147 CI failure, 2026-06-24) ──
+    part issue048 : Issue {
+        :>> id = "e0480048-0048-4e48-9048-516273840048";
+        :>> title = "Local pre-commit ran a curated guard SUBSET that diverged from CI's `guard all` — a viewpoint-renderer violation passed the hook and failed CI";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Sprint 147's tier-satisfaction Viewpoint failed CI (init_smoke `guard all` -> viewpoint-renderer: 'renderer names no known keel command — keel tier-satisfaction'). TWO root causes: (1) the local .githooks/pre-commit ran a CURATED per-path guard subset (acceptance-events/process-change/ceremony/sprint-coverage/charter/issues/requirement-rootedness) and NEVER ran viewpoint-renderer/manifest-coverage/critic-independence/process-skill/actors — so it could not catch the viewpoint-renderer violation that CI's `guard all` (via init_smoke) does; the local gate diverged from CI. (2) I cherry-picked the `git add` file list and left keel-cli/src/guards.rs (the tier-satisfaction VIEW_SUBCOMMANDS registration) UNSTAGED, so the committed binary lacked it while the viewpoint-registry referenced it — local (working tree) passed, CI (committed state) failed. PREVENTATIVE MEASURES (lightweight): (1, guard) localGateMatchesCi — the hook now runs the FULL `keel guard` (all enforced honest-state guards, kernel-free + fast) whenever any .sysml changes, so local == CI. (2, behavioral, memory) stage with `git add -A` (don't cherry-pick) + check `gh run` after every push. Caught by CI (no harm landed); the fix is in.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "localGateMatchesCi";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from localGateMatchesCi to issue048;
+    #ProcessDefect dependency from issue048 to d0047;
 }

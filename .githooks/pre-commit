@@ -24,33 +24,11 @@ sysml_run() {
         echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
 
-# Rust forward guard (D0074). If the binary isn't built, warn + skip (a fresh checkout
-# can't run it); when built, a violation aborts the commit.
-guard_run() {
-    if [ ! -x "$SYSMLV2" ]; then
-        echo "pre-commit: rust binary missing — guard '$1' skipped (build target/release to enforce)"; return 0
-    fi
-    echo "pre-commit: keel guard $1"
-    "$SYSMLV2" guard "$1" || {
-        echo "pre-commit: GUARD '$1' FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
-}
-
 # .engine schema/workflow/instance changes: kernel validators (deep SysML semantics).
 if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
-fi
-
-# Acceptance-event guard (D0066/D0047) — accepted Decision needs a passing acceptance event.
-if echo "$sysml_staged" | grep -q '^\.engine/decisions/'; then
-    guard_run acceptance-events
-fi
-
-# Process-change keystone guard (D0070/D0047) — a process-def change must co-commit a
-# #ProspectiveChange/#SafetyChange-marked Decision.
-if echo "$sysml_staged" | grep -qE '^\.engine/(processes|workflows)/'; then
-    guard_run process-change
 fi
 
 # .tracking changes: validated by the Rust authority (D0048) — fast, no JVM. Falls back to the
@@ -68,37 +46,22 @@ if echo "$sysml_staged" | grep -q '^\.tracking/'; then
     fi
 fi
 
-# Ceremony-gate ordering + retro-scan guard (issue010/issue011 / D0047).
-if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
-    guard_run ceremony
+# Forward GUARDS — run the FULL enforced set (`keel guard`, ALL honest-state guards) whenever any
+# .sysml changes, so the LOCAL gate matches CI's `guard all` (issue048: a curated per-path subset
+# omitted viewpoint-renderer / manifest-coverage / critic-independence / process-skill / actors, so
+# a viewpoint-renderer violation passed the hook and only failed in CI). The Rust guards are kernel-
+# free + fast (<1s), so running all of them every .sysml commit is cheap. Binary-missing => skip.
+# (Assurance — critique-COVERAGE + `assured` readiness — is a NON-BLOCKING burndown, D0098, and is
+# deliberately NOT in this enforced set; run `keel assured` / `keel critique-coverage` on demand.)
+if [ -n "$sysml_staged" ]; then
+    if [ -x "$SYSMLV2" ]; then
+        echo "pre-commit: keel guard (all enforced honest-state guards)"
+        "$SYSMLV2" guard || {
+            echo "pre-commit: GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    else
+        echo "pre-commit: rust binary missing — guards skipped (build target/release/keel to enforce)"
+    fi
 fi
-
-# No-sprint guard (D0064 / issue020) — a done backlog task must be covered by a sprint.
-if echo "$all_staged" | grep -qE '^\.tracking/(backlog\.sysml|delivery/)'; then
-    guard_run sprint-coverage
-fi
-
-# Charter-edge guard (D0068/D0069/D0047) — a NEWLY ADDED delivery Story needs its #CharteredBy edge.
-if echo "$all_staged" | grep -q '^\.tracking/delivery/'; then
-    guard_run charter
-fi
-
-# Issue-resolution guard (D0077) — every Issue must carry a #Resolves edge (untriaged = violation).
-if echo "$all_staged" | grep -q '^\.tracking/issues\.sysml$'; then
-    guard_run issues
-fi
-
-# Requirement-rootedness honesty gate (D0098/D0099) — a #Capability with no #DerivedFrom->Need fails.
-# Fire when a #Capability marker or its Need link could change (.tracking/ or .engine/decisions/).
-if echo "$all_staged" | grep -qE '^\.(tracking/|engine/decisions/)'; then
-    guard_run requirement-rootedness
-fi
-
-# Assurance is a NON-BLOCKING BURNDOWN, not a hard gate (honest-state doctrine, D0098): critique-
-# COVERAGE (`keel guard critique` / `keel critique-coverage`) and the composite readiness verdict
-# (`keel guard assured` / `keel assured`) are COMPLETENESS measures, surfaced in orient and run on
-# demand — never blocking a commit. Incomplete implementation flagged AS incomplete is honest state.
-# (Critique INDEPENDENCE stays enforced as `critic-independence` in the honest-state guard set.)
 
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
