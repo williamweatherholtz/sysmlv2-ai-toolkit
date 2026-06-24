@@ -2,6 +2,13 @@
 name = "keel-parser"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Keel — a no-JVM parser/validator for the engine's SysML v2 text dialect."
+keywords = ["sysml", "parser", "mbse", "validation"]
+categories = ["parser-implementations", "development-tools"]
 
 [dependencies]
 thiserror = "1"

@@ -2,6 +2,14 @@
 name = "keel-cli"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Keel — an AI-complemented, SysML v2-text work-tracking engine with strict, computed discipline (the `keel` CLI)."
+readme = "../README.md"
+keywords = ["sysml", "mbse", "work-tracking", "ai", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "keel"
