@@ -327,7 +327,10 @@ fn cmd_guard(args: &[String]) -> i32 {
     }
     let Some(name) = args.first() else { return 2 };
     let Some(report) = keel_cli::guards::run_one(name, &root) else {
-        eprintln!("unknown guard '{name}' (known: {})", keel_cli::guards::GUARD_NAMES.join(", "));
+        eprintln!(
+            "unknown guard '{name}' (enforced: {} | runnable diagnostics: assured, critique, critique-rigor, defect-guard-coverage)",
+            keel_cli::guards::GUARD_NAMES.join(", ")
+        );
         return 2;
     };
     report.print();

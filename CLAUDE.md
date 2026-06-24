@@ -318,24 +318,29 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\keel.exe guard                                                               # ALL thirteen forward guards (no kernel) — exit≠0 on any violation
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | critique | assured | viewpoint-renderer | manifest-coverage | critic-independence | process-skill  (+ runnable-only: critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL eleven HONEST-STATE forward guards (no kernel) — exit≠0 on any violation
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 ```
-The thirteen forward guards are the Rust authority (D0074 M3/M4): `keel guard` (actors D0037,
-acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
-D0068, process-change D0070 keystone, issues D0077/D0078, critique D0080/D0079, assured D0079c
-[both enforced at D0081 under charter-time scoping], viewpoint-renderer D0056/issue034 [renderers
-must name a real `keel` command, no retired query.py/report.py], manifest-coverage D0050/issue033
-[the deliverable-suspicion manifest stays valid — no dead task/path entries], critic-independence
-D0080/issue031 [a Critical-severity finding's target needs a human/tool critic, not only aiModel],
-process-skill D0059/issue036 [no inert process — every `.engine/processes/*.sysml` is named by a
-deploying skill's purpose]).
-Plus RUNNABLE-ONLY diagnostics (not in the enforced set): `critique-rigor` D0080/issue030 [low-rigor
-critiques + affirming-only critics]; `defect-guard-coverage` D0047/issue039 [a #ProcessDefect finding
-must resolve to a guard-producing action — the meta-audit that "corrections become guards", a WARN
-since the class judgment is heuristic]. The python `validate_*.py`
-guards, `query.py`, and `parity_check.py` were RETIRED at M4 (sprint58, issue012 closed) — the Rust
-path is the sole gate.
+**Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
+model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE. Completeness (coverage,
+critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
+(`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
+state, never a commit blocker (don't fake a pass, don't block recording true state).
+The eleven enforced honest-state guards are the Rust authority (D0074 M3/M4; D0098): `keel guard` (actors
+D0037, acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
+D0068, process-change D0070 keystone, issues D0077/D0078 [every recorded problem accounted for],
+viewpoint-renderer D0056/issue034 [renderers must name a real `keel` command, no retired query.py/
+report.py], manifest-coverage D0050/issue033 [the deliverable-suspicion manifest stays valid — no dead
+task/path entries], critic-independence D0080/issue031 [a critique must be by an INDEPENDENT critic —
+honesty], process-skill D0059/issue036 [no inert process — every `.engine/processes/*.sysml` is named
+by a deploying skill's purpose]). (The requirement-rootedness HONESTY guard — a chartered capability
+with no driving Need — joins this set via requirementRootednessGuard, D0098/issue047.)
+RUNNABLE BURNDOWN / diagnostics (computed, surfaced in orient, NEVER blocking — D0098): `assured`
+D0079c [composite readiness], `critique` D0080/D0079 [critique-COVERAGE; note INDEPENDENCE stays
+enforced above]; plus `critique-rigor` D0080/issue030 [low-rigor critiques + affirming-only critics];
+`defect-guard-coverage` D0047/issue039 [a #ProcessDefect finding must resolve to a guard-producing
+action]. The python `validate_*.py` guards, `query.py`, and `parity_check.py` were RETIRED at M4
+(sprint58, issue012 closed) — the Rust path is the sole gate.
 
 **`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
 SysML semantics than the Rust validator covers), and they remain the authoritative SysML

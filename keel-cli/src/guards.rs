@@ -494,10 +494,11 @@ pub fn issues(root: &Path) -> GuardReport {
 /// Guard: every assurance element carries its required-lens critiques (D0080/D0079).
 ///
 /// An element missing a required-lens critique (per the declared critique policy, D0097 — default
-/// Core-3) is a violation. RUNNABLE via
-/// `keel guard critique` but NOT yet in the enforced `GUARD_NAMES` set: with zero critiques
-/// recorded it would block every commit. It joins the enforced set (a hard pre-commit gate, the
-/// human-accepted choice) once a genuine critique pass brings the model to required-lens coverage.
+/// Core-3) is reported here. This is critique-COVERAGE — a COMPLETENESS measure, so under the honest-
+/// state doctrine (D0098) it is NOT in the enforced `GUARD_NAMES`: it is a non-blocking burndown,
+/// RUNNABLE via `keel guard critique` / `keel critique-coverage` and surfaced in orient, never a hard
+/// commit gate (an un-critiqued element is honest incomplete state, not a lie). Critique INDEPENDENCE
+/// (`critic-independence`) stays enforced — that is honesty, not completeness.
 #[must_use]
 pub fn critique(root: &Path) -> GuardReport {
     match crate::view::critique_gaps(root) {
@@ -514,10 +515,12 @@ pub fn critique(root: &Path) -> GuardReport {
 
 /// Guard: the composite assurance-readiness gate (D0079 c).
 ///
-/// Fails with the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
-/// verification, undispositioned >= Medium findings, open Critical, invariant violations). RUNNABLE
-/// via `keel guard assured` but NOT in the enforced `GUARD_NAMES` (it subsumes the per-commit
-/// guards and the not-yet-enforced critique gate — it is a readiness verdict, not a per-commit lock).
+/// Reports the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
+/// verification, undispositioned >= Medium findings, open Critical, invariant violations). This is the
+/// SELF-ASSURANCE composite (completeness/readiness), so under the honest-state doctrine (D0098) it is
+/// NOT in the enforced `GUARD_NAMES`: a NON-BLOCKING burndown verdict, RUNNABLE via `keel guard
+/// assured` / `keel assured` and surfaced in orient, never a hard commit gate. Incompleteness flagged
+/// AS incomplete is honest state; suppressing it or blocking on it both destroy the honest picture.
 #[must_use]
 pub fn assured(root: &Path) -> GuardReport {
     match crate::view::assured_blockers(root) {
@@ -785,12 +788,16 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
-/// `issues` joined the enforced set at IRL-d (D0077). `critique` + `assured` joined at D0081 once
-/// CHARTER-TIME scoping (D0068 freeze) made them safe to enforce: they bind only assurance elements
-/// created after the governing decision (D0079/D0080), so pre-decision work is grandfathered and the
-/// gates pass vacuously while holding all FUTURE requirements/needs/decisions to full rigor.
-pub const GUARD_NAMES: [&str; 13] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "critique", "assured", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill"];
+/// `issues` joined the enforced set at IRL-d (D0077). HONEST-STATE doctrine (D0098): the enforced set
+/// holds only INTEGRITY guards — the recorded model must not lie, be malformed, or be untraceable.
+/// COMPLETENESS / self-assurance (`assured` composite readiness + `critique`-COVERAGE) was DEMOTED
+/// from this set: it is computed as a NON-BLOCKING burndown (`keel guard assured` / `keel critique-
+/// coverage` stay runnable, surfaced in orient), never a hard commit gate — incomplete implementation
+/// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
+/// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
+/// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
+pub const GUARD_NAMES: [&str; 11] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
