@@ -557,7 +557,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
-    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness",
+    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness", "tier-satisfaction",
 ];
 
 /// The quoted value of `:>> {key} = "..."` on a line.
