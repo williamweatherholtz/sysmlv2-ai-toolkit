@@ -83,6 +83,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/item/:name", get(api_item))
         // sr18 — bounded section render (a declared view, or an element + its 1-hop neighbourhood)
         .route("/api/section", get(api_section))
+        // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
+        .route("/api/boundary", get(api_boundary))
+        .route("/api/boundary-sweep", get(api_boundary_sweep))
         // serveItemActions — append a downstream TestResult to a task
         .route("/api/testresult", post(api_testresult))
         // sr16 — on ACT, attach a tracked #Resolves resolver task to a finding
@@ -238,6 +241,19 @@ struct AgentReq {
     /// neighbourhood: the prompt names the section's members so the AI critiques `target` IN CONTEXT.
     #[serde(default)]
     section: Option<String>,
+    /// sr19 — optional Need name for a BLACK-BOX interface critique: critique the Need-slice's cut edges
+    /// (interfaces) rather than an element's internals. When set, `target` is ignored.
+    #[serde(default)]
+    boundary: Option<String>,
+}
+
+/// sr19 black-box critique prompt: critique the INTERFACES (cut edges) of a Need-slice boundary for
+/// necessity, minimality, and completeness — recording each finding as an Issue REFERENCING the cut edge
+/// (endpoints + kind; D0100 — no port, the edge is the interface). Names the interfaces so the critique is
+/// concrete. The agent inherits CLAUDE.md discipline; the prompt forbids committing (the human's gate).
+fn build_blackbox_prompt(need: &str, interfaces: &[String]) -> String {
+    let list = if interfaces.is_empty() { "(none — the boundary is fully self-contained)".to_string() } else { interfaces.join("; ") };
+    format!("Black-box (integration) critique of the Need-slice boundary `{need}`. Use the element-critique skill as an INDEPENDENT critic, but critique the INTERFACES — the cut edges crossing this boundary: {list}. For each interface assess necessity (is this cross-boundary edge needed?), minimality (is the boundary leaky — too many interfaces?), and completeness (is an expected interface missing?). Record each finding as a severity-carrying Issue that NAMES the interface (its endpoints + edge kind) per the issue-resolution process. Do NOT git commit; the human commits.")
 }
 
 /// Parse a section seed string (`view:NAME` / `element:NAME`) into the `(view, element)` pair
@@ -345,12 +361,18 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = (*s.root).clone();
     let action_ok = q.action == "critique";
-    // sr18 — if a section seed was supplied, resolve its members so the critique is section-scoped.
-    let section_members = q.section.as_deref().and_then(|seed| {
-        let (view, element) = parse_section_seed(seed);
-        crate::view::section_member_names(&root, view.as_deref(), element.as_deref()).ok()
-    });
-    let prompt = build_agent_prompt(&q.target, section_members.as_deref());
+    // sr19 black-box: if a boundary (Need) is given, critique its interfaces (cut edges); else (sr18)
+    // a section-scoped or plain white-box element critique.
+    let prompt = if let Some(need) = q.boundary.as_deref() {
+        let interfaces = crate::view::boundary_interfaces(&root, need).unwrap_or_default();
+        build_blackbox_prompt(need, &interfaces)
+    } else {
+        let section_members = q.section.as_deref().and_then(|seed| {
+            let (view, element) = parse_section_seed(seed);
+            crate::view::section_member_names(&root, view.as_deref(), element.as_deref()).ok()
+        });
+        build_agent_prompt(&q.target, section_members.as_deref())
+    };
     let counter = Arc::clone(&s.agents);
     let prev = counter.fetch_add(1, Ordering::SeqCst);
     let over_cap = prev >= AGENT_MAX_CONCURRENT;
@@ -566,6 +588,27 @@ async fn api_section(State(s): State<AppState>, Query(q): Query<SectionReq>) -> 
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
+}
+
+/// A Need-slice boundary request (sr19): the Need whose slice (internals + interfaces) to compute.
+#[derive(serde::Deserialize)]
+struct BoundaryReq {
+    need: String,
+}
+
+/// GET /api/boundary?need=NAME (sr19) — a Need-slice boundary: white-box internal elements + black-box
+/// interface cut edges + coupling count, as JSON. A computed `#View`.
+async fn api_boundary(State(s): State<AppState>, Query(q): Query<BoundaryReq>) -> Response {
+    match crate::view::boundary_json(&s.root, &q.need) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// GET /api/boundary-sweep (sr19) — the tier-satisfaction white-box sweep: per Need, slice size, coupling,
+/// SR count, decomposed/verified status. A computed `#View`.
+async fn api_boundary_sweep(State(s): State<AppState>) -> Response {
+    cached(&s, "boundary-sweep", crate::view::boundary_sweep_json)
 }
 
 /// The .tracking file declaring `action <task>;` (so a downstream `TestResult` can be appended to it).
@@ -827,5 +870,22 @@ mod tests {
         // An empty member set must not fabricate a section clause.
         let empty = build_agent_prompt("sr18", Some(&[]));
         assert!(!empty.contains("bounded SECTION"));
+    }
+
+    /// sr19 — the black-box prompt critiques the boundary's INTERFACES (cut edges), names them, asks the
+    /// integration concerns (necessity/minimality/completeness), and forbids committing. An empty
+    /// interface set is stated as self-contained, not fabricated.
+    #[test]
+    fn blackbox_prompt_critiques_named_interfaces() {
+        use super::build_blackbox_prompt;
+        let p = build_blackbox_prompt("n17", &["satisfy n17 -> sr99".to_string(), "allocate sr1 -> compX".to_string()]);
+        assert!(p.contains("Black-box"));
+        assert!(p.contains("n17"));
+        assert!(p.contains("satisfy n17 -> sr99"));
+        assert!(p.contains("necessity"));
+        assert!(p.contains("Do NOT git commit"));
+
+        let none = build_blackbox_prompt("n17", &[]);
+        assert!(none.contains("self-contained"));
     }
 }

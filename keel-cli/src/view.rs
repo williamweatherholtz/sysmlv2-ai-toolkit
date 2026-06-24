@@ -41,6 +41,8 @@ pub enum ViewError {
     UnknownElement(String),
     #[error("section needs exactly one seed: a view name or an element name")]
     BadSection,
+    #[error("element '{0}' is a {1}, not a Need (a boundary seed must be a Need)")]
+    NotANeed(String, String),
 }
 
 // ── the declared view (TOML) ────────────────────────────────────────────────
@@ -143,6 +145,7 @@ struct ItemInfo {
     marker: Option<String>,
 }
 
+#[derive(Clone)]
 struct Edge {
     kind: String,
     from: String,
@@ -333,6 +336,164 @@ fn element_neighbourhood(model: &Model, element: &str) -> HashSet<String> {
         }
     }
     set
+}
+
+/// A Need-SLICE boundary (sr19ServeWhiteboxBoundary).
+///
+/// The Need + the `SystemRequirement`s that satisfy it + the Components those SRs are allocated to + the
+/// Tests verifying any element in the slice — a vertical "system" taken from the traceability structure
+/// (D0100 — boundaries from existing structure, not graph clustering). Each is a recursive
+/// System-of-Interest: critique its internals (white-box) and its cut edges (black-box, [`cut_edges`]).
+fn need_slice(model: &Model, need: &str) -> HashSet<String> {
+    let mut slice = HashSet::new();
+    slice.insert(need.to_string());
+    // SystemRequirements satisfying the need: a `satisfy` edge need -> sr.
+    let srs: Vec<String> = model.edges.iter().filter(|e| e.kind == "satisfy" && e.from == need).map(|e| e.to.clone()).collect();
+    for sr in &srs {
+        slice.insert(sr.clone());
+        // Components allocated from that SR: an `allocate` edge sr -> component.
+        for e in &model.edges {
+            if e.kind == "allocate" && &e.from == sr {
+                slice.insert(e.to.clone());
+            }
+        }
+    }
+    // Tests verifying any element already in the slice: a `verify` edge test -> element.
+    let current: HashSet<String> = slice.iter().cloned().collect();
+    for e in &model.edges {
+        if e.kind == "verify" && current.contains(&e.to) {
+            slice.insert(e.from.clone());
+        }
+    }
+    slice
+}
+
+/// The INTERFACES of a boundary (sr19 black-box): the cut edges — those with exactly ONE endpoint
+/// inside `boundary` (crossing the System-of-Interest boundary). The count is a coupling signal; each is
+/// a candidate interface finding (recorded as an Issue referencing the edge, D0100 — edges stay
+/// lightweight, no port).
+fn cut_edges(model: &Model, boundary: &HashSet<String>) -> Vec<Edge> {
+    model.edges.iter().filter(|e| boundary.contains(&e.from) != boundary.contains(&e.to)).cloned().collect()
+}
+
+/// Emit a Need-slice BOUNDARY as JSON (sr19): the internal elements (white-box targets) + the interface
+/// cut edges (black-box targets, each naming its external endpoint) + the coupling count.
+fn boundary_emit_json(model: &Model, need: &str, slice: &HashSet<String>, cut: &[Edge]) -> String {
+    let mut names: Vec<&String> = slice.iter().collect();
+    names.sort();
+    let items: Vec<Json> = names
+        .iter()
+        .filter_map(|n| {
+            model.items.get(*n).map(|info| {
+                let mut o = vec![
+                    ("name".to_string(), Json::s((*n).clone())),
+                    ("type".to_string(), Json::s(info.type_name.clone())),
+                ];
+                if let Some(t) = info.attrs.get("title") {
+                    o.push(("title".to_string(), Json::s(t.clone())));
+                }
+                Json::Obj(o)
+            })
+        })
+        .collect();
+    let interfaces: Vec<Json> = cut
+        .iter()
+        .map(|e| {
+            let (internal_end, external) = if slice.contains(&e.from) { (e.from.clone(), e.to.clone()) } else { (e.to.clone(), e.from.clone()) };
+            Json::Obj(vec![
+                ("kind".to_string(), Json::s(e.kind.clone())),
+                ("from".to_string(), Json::s(e.from.clone())),
+                ("to".to_string(), Json::s(e.to.clone())),
+                ("internal".to_string(), Json::s(internal_end)),
+                ("external".to_string(), Json::s(external)),
+            ])
+        })
+        .collect();
+    Json::Obj(vec![
+        ("need".to_string(), Json::s(need.to_string())),
+        ("internal_count".to_string(), Json::Int(i64::try_from(items.len()).unwrap_or(0))),
+        ("coupling".to_string(), Json::Int(i64::try_from(cut.len()).unwrap_or(0))),
+        ("internal".to_string(), Json::Arr(items)),
+        ("interfaces".to_string(), Json::Arr(interfaces)),
+    ])
+    .dump()
+}
+
+/// Compute a Need-slice BOUNDARY as JSON (sr19ServeWhiteboxBoundary): the white-box internal element set
+/// + the black-box interface cut edges + the coupling count. A computed `#View`.
+///
+/// # Errors
+/// Returns [`ViewError`] for an unknown element, a non-Need seed, or a parse failure.
+pub fn boundary_json(root: &Path, need: &str) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    match model.items.get(need) {
+        Some(i) if i.type_name == "Need" => {}
+        Some(i) => return Err(ViewError::NotANeed(need.to_string(), i.type_name.clone())),
+        None => return Err(ViewError::UnknownElement(need.to_string())),
+    }
+    let slice = need_slice(&model, need);
+    let cut = cut_edges(&model, &slice);
+    Ok(boundary_emit_json(&model, need, &slice, &cut))
+}
+
+/// The interface descriptions of a Need-slice boundary (sr19 black-box) — one `"<kind> <internal> -> <external>"`
+/// string per cut edge, for naming the interfaces in a black-box critique prompt.
+///
+/// # Errors
+/// Returns [`ViewError`] for an unknown element, a non-Need seed, or a parse failure.
+pub fn boundary_interfaces(root: &Path, need: &str) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    match model.items.get(need) {
+        Some(i) if i.type_name == "Need" => {}
+        Some(i) => return Err(ViewError::NotANeed(need.to_string(), i.type_name.clone())),
+        None => return Err(ViewError::UnknownElement(need.to_string())),
+    }
+    let slice = need_slice(&model, need);
+    let mut ifaces: Vec<String> = cut_edges(&model, &slice)
+        .iter()
+        .map(|e| {
+            let (internal_end, external) = if slice.contains(&e.from) { (&e.from, &e.to) } else { (&e.to, &e.from) };
+            format!("{} {internal_end} -> {external}", e.kind)
+        })
+        .collect();
+    ifaces.sort();
+    Ok(ifaces)
+}
+
+/// The tier-satisfaction white-box SWEEP (sr19; the D0098 first sweep target).
+///
+/// Per Need: the slice size, coupling (interface cut-edge count), SR count, and whether the Need is
+/// decomposed (>=1 SR) and its SRs all verified — a per-boundary comprehensiveness reading. A computed `#View`.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn boundary_sweep_json(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut needs: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Need").map(|(n, _)| n).collect();
+    needs.sort();
+    let rows: Vec<Json> = needs
+        .iter()
+        .map(|n| {
+            let slice = need_slice(&model, n);
+            let cut = cut_edges(&model, &slice);
+            let srs: Vec<&String> = model.edges.iter().filter(|e| e.kind == "satisfy" && &e.from == *n).map(|e| &e.to).collect();
+            let verified = !srs.is_empty() && srs.iter().all(|sr| model.edges.iter().any(|e| e.kind == "verify" && &e.to == *sr));
+            Json::Obj(vec![
+                ("need".to_string(), Json::s((*n).clone())),
+                ("internal_count".to_string(), Json::Int(i64::try_from(slice.len()).unwrap_or(0))),
+                ("coupling".to_string(), Json::Int(i64::try_from(cut.len()).unwrap_or(0))),
+                ("sr_count".to_string(), Json::Int(i64::try_from(srs.len()).unwrap_or(0))),
+                ("decomposed".to_string(), Json::Bool(!srs.is_empty())),
+                ("srs_verified".to_string(), Json::Bool(verified)),
+            ])
+        })
+        .collect();
+    Ok(Json::Obj(vec![
+        ("sweep".to_string(), Json::s("tier-satisfaction white-box sweep (per Need-slice)".to_string())),
+        ("needs".to_string(), Json::Int(i64::try_from(rows.len()).unwrap_or(0))),
+        ("rows".to_string(), Json::Arr(rows)),
+    ])
+    .dump())
 }
 
 /// Emit a bounded section (`names`) of `model` as JSON: `{seed, kind, count, items[], edges[]}`. Items
@@ -3431,6 +3592,73 @@ mod tests {
         assert_eq!(got.len(), 2);
         assert!(got.contains("c1"));
         assert!(got.contains("r1"));
+    }
+
+    #[test]
+    fn need_slice_collects_srs_components_and_tests() {
+        // sr19 white-box boundary = a Need-slice: the Need + its satisfying SRs + their allocated
+        // Components + the Tests verifying any of them. n1 --satisfy--> sr1 --allocate--> comp1;
+        // t1 --verify--> sr1. Unrelated Need u1 is NOT in the slice.
+        let mut items = HashMap::new();
+        for (n, t) in [("n1", "Need"), ("sr1", "SystemRequirement"), ("comp1", "Component"), ("t1", "Test"), ("u1", "Need")] {
+            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None });
+        }
+        let edges = vec![
+            Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr1".to_string() },
+            Edge { kind: "allocate".to_string(), from: "sr1".to_string(), to: "comp1".to_string() },
+            Edge { kind: "verify".to_string(), from: "t1".to_string(), to: "sr1".to_string() },
+        ];
+        let slice = need_slice(&Model { items, edges }, "n1");
+        assert_eq!(slice.len(), 4);
+        for n in ["n1", "sr1", "comp1", "t1"] {
+            assert!(slice.contains(n), "slice should contain {n}");
+        }
+        assert!(!slice.contains("u1"));
+    }
+
+    #[test]
+    fn boundary_json_emits_internals_interfaces_and_coupling() {
+        // n1 slice {n1, sr1}; one cut edge sr1 --dependency--> ext (ext is OUTSIDE the boundary).
+        let mut items = HashMap::new();
+        for (n, t) in [("n1", "Need"), ("sr1", "SystemRequirement"), ("ext", "Component")] {
+            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None });
+        }
+        let edges = vec![
+            Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr1".to_string() },
+            Edge { kind: "dependency".to_string(), from: "sr1".to_string(), to: "ext".to_string() },
+        ];
+        let m = Model { items, edges };
+        let slice = need_slice(&m, "n1");
+        let cut = cut_edges(&m, &slice);
+        let out = boundary_emit_json(&m, "n1", &slice, &cut);
+        assert!(out.contains("\"need\": \"n1\""));
+        assert!(out.contains("\"coupling\": 1"));
+        assert!(out.contains("\"internal\""));
+        assert!(out.contains("\"interfaces\""));
+        assert!(out.contains("\"external\": \"ext\"")); // the outside endpoint named
+        assert!(out.contains("\"sr1\"")); // internal element present
+    }
+
+    #[test]
+    fn cut_edges_are_the_interfaces_leaving_the_boundary() {
+        // sr19 black-box: a boundary's interfaces = edges with exactly ONE endpoint inside. Boundary
+        // {a,b}: a->b is internal (both in); b->x leaves; y->a enters. cut = {b->x, y->a}.
+        let mut items = HashMap::new();
+        for n in ["a", "b", "x", "y"] {
+            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None });
+        }
+        let edges = vec![
+            Edge { kind: "dependency".to_string(), from: "a".to_string(), to: "b".to_string() },
+            Edge { kind: "dependency".to_string(), from: "b".to_string(), to: "x".to_string() },
+            Edge { kind: "satisfy".to_string(), from: "y".to_string(), to: "a".to_string() },
+        ];
+        let m = Model { items, edges };
+        let boundary: HashSet<String> = ["a", "b"].iter().map(|s| (*s).to_string()).collect();
+        let cut = cut_edges(&m, &boundary);
+        assert_eq!(cut.len(), 2);
+        assert!(cut.iter().any(|e| e.from == "b" && e.to == "x"));
+        assert!(cut.iter().any(|e| e.from == "y" && e.to == "a"));
+        assert!(!cut.iter().any(|e| e.from == "a" && e.to == "b"));
     }
 
     #[test]

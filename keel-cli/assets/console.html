@@ -38,7 +38,7 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
 let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
@@ -62,10 +62,11 @@ let mes=null;
 function stopModalAgent(){if(mes){mes.close();mes=null}}
 function closeItem(){stopModalAgent();document.getElementById('modal').classList.remove('on')}
 function mlog(s){const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent+=s;l.scrollTop=l.scrollHeight}}
-function runAgentModal(action,target,section){
- stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${target}${section?(' @ '+section):''} ===\n`}
- let url='/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target);
+function runAgentModal(action,target,section,boundary){
+ stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${boundary?('black-box '+boundary):target}${section?(' @ '+section):''} ===\n`}
+ let url='/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target||'');
  if(section)url+='&section='+encodeURIComponent(section); // sr18: section-scoped critique
+ if(boundary)url+='&boundary='+encodeURIComponent(boundary); // sr19: black-box interface critique
  mes=new EventSource(url);
  mes.addEventListener('status',e=>mlog('· '+e.data+'\n\n'));
  mes.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)mlog(t)});
@@ -122,6 +123,22 @@ function openSectionCritique(target,sectionSeed){
  m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>Critique '+esc(target)+' <span class=pill>section</span></h2>'+
   '<p class=muted>Section-scoped critique within <b>'+esc(sectionSeed)+'</b> — the AI judges it in its local context; findings recorded as Issues (not committed).</p>'+ACTLOG;
  runAgentModal('critique',target,sectionSeed);
+}
+// sr19 — Need-slice boundary: white-box (critique internals) + black-box (critique interfaces).
+let bndNeed='', bndData=null;
+async function loadBoundary(){
+ bndNeed=document.getElementById('bndNeed').value.trim();
+ if(!bndNeed){bndData=null;render();return}
+ status.textContent='loading boundary…';
+ try{bndData=await get('/api/boundary?need='+encodeURIComponent(bndNeed));}
+ catch(e){bndData={error:'not a Need (or unknown): '+bndNeed};}
+ render();
+}
+function openBoundaryCritique(need){
+ const m=document.getElementById('modal');m.classList.add('on');stopModalAgent();
+ m.innerHTML='<span class=x onclick="closeItem()">✕</span><h2>Black-box critique <span class=pill>'+esc(need)+'</span></h2>'+
+  '<p class=muted>Integration critique of the Need-slice’s INTERFACES (cut edges) — necessity / minimality / completeness; findings recorded as Issues referencing each interface (not committed).</p>'+ACTLOG;
+ runAgentModal('critique','',null,need);
 }
 async function disposition(finding,verdict){
  const rationale=prompt(`Rationale for "${verdict}" on ${finding}:`,'');
@@ -180,6 +197,28 @@ async function render(){
    document.getElementById('secGo').onclick=loadSection;
    document.getElementById('secSeed').addEventListener('keydown',ev=>{if(ev.key==='Enter')loadSection()});
    [...main.querySelectorAll('.rb[data-sc]')].forEach(b=>b.onclick=()=>openSectionCritique(b.dataset.sc,seedParam));
+  } else if(active==='boundary'){
+   const sweep=await get('/api/boundary-sweep').catch(()=>({rows:[]}));
+   let body='<div class=row><div class=t>White-box / black-box boundary critique (sr19)</div>'+
+    '<div class=m>A <b>Need-slice</b> = a Need + its SRs + allocated Components + verifying Tests (a recursive System-of-Interest). <b>White-box</b> = critique its internal elements; <b>black-box</b> = critique its interfaces (cut edges). Boundaries come from the model’s structure, not clustering (D0100).</div>'+
+    '<div style="margin-top:8px"><input id=bndNeed placeholder="Need name (e.g. n17ServeGranularWhitebox)" value="'+esc(bndNeed)+'" style="padding:4px 7px;border:1px solid var(--bd);border-radius:5px;min-width:300px"> <button class=rb id=bndGo>Render boundary ▶</button></div></div>';
+   if(bndData&&bndData.error){body+='<p class=muted style="color:var(--bad)">'+esc(bndData.error)+'</p>';}
+   else if(bndData){
+    body+='<p class=muted>boundary <b>'+esc(bndData.need)+'</b> · '+bndData.internal_count+' internal element(s) · coupling '+bndData.coupling+' interface(s)'+(aiBridge?' &nbsp; <button class=rb id=bndBB>Black-box critique (interfaces) ▶</button>':'')+'</p>'+
+     '<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:8px 0 3px">White-box · internal elements</h3>'+
+     (bndData.internal||[]).map(it=>`<div class=row><div class=t>${itemLink(it.name)} <span class=pill>${esc(it.type)}</span></div>${it.title?'<div class=m>'+esc(it.title)+'</div>':''}${aiBridge?`<div style="margin-top:5px"><button class=rb data-wb="${esc(it.name)}">Critique element ▶</button></div>`:''}</div>`).join('')+
+     '<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:11px 0 3px">Black-box · interfaces (cut edges)</h3>'+
+     ((bndData.interfaces||[]).length?bndData.interfaces.map(e=>`<div style="font-size:11px;margin:2px 0">${itemLink(e.internal)} <span class=pill>${esc(e.kind)}</span> ${itemLink(e.external)} <span class=muted>(external: ${esc(e.external)})</span></div>`).join(''):'<span class=muted>no interfaces — fully self-contained</span>');
+   } else {body+='<p class=muted>Enter a Need and press <b>Render boundary ▶</b>.</p>';}
+   // the tier-satisfaction sweep table
+   body+='<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:14px 0 3px">Tier-satisfaction sweep · per Need-slice</h3>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="text-align:left;color:var(--mut)"><th>Need</th><th>internal</th><th>coupling</th><th>SRs</th><th>decomposed</th><th>SRs verified</th></tr>'+
+    (sweep.rows||[]).map(r=>`<tr><td>${itemLink(r.need)}</td><td>${r.internal_count}</td><td>${r.coupling}</td><td>${r.sr_count}</td><td>${r.decomposed?'✓':'<span style="color:var(--bad)">✗</span>'}</td><td>${r.srs_verified?'✓':'<span style="color:var(--warn)">✗</span>'}</td></tr>`).join('')+'</table>';
+   main.innerHTML=body;
+   document.getElementById('bndGo').onclick=loadBoundary;
+   document.getElementById('bndNeed').addEventListener('keydown',ev=>{if(ev.key==='Enter')loadBoundary()});
+   if(bndData&&!bndData.error&&aiBridge){const bb=document.getElementById('bndBB');if(bb)bb.onclick=()=>openBoundaryCritique(bndData.need);}
+   [...main.querySelectorAll('.rb[data-wb]')].forEach(b=>b.onclick=()=>openSectionCritique(b.dataset.wb,'element:'+b.dataset.wb));
   } else if(active==='dispositions'){const d=await get('/api/dispositions');
    main.innerHTML='<div class=cards>'+card('≥Medium findings',d.ge_medium_findings,'total','')+card('Dispositioned',d.dispositioned,'have a typed verdict','good')+card('Undispositioned',d.undispositioned,'awaiting a verdict',d.undispositioned?'warn':'good')+'</div>'+
     '<p class=muted>Disposition a finding — your click + rationale is your explicit verdict (recorded via the write API; not committed).</p>'+
