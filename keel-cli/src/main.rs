@@ -47,6 +47,11 @@ const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\
 /// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
 /// engine/instance boundary). The new project adds entries as it builds source-dependent verifications.
 const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE\n# files (D0050), so `keel suspect` flags a task suspect when its source changed since it was\n# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...\n# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.\n";
+/// A RUST-ONLY pre-commit gate scaffolded into a fresh project (`.githooks/pre-commit`). Runs
+/// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
+/// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
+/// Degrades to a skip (never blocks) if `keel` isn't on PATH. POSIX sh.
+const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: '$KEEL' not on PATH — keel gate skipped (install keel to enforce)\"; exit 0; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\n";
 
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
@@ -1166,14 +1171,34 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error writing .tracking/README.md: {e}");
         return 1;
     }
+    // Scaffold a RUST-ONLY commit gate (.githooks/pre-commit) so the project has an automated
+    // keel validate/guard gate from day one — no conda/kernel (D0048). The user enables it with
+    // `git config core.hooksPath .githooks` (printed below).
+    let hooks = dir.join(".githooks");
+    if let Err(e) = std::fs::create_dir_all(&hooks) {
+        eprintln!("error creating .githooks: {e}");
+        return 1;
+    }
+    let hook_path = hooks.join("pre-commit");
+    if let Err(e) = std::fs::write(&hook_path, PRECOMMIT_HOOK) {
+        eprintln!("error writing .githooks/pre-commit: {e}");
+        return 1;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let _ = std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o755));
+    }
     println!("Scaffolded the engine into {} ({count} engine file(s)).", dir.display());
     println!();
     println!("Next:");
     println!("  1. cd {}", dir.display());
-    println!("  2. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
-    println!("  3. Run the `introduction` skill (guided onboarding) — capture your first need + run your first sprint.");
+    println!("  2. git init && git config core.hooksPath .githooks   (enable the keel pre-commit gate)");
+    println!("  3. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
+    println!("  4. Run the `introduction` skill (guided onboarding) — capture your first need + run your first sprint.");
     println!("     Or: keel orient .   (where things stand)");
     println!();
+    println!("The .githooks/pre-commit gate runs `keel validate` + `keel guard` (Rust-only, no kernel).");
     println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
     println!("your project authors its OWN decisions fresh in .engine/decisions/.");
     0

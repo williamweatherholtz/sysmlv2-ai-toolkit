@@ -64,6 +64,10 @@ fn init_scaffolds_a_working_project() {
     assert!(!dir.join(".engine").join("tools").exists(), ".engine/tools/ leaked into the scaffold (engine-dev only)");
     let py = walk_count(&dir.join(".engine"), &|p| p.extension().is_some_and(|e| e == "py" || e == "pyc"));
     assert_eq!(py, 0, "{py} python file(s) leaked into the scaffold (engine-dev only)");
+    // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel validate/guard; NO conda/kernel).
+    let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
+    assert!(hook.contains("keel") && hook.contains("validate") && hook.contains("guard"), "pre-commit gate missing keel validate/guard");
+    assert!(!hook.contains("conda") && !hook.contains("python") && !hook.contains(".py"), "pre-commit gate must be kernel-free (no conda/python)");
 
     // 2. the fresh scaffold validates clean.
     let out = keel().args(["validate", proj]).output().expect("run keel validate");
