@@ -1,0 +1,25 @@
+# CI gate (issue042 / n14TddBdd): enforce `cargo test` + `cargo clippy -D warnings` green on every
+# push and PR to main. This is the automated test-gate the critique campaign found MISSING — the
+# .githooks pre-commit hook runs clippy + keel validate/guard but NOT cargo test, and there was no CI,
+# so a failing test could reach main (issue042). A CI job (vs the pre-commit hook) keeps the ~15s test
+# run off the per-commit path (n11/D0054 friction). Rust gates only; the .sysml kernel/guard checks
+# stay in the pre-commit hook (they need the local conda kernel).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (-D warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace --release
