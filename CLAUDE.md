@@ -43,7 +43,10 @@ tasks/issues missing required edges); `keel view <name>`, `audit`, `attestation-
 `governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
 declared viewpoint concerns are served vs planned), `dispositions` (D0092 — which ≥Medium findings
 carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned), `sitting-coverage` (D0049/issue040
-— which delivery sprints have a covering per-sitting review via `#Covers` vs await one) are the other computed lenses
+— which delivery sprints have a covering per-sitting review via `#Covers` vs await one), `rootedness`
+(D0098/D0099 — the charter-source burndown + the `#Capability`-without-Need hard-gate set) and
+`tier-satisfaction` (D0098 — the downward burndown: are Needs decomposed into SRs and SRs verified, a
+leading indicator of insufficient implementation) are the other computed lenses
 (`suspect` also flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
 renders as an interactive artifact via `keel render <view> --mode graph|table|review` (D0086;
 the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
@@ -234,7 +237,7 @@ Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`
 it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
 baseline are all views (§2.1).
 
-**§3f — ORIENT.** Compute from authored facts — `keel orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier. No cursor file; no mutation.
+**§3f — ORIENT.** Compute from authored facts — `keel orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier + a non-blocking `burndown` block (D0098 — tier-satisfaction pcts, unrooted capabilities, orphan stories; the always-visible "what's incomplete" headline). No cursor file; no mutation.
 
 The six workflows (see the spec for detail):
 **Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →

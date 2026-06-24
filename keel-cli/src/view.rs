@@ -1848,6 +1848,106 @@ pub fn rootedness(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+// ── tier-satisfaction comprehensiveness (D0098/issue047 — the DOWNWARD integrity burndown) ──────
+// Is each tier cleanly + comprehensively satisfied by its downstream items? STRUCTURAL floor (the
+// measurable leading indicator): a Need is decomposed iff it has >=1 satisfying SystemRequirement
+// (satisfy edge); a SystemRequirement is verified iff it has >=1 verify edge (a Test #Verify-linked).
+// Thin downstream satisfaction predicts insufficient implementation. (DEEPER "comprehensive" judgment —
+// do the SRs fully discharge the Need — is the AI white-box layer, SR-3c, not yet built.) Non-blocking
+// burndown (D0098); computed from authored edges, nothing stored.
+
+struct TierStat {
+    tier: &'static str,
+    relation: &'static str,
+    total: usize,
+    satisfied: usize,
+    gaps: Vec<String>,
+}
+
+fn compute_tier_satisfaction(model: &Model) -> Vec<TierStat> {
+    let has_out = |kind: &str, from: &str| model.edges.iter().any(|e| e.kind == kind && e.from == from);
+    let has_in = |kind: &str, to: &str| model.edges.iter().any(|e| e.kind == kind && e.to == to);
+    let tier = |ty: &str, relation: &'static str, pred: &dyn Fn(&str) -> bool, label: &'static str| -> TierStat {
+        let mut names: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == ty).map(|(n, _)| n).collect();
+        names.sort();
+        let mut gaps: Vec<String> = Vec::new();
+        let mut satisfied = 0;
+        for n in &names {
+            if pred(n) {
+                satisfied += 1;
+            } else {
+                gaps.push((*n).clone());
+            }
+        }
+        TierStat { tier: label, relation, total: names.len(), satisfied, gaps }
+    };
+    vec![
+        // A Need is decomposed iff some SystemRequirement satisfies it (satisfy edge Need->SR).
+        tier("Need", "satisfied-by SystemRequirement", &|n| has_out("satisfy", n), "Need"),
+        // A SystemRequirement is verified iff a Test #Verify-links to it (verify edge Test->SR).
+        tier("SystemRequirement", "verified-by Test", &|sr| has_in("verify", sr), "SystemRequirement"),
+    ]
+}
+
+/// Tier-satisfaction comprehensiveness view (D0098/issue047).
+///
+/// Per tier, the fraction cleanly satisfied downstream (Needs decomposed into SRs; SRs verified by
+/// Tests) + the gap set — a leading indicator of insufficient implementation.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn tier_satisfaction(root: &Path) -> Result<String, ViewError> {
+    let stats = compute_tier_satisfaction(&Model::build(root)?);
+    let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
+    let tiers: Vec<Json> = stats
+        .iter()
+        .map(|t| {
+            Json::Obj(vec![
+                ("tier".to_string(), Json::s(t.tier)),
+                ("relation".to_string(), Json::s(t.relation)),
+                ("total".to_string(), n(t.total)),
+                ("satisfied".to_string(), n(t.satisfied)),
+                ("pct".to_string(), Json::Int(i64::from(pct(t.satisfied, t.total)))),
+                ("gaps".to_string(), Json::Arr(t.gaps.iter().map(|g| Json::s(g.clone())).collect())),
+            ])
+        })
+        .collect();
+    let out = Json::Obj(vec![
+        ("tier_satisfaction".to_string(), Json::s("tier-satisfaction comprehensiveness (D0098/issue047): STRUCTURAL downstream-satisfaction floor per tier — Needs decomposed into SystemRequirements (satisfy), SystemRequirements verified by Tests (verify). A leading indicator of insufficient implementation; thin downstream = predicted under-implementation. (Deeper 'do the SRs fully discharge the Need' is the AI white-box layer, not yet built.)")),
+        ("tiers".to_string(), Json::Arr(tiers)),
+    ]);
+    Ok(out.dump())
+}
+
+/// Compact non-blocking BURNDOWN summary (D0098) for `orient`.
+///
+/// The always-visible "what's incomplete" headline. Cheap (graph-only, no git): tier-satisfaction
+/// structural pcts + rootedness counts. Detail lives in `keel tier-satisfaction` / `keel rootedness` /
+/// `keel assured` / `keel critique-coverage`.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let tiers = compute_tier_satisfaction(&model);
+    let need = tiers.iter().find(|t| t.tier == "Need");
+    let sr = tiers.iter().find(|t| t.tier == "SystemRequirement");
+    let pct_of = |t: Option<&TierStat>| t.map_or(100, |s| pct(s.satisfied, s.total));
+    let unrooted_caps = capability_root_violations(&model).len();
+    let mut stories: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
+    stories.sort();
+    let orphan_stories = stories.iter().filter(|s| rd_charter_class(&model, s) == "orphan").count();
+    let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
+    Ok(Json::Obj(vec![
+        ("need_decomposed_pct".to_string(), Json::Int(i64::from(pct_of(need)))),
+        ("sr_verified_pct".to_string(), Json::Int(i64::from(pct_of(sr)))),
+        ("unrooted_capabilities".to_string(), n(unrooted_caps)),
+        ("orphan_stories".to_string(), n(orphan_stories)),
+        ("detail".to_string(), Json::s("keel tier-satisfaction | rootedness | assured | critique-coverage")),
+    ])
+    .dump())
+}
+
 // ── assurance readiness (D0079 c — the composite capstone gate) ───────────────────────────────
 // `assured` composes the whole assurance picture into ONE verdict: the deliverable is READY iff
 // (1) coverage complete (every Need/Requirement/Decision covered), (2) critique complete (every
@@ -3530,5 +3630,46 @@ mod tests {
     fn toml_rejects_unknown_field() {
         let bad = "name=\"x\"\n[select]\ntype=\"Story\"\nbogusfield=1\n";
         assert!(toml::from_str::<ViewSpec>(bad).is_err());
+    }
+
+    fn item(ty: &str, marker: Option<&str>) -> ItemInfo {
+        ItemInfo { type_name: ty.to_string(), attrs: HashMap::new(), marker: marker.map(str::to_string) }
+    }
+
+    #[test]
+    fn capability_must_derive_a_need() {
+        // D0099: a #Capability with no #DerivedFrom->Need is the rootedness violation; one WITH it is clean.
+        // Unmarked decision-driven work is exempt entirely.
+        let mut items = HashMap::new();
+        items.insert("n1".to_string(), item("Need", None));
+        items.insert("capA".to_string(), item("Decision", Some("Capability"))); // unrooted
+        items.insert("capB".to_string(), item("Decision", Some("Capability"))); // rooted
+        items.insert("plain".to_string(), item("Decision", None)); // exempt (unmarked)
+        let edges = vec![Edge { kind: "derivedfrom".to_string(), from: "capB".to_string(), to: "n1".to_string() }];
+        let model = Model { items, edges };
+        assert_eq!(capability_root_violations(&model), vec!["capA".to_string()]);
+    }
+
+    #[test]
+    fn tier_satisfaction_counts_decomposition_and_verification() {
+        // D0098: a Need is decomposed iff some SR satisfies it; an SR is verified iff a Test #Verify-links it.
+        let mut items = HashMap::new();
+        items.insert("n1".to_string(), item("Need", None)); // decomposed
+        items.insert("n2".to_string(), item("Need", None)); // gap
+        items.insert("sr1".to_string(), item("SystemRequirement", None)); // verified
+        items.insert("sr2".to_string(), item("SystemRequirement", None)); // gap
+        items.insert("t1".to_string(), item("Test", None));
+        let edges = vec![
+            Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr1".to_string() },
+            Edge { kind: "verify".to_string(), from: "t1".to_string(), to: "sr1".to_string() },
+        ];
+        let model = Model { items, edges };
+        let stats = compute_tier_satisfaction(&model);
+        let need = stats.iter().find(|t| t.tier == "Need").unwrap();
+        assert_eq!((need.total, need.satisfied), (2, 1));
+        assert_eq!(need.gaps, vec!["n2".to_string()]);
+        let sr = stats.iter().find(|t| t.tier == "SystemRequirement").unwrap();
+        assert_eq!((sr.total, sr.satisfied), (2, 1));
+        assert_eq!(sr.gaps, vec!["sr2".to_string()]);
     }
 }

@@ -168,6 +168,15 @@ package EngineViewpoints {
         :>> sources = "delivery Story #CharteredBy chains -> Need (direct / via satisfy'd SystemRequirement / via a Decision #DerivedFrom a Need); the #Capability marker + its #DerivedFrom->Need link (the hard-gate set)";
         :>> renderer = "keel rootedness (+ the requirement-rootedness guard for the #Capability hard gate)";
     }
+    part tierSatisfactionVP : Viewpoint {
+        :>> id = "63940516-2c7d-4e8f-a098-516273849698";
+        :>> title = "tier-satisfaction";
+        :>> createdBy = "wweatherholtz";
+        :>> concernText = "Is each tier cleanly + comprehensively satisfied by its downstream items — are Needs decomposed into SystemRequirements and SystemRequirements verified by Tests? Thin downstream satisfaction is a leading indicator of insufficient implementation (D0098/issue047).";
+        :>> audience = "maintainer / reviewer / systems engineer";
+        :>> sources = "satisfy edges (Need->SystemRequirement) + verify edges (Test->SystemRequirement); per-tier structural-satisfaction fraction + the gap set";
+        :>> renderer = "keel tier-satisfaction (+ the orient burndown block)";
+    }
     part critiquePolicyVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a097-516273849697";
         :>> title = "critique-policy";

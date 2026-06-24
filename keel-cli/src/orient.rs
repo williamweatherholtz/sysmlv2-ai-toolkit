@@ -47,6 +47,9 @@ pub struct Output {
     pub done: usize,
     /// Number of outstanding (not-done) tasks.
     pub outstanding: usize,
+    /// Compact non-blocking BURNDOWN summary (D0098) — a raw JSON-object fragment (tier-satisfaction
+    /// pcts + rootedness counts), always visible so incompleteness can't be silently ignored.
+    pub burndown: String,
 }
 
 impl Output {
@@ -68,8 +71,9 @@ impl Output {
         } else {
             format!("[{}]", sprints.join(", "))
         };
+        let burndown = if self.burndown.is_empty() { "{}" } else { self.burndown.as_str() };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
@@ -77,6 +81,7 @@ impl Output {
             str_array(&self.open_issues),
             self.done,
             self.outstanding,
+            burndown,
         )
     }
 }
@@ -585,6 +590,8 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         suspect_reasons,
         done,
         outstanding,
+        // Compact non-blocking burndown (D0098); empty -> "{}" on render if it can't be computed.
+        burndown: crate::view::burndown_summary_json(repo).unwrap_or_default(),
     }
 }
 
