@@ -6,7 +6,7 @@ package Decision0003 {
     part d0003 : Decision {
         :>> id = "13e4fd55-8929-4e78-9942-44d9d8473085";
         :>> title = "Single API surface for humans and AI; enforced write policy";
-        :>> status = DecisionStatus::accepted;
+        :>> status = DecisionStatus::superseded;  // superseded by D0096: the same-identical-API claim was overtaken by D0093's dual-surface, and the API-enforced writePolicy was never realized (issue045) — authorization is the human commit-gate (D0094). supersede back-reference is computed.
         :>> context = "Building a 'rich' GUI API and a 'simple' AI API causes "
             + "drift between human and AI capability. AI must be first-class "
             + "but not unconstrained.";

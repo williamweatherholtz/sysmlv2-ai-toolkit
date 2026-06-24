@@ -1,11 +1,12 @@
 // =====================================================================
 // EngineSkills — AI skills / agents as first-class workflow elements. The
 // engine is AI-complemented; skills are task tools it invokes (CLAUDE.md §3).
-// writePolicy is the enforced write boundary (decision 0003); a skill cannot
-// self-promote it. (trigger -> triggerCondition.)
+// writePolicy is a DECLARED convention the agent follows (read-only|pr-only|direct);
+// authorization itself is the human COMMIT-GATE — the agent never auto-commits (D0096
+// supersedes d0003: not API-enforced; D0093 dual-surface / D0094). (trigger -> triggerCondition.)
 // =====================================================================
 package EngineSkills {
-    doc /* AI skills/agents as first-class elements. writePolicy is the intended write boundary - enforced by discipline until the write API exists (D0003). */
+    doc /* AI skills/agents as first-class elements. writePolicy is a declared convention the agent follows; the authorization boundary is the human commit-gate (the agent never auto-commits), NOT API enforcement — D0096 supersedes d0003 (D0093 dual-surface + D0094). */
 
     private import ScalarValues::*;
     private import EngineElement::*;
