@@ -565,12 +565,12 @@ pub fn interaction_history(root: &Path) -> String {
             .map_or(0, |d| d.as_secs());
         files.push((p, mtime));
     }
-    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.sort_by_key(|f| std::cmp::Reverse(f.1));
     let sessions: Vec<Json> = files
         .iter()
         .map(|(p, mtime)| {
             let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            let turns = std::fs::read_to_string(p).map(|t| t.lines().count()).unwrap_or(0);
+            let turns = std::fs::read_to_string(p).map_or(0, |t| t.lines().count());
             Json::Obj(vec![
                 ("id".to_string(), Json::s(id)),
                 ("modified".to_string(), Json::Int(i64::try_from(*mtime).unwrap_or(i64::MAX))),

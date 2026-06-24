@@ -104,11 +104,7 @@ fn task_exists_in_pkg(pkg: &Package, name: &str) -> bool {
     for item in &pkg.items {
         match item {
             Item::ActionDecl(a) if a.name == name => return true,
-            Item::ActionDef(def) => {
-                if def.actions.iter().any(|a| a.name == name) {
-                    return true;
-                }
-            }
+            Item::ActionDef(def) if def.actions.iter().any(|a| a.name == name) => return true,
             _ => {}
         }
     }

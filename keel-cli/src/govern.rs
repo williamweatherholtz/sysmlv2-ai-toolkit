@@ -50,8 +50,7 @@ fn is_ancestor(repo: &Path, a: &str, b: &str) -> bool {
         .arg(repo)
         .args(["merge-base", "--is-ancestor", a, b])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|o| o.status.success())
 }
 
 // ── process-change Decisions ──────────────────────────────────────────────────

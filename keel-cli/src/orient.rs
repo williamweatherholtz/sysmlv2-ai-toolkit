@@ -117,8 +117,8 @@ pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
         .arg(repo)
         .args(["cat-file", "-t", sha])
         .output()
-        .map(|o| o.status.success() && o.stdout.starts_with(b"commit"))
-        .unwrap_or(true) // conservative: if git is unavailable, don't invalidate
+        // conservative: if git is unavailable, don't invalidate
+        .map_or(true, |o| o.status.success() && o.stdout.starts_with(b"commit"))
 }
 
 /// Read criterion text for `task` at git commit `sha`.

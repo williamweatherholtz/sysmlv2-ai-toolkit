@@ -1238,7 +1238,7 @@ fn compute_coverage<S: std::hash::BuildHasher>(
         let (tier, basis) = tier_of(&verifiers);
         out.push(Coverage { element: (*name).clone(), type_name: info.type_name.clone(), tier, basis, verifiers });
     }
-    out.sort_by(|a, b| (a.type_name.clone(), a.element.clone()).cmp(&(b.type_name.clone(), b.element.clone())));
+    out.sort_by_key(|c| (c.type_name.clone(), c.element.clone()));
     out
 }
 
@@ -1939,7 +1939,7 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
 
 /// Integer percentage `n/d` (vacuously 100% when there is nothing to measure).
 fn pct(n: usize, d: usize) -> u32 {
-    if d == 0 { 100 } else { u32::try_from(n.saturating_mul(100) / d).unwrap_or(0) }
+    n.saturating_mul(100).checked_div(d).map_or(100, |x| u32::try_from(x).unwrap_or(0))
 }
 
 /// Tone for a coverage-style percentage (higher is better).
