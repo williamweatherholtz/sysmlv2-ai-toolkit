@@ -1006,5 +1006,6 @@ package EngineBacklog {
 
         action orphanStoryCharterBackfill; // B2: backfill #CharteredBy on the 38 orphan (pre-convention) sprint Stories.
         verification orphanStoryCharterBackfillDoD : Test { :>> id = "a1c70159-0159-4159-9159-516273840159"; :>> method = VerificationMethod::inspect; :>> procedureText = "B2 (hygiene; pre-existing debt): 38 orphan sprint Stories carry no #CharteredBy edge (rootedness burndown orphan=38; pre-D0068 charter convention). The hard gate is clean (0 unrooted #Capability), so non-blocking. FIX (migration skill if bulk): backfill a #CharteredBy edge from each orphan Story to its driving Decision/Need/backlog item (read each sprint's intent; charter to the real origin) — grandfather any with no recoverable origin via a recorded basis, never fabricate. VERIFY: `keel rootedness` orphan -> 0 (or a recorded residual with basis); guard all green. (Low release relevance — post-v0.1.0 candidate.)"; }
+        part orphanStoryCharterBackfillDoDR1 : TestResult { :>> id = "2e54d086-e811-4455-9ceb-d96f9e88bc4b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "b268730"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     }
 }
