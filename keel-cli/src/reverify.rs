@@ -63,6 +63,10 @@ fn git_capture(root: &Path, args: &[&str]) -> Option<String> {
 }
 
 /// Run one reverify command as a shell command in `root`; returns true on exit 0.
+///
+/// Builds into an ISOLATED `target/reverify` dir (`CARGO_TARGET_DIR`) so a `cargo` gate never tries to
+/// overwrite the running `keel` binary (self-replacement lock — "Access is denied" on Windows). Harmless
+/// for non-cargo commands.
 fn run_shell(root: &Path, cmd: &str) -> bool {
     let mut c = if cfg!(windows) {
         let mut c = Command::new("cmd");
@@ -73,7 +77,7 @@ fn run_shell(root: &Path, cmd: &str) -> bool {
         c.arg("-c").arg(cmd);
         c
     };
-    c.current_dir(root).status().is_ok_and(|s| s.success())
+    c.current_dir(root).env("CARGO_TARGET_DIR", root.join("target").join("reverify")).status().is_ok_and(|s| s.success())
 }
 
 /// Run `keel reverify`: re-run the configured gate at HEAD and stamp a fresh result on green.
