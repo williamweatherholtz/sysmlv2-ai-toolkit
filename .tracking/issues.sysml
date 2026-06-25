@@ -575,4 +575,16 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from serveSettings to issue049;
+
+    part issue050 : Issue {
+        :>> id = "e0500050-0050-4e50-9050-516273840050";
+        :>> title = "D0098's PURE non-blocking rule exempts open CRITICAL findings, not just incompleteness";
+        :>> createdAt = "2026-06-25";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (A2 batch 1, d0098 x correctness, Medium): D0098's 'PURE rule — NOTHING completeness-related hard-blocks (incl. open Critical findings)' conflates INCOMPLETE IMPLEMENTATION (honest in-progress work) with a DISCOVERED CRITICAL DEFECT (purpose-defeating/unsafe). The decision's rationale ('hard-gating completeness forces fakery or blocks honest recording') justifies non-gating for INCOMPLETENESS, but an open Critical FINDING is a known defect, not incompleteness — so the rule lets purpose-defeating/unsafe state reach main backed only by NON-gating visibility (the orient burndown) + a NON-gating disposition backlog. Candidate resolver (if ACT): criticalFindingGatingReview — carve open-Critical findings back out of the non-blocking set into a hard honest-state gate (a Critical finding IS dishonest state to leave un-acted), keeping mere incompleteness non-blocking. PENDING human disposition (ACT / ACCEPT-RISK the visibility-only posture with rationale / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "criticalFindingGatingReview";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from criticalFindingGatingReview to issue050;
 }
