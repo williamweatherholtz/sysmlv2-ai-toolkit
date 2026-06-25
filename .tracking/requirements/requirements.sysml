@@ -454,6 +454,11 @@ package ProjectArchitecture {
     // D0100 descoped sr19's AI-proposed-clustering boundary mode (use existing structure instead). The
     // typed link makes that descope traceable from sr19 (resolves issue052 — was prose-only in D0100).
     #DependsOn dependency from sr19ServeWhiteboxBoundary to d0100;
+    // D0083 amended the FastStart statements/bars of n11 + sr11 (a governance relationship; was prose-only —
+    // surfaced by the D0102 decision-requirement-link guard). The other flagged refs (d0082/d0084/d0088 ->
+    // sr11FastStart) are contextual EXAMPLES, not governance, so left unlinked (accepted warning-level residual).
+    #DependsOn dependency from sr11FastStart to d0083;
+    #DependsOn dependency from n11FastStart to d0083;
 
     allocate sr01TypedItems to schemaCoreComp;
     allocate sr02DecisionRecord to trackingData;
