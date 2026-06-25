@@ -39,6 +39,8 @@ package ProjectRequirementVerification {
 
     verification sr07Verify : Test { :>> id = "7a1c0007-0007-4e07-9a07-516273840007"; :>> title = "Verify sr07AgentLoop"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "A discipline guide + validator toolchain let an AI agent orient->execute->validate->record->commit autonomously: CLAUDE.md (the discipline), .githooks/pre-commit (rust validate + 9 forward guards), and the `sysmlv2` CLI provide the loop. (The requirement names the retired validate_all.py; the Rust authority D0048 superseded it — capability preserved.) Inspect CLAUDE.md + .githooks/pre-commit; this session's 70+ autonomous sprints are the demonstration."; }
     part sr07VerifyR1 : TestResult { :>> id = "7a1c0007-0007-4e07-9a07-5162738400a7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R2 (A1 re-verify at HEAD): the deliverable source drifted since R1; the reverify gate (cargo test --workspace --release + clippy -D warnings, target/reverify) passed GREEN at edd7b75, and the agent loop (CLAUDE.md + pre-commit + keel CLI) is in active use this sitting. Claim holds; refreshed.
+    part sr07VerifyR2 : TestResult { :>> id = "7a1c0007-0007-4e07-9a07-5162738400c7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr07Verify to sr07AgentLoop;
 
     verification sr08Verify : Test { :>> id = "7a1c0008-0008-4e08-9a08-516273840008"; :>> title = "Verify sr08TraceQuery"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "A query traces a Need forward to its satisfying SystemRequirements from satisfy edges in text: `sysmlv2 trace-need n01AtomicItems .` returns the satisfy-edge trace JSON (confirmed live). Re-run: `sysmlv2 trace-need <need>`."; }
@@ -51,6 +53,8 @@ package ProjectRequirementVerification {
 
     verification sr10Verify : Test { :>> id = "7a1c0010-0010-4e10-9a10-516273840010"; :>> title = "Verify sr10RustCli"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "A Rust CLI binary performs parse/validate/orient/trace-need without JVM/conda/Jupyter: target/release/sysmlv2 runs all of these natively (used throughout this session, no kernel); cargo test -p sysmlv2-cli green. Re-run: `sysmlv2 validate|orient|trace-need` with no conda env active."; }
     part sr10VerifyR1 : TestResult { :>> id = "7a1c0010-0010-4e10-9a10-5162738400b0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R2 (A1 re-verify at HEAD): the reverify gate passed GREEN at edd7b75 (cargo test --workspace --release + clippy); the Rust CLI (parse/validate/orient, no JVM) is in active use this sitting. Claim holds; refreshed.
+    part sr10VerifyR2 : TestResult { :>> id = "7a1c0010-0010-4e10-9a10-5162738400c0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr10Verify to sr10RustCli;
 
     // sr11FastStart: target revised by D0083 (parse/validate < 500ms + full orient-with-suspicion
@@ -66,10 +70,14 @@ package ProjectRequirementVerification {
 
     verification sr12Verify : Test { :>> id = "7a1c0012-0012-4e12-9a12-516273840012"; :>> title = "Verify sr12DenyWarnings"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "The crates compile under #![deny(warnings, clippy::all, pedantic, nursery)] with no unwrap/expect/index-without-bounds in src/ outside tests: `cargo clippy --workspace --all-targets` is green at HEAD (the lints are declared in main.rs/lib.rs and enforced in pre-commit). Re-run: cargo clippy --workspace --all-targets -- -D warnings."; }
     part sr12VerifyR1 : TestResult { :>> id = "7a1c0012-0012-4e12-9a12-5162738400b2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R2 (A1 re-verify at HEAD): the reverify gate ran `cargo clippy --workspace --all-targets -- -D warnings` GREEN at edd7b75 — the #![deny(warnings, pedantic, nursery)] lint floor holds. Refreshed.
+    part sr12VerifyR2 : TestResult { :>> id = "7a1c0012-0012-4e12-9a12-5162738400c2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr12Verify to sr12DenyWarnings;
 
     verification sr13Verify : Test { :>> id = "7a1c0013-0013-4e13-9a13-516273840013"; :>> title = "Verify sr13SpecPin"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "build.rs embeds the canonical SysML v2 spec URL + pinned grammar SHA as compile-time constants and verifies the fetched manifest's SHA-256 (fail on divergence; SYSML_V2_SPEC_OFFLINE=1 skips): sysmlv2-parser/build.rs defines SYSML_V2_SPEC_URL + SYSML_V2_GRAMMAR_SHA + sha256_hex check (inspected). Inspect sysmlv2-parser/build.rs."; }
     part sr13VerifyR1 : TestResult { :>> id = "7a1c0013-0013-4e13-9a13-5162738400b3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0941e97"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R2 (A1 re-verify at HEAD): the reverify gate (cargo test --workspace --release) built GREEN at edd7b75 — build.rs still embeds + checks the pinned SysML v2 spec SHA (inspected; unchanged). Refreshed.
+    part sr13VerifyR2 : TestResult { :>> id = "7a1c0013-0013-4e13-9a13-5162738400c3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr13Verify to sr13SpecPin;
 
     verification sr14Verify : Test { :>> id = "7a1c0014-0014-4e14-9a14-516273840014"; :>> title = "Verify sr14TddBdd"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "Parser/semantic behavior is covered by cucumber-rs BDD + proptest property tests, and CI enforces cargo test + clippy green: the BDD feature files + proptest strategies exist in the crates and `cargo test --workspace` passes (28 + 31 + scenario suites). Re-run: cargo test --workspace."; }
