@@ -1710,6 +1710,9 @@ package ProjectCritiques {
     verification issue050Disp1 : Test { :>> id = "e0500050-d150-4e50-9050-516273840d50"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::acceptRisk; :>> procedureText = "ACCEPT-RISK (human, 2026-06-25): the d0098-correctness finding (open Critical findings are non-blocking, not just incompleteness) is risk-ACCEPTED. The visibility-only posture stands — open Critical findings are surfaced on the orient burndown + carry a disposition obligation, but never hard-block a commit — consistent with D0098's deliberate choice that hard-gating completeness forces fakery / blocks honest recording. The candidate resolver criticalFindingGatingReview is MOOTED (not pursued). The human chose 'ACCEPT-RISK' on the issue050 disposition prompt."; }
     part issue050Disp1R1 : TestResult { :>> id = "e0500050-d150-4e50-9050-516273840d51"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "22aa11c"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "wweatherholtz"; }
     #Dispositions dependency from issue050Disp1 to issue050;
+    // D0102: typed finding->critique link so critique_suspect can see issue050 (accept-risk'd) clears
+    // d0098's fail critique — the disposition resolves the suspicion via a typed path, not prose.
+    #DependsOn dependency from issue050 to d0098CorrectnessCritique;
 
     // ── A2 batch 2 (2026-06-25): Core-3 critique of d0101 + n17 + sr15/sr16/sr17. Independent critic
     //    claudeOpus != authors. All 15 survived (genuine attacks; minor caveats noted, none a finding). ──

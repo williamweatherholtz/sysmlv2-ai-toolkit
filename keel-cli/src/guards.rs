@@ -734,6 +734,26 @@ pub fn critique_rigor(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard (D0102/issue052): an accepted Decision that names a Need/SystemRequirement in its prose but
+/// carries NO typed edge to it — a governance/derivation link that should be typed, not prose.
+///
+/// WARNING-level: it RUNS in `GUARD_NAMES` (visible on every commit, not ignorable) but emits warnings,
+/// never violations, so it does not block (D0102 — warning first; promotable to a hard gate once proven
+/// low-noise by moving the warnings to violations). A compute error IS a violation.
+#[must_use]
+pub fn decision_requirement_link(root: &Path) -> GuardReport {
+    match crate::view::decision_requirement_prose_links(root) {
+        Ok(pairs) => {
+            let warnings = pairs
+                .iter()
+                .map(|(d, r)| format!("{d} names {r} in prose but has no typed edge to it (D0102 — link via #DependsOn/#Supersede/#DerivedFrom/satisfy/derive)"))
+                .collect();
+            GuardReport { name: "decision-requirement-link", scanned: pairs.len(), warnings, violations: Vec::new() }
+        }
+        Err(e) => GuardReport { name: "decision-requirement-link", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing decision-requirement links: {e}")] },
+    }
+}
+
 // ── process-skill guard (D0059/issue036: no inert process — every process has a deploying skill) ──
 
 /// Every `.engine/processes/<file>.sysml` path referenced anywhere in the skills-registry text.
@@ -817,8 +837,8 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 12] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness"];
+pub const GUARD_NAMES: [&str; 13] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-requirement-link"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -838,6 +858,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "critic-independence" => Some(critic_independence(root)),
         "process-skill" => Some(process_skill(root)),
         "requirement-rootedness" => Some(requirement_rootedness(root)),
+        "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         "defect-guard-coverage" => Some(defect_guard_coverage(root)), // runnable-only (D0047/issue039)
         _ => None,

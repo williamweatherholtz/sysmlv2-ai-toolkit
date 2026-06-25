@@ -73,7 +73,9 @@ at HEAD. Read state from tooling, not memory.
    lens. Record the `method=critique` Test (lens, critiquedBy) + TestResult (outcome, judgedBy != author,
    judgedAgainst HEAD), `#Verify`-linked to the target.
 3. **Findings:** every `fail` → an `Issue { description; severity }` triaged via the issue-resolution
-   skill (`#Resolves` to a resolving action or mooting Decision).
+   skill (`#Resolves` to a resolving action or mooting Decision). Also add the TYPED finding→critique
+   link `#DependsOn dependency from <issueNNN> to <critiqueTest>;` (D0102) — so a later ACCEPT-RISK/DISMISS
+   disposition clears the target's `critique_suspect` via a typed path (never prose).
 4. **Disposition (D0092):** for every >= Medium finding, get the human's TYPED verdict and record it
    via `keel apply-review` (batch verdict `act`/`accept-risk`/`dismiss` on the finding Issue) — a
    `#Dispositions`-linked `method=confirmation` verification carrying `disposition : DispositionKind`,

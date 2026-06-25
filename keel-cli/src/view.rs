@@ -1825,6 +1825,22 @@ pub fn critique_suspect(root: &Path) -> Result<Vec<String>, ViewError> {
 
 /// Pure core of [`critique_suspect`]: the sorted set of elements with an unresolved failing critique.
 fn critique_suspect_set(model: &Model) -> Vec<String> {
+    // D0102: a fail critique whose finding Issue is dispositioned ACCEPT-RISK/DISMISS no longer induces
+    // suspicion — the verdict consciously resolved it. The finding->critique link is the typed `#DependsOn`
+    // edge from the Issue to the critique Test (so the computation has a typed path, not prose).
+    let mut accepted: HashSet<String> = HashSet::new(); // critique Tests whose finding is accept-risk/dismiss
+    for (iname, iinfo) in &model.items {
+        if iinfo.type_name != "Issue" {
+            continue;
+        }
+        if matches!(issue_disposition(model, iname).as_deref(), Some("acceptRisk" | "dismiss")) {
+            for e in &model.edges {
+                if e.kind == "dependson" && &e.from == iname {
+                    accepted.insert(e.to.clone());
+                }
+            }
+        }
+    }
     let mut suspect: HashSet<String> = HashSet::new();
     for e in &model.edges {
         if e.kind != "verify" {
@@ -1834,6 +1850,9 @@ fn critique_suspect_set(model: &Model) -> Vec<String> {
         if src.attrs.get("method").map(String::as_str) != Some("critique") {
             continue;
         }
+        if accepted.contains(&e.from) {
+            continue; // D0102: this fail critique's finding was accept-risk'd / dismissed
+        }
         if matches!(latest_result(model, &e.from), Some((ref o, _)) if o == "fail") {
             suspect.insert(e.to.clone());
         }
@@ -1841,6 +1860,48 @@ fn critique_suspect_set(model: &Model) -> Vec<String> {
     let mut out: Vec<String> = suspect.into_iter().collect();
     out.sort();
     out
+}
+
+/// True if `token` occurs in `haystack` as a whole identifier (not a substring of a longer one) — so
+/// `sr1` does not match inside `sr15ServeIntrospect`. Used by [`decision_requirement_prose_links`].
+fn contains_token(haystack: &str, token: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    haystack.match_indices(token).any(|(i, _)| {
+        let before_ok = i == 0 || bytes.get(i - 1).is_none_or(|b| !b.is_ascii_alphanumeric());
+        let after_ok = bytes.get(i + token.len()).is_none_or(|b| !b.is_ascii_alphanumeric());
+        before_ok && after_ok
+    })
+}
+
+/// Decision→requirement references that exist only in PROSE (D0102, the issue052 defect class).
+///
+/// For each accepted Decision, the Needs/SystemRequirements its authored text names by exact identifier
+/// but to which it carries NO typed edge. Each `(decision, requirement)` pair is a governance/derivation
+/// link that should be typed, not prose. A computed `#View` (warning-level, never blocks).
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn decision_requirement_prose_links(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let reqs: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Need" || i.type_name == "SystemRequirement").map(|(n, _)| n).collect();
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (dname, dinfo) in &model.items {
+        if dinfo.type_name != "Decision" || dinfo.attrs.get("status").map(String::as_str) != Some("accepted") {
+            continue;
+        }
+        let text: String = ["context", "decision", "rationale", "consequences"].iter().filter_map(|f| dinfo.attrs.get(*f)).cloned().collect::<Vec<_>>().join(" ");
+        for r in &reqs {
+            if !contains_token(&text, r) {
+                continue;
+            }
+            let linked = model.edges.iter().any(|e| (&e.from == dname && e.to == **r) || (e.from == **r && &e.to == dname));
+            if !linked {
+                out.push((dname.clone(), (*r).clone()));
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// Critical-finding targets lacking a non-aiModel critic (D0080/issue031 independence).
@@ -3592,6 +3653,17 @@ mod tests {
         assert_eq!(got.len(), 2);
         assert!(got.contains("c1"));
         assert!(got.contains("r1"));
+    }
+
+    #[test]
+    fn contains_token_is_identifier_bounded() {
+        // D0102 decision-requirement-link: exact-identifier match, not substring — sr1 must NOT match
+        // inside sr15ServeIntrospect, but a real reference (any non-alphanumeric boundary) does.
+        assert!(contains_token("descoped by sr19ServeWhiteboxBoundary today", "sr19ServeWhiteboxBoundary"));
+        assert!(contains_token("see (d0100).", "d0100"));
+        assert!(contains_token("n17ServeGranularWhitebox", "n17ServeGranularWhitebox"));
+        assert!(!contains_token("sr15ServeIntrospect", "sr1"));
+        assert!(!contains_token("sr150Foo", "sr15"));
     }
 
     #[test]
