@@ -324,8 +324,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\keel.exe guard                                                               # ALL thirteen forward guards (no kernel) — 12 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only)
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL fourteen forward guards (no kernel) — 13 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only)
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -333,7 +333,7 @@ model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE.
 critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
 (`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
 state, never a commit blocker (don't fake a pass, don't block recording true state).
-The twelve hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098): `keel guard` (actors
+The thirteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098): `keel guard` (actors
 D0037, acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
 D0068, process-change D0070 keystone, issues D0077/D0078 [every recorded problem accounted for],
 viewpoint-renderer D0056/issue034 [renderers must name a real `keel` command, no retired query.py/
@@ -343,7 +343,9 @@ honesty], process-skill D0059/issue036 [no inert process — every `.engine/proc
 by a deploying skill's purpose], requirement-rootedness D0098/D0099/issue047 [a `#Capability`-marked
 user-facing feature must carry a `#DerivedFrom`→Need edge; UNMARKED decision-driven work is exempt —
 the engine is legitimately decision-driven, D0064; the full charter-source balance is the non-blocking
-`keel rootedness` burndown]). A THIRTEENTH guard, `decision-requirement-link` (D0102/issue052), RUNS in
+`keel rootedness` burndown], decision-rationale D0103 [every Decision must carry a SUBSTANTIVE context +
+rationale — the why — not a blank/trivial field; guarantees the decision-record's basis for future
+improvement + reevaluation]). A FOURTEENTH guard, `decision-requirement-link` (D0102/issue052), RUNS in
 `keel guard` every commit but is WARNING-level (visible, never blocks): it flags an accepted Decision
 that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance link that should
 be typed, not prose) — promotable to a hard gate once proven low-noise. (Relatedly, `critique_suspect`

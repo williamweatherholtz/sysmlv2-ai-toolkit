@@ -1873,6 +1873,28 @@ fn contains_token(haystack: &str, token: &str) -> bool {
     })
 }
 
+/// Decisions whose `context` OR `rationale` is blank/trivial (D0103): trimmed length < 20 chars.
+///
+/// Returns `(total decisions, weak names)`. A recorded decision without a substantive why is ill-formed
+/// state — the `decision-rationale` hard guard reads this. (`decision`/`consequences` stay schema-required.)
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn decisions_weak_rationale(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let model = Model::build(root)?;
+    let decisions: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| i.type_name == "Decision").collect();
+    let mut weak: Vec<String> = decisions
+        .iter()
+        .filter(|(_, info)| {
+            let blank = |f: &str| info.attrs.get(f).is_none_or(|v| v.trim().len() < 20);
+            blank("context") || blank("rationale")
+        })
+        .map(|(n, _)| (*n).clone())
+        .collect();
+    weak.sort();
+    Ok((decisions.len(), weak))
+}
+
 /// Decision→requirement references that exist only in PROSE (D0102, the issue052 defect class).
 ///
 /// For each accepted Decision, the Needs/SystemRequirements its authored text names by exact identifier
