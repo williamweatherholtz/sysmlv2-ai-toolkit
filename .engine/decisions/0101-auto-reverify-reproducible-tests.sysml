@@ -1,0 +1,31 @@
+// =====================================================================
+// D0101 — `keel reverify`: auto-re-verify drift-suspect REPRODUCIBLE method=test verifications by actually
+// re-running the recorded command at HEAD and appending a fresh TestResult on green. Surfaced by the
+// human's question "why aren't our processes automatically fixing suspicion items?" (2026-06-24). Answer:
+// suspicion is correctly NOT auto-cleared (the engine refuses to fabricate evidence — honest-state D0098;
+// clearing requires actually re-running the check). But for method=test verifications whose evidence is a
+// REPRODUCIBLE command, the engine CAN run it + stamp a fresh result honestly — lowering the re-verify
+// toil (D0054). CHANGE: a new subcommand + a reverify-command contract; alters re-verify automation (not a
+// guard/gate definition). Accepted 2026-06-24 by wweatherholtz (chose "Build autoReverify first (CHANGE)").
+// =====================================================================
+package Decision0101 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    part d0101 : Decision {
+        :>> id = "01a1b0c1-4101-42a3-ab5c-516273849701";
+        :>> title = "D0101: `keel reverify` — auto-re-verify drift-suspect reproducible method=test checks by re-running the command at HEAD (honest, never fabricated)";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Reviewing pre-v0.1.0 gaps, the human asked why suspicion isn't auto-fixed (based on commit? something else?). Suspicion IS computed from git (a verification is suspect when its covered source changed after its judged-against commit; D0050/D0084/D0086) and clears automatically the next compute once a FRESH verification is recorded. It is deliberately NOT auto-bumped: clearing it requires actually re-running the check, and auto-asserting 'still verified' without re-running would fabricate evidence — exactly the dishonesty honest-state (D0098) forbids. BUT a real friction gap exists: for method=test verifications whose evidence is a REPRODUCIBLE command (cargo test, clippy, keel validate/guard), the engine CAN re-run the command at HEAD and append a fresh result honestly — instead of manual append-result toil (the A1 reverifyDeliverableAtHead chore, repeated every time the deliverable source drifts). confirmation/inspect/analyze/demo cannot be automated (they need human/contextual judgment).";
+        :>> decision = "Add `keel reverify [--all-drift | --task NAME] [ROOT]`. It (1) computes the drift-suspect deliverable tasks (the same source-drift computation as `keel suspect`, over deliverable-manifest.txt); (2) runs the project's REVERIFY COMMAND(S) declared in a new `.engine/contracts/reverify.toml` (`commands = [\"cargo test --workspace\", \"cargo clippy --workspace --all-targets -- -D warnings\"]` for this project; absent file => reverify is a no-op that reports 'no reverify command configured', so downstream projects opt in); (3) on ALL commands exit 0, appends a FRESH judged-at-HEAD TestResult to each drift-suspect task via the write API (append_result); (4) on ANY non-zero exit, leaves the tasks suspect and reports which command failed + its output tail. It NEVER fabricates: a fresh result is stamped ONLY after the real command passed at HEAD. Scope: method=test reproducible verifications only; it refuses to touch confirmation/inspect/analyze/demo verifications (those stay manual). The reverify-command contract is downstream-overridable, like critique-policy.toml.";
+        :>> rationale = "ALTERNATIVES: (i) auto-bump the verifiedAtCommit on any new commit — REJECTED (fabricates evidence; the exact honest-state violation D0098 exists to prevent). (ii) leave it fully manual (status quo, the A1 chore) — REJECTED (D0054 friction; the human flagged it). (iii) have the tool TRUST an externally-run gate and just stamp — REJECTED (not self-evidencing; 'auto' must actually run the check). (iv) CHOSEN — run the configured reproducible command + stamp on green: honest (it really ran), low-friction (one command), downstream-general (config-driven), and scoped to the only verification class that CAN be safely automated (reproducible method=test). CRITERIA: honesty (no fabricated pass) x friction (D0054) x generality (config, not hardcoded cargo) x scope-safety (test-only; judgment methods stay manual).";
+        :>> consequences = "New subcommand `keel reverify` + a new `.engine/contracts/reverify.toml` contract (this project: the cargo test + clippy gate; shipped to downstream via keel init, which they edit). A1 (reverifyDeliverableAtHead) becomes `keel reverify --all-drift` instead of manual append-result per task — it supersedes the manual A1 toil going forward. The drift-suspect set clears when the gate passes at HEAD; stays flagged (honestly) when it fails. No change to the suspect COMPUTATION or any guard/gate definition (so no #ProspectiveChange keystone — this adds an automation tool, it does not change what 'suspect' or 'done' MEAN). doc-sync: CLAUDE.md §5 (the reverify command alongside validate/guard) + the suspect/D0050 narrative; README if it lists subcommands. Re-critique-on-resolution (the same friction for critiques, observed in sprint158) is a noted future extension, out of this scope.";
+    }
+
+    verification d0101Accept : Test { :>> id = "01a1b0c1-4101-42a3-bb5c-516273849701"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of d0101 (`keel reverify` auto-re-verifies drift-suspect reproducible method=test checks by re-running the configured command at HEAD and stamping a fresh result on green; never fabricates; judgment methods stay manual) via the explicit choice of 'Build autoReverify first (CHANGE)' on 2026-06-24, in answer to 'why aren't suspicion items auto-fixed?'."; }
+    part d0101AcceptR1 : TestResult { :>> id = "01a1b0c1-4101-42a3-cb5c-516273849701"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6669845"; :>> judgedAt = "2026-06-24"; :>> judgedBy = "wweatherholtz"; }
+}

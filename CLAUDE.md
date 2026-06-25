@@ -36,7 +36,10 @@ The **Rust toolchain is the sole authority (D0048; query.py retired at M4/D0074)
 `keel orient [ROOT]` (JSON) / `keel whats-next [ROOT]` (ready list).
 `orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
 verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
-source changed since it was verified — re-verify at HEAD to clear it.
+source changed since it was verified — re-verify at HEAD to clear it. For REPRODUCIBLE
+`method=test` drift, `keel reverify [--all-drift | --task NAME]` (D0101) re-runs the gate
+declared in `.engine/contracts/reverify.toml` and, on green, stamps a fresh judged-at-HEAD
+`TestResult` per drift task (honest — never fabricated; judgment methods stay manual).
 Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
 Rust tooling computes them: `keel orphans` renders the orphans viewpoint (needs/requirements/
 tasks/issues missing required edges); `keel view <name>`, `audit`, `attestation-coverage`,
@@ -323,6 +326,7 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe guard                                                               # ALL twelve HONEST-STATE forward guards (no kernel) — exit≠0 on any violation
 .\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
 model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE. Completeness (coverage,

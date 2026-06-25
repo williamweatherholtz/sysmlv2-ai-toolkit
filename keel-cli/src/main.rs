@@ -375,6 +375,34 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
     0
 }
 
+/// `keel reverify [--all-drift | --task NAME] [--by ACTOR] [ROOT]` (D0101) — re-run the configured gate
+/// at HEAD and stamp a fresh `TestResult` on each drift-suspect task on green.
+fn cmd_reverify(args: &[String]) -> i32 {
+    let mut task: Option<String> = None;
+    let mut by = "claudeOpus".to_string();
+    let mut root: Option<PathBuf> = None;
+    let mut i = 0;
+    while let Some(a) = args.get(i) {
+        match a.as_str() {
+            "--all-drift" => {}
+            "--task" => {
+                i += 1;
+                task = args.get(i).cloned();
+            }
+            "--by" => {
+                i += 1;
+                if let Some(b) = args.get(i) {
+                    by.clone_from(b);
+                }
+            }
+            other => root = Some(PathBuf::from(other)),
+        }
+        i += 1;
+    }
+    let root = root.or_else(find_repo_root).unwrap_or_else(|| PathBuf::from("."));
+    keel_cli::reverify::run(&root, task.as_deref(), &by)
+}
+
 fn cmd_open_issues(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -1274,6 +1302,7 @@ fn main() {
         Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("boundary-sweep") => cmd_query0(rest, "keel boundary-sweep [ROOT]", |r| keel_cli::view::boundary_sweep_json(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+        Some("reverify") => cmd_reverify(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
