@@ -451,6 +451,9 @@ package ProjectArchitecture {
     satisfy n16ServeCritiqueLoop by sr17ServeDirectedNoChat;
     satisfy n17ServeGranularWhitebox by sr18ServeSectionCritique;
     satisfy n17ServeGranularWhitebox by sr19ServeWhiteboxBoundary;
+    // D0100 descoped sr19's AI-proposed-clustering boundary mode (use existing structure instead). The
+    // typed link makes that descope traceable from sr19 (resolves issue052 — was prose-only in D0100).
+    #DependsOn dependency from sr19ServeWhiteboxBoundary to d0100;
 
     allocate sr01TypedItems to schemaCoreComp;
     allocate sr02DecisionRecord to trackingData;
