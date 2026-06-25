@@ -66,6 +66,11 @@ package ProjectRequirementVerification {
     // was amended (D0083) AFTER R1's commit (324ab15). Re-judged at 96584de where the statement is
     // stable and matches this evidence. Demonstrates the re-verify-on-change loop end to end.
     part sr11VerifyR2 : TestResult { :>> id = "7a1c0011-0011-4e11-9a11-5162738400b2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "96584de"; :>> judgedAt = "2026-06-21"; :>> judgedBy = "claudeOpus"; }
+    // R3 (B1 charterDebtGateCoverage re-verify at HEAD): the source drifted since R2, leaving sr11/n11 the
+    // last charter-debt (uncovered) pair. Re-measured at HEAD (D0083 two-bar target): keel validate ~88-118ms
+    // (< 500ms) AND keel orient ~0.86-1.12s (< 1.5s) over 4 runs (subprocess-timed, incl. spawn overhead).
+    // Both bars met; FastStart holds. Re-run: time `keel validate .` + `keel orient .`.
+    part sr11VerifyR3 : TestResult { :>> id = "7a1c0011-0011-4e11-9a11-5162738400c1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a342cac"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
     #Verify dependency from sr11Verify to sr11FastStart;
 
     verification sr12Verify : Test { :>> id = "7a1c0012-0012-4e12-9a12-516273840012"; :>> title = "Verify sr12DenyWarnings"; :>> createdAt = "2026-06-21"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "The crates compile under #![deny(warnings, clippy::all, pedantic, nursery)] with no unwrap/expect/index-without-bounds in src/ outside tests: `cargo clippy --workspace --all-targets` is green at HEAD (the lints are declared in main.rs/lib.rs and enforced in pre-commit). Re-run: cargo clippy --workspace --all-targets -- -D warnings."; }
