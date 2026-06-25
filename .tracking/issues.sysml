@@ -587,4 +587,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from criticalFindingGatingReview to issue050;
+
+    part issue052 : Issue {
+        :>> id = "e0520052-0052-4e52-9052-516273840052";
+        :>> title = "sr19ServeWhiteboxBoundary's statement overclaims 'AI-proposed clusters' vs the D0100 descope";
+        :>> createdAt = "2026-06-25";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Critique finding (A2 batch 3, sr19 x correctness, Medium): sr19's statement asserts 'boundaries definable both as AI-proposed clusters AND as human-declared views', but D0100 (accepted 2026-06-24) DESCOPED AI-proposed graph clustering (weak deterministic substrate over the work/requirements graph; low ROI vs the human-declared boundaries sr18 provides). sr19 was delivered + verified (sr19Verify) over human-declared / structural (Need-slice) boundaries ONLY. So the SR is marked verified while one clause of its statement (AI-clustering) is deliberately un-built — the statement overclaims relative to the accepted + verified scope, and a reader of sr19 alone would expect a capability D0100 chose not to build. Candidate resolver (if ACT): sr19StatementAlignD0100 — revise sr19's statement to match D0100 (drop or mark-deferred the AI-proposed-clusters clause, keep AI-proposed-clusters as future/optional), so verified == statement; re-verify. PENDING human disposition (ACT / ACCEPT-RISK the descope-is-recorded-in-D0100 posture / DISMISS).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "sr19StatementAlignD0100";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from sr19StatementAlignD0100 to issue052;
 }
