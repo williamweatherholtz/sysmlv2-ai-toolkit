@@ -1895,11 +1895,35 @@ pub fn decisions_weak_rationale(root: &Path) -> Result<(usize, Vec<String>), Vie
     Ok((decisions.len(), weak))
 }
 
-/// Decision→requirement references that exist only in PROSE (D0102, the issue052 defect class).
+/// Governance verbs (D0104): a Decision GOVERNS a requirement (vs merely mentioning it) when one of these
+/// sits near the requirement name. Matched as a lowercase substring so inflections count (amended/descoped).
+const GOV_VERBS: &[&str] = &["amend", "supersede", "descope", "revise", "cancel", "replace", "retire", "rescope", "moot"];
+
+/// True if `window` cites a FOREIGN decision id (`dNNNN`/`DNNNN` whose digits != `own_digits`).
+fn has_foreign_decision_id(window: &str, own_digits: &str) -> bool {
+    let b = window.as_bytes();
+    (0..b.len()).any(|i| {
+        let id_start = matches!(b.get(i), Some(b'd' | b'D'))
+            && b.get(i + 1..i + 5).is_some_and(|d| d.iter().all(u8::is_ascii_digit))
+            && b.get(i + 5).is_none_or(|c| !c.is_ascii_digit())
+            && (i == 0 || b.get(i - 1).is_none_or(|c| !c.is_ascii_alphanumeric()));
+        id_start && b.get(i + 1..i + 5).is_some_and(|d| d.iter().map(|&c| c as char).collect::<String>() != own_digits)
+    })
+}
+
+/// True if `window` (text around a requirement mention) reads as GOVERNANCE by the decision `own_digits`
+/// (D0104): a governance verb is present AND no FOREIGN decision id is cited (a foreign id means the verb is
+/// attributed to ANOTHER decision — a citation, not this decision's action).
+fn is_governance_mention(window: &str, own_digits: &str) -> bool {
+    let lower = window.to_lowercase();
+    GOV_VERBS.iter().any(|v| lower.contains(v)) && !has_foreign_decision_id(window, own_digits)
+}
+
+/// Decision→requirement GOVERNANCE references that exist only in PROSE (D0102/D0104, the issue052 class).
 ///
-/// For each accepted Decision, the Needs/SystemRequirements its authored text names by exact identifier
-/// but to which it carries NO typed edge. Each `(decision, requirement)` pair is a governance/derivation
-/// link that should be typed, not prose. A computed `#View` (warning-level, never blocks).
+/// For each accepted Decision, the Needs/SystemRequirements its text GOVERNS (a governance verb near the
+/// exact name, no foreign decision id) but to which it carries NO typed edge — a governance link that
+/// should be typed, not prose. Contextual mentions/examples are excluded (D0104). A computed `#View`.
 ///
 /// # Errors
 /// Returns [`ViewError`] on a parse failure.
@@ -1911,13 +1935,34 @@ pub fn decision_requirement_prose_links(root: &Path) -> Result<Vec<(String, Stri
         if dinfo.type_name != "Decision" || dinfo.attrs.get("status").map(String::as_str) != Some("accepted") {
             continue;
         }
+        let own_digits: String = dname.chars().filter(char::is_ascii_digit).take(4).collect();
         let text: String = ["context", "decision", "rationale", "consequences"].iter().filter_map(|f| dinfo.attrs.get(*f)).cloned().collect::<Vec<_>>().join(" ");
         for r in &reqs {
             if !contains_token(&text, r) {
                 continue;
             }
-            let linked = model.edges.iter().any(|e| (&e.from == dname && e.to == **r) || (e.from == **r && &e.to == dname));
-            if !linked {
+            if model.edges.iter().any(|e| (&e.from == dname && e.to == **r) || (e.from == **r && &e.to == dname)) {
+                continue; // already typed-linked
+            }
+            // D0104: flag only a GOVERNANCE mention (governance verb near R, no foreign decision id) — not a
+            // contextual example or a description of another decision's action.
+            let governs = text.match_indices(r.as_str()).any(|(i, _)| {
+                let bytes = text.as_bytes();
+                let boundary = (i == 0 || bytes.get(i - 1).is_none_or(|b| !b.is_ascii_alphanumeric())) && bytes.get(i + r.len()).is_none_or(|b| !b.is_ascii_alphanumeric());
+                if !boundary {
+                    return false;
+                }
+                let mut lo = i.saturating_sub(60);
+                let mut hi = (i + r.len() + 60).min(text.len());
+                while lo > 0 && !text.is_char_boundary(lo) {
+                    lo -= 1;
+                }
+                while hi < text.len() && !text.is_char_boundary(hi) {
+                    hi += 1;
+                }
+                is_governance_mention(text.get(lo..hi).unwrap_or(&text), &own_digits)
+            });
+            if governs {
                 out.push((dname.clone(), (*r).clone()));
             }
         }
@@ -3686,6 +3731,18 @@ mod tests {
         assert!(contains_token("n17ServeGranularWhitebox", "n17ServeGranularWhitebox"));
         assert!(!contains_token("sr15ServeIntrospect", "sr1"));
         assert!(!contains_token("sr150Foo", "sr15"));
+    }
+
+    #[test]
+    fn governance_mention_distinguishes_governance_from_context() {
+        // D0104: this decision's own governance (verb + no foreign id) -> true.
+        assert!(is_governance_mention("Amend the statements of need n11FastStart and requirement sr11FastStart to state both bars", "0083"));
+        // describes ANOTHER decision's action (foreign id D0083 near) -> false.
+        assert!(!is_governance_mention("amending sr11FastStart's statement (D0083) left sr11Verify falsely stale", "0084"));
+        // pure example, no governance verb -> false.
+        assert!(!is_governance_mention("sr11FastStart is a measured GAP (orient ~13.6s vs <500ms)", "0082"));
+        // cites a foreign decision's descope -> false.
+        assert!(!is_governance_mention("D0100 descoped sr19ServeWhiteboxBoundary's AI-clustering boundary mode", "0102"));
     }
 
     #[test]
