@@ -1,0 +1,38 @@
+// ProjectDeliveryS171 — Sprint 171: postReleaseBurndown (post-v0.1.0) — clear the post-session burndown.
+// Critique the 3 new decisions D0102/D0103/D0104 (Decision Core-3 = completeness/correctness/feasibility, 9
+// method=critique verifications, all survived) -> critique-coverage 100% / assured READY; then `keel reverify
+// --all-drift` to re-stamp the 2 reproducible drift tasks (rustS5CLI, rustToolchainFix) fresh at HEAD ->
+// suspect clean. EXECUTE. 1 pt. AUTONOMOUS (D0049).
+package ProjectDeliveryS171 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from postReleaseBurndownStory to postReleaseBurndown;
+
+    part postReleaseBurndownStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c171-51627384d001";
+        :>> title = "Sprint 171: postReleaseBurndown (1 pt) - critique D0102-D0104 + reverify drift -> assured READY / suspect clean";
+        :>> createdAt = "2026-06-30"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p3; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS171 {
+        action storyPostReleaseBurndown;
+        verification storyPostReleaseBurndownDoD : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d002"; :>> method = VerificationMethod::inspect; :>> procedureText = "Post-v0.1.0 burndown cleared. (1) Authored 9 method=critique verifications (critiques.sysml) for the 3 new decisions D0102/D0103/D0104 x Decision Core-3 (completeness/correctness/feasibility), independent critic claudeOpus != author wweatherholtz; all survived (genuine antagonistic attacks; minor caveats noted, no >=Medium findings -> no human disposition needed). VERIFIED: `keel critique-coverage .` -> 0 gaps (Decision 24/24, Need 3/3, SR 5/5); `keel assured .` -> ready=true. (2) `keel reverify --all-drift .` re-stamped the 2 reproducible drift tasks (rustS5CLI R10, rustToolchainFix R11) fresh at HEAD 9391588 -> `keel suspect .` suspect=[] + critique_suspect=[]. keel validate (184 clean) + guard all (14) green."; }
+        part storyPostReleaseBurndownDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification postReleaseBurndownRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d004"; :>> title = "Sprint 171 refine gate (DoR)"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the v0.1.0 release work added 3 governed decisions (D0102/D0103/D0104) and left 2 reproducible drift tasks suspect at the new HEAD. Both are pure burndown (no new code): author the required Core-3 critiques + run reverify. estimatedPoints=1. #CharteredBy postReleaseBurndown. DoR met."; }
+    part postReleaseBurndownRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    verification postReleaseBurndownStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d006"; :>> title = "Sprint 171 standup gate"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: author 9 method=critique verifications directly into critiques.sysml (the element-critique convention for an antagonistic decision review), #Verify-linked to each decision; then `keel reverify --all-drift`. No blockers; no code change."; }
+    part postReleaseBurndownStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    verification postReleaseBurndownImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d008"; :>> title = "Sprint 171 implement gate"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "9 critiques authored (d0102/d0103/d0104 x Core-3), all outcome=pass with genuine antagonistic procedureText; reverify re-stamped 2 drift. LIVE: critique-coverage 0 gaps; assured ready=true; suspect=[]; critique_suspect=[]; keel validate 184 clean; guard all (14) PASS."; }
+    part postReleaseBurndownImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    verification postReleaseBurndownReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d00a"; :>> title = "Sprint 171 review gate"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The critiques are genuine attacks, not rubber-stamps: each names the attack vector and why the decision survives, and the correctness lens on D0103 (the >=20-char rationale floor) and D0104 (the residual same-doc-quote false positive, kept warning-level) record real, honest caveats rather than pretending none exist. Coverage/assured/suspect all green by computation, not assertion. Clean."; }
+    part postReleaseBurndownReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    verification postReleaseBurndownCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d00c"; :>> title = "Sprint 171 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; the post-v0.1.0 burndown is cleared — critique-coverage 100% (0 gaps), assured ready=true, suspect=[] + critique_suspect=[]. keel validate (184) + guard all (14) green. Self-evidencing (D0051). Backlog outstanding remains 0."; }
+    part postReleaseBurndownCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+    verification postReleaseBurndownRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c171-51627384d00e"; :>> title = "Sprint 171 retro gate (autonomous, D0049)"; :>> createdAt = "2026-06-30"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the burndown surfaced AS burndown — the new decisions showed up uncovered in critique-coverage and the drift showed up in suspect the moment HEAD moved, exactly as honest-state design intends (D0098); clearing it was a mechanical, computed-verified pass with no surprises. AVOIDABLE-ISSUE SCAN: no avoidable defect this sprint — the 'gap' was expected, non-blocking burndown by design, not an escape. LESSON: every decision added in a release sprint creates Core-3 critique debt + a HEAD move re-suspects all reproducible drift; folding a short burndown sprint into the tail of any release is the cheap, predictable way to return to assured-READY/suspect-clean. Estimate 1 pt held. Backlog outstanding remains 0."; }
+    part postReleaseBurndownRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c171-51627384d00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
+}
