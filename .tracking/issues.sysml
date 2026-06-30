@@ -599,4 +599,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from sr19StatementAlignD0100 to issue052;
+
+    part issue053 : Issue {
+        :>> id = "e0530053-0053-4e53-9053-516273840053";
+        :>> title = "keel guard <ROOT> misread the ROOT arg as a guard name (e.g. `keel guard .` -> unknown guard)";
+        :>> createdAt = "2026-06-29";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Found during the v0.1.0 release smoke (sprint169): cmd_guard treated ANY non-'all' first arg as a guard NAME, so `keel guard .` or `keel guard myproj` (a ROOT path, as `keel validate <ROOT>` accepts) failed with 'unknown guard'. The scaffold's pre-commit hook uses bare `keel guard` (cwd-relative) so it was unaffected, but the CLI was inconsistent with `validate`. FIX (guardRootArgFix): classify_guard_args - a first arg that is a known guard name runs THAT guard; 'all'/no-arg/a non-name path runs ALL guards on that ROOT. Permanent control (D0047): unit test guard_args_distinguish_name_from_root. discoveredInField=false (release-smoke). severity Low (ergonomics; no wrong result, just a usage error).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "guardRootArgFix";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from guardRootArgFix to issue053;
 }

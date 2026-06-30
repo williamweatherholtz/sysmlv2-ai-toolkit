@@ -308,14 +308,31 @@ fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
     arg.map_or_else(find_repo_root, |p| Some(PathBuf::from(p)))
 }
 
+/// A string that names a runnable guard (an enforced one, or a runnable-only diagnostic).
+fn is_guard_name(s: &str) -> bool {
+    keel_cli::guards::GUARD_NAMES.contains(&s) || matches!(s, "assured" | "critique" | "critique-rigor" | "defect-guard-coverage")
+}
+
+/// Classify `keel guard` args into `(guard name to run, root arg)`. A first arg that is a known guard
+/// name runs THAT guard; `all`, no arg, or a non-name first arg (a ROOT path like `.` or a dir) runs
+/// ALL guards on that root. This is what lets `keel guard <ROOT>` work like `keel validate <ROOT>`.
+fn classify_guard_args(args: &[String]) -> (Option<&str>, Option<&str>) {
+    match args.first().map(String::as_str) {
+        None => (None, None),
+        Some("all") => (None, args.get(1).map(String::as_str)),
+        Some(a) if is_guard_name(a) => (Some(a), args.get(1).map(String::as_str)),
+        Some(a) => (None, Some(a)), // a bare ROOT, not a guard name
+    }
+}
+
 fn cmd_guard(args: &[String]) -> i32 {
-    // `keel guard` / `guard all [ROOT]` → run all six; `guard <name> [ROOT]` → run one.
-    let run_all = args.first().is_none_or(|a| a == "all");
-    let Some(root) = resolve_guard_root(args.get(1)) else {
+    // `keel guard` / `guard [ROOT]` / `guard all [ROOT]` → run all; `guard <name> [ROOT]` → run one.
+    let (name, root_arg) = classify_guard_args(args);
+    let Some(root) = resolve_guard_root(root_arg.map(String::from).as_ref()) else {
         eprintln!("error: no .engine/ directory found. usage: keel guard [<name>] [ROOT]");
         return 2;
     };
-    if run_all {
+    let Some(name) = name else {
         let reports = keel_cli::guards::run_all(&root);
         let mut all_ok = true;
         for r in &reports {
@@ -324,8 +341,7 @@ fn cmd_guard(args: &[String]) -> i32 {
         }
         println!("[guard] {}", if all_ok { "ALL PASS" } else { "FAILED" });
         return i32::from(!all_ok);
-    }
-    let Some(name) = args.first() else { return 2 };
+    };
     let Some(report) = keel_cli::guards::run_one(name, &root) else {
         eprintln!(
             "unknown guard '{name}' (enforced: {} | runnable diagnostics: assured, critique, critique-rigor, defect-guard-coverage)",
@@ -1344,7 +1360,21 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{remap_engine_path, Path};
+    use super::{classify_guard_args, remap_engine_path, Path};
+
+    #[test]
+    fn guard_args_distinguish_name_from_root() {
+        // Regression (v0.1.0 release smoke): `keel guard <ROOT>` must run all guards on ROOT, not read
+        // ROOT as a guard name. A known name runs that one guard; "all"/no-arg/a path runs all.
+        let s = |v: &[&str]| v.iter().map(|x| (*x).to_string()).collect::<Vec<_>>();
+        assert_eq!(classify_guard_args(&s(&[])), (None, None)); // run all, default root
+        assert_eq!(classify_guard_args(&s(&["all"])), (None, None)); // run all
+        assert_eq!(classify_guard_args(&s(&["myproj"])), (None, Some("myproj"))); // bare ROOT -> run all on it
+        assert_eq!(classify_guard_args(&s(&["."])), (None, Some("."))); // "." is a ROOT, not a guard
+        assert_eq!(classify_guard_args(&s(&["ceremony"])), (Some("ceremony"), None)); // a known guard name
+        assert_eq!(classify_guard_args(&s(&["ceremony", "myproj"])), (Some("ceremony"), Some("myproj"))); // name + root
+        assert_eq!(classify_guard_args(&s(&["all", "myproj"])), (None, Some("myproj"))); // all on root
+    }
 
     #[test]
     fn engine_path_remap_isolates_decisions() {
