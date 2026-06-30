@@ -611,4 +611,16 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from guardRootArgFix to issue053;
+
+    part issue054 : Issue {
+        :>> id = "e0540054-0054-4e54-9054-516273840054";
+        :>> title = "Architecture decisions can be locked before Needs exist, and decisions aren't captured at point-of-decision";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Found in downstream use bootstrapping a new keel project ('Ignite'): scope+architecture Decisions (full-drop-in, axum, plugin approach, demo-cut) were elicited and LOCKED before any Need was authored, and the human was asked to confirm Needs LAST; separately, none of the human's accepted decisions were recorded as Decisions at the moment they were made (they lived only in the chat until a later batch step). Two gaps: (F1) the Business->Architecture ordering is DEFINED in the workflows but ENFORCED by nothing - no hard guard checks needs-before-architecture; (F2) there is no `add-decision` write path, so recording a Decision is high-friction (hand-author a multi-field .sysml + acceptance event) and gets deferred/lost (contra D0054). PROPOSED FIX (needsFirstOrderingGuard): (C1) a `keel add-decision` write command that emits the Decision + its confirmation acceptance event in one call; (C2) a `keel guard ordering` (warning->hard per D0102) that flags an architectural Decision/SystemRequirement authored while zero Needs exist, or one carrying no satisfy/#DependsOn/charter edge to a Need; (C3) extend engine-triage + the planned UserPromptSubmit hook (issue020/sprint30) to require recorded Needs before architecture elicitation and to capture decisions at point-of-decision. Permanent control per D0047. Relates to D0054 (friction), D0064 (triage-first), issue020/sprint30 (per-interaction enforcement).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "needsFirstOrderingGuard";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from needsFirstOrderingGuard to issue054;
 }
