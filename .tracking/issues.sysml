@@ -623,4 +623,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from needsFirstOrderingGuard to issue054;
+
+    part issue055 : Issue {
+        :>> id = "e0550055-0055-4e55-9055-516273840055";
+        :>> title = "Substantive analysis/design/research has no charter home, so it runs untracked in conversation (issue054 recursed into the engine's own process)";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Surfaced while doing the declarative-controls design analysis for issue054 (docs/proposals/2026-06-30-declarative-controls-issue054.md): multi-turn, substantive design/diagnosis work (proving the 8-of-14 guard duplication, designing EdgeRule/ElementRule, resolving fork #1, authoring the proposal) ran with NO tracked sprint. ROOT (concrete, demonstrated): WorkKind::research EXISTS, but the charter model (D0068, enforced by guard:charter) requires every Story to #CharteredBy a Decision/Need/Requirement - and genuine UPSTREAM analysis precedes all three (the Decision is its OUTPUT). So pre-decision analysis cannot be chartered, falls outside the sprint system, and defaults to happening in conversation - the SAME defect as issue054 (substantive work uncaptured in chat), recursed one level up into the engine's OWN process. The schema affords the work-kind; the discipline never routes analysis through it. PROPOSED FIX (analysisChartersResearchSpike): allow a research Story to charter to an Issue or a status=proposed Decision (DoR), with DoD = a design artifact + a recorded (proposed) Decision; and update engine-triage to route substantial analysis/design through a chartered research spike rather than ad-hoc conversation. PROCESS CHANGE -> Change-Request path (Sec 3a). Relates to issue054 (same root), D0064 (triage-first), D0068 (charter), D0054 (friction).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "analysisChartersResearchSpike";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from analysisChartersResearchSpike to issue055;
 }
