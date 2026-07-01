@@ -635,4 +635,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from analysisChartersResearchSpike to issue055;
+
+    part issue056 : Issue {
+        :>> id = "e0560056-0056-4e56-9056-516273840056";
+        :>> title = "D0105 independent critique: residual findings C11 (AI-authored decision reframes accepted decisions) + C12 (two-thread coordination) need human disposition";
+        :>> createdAt = "2026-07-01";
+        :>> createdBy = "claudeSonnet46";
+        :>> description = "The independent Core-3 critique of D0105 (critic claudeSonnet46, sprint173) FAILED it as stale-vs-spike. The sprint173 rework RESOLVED the addressable findings (C1-C6/C10/C13: added OrderingRule as a third rule kind; corrected the 'scope is the load-bearing complexity' claim; added the rollback criterion + re-validation condition; folded the scope-cap meta-rule + OrderingRule into ONE frozen-core sign-off; made the reframe language conditional 'UPON ACCEPTANCE'; classified acceptance-events as an EdgeRule; specified the TOML migration concretely). TWO residual findings need a HUMAN, not an AI: C11 (High) - is it procedurally sound for an AI-authored status=proposed Decision to reframe THREE accepted decisions (D0047/D0088) on a conversational endorsement? This is precisely the schema/core frozen-core sign-off gate; D0105 must not be implemented until the human explicitly accepts (method=confirmation) - and per the confirmation rule, a general 'continue' instruction is NOT that sign-off. C12 (Med) - two threads (this analysis thread + the ignite thread that owns issue054) now co-edit the engine model with no recorded coordination/handoff protocol; define who may change what without re-authorization and how divergence is adjudicated. RESOLUTION: C11 by the human's D0105 acceptance decision (or rejection); C12 by a recorded coordination protocol (d0105CritiqueResiduals). Relates to D0105, D0080 (independent critique), issue054/issue055 (two-thread overlap).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "d0105CritiqueResiduals";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from d0105CritiqueResiduals to issue056;
 }
