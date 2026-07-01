@@ -12,7 +12,7 @@ description: |
   conversational replies that change nothing. CLAUDE.md §3 is the source of truth — this skill
   is the always-on checklist, fired every turn by a UserPromptSubmit hook (D0064).
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
   engine: keel-ai-toolkit
@@ -92,6 +92,17 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
    (a process violation, a skill gap, a schema gap), record it immediately as an
    `Issue` in `.tracking/issues.sysml` rather than letting it slip to memory. It
    will be triaged at retro. Use `relatedTask` to point to the relevant backlog action.
+
+8. **Analysis / design → a chartered research spike (issue055/D0068).** If a request triggers
+   *substantial* analysis, diagnosis, or architectural design (a multi-step investigation, a
+   design exploration, a decision that reframes others) — NOT a quick computed answer — do **not**
+   run it as free-form conversation. Route it as a **`WorkKind::research` spike**, chartered to an
+   **`Issue`** or a **`status=proposed` `Decision`** (the charter guard already permits both — it
+   checks edge existence, not target type). Its **DoD = a design artifact (e.g. a proposal doc) +
+   a recorded `proposed` Decision** capturing the direction. This exists because upstream analysis
+   *precedes* the Decision it produces, so it has no accepted charter source — and left un-routed it
+   leaks into chat, uncaptured (the issue054 defect, recursed into the engine's own process). Quick
+   VIEW/ORIENT answers stay conversational; sustained design gets a spike.
 
 ## Why this exists
 
