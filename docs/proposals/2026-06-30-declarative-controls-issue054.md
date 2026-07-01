@@ -212,3 +212,38 @@ This **redirects** `needsFirstOrderingGuard`:
 - [ ] Migration via expand/migrate/contract with a parity gate (§6.5).
 - [ ] Missing Business/Architecture deploying skill authored; `process-skill` extended to workflows.
 - [ ] doc-sync: CLAUDE.md §3 (triage axes) and §5 (guard enumeration → `keel check`).
+
+## 10. De-risk spike (2026-07-01) — does the 8-of-14 collapse survive the messy guards?
+
+The §2 proof sorted guards by their *headline* assertion. This spike stress-tested that by
+actually expressing the **three hardest** guards (git-temporal / grandfathered / keyword) as
+declared rules, reading their real implementations (`guards.rs`, `algo.rs`).
+
+| Guard | Declared form | New capability required |
+|---|---|---|
+| `charter` | `EdgeRule` (Story → `#CharteredBy`, ≥1) | scope `newlyAdded` (git-diff, forward-only) + numeric cutoff `sprintNum ≥ 38` |
+| `sprint-coverage` | `EdgeRule` (done Action ← covered-by ← Story) — **cleaner** than today's text-contains, *if* coverage becomes a typed edge | scope `where status=done` (computed) + exemption set |
+| `ceremony` | (a) gate-ordering = **succession-conformance** (reads the workflow `first…then…` at instance level); (b) retro-scan = `ElementRule` `matchesPattern(retro.text, {avoidable,…})` | a **third rule kind** (ordering) + exemption set |
+
+**Verdict — the collapse HOLDS, but my scope was understated.** The *predicates* stay small
+(edge-existence + `matchesPattern` cover the messy cases; `sprint-coverage` even improves).
+The complexity does not vanish — it **migrates into three bounded, reusable additions**:
+
+1. **A scope sub-language** (~4 predicates: `governedSince(decision)`, `newlyAdded` git-temporal,
+   `where status=<computed>`, numeric cutoff). **Scope — not predicates — is the load-bearing
+   complexity.** This is the real inner-platform danger zone: if scope predicates keep growing,
+   we've built a query language. MITIGATION: cap the scope vocabulary; a new scope predicate
+   requires a justifying meta-rule.
+2. **A third rule kind — `OrderingRule` / succession-conformance** — ceremony's gate-ordering is
+   neither an `EdgeRule` nor an `ElementRule`. It was implicit in §4.3 ("ordering from
+   succession") but is first-class and the most complex evaluator.
+3. **A declared exemption mechanism** (grandfather sets with recorded basis) — pervasive across
+   all three; one mechanism, reused, and honest (matches "grandfather-with-recorded-basis").
+
+**Answer to critique C4:** the vocabulary does **not** balloon into a general programming
+language — the additions are bounded and shared. But the honest minimal surface is **3 rule
+kinds + a ~4-predicate scope sub-language + exemptions**, NOT "2 shapes + 8 predicates."
+**D0105's direction survives; its SCOPE must be corrected upward**, and the "flat code" claim
+re-validated against that larger (still-bounded) surface before the full migration. The parity
+gate still governs cutover. (Recorded via the research spike `declarativeControlsCollapseSpike`,
+chartered to D0105 — dogfooding issue055.)
