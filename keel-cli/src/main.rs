@@ -42,7 +42,9 @@ use keel_cli::write as w;
 // ── engine scaffold payload (D0093 `init`): the reusable engine tree + operating manual, embedded at
 //    compile time so `keel init` is self-contained (no external fetch — the cytoscape precedent). ──
 static ENGINE_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../.engine");
-const CLAUDE_MD: &str = include_str!("../../CLAUDE.md");
+// A DOWNSTREAM CLAUDE.md template (issue057): a fresh project is TRACKED BY keel, not keel itself.
+// The self-build repo's own CLAUDE.md (about building the engine) is NEVER shipped to init'd projects.
+const CLAUDE_MD: &str = include_str!("../assets/claude-md-template.md");
 const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `keel orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
 /// A fresh project's deliverable-suspicion manifest is EMPTY — the shipped one lists the ENGINE's own
 /// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
@@ -1383,5 +1385,14 @@ mod tests {
         // Everything else is scaffolded unchanged.
         assert_eq!(remap_engine_path(Path::new("schema/core/element.sysml")), Path::new("schema/core/element.sysml"));
         assert_eq!(remap_engine_path(Path::new("processes/introduction.sysml")), Path::new("processes/introduction.sysml"));
+    }
+
+    #[test]
+    fn init_ships_downstream_claude_md_not_self_build() {
+        // issue057 (field defect): `keel init` must ship a DOWNSTREAM "tracked by keel" CLAUDE.md,
+        // NEVER the self-build's ("This repo is a work-tracking engine"). D0047 permanent control.
+        assert!(super::CLAUDE_MD.contains("tracked by keel"), "init CLAUDE.md must frame the project as tracked BY keel");
+        assert!(!super::CLAUDE_MD.contains("is a work-tracking engine"), "init must NOT ship the self-build CLAUDE.md");
+        assert!(super::CLAUDE_MD.contains("Parsed:"), "downstream CLAUDE.md must carry the D0106 parse-first discipline");
     }
 }
