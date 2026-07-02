@@ -659,4 +659,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from downstreamClaudeMdTemplate to issue057;
+
+    part issue058 : Issue {
+        :>> id = "e0580058-0058-4e58-9058-516273840058";
+        :>> title = "Ad-hoc decision-authoring produced dual-truth (acceptance verdict restated as prose alongside the discrete TestResult)";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Caught by the human: when recording D0105/D0106 acceptance I ALSO restated the verdict as PROSE (the '(ACCEPTED <date> by <who>)' comment header + a consequences-field sentence) on top of the discrete method=confirmation d####Accept + AcceptR1 TestResult — dual-truth, drift-prone, contra Sec 2.1 (one source of truth). ROOT (the accountability): I acted AD-HOC — narrating for readability outside any defined process — which is exactly what D0106 (strict process-boundedness) forbids. There is no DEFINED decision-authoring process constraining WHICH fields carry which facts and forbidding restatement of computed/verdict/status facts, so prose crept in each time (and my first 'fix' was itself ad-hoc + incomplete, leaving the comment headers). IMMEDIATE cleanup done: removed the verdict prose from D0105/D0106 headers + D0105 consequences (the d####Accept TestResult is now the sole source). SYSTEMIC FIX (oneSourceDecisionAuthoring): (1) define a decision-authoring discipline/process (each fact ONE canonical home; acceptance/verdict/critique-state/status are structured or COMPUTED, never restated as prose; prose fields describe only the decision's own what/why/impact) + a deploying skill; (2) a DETECTING rule — under D0105 an ElementRule: a Decision must not contain acceptance-verdict prose when an AcceptR1 event exists; (3) 'status computed from the acceptance event' folds into guardsToRulesMigration (acceptance-events -> EdgeRule; status a computed #View — noting status also encodes proposed/superseded, so it is a guarded cross-check, not pure redundancy). Relates to D0106 (the violated principle), D0105 (declarative controls / detecting rule), Sec 2.1.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "oneSourceDecisionAuthoring";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from oneSourceDecisionAuthoring to issue058;
 }

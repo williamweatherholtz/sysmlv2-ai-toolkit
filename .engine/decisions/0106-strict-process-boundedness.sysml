@@ -1,5 +1,5 @@
 // =====================================================================
-// D0106 (ACCEPTED 2026-07-02 by wweatherholtz) — strict process-boundedness. Field feedback from keel used in
+// D0106 — strict process-boundedness. Field feedback from keel used in
 // other projects: the AI must never propose or take an action that is not tied to a DEFINED process.
 // The AI's role is (1) PARSE/interpret input into an enumerated, VISIBLE decomposition classifying each
 // part; (2) route each part to a defined process, DEFINING a new process when none fits; (3) EXECUTE the
