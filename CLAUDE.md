@@ -159,14 +159,24 @@ This rule exists because every recurring task executed without a skill leaks pro
 knowledge into conversation history, where it cannot be enforced, reviewed, or
 improved. Skills are the durable encoding of how we do things.
 
-**Triage is a MANDATORY first move on EVERY request (D0064).** Open every substantive response
-by running the triage: break the request down, name the category + route for *each* part —
-e.g. *"RECORD → §3c"* — *before* acting, and explicitly **flag anything that does not cleanly
-map** to a process rather than force-fitting it. Never infer-and-act silently: a silent mis-route
-is exactly how an action slips past the discipline (e.g. recording a confirmation that was never
-given, or doing delivery/engine work with **no sprint** — issue020). The `engine-triage` skill
-encodes this checklist; invoke it at the start of every request. (A `UserPromptSubmit` triage
-hook that fires it every turn is sprint30.)
+**Strict process-boundedness — PARSE first, on EVERY request (D0106, reframes D0064).** The AI's
+role is: **parse/interpret input → route each part to a defined process (DEFINE a new process when
+none fits) → execute** (in parallel where the dependency DAG allows), leveraging skills. **No action
+is ever proposed or taken that is not tied to a defined process.** Open **every** response with a
+visible, enumerated **`Parsed:`** decomposition — one line per part, each **labelled by kind**
+(`TRIVIAL` / `CHANGE` / `EXECUTE` / `RECORD` / `VIEW` / `ORIENT`) with its route, e.g.:
+
+> **Parsed:** 1. `TRIVIAL` — rename process X to Y. 2. `CHANGE` — add test A to block ii of process Y → §3a.
+
+Then act. Rules: **(a)** when a non-trivial part maps to no existing process, **DEFINE the process**
+(a process definition is the AI's creative output — not an ad-hoc action); it runs through the
+discipline like any CHANGE. **(b)** Only **strictly-trivial** one-off edits (a typo, a single rename,
+one doc line) use the fast-path — and are still **labelled `TRIVIAL`** in the parse so the exemption
+is visible, never silent. **(c)** **Human sign-off is an explicit process STEP** — a declared
+`method=confirmation` gate whose passing `TestResult` carries the attestation (D0016/D0066); **never
+inferred** from a general instruction. Never infer-and-act silently (recording a confirmation never
+given, or doing work with **no sprint/process** — issue020). The `engine-triage` skill encodes this;
+it is invoked (and fired every turn by the `UserPromptSubmit` hook) at the start of every request.
 
 **§3a — CHANGE.** Never freelance an edit to a workflow / phase / gate / schema. Route
 through **Change Request** (§4): state the change + rationale, research alternatives if

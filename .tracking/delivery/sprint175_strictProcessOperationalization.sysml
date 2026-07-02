@@ -1,0 +1,38 @@
+// ProjectDeliveryS175 — Sprint 175: strictProcessOperationalization (D0106, ACCEPTED 2026-07-02).
+// The human signed off D0106 ('yes for d0106'). Put strict process-boundedness IN FORCE: CLAUDE.md Sec 3
+// now requires a visible 'Parsed:' decomposition every turn (each part labelled TRIVIAL/CHANGE/EXECUTE/
+// RECORD/VIEW/ORIENT), strict process adherence (DEFINE a process when none fits), and sign-off as an
+// explicit method=confirmation gate; the engine-triage skill emits the Parsed: block. EXECUTE. 1 pt. AUTONOMOUS (D0049).
+package ProjectDeliveryS175 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from strictProcessStory to d0106;
+
+    part strictProcessStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c175-51627384c001";
+        :>> title = "Sprint 175: strictProcessOperationalization (1 pt) - put D0106 strict process-boundedness in force (CLAUDE.md Sec 3 + engine-triage)";
+        :>> createdAt = "2026-07-02"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::documentation; :>> priority = WorkPriority::p1; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS175 {
+        action storyStrictProcess;
+        verification storyStrictProcessDoD : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c002"; :>> method = VerificationMethod::inspect; :>> procedureText = "D0106 accepted (d0106Accept, wweatherholtz 'yes for d0106' 2026-07-02) -> operationalized. CLAUDE.md Sec 3: the triage paragraph is replaced by 'Strict process-boundedness — PARSE first' (D0106): the AI parses input -> routes each part to a defined process (DEFINES one when none fits) -> executes (parallel where the DAG allows); every response opens with a visible enumerated 'Parsed:' block, each part labelled TRIVIAL/CHANGE/EXECUTE/RECORD/VIEW/ORIENT + route; only strictly-trivial edits fast-path (labelled); human sign-off is an explicit method=confirmation gate (D0016/D0066), never inferred. engine-triage SKILL.md item 2 rewritten to emit the Parsed: block + define-when-unmapped + sign-off-as-gate; version 0.3.0 -> 0.4.0. doc-sync done. VERIFY: CLAUDE.md Sec 3 + engine-triage carry the parsed-output + strict-adherence + sign-off-gate; keel validate + guard all green; kernel validate_instances PASS (skill + d0106)."; }
+        part storyStrictProcessDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification strictProcessRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c004"; :>> title = "Sprint 175 refine gate (DoR)"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: D0106 ACCEPTED via explicit human sign-off (d0106Accept). Operationalize it (CLAUDE.md Sec 3 + engine-triage). estimatedPoints=1. #CharteredBy d0106. DoR met."; }
+    part strictProcessRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    verification strictProcessStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c006"; :>> title = "Sprint 175 standup gate"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: rewrite the CLAUDE.md Sec 3 triage paragraph to the D0106 parse-first model; rewrite engine-triage item 2 to emit the Parsed: block + define-when-unmapped + sign-off-gate; bump skill version; doc-sync. No blockers (doc changes; no rebuild)."; }
+    part strictProcessStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    verification strictProcessImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c008"; :>> title = "Sprint 175 implement gate"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLAUDE.md Sec 3 replaced (strict process-boundedness + Parsed: block + sign-off gate); engine-triage item 2 rewritten + version 0.4.0; D0106 flipped to accepted with d0106Accept event. keel validate + guard all green; kernel validate_instances PASS."; }
+    part strictProcessImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    verification strictProcessReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c00a"; :>> title = "Sprint 175 review gate"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The operationalization is faithful to D0106 + the human's exact ask (a visible labelled Parsed: block; trivial-but-labelled fast-path; sign-off = a verified method=confirmation gate). Reuses the existing confirmation/TestResult mechanism (no new construct). doc-sync applied to both the authority doc (CLAUDE.md Sec 3) and its deploying skill (engine-triage). Clean."; }
+    part strictProcessReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    verification strictProcessCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c00c"; :>> title = "Sprint 175 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; D0106 is IN FORCE (CLAUDE.md Sec 3 + engine-triage). keel validate + guard all green. Self-evidencing (D0051). Strict process-boundedness is now the operating model."; }
+    part strictProcessCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+    verification strictProcessRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c175-51627384c00e"; :>> title = "Sprint 175 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-02"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the whole loop dogfooded itself — the principle (sign-off is an explicit gate) was applied to accepting the principle (D0106 flipped only on the human's explicit 'yes'), and the Parsed: block was already in use before it was codified. AVOIDABLE-ISSUE SCAN: no avoidable defect; the change tightens the exact hole (free-form action after routing) that caused the session's recurring design-in-chat. LESSON: field feedback that narrows the AI's ROLE (parser/executor, not free agent) is the highest-leverage kind — encode it in the authority doc AND its deploying skill together (doc-sync as a pair). Estimate 1 pt held. Follow-ups still queued: issue057 (downstreamClaudeMdTemplate), businessArchSkillAndWorkflowGuard, serveBusinessNeedsView; frozen-core (D0105) still awaits its own sign-off."; }
+    part strictProcessRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c175-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4873cd3"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+}

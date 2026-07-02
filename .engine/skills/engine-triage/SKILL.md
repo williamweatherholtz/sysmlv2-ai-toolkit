@@ -12,7 +12,7 @@ description: |
   conversational replies that change nothing. CLAUDE.md §3 is the source of truth — this skill
   is the always-on checklist, fired every turn by a UserPromptSubmit hook (D0064).
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
   engine: keel-ai-toolkit
@@ -38,10 +38,19 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
    | VIEW       | asks for a computed answer (status, trace, stale set, a doc)  | §3d   |
    | ORIENT     | asks where things stand / what is next                        | §3f   |
 
-2. **State the routes out loud** in the first line of your response — e.g. `RECORD → §3c`.
-   A request often spans categories: **split it** and name each route. **Flag anything that
-   does not cleanly map** to a category rather than forcing it into one — say so and ask.
-   Routing *every* part (not just the first) is mandatory (D0064).
+2. **Emit a visible `Parsed:` block** at the START of every response (D0106) — an enumerated
+   decomposition, one line per part, each **labelled by kind** with its route, e.g.:
+
+   > **Parsed:** 1. `TRIVIAL` — rename process X to Y. 2. `CHANGE` — add test A to block ii of Y → §3a. 3. `RECORD` — file the field defect → §3c.
+
+   Routing *every* part (not just the first) is mandatory. **No action untied to a process.**
+   When a non-trivial part maps to **no existing process, DEFINE the process** (a process
+   definition is the AI's creative output — not an ad-hoc action); it runs through the discipline
+   like any CHANGE. Do **not** silently force-fit or free-form — define, then execute. The
+   **`TRIVIAL`** label is the ONLY fast-path, and it must still appear in the parse (visible, never
+   silent). **Human sign-off is an explicit process STEP** — a declared `method=confirmation` gate
+   whose passing `TestResult` carries the attestation (D0016/D0066); **never inferred** from a
+   general instruction.
 
 3. **If you cannot classify confidently, ask** — do not default to EXECUTE. Engine work
    (building the engine's own runtime/tooling) is not a separate route: route it by *what it
