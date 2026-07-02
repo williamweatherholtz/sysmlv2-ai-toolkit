@@ -647,4 +647,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from d0105CritiqueResiduals to issue056;
+
+    part issue057 : Issue {
+        :>> id = "e0570057-0057-4e57-9057-516273840057";
+        :>> title = "keel init ships the SELF-BUILD CLAUDE.md verbatim, so downstream projects think they ARE keel";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "FIELD DEFECT (keel used in other projects). keel-cli/src/main.rs:45 'const CLAUDE_MD = include_str!(../../CLAUDE.md)' and cmd_init writes that file verbatim (main.rs:1238) into every 'keel init' project. But that CLAUDE.md is the SELF-BUILD's — it opens 'This repo IS a work-tracking engine ... built using its own discipline' and describes building keel ITSELF (schema/core frozen, the self-build backlog, decisions 0001+, the miniforge kernel paths). A downstream project is NOT keel — it is a project TRACKED BY keel. Shipping the self-build CLAUDE.md mis-frames the newcomer (they think they are building the engine), leaks self-build specifics, and contradicts D0093 (engine architecture ships as READ-ONLY .engine/reference/; the new project authors fresh). FIX (downstreamClaudeMdTemplate): ship a DOWNSTREAM CLAUDE.md template — 'this project is tracked BY keel; here is how to work as a keel-tracked project' — pointing at .engine/reference for engine architecture; 'keel init' writes the TEMPLATE, not the self-build file; the self-build repo keeps its own CLAUDE.md un-shipped. PROCESS CHANGE (what init ships) -> sprint. Relates to D0093 (spin-up), the strict-process principle (D0106).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "downstreamClaudeMdTemplate";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from downstreamClaudeMdTemplate to issue057;
 }
