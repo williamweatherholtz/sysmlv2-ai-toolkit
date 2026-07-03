@@ -236,4 +236,12 @@ package EngineSkillRegistry {
         :>> triggerCondition = "A human asks to be introduced/onboarded, 'how do I start', 'set up / spin up a new project', or right after `keel init`.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part businessArchitectureSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a105-516273849619";
+        :>> title = "business-architecture";
+        :>> purpose = "The keel-native design skill: run design/scoping by DEPLOYING the Business workflow (.engine/workflows/business.sysml: Brief->Personas->Needs->UseCases) then the Architecture workflow (.engine/workflows/architecture.sysml), recording each decision at the point of decision, keeping Needs strictly upstream of architecture, emitting authored facts (Brief/Needs/Decisions/SystemRequirements + typed edges) never a prose design doc. Replaces the keel-blind brainstorming skill (issue054 F1 root: the Business/Architecture workflows were inert — no deploying skill, D0059). Bound by D0106 (parse-first, point-of-decision recording) + D0105 (one source of truth). The deploying skill for .engine/workflows/business.sysml + .engine/workflows/architecture.sysml.";
+        :>> location = ".engine/skills/business-architecture/SKILL.md";
+        :>> triggerCondition = "A request means design/scope/figure-out X, 'what should we build', a new capability, requirements elicitation, or any architectural direction.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }
