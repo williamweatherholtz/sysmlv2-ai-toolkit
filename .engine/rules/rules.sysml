@@ -25,4 +25,21 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from capabilityRootednessRule to d0099;
+
+    // Mirrors guard:issues (D0077/D0078). Parity target: view::untriaged_issues (an Issue with no
+    // INCOMING #Resolves edge from a resolving action/Decision).
+    part issuesTriagedRule : EdgeRule {
+        :>> id = "d0105r002-0002-4002-9002-516273841002";
+        :>> title = "Every Issue must be triaged (have a resolving edge)";
+        :>> subjectType = "Issue";
+        :>> requiredEdge = EdgeKind::resolves;
+        :>> edgeDirection = EdgeDirection::incoming;
+        :>> objectType = "*";
+        :>> cardinality = RuleCardinality::atLeastOne;
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "all";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from issuesTriagedRule to d0078;
 }

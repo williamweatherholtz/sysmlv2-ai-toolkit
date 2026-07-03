@@ -2243,7 +2243,8 @@ fn rc_matches_subject(info: &ItemInfo, subject: &str) -> bool {
 /// `EdgeRule` violations: `subject` instances lacking `edge` (at `cardinality`) to an existing instance
 /// of `object` (`"*"` = any target). Sorted subject names. The generic core that subsumes the ~9
 /// conformance guards once each rule reaches parity.
-fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, cardinality: &str) -> Vec<String> {
+fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, direction: &str, cardinality: &str) -> Vec<String> {
+    let incoming = direction == "incoming";
     let mut out: Vec<String> = Vec::new();
     for (name, info) in &model.items {
         if !rc_matches_subject(info, subject) {
@@ -2253,9 +2254,10 @@ fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, 
             .edges
             .iter()
             .filter(|e| {
+                let (near, far) = if incoming { (&e.to, &e.from) } else { (&e.from, &e.to) };
                 e.kind == edge
-                    && &e.from == name
-                    && (object == "*" || model.items.get(&e.to).is_some_and(|t| t.type_name == object))
+                    && near == name
+                    && (object == "*" || model.items.get(far).is_some_and(|t| t.type_name == object))
             })
             .count();
         let ok = if cardinality == "exactlyOne" { count == 1 } else { count >= 1 };
@@ -2291,7 +2293,7 @@ pub fn check(root: &Path) -> Result<String, ViewError> {
             if s.is_empty() { "all".to_string() } else { s }
         };
         let (violations, evaluated) = if scope == "all" {
-            (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("cardinality")), true)
+            (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality")), true)
         } else {
             (Vec::new(), false)
         };
@@ -4355,8 +4357,23 @@ mod tests {
         let edges = vec![Edge { kind: "derivedfrom".to_string(), from: "capB".to_string(), to: "n1".to_string() }];
         let model = Model { items, edges };
         assert_eq!(
-            edge_rule_violations(&model, "#Capability", "derivedfrom", "Need", "atLeastOne"),
+            edge_rule_violations(&model, "#Capability", "derivedfrom", "Need", "outgoing", "atLeastOne"),
             capability_root_violations(&model),
+        );
+    }
+
+    #[test]
+    fn edge_rule_incoming_flags_untriaged_issue() {
+        // D0105: issuesTriagedRule = an Issue must carry an INCOMING #Resolves edge (some resolver -> issue).
+        let mut items = HashMap::new();
+        items.insert("issueA".to_string(), item("Issue", None)); // untriaged
+        items.insert("issueB".to_string(), item("Issue", None)); // triaged
+        items.insert("fixB".to_string(), item("Story", None));
+        let edges = vec![Edge { kind: "resolves".to_string(), from: "fixB".to_string(), to: "issueB".to_string() }];
+        let model = Model { items, edges };
+        assert_eq!(
+            edge_rule_violations(&model, "Issue", "resolves", "*", "incoming", "atLeastOne"),
+            vec!["issueA".to_string()],
         );
     }
 
