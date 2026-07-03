@@ -201,6 +201,7 @@ impl Model {
             root.join(".engine").join("processes"),
             root.join(".engine").join("views"),
             root.join(".engine").join("skills"),
+            root.join(".engine").join("rules"),   // D0105: declared EdgeRule/ElementRule/OrderingRule instances (`keel check`)
         ];
         let mut items: HashMap<String, ItemInfo> = HashMap::new();
         let mut edges: Vec<Edge> = Vec::new();
@@ -2227,6 +2228,89 @@ fn capability_root_violations(model: &Model) -> Vec<String> {
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn rootedness_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
     Ok(capability_root_violations(&Model::build(root)?))
+}
+
+// ── `keel check` (D0105 EXPAND step 2): the generic evaluator over DECLARED rules ────────────────
+
+/// Does `info` match an `EdgeRule` `subjectType` — a `#Marker` (marker match) or a bare type name?
+fn rc_matches_subject(info: &ItemInfo, subject: &str) -> bool {
+    subject.strip_prefix('#').map_or_else(
+        || info.type_name == subject,
+        |marker| info.marker.as_deref().is_some_and(|m| m.trim_start_matches('#').eq_ignore_ascii_case(marker)),
+    )
+}
+
+/// `EdgeRule` violations: `subject` instances lacking `edge` (at `cardinality`) to an existing instance
+/// of `object` (`"*"` = any target). Sorted subject names. The generic core that subsumes the ~9
+/// conformance guards once each rule reaches parity.
+fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, cardinality: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for (name, info) in &model.items {
+        if !rc_matches_subject(info, subject) {
+            continue;
+        }
+        let count = model
+            .edges
+            .iter()
+            .filter(|e| {
+                e.kind == edge
+                    && &e.from == name
+                    && (object == "*" || model.items.get(&e.to).is_some_and(|t| t.type_name == object))
+            })
+            .count();
+        let ok = if cardinality == "exactlyOne" { count == 1 } else { count >= 1 };
+        if !ok {
+            out.push(name.clone());
+        }
+    }
+    out.sort();
+    out
+}
+
+/// `keel rules` (D0105 EXPAND step 2): evaluate DECLARED rules over the model.
+///
+/// The generic evaluator that replaces the bespoke guards once each reaches PARITY
+/// (guardsToRulesMigration). This walking skeleton evaluates `EdgeRule` with `appliesWhen="all"`;
+/// `ElementRule`/`OrderingRule` and the full scope sub-language are later EXPAND steps (reported
+/// `evaluated=false` meanwhile). Runs ALONGSIDE `keel guard` — nothing is retired here.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance/rule file fails to parse.
+pub fn check(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut rule_names: Vec<&String> =
+        model.items.iter().filter(|(_, i)| i.type_name == "EdgeRule").map(|(n, _)| n).collect();
+    rule_names.sort();
+    let mut rules_json: Vec<Json> = Vec::new();
+    let mut total = 0usize;
+    for rname in rule_names {
+        let Some(info) = model.items.get(rname) else { continue };
+        let a = |k: &str| info.attrs.get(k).cloned().unwrap_or_default();
+        let scope = {
+            let s = a("appliesWhen");
+            if s.is_empty() { "all".to_string() } else { s }
+        };
+        let (violations, evaluated) = if scope == "all" {
+            (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("cardinality")), true)
+        } else {
+            (Vec::new(), false)
+        };
+        total += violations.len();
+        rules_json.push(Json::Obj(vec![
+            ("rule".to_string(), Json::s(rname.clone())),
+            ("kind".to_string(), Json::s("EdgeRule")),
+            ("severity".to_string(), Json::s(a("severity"))),
+            ("scope".to_string(), Json::s(scope)),
+            ("evaluated".to_string(), Json::Bool(evaluated)),
+            ("violations".to_string(), Json::Arr(violations.into_iter().map(Json::s).collect())),
+        ]));
+    }
+    Ok(Json::Obj(vec![
+        ("check".to_string(), Json::s("declared-rule evaluation (D0105 EXPAND; EdgeRule, appliesWhen=all)")),
+        ("rules".to_string(), Json::Arr(rules_json)),
+        ("total_violations".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+    ])
+    .dump())
 }
 
 /// Requirement-rootedness view (D0098/D0099, issue047): the charter-source BURNDOWN (need-rooted vs
@@ -4257,6 +4341,23 @@ mod tests {
         let edges = vec![Edge { kind: "derivedfrom".to_string(), from: "capB".to_string(), to: "n1".to_string() }];
         let model = Model { items, edges };
         assert_eq!(capability_root_violations(&model), vec!["capA".to_string()]);
+    }
+
+    #[test]
+    fn edge_rule_evaluator_reaches_parity_with_the_rootedness_guard() {
+        // D0105 EXPAND parity: the GENERIC EdgeRule evaluator must reproduce guard:requirement-rootedness
+        // (capabilityRootednessRule: subject=#Capability, edge=derivedFrom, object=Need, atLeastOne).
+        let mut items = HashMap::new();
+        items.insert("n1".to_string(), item("Need", None));
+        items.insert("capA".to_string(), item("Decision", Some("Capability"))); // unrooted
+        items.insert("capB".to_string(), item("Decision", Some("Capability"))); // rooted
+        items.insert("plain".to_string(), item("Decision", None)); // exempt (unmarked)
+        let edges = vec![Edge { kind: "derivedfrom".to_string(), from: "capB".to_string(), to: "n1".to_string() }];
+        let model = Model { items, edges };
+        assert_eq!(
+            edge_rule_violations(&model, "#Capability", "derivedfrom", "Need", "atLeastOne"),
+            capability_root_violations(&model),
+        );
     }
 
     #[test]

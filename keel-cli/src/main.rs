@@ -517,6 +517,33 @@ fn cmd_concern_coverage(args: &[String]) -> i32 {
     }
 }
 
+// `keel rules [ROOT]` (D0105 EXPAND step 2): evaluate the DECLARED rules (`keel check` is taken by the
+// spec-compat file checker; the D0105 name reconciliation is a tracked follow-up). Runs ALONGSIDE
+// `keel guard` until parity retires each guard (guardsToRulesMigration).
+fn cmd_rules(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: keel rules [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match keel_cli::view::check(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("rules error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_coverage(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -1297,6 +1324,7 @@ fn main() {
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
         Some("check") => cmd_check(rest),
+        Some("rules") => cmd_rules(rest),
         Some("ls") => cmd_ls(rest),
         Some("orient") => cmd_orient(rest),
         Some("whats-next") => cmd_whats_next(rest),
