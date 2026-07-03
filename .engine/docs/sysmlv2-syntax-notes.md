@@ -172,4 +172,13 @@ Decision files are standalone SysML v2 packages. Common mistakes caught by the l
 - `%export` is a silent no-op; multi-valued sequences render as opaque
   `OperatorExpression`; `succession` renders readably (earlier/laterOccurrence).
 - Native `elementId` REGENERATES every parse — never use it as durable identity.
+- **Reserved words can't be identifiers (enum literals / attribute names).** SysML v2 reserves the
+  relationship keywords `satisfy` / `verify` / `allocate` / `dependency` / `supersede` and the
+  requirement keyword `subject` (also `specializes`, `in`/`out`) — using them as an `enum def`
+  literal or `attribute` name yields "no viable alternative at input" (D0105 `rules.sysml` hit this;
+  fix: `Edge`-suffix the literals, `subject` → `subjectType`).
+- **`String` needs `private import ScalarValues::*;`** — it is NOT re-exported by `EngineElement`
+  (element.sysml imports ScalarValues itself). Without it: "Couldn't resolve reference to Type 'String'".
+- **A new `schema/core/*.sysml` file must be registered in `_schema_files.SCHEMA_ORDER`** (after the
+  files it imports) or `validate_schema.py` hard-fails (exit 2) before the kernel even runs.
 
