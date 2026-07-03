@@ -2269,6 +2269,55 @@ fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, 
     out
 }
 
+/// `strip_prefix(p)` then `strip_suffix(')')` — pulls `args` out of a `fn(args)` predicate term.
+fn predicate_args<'a>(t: &'a str, p: &str) -> Option<&'a str> {
+    t.strip_prefix(p).and_then(|r| r.strip_suffix(')'))
+}
+
+/// Evaluate one `ElementRule` predicate TERM against an item's attrs. Supported (closed) vocabulary so
+/// far: `nonBlank(field)` (trimmed len > 0) and `minLength(field,n)` (trimmed len >= n). Unknown term
+/// returns `None` (the caller reports the rule `evaluated=false` rather than silently passing).
+fn eval_predicate_term(attrs: &HashMap<String, String>, term: &str) -> Option<bool> {
+    let term = term.trim();
+    if let Some(args) = predicate_args(term, "nonBlank(") {
+        return Some(attrs.get(args.trim()).is_some_and(|v| !v.trim().is_empty()));
+    }
+    if let Some(args) = predicate_args(term, "minLength(") {
+        let mut parts = args.split(',');
+        let field = parts.next()?.trim();
+        let n: usize = parts.next()?.trim().parse().ok()?;
+        return Some(attrs.get(field).is_some_and(|v| v.trim().chars().count() >= n));
+    }
+    None
+}
+
+/// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) against an item. Returns `None` if
+/// ANY term is unsupported (so the rule reports `evaluated=false`, never a false pass). Conjunction only.
+fn eval_predicate(attrs: &HashMap<String, String>, predicate: &str) -> Option<bool> {
+    let mut all = true;
+    for term in predicate.split(" and ") {
+        all &= eval_predicate_term(attrs, term)?;
+    }
+    Some(all)
+}
+
+/// `ElementRule` violations: `subject` instances whose `predicate` is false. `Some(sorted names)`, or
+/// `None` if the predicate uses an unsupported term (caller marks the rule not-evaluated). Subsumes the
+/// ~5 structural guards as each predicate becomes expressible.
+fn element_rule_violations(model: &Model, subject: &str, predicate: &str) -> Option<Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    for (name, info) in &model.items {
+        if !rc_matches_subject(info, subject) {
+            continue;
+        }
+        if !eval_predicate(&info.attrs, predicate)? {
+            out.push(name.clone());
+        }
+    }
+    out.sort();
+    Some(out)
+}
+
 /// `keel rules` (D0105 EXPAND step 2): evaluate DECLARED rules over the model.
 ///
 /// The generic evaluator that replaces the bespoke guards once each reaches PARITY
@@ -2281,26 +2330,31 @@ fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, 
 pub fn check(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let mut rule_names: Vec<&String> =
-        model.items.iter().filter(|(_, i)| i.type_name == "EdgeRule").map(|(n, _)| n).collect();
+        model.items.iter().filter(|(_, i)| matches!(i.type_name.as_str(), "EdgeRule" | "ElementRule")).map(|(n, _)| n).collect();
     rule_names.sort();
     let mut rules_json: Vec<Json> = Vec::new();
     let mut total = 0usize;
     for rname in rule_names {
         let Some(info) = model.items.get(rname) else { continue };
+        let kind = info.type_name.clone();
         let a = |k: &str| info.attrs.get(k).cloned().unwrap_or_default();
         let scope = {
             let s = a("appliesWhen");
             if s.is_empty() { "all".to_string() } else { s }
         };
-        let (violations, evaluated) = if scope == "all" {
+        // Only appliesWhen="all" is evaluated so far; the scope sub-language is a later EXPAND step.
+        let (violations, evaluated) = if scope != "all" {
+            (Vec::new(), false)
+        } else if kind == "EdgeRule" {
             (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality")), true)
         } else {
-            (Vec::new(), false)
+            // ElementRule — None if the predicate uses an unsupported term (report not-evaluated).
+            element_rule_violations(&model, &a("subjectType"), &a("predicate")).map_or((Vec::new(), false), |v| (v, true))
         };
         total += violations.len();
         rules_json.push(Json::Obj(vec![
             ("rule".to_string(), Json::s(rname.clone())),
-            ("kind".to_string(), Json::s("EdgeRule")),
+            ("kind".to_string(), Json::s(kind)),
             ("severity".to_string(), Json::s(a("severity"))),
             ("scope".to_string(), Json::s(scope)),
             ("evaluated".to_string(), Json::Bool(evaluated)),
@@ -2308,7 +2362,7 @@ pub fn check(root: &Path) -> Result<String, ViewError> {
         ]));
     }
     Ok(Json::Obj(vec![
-        ("check".to_string(), Json::s("declared-rule evaluation (D0105 EXPAND; EdgeRule, appliesWhen=all)")),
+        ("check".to_string(), Json::s("declared-rule evaluation (D0105; EdgeRule + ElementRule, appliesWhen=all)")),
         ("rules".to_string(), Json::Arr(rules_json)),
         ("total_violations".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
     ])
@@ -4375,6 +4429,33 @@ mod tests {
             edge_rule_violations(&model, "Issue", "resolves", "*", "incoming", "atLeastOne"),
             vec!["issueA".to_string()],
         );
+    }
+
+    #[test]
+    fn element_rule_reaches_parity_with_decision_rationale_guard() {
+        // D0105: decisionRationaleRule = minLength(context,20) and minLength(rationale,20) — must reproduce
+        // view::decisions_weak_rationale (a Decision whose context OR rationale is < 20 trimmed chars).
+        let long = "x".repeat(25);
+        let mk = |ctx: &str, rat: &str| {
+            let mut a = HashMap::new();
+            a.insert("context".to_string(), ctx.to_string());
+            a.insert("rationale".to_string(), rat.to_string());
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None }
+        };
+        let mut items = HashMap::new();
+        items.insert("dGood".to_string(), mk(&long, &long));
+        items.insert("dWeakCtx".to_string(), mk("short", &long));
+        items.insert("dWeakRat".to_string(), mk(&long, "short"));
+        let model = Model { items, edges: vec![] };
+        let via_rule = element_rule_violations(&model, "Decision", "minLength(context,20) and minLength(rationale,20)").unwrap();
+        // The guard's own logic (blank = trimmed len < 20 on context OR rationale).
+        let mut via_guard: Vec<String> = model.items.iter()
+            .filter(|(_, i)| i.type_name == "Decision")
+            .filter(|(_, i)| { let b = |f: &str| i.attrs.get(f).is_none_or(|v| v.trim().chars().count() < 20); b("context") || b("rationale") })
+            .map(|(n, _)| n.clone()).collect();
+        via_guard.sort();
+        assert_eq!(via_rule, via_guard);
+        assert_eq!(via_rule, vec!["dWeakCtx".to_string(), "dWeakRat".to_string()]);
     }
 
     #[test]

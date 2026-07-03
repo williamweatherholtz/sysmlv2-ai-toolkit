@@ -42,4 +42,18 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from issuesTriagedRule to d0078;
+
+    // Mirrors guard:decision-rationale (D0103). Parity target: view::decisions_weak_rationale (a Decision
+    // whose context OR rationale is blank/trivial — both must be a substantive >=20 chars).
+    part decisionRationaleRule : ElementRule {
+        :>> id = "d0105r003-0003-4003-9003-516273841003";
+        :>> title = "A Decision must carry a substantive context + rationale (the why)";
+        :>> subjectType = "Decision";
+        :>> predicate = "minLength(context,20) and minLength(rationale,20)";
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "all";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from decisionRationaleRule to d0103;
 }
