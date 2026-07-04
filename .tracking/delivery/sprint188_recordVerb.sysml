@@ -1,0 +1,37 @@
+// ProjectDeliveryS188 — Sprint 188: recordVerb (issue054 C1 / D0105/D0106 RMWX `record` axis).
+// `keel record decision` scaffolds a PROPOSED Decision file (auto NNNN + UUID) in one call, killing
+// point-of-decision authoring friction (D0054). Resolves issue054 (C1 done, C2 superseded by D0105, C3
+// done via D0106). Covers backlog action needsFirstOrderingGuard. EXECUTE. 2 pt. AUTONOMOUS (D0049).
+package ProjectDeliveryS188 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from recordVerbStory to d0106;
+
+    part recordVerbStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c188-51627384c001";
+        :>> title = "Sprint 188: recordVerb (2 pt) - `keel record decision` (RMWX record axis) resolves issue054 C1";
+        :>> createdAt = "2026-07-03"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p1; :>> owner = "claudeOpus"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS188 {
+        action storyRecordVerb;
+        verification storyRecordVerbDoD : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c002"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue054 C1 (the record verb) via the D0105/D0106 RMWX `record` axis. write::record_decision(root, slug, title, date, author, context, decision, rationale, consequences): computes the next NNNN (scan .engine/decisions/), generates a UUID, writes a status=proposed Decision file with all required fields (sanitize_field keeps each a one-line SysML literal). `keel record decision --slug --title --context --decision --rationale --consequences --date --author [--root]` (all why-fields required — D0103). D0106-CORRECTED: it does NOT emit an acceptance event — acceptance is a SEPARATE explicit human gate (never fabricated). VERIFIED LIVE: `keel record decision` in a fresh `keel init` project -> D0001 (proposed) written + validates clean. D0047 control: unit test sanitize_field_makes_a_safe_one_line_literal. doc-sync: CLAUDE.md write-API section. This covers needsFirstOrderingGuard (issue054: C1 done here, C2 superseded by D0105, C3 done by D0106). VERIFY: clippy -D warnings clean; cargo test (sanitize_field) green; keel validate + guard all (14) green."; }
+        part storyRecordVerbDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification recordVerbRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c004"; :>> title = "Sprint 188 refine gate (DoR)"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: human chose to build the record verb (issue054 C1). Scoped to `keel record decision` (the highest-friction case), first of the RMWX record axis. estimatedPoints=2. #CharteredBy d0106. DoR met."; }
+    part recordVerbRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    verification recordVerbStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c006"; :>> title = "Sprint 188 standup gate"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: write::record_decision + next_decision_number + sanitize_field; cmd_record (decision subcommand, required why-flags); proposed-only (no fabricated acceptance, D0106); unit test + live test in a temp init. No blockers."; }
+    part recordVerbStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    verification recordVerbImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c008"; :>> title = "Sprint 188 implement gate"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "record_decision + cmd_record landed. LIVE: keel record decision in temp init -> D0001 proposed + validates clean. clippy -D clean; cargo test sanitize_field green; keel validate + guard green; doc-sync CLAUDE.md."; }
+    part recordVerbImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    verification recordVerbReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c00a"; :>> title = "Sprint 188 review gate"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The verb kills the D0054 friction (one call vs hand-authoring a multi-field file), requires all why-fields (D0103), and is D0106-correct (proposed-only; acceptance stays the human's explicit gate, never fabricated). First of the RMWX record axis; extensible to other types. Live-tested in a clean init (works downstream). Clean."; }
+    part recordVerbReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    verification recordVerbCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c00c"; :>> title = "Sprint 188 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; issue054 resolved (C1 record verb done, C2 superseded, C3 done). clippy + cargo test + keel validate + guard green. Self-evidencing (D0051)."; }
+    part recordVerbCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+    verification recordVerbRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c188-51627384c00e"; :>> title = "Sprint 188 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-03"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the record verb closes issue054's last active piece + delivers the first RMWX write verb (D0105/D0106), and stayed D0106-honest (proposed-only, no fabricated acceptance) — the friction fix the whole ignite episode pointed at. AVOIDABLE-ISSUE SCAN: the similar-names clippy lint (content vs context) + doc lints cost a round-trip (the standard new-code tax). LESSON: scoping the generic `record` axis to its highest-value first type (decision) delivered the value without a risky fully-generic writer. Estimate 2 pt held. All three human-selected items done: issue058 detecting rule (sprint187), issue056 C12 protocol (D0108 proposed, sprint187), issue054 record verb (here). Remaining opens now: issue056 (pending D0108 human acceptance) only."; }
+    part recordVerbRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c188-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f454ea5"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "claudeOpus"; }
+}

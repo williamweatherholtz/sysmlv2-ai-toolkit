@@ -748,3 +748,98 @@ pub fn add_task(
     std::fs::write(path, new_content)?;
     Ok(uuid)
 }
+
+// ── record verb (D0105/D0106 RMWX axis; issue054 C1) ────────────────────────────
+
+/// Sanitize a field value for a one-line `SysML` string literal (double-quote → single, whitespace collapsed).
+fn sanitize_field(v: &str) -> String {
+    v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Next `NNNN` decision number in `<root>/.engine/decisions/` (highest `^\d{4}` + 1).
+fn next_decision_number(decisions_dir: &Path) -> u32 {
+    let mut max = 0u32;
+    if let Ok(entries) = std::fs::read_dir(decisions_dir) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if let Some(n) = name.get(0..4).and_then(|s| s.parse::<u32>().ok()) {
+                if n > max {
+                    max = n;
+                }
+            }
+        }
+    }
+    max + 1
+}
+
+/// `keel record decision` (issue054 C1 / D0105 RMWX `record` axis): scaffold a new proposed Decision file.
+///
+/// Auto-generates the UUID + next `NNNN` number, killing point-of-decision authoring friction (D0054).
+/// Returns `(number, relative path)`. Status is `proposed` — acceptance is a separate explicit human gate
+/// (D0106); this only CAPTURES the decision at the moment it is made.
+///
+/// # Errors
+/// Returns `WriteError::Io` on filesystem errors.
+#[allow(clippy::too_many_arguments)]
+pub fn record_decision(
+    root: &Path,
+    slug: &str,
+    title: &str,
+    date: &str,
+    author: &str,
+    context: &str,
+    decision: &str,
+    rationale: &str,
+    consequences: &str,
+) -> Result<(String, String), WriteError> {
+    let dir = root.join(".engine").join("decisions");
+    let num = next_decision_number(&dir);
+    let nnnn = format!("{num:04}");
+    let uuid = gen_uuid();
+    let s = sanitize_field;
+    let file_text = format!(
+        "// D{nnnn} (PROPOSED — NOT YET ACCEPTED) — {title_c}\n\
+         // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit\n\
+         // human gate (method=confirmation, D0106): flip status + add the d{nnnn}Accept event on sign-off.\n\
+         package Decision{nnnn} {{\n\
+         \x20   private import EngineElement::*;\n\
+         \x20   private import EngineWork::*;\n\
+         \x20   private import EngineVerification::*;\n\
+         \x20   private import EngineRelationships::*;\n\n\
+         \x20   part d{nnnn} : Decision {{\n\
+         \x20       :>> id = \"{uuid}\";\n\
+         \x20       :>> title = \"{title_c}\";\n\
+         \x20       :>> createdAt = \"{date_c}\";\n\
+         \x20       :>> createdBy = \"{author_c}\";\n\
+         \x20       :>> status = DecisionStatus::proposed;\n\
+         \x20       :>> context = \"{context_c}\";\n\
+         \x20       :>> decision = \"{decision_c}\";\n\
+         \x20       :>> rationale = \"{rationale_c}\";\n\
+         \x20       :>> consequences = \"{consequences_c}\";\n\
+         \x20   }}\n\
+         }}\n",
+        title_c = s(title),
+        date_c = s(date),
+        author_c = s(author),
+        context_c = s(context),
+        decision_c = s(decision),
+        rationale_c = s(rationale),
+        consequences_c = s(consequences),
+    );
+    let filename = format!("{nnnn}-{slug}.sysml");
+    std::fs::write(dir.join(&filename), file_text)?;
+    Ok((nnnn, format!(".engine/decisions/{filename}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_field;
+
+    #[test]
+    fn sanitize_field_makes_a_safe_one_line_literal() {
+        // record_decision (issue054) — field values must not break the one-line SysML string literal.
+        assert_eq!(sanitize_field("has \"quotes\""), "has 'quotes'");
+        assert_eq!(sanitize_field("multi\n  line\t text"), "multi line text");
+        assert_eq!(sanitize_field("  trimmed  "), "trimmed");
+    }
+}

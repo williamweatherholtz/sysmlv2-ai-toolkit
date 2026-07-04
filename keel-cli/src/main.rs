@@ -888,6 +888,45 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     }
 }
 
+/// `keel record <type> ...` — the closed RMWX `record` verb (D0105/D0106; issue054 C1). Currently
+/// records a Decision: `keel record decision --slug S --title T --context C --decision D --rationale R
+/// --consequences Q --date YYYY-MM-DD --author A [--root ROOT]` → writes a proposed Decision file
+/// (auto NNNN + UUID), killing point-of-decision friction (D0054). Acceptance stays a separate human gate.
+fn cmd_record(args: &[String]) -> i32 {
+    if args.first().map(String::as_str) != Some("decision") {
+        eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
+        return 2;
+    }
+    let root = flag(args, "root").map_or_else(
+        || find_repo_root().unwrap_or_else(|| PathBuf::from(".")),
+        PathBuf::from,
+    );
+    let req = |name: &str| flag(args, name);
+    let (Some(slug), Some(title), Some(context), Some(decision), Some(rationale), Some(consequences)) =
+        (req("slug"), req("title"), req("context"), req("decision"), req("rationale"), req("consequences"))
+    else {
+        eprintln!("error: --slug --title --context --decision --rationale --consequences are all required (a substantive why — D0103)");
+        return 2;
+    };
+    let date = flag(args, "date").unwrap_or_default();
+    let author = flag(args, "author").unwrap_or_else(|| "wweatherholtz".to_owned());
+    if date.is_empty() {
+        eprintln!("error: --date YYYY-MM-DD required (the attestation time is its own irreducible fact)");
+        return 2;
+    }
+    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences) {
+        Ok((nnnn, path)) => {
+            println!("recorded D{nnnn} (proposed) -> {path}");
+            println!("accept later via an explicit human sign-off (flip status + add the d{nnnn}Accept event).");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_add_task(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
         eprintln!("usage: keel add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
@@ -1392,6 +1431,7 @@ fn main() {
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
+        Some("record") => cmd_record(rest),
         _ => {
             eprintln!("keel <subcommand> [args]");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");

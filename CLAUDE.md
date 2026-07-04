@@ -264,10 +264,12 @@ The six workflows (see the spec for detail):
 - **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `keel append-result`
   to append a `TestResult` to an action task, `keel append-gate-result` to append a `TestResult`
   to a ceremony gate (`verification` — the `{gate}R{n}` form, used by sprint closeOut/retro), and
-  `keel add-task` to add a task + `DoD` to an action def — all enforce UUID generation and
-  append-only semantics automatically. Direct editing of `.sysml` / instance files is still possible
-  but is no longer the primary path; use it only when the write API does not yet cover the operation
-  (schema changes, decision files).
+  `keel add-task` to add a task + `DoD` to an action def, and `keel record decision` (the D0105/D0106
+  RMWX `record` axis, issue054) to scaffold a **proposed** Decision file (auto NNNN + UUID) in one call —
+  all enforce UUID generation and append-only semantics automatically. (`keel record decision` writes the
+  Decision as `status=proposed`; ACCEPTANCE stays a separate explicit human gate — it never fabricates the
+  acceptance event, D0106.) Direct editing of `.sysml` / instance files is still possible but is no longer
+  the primary path; use it only when the write API does not yet cover the operation (schema changes).
 - **Every change to schema or a workflow/process definition MUST:**
   1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
      rationale — capture the decision even if small; commit messages and memory are NOT
