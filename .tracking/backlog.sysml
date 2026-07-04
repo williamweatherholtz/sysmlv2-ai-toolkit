@@ -1053,5 +1053,6 @@ package EngineBacklog {
 
         action d0105CritiqueResiduals; // issue056: residual D0105-critique findings needing a HUMAN — C11 (acceptance/procedural soundness) + C12 (two-thread coordination protocol).
         verification d0105CritiqueResidualsDoD : Test { :>> id = "a1c70165-0165-4165-9165-516273840165"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Resolves issue056 (residual findings from the independent D0105 critique that an AI cannot self-resolve). C11: the HUMAN explicitly accepts or rejects D0105 (method=confirmation, the frozen-core sign-off) — is an AI-authored proposed decision reframing D0047/D0088 procedurally acceptable, and is the reworked D0105 sound? Per the confirmation rule a general 'continue' is NOT this sign-off. C12: record a two-thread coordination protocol (which thread owns the engine model; what the implementing thread may change without re-authorization; how divergence is adjudicated). VERIFY: a recorded human acceptance/rejection of D0105 (disposition of C11) + a recorded coordination protocol (C12); guard all green."; }
+        part d0105CritiqueResidualsDoDR1 : TestResult { :>> id = "a1c70165-0165-4165-9165-51627384016f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "50a98a9"; :>> judgedAt = "2026-07-03"; :>> judgedBy = "wweatherholtz"; }
     }
 }

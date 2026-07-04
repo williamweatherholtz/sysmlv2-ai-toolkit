@@ -12,7 +12,7 @@ description: |
   conversational replies that change nothing. CLAUDE.md §3 is the source of truth — this skill
   is the always-on checklist, fired every turn by a UserPromptSubmit hook (D0064).
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
   engine: keel-ai-toolkit
@@ -101,6 +101,14 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
    (a process violation, a skill gap, a schema gap), record it immediately as an
    `Issue` in `.tracking/issues.sysml` rather than letting it slip to memory. It
    will be triaged at retro. Use `relatedTask` to point to the relevant backlog action.
+
+8a. **Multi-thread coordination (D0108).** When more than one AI thread edits this model, before touching
+   an item you did NOT create: do **not** edit its fields. Only the OWNER-OF-RECORD (the item's `createdBy`)
+   edits an item in place. A non-owner may only **ADD** new items + typed edges that reference it
+   (`#DependsOn`/`#Resolves`/`supersede`), **supersede** a Decision (author a new one, D0070) rather than
+   overwrite it, and treat shared files (`issues.sysml`, `backlog.sysml`) as append-or-rebase (never
+   force-overwrite; `git fetch` before a shared-region edit). Conflicting conclusions across threads →
+   record an `Issue` and let the HUMAN adjudicate; neither thread silently wins.
 
 8. **Analysis / design → a chartered research spike (issue055/D0068).** If a request triggers
    *substantial* analysis, diagnosis, or architectural design (a multi-step investigation, a

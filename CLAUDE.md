@@ -317,6 +317,12 @@ The six workflows (see the spec for detail):
   `main`; the `post-commit` hook pushes every commit. No long-lived feature branches: everything
   is pushed and merged to `main` only. (This overrides the generic "branch off the default branch
   first" default — per explicit standing instruction, 2026-06-11.)
+- **Multi-thread coordination (D0108).** When more than one AI thread edits this model concurrently:
+  each item is owned by its `createdBy` (owner-of-record) and only the owner edits its fields; a
+  non-owner may only ADD items + typed edges referencing it, or SUPERSEDE a Decision (new one, D0070) —
+  never overwrite another thread's item in place. Shared files (`issues.sysml`, `backlog.sysml`) are
+  append-or-rebase (`git fetch` before a shared-region edit; never force-overwrite). Conflicting
+  conclusions across threads → record an `Issue`; the HUMAN adjudicates, neither thread silently wins.
 - **The meta-process is frozen:** do not use Change Request to modify the
   Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
 - **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
