@@ -2330,6 +2330,15 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         let ev = format!("{name}{}R1", suffix.trim());
         return Some(model.items.get(&ev).and_then(|i| i.attrs.get("outcome")).map(String::as_str) == Some("pass"));
     }
+    // matchesPattern(field, needle) / notMatchesPattern(field, needle): case-sensitive substring on an attr.
+    // `needle` may contain spaces (everything after the first comma); it must not contain a ')'.
+    for (prefix, want) in [("matchesPattern(", true), ("notMatchesPattern(", false)] {
+        if let Some(args) = predicate_args(term, prefix) {
+            let (field, needle) = args.split_once(',')?;
+            let hit = attrs.get(field.trim()).is_some_and(|v| v.contains(needle.trim()));
+            return Some(hit == want);
+        }
+    }
     None
 }
 
@@ -4613,6 +4622,24 @@ mod tests {
         assert_eq!(
             edge_rule_violations(&model, "Story", "charteredby", "*", "outgoing", "atLeastOne", None),
             vec!["newUncharted".to_string(), "oldUncharted".to_string()],
+        );
+    }
+
+    #[test]
+    fn element_rule_not_matches_pattern_flags_verdict_prose() {
+        // issue058 decisionNoVerdictProseRule: a Decision restating "ACCEPTED 202..." in prose is flagged.
+        let dec = |consequences: &str| {
+            let mut a = HashMap::new();
+            a.insert("consequences".to_string(), consequences.to_string());
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None, file: String::new() }
+        };
+        let mut items = HashMap::new();
+        items.insert("dClean".to_string(), dec("no verdict prose here"));
+        items.insert("dDual".to_string(), dec("... ACCEPTED 2026-07-03 by wweatherholtz ...")); // dual-truth
+        let model = Model { items, edges: vec![] };
+        assert_eq!(
+            element_rule_violations(&model, "Decision", "notMatchesPattern(consequences,ACCEPTED 202)", "all").unwrap(),
+            vec!["dDual".to_string()],
         );
     }
 

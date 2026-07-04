@@ -88,4 +88,19 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from charterRule to d0068;
+
+    // issue058 detecting rule: a Decision must NOT restate its acceptance verdict as PROSE (the dual-truth
+    // the human caught — "ACCEPTED <date> by <who>" belongs in the discrete AcceptR1 TestResult, not a
+    // field). Diagnostic (surfaced by `keel rules`, not gating); heuristic like decision-requirement-link.
+    part decisionNoVerdictProseRule : ElementRule {
+        :>> id = "d0105r006-0006-4006-9006-516273841006";
+        :>> title = "A Decision must not restate its acceptance verdict as prose (one source of truth)";
+        :>> subjectType = "Decision";
+        :>> predicate = "notMatchesPattern(consequences,ACCEPTED 202) and notMatchesPattern(context,ACCEPTED 202)";
+        :>> severity = RuleSeverity::warning;
+        :>> onViolation = ViolationKind::warn;
+        :>> appliesWhen = "all";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from decisionNoVerdictProseRule to d0107;
 }
