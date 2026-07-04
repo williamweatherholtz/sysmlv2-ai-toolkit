@@ -361,6 +361,16 @@ that names a Need/SystemRequirement in its prose with NO typed edge to it (a gov
 be typed, not prose) — promotable to a hard gate once proven low-noise. (Relatedly, `critique_suspect`
 honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
 `#DependsOn` finding→critique edge — no longer induces suspicion.)
+**Declarative controls (D0105/D0107).** Controls are being migrated from bespoke Rust predicates to
+DECLARED rules (`.engine/rules/*.sysml` — `EdgeRule`/`ElementRule`/`OrderingRule`) evaluated generically
+by `keel rules` (the `keel check` name is taken by the spec-compat checker; reconciliation is a follow-up).
+The migration is PARTIAL (D0107, accepted): **5 guards are now sourced from their declared rule** (the
+single gate source, via `view::rule_violations`) — `requirement-rootedness`→`capabilityRootednessRule`,
+`issues`→`issuesTriagedRule`, `decision-rationale`→`decisionRationaleRule`, `acceptance-events`→
+`acceptanceEventRule`, `charter`→`charterRule`. The other ~8 guards stay Rust (bad-fit: relational /
+external-file / text-blob / git-co-commit / prose / per-file — D0105 rollback criterion). Guard NAMES +
+commit-gating are unchanged; downstream projects can declare their own rules.
+
 RUNNABLE BURNDOWN / diagnostics (computed, surfaced in orient, NEVER blocking — D0098): `assured`
 D0079c [composite readiness], `critique` D0080/D0079 [critique-COVERAGE; note INDEPENDENCE stays
 enforced above]; plus `critique-rigor` D0080/issue030 [low-rigor critiques + affirming-only critics];

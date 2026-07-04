@@ -150,7 +150,8 @@ pub fn actors(root: &Path) -> GuardReport {
 /// Reuses `view::attestation_data` (the enforcement twin of attestation-coverage).
 #[must_use]
 pub fn acceptance_events(root: &Path) -> GuardReport {
-    match crate::view::attestation_data(root) {
+    // CONTRACT (D0107): sourced from the declared acceptanceEventRule (single gate source).
+    match crate::view::rule_violations(root, "acceptanceEventRule") {
         Ok((total, mut missing)) => {
             missing.sort();
             let violations = missing
@@ -344,63 +345,22 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-fn added_delivery_files(root: &Path) -> Vec<String> {
-    git_stdout(root, &["diff", "--cached", "--name-only", "--diff-filter=A"])
-        .lines()
-        .map(|l| l.trim().replace('\\', "/"))
-        .filter(|l| l.starts_with(".tracking/delivery/") && std::path::Path::new(l).extension().is_some_and(|e| e == "sysml"))
-        .collect()
-}
-
-/// `#CharteredBy dependency from <work> to <_>` → the chartered work names.
-fn chartered_work(text: &str) -> HashSet<String> {
-    let mut out = HashSet::new();
-    for chunk in text.split("#CharteredBy").skip(1) {
-        let mut it = chunk.split_whitespace();
-        if it.next() != Some("dependency") || it.next() != Some("from") {
-            continue;
-        }
-        let Some(tok) = it.next() else { continue };
-        let work: String = tok.chars().take_while(|c| crate::algo::is_word(*c)).collect();
-        if !work.is_empty() && it.next() == Some("to") {
-            out.insert(work);
-        }
-    }
-    out
-}
-
-/// Pure core: violations for newly-added delivery files `(path, staged_text)`.
-fn charter_violations(added: &[(String, String)]) -> Vec<String> {
-    let mut sorted: Vec<&(String, String)> = added.iter().collect();
-    sorted.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut violations = Vec::new();
-    for (path, text) in sorted {
-        let chartered = chartered_work(text);
-        let mut uncharted: Vec<String> = crate::algo::story_names(text).into_iter().filter(|s| !chartered.contains(s)).collect();
-        uncharted.sort();
-        uncharted.dedup();
-        for s in uncharted {
-            violations.push(format!(
-                "{path}: Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement (D0068)"
-            ));
-        }
-    }
-    violations
-}
-
 /// Guard: every newly-added delivery Story declares its `#CharteredBy` edge (D0068).
 ///
-/// Newly-added = `git diff --cached --diff-filter=A`. Forward-only — existing files are never
-/// re-checked. Mirrors `validate_charter.py`.
+/// CONTRACT (D0107): sourced from the declared `charterRule` (an `EdgeRule` with `newlyAdded` git scope)
+/// — the single gate source; the bespoke charter predicate was retired after parity (sprints 178-183).
 #[must_use]
 pub fn charter(root: &Path) -> GuardReport {
-    let added = added_delivery_files(root);
-    let texts: Vec<(String, String)> = added
-        .iter()
-        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
-        .collect();
-    let violations = charter_violations(&texts);
-    GuardReport { name: "charter", scanned: added.len(), warnings: Vec::new(), violations }
+    match crate::view::rule_violations(root, "charterRule") {
+        Ok((scanned, uncharted)) => {
+            let violations = uncharted
+                .into_iter()
+                .map(|s| format!("Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement (D0068)"))
+                .collect();
+            GuardReport { name: "charter", scanned, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "charter", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading charter rule: {e}")] },
+    }
 }
 
 /// Guard: requirement-rootedness (D0098/D0099, issue047).
@@ -412,8 +372,9 @@ pub fn charter(root: &Path) -> GuardReport {
 /// non-blocking `keel rootedness` burndown.
 #[must_use]
 pub fn requirement_rootedness(root: &Path) -> GuardReport {
-    match crate::view::rootedness_gaps(root) {
-        Ok(gaps) => {
+    // CONTRACT (D0107): sourced from the declared capabilityRootednessRule (single gate source).
+    match crate::view::rule_violations(root, "capabilityRootednessRule") {
+        Ok((_scanned, gaps)) => {
             let violations = gaps
                 .into_iter()
                 .map(|c| format!("{c}: #Capability with no #DerivedFrom edge to a Need — state the driving Need (D0099)"))
@@ -500,7 +461,8 @@ pub fn process_change(root: &Path) -> GuardReport {
 /// but not gating.
 #[must_use]
 pub fn issues(root: &Path) -> GuardReport {
-    match crate::view::untriaged_issues(root) {
+    // CONTRACT (D0107): sourced from the declared issuesTriagedRule (single gate source), not a bespoke predicate.
+    match crate::view::rule_violations(root, "issuesTriagedRule") {
         Ok((total, untriaged)) => {
             let violations = untriaged
                 .into_iter()
@@ -741,7 +703,8 @@ pub fn critique_rigor(root: &Path) -> GuardReport {
 /// chars) is a violation. Precise (no false positives), and all current decisions pass — no flood.
 #[must_use]
 pub fn decision_rationale(root: &Path) -> GuardReport {
-    match crate::view::decisions_weak_rationale(root) {
+    // CONTRACT (D0107): sourced from the declared decisionRationaleRule (single gate source).
+    match crate::view::rule_violations(root, "decisionRationaleRule") {
         Ok((total, weak)) => {
             let violations = weak
                 .into_iter()
@@ -972,17 +935,8 @@ mod tests {
         assert!(!retro_scan_missing(prose_then_real, &passed));
     }
 
-    #[test]
-    fn charter_selftest() {
-        // Mirrors validate_charter.selftest: chartered passes, uncharted flagged, none passes.
-        let good = "package S {\n    part s42 : Story { :>> id = \"x\"; }\n    #CharteredBy dependency from s42 to d0070;\n}";
-        let bad = "package S {\n    part s99 : Story { :>> id = \"y\"; }\n}";
-        assert!(charter_violations(&[(".tracking/delivery/g.sysml".to_string(), good.to_string())]).is_empty());
-        let neg = charter_violations(&[(".tracking/delivery/b.sysml".to_string(), bad.to_string())]);
-        assert_eq!(neg.len(), 1);
-        assert!(neg[0].contains("s99"));
-        assert!(charter_violations(&[]).is_empty());
-    }
+    // charter_selftest retired (D0107 CONTRACT): the charter guard now sources from charterRule; its
+    // logic + parity are covered by view::tests::edge_rule_newly_added_scope_restricts_to_staged_files.
 
     #[test]
     fn keystone_selftest() {

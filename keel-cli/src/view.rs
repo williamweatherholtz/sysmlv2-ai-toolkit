@@ -2363,6 +2363,41 @@ fn element_rule_violations(model: &Model, subject: &str, predicate: &str, scope:
     Some(out)
 }
 
+/// Evaluate ONE declared rule by name → `(subjects_scanned, sorted violations)`.
+///
+/// The CONTRACT single source (D0107): the 5 migrated guards source their violations here instead of a
+/// bespoke Rust predicate.
+///
+/// # Errors
+/// [`ViewError`] on a parse failure, an unknown rule name, or an unsupported predicate/scope.
+pub fn rule_violations(root: &Path, rule_name: &str) -> Result<(usize, Vec<String>), ViewError> {
+    let model = Model::build(root)?;
+    let Some(info) = model.items.get(rule_name) else {
+        return Err(ViewError::Track(rule_name.to_string(), format!("declared rule '{rule_name}' not found")));
+    };
+    let a = |k: &str| info.attrs.get(k).cloned().unwrap_or_default();
+    let scope = {
+        let s = a("appliesWhen");
+        if s.is_empty() { "all".to_string() } else { s }
+    };
+    let subject = a("subjectType");
+    match info.type_name.as_str() {
+        "EdgeRule" => {
+            let scope_files = if scope == "newlyAdded" { Some(staged_added_files(root)) } else { None };
+            let scanned = model.items.values().filter(|i| rc_matches_subject(i, &subject) && scope_files.as_ref().is_none_or(|f| f.contains(&i.file))).count();
+            let v = edge_rule_violations(&model, &subject, &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality"), scope_files.as_ref());
+            Ok((scanned, v))
+        }
+        "ElementRule" => {
+            let scanned = model.items.values().filter(|i| rc_matches_subject(i, &subject) && subject_in_scope(i, &scope).unwrap_or(false)).count();
+            let v = element_rule_violations(&model, &subject, &a("predicate"), &scope)
+                .ok_or_else(|| ViewError::Track(rule_name.to_string(), "unsupported predicate/scope term".to_string()))?;
+            Ok((scanned, v))
+        }
+        other => Err(ViewError::Track(rule_name.to_string(), format!("unknown rule kind '{other}'"))),
+    }
+}
+
 /// `keel rules` (D0105 EXPAND step 2): evaluate DECLARED rules over the model.
 ///
 /// The generic evaluator that replaces the bespoke guards once each reaches PARITY
