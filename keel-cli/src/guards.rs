@@ -355,7 +355,7 @@ pub fn charter(root: &Path) -> GuardReport {
         Ok((scanned, uncharted)) => {
             let violations = uncharted
                 .into_iter()
-                .map(|s| format!("Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement (D0068)"))
+                .map(|s| format!("Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement, or (a research spike) to an Issue/proposed-Decision (D0068/issue055)"))
                 .collect();
             GuardReport { name: "charter", scanned, warnings: Vec::new(), violations }
         }
