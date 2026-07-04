@@ -671,4 +671,55 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from oneSourceDecisionAuthoring to issue058;
+
+    // ── Retrospective findings (2026-07-04): honest critique of THIS session's resolutions. The recurring
+    //    theme — several new controls rely on VIGILANCE, not enforcement (the exact weakness they cured). ──
+
+    part issue059 : Issue {
+        :>> id = "e0590059-0059-4e59-9059-516273840059";
+        :>> title = "D0106 strict process-boundedness is unenforced (vigilance-only) — it was violated AFTER adoption";
+        :>> createdAt = "2026-07-04";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Retrospective finding (the sharpest). D0106 (parse-first / no action untied to a process / sign-off as an explicit gate) is enforced only by convention + a UserPromptSubmit REMINDER hook — there is no hard gate that a response/commit actually carried its route + sign-off evidence. Proof it is weak: the dual-truth defect (issue058) occurred AFTER D0106 was in force, and the first fix was itself incomplete — the one principle meant to stop ad-hoc work did not prevent its own target failure. The `Parsed:` block also risks becoming ritual (produced every turn, rubber-stampable). This is the same vigilance-is-not-a-control lesson as D0047/issue010. PROPOSED FIX (strictProcessGate): make D0106 a real control — e.g. a commit-time check that substantive work carries its process linkage (a sprint/charter or a recorded route) and that method=confirmation results carry an actual attestation, not just a reminder. PROCESS CHANGE -> Change-Request path. Relates to D0106, D0064, issue020/sprint30 (the planned hook), issue058.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "strictProcessGate";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from strictProcessGate to issue059;
+
+    part issue060 : Issue {
+        :>> id = "e0600060-0060-4e60-9060-516273840060";
+        :>> title = "Declarative-controls migration payoff is unproven — net code up, OrderingRule unused (dead schema), keel check name unfreed, RMWX axis one verb";
+        :>> createdAt = "2026-07-04";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Retrospective finding. The declarative-controls effort (D0105/D0107) built a rule schema + `keel rules` evaluator but migrated only 5 of 14 guards, so it ADDED machinery (schema + evaluator + rule files) while removing duplication in only 5 guards — net lines-of-code likely INCREASED, and the D0105 'code stays flat' claim is unproven and probably false at this scope. Concrete loose ends: (a) `OrderingRule` is defined in schema/core with ZERO instances (ceremony stayed Rust) — dead schema; (b) `keel check` (D0105's intended evaluator name) was never freed — the evaluator is `keel rules`; (c) the RMWX 'closed verb axis' is one verb (`record decision`); the per-type add-*/append-* verbs all remain; (d) the primary justification ('downstream projects declare their own rules') is speculative — no downstream rule exists. This may itself be the inner-platform over-engineering D0105 warned against. PROPOSED FIX (declarativeControlsRoiOrRescope): either PROVE the ROI (migrate enough more guards to actually DELETE Rust guard code, freeing `keel check`) OR RESCOPE — remove the unused OrderingRule kind + mark the mechanism 'downstream-only, minimal engine use' honestly. PROCESS/CHANGE. Relates to D0105, D0107, issue054 (RMWX).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "declarativeControlsRoiOrRescope";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from declarativeControlsRoiOrRescope to issue060;
+
+    part issue061 : Issue {
+        :>> id = "e0610061-0061-4e61-9061-516273840061";
+        :>> title = "New process deployments are declared but unexercised — business-architecture skill never run; issue055 spike-routing is vigilance-dependent";
+        :>> createdAt = "2026-07-04";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Retrospective finding. Two fixes that address 'inert/undeployed process' are themselves unexercised — the same inert-until-deployed risk (D0059) one level up. (a) The business-architecture skill (issue054 F1 fix — deploys the Business/Architecture workflows) was authored but NEVER RUN on a real design session this session; its efficacy is unproven. (b) issue055's research-spike routing (engine-triage item 8) exists but is vigilance-dependent — most analysis since (INCLUDING the retrospective that produced these issues) still ran in conversation without a chartered spike. So both 'fixes' depend on the same discretionary follow-through that caused the original problem. PROPOSED FIX (proveProcessDeployment): exercise the business-architecture skill on the next real design/scoping request (dogfood it end-to-end), and tie research-spike routing to the issue059 strict-process gate so substantial analysis is routed by a control, not by memory. Relates to issue054, issue055, D0059, D0106, issue059.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "proveProcessDeployment";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from proveProcessDeployment to issue061;
+
+    part issue062 : Issue {
+        :>> id = "e0620062-0062-4e62-9062-516273840062";
+        :>> title = "The dual-truth detecting rule is non-gating, heuristic, and its positive path is untested";
+        :>> createdAt = "2026-07-04";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Retrospective finding. decisionNoVerdictProseRule (issue058) is warning-level + non-gating (shows in `keel rules`, never blocks a commit), heuristic (substring 'ACCEPTED 202'), and fires 0 today — so its POSITIVE path (actually catching a dual-truth) is untested on real data, and it would miss other dual-truth forms (a verdict restated without that exact substring). It documents the intent more than it enforces it. PROPOSED FIX (hardenVerdictProseRule): add a positive test fixture (a synthetic offending decision the rule must flag), broaden the pattern beyond one substring, and decide whether it should gate (promote to a blocking rule/guard) once low-noise — mirroring the decision-requirement-link warning->hard promotion path. Relates to issue058, D0102 (warning->hard precedent).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "hardenVerdictProseRule";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from hardenVerdictProseRule to issue062;
 }
