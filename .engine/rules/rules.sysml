@@ -71,4 +71,21 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from acceptanceEventRule to d0066;
+
+    // Mirrors guard:charter (D0068). First rule using the git-temporal `newlyAdded` scope. Parity target:
+    // guards::charter (a Story in a newly-added .tracking/delivery file lacking a #CharteredBy edge).
+    part charterRule : EdgeRule {
+        :>> id = "d0105r005-0005-4005-9005-516273841005";
+        :>> title = "A newly-added delivery Story must be chartered";
+        :>> subjectType = "Story";
+        :>> requiredEdge = EdgeKind::charteredBy;
+        :>> edgeDirection = EdgeDirection::outgoing;
+        :>> objectType = "*";
+        :>> cardinality = RuleCardinality::atLeastOne;
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "newlyAdded";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from charterRule to d0068;
 }

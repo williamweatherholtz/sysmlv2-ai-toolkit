@@ -143,6 +143,9 @@ struct ItemInfo {
     type_name: String,
     attrs: HashMap<String, String>,
     marker: Option<String>,
+    /// Repo-relative source file (forward-slashed) — powers the `newlyAdded` git-temporal rule scope
+    /// (D0105). Empty for items constructed in tests / without a known source.
+    file: String,
 }
 
 #[derive(Clone)]
@@ -211,7 +214,9 @@ impl Model {
             let src = std::fs::read_to_string(&path).map_err(|e| ViewError::Io(name.clone(), e))?;
             let tokens = tokenize(&src, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
             let pkg = parse(tokens, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
-            Self::ingest(&pkg, &mut items, &mut edges);
+            // Repo-relative, forward-slashed path — matches `git diff --name-only` for `newlyAdded` scope.
+            let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string().replace('\\', "/");
+            Self::ingest(&pkg, &mut items, &mut edges, &rel);
         }
         // `resultof` edges: a TestResult named `<test>R<n>` records a run of Test `<test>` (gate or
         // DoD). The link is by naming convention, not a typed edge — derive it so result leaves
@@ -228,27 +233,27 @@ impl Model {
         Ok(Self { items, edges })
     }
 
-    fn ingest(pkg: &Package, items: &mut HashMap<String, ItemInfo>, edges: &mut Vec<Edge>) {
+    fn ingest(pkg: &Package, items: &mut HashMap<String, ItemInfo>, edges: &mut Vec<Edge>, file: &str) {
         for item in &pkg.items {
             match item {
-                Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref()),
-                Item::Verification(v) => add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None),
-                Item::ActionDecl(a) => add_item_typed(items, &a.name, "action"),
+                Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref(), file),
+                Item::Verification(v) => add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None, file),
+                Item::ActionDecl(a) => add_item_typed(items, &a.name, "action", file),
                 Item::ActionDef(ad) => {
-                    add_item_typed(items, &ad.name, "ActionDef");
+                    add_item_typed(items, &ad.name, "ActionDef", file);
                     // `contains` edges: a def structurally owns its nested parts/verifications/actions.
                     // This containment is real structure the flat item map loses; the diagram draws it
                     // so the nested children connect to their def instead of floating.
                     for p in &ad.parts {
-                        add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref());
+                        add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref(), file);
                         edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: p.name.clone() });
                     }
                     for v in &ad.verifications {
-                        add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None);
+                        add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None, file);
                         edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: v.name.clone() });
                     }
                     for a in &ad.actions {
-                        add_item_typed(items, &a.name, "action");
+                        add_item_typed(items, &a.name, "action", file);
                         edges.push(Edge { kind: "contains".to_string(), from: ad.name.clone(), to: a.name.clone() });
                     }
                     for s in &ad.successions {
@@ -291,13 +296,13 @@ impl Model {
     }
 }
 
-fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[keel_parser::ast::Attribute], marker: Option<&str>) {
+fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[keel_parser::ast::Attribute], marker: Option<&str>, file: &str) {
     let attrs = attributes.iter().map(|a| (a.name.clone(), value_to_string(&a.value))).collect();
-    items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string) });
+    items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string), file: file.to_string() });
 }
 
-fn add_item_typed(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: &str) {
-    items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None });
+fn add_item_typed(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: &str, file: &str) {
+    items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None, file: file.to_string() });
 }
 
 /// Strip a `R<digits>` result suffix: `storyDiagramRenderFixDoDR1` -> `storyDiagramRenderFixDoD`.
@@ -2243,11 +2248,28 @@ fn rc_matches_subject(info: &ItemInfo, subject: &str) -> bool {
 /// `EdgeRule` violations: `subject` instances lacking `edge` (at `cardinality`) to an existing instance
 /// of `object` (`"*"` = any target). Sorted subject names. The generic core that subsumes the ~9
 /// conformance guards once each rule reaches parity.
-fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, direction: &str, cardinality: &str) -> Vec<String> {
+/// Repo-relative, forward-slashed files git reports as newly-ADDED in the staged index — the `newlyAdded`
+/// scope set (matches the charter/sprint-coverage guards' forward-only semantics). Empty if git fails.
+fn staged_added_files(root: &Path) -> std::collections::HashSet<String> {
+    std::process::Command::new("git")
+        .arg("-C").arg(root)
+        .args(["diff", "--cached", "--name-only", "--diff-filter=A"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(|l| l.trim().replace('\\', "/")).collect())
+        .unwrap_or_default()
+}
+
+fn edge_rule_violations(model: &Model, subject: &str, edge: &str, object: &str, direction: &str, cardinality: &str, scope_files: Option<&std::collections::HashSet<String>>) -> Vec<String> {
     let incoming = direction == "incoming";
     let mut out: Vec<String> = Vec::new();
     for (name, info) in &model.items {
         if !rc_matches_subject(info, subject) {
+            continue;
+        }
+        // `newlyAdded` scope: only subjects whose source file is in the staged-added set.
+        if scope_files.is_some_and(|files| !files.contains(&info.file)) {
             continue;
         }
         let count = model
@@ -2366,9 +2388,10 @@ pub fn check(root: &Path) -> Result<String, ViewError> {
             if s.is_empty() { "all".to_string() } else { s }
         };
         let (violations, evaluated) = if kind == "EdgeRule" {
-            // EdgeRule scope is still all-only (git-temporal newlyAdded is a later sub-step).
-            if scope == "all" {
-                (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality")), true)
+            // EdgeRule scope: `all` (whole model) or `newlyAdded` (git staged-added files); else unsupported.
+            let scope_files = if scope == "newlyAdded" { Some(staged_added_files(root)) } else { None };
+            if scope == "all" || scope == "newlyAdded" {
+                (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality"), scope_files.as_ref()), true)
             } else {
                 (Vec::new(), false)
             }
@@ -3849,11 +3872,11 @@ mod tests {
 
     fn model() -> Model {
         let mut items = HashMap::new();
-        items.insert("r1".to_string(), ItemInfo { type_name: "Requirement".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("c1".to_string(), ItemInfo { type_name: "Component".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("r1".to_string(), ItemInfo { type_name: "Requirement".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("c1".to_string(), ItemInfo { type_name: "Component".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         let mut dattrs = HashMap::new();
         dattrs.insert("status".to_string(), "accepted".to_string());
-        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: Some("ProspectiveChange".to_string()) });
+        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: Some("ProspectiveChange".to_string()), file: String::new() });
         let edges = vec![Edge { kind: "satisfy".to_string(), from: "r1".to_string(), to: "c1".to_string() }];
         Model { items, edges }
     }
@@ -3917,7 +3940,7 @@ mod tests {
         // t1 --verify--> sr1. Unrelated Need u1 is NOT in the slice.
         let mut items = HashMap::new();
         for (n, t) in [("n1", "Need"), ("sr1", "SystemRequirement"), ("comp1", "Component"), ("t1", "Test"), ("u1", "Need")] {
-            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
         let edges = vec![
             Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr1".to_string() },
@@ -3937,7 +3960,7 @@ mod tests {
         // n1 slice {n1, sr1}; one cut edge sr1 --dependency--> ext (ext is OUTSIDE the boundary).
         let mut items = HashMap::new();
         for (n, t) in [("n1", "Need"), ("sr1", "SystemRequirement"), ("ext", "Component")] {
-            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(n.to_string(), ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
         let edges = vec![
             Edge { kind: "satisfy".to_string(), from: "n1".to_string(), to: "sr1".to_string() },
@@ -3961,7 +3984,7 @@ mod tests {
         // {a,b}: a->b is internal (both in); b->x leaves; y->a enters. cut = {b->x, y->a}.
         let mut items = HashMap::new();
         for n in ["a", "b", "x", "y"] {
-            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
         let edges = vec![
             Edge { kind: "dependency".to_string(), from: "a".to_string(), to: "b".to_string() },
@@ -4004,7 +4027,7 @@ mod tests {
         // a -> b -> c chain; Section(a) = {a, b} only — c is two hops away, beyond the local section.
         let mut items = HashMap::new();
         for n in ["a", "b", "c"] {
-            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(n.to_string(), ItemInfo { type_name: "X".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
         let edges = vec![
             Edge { kind: "dependency".to_string(), from: "a".to_string(), to: "b".to_string() },
@@ -4022,10 +4045,10 @@ mod tests {
         // i1 resolved by a done action; i2 open (resolver action not done); i3 untriaged (no edge).
         let mut items = HashMap::new();
         for n in ["i1", "i2", "i3"] {
-            items.insert(n.to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(n.to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
-        items.insert("actDone".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("actOpen".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("actDone".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("actOpen".to_string(), ItemInfo { type_name: "action".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         let edges = vec![
             Edge { kind: "resolves".to_string(), from: "actDone".to_string(), to: "i1".to_string() },
             Edge { kind: "resolves".to_string(), from: "actOpen".to_string(), to: "i2".to_string() },
@@ -4042,10 +4065,10 @@ mod tests {
     #[test]
     fn issue_resolved_by_accepted_decision() {
         let mut items = HashMap::new();
-        items.insert("i9".to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("i9".to_string(), ItemInfo { type_name: "Issue".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         let mut dattrs = HashMap::new();
         dattrs.insert("status".to_string(), "accepted".to_string());
-        items.insert("d99".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: None });
+        items.insert("d99".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: dattrs, marker: None, file: String::new() });
         let edges = vec![Edge { kind: "resolves".to_string(), from: "d99".to_string(), to: "i9".to_string() }];
         let model = Model { items, edges };
         let res = compute_issue_resolution(&model, &HashSet::new());
@@ -4066,21 +4089,21 @@ mod tests {
             a
         };
         for d in ["d1", "d2", "d3"] {
-            items.insert(d.to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None });
+            items.insert(d.to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None, file: String::new() });
         }
         for sr in ["sr1", "sr2"] {
-            items.insert(sr.to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: HashMap::new(), marker: None });
+            items.insert(sr.to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         }
-        items.insert("n1".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("n2".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("d4".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None });
+        items.insert("n1".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("n2".to_string(), ItemInfo { type_name: "Need".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("d4".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: accepted(), marker: None, file: String::new() });
         let mut ev = HashMap::new();
         ev.insert("outcome".to_string(), "pass".to_string());
-        items.insert("d4AcceptR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: ev, marker: None });
-        items.insert("vt".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("d4AcceptR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: ev, marker: None, file: String::new() });
+        items.insert("vt".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         let mut vtres = HashMap::new();
         vtres.insert("outcome".to_string(), "pass".to_string());
-        items.insert("vtR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: vtres, marker: None });
+        items.insert("vtR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: vtres, marker: None, file: String::new() });
         let edges = vec![
             Edge { kind: "charteredby".to_string(), from: "aStory".to_string(), to: "d1".to_string() },
             Edge { kind: "charteredby".to_string(), from: "bStory".to_string(), to: "d2".to_string() },
@@ -4112,23 +4135,23 @@ mod tests {
         let mut items = HashMap::new();
         let mut req = HashMap::new();
         req.insert("createdBy".to_string(), "wweatherholtz".to_string());
-        items.insert("sr1".to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: req, marker: None });
+        items.insert("sr1".to_string(), ItemInfo { type_name: "SystemRequirement".to_string(), attrs: req, marker: None, file: String::new() });
         let crit = |lens: &str| {
             let mut a = HashMap::new();
             a.insert("method".to_string(), "critique".to_string());
             a.insert("lens".to_string(), lens.to_string());
             a
         };
-        items.insert("c1".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("completeness"), marker: None });
-        items.insert("c2".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("correctness"), marker: None });
+        items.insert("c1".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("completeness"), marker: None, file: String::new() });
+        items.insert("c2".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit("correctness"), marker: None, file: String::new() });
         let res = |by: &str| {
             let mut a = HashMap::new();
             a.insert("outcome".to_string(), "pass".to_string());
             a.insert("judgedBy".to_string(), by.to_string());
             a
         };
-        items.insert("c1R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("claudeOpus"), marker: None });
-        items.insert("c2R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("wweatherholtz"), marker: None });
+        items.insert("c1R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("claudeOpus"), marker: None, file: String::new() });
+        items.insert("c2R1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("wweatherholtz"), marker: None, file: String::new() });
         let edges = vec![
             Edge { kind: "verify".to_string(), from: "c1".to_string(), to: "sr1".to_string() },
             Edge { kind: "verify".to_string(), from: "c2".to_string(), to: "sr1".to_string() },
@@ -4147,22 +4170,22 @@ mod tests {
     fn critique_suspect_flags_unresolved_failing_critique() {
         // D0086: an element with a failing critique is suspect; a passing critique is not.
         let mut items = HashMap::new();
-        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None });
-        items.insert("d2".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None });
+        items.insert("d1".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("d2".to_string(), ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
         let crit = || {
             let mut a = HashMap::new();
             a.insert("method".to_string(), "critique".to_string());
             a
         };
-        items.insert("cFail".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None });
-        items.insert("cPass".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None });
+        items.insert("cFail".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None, file: String::new() });
+        items.insert("cPass".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit(), marker: None, file: String::new() });
         let res = |o: &str| {
             let mut a = HashMap::new();
             a.insert("outcome".to_string(), o.to_string());
             a
         };
-        items.insert("cFailR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("fail"), marker: None });
-        items.insert("cPassR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("pass"), marker: None });
+        items.insert("cFailR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("fail"), marker: None, file: String::new() });
+        items.insert("cPassR1".to_string(), ItemInfo { type_name: "TestResult".to_string(), attrs: res("pass"), marker: None, file: String::new() });
         let edges = vec![
             Edge { kind: "verify".to_string(), from: "cFail".to_string(), to: "d1".to_string() },
             Edge { kind: "verify".to_string(), from: "cPass".to_string(), to: "d2".to_string() },
@@ -4180,12 +4203,12 @@ mod tests {
         let mk = |sev: &str| {
             let mut a = HashMap::new();
             a.insert("severity".to_string(), sev.to_string());
-            ItemInfo { type_name: "Issue".to_string(), attrs: a, marker: None }
+            ItemInfo { type_name: "Issue".to_string(), attrs: a, marker: None, file: String::new() }
         };
         let disp = |verdict: &str| {
             let mut a = HashMap::new();
             a.insert("disposition".to_string(), verdict.to_string());
-            ItemInfo { type_name: "Test".to_string(), attrs: a, marker: None }
+            ItemInfo { type_name: "Test".to_string(), attrs: a, marker: None, file: String::new() }
         };
         let mut items = HashMap::new();
         items.insert("iActed".to_string(), mk("Medium"));
@@ -4224,7 +4247,7 @@ mod tests {
     fn sitting_coverage_detects_covered_sprints() {
         // D0049/issue040: a #Covers edge (review -> sprint Story) marks that sprint covered.
         let mut items = HashMap::new();
-        let story = |t: &str| ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None };
+        let story = |t: &str| ItemInfo { type_name: t.to_string(), attrs: HashMap::new(), marker: None, file: String::new() };
         items.insert("s1".to_string(), story("Story"));
         items.insert("s2".to_string(), story("Story"));
         items.insert("sittingRev1".to_string(), story("Test"));
@@ -4407,7 +4430,7 @@ mod tests {
     }
 
     fn item(ty: &str, marker: Option<&str>) -> ItemInfo {
-        ItemInfo { type_name: ty.to_string(), attrs: HashMap::new(), marker: marker.map(str::to_string) }
+        ItemInfo { type_name: ty.to_string(), attrs: HashMap::new(), marker: marker.map(str::to_string), file: String::new() }
     }
 
     #[test]
@@ -4436,7 +4459,7 @@ mod tests {
         let edges = vec![Edge { kind: "derivedfrom".to_string(), from: "capB".to_string(), to: "n1".to_string() }];
         let model = Model { items, edges };
         assert_eq!(
-            edge_rule_violations(&model, "#Capability", "derivedfrom", "Need", "outgoing", "atLeastOne"),
+            edge_rule_violations(&model, "#Capability", "derivedfrom", "Need", "outgoing", "atLeastOne", None),
             capability_root_violations(&model),
         );
     }
@@ -4451,7 +4474,7 @@ mod tests {
         let edges = vec![Edge { kind: "resolves".to_string(), from: "fixB".to_string(), to: "issueB".to_string() }];
         let model = Model { items, edges };
         assert_eq!(
-            edge_rule_violations(&model, "Issue", "resolves", "*", "incoming", "atLeastOne"),
+            edge_rule_violations(&model, "Issue", "resolves", "*", "incoming", "atLeastOne", None),
             vec!["issueA".to_string()],
         );
     }
@@ -4465,7 +4488,7 @@ mod tests {
             let mut a = HashMap::new();
             a.insert("context".to_string(), ctx.to_string());
             a.insert("rationale".to_string(), rat.to_string());
-            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None }
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None, file: String::new() }
         };
         let mut items = HashMap::new();
         items.insert("dGood".to_string(), mk(&long, &long));
@@ -4484,18 +4507,41 @@ mod tests {
     }
 
     #[test]
+    fn edge_rule_newly_added_scope_restricts_to_staged_files() {
+        // D0105 charterRule: an uncharted Story in a NEWLY-ADDED file is flagged; one in an existing
+        // (not-added) file is out of scope. Mirrors guard:charter's forward-only (staged-added) semantics.
+        let story = |file: &str| ItemInfo { type_name: "Story".to_string(), attrs: HashMap::new(), marker: None, file: file.to_string() };
+        let mut items = HashMap::new();
+        items.insert("newUncharted".to_string(), story(".tracking/delivery/sprintNew.sysml")); // added + uncharted
+        items.insert("oldUncharted".to_string(), story(".tracking/delivery/sprintOld.sysml")); // uncharted but NOT added
+        let edges = vec![]; // neither is chartered
+        let model = Model { items, edges };
+        let added: std::collections::HashSet<String> = std::iter::once(".tracking/delivery/sprintNew.sysml".to_string()).collect();
+        // newlyAdded scope: only the story in the staged-added file is flagged.
+        assert_eq!(
+            edge_rule_violations(&model, "Story", "charteredby", "*", "outgoing", "atLeastOne", Some(&added)),
+            vec!["newUncharted".to_string()],
+        );
+        // all scope (None): both uncharted stories flagged — confirms the scope filter is what narrows it.
+        assert_eq!(
+            edge_rule_violations(&model, "Story", "charteredby", "*", "outgoing", "atLeastOne", None),
+            vec!["newUncharted".to_string(), "oldUncharted".to_string()],
+        );
+    }
+
+    #[test]
     fn element_rule_scope_and_result_reach_parity_with_acceptance_events() {
         // D0105: acceptanceEventRule = whereStatus(accepted) Decision must hasPassingResult(Accept) —
         // must reproduce compute_attestation (accepted Decision lacking a passing <name>AcceptR1).
         let dec = |status: &str| {
             let mut a = HashMap::new();
             a.insert("status".to_string(), status.to_string());
-            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None }
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None, file: String::new() }
         };
         let result = |outcome: &str| {
             let mut a = HashMap::new();
             a.insert("outcome".to_string(), outcome.to_string());
-            ItemInfo { type_name: "TestResult".to_string(), attrs: a, marker: None }
+            ItemInfo { type_name: "TestResult".to_string(), attrs: a, marker: None, file: String::new() }
         };
         let mut items = HashMap::new();
         items.insert("dAcc".to_string(), dec("accepted")); // accepted + passing event => ok
