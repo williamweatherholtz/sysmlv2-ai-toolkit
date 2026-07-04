@@ -2331,11 +2331,22 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         return Some(model.items.get(&ev).and_then(|i| i.attrs.get("outcome")).map(String::as_str) == Some("pass"));
     }
     // matchesPattern(field, needle) / notMatchesPattern(field, needle): case-sensitive substring on an attr.
-    // `needle` may contain spaces (everything after the first comma); it must not contain a ')'.
-    for (prefix, want) in [("matchesPattern(", true), ("notMatchesPattern(", false)] {
+    // The `CI` variants are case-insensitive. `needle` may contain spaces (after the first comma); no ')'.
+    for (prefix, want, ci) in [
+        ("matchesPatternCI(", true, true),
+        ("notMatchesPatternCI(", false, true),
+        ("matchesPattern(", true, false),
+        ("notMatchesPattern(", false, false),
+    ] {
         if let Some(args) = predicate_args(term, prefix) {
             let (field, needle) = args.split_once(',')?;
-            let hit = attrs.get(field.trim()).is_some_and(|v| v.contains(needle.trim()));
+            let hit = attrs.get(field.trim()).is_some_and(|v| {
+                if ci {
+                    v.to_lowercase().contains(&needle.trim().to_lowercase())
+                } else {
+                    v.contains(needle.trim())
+                }
+            });
             return Some(hit == want);
         }
     }
@@ -4636,10 +4647,17 @@ mod tests {
         let mut items = HashMap::new();
         items.insert("dClean".to_string(), dec("no verdict prose here"));
         items.insert("dDual".to_string(), dec("... ACCEPTED 2026-07-03 by wweatherholtz ...")); // dual-truth
+        items.insert("dLower".to_string(), dec("was accepted 2026 by the human")); // CI variant (issue062)
         let model = Model { items, edges: vec![] };
+        // case-sensitive: only the uppercase form.
         assert_eq!(
             element_rule_violations(&model, "Decision", "notMatchesPattern(consequences,ACCEPTED 202)", "all").unwrap(),
             vec!["dDual".to_string()],
+        );
+        // case-insensitive (the broadened rule, issue062): catches BOTH forms.
+        assert_eq!(
+            element_rule_violations(&model, "Decision", "notMatchesPatternCI(consequences,accepted 202)", "all").unwrap(),
+            vec!["dDual".to_string(), "dLower".to_string()],
         );
     }
 

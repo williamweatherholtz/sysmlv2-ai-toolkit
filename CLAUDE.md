@@ -370,7 +370,8 @@ be typed, not prose) — promotable to a hard gate once proven low-noise. (Relat
 honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
 `#DependsOn` finding→critique edge — no longer induces suspicion.)
 **Declarative controls (D0105/D0107).** Controls are being migrated from bespoke Rust predicates to
-DECLARED rules (`.engine/rules/*.sysml` — `EdgeRule`/`ElementRule`/`OrderingRule`) evaluated generically
+DECLARED rules (`.engine/rules/*.sysml` — `EdgeRule`/`ElementRule`; a third `OrderingRule` kind was
+removed as dead schema, issue060) evaluated generically
 by `keel rules` (the `keel check` name is taken by the spec-compat checker; reconciliation is a follow-up).
 The migration is PARTIAL (D0107, accepted): **5 guards are now sourced from their declared rule** (the
 single gate source, via `view::rule_violations`) — `requirement-rootedness`→`capabilityRootednessRule`,

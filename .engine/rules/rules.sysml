@@ -96,7 +96,7 @@ package EngineRuleSet {
         :>> id = "d0105r006-0006-4006-9006-516273841006";
         :>> title = "A Decision must not restate its acceptance verdict as prose (one source of truth)";
         :>> subjectType = "Decision";
-        :>> predicate = "notMatchesPattern(consequences,ACCEPTED 202) and notMatchesPattern(context,ACCEPTED 202)";
+        :>> predicate = "notMatchesPatternCI(consequences,accepted 202) and notMatchesPatternCI(context,accepted 202) and notMatchesPatternCI(decision,accepted 202) and notMatchesPatternCI(rationale,accepted 202)";
         :>> severity = RuleSeverity::warning;
         :>> onViolation = ViolationKind::warn;
         :>> appliesWhen = "all";

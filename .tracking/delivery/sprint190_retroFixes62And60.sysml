@@ -1,0 +1,36 @@
+// ProjectDeliveryS190 — Sprint 190: retroFixes62And60 — issue062 (broaden+harden the dual-truth detecting
+// rule) + issue060 (rescope the declarative migration: remove the unused OrderingRule dead schema). CR
+// (schema/core change) governed by D0107. 1 pt. AUTONOMOUS (D0049).
+package ProjectDeliveryS190 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from retroFixStory to d0107;
+
+    part retroFixStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c190-51627384c001";
+        :>> title = "Sprint 190: retroFixes62And60 (1 pt) - harden dual-truth rule (issue062) + remove dead OrderingRule (issue060)";
+        :>> createdAt = "2026-07-04"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS190 {
+        action storyRetroFix;
+        verification storyRetroFixDoD : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c002"; :>> method = VerificationMethod::test; :>> procedureText = "Two retrospective resolvers. issue062 (hardenVerdictProseRule): predicate engine gains case-insensitive matchesPatternCI/notMatchesPatternCI; decisionNoVerdictProseRule broadened to all four prose fields (context/decision/rationale/consequences) case-insensitively ('accepted 202'); positive test element_rule_not_matches_pattern_flags_verdict_prose now asserts the CI form catches a lowercase 'accepted 2026' too (positive path proven). Stays warning-level (D0102 warning->hard precedent: promote only once real hits prove low-noise; live = 0 hits). issue060 (declarativeControlsRoiOrRescope, rescope path): removed the unused `OrderingRule` kind from schema/core/rules.sysml (ZERO instances — ceremony is bad-fit + stays Rust, D0107) as dead schema; corrected the schema header (two rule kinds) + CLAUDE.md Sec 5. D0105's historical text left intact (record); the schema is now the truth. VERIFY: clippy -D warnings clean; cargo test not_matches_pattern (CI positive case) green; kernel validate_schema PASS (OrderingRule removed, frozen-core); keel validate + guard all (14) green; decisionNoVerdictProseRule still 0 on the live repo. NOTE: issue060's ROI-prove alternative was NOT taken (rescope chosen — honest partial per D0107); issue059/issue061 remain (the keystone enforcement + its dependent)."; }
+        part storyRetroFixDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification retroFixRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c004"; :>> title = "Sprint 190 refine gate (DoR)"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the two bounded retrospective resolvers (issue062 harden, issue060 rescope). estimatedPoints=1. #CharteredBy d0107. DoR met."; }
+    part retroFixRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    verification retroFixStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c006"; :>> title = "Sprint 190 standup gate"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: add CI predicate variants + broaden the rule + CI positive test (issue062); remove OrderingRule + fix header/CLAUDE.md, kernel-revalidate schema (issue060). No blockers."; }
+    part retroFixStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    verification retroFixImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c008"; :>> title = "Sprint 190 implement gate"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "CI predicates + broadened rule + CI positive test landed; OrderingRule removed + docs fixed. clippy -D clean; cargo test not_matches_pattern (CI) green; kernel validate_schema PASS; keel validate + guard green; rule still 0 live."; }
+    part retroFixImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    verification retroFixReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c00a"; :>> title = "Sprint 190 review gate"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. issue062: the rule now catches case variants across all prose fields + has a proven positive path (not just the 0-hit clean path); staying warning-level is the honest choice (no real hits yet). issue060: removing dead OrderingRule schema is the honest rescope (no fabricated 'ordering support' we never used), consistent with D0107's accepted partial migration. Clean."; }
+    part retroFixReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    verification retroFixCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c00c"; :>> title = "Sprint 190 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; issue062 + issue060 resolved. clippy + cargo test + kernel schema + keel validate + guard green. Self-evidencing (D0051)."; }
+    part retroFixCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+    verification retroFixRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c190-51627384c00e"; :>> title = "Sprint 190 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-04"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: two honest bounded fixes — the detecting rule now has a proven catch path + broader coverage, and the dead OrderingRule schema is gone (no pretend-capability). Both directly close self-critique findings. AVOIDABLE-ISSUE SCAN: the OrderingRule was avoidable dead schema from over-designing D0105's surface ahead of use; LESSON (reinforces issue060): don't add a schema kind before it has an instance/use. Estimate 1 pt held. NEXT: issue059 (strictProcessGate — the keystone, its own sprint) + issue061 (depends on 059 + a real design session)."; }
+    part retroFixRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c190-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3309949"; :>> judgedAt = "2026-07-04"; :>> judgedBy = "claudeOpus"; }
+}

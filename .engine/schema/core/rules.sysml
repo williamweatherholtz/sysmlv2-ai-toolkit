@@ -1,6 +1,6 @@
 // =====================================================================
 // EngineRules — declarative controls (D0105). The `keel check` evaluator reads DECLARED Rule elements
-// instead of bespoke Rust guards. Three rule kinds + a bounded SCOPE sub-language + an exemption
+// instead of bespoke Rust guards. Two rule kinds (EdgeRule + ElementRule) + a bounded SCOPE sub-language + an exemption
 // mechanism (per the sprint172 spike: predicates stay small, complexity lives in SCOPE). This is the
 // EXPAND phase of the D0067 guards->rules migration — the 14 guards still run until `keel check`
 // reaches PARITY on each (guardsToRulesMigration); nothing is retired by adding this schema.
@@ -60,10 +60,8 @@ package EngineRules {
         attribute predicate : String;      // e.g. "nonBlank(context) and minLength(rationale,20)"
     }
 
-    // SUCCESSION-CONFORMANCE: instances of the artifacts a workflow produces must respect its declared
-    // first..then order (the evaluator reads .engine/workflows/<workflow>.sysml). Subsumes ceremony's
-    // gate-ordering. The THIRD rule kind the sprint172 spike found necessary.
-    part def OrderingRule :> Rule {
-        attribute workflow : String;       // the workflow whose succession is enforced (e.g. "agile-workflow")
-    }
+    // NOTE (issue060 rescope, 2026-07-04): a third `OrderingRule` kind (succession-conformance for
+    // ceremony) was defined here but NEVER instantiated — ceremony is a bad-fit for a declarative rule
+    // (per-file gate-order + retro-keyword + grandfather) and stays a Rust guard (D0107). It was removed
+    // as dead schema. If a genuinely rule-fit ordering case ever appears, re-add it THEN (with an instance).
 }
