@@ -2274,11 +2274,27 @@ fn predicate_args<'a>(t: &'a str, p: &str) -> Option<&'a str> {
     t.strip_prefix(p).and_then(|r| r.strip_suffix(')'))
 }
 
-/// Evaluate one `ElementRule` predicate TERM against an item's attrs. Supported (closed) vocabulary so
-/// far: `nonBlank(field)` (trimmed len > 0) and `minLength(field,n)` (trimmed len >= n). Unknown term
-/// returns `None` (the caller reports the rule `evaluated=false` rather than silently passing).
-fn eval_predicate_term(attrs: &HashMap<String, String>, term: &str) -> Option<bool> {
+/// Is `name` within a rule's `appliesWhen` SCOPE? `all` (always), `whereStatus(v)` (the item's `status`
+/// attr == v). `Some(bool)`, or `None` if the scope predicate is unsupported (caller marks the rule
+/// not-evaluated). Git-temporal scopes (`newlyAdded`) are a later sub-step, reported unsupported here.
+fn subject_in_scope(info: &ItemInfo, scope: &str) -> Option<bool> {
+    let scope = scope.trim();
+    if scope == "all" {
+        return Some(true);
+    }
+    if let Some(v) = predicate_args(scope, "whereStatus(") {
+        return Some(info.attrs.get("status").map(String::as_str) == Some(v.trim()));
+    }
+    None
+}
+
+/// Evaluate one `ElementRule` predicate TERM for item `name`. Closed vocabulary so far: `nonBlank(field)`
+/// (trimmed len > 0), `minLength(field,n)` (trimmed len >= n), and `hasPassingResult(suffix)` (a sibling
+/// item `<name><suffix>R1` exists with `outcome=pass` — the acceptance/DoD naming convention). Unknown
+/// term returns `None` (the caller reports the rule `evaluated=false` rather than silently passing).
+fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
     let term = term.trim();
+    let attrs = &model.items.get(name)?.attrs;
     if let Some(args) = predicate_args(term, "nonBlank(") {
         return Some(attrs.get(args.trim()).is_some_and(|v| !v.trim().is_empty()));
     }
@@ -2288,29 +2304,36 @@ fn eval_predicate_term(attrs: &HashMap<String, String>, term: &str) -> Option<bo
         let n: usize = parts.next()?.trim().parse().ok()?;
         return Some(attrs.get(field).is_some_and(|v| v.trim().chars().count() >= n));
     }
+    if let Some(suffix) = predicate_args(term, "hasPassingResult(") {
+        let ev = format!("{name}{}R1", suffix.trim());
+        return Some(model.items.get(&ev).and_then(|i| i.attrs.get("outcome")).map(String::as_str) == Some("pass"));
+    }
     None
 }
 
-/// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) against an item. Returns `None` if
-/// ANY term is unsupported (so the rule reports `evaluated=false`, never a false pass). Conjunction only.
-fn eval_predicate(attrs: &HashMap<String, String>, predicate: &str) -> Option<bool> {
+/// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) for item `name`. Returns `None`
+/// if ANY term is unsupported (so the rule reports `evaluated=false`, never a false pass). Conjunction.
+fn eval_predicate(model: &Model, name: &str, predicate: &str) -> Option<bool> {
     let mut all = true;
     for term in predicate.split(" and ") {
-        all &= eval_predicate_term(attrs, term)?;
+        all &= eval_predicate_term(model, name, term)?;
     }
     Some(all)
 }
 
-/// `ElementRule` violations: `subject` instances whose `predicate` is false. `Some(sorted names)`, or
-/// `None` if the predicate uses an unsupported term (caller marks the rule not-evaluated). Subsumes the
-/// ~5 structural guards as each predicate becomes expressible.
-fn element_rule_violations(model: &Model, subject: &str, predicate: &str) -> Option<Vec<String>> {
+/// `ElementRule` violations: `scope`d `subject` instances whose `predicate` is false. `Some(sorted
+/// names)`, or `None` if the scope or predicate uses an unsupported term (caller marks the rule
+/// not-evaluated). Subsumes the ~5 structural guards as each predicate becomes expressible.
+fn element_rule_violations(model: &Model, subject: &str, predicate: &str, scope: &str) -> Option<Vec<String>> {
     let mut out: Vec<String> = Vec::new();
     for (name, info) in &model.items {
         if !rc_matches_subject(info, subject) {
             continue;
         }
-        if !eval_predicate(&info.attrs, predicate)? {
+        if !subject_in_scope(info, scope)? {
+            continue;
+        }
+        if !eval_predicate(model, name, predicate)? {
             out.push(name.clone());
         }
     }
@@ -2342,14 +2365,16 @@ pub fn check(root: &Path) -> Result<String, ViewError> {
             let s = a("appliesWhen");
             if s.is_empty() { "all".to_string() } else { s }
         };
-        // Only appliesWhen="all" is evaluated so far; the scope sub-language is a later EXPAND step.
-        let (violations, evaluated) = if scope != "all" {
-            (Vec::new(), false)
-        } else if kind == "EdgeRule" {
-            (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality")), true)
+        let (violations, evaluated) = if kind == "EdgeRule" {
+            // EdgeRule scope is still all-only (git-temporal newlyAdded is a later sub-step).
+            if scope == "all" {
+                (edge_rule_violations(&model, &a("subjectType"), &a("requiredEdge").to_lowercase(), &a("objectType"), &a("edgeDirection"), &a("cardinality")), true)
+            } else {
+                (Vec::new(), false)
+            }
         } else {
-            // ElementRule — None if the predicate uses an unsupported term (report not-evaluated).
-            element_rule_violations(&model, &a("subjectType"), &a("predicate")).map_or((Vec::new(), false), |v| (v, true))
+            // ElementRule handles scope (all / whereStatus) itself; None => unsupported scope/predicate.
+            element_rule_violations(&model, &a("subjectType"), &a("predicate"), &scope).map_or((Vec::new(), false), |v| (v, true))
         };
         total += violations.len();
         rules_json.push(Json::Obj(vec![
@@ -4447,7 +4472,7 @@ mod tests {
         items.insert("dWeakCtx".to_string(), mk("short", &long));
         items.insert("dWeakRat".to_string(), mk(&long, "short"));
         let model = Model { items, edges: vec![] };
-        let via_rule = element_rule_violations(&model, "Decision", "minLength(context,20) and minLength(rationale,20)").unwrap();
+        let via_rule = element_rule_violations(&model, "Decision", "minLength(context,20) and minLength(rationale,20)", "all").unwrap();
         // The guard's own logic (blank = trimmed len < 20 on context OR rationale).
         let mut via_guard: Vec<String> = model.items.iter()
             .filter(|(_, i)| i.type_name == "Decision")
@@ -4456,6 +4481,32 @@ mod tests {
         via_guard.sort();
         assert_eq!(via_rule, via_guard);
         assert_eq!(via_rule, vec!["dWeakCtx".to_string(), "dWeakRat".to_string()]);
+    }
+
+    #[test]
+    fn element_rule_scope_and_result_reach_parity_with_acceptance_events() {
+        // D0105: acceptanceEventRule = whereStatus(accepted) Decision must hasPassingResult(Accept) —
+        // must reproduce compute_attestation (accepted Decision lacking a passing <name>AcceptR1).
+        let dec = |status: &str| {
+            let mut a = HashMap::new();
+            a.insert("status".to_string(), status.to_string());
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None }
+        };
+        let result = |outcome: &str| {
+            let mut a = HashMap::new();
+            a.insert("outcome".to_string(), outcome.to_string());
+            ItemInfo { type_name: "TestResult".to_string(), attrs: a, marker: None }
+        };
+        let mut items = HashMap::new();
+        items.insert("dAcc".to_string(), dec("accepted")); // accepted + passing event => ok
+        items.insert("dAccAcceptR1".to_string(), result("pass"));
+        items.insert("dGap".to_string(), dec("accepted")); // accepted, NO event => violation
+        items.insert("dProp".to_string(), dec("proposed")); // proposed => out of scope, ignored
+        let model = Model { items, edges: vec![] };
+        let via_rule = element_rule_violations(&model, "Decision", "hasPassingResult(Accept)", "whereStatus(accepted)").unwrap();
+        let (_total, via_guard) = compute_attestation(&model);
+        assert_eq!(via_rule, via_guard);
+        assert_eq!(via_rule, vec!["dGap".to_string()]);
     }
 
     #[test]

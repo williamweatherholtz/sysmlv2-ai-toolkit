@@ -56,4 +56,19 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from decisionRationaleRule to d0103;
+
+    // Mirrors guard:acceptance-events (D0066). First rule using the SCOPE sub-language (whereStatus) + a
+    // sibling-result predicate. Parity target: view::compute_attestation (a status=accepted Decision with
+    // no passing <name>AcceptR1 event).
+    part acceptanceEventRule : ElementRule {
+        :>> id = "d0105r004-0004-4004-9004-516273841004";
+        :>> title = "An accepted Decision must carry a passing acceptance event";
+        :>> subjectType = "Decision";
+        :>> predicate = "hasPassingResult(Accept)";
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "whereStatus(accepted)";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from acceptanceEventRule to d0066;
 }
