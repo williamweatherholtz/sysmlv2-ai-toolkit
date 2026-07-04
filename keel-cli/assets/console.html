@@ -38,7 +38,7 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["recent","Recent"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+const TABS=[["orient","Orient"],["recent","Recent"],["business","Business"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
 let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
@@ -172,6 +172,16 @@ async function render(){
    '</div>';
   } else if(active==='recent'){const r=await get('/api/recent');
    main.innerHTML='<p class=muted>'+esc(r.recent||'')+'</p>'+(r.commits||[]).map(c=>`<div class=row><div class=t><span class=pill>${esc(c.date)}</span> ${esc(c.subject)} <span class=muted>${esc(c.sha)}</span></div><div class=m>${linkList((c.files||[]).map(f=>f.split('/').pop().replace(/\.sysml$/,'')),8)}</div></div>`).join('')||'<span class=muted>no recent activity</span>';
+  } else if(active==='business'){const b=await get('/api/business');
+   const brief=(b.briefs||[]).map(x=>`<div class=row><div class=t>${itemLink(x.name)} ${esc(x.title||'')}</div><div class=m><b>Problem:</b> ${esc(x.problem||'')}<br><b>Opportunity:</b> ${esc(x.opportunity||'')}${x.constraintsNote?'<br><b>Constraints:</b> '+esc(x.constraintsNote):''}</div></div>`).join('');
+   const needs=(b.needs||[]).map(x=>`<div class=row><div class=t>${itemLink(x.name)} ${esc(x.title||'')} <span class=m>${esc(x.priority||'')}${x.decomposed?' · decomposed':' · <b>no SR yet</b>'}</span></div><div class=m>${esc(x.statement||'')}</div></div>`).join('');
+   const pers=(b.personas||[]).map(x=>`<div class=row><div class=t>${itemLink(x.name)} ${esc(x.title||'')}</div><div class=m>${esc(x.description||'')}${x.goals?'<br><b>Goals:</b> '+esc(x.goals):''}</div></div>`).join('');
+   const ucs=(b.useCases||[]).map(x=>`<div class=row><div class=t>${itemLink(x.name)} ${esc(x.title||'')}</div></div>`).join('');
+   main.innerHTML='<p class=muted>'+esc(b.business||'')+'</p>'
+     +'<h3>Brief</h3>'+(brief||'<span class=muted>none</span>')
+     +'<h3>Needs</h3>'+(needs||'<span class=muted>none</span>')
+     +'<h3>Personas</h3>'+(pers||'<span class=muted>none</span>')
+     +(ucs?'<h3>Use cases</h3>'+ucs:'');
   } else if(active==='decisions'){const d=await get('/api/decisions');
    // sr15: decisions newest-first (dNNNN is sequential ~ chronological); the score order stays as a tiebreak from the API.
    const arr=(d.decisions||[]).slice().sort((a,b)=>String(b.decision||b.name||'').localeCompare(String(a.decision||a.name||'')));

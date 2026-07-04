@@ -544,6 +544,31 @@ fn cmd_rules(args: &[String]) -> i32 {
     }
 }
 
+// `keel business [ROOT]` (serveBusinessNeedsView): the Business layer (Brief/Personas/Needs/UseCases).
+fn cmd_business(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: keel business [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match keel_cli::view::business(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("business error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_coverage(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -1325,6 +1350,7 @@ fn main() {
         Some("validate") => cmd_validate(rest),
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),
+        Some("business") => cmd_business(rest),
         Some("ls") => cmd_ls(rest),
         Some("orient") => cmd_orient(rest),
         Some("whats-next") => cmd_whats_next(rest),

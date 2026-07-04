@@ -2363,6 +2363,58 @@ fn element_rule_violations(model: &Model, subject: &str, predicate: &str, scope:
     Some(out)
 }
 
+/// Business-layer view (serveBusinessNeedsView): the Brief, Personas, Needs and use cases.
+///
+/// The "what/why" layer the `keel serve` console lacked. A computed `#View`; each Need carries a
+/// `decomposed` flag (some `SystemRequirement` `satisfy`-links it) so the human sees the trace frontier.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn business(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let by_type = |ty: &str| {
+        let mut v: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| i.type_name == ty).collect();
+        v.sort_by(|a, b| a.0.cmp(b.0));
+        v
+    };
+    let field = |i: &ItemInfo, k: &str| Json::s(i.attrs.get(k).cloned().unwrap_or_default());
+    let briefs = by_type("Brief").into_iter().map(|(n, i)| Json::Obj(vec![
+        ("name".to_string(), Json::s(n.clone())),
+        ("title".to_string(), field(i, "title")),
+        ("problem".to_string(), field(i, "problem")),
+        ("opportunity".to_string(), field(i, "opportunity")),
+        ("constraintsNote".to_string(), field(i, "constraintsNote")),
+    ])).collect();
+    let personas = by_type("Persona").into_iter().map(|(n, i)| Json::Obj(vec![
+        ("name".to_string(), Json::s(n.clone())),
+        ("title".to_string(), field(i, "title")),
+        ("description".to_string(), field(i, "description")),
+        ("goals".to_string(), field(i, "goals")),
+    ])).collect();
+    let needs = by_type("Need").into_iter().map(|(n, i)| {
+        let decomposed = model.edges.iter().any(|e| e.kind == "satisfy" && &e.from == n);
+        Json::Obj(vec![
+            ("name".to_string(), Json::s(n.clone())),
+            ("title".to_string(), field(i, "title")),
+            ("statement".to_string(), field(i, "statement")),
+            ("priority".to_string(), field(i, "priority")),
+            ("source".to_string(), field(i, "source")),
+            ("decomposed".to_string(), Json::Bool(decomposed)),
+        ])
+    }).collect();
+    let use_cases = by_type("UseCase").into_iter().map(|(n, i)| Json::Obj(vec![
+        ("name".to_string(), Json::s(n.clone())),
+        ("title".to_string(), field(i, "title")),
+    ])).collect();
+    Ok(Json::Obj(vec![
+        ("business".to_string(), Json::s("Business layer (Brief -> Personas -> Needs -> UseCases) — the what/why (D0105 serveBusinessNeedsView)")),
+        ("briefs".to_string(), Json::Arr(briefs)),
+        ("personas".to_string(), Json::Arr(personas)),
+        ("needs".to_string(), Json::Arr(needs)),
+        ("useCases".to_string(), Json::Arr(use_cases)),
+    ]).dump())
+}
+
 /// Evaluate ONE declared rule by name → `(subjects_scanned, sorted violations)`.
 ///
 /// The CONTRACT single source (D0107): the 5 migrated guards source their violations here instead of a

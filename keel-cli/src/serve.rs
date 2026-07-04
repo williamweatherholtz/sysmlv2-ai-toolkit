@@ -65,6 +65,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/orient", get(api_orient))
         .route("/api/recent", get(api_recent))
         .route("/api/decisions", get(api_decisions))
+        .route("/api/business", get(api_business))
         .route("/api/dispositions", get(api_dispositions))
         .route("/api/processes", get(api_processes))
         .route("/api/report/:name", get(api_report))
@@ -540,6 +541,11 @@ async fn api_orient(State(s): State<AppState>) -> Response {
 
 async fn api_decisions(State(s): State<AppState>) -> Response {
     cached(&s, "decisions", crate::view::decisions_report)
+}
+
+// serveBusinessNeedsView: the Business layer (Brief/Personas/Needs/UseCases) — the "what/why".
+async fn api_business(State(s): State<AppState>) -> Response {
+    cached(&s, "business", crate::view::business)
 }
 
 async fn api_dispositions(State(s): State<AppState>) -> Response {
