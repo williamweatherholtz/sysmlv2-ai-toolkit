@@ -2330,6 +2330,13 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         let ev = format!("{name}{}R1", suffix.trim());
         return Some(model.items.get(&ev).and_then(|i| i.attrs.get("outcome")).map(String::as_str) == Some("pass"));
     }
+    // resultJudgedByHuman(suffix): the sibling result <name><suffix>R1 was judged by a HUMAN actor — its
+    // judgedBy names a `Person`-typed item (D0106 confirmation-authenticity: sign-off is never AI-fabricated).
+    if let Some(suffix) = predicate_args(term, "resultJudgedByHuman(") {
+        let ev = format!("{name}{}R1", suffix.trim());
+        let judged_by = model.items.get(&ev).and_then(|i| i.attrs.get("judgedBy"));
+        return Some(judged_by.and_then(|jb| model.items.get(jb)).is_some_and(|a| a.type_name == "Person"));
+    }
     // matchesPattern(field, needle) / notMatchesPattern(field, needle): case-sensitive substring on an attr.
     // The `CI` variants are case-insensitive. `needle` may contain spaces (after the first comma); no ')'.
     for (prefix, want, ci) in [
@@ -4633,6 +4640,29 @@ mod tests {
         assert_eq!(
             edge_rule_violations(&model, "Story", "charteredby", "*", "outgoing", "atLeastOne", None),
             vec!["newUncharted".to_string(), "oldUncharted".to_string()],
+        );
+    }
+
+    #[test]
+    fn element_rule_flags_ai_judged_acceptance() {
+        // issue059/D0106: an accepted Decision whose acceptance event is AI-judged is flagged; human-judged passes.
+        let dec = || ItemInfo { type_name: "Decision".to_string(), attrs: {
+            let mut a = HashMap::new(); a.insert("status".to_string(), "accepted".to_string()); a
+        }, marker: None, file: String::new() };
+        let ev = |by: &str| ItemInfo { type_name: "TestResult".to_string(), attrs: {
+            let mut a = HashMap::new(); a.insert("judgedBy".to_string(), by.to_string()); a
+        }, marker: None, file: String::new() };
+        let mut items = HashMap::new();
+        items.insert("will".to_string(), ItemInfo { type_name: "Person".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("claudeOpus".to_string(), ItemInfo { type_name: "Actor".to_string(), attrs: HashMap::new(), marker: None, file: String::new() });
+        items.insert("dHuman".to_string(), dec());
+        items.insert("dHumanAcceptR1".to_string(), ev("will")); // human -> ok
+        items.insert("dAi".to_string(), dec());
+        items.insert("dAiAcceptR1".to_string(), ev("claudeOpus")); // AI-judged -> violation
+        let model = Model { items, edges: vec![] };
+        assert_eq!(
+            element_rule_violations(&model, "Decision", "resultJudgedByHuman(Accept)", "whereStatus(accepted)").unwrap(),
+            vec!["dAi".to_string()],
         );
     }
 

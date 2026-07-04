@@ -103,4 +103,19 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from decisionNoVerdictProseRule to d0107;
+
+    // issue059 (the enforceable slice of D0106): an accepted Decision's acceptance event must be judged by
+    // a HUMAN (a Person), never AI-fabricated. GATING — the guard `confirmation-authenticity` sources from
+    // this rule (CONTRACT pattern). Enforces "sign-off is a real human attestation" (D0016/D0106).
+    part confirmationAuthenticityRule : ElementRule {
+        :>> id = "d0105r007-0007-4007-9007-516273841007";
+        :>> title = "An accepted Decision's acceptance must be human-judged (never AI-fabricated)";
+        :>> subjectType = "Decision";
+        :>> predicate = "resultJudgedByHuman(Accept)";
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "whereStatus(accepted)";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from confirmationAuthenticityRule to d0106;
 }

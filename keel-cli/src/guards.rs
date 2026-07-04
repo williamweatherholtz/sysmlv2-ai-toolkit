@@ -146,8 +146,26 @@ pub fn actors(root: &Path) -> GuardReport {
 
 // ── acceptance-events guard (accepted Decision has a passing acceptance event) ─────────────────
 
+/// Guard: an accepted Decision's acceptance event must be HUMAN-judged (D0106/issue059).
+///
+/// The enforceable slice of strict process-boundedness (a sign-off is never AI-fabricated). Rule-sourced
+/// from `confirmationAuthenticityRule` (the CONTRACT pattern). D0106's conversational parse-first part is
+/// inherently un-gatable at commit and stays reminder-enforced.
+#[must_use]
+pub fn confirmation_authenticity(root: &Path) -> GuardReport {
+    match crate::view::rule_violations(root, "confirmationAuthenticityRule") {
+        Ok((scanned, bad)) => {
+            let violations = bad
+                .into_iter()
+                .map(|d| format!("{d}: accepted but its acceptance event is not human-judged — a sign-off must be a real human attestation, never AI-fabricated (D0106/D0016)"))
+                .collect();
+            GuardReport { name: "confirmation-authenticity", scanned, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading confirmation-authenticity rule: {e}")] },
+    }
+}
+
 /// Guard: every `status=accepted` Decision carries a passing `dNNNNAcceptR1` event (D0066).
-/// Reuses `view::attestation_data` (the enforcement twin of attestation-coverage).
 #[must_use]
 pub fn acceptance_events(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared acceptanceEventRule (single gate source).
@@ -819,8 +837,8 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 14] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link"];
+pub const GUARD_NAMES: [&str; 15] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link", "confirmation-authenticity"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -842,6 +860,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "requirement-rootedness" => Some(requirement_rootedness(root)),
         "decision-rationale" => Some(decision_rationale(root)), // hard (D0103)
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
+        "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
+
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         "defect-guard-coverage" => Some(defect_guard_coverage(root)), // runnable-only (D0047/issue039)
         _ => None,
