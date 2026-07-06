@@ -236,6 +236,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "A human asks to be introduced/onboarded, 'how do I start', 'set up / spin up a new project', or right after `keel init`.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part decisionAuthoringSkill : AISkill {
+        :>> id = "63940516-2c7d-4e8f-a108-516273849620";
+        :>> title = "decision-authoring";
+        :>> purpose = "Deploy the Decision Authoring process (issue058/D0058): author every Decision so each fact has ONE canonical home — the why in its own fields, the acceptance verdict in a discrete human-judged method=confirmation TestResult, status/state COMPUTED — never restated as prose in another field or a comment. Backstopped by decisionNoVerdictProseRule + guard:confirmation-authenticity. The deploying skill for .engine/processes/decision-authoring.sysml.";
+        :>> location = ".engine/skills/decision-authoring/SKILL.md";
+        :>> triggerCondition = "Recording, accepting, or amending a Decision (CHANGE/RECORD, or `keel record decision`).";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part businessArchitectureSkill : AISkill {
         :>> id = "63940516-2c7d-4e8f-a105-516273849619";
         :>> title = "business-architecture";
