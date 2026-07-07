@@ -275,6 +275,17 @@ fn parse_section_seed(seed: &str) -> (Option<String>, Option<String>) {
 /// sr18 — when `section_members` is supplied, the critique is SECTION-SCOPED: the prompt names the
 /// bounded local neighbourhood so the AI judges `target` in its context (whole-model views are too
 /// coarse for local "does X make sense here" critique), still recording findings against the elements.
+/// Launch prompt (srServeLauncherDefinedOnly, Tier 2a): execute a DECLARED process/skill by name. The
+/// agent reads the launchable's definition from `.engine`; this prompt just directs it to follow that
+/// definition + record tracked facts, never commit. Only reached for an `is_launchable` target.
+fn build_launch_prompt(target: &str) -> String {
+    format!(
+        "Deploy/execute the DECLARED keel process or skill `{target}` exactly per its definition in `.engine` \
+         (its steps / purpose / write-policy). Produce its declared artifacts as tracked facts (append via the \
+         write API where applicable); stay strictly within that process — do not freelance beyond it. Do NOT git commit; the human commits."
+    )
+}
+
 fn build_agent_prompt(target: &str, section_members: Option<&[String]>) -> String {
     use std::fmt::Write as _;
     let mut prompt = format!("Use the element-critique skill to adversarially critique `{target}` through its Core-3 lenses as an INDEPENDENT critic; record each finding as a severity-carrying Issue per the issue-resolution process.");
@@ -362,13 +373,19 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 /// the concurrency cap; never sets `ANTHROPIC_API_KEY`.
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = (*s.root).clone();
-    let action_ok = q.action == "critique";
-    // sr19 black-box: if a boundary (Need) is given, critique its interfaces (cut edges); else (sr18)
-    // a section-scoped or plain white-box element critique.
-    let prompt = if let Some(need) = q.boundary.as_deref() {
+    // sr17 critique + D0109 launch (the model-driven launcher — supersedes sr17's one-action limit with
+    // the declared launchable set; still NON-freeform: a launch target must be `is_launchable`).
+    let action_ok = matches!(q.action.as_str(), "critique" | "launch");
+    // srServeLauncherDefinedOnly (Tier 2a): a `launch` target must be a DECLARED process/skill; no freeform launch.
+    let launch_undefined = q.action == "launch" && !crate::view::is_launchable(&root, &q.target).unwrap_or(false);
+    let prompt = if q.action == "launch" {
+        build_launch_prompt(&q.target)
+    } else if let Some(need) = q.boundary.as_deref() {
+        // sr19 black-box: critique the Need-slice's interfaces (cut edges).
         let interfaces = crate::view::boundary_interfaces(&root, need).unwrap_or_default();
         build_blackbox_prompt(need, &interfaces)
     } else {
+        // sr18 / white-box: a section-scoped or plain element critique.
         let section_members = q.section.as_deref().and_then(|seed| {
             let (view, element) = parse_section_seed(seed);
             crate::view::section_member_names(&root, view.as_deref(), element.as_deref()).ok()
@@ -390,8 +407,13 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
             return;
         }
         if !action_ok {
-            // sr17 directed-only: the bridge serves exactly one recording action — critique.
-            yield Ok(Event::default().event("error").data("only the `critique` action is supported \u{2014} the console has no free-form AI surface (sr17/D0098): every AI action is a directed, recorded critique of a named element. For free-form AI, open a terminal."));
+            // Directed-only (sr17/D0098 + D0109): the bridge serves `critique` + `launch` of a DECLARED target — no free-form AI surface.
+            yield Ok(Event::default().event("error").data("only `critique` and `launch` are supported \u{2014} the console has no free-form AI surface (sr17/D0098/D0109): every AI action is directed at a named element (critique) or a DECLARED process/skill (launch). For free-form AI, open a terminal."));
+            return;
+        }
+        if launch_undefined {
+            // srServeLauncherDefinedOnly (Tier 2a): reject a launch of a non-declared target — no freeform launch.
+            yield Ok(Event::default().event("error").data(format!("`{}` is not a declared launchable (srServeLauncherDefinedOnly/D0109): only declared processes/skills may be launched \u{2014} see `keel launchables`. There is no freeform launch path.", q.target)));
             return;
         }
         if over_cap {
@@ -828,8 +850,20 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-    use super::claude_in_dirs;
+    use super::{build_launch_prompt, claude_in_dirs};
     use std::ffi::OsString;
+
+    #[test]
+    fn launch_prompt_directs_a_declared_target_no_commit() {
+        // srServeLauncherDefinedOnly (Tier 2a): the launch prompt names the declared target, directs
+        // execution per its definition, and forbids committing (the human commits). Freeform rejection
+        // is enforced upstream by is_launchable (tested in view::tests).
+        let p = build_launch_prompt("doc-sync");
+        assert!(p.contains("`doc-sync`"));
+        assert!(p.contains("DECLARED"));
+        assert!(p.contains("do not freelance") || p.contains("strictly within"));
+        assert!(p.contains("Do NOT git commit"));
+    }
 
     /// serveDownstreamDegrade: the agent bridge is OPTIONAL. `claude_in_dirs` must report absent
     /// when no `claude` executable sits on PATH — so the console can emit a clear "not installed"
