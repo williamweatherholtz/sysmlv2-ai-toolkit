@@ -1,0 +1,36 @@
+// ProjectDeliveryS196 — Sprint 196: serveDisciplineArchitecture — Architecture phase for the D0109
+// serve-discipline tooling. Needs accepted (Business gate 2026-07-07) -> derive SystemRequirements
+// (measurable) satisfy-linked to Needs, with #DependsOn dependency tiers for build order. EXECUTE. 1 pt. AUTONOMOUS (D0049).
+package ProjectDeliveryS196 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from serveDiscArchStory to d0109;
+
+    part serveDiscArchStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c196-51627384c001";
+        :>> title = "Sprint 196: serveDisciplineArchitecture (1 pt) - SystemRequirements + dependency tiers for the serve-discipline tooling";
+        :>> createdAt = "2026-07-07"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::modeling; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS196 {
+        action storyServeDiscArch;
+        verification storyServeDiscArchDoD : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c002"; :>> method = VerificationMethod::inspect; :>> procedureText = "Business gate passed (serveDisciplineNeedsAccept, human 2026-07-07) -> Architecture phase (business-architecture skill Phase 2). Authored .tracking/requirements/serve-discipline-requirements.sysml: 5 SystemRequirements with measurable criteria, satisfy-linked to the 5 Needs, no new accepted-Decision gate needed (D0109 already blesses the direction). #DependsOn edges encode build TIERS (human's build-order rule = highest-tier first): Tier 1 srServeModelDrivenRegistry (the model-driven launch/output contract) -> Tier 2 srServeLauncherDefinedOnly + srServeApproveGate + srServeOutputSchemaValidate -> Tier 3 srServeScopedContext. VERIFY: keel validate + guard all (15) green; keel coverage lists all 5 Needs + 5 SRs; satisfy edges present; #DependsOn tiers present. The design (Business + Architecture) is complete; implementation follows tier order (Tier 1 first)."; }
+        part storyServeDiscArchDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification serveDiscArchRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c004"; :>> title = "Sprint 196 refine gate (DoR)"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: Needs accepted (Business gate). Derive SystemRequirements + dependency tiers. estimatedPoints=1. #CharteredBy d0109. DoR met."; }
+    part serveDiscArchRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    verification serveDiscArchStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c006"; :>> title = "Sprint 196 standup gate"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: one SR per Need with measurable criteria; satisfy edges; #DependsOn tiers (registry -> launcher/validator -> context). No new decision gate (D0109 covers direction). No blockers."; }
+    part serveDiscArchStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    verification serveDiscArchImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c008"; :>> title = "Sprint 196 implement gate"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "5 SRs + satisfy + #DependsOn tiers authored. keel validate 211 + guard all (15) green; coverage lists Needs + SRs. Design complete."; }
+    part serveDiscArchImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    verification serveDiscArchReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c00a"; :>> title = "Sprint 196 review gate"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. Full Business->Architecture design done the disciplined way: accepted Needs -> measurable SRs (satisfy-traced) -> explicit dependency tiers for build order (the human's no-downstream-churn rule, encoded as #DependsOn not prose). No premature code. Requirements are verifiable (each states a checkable condition). Clean — and it dogfooded the business-architecture skill end-to-end (issue061)."; }
+    part serveDiscArchReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    verification serveDiscArchCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c00c"; :>> title = "Sprint 196 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; the serve-discipline design (Business + Architecture) is complete + traced. keel validate + guard green. Self-evidencing (D0051). Implementation (Tier 1 srServeModelDrivenRegistry first) is the next phase."; }
+    part serveDiscArchCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+    verification serveDiscArchRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c196-51627384c00e"; :>> title = "Sprint 196 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-07"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the business-architecture skill ran END-TO-END on a real task — accepted Needs -> traced, measurable SRs -> dependency-tiered build order — which is the complete inversion of the ignite failure (architecture-in-chat-before-needs) that started this whole arc, and it closes issue061's skill-run. Build order is now a computed DAG (#DependsOn), not a guess. AVOIDABLE-ISSUE SCAN: none. LESSON: encode build order as #DependsOn tiers on the requirements, so implementation sequencing is read from the model, not re-litigated. Estimate 1 pt held. NEXT: refine Tier-1 srServeModelDrivenRegistry into an implementation story + build it (a keel serve increment), then Tier 2, then Tier 3; add #Verify edges as each ships. issue061 -> resolvable (skill dogfooded end-to-end)."; }
+    part serveDiscArchRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c196-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "claudeOpus"; }
+}

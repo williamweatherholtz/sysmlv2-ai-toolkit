@@ -62,4 +62,8 @@ package ProjectBusinessServeDiscipline {
         :>> statement = "The set of launchable processes and their expected output structures are read from keel's already-declared model — one source of truth — never a separately-maintained list that can drift.";
         :>> priority = Priority::should;
     }
+
+    // ── Business gate: human acceptance of the Needs (needs-before-architecture). ──
+    verification serveDisciplineNeedsAccept : Test { :>> id = "5e40d1c0-0109-4b7a-9c1e-00000000000a"; :>> title = "serve-discipline Needs accepted (Business gate)"; :>> createdAt = "2026-07-07"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts the 5 serve-discipline Needs (nServeLaunchDefinedOnly / nServeApproveBeforeExecute / nServeValidatedOutput [must], nServeBoundedContext / nServeReuseModel [should]) via the explicit 'yes' on 2026-07-07 — the Business gate. Architecture (SystemRequirements) may now be derived from these accepted Needs."; }
+    part serveDisciplineNeedsAcceptR1 : TestResult { :>> id = "5e40d1c0-0109-4b7a-9c1e-00000000000b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5c0b17f"; :>> judgedAt = "2026-07-07"; :>> judgedBy = "wweatherholtz"; }
 }
