@@ -544,6 +544,31 @@ fn cmd_rules(args: &[String]) -> i32 {
     }
 }
 
+// `keel launchables [ROOT]` (srServeModelDrivenRegistry, Tier 1a): the model-declared launchable set.
+fn cmd_launchables(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => {
+            if let Some(r) = find_repo_root() {
+                r
+            } else {
+                eprintln!("usage: keel launchables [ROOT]");
+                return 2;
+            }
+        }
+    };
+    match keel_cli::view::launchables(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("launchables error: {e}");
+            1
+        }
+    }
+}
+
 // `keel business [ROOT]` (serveBusinessNeedsView): the Business layer (Brief/Personas/Needs/UseCases).
 fn cmd_business(args: &[String]) -> i32 {
     let root = match args.first() {
@@ -1390,6 +1415,7 @@ fn main() {
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),
         Some("business") => cmd_business(rest),
+        Some("launchables") => cmd_launchables(rest),
         Some("ls") => cmd_ls(rest),
         Some("orient") => cmd_orient(rest),
         Some("whats-next") => cmd_whats_next(rest),

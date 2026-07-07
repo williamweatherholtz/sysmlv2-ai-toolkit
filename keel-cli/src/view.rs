@@ -2442,6 +2442,48 @@ pub fn business(root: &Path) -> Result<String, ViewError> {
     ]).dump())
 }
 
+/// Launchable-set view (srServeModelDrivenRegistry, Tier 1a): the processes + skills keel serve may launch.
+///
+/// Computed from the DECLARED model (no separately-authored list — nServeReuseModel). Each entry carries
+/// its name/title/kind. A computed `#View`; finer per-launchable output schemas are a later increment.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn launchables(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let of_kind = |ty: &str| -> Vec<Json> {
+        let mut v: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| i.type_name == ty).collect();
+        v.sort_by(|a, b| a.0.cmp(b.0));
+        v.into_iter()
+            .map(|(n, i)| Json::Obj(vec![
+                ("name".to_string(), Json::s(n.clone())),
+                ("title".to_string(), Json::s(i.attrs.get("title").cloned().unwrap_or_default())),
+                ("kind".to_string(), Json::s(ty)),
+            ]))
+            .collect()
+    };
+    let skills = of_kind("AISkill");
+    let processes = of_kind("Process");
+    let total = skills.len() + processes.len();
+    Ok(Json::Obj(vec![
+        ("launchables".to_string(), Json::s("keel serve launchable set — declared skills + processes (srServeModelDrivenRegistry, D0109). Only these may be launched; no freeform path.")),
+        ("skills".to_string(), Json::Arr(skills)),
+        ("processes".to_string(), Json::Arr(processes)),
+        ("total".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
+    ])
+    .dump())
+}
+
+/// Whether `target` is a declared launchable (a `Process` or `AISkill` in the model) — the guardrail
+/// behind srServeLauncherDefinedOnly (no freeform launch). Tier 1a helper.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn is_launchable(root: &Path, target: &str) -> Result<bool, ViewError> {
+    let model = Model::build(root)?;
+    Ok(model.items.get(target).is_some_and(|i| matches!(i.type_name.as_str(), "Process" | "AISkill")))
+}
+
 /// Evaluate ONE declared rule by name → `(subjects_scanned, sorted violations)`.
 ///
 /// The CONTRACT single source (D0107): the 5 migrated guards source their violations here instead of a
@@ -4641,6 +4683,23 @@ mod tests {
             edge_rule_violations(&model, "Story", "charteredby", "*", "outgoing", "atLeastOne", None),
             vec!["newUncharted".to_string(), "oldUncharted".to_string()],
         );
+    }
+
+    #[test]
+    fn launchable_set_is_processes_and_skills_only() {
+        // srServeLauncherDefinedOnly (Tier 1a): a Process/AISkill is launchable; anything else (or unknown) is not.
+        fn is_launchable_in(model: &Model, target: &str) -> bool {
+            model.items.get(target).is_some_and(|i| matches!(i.type_name.as_str(), "Process" | "AISkill"))
+        }
+        let mut items = HashMap::new();
+        items.insert("someProcess".to_string(), item("Process", None));
+        items.insert("someSkill".to_string(), item("AISkill", None));
+        items.insert("someDecision".to_string(), item("Decision", None));
+        let model = Model { items, edges: vec![] };
+        assert!(is_launchable_in(&model, "someProcess"));
+        assert!(is_launchable_in(&model, "someSkill"));
+        assert!(!is_launchable_in(&model, "someDecision")); // not launchable
+        assert!(!is_launchable_in(&model, "doesNotExist")); // freeform target -> not launchable
     }
 
     #[test]
