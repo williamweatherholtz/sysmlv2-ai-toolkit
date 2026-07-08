@@ -78,6 +78,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // persistent serve settings (e.g. the agent-bridge toggle — claude -p billing control)
         .route("/api/settings", get(api_settings_get).post(api_settings_post))
         // m3 — agent-bridge (headless claude -> SSE)
+        .route("/api/agent/plan", get(api_agent_plan))
         .route("/api/agent/stream", get(api_agent_stream))
         // serveLiveCache — event-driven change push (SSE)
         .route("/api/events", get(api_events))
@@ -247,6 +248,10 @@ struct AgentReq {
     /// (interfaces) rather than an element's internals. When set, `target` is ignored.
     #[serde(default)]
     boundary: Option<String>,
+    /// srServeApproveGate (Tier 2b) — the execute stream refuses to run unless this is true; the console
+    /// sets it only after the human reviews the /api/agent/plan output and clicks approve.
+    #[serde(default)]
+    approved: bool,
 }
 
 /// sr19 black-box critique prompt: critique the INTERFACES (cut edges) of a Need-slice boundary for
@@ -284,6 +289,27 @@ fn build_launch_prompt(target: &str) -> String {
          (its steps / purpose / write-policy). Produce its declared artifacts as tracked facts (append via the \
          write API where applicable); stay strictly within that process — do not freelance beyond it. Do NOT git commit; the human commits."
     )
+}
+
+/// The computed PLAN for an agent request (srServeApproveGate, Tier 2b): what WOULD run, computed without
+/// spawning — so the human can review + approve before execution. `action_ok`/`launch_undefined` are the
+/// same validity checks the stream enforces; `prompt` is exactly what the agent would receive.
+fn request_plan(root: &Path, q: &AgentReq) -> (bool, bool, String) {
+    let action_ok = matches!(q.action.as_str(), "critique" | "launch");
+    let launch_undefined = q.action == "launch" && !crate::view::is_launchable(root, &q.target).unwrap_or(false);
+    let prompt = if q.action == "launch" {
+        build_launch_prompt(&q.target)
+    } else if let Some(need) = q.boundary.as_deref() {
+        let interfaces = crate::view::boundary_interfaces(root, need).unwrap_or_default();
+        build_blackbox_prompt(need, &interfaces)
+    } else {
+        let section_members = q.section.as_deref().and_then(|seed| {
+            let (view, element) = parse_section_seed(seed);
+            crate::view::section_member_names(root, view.as_deref(), element.as_deref()).ok()
+        });
+        build_agent_prompt(&q.target, section_members.as_deref())
+    };
+    (action_ok, launch_undefined, prompt)
 }
 
 fn build_agent_prompt(target: &str, section_members: Option<&[String]>) -> String {
@@ -371,27 +397,33 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 /// accepted action is `critique` (the directed, RECORDING AI action — D0098/sr17: no free-form/chat/
 /// investigate); any other action is rejected. Degrades gracefully if `claude` is absent; rejects past
 /// the concurrency cap; never sets `ANTHROPIC_API_KEY`.
+/// GET /api/agent/plan?action=&target=... (srServeApproveGate, Tier 2b) — compute what the agent WOULD
+/// run (parsed action, target, validity, exact prompt) WITHOUT spawning, so the human can review before
+/// approving. The console shows this, then calls /api/agent/stream with approved=1 on approval.
+async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Response {
+    let (action_ok, launch_undefined, prompt) = request_plan(&s.root, &q);
+    let json = crate::json::Json::Obj(vec![
+        ("plan".to_string(), crate::json::Json::s("agent-request plan (srServeApproveGate) — review, then execute with approved=1")),
+        ("action".to_string(), crate::json::Json::s(q.action)),
+        ("target".to_string(), crate::json::Json::s(q.target)),
+        ("action_ok".to_string(), crate::json::Json::Bool(action_ok)),
+        ("launch_undefined".to_string(), crate::json::Json::Bool(launch_undefined)),
+        ("executable".to_string(), crate::json::Json::Bool(action_ok && !launch_undefined)),
+        ("prompt".to_string(), crate::json::Json::s(prompt)),
+        ("requires_approval".to_string(), crate::json::Json::Bool(true)),
+    ])
+    .dump();
+    ok_json(json)
+}
+
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = (*s.root).clone();
-    // sr17 critique + D0109 launch (the model-driven launcher — supersedes sr17's one-action limit with
-    // the declared launchable set; still NON-freeform: a launch target must be `is_launchable`).
-    let action_ok = matches!(q.action.as_str(), "critique" | "launch");
-    // srServeLauncherDefinedOnly (Tier 2a): a `launch` target must be a DECLARED process/skill; no freeform launch.
-    let launch_undefined = q.action == "launch" && !crate::view::is_launchable(&root, &q.target).unwrap_or(false);
-    let prompt = if q.action == "launch" {
-        build_launch_prompt(&q.target)
-    } else if let Some(need) = q.boundary.as_deref() {
-        // sr19 black-box: critique the Need-slice's interfaces (cut edges).
-        let interfaces = crate::view::boundary_interfaces(&root, need).unwrap_or_default();
-        build_blackbox_prompt(need, &interfaces)
-    } else {
-        // sr18 / white-box: a section-scoped or plain element critique.
-        let section_members = q.section.as_deref().and_then(|seed| {
-            let (view, element) = parse_section_seed(seed);
-            crate::view::section_member_names(&root, view.as_deref(), element.as_deref()).ok()
-        });
-        build_agent_prompt(&q.target, section_members.as_deref())
-    };
+    // sr17 critique + D0109 launch (model-driven launcher; non-freeform: a launch target must be is_launchable).
+    let (action_ok, launch_undefined, prompt) = request_plan(&root, &q);
+    // srServeApproveGate (Tier 2b): the execute path refuses to run without an EXPLICIT approval — the human
+    // must GET /api/agent/plan, review the route/prompt, and only then re-invoke with approved=1. This makes
+    // approve-before-execute structural (closes D0106's conversational residual, issue059).
+    let unapproved = !q.approved;
     let counter = Arc::clone(&s.agents);
     let prev = counter.fetch_add(1, Ordering::SeqCst);
     let over_cap = prev >= AGENT_MAX_CONCURRENT;
@@ -414,6 +446,11 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         if launch_undefined {
             // srServeLauncherDefinedOnly (Tier 2a): reject a launch of a non-declared target — no freeform launch.
             yield Ok(Event::default().event("error").data(format!("`{}` is not a declared launchable (srServeLauncherDefinedOnly/D0109): only declared processes/skills may be launched \u{2014} see `keel launchables`. There is no freeform launch path.", q.target)));
+            return;
+        }
+        if unapproved {
+            // srServeApproveGate (Tier 2b): no execution without explicit approval of the reviewed plan.
+            yield Ok(Event::default().event("error").data("approval required (srServeApproveGate/D0109): GET /api/agent/plan to review the parsed route + exact prompt, then re-invoke this stream with approved=1. The agent never runs on an unreviewed/unapproved route (closes issue059)."));
             return;
         }
         if over_cap {

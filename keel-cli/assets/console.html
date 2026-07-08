@@ -62,12 +62,18 @@ let mes=null;
 function stopModalAgent(){if(mes){mes.close();mes=null}}
 function closeItem(){stopModalAgent();document.getElementById('modal').classList.remove('on')}
 function mlog(s){const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent+=s;l.scrollTop=l.scrollHeight}}
-function runAgentModal(action,target,section,boundary){
+async function runAgentModal(action,target,section,boundary){
  stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${boundary?('black-box '+boundary):target}${section?(' @ '+section):''} ===\n`}
- let url='/api/agent/stream?action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target||'');
- if(section)url+='&section='+encodeURIComponent(section); // sr18: section-scoped critique
- if(boundary)url+='&boundary='+encodeURIComponent(boundary); // sr19: black-box interface critique
- mes=new EventSource(url);
+ // srServeApproveGate (D0109): fetch + show the PLAN, require explicit approval, THEN execute (approved=1).
+ let q='action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target||'');
+ if(section)q+='&section='+encodeURIComponent(section); // sr18: section-scoped critique
+ if(boundary)q+='&boundary='+encodeURIComponent(boundary); // sr19: black-box interface critique
+ let plan;
+ try{const r=await fetch('/api/agent/plan?'+q);plan=await r.json()}catch(e){mlog('[error] could not fetch plan: '+e.message+'\n');return}
+ mlog('PLAN — review before approving (srServeApproveGate):\n  action: '+plan.action+'\n  target: '+plan.target+'\n  executable: '+plan.executable+'\n\n  prompt:\n  '+String(plan.prompt||'').replace(/\n/g,'\n  ')+'\n\n');
+ if(!plan.executable){mlog('[blocked] not executable — a non-declared launchable / unsupported action. See the Launch tab / `keel launchables`.\n');return}
+ if(!confirm('Approve + run this '+plan.action+'?\n\n'+plan.prompt)){mlog('[cancelled] not approved — nothing ran.\n');return}
+ mes=new EventSource('/api/agent/stream?'+q+'&approved=1');
  mes.addEventListener('status',e=>mlog('· '+e.data+'\n\n'));
  mes.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)mlog(t)});
  mes.addEventListener('done',e=>{mlog('\n\n'+e.data+'\n');stopModalAgent()});
