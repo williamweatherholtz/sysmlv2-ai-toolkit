@@ -118,4 +118,24 @@ package EngineRuleSet {
         :>> exemptions = "";
     }
     #JustifiedBy dependency from confirmationAuthenticityRule to d0106;
+
+    // issue055 (the enforceable slice of research-spike routing): a WorkKind::research Story must charter
+    // to a LEGITIMATE governing source — its originating Decision/Need/SystemRequirement, or (as a spike)
+    // an Issue/proposed-Decision (the union the charter guard sanctions, D0068/issue055) — never an
+    // arbitrary element (a Story, a TestResult, ...). Converts issue055's triage-item-8 CONVENTION into a
+    // declared control on the structurally-visible side — the "did analysis skip the spike?" judgment
+    // stays reminder-enforced (a commit gate cannot see a conversation). WARNING first (the D0102
+    // decision-requirement-link precedent — visible, non-gating; promote once proven low-noise). Uses the
+    // whereKind scope + charterTargetType predicate (both added this sprint).
+    part researchSpikeCharterRule : ElementRule {
+        :>> id = "d0105r008-0008-4008-9008-516273841008";
+        :>> title = "A research spike must charter to a legitimate governing source (Decision/Need/SystemRequirement/Issue)";
+        :>> subjectType = "Story";
+        :>> predicate = "charterTargetType(Issue,Decision,Need,SystemRequirement)";
+        :>> severity = RuleSeverity::warning;
+        :>> onViolation = ViolationKind::warn;
+        :>> appliesWhen = "whereKind(research)";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from researchSpikeCharterRule to d0111;
 }

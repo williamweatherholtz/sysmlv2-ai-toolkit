@@ -2297,8 +2297,9 @@ fn predicate_args<'a>(t: &'a str, p: &str) -> Option<&'a str> {
 }
 
 /// Is `name` within a rule's `appliesWhen` SCOPE? `all` (always), `whereStatus(v)` (the item's `status`
-/// attr == v). `Some(bool)`, or `None` if the scope predicate is unsupported (caller marks the rule
-/// not-evaluated). Git-temporal scopes (`newlyAdded`) are a later sub-step, reported unsupported here.
+/// attr == v), `whereKind(v)` (the item's `kind` `WorkKind` == v). `Some(bool)`, or `None` if the scope
+/// predicate is unsupported (caller marks the rule not-evaluated). Git-temporal scopes (`newlyAdded`)
+/// are a later sub-step, reported unsupported here.
 fn subject_in_scope(info: &ItemInfo, scope: &str) -> Option<bool> {
     let scope = scope.trim();
     if scope == "all" {
@@ -2307,13 +2308,21 @@ fn subject_in_scope(info: &ItemInfo, scope: &str) -> Option<bool> {
     if let Some(v) = predicate_args(scope, "whereStatus(") {
         return Some(info.attrs.get("status").map(String::as_str) == Some(v.trim()));
     }
+    // whereKind(v): the item's WorkKind == v (e.g. research) — scopes a rule to a work-kind (issue055
+    // researchSpikeCharterRule: only WorkKind::research Stories). The parser stores the enum MEMBER,
+    // so `WorkKind::research` reads back as "research".
+    if let Some(v) = predicate_args(scope, "whereKind(") {
+        return Some(info.attrs.get("kind").map(String::as_str) == Some(v.trim()));
+    }
     None
 }
 
 /// Evaluate one `ElementRule` predicate TERM for item `name`. Closed vocabulary so far: `nonBlank(field)`
-/// (trimmed len > 0), `minLength(field,n)` (trimmed len >= n), and `hasPassingResult(suffix)` (a sibling
-/// item `<name><suffix>R1` exists with `outcome=pass` — the acceptance/DoD naming convention). Unknown
-/// term returns `None` (the caller reports the rule `evaluated=false` rather than silently passing).
+/// (trimmed len > 0), `minLength(field,n)` (trimmed len >= n), `hasPassingResult(suffix)` (a sibling
+/// item `<name><suffix>R1` exists with `outcome=pass` — the acceptance/DoD naming convention),
+/// `resultJudgedByHuman(suffix)`, the `[not]matchesPattern[CI]` substring family, and
+/// `charterTargetType(T1,...)` (every outgoing `#CharteredBy` edge targets an allow-listed type).
+/// Unknown term returns `None` (the caller reports the rule `evaluated=false` rather than silently passing).
 fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
     let term = term.trim();
     let attrs = &model.items.get(name)?.attrs;
@@ -2336,6 +2345,21 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         let ev = format!("{name}{}R1", suffix.trim());
         let judged_by = model.items.get(&ev).and_then(|i| i.attrs.get("judgedBy"));
         return Some(judged_by.and_then(|jb| model.items.get(jb)).is_some_and(|a| a.type_name == "Person"));
+    }
+    // charterTargetType(T1,T2,...): every OUTGOING #CharteredBy edge from `name` targets an item whose
+    // TYPE is in the allow-list. The enforceable slice of research-spike routing (issue055): once a
+    // spike EXISTS, its charter must point at a real Issue or Decision, so the routing convention gains a
+    // control on the structurally-visible side (the "did analysis skip the spike?" judgment stays
+    // reminder-enforced — a commit gate cannot see a conversation). Vacuously true when `name` has no
+    // charter edge — edge EXISTENCE is charterRule's job (D0068), not this rule's.
+    if let Some(args) = predicate_args(term, "charterTargetType(") {
+        let allow: Vec<&str> = args.split(',').map(str::trim).collect();
+        let ok = model
+            .edges
+            .iter()
+            .filter(|e| e.kind == "charteredby" && e.from == name)
+            .all(|e| model.items.get(&e.to).is_some_and(|t| allow.contains(&t.type_name.as_str())));
+        return Some(ok);
     }
     // matchesPattern(field, needle) / notMatchesPattern(field, needle): case-sensitive substring on an attr.
     // The `CI` variants are case-insensitive. `needle` may contain spaces (after the first comma); no ')'.
@@ -4722,6 +4746,46 @@ mod tests {
         assert_eq!(
             element_rule_violations(&model, "Decision", "resultJudgedByHuman(Accept)", "whereStatus(accepted)").unwrap(),
             vec!["dAi".to_string()],
+        );
+    }
+
+    #[test]
+    fn element_rule_flags_research_spike_bad_charter() {
+        // issue055 researchSpikeCharterRule: a WorkKind::research Story must charter to a legitimate
+        // governing source — Decision/Need/SystemRequirement/Issue (the D0068 union). whereKind(research)
+        // scope + charterTargetType(...) predicate. A spike chartered to an arbitrary element is flagged.
+        let story = |kind: &str| {
+            let mut a = HashMap::new();
+            a.insert("kind".to_string(), kind.to_string());
+            ItemInfo { type_name: "Story".to_string(), attrs: a, marker: None, file: String::new() }
+        };
+        let bare = |ty: &str| ItemInfo { type_name: ty.to_string(), attrs: HashMap::new(), marker: None, file: String::new() };
+        let ch = |from: &str, to: &str| Edge { kind: "charteredby".to_string(), from: from.to_string(), to: to.to_string() };
+        let mut items = HashMap::new();
+        items.insert("iss".to_string(), bare("Issue"));
+        items.insert("dec".to_string(), bare("Decision"));
+        items.insert("ndd".to_string(), bare("Need"));
+        items.insert("sr".to_string(), bare("SystemRequirement"));
+        items.insert("otherStory".to_string(), bare("Story"));
+        items.insert("spikeToIssue".to_string(), story("research")); // -> Issue: ok
+        items.insert("spikeToDecision".to_string(), story("research")); // -> Decision: ok
+        items.insert("spikeToNeed".to_string(), story("research")); // -> Need: ok (originating source)
+        items.insert("spikeToSr".to_string(), story("research")); // -> SystemRequirement: ok (sr19SpikeStory case)
+        items.insert("spikeToStory".to_string(), story("research")); // -> Story: VIOLATION (not a governing source)
+        items.insert("spikeUnchartered".to_string(), story("research")); // no charter: vacuously ok (charterRule's job)
+        items.insert("codeToStory".to_string(), story("code")); // non-research: out of scope, ignored
+        let edges = vec![
+            ch("spikeToIssue", "iss"),
+            ch("spikeToDecision", "dec"),
+            ch("spikeToNeed", "ndd"),
+            ch("spikeToSr", "sr"),
+            ch("spikeToStory", "otherStory"),
+            ch("codeToStory", "otherStory"),
+        ];
+        let model = Model { items, edges };
+        assert_eq!(
+            element_rule_violations(&model, "Story", "charterTargetType(Issue,Decision,Need,SystemRequirement)", "whereKind(research)").unwrap(),
+            vec!["spikeToStory".to_string()],
         );
     }
 

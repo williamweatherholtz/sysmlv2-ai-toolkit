@@ -12,7 +12,7 @@ description: |
   conversational replies that change nothing. CLAUDE.md §3 is the source of truth — this skill
   is the always-on checklist, fired every turn by a UserPromptSubmit hook (D0064).
 metadata:
-  version: 0.5.0
+  version: 0.6.0
   domain: [process-discipline, request-routing, work-tracking, MBSE, SysMLv2]
   writePolicy: read-only
   engine: keel-ai-toolkit
@@ -119,7 +119,11 @@ hook (`.engine/tools/triage_reminder.py`, D0064).
    a recorded `proposed` Decision** capturing the direction. This exists because upstream analysis
    *precedes* the Decision it produces, so it has no accepted charter source — and left un-routed it
    leaks into chat, uncaptured (the issue054 defect, recursed into the engine's own process). Quick
-   VIEW/ORIENT answers stay conversational; sustained design gets a spike.
+   VIEW/ORIENT answers stay conversational; sustained design gets a spike. The artifact side of this
+   is now a declared control: `researchSpikeCharterRule` (D0111/issue055, warning-level in `keel rules`)
+   flags a `WorkKind::research` spike that charters to something other than a legitimate governing source
+   (Decision/Need/SystemRequirement/Issue). The "did this analysis skip the spike?" judgment stays with
+   you — a commit gate cannot see a conversation — but a spike that DOES exist must be well-formed.
 
 ## Why this exists
 

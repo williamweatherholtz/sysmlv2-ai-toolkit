@@ -382,7 +382,11 @@ single gate source, via `view::rule_violations`) — `requirement-rootedness`→
 `issues`→`issuesTriagedRule`, `decision-rationale`→`decisionRationaleRule`, `acceptance-events`→
 `acceptanceEventRule`, `charter`→`charterRule`. The other ~8 guards stay Rust (bad-fit: relational /
 external-file / text-blob / git-co-commit / prose / per-file — D0105 rollback criterion). Guard NAMES +
-commit-gating are unchanged; downstream projects can declare their own rules.
+commit-gating are unchanged; downstream projects can declare their own rules. Two further declared rules
+run WARNING-ONLY in `keel rules` (visible, non-gating — the D0102 promote-once-low-noise pattern):
+`decisionNoVerdictProseRule` (issue058 dual-truth detector) and `researchSpikeCharterRule` (D0111/issue055 —
+a `WorkKind::research` spike must charter to a legitimate governing source: Decision/Need/SystemRequirement/
+Issue; via the `whereKind` scope + `charterTargetType` predicate).
 
 RUNNABLE BURNDOWN / diagnostics (computed, surfaced in orient, NEVER blocking — D0098): `assured`
 D0079c [composite readiness], `critique` D0080/D0079 [critique-COVERAGE; note INDEPENDENCE stays
