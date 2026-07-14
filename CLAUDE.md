@@ -342,6 +342,7 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
+.\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
 .\target\release\keel.exe guard                                                               # ALL sixteen forward guards (no kernel) — 15 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
 .\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
@@ -397,9 +398,11 @@ enforced above]; plus `critique-rigor` D0080/issue030 [low-rigor critiques + aff
 action]. The python `validate_*.py` guards, `query.py`, and `parity_check.py` were RETIRED at M4
 (sprint58, issue012 closed) — the Rust path is the sole gate.
 
-**`.engine/` schema/workflow/instance changes still use the kernel validators** (deeper
-SysML semantics than the Rust validator covers), and they remain the authoritative SysML
-oracle on demand / in CI (each starts the pilot kernel, ~20s):
+**`.engine/` changes: the reference/name-resolution layer is now KERNEL-FREE** (`keel check-engine`,
+D0112 phase 2/issue067 — unresolved type refs + unknown imports across schema+instances, runs in the
+hook + CI). The **kernel validators** remain the authoritative SysML oracle only for the DEEPER residual
+(full type-conformance / specialization / multiplicity that the Rust registry does not yet cover —
+D0112 phase 3), on demand / in the pre-commit hook (each starts the pilot kernel, ~20s):
 
 ```
 $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"

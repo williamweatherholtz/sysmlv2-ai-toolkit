@@ -58,6 +58,11 @@ if [ -n "$sysml_staged" ]; then
         echo "pre-commit: keel guard (all enforced honest-state guards)"
         "$SYSMLV2" guard || {
             echo "pre-commit: GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+        # .engine reference resolution, KERNEL-FREE (D0112 phase 2/issue067): catches unresolved type
+        # refs + unknown imports on .engine instances even when conda/kernel is unavailable.
+        echo "pre-commit: keel check-engine ."
+        "$SYSMLV2" check-engine . || {
+            echo "pre-commit: CHECK-ENGINE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     else
         echo "pre-commit: rust binary missing — guards skipped (build target/release/keel to enforce)"
     fi

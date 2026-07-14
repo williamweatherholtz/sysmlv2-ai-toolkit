@@ -408,3 +408,72 @@ pub fn validate_root(root: &Path) -> Report {
 
     report
 }
+
+/// True for the `.engine` files that are INSTANCES (validated like `.tracking`), not schema/workflow
+/// definitions (registered as ground truth only): `decisions/`, `processes/`, `views/`, plus
+/// `skills-registry.sysml` and `tracking-template.sysml`.
+fn is_engine_instance_file(path: &Path) -> bool {
+    let s = path.to_string_lossy().replace('\\', "/");
+    s.contains("/decisions/")
+        || s.contains("/processes/")
+        || s.contains("/views/")
+        || s.ends_with("skills-registry.sysml")
+        || s.ends_with("tracking-template.sysml")
+}
+
+/// Semantically validate the `.engine` INSTANCE files against the schema, KERNEL-FREE (D0112 phase 2,
+/// issue067).
+///
+/// The Rust backstop for the `unresolved` reference class that the JVM `validate_instances.py` was the
+/// only source of. Registers ALL `.engine` packages first (schema + instances) so cross-file references
+/// resolve (the Rust advantage over the per-file kernel, issue021/024), then runs the SAME
+/// [`PackageRegistry::validate`] used for `.tracking`. Schema/workflow files are registered but NOT
+/// validated (they reference the `ScalarValues` system namespace). Returns `(path, diagnostic)` pairs —
+/// empty when clean.
+#[must_use]
+pub fn validate_engine_instances(root: &Path) -> Vec<(PathBuf, Diagnostic)> {
+    let engine_dir = root.join(".engine");
+    if !engine_dir.is_dir() {
+        return Vec::new();
+    }
+    let all = collect_sysml(&engine_dir);
+    let mut registry = PackageRegistry::new();
+    for path in &all {
+        if let Ok(pkg) = parse_pkg(path) {
+            registry.register(&pkg);
+        }
+    }
+    let mut out = Vec::new();
+    for path in &all {
+        if !is_engine_instance_file(path) {
+            continue;
+        }
+        if let Ok(pkg) = parse_pkg(path) {
+            for d in registry.validate(&pkg, &path.to_string_lossy()) {
+                out.push((path.clone(), d));
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod engine_instance_tests {
+    use super::is_engine_instance_file;
+    use std::path::Path;
+
+    #[test]
+    fn classifies_engine_instance_files() {
+        // D0112 phase 2: decisions/processes/views + the two named files are instances (validated);
+        // schema/workflows are NOT (registered as ground truth only).
+        assert!(is_engine_instance_file(Path::new(".engine/decisions/0112-x.sysml")));
+        assert!(is_engine_instance_file(Path::new(".engine/processes/doc-sync.sysml")));
+        assert!(is_engine_instance_file(Path::new(".engine/views/viewpoint-registry.sysml")));
+        assert!(is_engine_instance_file(Path::new(".engine/skills/skills-registry.sysml")));
+        assert!(is_engine_instance_file(Path::new(".engine/docs/tracking-template.sysml")));
+        // schema + workflow DEFS are not instances.
+        assert!(!is_engine_instance_file(Path::new(".engine/schema/core.sysml")));
+        assert!(!is_engine_instance_file(Path::new(".engine/workflows/delivery.sysml")));
+        assert!(!is_engine_instance_file(Path::new(".engine/rules/rules.sysml")));
+    }
+}

@@ -2,8 +2,10 @@
 # push and PR to main. This is the automated test-gate the critique campaign found MISSING — the
 # .githooks pre-commit hook runs clippy + keel validate/guard but NOT cargo test, and there was no CI,
 # so a failing test could reach main (issue042). A CI job (vs the pre-commit hook) keeps the ~15s test
-# run off the per-commit path (n11/D0054 friction). Rust gates only; the .sysml kernel/guard checks
-# stay in the pre-commit hook (they need the local conda kernel).
+# run off the per-commit path (n11/D0054 friction). Rust gates only — the KERNEL (JVM) validators still
+# stay in the pre-commit hook (they need the local conda kernel). But the kernel-FREE keel gates
+# (validate/guard/check-engine) run here too as a SKIP_VALIDATE-proof backstop (issue067/D0112 phase 2):
+# a commit that skipped the hook (e.g. a hanging kernel) is still caught in CI for the Rust-checkable layer.
 name: ci
 on:
   push:
@@ -23,3 +25,8 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
         run: cargo test --workspace --release
+      - name: keel gates (kernel-free backstop — SKIP_VALIDATE can't bypass CI)
+        run: |
+          ./target/release/keel validate .
+          ./target/release/keel guard
+          ./target/release/keel check-engine .

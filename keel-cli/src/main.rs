@@ -113,6 +113,35 @@ fn cmd_validate(args: &[String]) -> i32 {
     }
 }
 
+/// `keel check-engine [ROOT]` (D0112 phase 2, issue067) — semantically validate the `.engine` INSTANCE
+/// files (decisions/processes/views + registry + template) against the schema, KERNEL-FREE — the Rust
+/// backstop for the `unresolved` reference class the JVM `validate_instances.py` used to be the sole
+/// source of.
+fn cmd_check_engine(args: &[String]) -> i32 {
+    let root = match args.first() {
+        Some(p) => PathBuf::from(p),
+        None => if let Some(r) = find_repo_root() { r } else {
+            eprintln!("error: no .engine/ directory found from the current directory upward.");
+            eprintln!("usage: keel check-engine [ROOT]");
+            return 2;
+        },
+    };
+    let diags = keel_cli::validate_engine_instances(&root);
+    for (path, d) in &diags {
+        println!("ERROR: {}:{} — {}", path.display(), d.line, d.message);
+        if let Some(hint) = &d.suggestion {
+            println!("       hint: {hint}");
+        }
+    }
+    if diags.is_empty() {
+        println!(".engine instance files validated clean (kernel-free; D0112 phase 2).");
+        0
+    } else {
+        eprintln!("{} .engine semantic diagnostic(s).", diags.len());
+        1
+    }
+}
+
 fn cmd_spec_version(args: &[String]) -> i32 {
     use keel_parser::spec_compat as sc;
     println!("grammar version (baked): {}", sc::SYSML_V2_GRAMMAR_VERSION);
@@ -1412,6 +1441,7 @@ fn main() {
         Some("init") => cmd_init(rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
+        Some("check-engine") => cmd_check_engine(rest),
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),
         Some("business") => cmd_business(rest),
