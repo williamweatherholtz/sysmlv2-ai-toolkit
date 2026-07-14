@@ -159,4 +159,8 @@ package ProjectBusinessKeelViewer {
         :>> mainSuccess = "Open a deployed, authenticated URL; pick a viewpoint; explore; save personal views; read-only by default.";
         :>> extensions = "Whether multi-user deployment belongs in keel or a separate viewer is the core A/B/C decision (Q1/Q5).";
     }
+
+    // ── Business gate: human acceptance of the Needs (needs-before-architecture). ──
+    verification keelViewerNeedsAccept : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000a"; :>> title = "keel-viewer Needs accepted (Business gate)"; :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts the 8 keel-viewer Needs (N-1..N-8: nViewerViewpointForm / nViewerExplorableGraph / nViewerTemporalState / nViewerCrossCuttingSlices / nViewerSeparation [must], nViewerQueryExpansion / nViewerMultiStakeholder / nViewerPersistedViewpoints [should]) AS-IS via the explicit 'Accept the Needs as-is' selection on 2026-07-14 — the Business gate. Architecture (SystemRequirements + the A/B/C Decision) may now be derived from these accepted Needs."; }
+    part keelViewerNeedsAcceptR1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5f82eec"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
 }
