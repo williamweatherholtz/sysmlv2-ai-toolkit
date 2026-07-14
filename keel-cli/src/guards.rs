@@ -837,70 +837,6 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-// ── engine-lint guard (D0112 phase 1: the mechanical .engine instance lints, ported kernel-free) ──
-
-/// Instance types that carry an `:>> id` (identity invariant §2.3). Mirrors validate_instances._ID_TYPES.
-const ENGINE_ID_TYPES: &[&str] = &[
-    "Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult", "Brief", "Persona", "Need",
-    "Issue", "Story", "Release", "ChangeRequest", "Component", "DesignElement", "Test", "Viewpoint",
-    "Indicator", "Measurement",
-];
-
-/// Count `part|verification|requirement <name> : <IdType>` declarations in `text` (mirrors the
-/// validate_instances.warn_missing_ids regex, line-based).
-fn count_tracked_instances(text: &str) -> usize {
-    text.lines()
-        .filter(|line| {
-            let t = line.trim_start();
-            ["part ", "verification ", "requirement "].iter().any(|kw| {
-                t.strip_prefix(kw)
-                    .and_then(|rest| rest.split_once(':'))
-                    .map(|(_, after)| after.trim_start().split(|c: char| !c.is_alphanumeric()).next().unwrap_or(""))
-                    .is_some_and(|ty| ENGINE_ID_TYPES.contains(&ty))
-            })
-        })
-        .count()
-}
-
-/// Guard: the two mechanical `.engine`-instance lints ported from `validate_instances.py` (D0112 phase 1,
-/// kernel-free — the first step of retiring the JVM from the `.engine` path). (1) HARD — every
-/// `.engine/decisions/*.sysml` must `import EngineWork` (the `Decision` type lives there). (2) WARN —
-/// every tracked instance (`part|verification|requirement <name> : <IdType>`) should carry an `:>> id`
-/// (identity invariant §2.3). Parity with the python lints by VERDICT, not byte-identical text.
-pub fn engine_lint(root: &Path) -> GuardReport {
-    let mut warnings = Vec::new();
-    let mut violations = Vec::new();
-    let decisions_dir = root.join(".engine").join("decisions");
-    let decision_files = crate::collect_sysml(&decisions_dir);
-    // (1) HARD: import-EngineWork on every decision file.
-    for path in &decision_files {
-        if let Ok(text) = std::fs::read_to_string(path) {
-            if !text.contains("import EngineWork") {
-                violations.push(format!(
-                    "{}: Decision file missing 'import EngineWork' — the Decision type lives in EngineWork (D0112)",
-                    relpath(root, path)
-                ));
-            }
-        }
-    }
-    // (2) WARN: missing-id across the .engine instance set (decisions/processes/views + registry + template).
-    let mut inst_files: Vec<PathBuf> = Vec::new();
-    for sub in ["decisions", "processes", "views"] {
-        inst_files.extend(crate::collect_sysml(&root.join(".engine").join(sub)));
-    }
-    inst_files.push(root.join(".engine").join("skills").join("skills-registry.sysml"));
-    inst_files.push(root.join(".engine").join("docs").join("tracking-template.sysml"));
-    for path in &inst_files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
-        let inst = count_tracked_instances(&text);
-        let ids = text.matches(":>> id =").count();
-        if inst > ids {
-            warnings.push(format!("{}: {} tracked instance(s) missing :>> id (§2.3)", relpath(root, path), inst - ids));
-        }
-    }
-    GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
-}
-
 pub const GUARD_NAMES: [&str; 16] =
     ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link", "confirmation-authenticity", "engine-lint"];
 
@@ -937,6 +873,73 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
 #[must_use]
 pub fn run_all(root: &Path) -> Vec<GuardReport> {
     GUARD_NAMES.iter().filter_map(|n| run_one(n, root)).collect()
+}
+
+// ── engine-lint guard (D0112 phase 1: the mechanical .engine instance lints, ported kernel-free) ──
+
+/// Instance types that carry an `:>> id` (identity invariant §2.3). Mirrors `validate_instances._ID_TYPES`.
+const ENGINE_ID_TYPES: &[&str] = &[
+    "Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult", "Brief", "Persona", "Need",
+    "Issue", "Story", "Release", "ChangeRequest", "Component", "DesignElement", "Test", "Viewpoint",
+    "Indicator", "Measurement",
+];
+
+/// Count `part|verification|requirement <name> : <IdType>` declarations in `text`.
+///
+/// Line-based mirror of `validate_instances.warn_missing_ids`.
+fn count_tracked_instances(text: &str) -> usize {
+    text.lines()
+        .filter(|line| {
+            let t = line.trim_start();
+            ["part ", "verification ", "requirement "].iter().any(|kw| {
+                t.strip_prefix(kw)
+                    .and_then(|rest| rest.split_once(':'))
+                    .map(|(_, after)| after.trim_start().split(|c: char| !c.is_alphanumeric()).next().unwrap_or(""))
+                    .is_some_and(|ty| ENGINE_ID_TYPES.contains(&ty))
+            })
+        })
+        .count()
+}
+
+/// The two mechanical `.engine`-instance lints, ported kernel-free (D0112 phase 1).
+///
+/// (1) HARD — every `.engine/decisions/*.sysml` must `import EngineWork` (the `Decision` type lives
+/// there). (2) WARN — every tracked instance (`part|verification|requirement <name> : <IdType>`) should
+/// carry an `:>> id` (§2.3). The first kernel-free step of retiring the JVM from the `.engine` path;
+/// parity with the python lints by VERDICT, not byte-identical text.
+#[must_use]
+pub fn engine_lint(root: &Path) -> GuardReport {
+    let mut warnings = Vec::new();
+    let mut violations = Vec::new();
+    let decisions_dir = root.join(".engine").join("decisions");
+    let decision_files = crate::collect_sysml(&decisions_dir);
+    // (1) HARD: import-EngineWork on every decision file.
+    for path in &decision_files {
+        if let Ok(text) = std::fs::read_to_string(path) {
+            if !text.contains("import EngineWork") {
+                violations.push(format!(
+                    "{}: Decision file missing 'import EngineWork' — the Decision type lives in EngineWork (D0112)",
+                    relpath(root, path)
+                ));
+            }
+        }
+    }
+    // (2) WARN: missing-id across the .engine instance set (decisions/processes/views + registry + template).
+    let mut inst_files: Vec<PathBuf> = Vec::new();
+    for sub in ["decisions", "processes", "views"] {
+        inst_files.extend(crate::collect_sysml(&root.join(".engine").join(sub)));
+    }
+    inst_files.push(root.join(".engine").join("skills").join("skills-registry.sysml"));
+    inst_files.push(root.join(".engine").join("docs").join("tracking-template.sysml"));
+    for path in &inst_files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let inst = count_tracked_instances(&text);
+        let ids = text.matches(":>> id =").count();
+        if inst > ids {
+            warnings.push(format!("{}: {} tracked instance(s) missing :>> id (§2.3)", relpath(root, path), inst - ids));
+        }
+    }
+    GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
 }
 
 #[cfg(test)]
