@@ -342,8 +342,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\keel.exe guard                                                               # ALL fifteen forward guards (no kernel) — 14 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL sixteen forward guards (no kernel) — 15 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -351,9 +351,11 @@ model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE.
 critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
 (`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
 state, never a commit blocker (don't fake a pass, don't block recording true state).
-The fourteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
+The fifteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
 plus `confirmation-authenticity` (D0106/issue059: an accepted Decision's acceptance event must be HUMAN-judged,
-never AI-fabricated; rule-sourced from `confirmationAuthenticityRule`): `keel guard` (actors
+never AI-fabricated; rule-sourced from `confirmationAuthenticityRule`) and `engine-lint` (D0112 phase 1: the
+first kernel-free port of the `.engine`-instance lints — HARD: every `.engine/decisions/*.sysml` imports
+EngineWork; WARN: tracked instances carry an `:>> id`): `keel guard` (actors
 D0037, acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
 D0068, process-change D0070 keystone, issues D0077/D0078 [every recorded problem accounted for],
 viewpoint-renderer D0056/issue034 [renderers must name a real `keel` command, no retired query.py/
@@ -367,7 +369,7 @@ the engine is legitimately decision-driven, D0064; the full charter-source balan
 rationale — the why — not a blank/trivial field; guarantees the decision-record's basis for future
 improvement + reevaluation], confirmation-authenticity D0106/issue059 [an accepted Decision's acceptance
 event must be judged by a human `Person`, never AI-fabricated — the enforceable slice of D0106; the
-conversational parse-first part stays reminder-enforced]). A FIFTEENTH guard, `decision-requirement-link`
+conversational parse-first part stays reminder-enforced]). A SIXTEENTH guard, `decision-requirement-link`
 (D0102/issue052), RUNS in `keel guard` every commit but is WARNING-level (visible, never blocks): it flags
 an accepted Decision that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance
 link that should be typed, not prose) — promotable to a hard gate once proven low-noise. (Relatedly, `critique_suspect`
