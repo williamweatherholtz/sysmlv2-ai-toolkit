@@ -416,7 +416,16 @@ See `.engine/docs/keel-syntax-notes.md` for confirmed syntax do's/don'ts before 
 
 ## 6. Environment notes
 
-- Windows + PowerShell. Use PowerShell syntax (`$null`, `$env:VAR`, backtick line-continuation).
+- **Adapt commands to the HOST OS/shell — the #1 avoidable-friction class (issue065).** Detect the
+  host before assuming syntax: which shell tool is active (Bash vs PowerShell), and what the target
+  program expects. Command *forms* are OS/shell-specific — path separators, env-var syntax (`$VAR` vs
+  `$env:VAR`), null device (`/dev/null` vs `$null`), the call operator (`&`), quoting/escaping, and
+  which characters trigger substitution (backticks are literal in POSIX single-quotes but run commands
+  in a double-quoted Bash string — a real self-inflicted bug this project hit). If a shell tool errors
+  or hangs, switch to the other tool rather than re-issuing the same form. This principle is
+  OS-agnostic; the specifics BELOW are THIS repo's host (Windows). A downstream project restates its
+  own host's specifics.
+- This repo's host: **Windows + PowerShell.** Use PowerShell syntax (`$null`, `$env:VAR`, backtick line-continuation).
 - **`conda` is NOT on `$env:PATH`** in PowerShell sessions that don't run conda init (e.g.
   Claude Code's shell). Use the full miniforge3 path every time:
   ```

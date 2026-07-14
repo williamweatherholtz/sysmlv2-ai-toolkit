@@ -82,3 +82,21 @@ keel orient .      # where things stand + what's ready + the burndown
 ```
 
 Run these before considering any change done. keel is kernel-free for these — fast, no JVM.
+
+---
+
+## 6. Environment — adapt to your host OS/shell
+
+Command *forms* are OS- and shell-specific. Before assuming syntax, detect your host: which shell
+is active and what each program expects. Watch the parts that differ across systems:
+
+- **Path separators** (`/` vs `\`) and quoting/escaping rules.
+- **Env vars** (`$VAR` in POSIX shells vs `$env:VAR` in PowerShell).
+- **Null device** (`/dev/null` vs `$null`), redirects, and pipes.
+- **Substitution characters** — e.g. backticks are literal inside POSIX single-quotes but run
+  commands inside a double-quoted Bash string.
+
+If a command errors or hangs, switch shells or fix the *form* rather than re-issuing the same one.
+Prefer **absolute paths** for file/script arguments so a working-directory change in one tool doesn't
+break the next. Record your project's concrete host specifics (OS, shell, toolchain paths) right here,
+so future sessions inherit them instead of rediscovering them.
