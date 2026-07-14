@@ -1,0 +1,40 @@
+// ProjectDeliveryS208 — Sprint 208: keelViewerBusinessPhase — deploy the business-architecture skill on
+// the keel-viewer handoff (a GENUINE design request; advances issue061 part 1). Phase 1 Business:
+// Brief + 4 Personas + 8 Needs + 6 UseCases authored as TRACKED FACTS (.tracking/business/keel-viewer.sysml),
+// not chat. STOPS at the Needs-acceptance gate: the human accepts the Needs + decides the A/B/C
+// architecture (handoff §3/§6) before any SystemRequirement/architecture Decision is recorded
+// (needs-before-architecture). Does NOT close issue061 (acceptance + architecture pending). EXECUTE. 1 pt.
+package ProjectDeliveryS208 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRequirements::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from keelViewerBizStory to keelViewerBrief;
+
+    part keelViewerBizStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c208-51627384c001";
+        :>> title = "Sprint 208: keelViewerBusinessPhase (1 pt) - Brief/Personas/Needs/UseCases for the keel-viewer, via the business-architecture skill";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS208 {
+        action storyKeelViewerBusinessPhase;
+        verification storyKeelViewerBusinessPhaseDoD : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c002"; :>> method = VerificationMethod::inspect; :>> procedureText = "Deploys the business-architecture skill (Business workflow: Brief -> Personas -> Needs -> UseCases) on the keel-viewer handoff (KEEL-VIEWER-HANDOFF.md) — a genuine design/scoping request, advancing issue061 part 1 (dogfood the skill on a real design). AUTHORED as tracked facts in .tracking/business/keel-viewer.sysml, NOT prose: keelViewerBrief (problem/opportunity/constraints incl. the A/B/C separation decision); 4 Personas (safety engineer, process owner/auditor, technical modeler, non-technical stakeholder); 8 Needs (N-1..N-8, MoSCoW; N-3 temporal state is the primary gap); 6 UseCases (UC-1..UC-6) tracing to the Needs. NEEDS-BEFORE-ARCHITECTURE honored: NO SystemRequirement / architecture Decision authored — those await the human's Needs-acceptance gate + the A/B/C decision (handoff §6's 6 open questions). issue061 NOT closed here (its DoD needs accepted Needs + recorded architecture Decisions). VERIFY: keel validate clean (business file parses); keel guard all green; the Business artifacts exist as authored items (not a prose doc)."; }
+        part storyKeelViewerBusinessPhaseDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification kvbRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c004"; :>> title = "Sprint 208 refine gate (DoR)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the keel-viewer handoff is a genuine design/scoping request -> route via the business-architecture skill (needs-before-architecture). Start the Business phase (Brief->Personas->Needs->UseCases) as authored facts. estimatedPoints=1. #CharteredBy keelViewerBrief. DoR met."; }
+    part kvbRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvbStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c006"; :>> title = "Sprint 208 standup gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: transcribe the handoff into authored Business items (Brief/Personas/Needs/UseCases), MoSCoW-prioritised, traced; hold the acceptance gate + architecture for the human. No blockers."; }
+    part kvbStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvbImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c008"; :>> title = "Sprint 208 implement gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "keel-viewer.sysml authored: Brief + 4 Personas + 8 Needs + 6 UseCases. keel validate clean (224 files); keel guard all + check-engine green. Business artifacts are items, not a prose doc."; }
+    part kvbImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvbReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c00a"; :>> title = "Sprint 208 review gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The design went through the skill the disciplined way: authored facts (Brief/Personas/Needs/UseCases), not a chat write-up; needs-before-architecture strictly held (no SystemRequirement/architecture Decision recorded); the A/B/C separation decision + the 6 open questions correctly surfaced for the HUMAN, not fabricated. This is the second real dogfood of the business-architecture skill — advancing issue061. Honest: issue061 stays OPEN (its DoD needs accepted Needs + architecture Decisions). Clean."; }
+    part kvbReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvbCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c00c"; :>> title = "Sprint 208 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; the keel-viewer Business phase is authored + green. Self-evidencing (D0051). GATE FOR THE HUMAN (not autonomous): accept the 8 Needs (the Business gate) + decide the A/B/C architecture + answer the 6 open questions — THEN the Architecture phase (SystemRequirements + Decisions) + implementation backlog run. issue061 advances but stays OPEN until then."; }
+    part kvbCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvbRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c208-51627384c00e"; :>> title = "Sprint 208 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: a real external design brief was integrated the disciplined way — routed to the business-architecture skill, authored as tracked Needs/Personas/UseCases (not a prose write-up), needs-before-architecture held, and the genuinely-human decisions (A/B/C + 6 open questions) surfaced rather than fabricated. This is exactly the process issue061 exists to prove works, on a genuine task. AVOIDABLE-ISSUE SCAN: none. LESSON: when a design doc arrives, deploy the workflow, don't chat it (the skill's whole point). Estimate 1 pt held. NEXT: the human's Needs-acceptance + A/B/C decision unblocks the Architecture phase, implementation Stories, and closes issue061."; }
+    part kvbRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c208-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92bc969"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+}
