@@ -722,4 +722,52 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from hardenVerdictProseRule to issue062;
+
+    part issue063 : Issue {
+        :>> id = "e0630063-0063-4e63-9063-516273840063";
+        :>> title = "keel serve orient first-load intermittently 16-23s: orient's criterion-drift spawns hundreds of git subprocesses (Windows spawn storm)";
+        :>> createdAt = "2026-07-14";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Field-discovered via keel serve on this project (human observed a ~16s orient load). MEASURED: CLI orient ~1.1s; serve cold ~1.1s normally, cached ~50ms — but one cold /api/orient spiked to 23s. ROOT: orient::compute's criterion-drift check runs `git ls-tree -r <sha> .tracking` + a `git show <sha>:<file>` per .sysml file, PER done task (423 done -> hundreds of git.exe spawns); on this AzureAD/Enterprise Windows box (Defender real-time scan of each spawn + process-creation overhead) the spawn burst has a heavy, variable tail (1s..23s). The serve per-fingerprint cache masks it after the first hit, so the FIRST page load eats the whole spike. FIX (fixServeOrientPerf): collapse the git-spawn count (single targeted `git show` of the DoD's file; or cache criterion blobs) + run the serve compute via spawn_blocking. Perf-only (orient output unchanged) -> EXECUTE. Relates to D0054 (friction is the #1 adoption risk).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "fixServeOrientPerf";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from fixServeOrientPerf to issue063;
+
+    part issue064 : Issue {
+        :>> id = "e0640064-0064-4e64-9064-516273840064";
+        :>> title = "keel serve console shows action/ready items as 'no authored attrs' + a NextWork contains-edge, hiding the real description in the linked DoD procedureText";
+        :>> createdAt = "2026-07-14";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Field-discovered via keel serve. Clicking a ready item (e.g. proveProcessDeployment) shows 'no authored attrs' + an incoming edge labelled NextWork. Both are technically true but misleading: (a) an `action X;` task genuinely carries no authored attributes (its human description lives in the verify-linked <task>DoD Test's procedureText, which the element view never surfaces); (b) 'NextWork' is the action-def BACKLOG CONTAINER, so the edge is the structural `contains` relation, not task data. Net effect: a fully-specified task LOOKS empty, hiding the DoD criterion. FIX (surfaceDodDescription): resolve <task>DoD and present its procedureText (+ method) as the task's description in the element/console view. Relates to issue063 (same serve dogfood).";
+        :>> discoveredInField = true;
+        :>> relatedTask = "surfaceDodDescription";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from surfaceDodDescription to issue064;
+
+    part issue065 : Issue {
+        :>> id = "e0650065-0065-4e65-9065-516273840065";
+        :>> title = "AI shell/command guidance is hardcoded to Windows/PowerShell and the downstream keel-init template ships NO OS guidance — avoidable shell-mismatch mistakes";
+        :>> createdAt = "2026-07-14";
+        :>> createdBy = "wweatherholtz";
+        :>> description = "Retro finding (generalizes issue013's cwd-specific fix). CLAUDE.md Sec 6 assumes Windows + PowerShell + miniforge; the shipped downstream CLAUDE.md template (keel-cli/assets/claude-md-template.md) has NO OS/env section at all (it ends at Sec 5). So a downstream project on macOS/Linux gets an AI with zero OS-adaptation instruction, and even here the class recurs — this session the PowerShell tool broke and command-form mixups (bash `&`/conda syntax) followed. HONEST LIMIT: behavioral guidance is a 'linter, ignorable' (D0110) — not a hard gate — so this reduces, not eliminates, the mistake rate. FIX (osAdaptiveCommandGuidance): state the PRINCIPLE (detect + adapt to the host OS/shell; verify the shell before assuming syntax) in the operating guidance, keep Windows specifics as this repo's instance, and add an OS/shell section to the downstream template. Relates to issue013, D0093 (downstream template).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "osAdaptiveCommandGuidance";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from osAdaptiveCommandGuidance to issue065;
+
+    part issue066 : Issue {
+        :>> id = "e0660066-0066-4e66-9066-516273840066";
+        :>> title = "The JVM kernel is still required for .engine SysML validation — a conda/JVM dependency persists for all engine work (D0048 kept it deliberately)";
+        :>> createdAt = "2026-07-14";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Architecture opportunity surfaced in the D0048 review this session. D0048 eliminated the JVM for the routine .tracking path but DELIBERATELY kept the kernel validators (validate_schema/workflows/instances) as the .engine SysML oracle, because the Rust validator does not cover their deeper SysML semantics. Cost: every engine commit (schema/decisions/rules/processes) still needs conda + a ~20s JVM start; downstream engine work inherits the conda dependency; this session the kernel step was environment-fragile (PowerShell tool broke). NOT a defect (the split is correct today) but a standing opportunity. PROPOSED (jvmRetirementSpike): a WorkKind::research SPIKE — enumerate exactly which checks the kernel does that Rust does not, assess replicating them in Rust, and produce a design artifact + a PROPOSED Decision on retiring the kernel entirely; implementation is a follow-on program gated on human acceptance. Relates to D0048, D0074.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "jvmRetirementSpike";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from jvmRetirementSpike to issue066;
 }
