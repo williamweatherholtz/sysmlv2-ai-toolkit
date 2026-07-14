@@ -100,12 +100,14 @@ async function openItem(name){
    document.getElementById('trbtn').onclick=()=>addTestResult(name);
    return;
   }
-  const attrs=(d.attrs||[]).map(a=>`<tr><td class=k>${esc(a.key)}</td><td>${esc(a.value)}</td></tr>`).join('')||'<tr><td class=muted colspan=2>no authored attrs</td></tr>';
+  const attrs=(d.attrs||[]).map(a=>`<tr><td class=k>${esc(a.key)}</td><td>${esc(a.value)}</td></tr>`).join('')||`<tr><td class=muted colspan=2>${d.dod?'no authored attrs — see Definition of Done below':'no authored attrs'}</td></tr>`;
+  // issue064: a task's real description is its <name>DoD procedureText — show it prominently, not just the empty shell.
+  const dod=d.dod&&d.dod.procedureText?('<div style="margin:8px 0;padding:9px 11px;background:#0f1720;border-radius:6px"><div class=muted style="font-size:10px;text-transform:uppercase;letter-spacing:.04em">Definition of Done'+(d.dod.method?' · '+esc(d.dod.method):'')+'</div><div style="font-size:12px;line-height:1.5;white-space:pre-wrap;margin-top:5px;color:#cfe3f0">'+esc(d.dod.procedureText)+'</div></div>'):'';
   const edges=(arr,label)=>arr&&arr.length?('<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:11px 0 3px">'+label+' ('+arr.length+')</h3>'+arr.map(e=>`<div style="font-size:11px;margin:2px 0"><span class=pill>${esc(e.kind)}</span> ${itemLink(e.node)}</div>`).join('')):'';
   const disp=d.type==='Issue'?'<button class=rb data-dv=act>Act</button><button class=rb data-dv=accept-risk>Accept-risk</button><button class=rb data-dv=dismiss>Dismiss</button>':'';
   m.innerHTML='<span class=x onclick="closeItem()">✕</span>'+
    '<h2>'+esc(d.name)+' <span class=pill>'+esc(d.type)+'</span>'+(d.marker?' <span class=pill>#'+esc(d.marker)+'</span>':'')+'</h2>'+
-   '<div style="margin:6px 0">'+(aiBridge?'<button class=rb id=mcrit>Critique ▶</button>':'<span class=muted>AI critique off — Settings</span>')+' '+disp+'</div>'+ACTLOG+
+   '<div style="margin:6px 0">'+(aiBridge?'<button class=rb id=mcrit>Critique ▶</button>':'<span class=muted>AI critique off — Settings</span>')+' '+disp+'</div>'+ACTLOG+dod+
    '<table>'+attrs+'</table>'+edges(d.outgoing,'Outgoing →')+edges(d.incoming,'Incoming ←');
   if(aiBridge)document.getElementById('mcrit').onclick=()=>runAgentModal('critique',d.name);
   [...m.querySelectorAll('.rb[data-dv]')].forEach(b=>b.onclick=()=>disposition(d.name,b.dataset.dv));

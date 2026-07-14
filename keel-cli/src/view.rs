@@ -1165,8 +1165,14 @@ pub fn defect_guard_coverage(root: &Path) -> Result<(usize, Vec<String>), ViewEr
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn item_detail(root: &Path, name: &str) -> Result<String, ViewError> {
     let model = Model::build(root)?;
+    Ok(item_detail_json(&model, name).dump())
+}
+
+/// The pure Model→JSON core of [`item_detail`] (extracted so it is unit-testable without a fixture
+/// dir). Resolves the `<name>DoD` procedureText (issue064) as the task's `dod` description.
+fn item_detail_json(model: &Model, name: &str) -> Json {
     let Some(info) = model.items.get(name) else {
-        return Ok(Json::Obj(vec![("found".to_string(), Json::Bool(false)), ("name".to_string(), Json::s(name.to_string()))]).dump());
+        return Json::Obj(vec![("found".to_string(), Json::Bool(false)), ("name".to_string(), Json::s(name.to_string()))]);
     };
     let mut attr_keys: Vec<&String> = info.attrs.keys().collect();
     attr_keys.sort();
@@ -1185,16 +1191,25 @@ pub fn item_detail(root: &Path, name: &str) -> Result<String, ViewError> {
         pairs.dedup();
         pairs.into_iter().map(|(kind, node)| Json::Obj(vec![("kind".to_string(), Json::s(kind)), ("node".to_string(), Json::s(node))])).collect()
     };
-    let out = Json::Obj(vec![
+    // serveItemIntrospect (issue064): an `action <name>;` task carries NO authored attrs — its human
+    // description lives in the `<name>DoD` verify Test's procedureText. Surface it (+ method) so the
+    // console shows a task's real content instead of an empty shell + the structural NextWork edge.
+    let dod = model.items.get(&format!("{name}DoD")).map_or(Json::Null, |d| {
+        Json::Obj(vec![
+            ("method".to_string(), Json::s(d.attrs.get("method").cloned().unwrap_or_default())),
+            ("procedureText".to_string(), Json::s(d.attrs.get("procedureText").cloned().unwrap_or_default())),
+        ])
+    });
+    Json::Obj(vec![
         ("found".to_string(), Json::Bool(true)),
         ("name".to_string(), Json::s(name.to_string())),
         ("type".to_string(), Json::s(info.type_name.clone())),
         ("marker".to_string(), info.marker.clone().map_or(Json::Null, Json::s)),
         ("attrs".to_string(), Json::Arr(attrs)),
+        ("dod".to_string(), dod),
         ("outgoing".to_string(), Json::Arr(edges_for(true))),
         ("incoming".to_string(), Json::Arr(edges_for(false))),
-    ]);
-    Ok(out.dump())
+    ])
 }
 
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
@@ -4611,6 +4626,25 @@ mod tests {
 
     fn item(ty: &str, marker: Option<&str>) -> ItemInfo {
         ItemInfo { type_name: ty.to_string(), attrs: HashMap::new(), marker: marker.map(str::to_string), file: String::new() }
+    }
+
+    #[test]
+    fn item_detail_surfaces_dod_procedure_text() {
+        // issue064: an action task carries no authored attrs; its description is the <name>DoD
+        // procedureText. item_detail_json surfaces it as `dod`; a task without a DoD sibling -> no dod.
+        let mut items = HashMap::new();
+        items.insert("proveX".to_string(), item("Action", None)); // no authored attrs
+        let mut dod_attrs = HashMap::new();
+        dod_attrs.insert("method".to_string(), "inspect".to_string());
+        dod_attrs.insert("procedureText".to_string(), "Resolves issueNNN: do the thing and verify Y.".to_string());
+        items.insert("proveXDoD".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: dod_attrs, marker: None, file: String::new() });
+        items.insert("bareTask".to_string(), item("Action", None)); // no DoD sibling
+        let model = Model { items, edges: vec![] };
+        let with_dod = item_detail_json(&model, "proveX").dump();
+        assert!(with_dod.contains("Resolves issueNNN: do the thing and verify Y."), "dod procedureText surfaced: {with_dod}");
+        assert!(with_dod.contains("inspect"), "dod method surfaced: {with_dod}");
+        let no_dod = item_detail_json(&model, "bareTask").dump();
+        assert!(!no_dod.contains("procedureText"), "task without a DoD carries no dod text: {no_dod}");
     }
 
     #[test]
