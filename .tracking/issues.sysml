@@ -770,4 +770,16 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from jvmRetirementSpike to issue066;
+
+    part issue067 : Issue {
+        :>> id = "e0670067-0067-4e67-9067-516273840067";
+        :>> title = "An .engine .sysml change committed with SKIP_VALIDATE=1 gets NO kernel validation — CI is Rust-only, so deep SysML semantics can land unvalidated";
+        :>> createdAt = "2026-07-14";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Surfaced this session (dogfood): the JVM kernel (the authoritative .engine SysML oracle, D0048) hung repeatedly, so D0112 was committed with SKIP_VALIDATE=1 — which bypasses the pre-commit hook's kernel step. CI is Rust-only BY DESIGN (ci.yml: 'the .sysml kernel/guard checks stay in the pre-commit hook; they need the local conda kernel'; n11/D0054 friction). So an .engine .sysml change that skips the hook has NO kernel backstop ANYWHERE — its deep name/type-resolution semantics land unvalidated (only Rust `keel validate` + structural inspection). D0112 is Rust-validated + structurally identical to the kernel-passed D0110/D0111, so THIS instance is low-risk, but the HOLE is real. RELATED honest note: SKIP_VALIDATE also silently skipped clippy this session (a642269 landed a workspace-clippy failure). FIX (engineRefResolver = D0112 phase 2): a Rust .engine reference/name-existence resolver gives a kernel-free backstop for the common `unresolved` class; interim option: make the hook refuse SKIP_VALIDATE when .engine .sysml is staged. Relates to D0112, D0048, D0054/n11, issue066.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "engineRefResolver";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from engineRefResolver to issue067;
 }
