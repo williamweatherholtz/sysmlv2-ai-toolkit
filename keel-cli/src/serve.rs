@@ -583,7 +583,11 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
     if let Some(json) = hit {
         return ok_json(json);
     }
-    match compute(&state.root) {
+    // issue063: the compute can shell out to git (orient suspect/drift) for up to a second-plus on a cold
+    // hit; run it via block_in_place so it never STARVES the multi-thread runtime's worker — other
+    // requests + the SSE change-push keep flowing while this view computes. (No async refactor needed:
+    // block_in_place offloads the current worker's other tasks; the serve runtime is new_multi_thread.)
+    match tokio::task::block_in_place(|| compute(&state.root)) {
         Ok(json) => {
             {
                 let mut guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);

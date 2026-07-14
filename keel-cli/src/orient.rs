@@ -126,46 +126,33 @@ pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
         .map_or(true, |o| o.status.success() && o.stdout.starts_with(b"commit"))
 }
 
-/// Read criterion text for `task` at git commit `sha`.
+/// Read criterion text for `task`'s `DoD` at git commit `sha`. The per-task FALLBACK for when the
+/// batched blob fetch (`batch_cat_blobs`) missed — e.g. the `DoD` moved files since `sha`.
+///
+/// orientPerf/issue063: ONE `git grep -h` for the `DoD`'s (single-line) declaration at `sha`, instead
+/// of `git ls-tree` + a `git show` per `.sysml` file — many fewer subprocess spawns (the Windows
+/// process-creation/AV tail-latency cost). `-h` yields the raw matched line(s), so the extraction below
+/// is IDENTICAL to the pre-change ls-tree+show path (a `DoD` is authored on one line in this model).
 fn git_criterion_at(sha: &str, task: &str, repo: &Path) -> Option<String> {
-    let ls = Command::new("git")
+    let dod_pfx = format!("verification {task}DoD");
+    let grep = Command::new("git")
         .arg("-C")
         .arg(repo)
-        .args(["ls-tree", "-r", "--name-only", sha, ".tracking"])
+        .args(["grep", "-h", "-F", "--no-color", "-e", &dod_pfx, sha, "--", ".tracking"])
         .output()
         .ok()?;
-    if !ls.status.success() {
-        return None;
+    if !grep.status.success() {
+        return None; // no match (or git error) — conservative, matches the old "not found" path
     }
-    let file_list = String::from_utf8(ls.stdout).ok()?;
-    let dod_pfx = format!("verification {task}DoD");
-
-    for rel in file_list.lines() {
-        if !std::path::Path::new(rel)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("sysml"))
-        {
-            continue;
-        }
-        let show = Command::new("git")
-            .arg("-C")
-            .arg(repo)
-            .args(["show", &format!("{sha}:{rel}")])
-            .output()
-            .ok()?;
-        if !show.status.success() {
-            continue;
-        }
-        let content = String::from_utf8(show.stdout).ok()?;
-        for line in content.lines() {
-            if line.trim().starts_with(&dod_pfx) {
-                // Extract procedureText from the line.
-                let pat = "procedureText = \"";
-                let start = line.find(pat)? + pat.len();
-                let rest = &line[start..];
-                let end = rest.find('"')?;
-                return Some(rest[..end].to_owned());
-            }
+    let content = String::from_utf8(grep.stdout).ok()?;
+    for line in content.lines() {
+        if line.trim().starts_with(&dod_pfx) {
+            // Extract procedureText from the line (unchanged from the ls-tree+show path).
+            let pat = "procedureText = \"";
+            let start = line.find(pat)? + pat.len();
+            let rest = &line[start..];
+            let end = rest.find('"')?;
+            return Some(rest[..end].to_owned());
         }
     }
     None
