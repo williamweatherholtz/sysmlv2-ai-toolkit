@@ -471,6 +471,51 @@ pub fn process_change(root: &Path) -> GuardReport {
     GuardReport { name: "process-change", scanned, warnings: Vec::new(), violations }
 }
 
+// ── doc-sync guard (D0113: the doc-sync discipline made a CONTROL — was pure vigilance) ────────────
+
+/// A staged path whose change is DEFINITIONAL and near-always carries doc implications: `.engine`
+/// schema / process / workflow definitions. (Tool `.rs` code + skills are deliberately EXCLUDED to keep
+/// this low-noise; the scope can widen once proven, D0113.)
+fn is_doc_governed_def(p: &str) -> bool {
+    p.starts_with(".engine/schema/")
+        || p.starts_with(".engine/processes/")
+        || p.starts_with(".engine/workflows/")
+}
+
+/// A staged path that COUNTS as a doc update (satisfies doc-sync): `CLAUDE.md`, `.engine/docs/`, or any
+/// `README.md`.
+fn is_doc_file(p: &str) -> bool {
+    p == "CLAUDE.md" || p.starts_with(".engine/docs/") || p.ends_with("README.md")
+}
+
+/// Pure core: a staged definitional change (schema/process/workflow) with NO co-committed doc update
+/// yields one warning naming the offending files. Empty when nothing definitional changed OR a doc did.
+fn doc_sync_warnings(changed: &[String]) -> Vec<String> {
+    let mut governed: Vec<&str> = changed.iter().map(String::as_str).filter(|p| is_doc_governed_def(p)).collect();
+    governed.sort_unstable();
+    if governed.is_empty() || changed.iter().any(|p| is_doc_file(p)) {
+        return Vec::new();
+    }
+    vec![format!(
+        "definitional change ({}) with NO co-committed doc update (CLAUDE.md / .engine/docs / README) — run the doc-sync skill; fix any doc claim this change invalidates in THIS commit",
+        governed.join(", ")
+    )]
+}
+
+/// Guard (WARNING-level, D0113): a staged schema/process/workflow change co-committed with no doc update.
+///
+/// Converts the doc-sync discipline from pure vigilance into a visible control — documentation drift was
+/// a recorded HIGH critique finding, and doc-sync had no enforcing guard (only the skill). Heuristic +
+/// WARNING (the D0102 promote-once-low-noise pattern, like `decision-requirement-link`): a definitional
+/// change MIGHT legitimately need no doc, so this NUDGES (never blocks); promote to hard once proven
+/// low-noise. Shares the `staged_files` git mechanism with `process_change`.
+#[must_use]
+pub fn doc_sync(root: &Path) -> GuardReport {
+    let changed = staged_files(root);
+    let scanned = changed.iter().filter(|p| is_doc_governed_def(p)).count();
+    GuardReport { name: "doc-sync", scanned, warnings: doc_sync_warnings(&changed), violations: Vec::new() }
+}
+
 /// Guard: every Issue carries a `#Resolves` edge (D0077).
 ///
 /// An untriaged issue (no resolver) is a violation — it has no resolving work/Decision and can
@@ -837,8 +882,8 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 16] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link", "confirmation-authenticity", "engine-lint"];
+pub const GUARD_NAMES: [&str; 17] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -862,6 +907,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
+        "doc-sync" => Some(doc_sync(root)), // WARNING-level member of GUARD_NAMES (D0113) — definitional change w/o doc update
 
         "critique-rigor" => Some(critique_rigor(root)), // runnable-only (not in GUARD_NAMES)
         "defect-guard-coverage" => Some(defect_guard_coverage(root)), // runnable-only (D0047/issue039)
@@ -950,6 +996,16 @@ mod tests {
     fn actor_refs_extracted() {
         let line = "    part x { :>> authoredBy = \"ana\"; :>> judgedBy = \"bob\"; :>> title = \"z\"; }";
         assert_eq!(scan_actor_refs(line), vec!["ana".to_string(), "bob".to_string()]);
+    }
+
+    #[test]
+    fn doc_sync_flags_undocumented_definitional_change() {
+        // D0113: a schema/process/workflow change with no co-committed doc = warn; with a doc = clean.
+        let warn = doc_sync_warnings(&[".engine/processes/foo.sysml".to_string(), "keel-cli/src/x.rs".to_string()]);
+        assert_eq!(warn.len(), 1, "definitional change + no doc must warn: {warn:?}");
+        assert!(doc_sync_warnings(&[".engine/processes/foo.sysml".to_string(), "CLAUDE.md".to_string()]).is_empty());
+        assert!(doc_sync_warnings(&[".engine/schema/core.sysml".to_string(), ".engine/docs/guide.md".to_string()]).is_empty());
+        assert!(doc_sync_warnings(&[".tracking/backlog.sysml".to_string()]).is_empty()); // nothing definitional
     }
 
     #[test]

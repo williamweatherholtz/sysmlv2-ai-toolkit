@@ -343,8 +343,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL sixteen forward guards (no kernel) — 15 hard-blocking (exit≠0 on any violation) + decision-requirement-link (warning-only); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL seventeen forward guards (no kernel) — 15 hard-blocking (exit≠0 on any violation) + 2 warning-only (decision-requirement-link, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -373,7 +373,11 @@ event must be judged by a human `Person`, never AI-fabricated — the enforceabl
 conversational parse-first part stays reminder-enforced]). A SIXTEENTH guard, `decision-requirement-link`
 (D0102/issue052), RUNS in `keel guard` every commit but is WARNING-level (visible, never blocks): it flags
 an accepted Decision that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance
-link that should be typed, not prose) — promotable to a hard gate once proven low-noise. (Relatedly, `critique_suspect`
+link that should be typed, not prose) — promotable to a hard gate once proven low-noise. A SEVENTEENTH guard,
+`doc-sync` (D0113), is the second WARNING-level member: a staged DEFINITIONAL change (`.engine/schema|processes|
+workflows/`) with NO co-committed doc update (CLAUDE.md / `.engine/docs/` / any README) is flagged — the doc-sync
+discipline made a control (was pure vigilance; doc drift was a HIGH critique finding), heuristic + warning-first,
+promotable once low-noise. (Relatedly, `critique_suspect`
 honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
 `#DependsOn` finding→critique edge — no longer induces suspicion.)
 **Declarative controls (D0105/D0107).** Controls are being migrated from bespoke Rust predicates to
