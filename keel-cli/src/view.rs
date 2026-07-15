@@ -869,6 +869,10 @@ fn section_subgraph_json(model: &Model, names: &HashSet<String>, seed: &str, kin
                 if let Some(m) = &info.marker {
                     o.push(("marker".to_string(), Json::s(m.clone())));
                 }
+                // all authored attribute values — lets a consumer ENCODE by attribute (N-18/D0120)
+                let mut aobj: Vec<(String, Json)> = info.attrs.iter().map(|(k, v)| (k.clone(), Json::s(v.clone()))).collect();
+                aobj.sort_by(|a, b| a.0.cmp(&b.0));
+                o.push(("attrs".to_string(), Json::Obj(aobj)));
                 Json::Obj(o)
             })
         })
