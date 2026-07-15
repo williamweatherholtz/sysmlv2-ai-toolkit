@@ -319,6 +319,10 @@ package ProjectBusinessKeelViewer {
     // UC-4 (business-process state) is re-served by querying (e.g. 'not reviewed since <date>'), so it stays.
     #Supersede dependency from d0116 to nViewerTemporalState;
 
+    // The N-18 acceptance gate is ABOUT the Need it gates — a typed link so the review surface can
+    // one-click to the item under review (issue068 linkify; keeps context easy to find).
+    #DependsOn dependency from keelViewerNeedsAccept5 to nViewerEncodingViewpoints;
+
     // ── New Needs (N-15, N-16) — the human's actual goal: AI-assisted critique of constrained systems.
     //    PENDING acceptance (third gate); no architecture until accepted. ──
     requirement nViewerIterativeCritique : Need {

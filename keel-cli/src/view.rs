@@ -1097,12 +1097,31 @@ pub(crate) fn review_queue_json(root: &Path) -> Result<String, ViewError> {
 
     let attr = |name: &str, key: &str| json_esc(model.items.get(name).and_then(|i| i.attrs.get(key)).map_or("", String::as_str));
     let file_of = |name: &str| json_esc(model.items.get(name).map_or("", |i| i.file.as_str()));
+    // Referenced items (both edge directions) — the linked context a reviewer wants one click away
+    // (e.g. the Need an acceptance gate gates, the items a Decision derives from / depends on).
+    let refs_of = |name: &str| -> String {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut out = Vec::new();
+        for e in &model.edges {
+            let (other, dir) = if e.from == name {
+                (&e.to, "out")
+            } else if e.to == name {
+                (&e.from, "in")
+            } else {
+                continue;
+            };
+            if other != name && seen.insert((e.kind.clone(), other.clone())) {
+                out.push(format!("{{\"kind\":\"{}\",\"dir\":\"{dir}\",\"name\":\"{}\"}}", json_esc(&e.kind), json_esc(other)));
+            }
+        }
+        format!("[{}]", out.join(","))
+    };
 
     let mut items: Vec<String> = Vec::with_capacity(decisions.len() + gates.len());
     for n in &decisions {
         items.push(format!(
-            "{{\"kind\":\"decision\",\"name\":\"{n}\",\"ceremony\":false,\"title\":\"{}\",\"context\":\"{}\",\"decision\":\"{}\",\"rationale\":\"{}\",\"consequences\":\"{}\",\"file\":\"{}\"}}",
-            attr(n, "title"), attr(n, "context"), attr(n, "decision"), attr(n, "rationale"), attr(n, "consequences"), file_of(n)
+            "{{\"kind\":\"decision\",\"name\":\"{n}\",\"ceremony\":false,\"title\":\"{}\",\"context\":\"{}\",\"decision\":\"{}\",\"rationale\":\"{}\",\"consequences\":\"{}\",\"file\":\"{}\",\"references\":{}}}",
+            attr(n, "title"), attr(n, "context"), attr(n, "decision"), attr(n, "rationale"), attr(n, "consequences"), file_of(n), refs_of(n)
         ));
     }
     let phases = declared_workflow_phases(root);
@@ -1113,8 +1132,8 @@ pub(crate) fn review_queue_json(root: &Path) -> Result<String, ViewError> {
             actionable_gates += 1;
         }
         items.push(format!(
-            "{{\"kind\":\"gate\",\"name\":\"{n}\",\"ceremony\":{ceremony},\"title\":\"{}\",\"procedureText\":\"{}\",\"file\":\"{}\"}}",
-            attr(n, "title"), attr(n, "procedureText"), file_of(n)
+            "{{\"kind\":\"gate\",\"name\":\"{n}\",\"ceremony\":{ceremony},\"title\":\"{}\",\"procedureText\":\"{}\",\"file\":\"{}\",\"references\":{}}}",
+            attr(n, "title"), attr(n, "procedureText"), file_of(n), refs_of(n)
         ));
     }
     let count = items.len();

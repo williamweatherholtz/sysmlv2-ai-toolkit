@@ -12,15 +12,18 @@ package DeliveryWorkflow {
         action implement { in s : Story; out tr : TestResult; }
         action review { in tr : TestResult; }
         action closeOut { in tr : TestResult; }
+        action retro { in tr : TestResult; }   // autonomous (D0049/D0123): generates items, each individually assessed; NO confirmation gate
 
         first refine then standup;
         first standup then implement;
         first implement then review;
         first review then closeOut;
+        first closeOut then retro;
 
         flow from refine.s to standup.s;
         flow from refine.s to implement.s;
         flow from implement.tr to review.tr;
         flow from implement.tr to closeOut.tr;
+        flow from implement.tr to retro.tr;
     }
 }
