@@ -139,6 +139,7 @@ pub struct Project {
 
 // ── the tracking model the view runs over ────────────────────────────────────
 
+#[derive(Clone)]
 struct ItemInfo {
     type_name: String,
     attrs: HashMap<String, String>,
@@ -155,6 +156,7 @@ struct Edge {
     to: String,
 }
 
+#[derive(Clone)]
 struct Model {
     items: HashMap<String, ItemInfo>,
     edges: Vec<Edge>,
@@ -193,8 +195,59 @@ fn edge_kind_from_marker(marker: &str) -> String {
     }
 }
 
+/// Process-global memo of the last-built model, keyed by a content fingerprint (perf: a serve
+/// page-load burst fires ~8 views that each call `Model::build`; without this they each re-parse all
+/// ~260 files — slow on I/O-heavy hosts, e.g. Windows Defender scanning each read). Regenerable cache,
+/// never truth (§2.1) — invalidated automatically when any file changes.
+static MODEL_CACHE: std::sync::Mutex<Option<(u64, Model)>> = std::sync::Mutex::new(None);
+/// Serializes BUILDS so a concurrent cold burst does ONE parse (others wait, then hit the cache).
+static MODEL_BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 impl Model {
+    /// The cached model if its fingerprint matches `fp`.
+    fn cached_model(fp: u64) -> Option<Self> {
+        MODEL_CACHE.lock().ok().and_then(|g| g.as_ref().filter(|(c, _)| *c == fp).map(|(_, m)| m.clone()))
+    }
+
+    /// Content fingerprint of the model files (stat-only: path + len + mtime). Same shape as serve's.
+    fn fingerprint(root: &Path) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for base in [".tracking", ".engine"] {
+            for f in crate::collect_sysml(&root.join(base)) {
+                if let Ok(m) = std::fs::metadata(&f) {
+                    f.to_string_lossy().hash(&mut h);
+                    m.len().hash(&mut h);
+                    if let Ok(t) = m.modified() {
+                        if let Ok(d) = t.duration_since(std::time::UNIX_EPOCH) {
+                            d.as_nanos().hash(&mut h);
+                        }
+                    }
+                }
+            }
+        }
+        h.finish()
+    }
+
+    /// Build the model, MEMOIZED by content fingerprint (see [`MODEL_CACHE`]). A burst of concurrent
+    /// callers on an unchanged model shares one parse; the cache invalidates on any file change.
     fn build(root: &Path) -> Result<Self, ViewError> {
+        let fp = Self::fingerprint(root);
+        if let Some(m) = Self::cached_model(fp) {
+            return Ok(m);
+        }
+        let _bl = MODEL_BUILD_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(m) = Self::cached_model(fp) {
+            return Ok(m); // another thread built it while we waited
+        }
+        let model = Self::build_uncached(root)?;
+        if let Ok(mut g) = MODEL_CACHE.lock() {
+            *g = Some((fp, model.clone()));
+        }
+        Ok(model)
+    }
+
+    fn build_uncached(root: &Path) -> Result<Self, ViewError> {
         // Authored instances live in .tracking AND in the .engine instance dirs (decisions,
         // processes, views, skills). Parsing is syntactic (no import resolution), so .engine
         // instance files parse standalone. The schema + workflow DEFS are not instances — skip.
