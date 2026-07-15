@@ -32,7 +32,7 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.4.0";
+pub const KEEL_API_VERSION: &str = "1.5.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
@@ -40,6 +40,15 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/critique-plan", "/api/boundary",
     "/api/boundary-sweep", "/api/events",
+];
+
+/// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
+/// guarded write API (N-16 `viewerInProgramEdit` / D0117 generative UI — the write half of the surface,
+/// advertised in `/api/version` so a viewer discovers actions rather than hardcoding them). Every write
+/// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
+/// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
+const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
+    "/api/decision", "/api/disposition", "/api/testresult", "/api/resolver",
 ];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
@@ -116,6 +125,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/testresult", post(api_testresult))
         // sr16 — on ACT, attach a tracked #Resolves resolver task to a finding
         .route("/api/resolver", post(api_resolver))
+        // viewerInProgramEdit (N-16/D0117) — scaffold a PROPOSED Decision via the keel record process
+        .route("/api/decision", post(api_decision))
         .layer(middleware::from_fn(log_request))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
@@ -199,6 +210,34 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct DecisionReq {
+    slug: String,
+    title: String,
+    context: String,
+    decision: String,
+    rationale: String,
+    consequences: String,
+    date: String,
+    author: Option<String>,
+}
+
+/// POST /api/decision (viewerInProgramEdit, N-16/D0117) — scaffold a PROPOSED Decision through the keel
+/// `record decision` process (D0105 RMWX axis). Reuses `write::record_decision`: auto NNNN + UUID,
+/// `status=proposed`. Acceptance is a SEPARATE explicit human gate (D0106) — this never fabricates the
+/// acceptance event, and never auto-commits (the human reviews + commits). The generated UI proposes
+/// changes THROUGH the process, not by editing facts directly ("not going rogue").
+async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionReq>) -> Response {
+    let author = b.author.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    if b.slug.is_empty() || b.title.is_empty() || b.decision.is_empty() {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"slug, title, and decision are required\"}".to_string()).into_response();
+    }
+    match crate::write::record_decision(&s.root, &b.slug, &b.title, &b.date, &author, &b.context, &b.decision, &b.rationale, &b.consequences) {
+        Ok((nnnn, path)) => ok_json(format!("{{\"ok\":true,\"decision\":\"D{nnnn}\",\"path\":\"{path}\",\"status\":\"proposed\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }
@@ -627,10 +666,12 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
 /// contract a viewer app pins to. Static (no model read); the one endpoint a client hits first.
 async fn api_version() -> Response {
     let eps = KEEL_API_READ_ENDPOINTS.iter().map(|e| Json::s((*e).to_string())).collect();
+    let weps = KEEL_API_WRITE_ENDPOINTS.iter().map(|e| Json::s((*e).to_string())).collect();
     ok_json(Json::Obj(vec![
         ("apiVersion".to_string(), Json::s(KEEL_API_VERSION.to_string())),
-        ("viewerKeelApi".to_string(), Json::s("committed read API for a viewpoint explorer (D0114 shape B); breaking read-contract changes bump the major version".to_string())),
+        ("viewerKeelApi".to_string(), Json::s("committed read+write API for a viewpoint explorer (D0114 shape B); breaking read-contract changes bump the major version".to_string())),
         ("readEndpoints".to_string(), Json::Arr(eps)),
+        ("writeEndpoints".to_string(), Json::Arr(weps)),
     ]).dump())
 }
 
@@ -1003,7 +1044,7 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-    use super::{build_launch_prompt, claude_in_dirs, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION};
+    use super::{build_launch_prompt, claude_in_dirs, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
     use std::ffi::OsString;
 
     #[test]
@@ -1016,6 +1057,10 @@ mod tests {
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/item/:name"), "contract must include item detail");
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/slice"), "contract must include the configurable slice");
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/critique-plan"), "contract must include the critique plan");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/schema"), "contract must include the declared-model schema");
+        // viewerInProgramEdit (N-16/D0117): the write half is advertised so a viewer discovers actions.
+        assert!(KEEL_API_WRITE_ENDPOINTS.contains(&"/api/decision"), "write contract must include record-Decision");
+        assert!(KEEL_API_WRITE_ENDPOINTS.contains(&"/api/disposition"), "write contract must include disposition");
     }
 
     #[test]
