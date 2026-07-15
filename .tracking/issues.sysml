@@ -782,4 +782,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from engineRefResolver to issue067;
+
+    part issue068 : Issue {
+        :>> id = "e0680068-0068-4e68-9068-516273840068";
+        :>> title = "Review queue (D0121) surfaced HISTORICAL ceremony confirmation gates as CURRENT human obligations — it ignored governing-version / creation-time process governance";
+        :>> createdAt = "2026-07-15";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Surfaced this session (dogfood, human-caught). The new review-queue view (D0121) scans ALL method=confirmation gates model-wide and treats each as a live human obligation. It surfaced the legacy pre-D0049 retro confirmation gates (rustS5/6/7 RetroGate) as items awaiting the human's sign-off — but retro is AUTONOMOUS (D0049), and those gates were chartered under the PRE-D0049 process where retro-confirmation was correct. ROOT CAUSE: a new computed obligation-view was built WITHOUT applying the engine's existing governing-version discipline (govern.rs governing-version + forward-only retroactivity markers, D0068/D0069/D0070/D0034) — so it re-introduced the grandfathering the engine was designed to prevent (items must be governed by the process in force at their creation, not retroactively judged against expanded/relaxed processes). COMPOUNDING (avoided): the initially-proposed fix was a guard that would FAIL any ceremony confirmation gate — which would have retroactively flagged historical items as deficient, the same anti-pattern. NON-FIX (reverted): reclassifying the 3 legacy gates confirmation->analyze was rejected — that rewrites their creation-time truth. FIX (reviewQueueGoverningVersion): obligation-views must reflect CURRENT-process obligations without resurrecting historical items — immediate: declare `retro` as a Delivery workflow phase so the EXISTING model-driven ceremony filter (is_ceremony_gate from declared phases) recognizes + excludes retro gates (ceremony = autonomous, no human confirmation); broader: obligation-views consult governing-version so historical items under superseded process versions are neither surfaced as live obligations nor flagged as deficient (exceptions — safety-related / high-level Needs — may be deliberately re-governed). Any NEW guard must be forward-only (honor retroactivity). Relates D0121, D0049, D0047, D0034, D0068/D0069/D0070.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "reviewQueueGoverningVersion";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from reviewQueueGoverningVersion to issue068;
 }
