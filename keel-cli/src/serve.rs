@@ -32,13 +32,13 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.0.0";
+pub const KEEL_API_VERSION: &str = "1.1.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
     "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
-    "/api/item/:name", "/api/section", "/api/boundary", "/api/boundary-sweep", "/api/events",
+    "/api/item/:name", "/api/section", "/api/slice", "/api/boundary", "/api/boundary-sweep", "/api/events",
 ];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
@@ -102,6 +102,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/item/:name", get(api_item))
         // sr18 — bounded section render (a declared view, or an element + its 1-hop neighbourhood)
         .route("/api/section", get(api_section))
+        // viewerConfigurableSlice (N-2/N-4/N-10) — seed + configurable depth/edges/direction
+        .route("/api/slice", get(api_slice))
         // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
         .route("/api/boundary", get(api_boundary))
         .route("/api/boundary-sweep", get(api_boundary_sweep))
@@ -688,6 +690,35 @@ struct SectionReq {
 /// (`{seed, kind, count, items[], edges[]}`) for local, section-scoped critique. A computed `#View`.
 async fn api_section(State(s): State<AppState>, Query(q): Query<SectionReq>) -> Response {
     match crate::view::section_json(&s.root, q.view.as_deref(), q.element.as_deref()) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// A configurable-slice request (viewerConfigurableSlice, N-2/N-4/N-10).
+#[derive(serde::Deserialize)]
+struct SliceReq {
+    seed: String,
+    depth: Option<usize>,
+    edges: Option<String>,
+    dir: Option<String>,
+}
+
+/// GET /api/slice?seed=NAME&depth=N&edges=a,b&dir=down|up|both (viewerConfigurableSlice, N-2/N-4/N-10) —
+/// a configurable-depth, edge-filtered slice from a seed as JSON (`{seed, kind, count, items[], edges[]}`).
+/// `depth` default 1; `edges` empty = all kinds; `dir` default `both` (`up` = change-impact/dependents).
+async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Response {
+    let depth = q.depth.unwrap_or(1);
+    let edges: std::collections::HashSet<String> = q
+        .edges
+        .as_deref()
+        .unwrap_or("")
+        .split(',')
+        .map(|e| e.trim().to_lowercase())
+        .filter(|e| !e.is_empty())
+        .collect();
+    let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
+    match crate::view::slice_json(&s.root, &q.seed, depth, &edges, dir) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

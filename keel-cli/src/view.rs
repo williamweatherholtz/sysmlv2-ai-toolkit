@@ -344,6 +344,88 @@ fn element_neighbourhood(model: &Model, element: &str) -> HashSet<String> {
     set
 }
 
+/// Traversal direction for a configurable slice (viewerConfigurableSlice, N-2/N-4/N-10).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SliceDir {
+    /// Follow edges FROM the node (`from == node` -> `to`); the "downstream" reach.
+    Down,
+    /// Follow edges INTO the node (`to == node` -> `from`); the "what depends on this" reach (change-impact).
+    Up,
+    /// Both directions (the neighbourhood reach).
+    Both,
+}
+
+impl SliceDir {
+    /// Parse `down` / `up` / `both` (default `both`).
+    pub(crate) fn parse(s: &str) -> Self {
+        match s {
+            "down" => Self::Down,
+            "up" => Self::Up,
+            _ => Self::Both,
+        }
+    }
+}
+
+/// A CONFIGURABLE slice from `seed` (viewerConfigurableSlice, N-2/N-4).
+///
+/// BFS to `depth` hops over the selected edge KINDS (`edges` empty = all) in `dir`; `depth=0` = seed
+/// only; unknown seed -> empty. Generalizes [`element_neighbourhood`] (depth-1, `Both`, all-edges).
+/// Powers seed-and-expand (N-2), cross-cutting slices (N-4), and change-impact (N-10, `dir=Up`).
+#[must_use]
+fn configurable_slice(model: &Model, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir) -> HashSet<String> {
+    let mut set = HashSet::new();
+    if !model.items.contains_key(seed) {
+        return set;
+    }
+    set.insert(seed.to_string());
+    let mut frontier = vec![seed.to_string()];
+    for _ in 0..depth {
+        let mut next = Vec::new();
+        for node in &frontier {
+            for e in &model.edges {
+                if !edges.is_empty() && !edges.contains(&e.kind) {
+                    continue;
+                }
+                let neighbour = match dir {
+                    SliceDir::Down => (e.from == *node).then_some(&e.to),
+                    SliceDir::Up => (e.to == *node).then_some(&e.from),
+                    SliceDir::Both => {
+                        if e.from == *node {
+                            Some(&e.to)
+                        } else if e.to == *node {
+                            Some(&e.from)
+                        } else {
+                            None
+                        }
+                    }
+                };
+                if let Some(n) = neighbour {
+                    if set.insert(n.clone()) {
+                        next.push(n.clone());
+                    }
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next;
+    }
+    set
+}
+
+/// Configurable-slice view (viewerConfigurableSlice / `/api/slice`): the induced subgraph of
+/// [`configurable_slice`], emitted like a section.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+#[allow(clippy::implicit_hasher)]
+pub(crate) fn slice_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let names = configurable_slice(&model, seed, depth, edges, dir);
+    Ok(section_subgraph_json(&model, &names, seed, "slice"))
+}
+
 /// A Need-SLICE boundary (sr19ServeWhiteboxBoundary).
 ///
 /// The Need + the `SystemRequirement`s that satisfy it + the Components those SRs are allocated to + the
@@ -4114,6 +4196,34 @@ mod tests {
         assert!(contains_token("n17ServeGranularWhitebox", "n17ServeGranularWhitebox"));
         assert!(!contains_token("sr15ServeIntrospect", "sr1"));
         assert!(!contains_token("sr150Foo", "sr15"));
+    }
+
+    #[test]
+    fn configurable_slice_respects_depth_dir_and_edges() {
+        // a -satisfy-> b -verify-> c ; a -dependency-> d
+        let mut items = HashMap::new();
+        for n in ["a", "b", "c", "d"] {
+            items.insert(n.to_string(), item("Need", None));
+        }
+        let edges = vec![
+            Edge { kind: "satisfy".to_string(), from: "a".to_string(), to: "b".to_string() },
+            Edge { kind: "verify".to_string(), from: "b".to_string(), to: "c".to_string() },
+            Edge { kind: "dependency".to_string(), from: "a".to_string(), to: "d".to_string() },
+        ];
+        let model = Model { items, edges };
+        let all: HashSet<String> = HashSet::new();
+        let names = |v: &[&str]| -> HashSet<String> { v.iter().map(|s| (*s).to_string()).collect() };
+        // depth 1 down from a: a,b,d
+        assert_eq!(configurable_slice(&model, "a", 1, &all, SliceDir::Down), names(&["a", "b", "d"]));
+        // depth 2 down from a: a,b,c,d
+        assert_eq!(configurable_slice(&model, "a", 2, &all, SliceDir::Down), names(&["a", "b", "c", "d"]));
+        // satisfy-only edge filter, depth 2 down: verify is not followed -> a,b
+        let sat: HashSet<String> = std::iter::once("satisfy".to_string()).collect();
+        assert_eq!(configurable_slice(&model, "a", 2, &sat, SliceDir::Down), names(&["a", "b"]));
+        // Up from c (change-impact / what reaches c): c,b,a
+        assert_eq!(configurable_slice(&model, "c", 9, &all, SliceDir::Up), names(&["a", "b", "c"]));
+        // unknown seed -> empty
+        assert!(configurable_slice(&model, "zzz", 5, &all, SliceDir::Both).is_empty());
     }
 
     #[test]
