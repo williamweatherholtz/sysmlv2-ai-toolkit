@@ -414,6 +414,76 @@ fn configurable_slice(model: &Model, seed: &str, depth: usize, edges: &HashSet<S
     set
 }
 
+/// Change-impact (srViewerChangeImpact / N-10): from `seed`, the elements reachable over `edges` in
+/// `dir`, GROUPED BY DISTANCE (BFS level; each node counted once at its shortest distance, so cycles
+/// terminate). Dependents are typically `dir=up` (edges pointing AT the seed). Empty `byDistance` means
+/// nothing is reachable — a leaf ("nothing depends on this").
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub(crate) fn change_impact_json(root: &Path, seed: &str, edges: &HashSet<String>, dir: SliceDir) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let dir_label = match dir { SliceDir::Down => "down", SliceDir::Up => "up", SliceDir::Both => "both" };
+    let mut dist: HashMap<String, usize> = HashMap::new();
+    if model.items.contains_key(seed) {
+        let mut frontier = vec![seed.to_string()];
+        let mut level = 0usize;
+        while !frontier.is_empty() {
+            level += 1;
+            let mut next = Vec::new();
+            for node in &frontier {
+                for e in &model.edges {
+                    if !edges.is_empty() && !edges.contains(&e.kind) {
+                        continue;
+                    }
+                    let neighbour = match dir {
+                        SliceDir::Down => (e.from == *node).then_some(&e.to),
+                        SliceDir::Up => (e.to == *node).then_some(&e.from),
+                        SliceDir::Both => {
+                            if e.from == *node { Some(&e.to) } else if e.to == *node { Some(&e.from) } else { None }
+                        }
+                    };
+                    if let Some(n) = neighbour {
+                        if n != seed && !dist.contains_key(n) {
+                            dist.insert(n.clone(), level);
+                            next.push(n.clone());
+                        }
+                    }
+                }
+            }
+            frontier = next;
+        }
+    }
+    let max_d = dist.values().copied().max().unwrap_or(0);
+    let mut groups: Vec<Json> = Vec::new();
+    for d in 1..=max_d {
+        let mut names: Vec<&String> = dist.iter().filter(|(_, &v)| v == d).map(|(n, _)| n).collect();
+        names.sort();
+        let items: Vec<Json> = names
+            .iter()
+            .filter_map(|n| model.items.get(*n).map(|info| Json::Obj(vec![
+                ("name".to_string(), Json::s((*n).clone())),
+                ("type".to_string(), Json::s(info.type_name.clone())),
+                ("title".to_string(), Json::s(info.attrs.get("title").cloned().unwrap_or_default())),
+            ])))
+            .collect();
+        groups.push(Json::Obj(vec![
+            ("distance".to_string(), Json::Int(i64::try_from(d).unwrap_or(0))),
+            ("count".to_string(), Json::Int(i64::try_from(items.len()).unwrap_or(0))),
+            ("items".to_string(), Json::Arr(items)),
+        ]));
+    }
+    Ok(Json::Obj(vec![
+        ("view".to_string(), Json::s("change-impact (srViewerChangeImpact/N-10): elements reachable from the focus, grouped by distance; cycles counted once".to_string())),
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("direction".to_string(), Json::s(dir_label.to_string())),
+        ("impacted".to_string(), Json::Int(i64::try_from(dist.len()).unwrap_or(0))),
+        ("note".to_string(), Json::s(if dist.is_empty() { "nothing depends on this (leaf) — or unknown focus".to_string() } else { String::new() })),
+        ("byDistance".to_string(), Json::Arr(groups)),
+    ])
+    .dump())
+}
+
 /// Parse a `… def <Name>` type-definition header line → `Name` (the declared item type). Recognises the
 /// `def` keywords used in `schema/core`; `None` for non-def lines. Powers the generative-UI schema
 /// exposure (`viewerSchemaApi`/N-17) — the parser skips type-def bodies, so this text-scans them.

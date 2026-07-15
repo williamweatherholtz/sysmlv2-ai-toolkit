@@ -32,13 +32,13 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.8.0";
+pub const KEEL_API_VERSION: &str = "1.9.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
-    "/api/item/:name", "/api/section", "/api/slice", "/api/critique-plan", "/api/boundary",
+    "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/critique-plan", "/api/boundary",
     "/api/boundary-sweep", "/api/events",
 ];
 
@@ -118,6 +118,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/section", get(api_section))
         // viewerConfigurableSlice (N-2/N-4/N-10) — seed + configurable depth/edges/direction
         .route("/api/slice", get(api_slice))
+        // viewerChangeImpact (N-10) — blast radius from a focus, grouped by distance
+        .route("/api/change-impact", get(api_change_impact))
         // viewerIterativeCritique (N-15) — deterministic iteration plan over a slice (axis + context + lens)
         .route("/api/critique-plan", get(api_critique_plan))
         // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
@@ -935,6 +937,25 @@ async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Resp
         until: q.until.as_deref().filter(|d| !d.is_empty()),
     };
     match crate::view::slice_json(&s.root, &q.seed, depth, &edges, dir, df) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ChangeImpactReq {
+    seed: String,
+    edges: Option<String>,
+    dir: Option<String>,
+}
+
+/// GET /api/change-impact?seed=NAME[&edges=a,b&dir=up|down|both] (viewerChangeImpact / N-10) — the
+/// elements reachable from the focus GROUPED BY DISTANCE (blast radius); cycles counted once. `dir=up`
+/// (default) = dependents (edges pointing at the focus); `edges` empty = all.
+async fn api_change_impact(State(s): State<AppState>, Query(q): Query<ChangeImpactReq>) -> Response {
+    let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
+    let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("up"));
+    match crate::view::change_impact_json(&s.root, &q.seed, &edges, dir) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
