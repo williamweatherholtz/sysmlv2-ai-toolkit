@@ -294,4 +294,8 @@ package ProjectBusinessKeelViewer {
         :>> mainSuccess = "On first open, a brief tour explains the viewpoint's purpose, the key elements, and how to expand/filter/drill; dismissible + re-openable.";
         :>> extensions = "ALT: returning user -> tour is skipped by default. EXCEPTION: an empty viewpoint -> the tour explains why it's empty + how to widen the scope.";
     }
+
+    // ── Business gate 2: human acceptance of the expansion Needs N-9..N-14 (needs-before-architecture). ──
+    verification keelViewerNeedsAccept2 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000001a"; :>> title = "keel-viewer expansion Needs N-9..N-14 accepted (Business gate 2)"; :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts the 6 expansion Needs (N-9 nViewerCoverageGap [must], N-10 nViewerChangeImpact / N-11 nViewerNotifications / N-12 nViewerExportShare / N-14 nViewerAuditProvenance [should], N-13 nViewerBaselineCompare [could]) AS-IS via the explicit 'Accept N-9..N-14 as-is' selection on 2026-07-14 — the second Business gate. Architecture (SystemRequirements) may now be derived from these accepted Needs, under the existing shape B (D0114)."; }
+    part keelViewerNeedsAccept2R1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000001b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4510d0e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
 }
