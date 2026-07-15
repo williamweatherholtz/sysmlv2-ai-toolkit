@@ -115,10 +115,10 @@ package ProjectRequirementsKeelViewer {
     }
     requirement srViewerInProgramEdit : SystemRequirement {
         :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ae02";
-        :>> title = "In-program modify + re-critique, write-back through keel";
+        :>> title = "In-program modify (via keel processes) + re-critique";
         :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall let a user edit an element's fields and (re)critique it on the same surface, writing every change back through keel's write API + guards (never a second store); a guard-rejected edit is refused inline with the guard message, and a concurrent change flags a conflict (D0108).";
-        :>> rationale = "N-16: keel's apply-review already writes critiques/dispositions back through the guarded write API; this extends it to element edits so critique->fix->re-critique iterates in one place.";
+        :>> statement = "The system shall let a user modify facts + (re)critique them on the same surface, where a modification is made THROUGH keel's disciplined write PROCESSES — record a Decision, supersede a Need (a change to a fact IS a superseding Decision, §2.4), apply-review, append-result, add-task — via the guarded write API, NEVER a raw field mutation or a second store. A guard-rejected write is refused inline with the guard message; a concurrent change flags a conflict (D0108). So critique -> disciplined-change -> re-critique iterates in one place without going rogue.";
+        :>> rationale = "N-16 (human clarification 2026-07-15): 'we modify facts through keel processes like decisions, not going rogue'. keel's apply-review/append-result/add-task/record-decision already write through the guarded API; this surfaces those PROCESS operations in-program — the change is itself tracked + guarded, never a freeform edit.";
         :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
     }
 
