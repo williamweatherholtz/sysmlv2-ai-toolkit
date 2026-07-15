@@ -310,6 +310,11 @@ package ProjectBusinessKeelViewer {
     #Supersede dependency from d0115 to nViewerNotifications;
     #Supersede dependency from d0115 to nViewerAuditProvenance;
     #Supersede dependency from d0115 to nViewerCoverageGap;
+    // The use cases of the superseded Needs go with them: UC-7 (coverage dashboard — obsolete, its
+    // intent now lives in UC-15), UC-9 (notifications — deferred with N-11), UC-12 (audit — deferred with N-14).
+    #Supersede dependency from d0115 to ucCoverageGapDashboard;
+    #Supersede dependency from d0115 to ucFreshnessNotifications;
+    #Supersede dependency from d0115 to ucAuditProvenance;
 
     // ── New Needs (N-15, N-16) — the human's actual goal: AI-assisted critique of constrained systems.
     //    PENDING acceptance (third gate); no architecture until accepted. ──

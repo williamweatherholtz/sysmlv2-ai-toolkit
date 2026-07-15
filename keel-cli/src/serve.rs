@@ -28,6 +28,19 @@ use crate::json::Json;
 /// The embedded single-page console frontend (self-contained, no CDN — the cytoscape precedent).
 const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 
+/// The committed keel read-API version (`viewerKeelApi`, D0114 shape B).
+///
+/// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
+/// app pins this; `GET /api/version` reports it.
+pub const KEEL_API_VERSION: &str = "1.0.0";
+
+/// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
+const KEEL_API_READ_ENDPOINTS: &[&str] = &[
+    "/api/version", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
+    "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
+    "/api/item/:name", "/api/section", "/api/boundary", "/api/boundary-sweep", "/api/events",
+];
+
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
 const AGENT_MAX_TURNS: &str = "30";
 const AGENT_MAX_CONCURRENT: usize = 2;
@@ -62,6 +75,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     let state = AppState { root: Arc::new(root), agents: Arc::new(AtomicUsize::new(0)), cache: Arc::new(Mutex::new(HashMap::new())) };
     let app = Router::new()
         .route("/", get(index))
+        // viewerKeelApi (D0114 shape B / N-6): the COMMITTED, VERSIONED read API contract. A separate
+        // viewer app consumes keel through it; breaking changes bump KEEL_API_VERSION.
+        .route("/api/version", get(api_version))
         .route("/api/orient", get(api_orient))
         .route("/api/recent", get(api_recent))
         .route("/api/decisions", get(api_decisions))
@@ -104,6 +120,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         }
     };
     println!("Keel console (D0094 m1+m2+m3) on http://{addr}  \u{2014} Ctrl-C to stop");
+    println!("  api:   /api/version (committed read API v{KEEL_API_VERSION}, viewerKeelApi/D0114 shape B)");
     println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
     println!("  act:   POST /api/disposition · /view/report/<name> · /view/diagram");
     println!("  agent: /api/agent/stream?action=critique&target=<x> (SSE; local `claude` CLI; directed-only — sr17)");
@@ -599,6 +616,17 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
     }
 }
 
+/// GET /api/version (viewerKeelApi / D0114 shape B) — the committed API version + the stable read-endpoint
+/// contract a viewer app pins to. Static (no model read); the one endpoint a client hits first.
+async fn api_version() -> Response {
+    let eps = KEEL_API_READ_ENDPOINTS.iter().map(|e| Json::s((*e).to_string())).collect();
+    ok_json(Json::Obj(vec![
+        ("apiVersion".to_string(), Json::s(KEEL_API_VERSION.to_string())),
+        ("viewerKeelApi".to_string(), Json::s("committed read API for a viewpoint explorer (D0114 shape B); breaking read-contract changes bump the major version".to_string())),
+        ("readEndpoints".to_string(), Json::Arr(eps)),
+    ]).dump())
+}
+
 async fn api_orient(State(s): State<AppState>) -> Response {
     cached(&s, "orient", |r| Ok(crate::orient::compute(r).to_json()))
 }
@@ -891,8 +919,18 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-    use super::{build_launch_prompt, claude_in_dirs};
+    use super::{build_launch_prompt, claude_in_dirs, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION};
     use std::ffi::OsString;
+
+    #[test]
+    fn api_version_contract_is_self_consistent() {
+        // viewerKeelApi (D0114): the version is SemVer-shaped, and the committed contract advertises
+        // itself + the core read endpoints a viewer depends on.
+        assert_eq!(KEEL_API_VERSION.split('.').count(), 3, "SemVer major.minor.patch: {KEEL_API_VERSION}");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/version"), "contract must advertise itself");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/orient"), "contract must include orient");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/item/:name"), "contract must include item detail");
+    }
 
     #[test]
     fn launch_prompt_directs_a_declared_target_no_commit() {
