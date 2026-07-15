@@ -1,0 +1,37 @@
+// ProjectDeliveryS224 — Sprint 224: sysmlv2NotationResearch — a RESEARCH SPIKE (D0111) into the standard
+// SysML v2 textual/graphical/API representations, to decide how the viewer leverages them. Findings +
+// leverage direction recorded as D0119 (PROPOSED). Charters to d0114 (the committed-API architecture).
+// EXECUTE (research). 2 pts.
+package ProjectDeliveryS224 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from sysmlv2ResearchStory to d0114;
+
+    part sysmlv2ResearchStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c224-51627384c001";
+        :>> title = "Sprint 224: sysmlv2NotationResearch (2 pts) - research SysML v2 standard representations; decide leverage (D0119)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::research; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS224 {
+        action storySysmlv2Research;
+        verification storySysmlv2ResearchDoD : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c002"; :>> method = VerificationMethod::analyze; :>> procedureText = "Research spike (D0111 chartered to d0114). QUESTION (user, 2026-07-15): what standard textual/graphical representations ship with SysML v2, and how do we leverage them (ideally wholesale)? METHOD: web research over authoritative sources (OMG, Systems-Modeling GitHub, SysON, DeciSym), cited. FINDINGS (recorded in D0119): OMG finalized SysML v2 + KerML 1.0 + Systems Modeling API & Services 1.0 on 2025-07-21 (formal/25-09-03); the .sysml TEXTUAL notation is normative (we already use it); a GRAPHICAL notation is standardized via GBNF but is a VIEW with NO reusable web/JS library; the standard interchange is JSON via the API (XMI dropped) with Project/Commit/Element/Relationship/Query resources + an @type/@id/ownedRelationship envelope; view kinds = General/Interconnection/Action/State/Sequence/Requirement/Tree/Table via View&Viewpoint. DIRECTION (D0119 PROPOSED): leverage the standard at the DATA/API + view-kind-vocabulary layer (adopt the standard JSON envelope + name presets after the standard view kinds); treat the graphical notation as an optional approximation target. VERIFY: D0119 authored with cited findings + a recommended direction; open verify-later flagged (graphical-notation normative status vs the spec PDF). keel validate + guard + check-engine green."; }
+        part storySysmlv2ResearchDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification svrRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c004"; :>> title = "Sprint 224 refine gate (DoR)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: user asked to research + leverage the SysML v2 standard notations. Scope: a cited research spike -> a leverage Decision. kind=research, #CharteredBy d0114 (D0111). estimatedPoints=2. DoR met."; }
+    part svrRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification svrStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c006"; :>> title = "Sprint 224 standup gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: dispatch a research subagent over primary sources (OMG spec pages, Systems-Modeling repos, SysON/DeciSym), require citations + version/date context, answer 5 framed questions, return a structured report. No blockers."; }
+    part svrStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification svrImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c008"; :>> title = "Sprint 224 implement gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Research completed + corroborated across authoritative sources; findings + leverage direction recorded as D0119 (PROPOSED) with citations. keel validate + guard + check-engine green."; }
+    part svrImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification svrReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c00a"; :>> title = "Sprint 224 review gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The research answers the user's question with a defensible, cited direction: we're already on the standard TEXTUAL surface; the biggest low-cost win is adopting the standard JSON API envelope + view-kind vocabulary; the graphical notation is standardized but has no reusable web lib, so full adoption is not available (approximate only if required). Honest uncertainty flagged (graphical-notation normative clause not extracted from the PDF). Clean."; }
+    part svrReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification svrCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c00c"; :>> title = "Sprint 224 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; leverage direction recorded (D0119 PROPOSED). Self-evidencing. NEXT: the encoding-viewpoints feature (N-18/D0120) composes on the standard view kinds; awaits N-18 human acceptance."; }
+    part svrCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification svrRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c224-51627384c00e"; :>> title = "Sprint 224 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: parallelised — ran the research spike as a background subagent while recording the viewer MVP (part 1), then recorded the finding as a PROPOSED Decision (not a silent adoption). AVOIDABLE-ISSUE SCAN: none. LESSON: a research spike's output IS a recorded Decision with citations (not just a chat answer); charter it (D0111) and record its direction as proposable governance. Estimate 2 pts. NEXT: N-18/D0120 encoding viewpoints (awaiting acceptance)."; }
+    part svrRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c224-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+}

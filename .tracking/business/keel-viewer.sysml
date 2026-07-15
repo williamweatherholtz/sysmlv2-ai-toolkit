@@ -378,4 +378,17 @@ package ProjectBusinessKeelViewer {
     // ── Business gate 4: human acceptance of N-17 (needs-before-architecture). ──
     verification keelViewerNeedsAccept4 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003a"; :>> title = "keel-viewer generative-UI Need N-17 accepted (Business gate 4)"; :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz directed N-17 (2026-07-15): 'it should dynamically integrate with keel data and processes and intelligently generate a UI... we're not hard coding actions, we're developing an engine. when a process is added, it should be manipulable in the UI. same for new attribute fields. evolution!' Accepting the model-driven generative-UI Need; architecture (D0117 + SRs) may derive."; }
     part keelViewerNeedsAccept4R1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "38a31a2"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "wweatherholtz"; }
+
+    // ── N-18: axis→visual-encoding viewpoints — map model attributes to graphical channels (human, 2026-07-15). ──
+    requirement nViewerEncodingViewpoints : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-000000000010";
+        :>> title = "N-18: map model axes/attributes to visual encodings (colour/position/swimlanes/nesting), auto-generated + overridable";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A viewpoint must let the user MAP model axes (attributes/edges) to VISUAL ENCODING CHANNELS: colour <- an attribute (continuous range OR enum); horizontal position <- a date/continuous attribute; horizontal swimlane bands <- binned continuous values OR enum members; a SUPERSEDING/NESTED swimlane layer <- a second attribute (bands within bands); and similar channel<-attribute bindings. The mapping must be defined SEMANTICALLY enough to AUTO-GENERATE from the schema + data (types, attribute kinds, enum members, value ranges), with a MANUAL override/edit layer (e.g. reorder an enum, define the colour mapping for specific enum values, set colour ranges/bins for continuous values). This turns a viewpoint into a strong, reusable, declarable analytical view (realises N-1 'viewpoint = query + form' concretely) and is the durable expressive power of the explorer.";
+        :>> priority = Priority::must;
+    }
+
+    // ── Business gate 5: PENDING human acceptance of N-18 (needs-before-architecture — NOT yet accepted). ──
+    verification keelViewerNeedsAccept5 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003c"; :>> title = "keel-viewer encoding-viewpoints Need N-18 accepted (Business gate 5)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AWAITING wweatherholtz's explicit acceptance of N-18 (axis->visual-encoding viewpoints: colour/position/swimlanes/nesting, auto-generated + overridable). Directed 2026-07-15 as a 'HUGE feature'; captured as a Need before architecture. Design direction is D0120 (PROPOSED). No downstream build until this gate passes."; }
+    // (no TestResult yet — N-18 is proposed/unaccepted; the human signs off at the sitting review.)
 }

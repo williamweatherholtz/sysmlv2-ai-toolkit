@@ -1,0 +1,38 @@
+// ProjectDeliveryS225 — Sprint 225: encodingViewpointsCapture — capture the user's axis->visual-encoding
+// viewpoint feature (2026-07-15, a 'HUGE feature') as governance BEFORE building: Need N-18
+// (nViewerEncodingViewpoints) + design Decision D0120 (PROPOSED). Needs-before-architecture: N-18's
+// acceptance (Business gate 5) is PENDING the human; no downstream build until it passes. EXECUTE
+// (business+architecture capture). 1 pt.
+package ProjectDeliveryS225 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from encodingCaptureStory to d0117;
+
+    part encodingCaptureStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c225-51627384c001";
+        :>> title = "Sprint 225: encodingViewpointsCapture (1 pt) - capture N-18 + D0120 (axis->visual-encoding viewpoints)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS225 {
+        action storyEncodingCapture;
+        verification storyEncodingCaptureDoD : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c002"; :>> method = VerificationMethod::inspect; :>> procedureText = "Capture the user's axis->visual-encoding viewpoint feature (2026-07-15: map colour to an attribute [continuous/enum], place items left-to-right by date, place items in horizontal swimlane bars by continuous bins or enum values, add a SUPERSEDING nested swimlane layer by another attribute, defined semantically enough to AUTO-generate, with manual override — sort the enum, define colour mappings for enum values, colour ranges for items). AUTHORED: Need N-18 (nViewerEncodingViewpoints, priority=must) in .tracking/business/keel-viewer.sysml; a PENDING Business gate 5 (keelViewerNeedsAccept5, method=confirmation, NO TestResult — awaiting the human, needs-before-architecture); design Decision D0120 (PROPOSED — a declarative channel<-attribute encoding spec auto-generated from schema/data semantics + an override layer), #DerivedFrom N-18, #DependsOn D0119. VERIFY (inspect): N-18 + gate 5 present (gate UNPASSED); D0120 authored PROPOSED with substantive context+rationale; no downstream SR/build authored yet (blocked on acceptance). keel validate + guard + check-engine green."; }
+        part storyEncodingCaptureDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification ecRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c004"; :>> title = "Sprint 225 refine gate (DoR)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: user directed a 'HUGE feature' (axis->visual-encoding viewpoints). Needs-before-architecture: capture as a Need + a proposed design Decision, hold acceptance for the human. Scope: N-18 + D0120, no build. estimatedPoints=1. DoR met."; }
+    part ecRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification ecStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c006"; :>> title = "Sprint 225 standup gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: author N-18 in the viewer business file with a PENDING acceptance gate (no result); author D0120 as a declarative channel<-attribute encoding spec (grammar-of-graphics shape) auto-derived from declared semantics + override, composing on D0119's standard view kinds and D0117's generative principle. No blockers."; }
+    part ecStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification ecImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c008"; :>> title = "Sprint 225 implement gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "N-18 + pending Business gate 5 + D0120 (PROPOSED, #DerivedFrom N-18, #DependsOn D0119) authored. No downstream SR/backlog yet (blocked on acceptance). keel validate + guard + check-engine green."; }
+    part ecImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification ecReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c00a"; :>> title = "Sprint 225 review gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The feature is captured faithfully (all the user's examples — colour<-attr, date position, swimlane bins/enum, nested swimlanes, auto-generate + override) as an irreducible Need, and the design direction (declarative channel<-attribute spec from semantics) is recorded WITHOUT jumping to build — acceptance is correctly held for the human (Business gate 5 pending). It composes cleanly with the generative principle (D0117) and the standard view kinds (D0119). Honest: proposed + blocked, not started. Clean."; }
+    part ecReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification ecCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c00c"; :>> title = "Sprint 225 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; N-18 + D0120 captured as governance. Self-evidencing. AWAITING: human acceptance of N-18 (Business gate 5) before decomposing into SRs + build sprints."; }
+    part ecCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification ecRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c225-51627384c00e"; :>> title = "Sprint 225 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: captured a big feature as governance FIRST (Need + proposed design Decision) and correctly HELD acceptance for the human rather than sliding into build — respecting needs-before-architecture and the confirmation gate. Recording happened in the same effort as understanding the ask (the lesson from part 1). AVOIDABLE-ISSUE SCAN: none. LESSON: for a large new capability, the deliverable of the FIRST turn is captured, well-formed, unaccepted governance — not code. Estimate 1 pt. NEXT (post-acceptance): decompose N-18 into SRs (keel: expose enum members + value ranges; viewer: encoding engine + override editor)."; }
+    part ecRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c225-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "67f3e8a"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+}
