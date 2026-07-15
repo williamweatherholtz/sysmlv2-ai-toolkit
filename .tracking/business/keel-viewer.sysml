@@ -315,6 +315,9 @@ package ProjectBusinessKeelViewer {
     #Supersede dependency from d0115 to ucCoverageGapDashboard;
     #Supersede dependency from d0115 to ucFreshnessNotifications;
     #Supersede dependency from d0115 to ucAuditProvenance;
+    // D0116 (Q2 answer): no due-date/overdue state — temporal is time-as-query-filter (N-5). N-3 out;
+    // UC-4 (business-process state) is re-served by querying (e.g. 'not reviewed since <date>'), so it stays.
+    #Supersede dependency from d0116 to nViewerTemporalState;
 
     // ── New Needs (N-15, N-16) — the human's actual goal: AI-assisted critique of constrained systems.
     //    PENDING acceptance (third gate); no architecture until accepted. ──

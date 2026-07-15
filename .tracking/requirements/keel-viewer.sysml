@@ -20,16 +20,7 @@ package ProjectRequirementsKeelViewer {
         :>> priority = Priority::must;
         :>> verificationMethod = VerificationMethod::test;
     }
-    requirement srViewerTemporalState : SystemRequirement {
-        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ac02";
-        :>> title = "Calendar-based temporal state computed from authored date facts";
-        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
-        :>> statement = "keel shall compute, from authored date facts (e.g. judgedAt + a review-cadence), a calendar-based state per element classified as current / due-soon / overdue (thresholds configurable per viewpoint), and expose last-reviewer + last-review-date, filterable by state. This is the primary gap (nothing computes calendar aging today; freshness is git-content-drift only).";
-        :>> rationale = "Blocks UC-4 (business-process compliance). The exact date-fact model (cadence attribute vs authored next-due) is open question Q2 — resolved by a follow-on Decision.";
-        :>> kind = RequirementKind::functional;
-        :>> priority = Priority::must;
-        :>> verificationMethod = VerificationMethod::test;
-    }
+    // (srViewerTemporalState removed — D0116: no due-date/overdue state; temporal = time-as-query-filter, served by N-5 srViewerDatePredicates.)
     requirement srViewerGraphExpand : SystemRequirement {
         :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ac03";
         :>> title = "Seed-and-expand, incrementally-loaded, stable-layout graph";
@@ -73,7 +64,6 @@ package ProjectRequirementsKeelViewer {
 
     // ── satisfy edges: SR satisfies the upstream accepted Need (needs-before-architecture). ──
     satisfy nViewerSeparation by srViewerKeelApi;
-    satisfy nViewerTemporalState by srViewerTemporalState;
     satisfy nViewerExplorableGraph by srViewerGraphExpand;
     satisfy nViewerViewpointForm by srViewerVisualViewpoint;
     satisfy nViewerCrossCuttingSlices by srViewerConfigurableSlice;
