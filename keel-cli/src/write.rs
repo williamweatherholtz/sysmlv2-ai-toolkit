@@ -625,6 +625,7 @@ pub fn append_gate_result(
     verdict: &str,
     judged_at: &str,
     judged_by: &str,
+    notes: Option<&str>,
 ) -> Result<String, WriteError> {
     if verdict != "pass" && verdict != "fail" {
         return Err(WriteError::InvalidVerdict(verdict.to_owned()));
@@ -648,8 +649,11 @@ pub fn append_gate_result(
         " ".repeat(line.len() - line.trim_start().len())
     });
 
+    let notes_attr = notes
+        .map(|t| format!(" :>> notes = \"{}\";", sanitize_field(t)))
+        .unwrap_or_default();
     let new_line = format!(
-        "{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
+        "{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\";{notes_attr} }}"
     );
 
     let mut new_content = String::with_capacity(content.len() + new_line.len() + 1);
@@ -829,6 +833,87 @@ pub fn record_decision(
     let filename = format!("{nnnn}-{slug}.sysml");
     std::fs::write(dir.join(&filename), file_text)?;
     Ok((nnnn, format!(".engine/decisions/{filename}")))
+}
+
+/// Accept a PROPOSED Decision (D0121 human review loop).
+///
+/// Flips `status = DecisionStatus::proposed` to `accepted` and appends the required acceptance event — a
+/// `{decision}Accept : Test` (`method=confirmation`, `procedureText` = the human's note) + a passing
+/// `{decision}AcceptR1 : TestResult` (`judgedBy` = the human `Person`). The note + the human's explicit
+/// action ARE the attestation (D0106 — never fabricated); naming matches the attestation guard
+/// (D0066 `{decision}AcceptR1`). Does NOT auto-commit.
+///
+/// # Errors
+/// `WriteError::TaskNotFound` if the decision part or a `proposed` status is not present (already
+/// accepted, or wrong file); `WriteError::Io` on filesystem errors.
+pub fn accept_decision(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    note: &str,
+) -> Result<String, WriteError> {
+    let content = std::fs::read_to_string(path)?;
+    if !content.contains(&format!("part {decision} : Decision")) {
+        return Err(WriteError::TaskNotFound(decision.to_owned()));
+    }
+    if !content.contains("DecisionStatus::proposed") {
+        return Err(WriteError::TaskNotFound(format!("{decision} (no proposed status to accept)")));
+    }
+    let flipped = content.replacen("DecisionStatus::proposed", "DecisionStatus::accepted", 1);
+    let close = flipped.rfind('}').ok_or_else(|| WriteError::TaskNotFound(format!("{decision} (no package close)")))?;
+    let u1 = gen_uuid();
+    let u2 = gen_uuid();
+    let note_c = sanitize_field(note);
+    let block = format!(
+        "\n    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)\n\
+         \x20   verification {decision}Accept : Test {{ :>> id = \"{u1}\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"{note_c}\"; }}\n\
+         \x20   part {decision}AcceptR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
+    );
+    let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
+    std::fs::write(path, new_content)?;
+    Ok(u1)
+}
+
+/// Reject a PROPOSED Decision (D0121/D0122 human review loop).
+///
+/// Flips `status = DecisionStatus::proposed` to `rejected` and appends the rejection judgment — a
+/// `{decision}Reject : Test` (`method=confirmation`, `procedureText` = the human's rationale) + a
+/// `{decision}RejectR1 : TestResult` (`outcome=fail`, `judgedBy` = the human `Person`). The rationale +
+/// the human's explicit action ARE the attestation (D0106 — never fabricated). Does NOT auto-commit.
+///
+/// # Errors
+/// `WriteError::TaskNotFound` if the decision part or a `proposed` status is not present; `WriteError::Io`
+/// on filesystem errors.
+pub fn reject_decision(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    rationale: &str,
+) -> Result<String, WriteError> {
+    let content = std::fs::read_to_string(path)?;
+    if !content.contains(&format!("part {decision} : Decision")) {
+        return Err(WriteError::TaskNotFound(decision.to_owned()));
+    }
+    if !content.contains("DecisionStatus::proposed") {
+        return Err(WriteError::TaskNotFound(format!("{decision} (no proposed status to reject)")));
+    }
+    let flipped = content.replacen("DecisionStatus::proposed", "DecisionStatus::rejected", 1);
+    let close = flipped.rfind('}').ok_or_else(|| WriteError::TaskNotFound(format!("{decision} (no package close)")))?;
+    let u1 = gen_uuid();
+    let u2 = gen_uuid();
+    let why = sanitize_field(rationale);
+    let block = format!(
+        "\n    // rejection judgment (D0121 review-queue; D0106 — human-judged, not fabricated)\n\
+         \x20   verification {decision}Reject : Test {{ :>> id = \"{u1}\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"REJECTED: {why}\"; }}\n\
+         \x20   part {decision}RejectR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
+    );
+    let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
+    std::fs::write(path, new_content)?;
+    Ok(u1)
 }
 
 #[cfg(test)]

@@ -186,7 +186,7 @@ fn when_add_task(world: &mut WriteWorld, task: String, dod: String, method: Stri
 #[when(regex = r#"^I append a passing gate result for "([^"]+)" at SHA "([^"]+)"$"#)]
 fn when_append_gate_pass(world: &mut WriteWorld, gate: String, sha: String) {
     let path = world.file.clone().unwrap();
-    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz");
+    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz", None);
     world.last_content = std::fs::read_to_string(&path).ok();
     world.result = Some(res.map_err(|e| e.to_string()));
 }
@@ -194,7 +194,7 @@ fn when_append_gate_pass(world: &mut WriteWorld, gate: String, sha: String) {
 #[when(regex = r#"^I append a gate result for unknown gate "([^"]+)" at SHA "([^"]+)"$"#)]
 fn when_append_gate_unknown(world: &mut WriteWorld, gate: String, sha: String) {
     let path = world.file.clone().unwrap();
-    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz");
+    let res = append_gate_result(&path, &gate, &sha, "pass", "2026-06-15", "wweatherholtz", None);
     world.result = Some(res.map_err(|e| e.to_string()));
 }
 

@@ -38,7 +38,7 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["recent","Recent"],["business","Business"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+const TABS=[["orient","Orient"],["review","Review"],["recent","Recent"],["business","Business"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
 let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
@@ -48,7 +48,7 @@ function renderAgentEvent(data){
   return '';
  }catch(_){return ''}
 }
-let active="orient", reportName="assurance";
+let active="orient", reportName="assurance", showAllReview=false;
 const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
 TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;draw();render()};nav.appendChild(b)});
 function draw(){[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===active))}
@@ -167,6 +167,48 @@ async function disposition(finding,verdict){
  }catch(e){status.textContent='disposition error: '+e.message}
 }
 
+// D0121 review queue — the human accepts a user-gated item; the click + note IS the recorded sign-off
+// (write API; D0106 — never AI-fabricated; not committed).
+async function acceptDecision(name,file){
+ const note=prompt('Acceptance note for '+name+' — your rationale. This IS your recorded sign-off:','');
+ if(note===null)return;
+ const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ status.textContent='recording acceptance…';
+ try{const r=await fetch('/api/decision/accept',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent='accepted '+name+' ✓ (recorded)';render();
+ }catch(e){status.textContent='accept error: '+e.message}
+}
+async function acceptGate(name,file){
+ const note=prompt('Acceptance note for '+name+' (optional) — this IS your recorded sign-off:','');
+ if(note===null)return;
+ const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ status.textContent='recording acceptance…';
+ try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'pass',note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent='accepted gate '+name+' ✓ (recorded)';render();
+ }catch(e){status.textContent='accept error: '+e.message}
+}
+async function rejectDecision(name,file){
+ const rationale=prompt('REJECT '+name+' — rationale (required). This IS your recorded judgment:','');
+ if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
+ const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ status.textContent='recording rejection…';
+ try{const r=await fetch('/api/decision/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent='rejected '+name+' ✓ (recorded)';render();
+ }catch(e){status.textContent='reject error: '+e.message}
+}
+async function rejectGate(name,file){
+ const rationale=prompt('REJECT '+name+' — rationale (required). This IS your recorded judgment:','');
+ if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
+ const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ status.textContent='recording rejection…';
+ try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'fail',note:rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent='rejected gate '+name+' ✓ (recorded)';render();
+ }catch(e){status.textContent='reject error: '+e.message}
+}
 async function render(){
  status.textContent='refreshing…';
  try{
@@ -178,6 +220,23 @@ async function render(){
     card('Open issues',(o.open_issues||[]).length,linkList(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
     card('Suspect / stale',(o.suspect||[]).length,linkList(o.suspect,10),(o.suspect||[]).length?'warn':'good')+
    '</div>';
+  } else if(active==='review'){const q=await get('/api/review-queue');
+   const items=(q.items||[]).filter(x=>showAllReview||!x.ceremony);
+   main.innerHTML='<div class=cards>'+
+    card('Awaiting you',q.actionable,'user-gated items needing your judgment',q.actionable?'warn':'good')+
+    card('Proposed decisions',q.proposedDecisions,'awaiting acceptance','')+
+    card('Pending gates',q.pendingGates,'confirmation gates','')+
+   '</div>'+
+   '<p class=muted><label><input type=checkbox id=revall '+(showAllReview?'checked':'')+'> show ceremony / all ('+q.count+' total, incl. legacy autonomous gates)</label> &nbsp;·&nbsp; your <b>Accept</b> + note IS your recorded sign-off (write API; D0106; not committed)</p>'+
+   (items.length?items.map(x=>{
+    const body=x.kind==='decision'
+     ?('<b>Context:</b> '+esc(x.context)+'<br><b>Decision:</b> '+esc(x.decision)+'<br><b>Rationale:</b> '+esc(x.rationale)+(x.consequences?'<br><b>Consequences:</b> '+esc(x.consequences):''))
+     :esc(x.procedureText);
+    return '<div class=row><div class=t>'+itemLink(x.name)+' '+esc(x.title||'')+' <span class=pill>'+(x.kind==='decision'?'Decision · proposed':'confirmation gate')+'</span>'+(x.ceremony?' <span class=pill>ceremony</span>':'')+'</div><div class=m>'+body+'</div><div style="margin-top:6px"><button class=rb data-acc="'+esc(x.name)+'" data-file="'+esc(x.file)+'" data-kind="'+esc(x.kind)+'">Accept ▶</button><button class=rb data-rej="'+esc(x.name)+'" data-file="'+esc(x.file)+'" data-kind="'+esc(x.kind)+'" style="border-color:var(--bad);color:var(--bad)">Reject ✕</button></div></div>';
+   }).join(''):'<p class=muted>nothing awaiting your review 🎉</p>');
+   const ra=document.getElementById('revall');if(ra)ra.onchange=e=>{showAllReview=e.target.checked;render()};
+   [...main.querySelectorAll('.rb[data-acc]')].forEach(b=>b.onclick=()=>{b.dataset.kind==='decision'?acceptDecision(b.dataset.acc,b.dataset.file):acceptGate(b.dataset.acc,b.dataset.file)});
+   [...main.querySelectorAll('.rb[data-rej]')].forEach(b=>b.onclick=()=>{b.dataset.kind==='decision'?rejectDecision(b.dataset.rej,b.dataset.file):rejectGate(b.dataset.rej,b.dataset.file)});
   } else if(active==='recent'){const r=await get('/api/recent');
    main.innerHTML='<p class=muted>'+esc(r.recent||'')+'</p>'+(r.commits||[]).map(c=>`<div class=row><div class=t><span class=pill>${esc(c.date)}</span> ${esc(c.subject)} <span class=muted>${esc(c.sha)}</span></div><div class=m>${linkList((c.files||[]).map(f=>f.split('/').pop().replace(/\.sysml$/,'')),8)}</div></div>`).join('')||'<span class=muted>no recent activity</span>';
   } else if(active==='business'){const b=await get('/api/business');

@@ -10,7 +10,7 @@ package EngineWork {
 
     enum def WorkKind { code; research; documentation; refactor; decision; modeling; }
     enum def WorkPriority { p0; p1; p2; p3; }
-    enum def DecisionStatus { proposed; accepted; superseded; }
+    enum def DecisionStatus { proposed; accepted; rejected; superseded; }
 
     part def WorkItem :> Element {
         attribute kind : WorkKind;

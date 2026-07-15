@@ -936,7 +936,8 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     // Callers should pass --judged-at for determinism; this is a safe fallback.
     let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
 
-    match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by) {
+    let notes = flag(args, "notes");
+    match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref()) {
         Ok(uuid) => { println!("{uuid}"); 0 }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }

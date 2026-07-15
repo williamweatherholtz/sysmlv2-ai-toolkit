@@ -1063,6 +1063,119 @@ pub fn attestation_coverage(root: &Path) -> Result<String, ViewError> {
     ))
 }
 
+/// The human REVIEW QUEUE (D0121) — user-gated items that need an explicit HUMAN judgment and don't
+/// have one yet: (a) proposed Decisions (`status=proposed`), and (b) pending confirmation gates
+/// (`method=confirmation` Tests with no PASSING result). Everything else is machine-verifiable or
+/// already judged, so it is out of scope. A pure computed view — nothing stored; the `keel serve`
+/// "Review" surface renders this and records the human's acceptance back via the write API (D0106:
+/// the human's action + note IS the attestation, never AI-fabricated).
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub(crate) fn review_queue_json(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+
+    let mut decisions: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("proposed"))
+        .map(|(n, _)| n)
+        .collect();
+    decisions.sort();
+
+    let mut gates: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(n, i)| {
+            // truly UNJUDGED confirmation gate: no result yet (a pass=accepted or fail=rejected both
+            // count as judged and drop out of the queue).
+            i.attrs.get("method").map(String::as_str) == Some("confirmation") && latest_result(&model, n).is_none()
+        })
+        .map(|(n, _)| n)
+        .collect();
+    gates.sort();
+
+    let attr = |name: &str, key: &str| json_esc(model.items.get(name).and_then(|i| i.attrs.get(key)).map_or("", String::as_str));
+    let file_of = |name: &str| json_esc(model.items.get(name).map_or("", |i| i.file.as_str()));
+
+    let mut items: Vec<String> = Vec::with_capacity(decisions.len() + gates.len());
+    for n in &decisions {
+        items.push(format!(
+            "{{\"kind\":\"decision\",\"name\":\"{n}\",\"ceremony\":false,\"title\":\"{}\",\"context\":\"{}\",\"decision\":\"{}\",\"rationale\":\"{}\",\"consequences\":\"{}\",\"file\":\"{}\"}}",
+            attr(n, "title"), attr(n, "context"), attr(n, "decision"), attr(n, "rationale"), attr(n, "consequences"), file_of(n)
+        ));
+    }
+    let phases = declared_workflow_phases(root);
+    let mut actionable_gates = 0usize;
+    for n in &gates {
+        let ceremony = is_ceremony_gate(n, &phases);
+        if !ceremony {
+            actionable_gates += 1;
+        }
+        items.push(format!(
+            "{{\"kind\":\"gate\",\"name\":\"{n}\",\"ceremony\":{ceremony},\"title\":\"{}\",\"procedureText\":\"{}\",\"file\":\"{}\"}}",
+            attr(n, "title"), attr(n, "procedureText"), file_of(n)
+        ));
+    }
+    let count = items.len();
+    let actionable = decisions.len() + actionable_gates;
+    Ok(format!(
+        "{{\n  \"queue\": \"user-gated items awaiting human judgment (D0121): proposed Decisions + pending confirmation gates. 'ceremony' gates are legacy pre-D0049/D0051 sprint DoD/retro confirmations (autonomous now) — filtered from the actionable default.\",\n  \"count\": {count},\n  \"actionable\": {actionable},\n  \"proposedDecisions\": {},\n  \"pendingGates\": {},\n  \"items\": [\n    {}\n  ]\n}}",
+        decisions.len(),
+        gates.len(),
+        items.join(",\n    ")
+    ))
+}
+
+/// The phase-name vocabulary DECLARED by the project's own workflows — the sub-`action`s of each
+/// `action def` in `.engine/workflows/*.sysml` (e.g. refine/standup/implement/review/closeOut/retro
+/// for Delivery). Read from the declared model so ceremony detection ADAPTS to the project's processes
+/// rather than assuming keel's names. Empty if no workflows are declared (then nothing is ceremony).
+fn declared_workflow_phases(root: &Path) -> Vec<String> {
+    let dir = root.join(".engine").join("workflows");
+    let Ok(entries) = std::fs::read_dir(&dir) else { return Vec::new() };
+    let mut phases = Vec::new();
+    let mut in_def = 0i32; // brace depth inside an `action def`
+    for entry in entries.flatten() {
+        if entry.path().extension().is_none_or(|e| e != "sysml") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(entry.path()) else { continue };
+        for raw in text.lines() {
+            let line = raw.trim();
+            if line.starts_with("action def ") {
+                in_def = 1;
+                continue;
+            }
+            if in_def > 0 {
+                in_def += i32::try_from(line.matches('{').count()).unwrap_or(0);
+                in_def -= i32::try_from(line.matches('}').count()).unwrap_or(0);
+                // a phase is a sub-action: `action <name> { ... }` (not `action def`, not a flow/first)
+                if let Some(rest) = line.strip_prefix("action ") {
+                    if let Some(name) = rest.split([' ', '{', ';']).next() {
+                        if !name.is_empty() && name != "def" && !phases.iter().any(|p| p == name) {
+                            phases.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    phases
+}
+
+/// True for a sprint-internal ceremony / definition-of-done confirmation gate — legacy pre-D0049/D0051
+/// `method=confirmation` gates that are autonomous now (inspect/analyze) and are NOT things a human
+/// signs off. Derived from the project's DECLARED workflow `phases` (a gate named `<x><Phase>Gate` for
+/// a declared phase), plus the `DoD` definition-of-done convention. No hardcoded keel phase list.
+fn is_ceremony_gate(name: &str, phases: &[String]) -> bool {
+    if name.ends_with("DoD") {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    phases.iter().any(|p| lower.ends_with(&format!("{}gate", p.to_ascii_lowercase())))
+}
+
 // ── open-issues (D0077 Issue Resolution Loop) ─────────────────────────────────────────────────
 // An Issue is RESOLVED (computed, never stored) iff a #Resolves resolver is COMPLETE — an action
 // in `done` OR a Decision with status=accepted; else OPEN. An issue with no #Resolves edge is OPEN
@@ -4369,6 +4482,19 @@ mod tests {
         assert_eq!(attr_field("        attribute source : NeedSource;"), Some(("source".to_string(), "NeedSource".to_string())));
         assert_eq!(attr_field("        attribute goals : String[*];"), Some(("goals".to_string(), "String".to_string())));
         assert_eq!(attr_field("        part def X {"), None);
+    }
+
+    #[test]
+    fn ceremony_gate_derives_from_declared_phases() {
+        // D0121 review queue — ceremony detection ADAPTS to the project's declared workflow phases;
+        // it does NOT hardcode keel's phase names (the fix for "dynamically adjust to existing processes").
+        let phases: Vec<String> = ["refine", "review", "closeOut"].iter().map(|s| (*s).to_string()).collect();
+        assert!(is_ceremony_gate("vamReviewGate", &phases)); // declared phase -> ceremony
+        assert!(is_ceremony_gate("vamCloseOutGate", &phases));
+        assert!(is_ceremony_gate("storyFooDoD", &phases)); // DoD convention
+        assert!(!is_ceremony_gate("keelViewerNeedsAccept5", &phases)); // genuine acceptance gate
+        assert!(!is_ceremony_gate("someUndeclaredGate", &phases)); // 'undeclared' isn't a phase -> NOT hidden
+        assert!(!is_ceremony_gate("vamReviewGate", &[])); // no declared workflow -> only DoD is ceremony
     }
 
     #[test]

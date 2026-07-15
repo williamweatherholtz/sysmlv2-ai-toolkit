@@ -32,12 +32,12 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.5.0";
+pub const KEEL_API_VERSION: &str = "1.8.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
-    "/api/version", "/api/schema", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
-    "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
+    "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
+    "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/critique-plan", "/api/boundary",
     "/api/boundary-sweep", "/api/events",
 ];
@@ -48,7 +48,7 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
-    "/api/decision", "/api/disposition", "/api/testresult", "/api/resolver",
+    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver",
 ];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
@@ -90,6 +90,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/version", get(api_version))
         // viewerSchemaApi (N-17/D0117) — declared types + attributes, the generative-UI substrate
         .route("/api/schema", get(api_schema))
+        // review queue (D0121) — user-gated items awaiting human judgment (read side of the loop)
+        .route("/api/review-queue", get(api_review_queue))
         .route("/api/orient", get(api_orient))
         .route("/api/recent", get(api_recent))
         .route("/api/decisions", get(api_decisions))
@@ -127,6 +129,10 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/resolver", post(api_resolver))
         // viewerInProgramEdit (N-16/D0117) — scaffold a PROPOSED Decision via the keel record process
         .route("/api/decision", post(api_decision))
+        // review queue (D0121) — record human acceptance/rejection as fact: accept/reject a Decision, accept/reject a gate
+        .route("/api/decision/accept", post(api_decision_accept))
+        .route("/api/decision/reject", post(api_decision_reject))
+        .route("/api/gate-result", post(api_gate_result))
         .layer(middleware::from_fn(log_request))
         // viewerKeelApi (D0114 shape B): let a separate local viewer app consume /api/* cross-port
         .layer(middleware::from_fn(cors_localhost))
@@ -287,6 +293,99 @@ async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<Decis
         Ok((nnnn, path)) => ok_json(format!("{{\"ok\":true,\"decision\":\"D{nnnn}\",\"path\":\"{path}\",\"status\":\"proposed\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct DecisionAcceptReq {
+    decision: String,
+    file: String,
+    note: String,
+    judged_at: String,
+    judged_by: Option<String>,
+}
+
+/// POST /api/decision/accept (D0121 review queue) — ACCEPT a proposed Decision: flip status + append
+/// the `{decision}Accept` event via `write::accept_decision`. The human's note IS the attestation
+/// (D0106 — `judged_by` is a Person, never AI-fabricated); never auto-commits.
+async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionAcceptReq>) -> Response {
+    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    };
+    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let sha = git_head(&s.root);
+    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.note) {
+        Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct DecisionRejectReq {
+    decision: String,
+    file: String,
+    rationale: String,
+    judged_at: String,
+    judged_by: Option<String>,
+}
+
+/// POST /api/decision/reject (D0121/D0122 review queue) — REJECT a proposed Decision: flip status to
+/// `rejected` + append the `{decision}Reject` judgment (rationale) via `write::reject_decision`. The
+/// human's rationale IS the attestation (D0106); never auto-commits.
+async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionRejectReq>) -> Response {
+    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    };
+    if b.rationale.trim().is_empty() {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"a rejection rationale is required\"}".to_string()).into_response();
+    }
+    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let sha = git_head(&s.root);
+    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.rationale) {
+        Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct GateResultReq {
+    gate: String,
+    file: String,
+    judged_at: String,
+    verdict: Option<String>,
+    note: Option<String>,
+    judged_by: Option<String>,
+}
+
+/// POST /api/gate-result (D0121 review queue) — ACCEPT a pending confirmation gate: append a passing
+/// `{gate}R{n}` `TestResult` via `write::append_gate_result` (the human's action = the sign-off, D0106;
+/// optional note recorded as `notes`). Never auto-commits.
+async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<GateResultReq>) -> Response {
+    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    };
+    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let sha = git_head(&s.root);
+    let note = b.note.as_deref().filter(|t| !t.is_empty());
+    let verdict = match b.verdict.as_deref() {
+        Some("fail") => "fail",
+        _ => "pass",
+    };
+    match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note) {
+        Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// Resolve a repo-relative `.sysml` path safely (no absolute paths, no `..` traversal, stays under root).
+fn safe_repo_path(root: &Path, rel: &str) -> Option<PathBuf> {
+    if rel.is_empty() || rel.contains("..") {
+        return None;
+    }
+    let p = std::path::Path::new(rel);
+    if p.is_absolute() || p.extension().is_none_or(|e| !e.eq_ignore_ascii_case("sysml")) {
+        return None;
+    }
+    Some(root.join(p))
 }
 
 /// Wrap a `ViewError`-fallible HTML computation into a response (500 + message on error).
@@ -727,6 +826,13 @@ async fn api_version() -> Response {
 /// content fingerprint. New types/attributes appear automatically — nothing hardcoded.
 async fn api_schema(State(s): State<AppState>) -> Response {
     cached(&s, "schema", crate::view::schema_json)
+}
+
+/// GET /api/review-queue (D0121) — the human review queue: user-gated items awaiting judgment
+/// (proposed Decisions + pending confirmation gates). The read side of the human-oversight loop;
+/// the "Review" console tab renders it and records acceptance via the write endpoints.
+async fn api_review_queue(State(s): State<AppState>) -> Response {
+    cached(&s, "review-queue", crate::view::review_queue_json)
 }
 
 async fn api_orient(State(s): State<AppState>) -> Response {
