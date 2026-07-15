@@ -32,11 +32,11 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.3.0";
+pub const KEEL_API_VERSION: &str = "1.4.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
-    "/api/version", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
+    "/api/version", "/api/schema", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
     "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/critique-plan", "/api/boundary",
     "/api/boundary-sweep", "/api/events",
@@ -79,6 +79,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // viewerKeelApi (D0114 shape B / N-6): the COMMITTED, VERSIONED read API contract. A separate
         // viewer app consumes keel through it; breaking changes bump KEEL_API_VERSION.
         .route("/api/version", get(api_version))
+        // viewerSchemaApi (N-17/D0117) — declared types + attributes, the generative-UI substrate
+        .route("/api/schema", get(api_schema))
         .route("/api/orient", get(api_orient))
         .route("/api/recent", get(api_recent))
         .route("/api/decisions", get(api_decisions))
@@ -630,6 +632,13 @@ async fn api_version() -> Response {
         ("viewerKeelApi".to_string(), Json::s("committed read API for a viewpoint explorer (D0114 shape B); breaking read-contract changes bump the major version".to_string())),
         ("readEndpoints".to_string(), Json::Arr(eps)),
     ]).dump())
+}
+
+/// GET /api/schema (viewerSchemaApi, N-17/D0117) — the declared item types + attribute fields, so a
+/// generative UI builds forms from the model (paired with /api/launchables for actions). Cached per
+/// content fingerprint. New types/attributes appear automatically — nothing hardcoded.
+async fn api_schema(State(s): State<AppState>) -> Response {
+    cached(&s, "schema", crate::view::schema_json)
 }
 
 async fn api_orient(State(s): State<AppState>) -> Response {

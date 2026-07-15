@@ -414,6 +414,79 @@ fn configurable_slice(model: &Model, seed: &str, depth: usize, edges: &HashSet<S
     set
 }
 
+/// Parse a `… def <Name>` type-definition header line → `Name` (the declared item type). Recognises the
+/// `def` keywords used in `schema/core`; `None` for non-def lines. Powers the generative-UI schema
+/// exposure (`viewerSchemaApi`/N-17) — the parser skips type-def bodies, so this text-scans them.
+fn def_name(line: &str) -> Option<String> {
+    let idx = line.find(" def ")?;
+    let first = line[..idx].split_whitespace().next()?;
+    if !matches!(
+        first,
+        "part" | "requirement" | "attribute" | "occurrence" | "item" | "enum" | "abstract" | "use" | "action" | "connection" | "port" | "interface" | "metadata"
+    ) {
+        return None;
+    }
+    let name = line.get(idx + 5..)?.split(|c: char| c.is_whitespace() || c == '{' || c == ':' || c == ';').find(|s| !s.is_empty())?;
+    name.chars().next().filter(char::is_ascii_alphabetic).map(|_| name.to_string())
+}
+
+/// Parse an `attribute <name> : <Type>…` member line → `(name, type)` (type stripped of `[..]`/default/
+/// `;`). `None` for non-attribute lines.
+fn attr_field(line: &str) -> Option<(String, String)> {
+    let rest = line.trim().strip_prefix("attribute ")?;
+    let (name, ty) = rest.split_once(':')?;
+    let name = name.trim();
+    let ty = ty.trim().split(|c: char| c.is_whitespace() || c == ';' || c == '[' || c == '{').find(|s| !s.is_empty()).unwrap_or("");
+    (!name.is_empty() && !ty.is_empty()).then(|| (name.to_string(), ty.to_string()))
+}
+
+/// The declared item types + their attribute fields (viewerSchemaApi / N-17 / D0117): the machine-readable
+/// declared-model substrate a generative UI reads to build display + edit forms. Text-scans `schema/`
+/// (the parser skips type-def bodies); brace-depth tracks each def's body. New types/attributes appear
+/// automatically — nothing hardcoded.
+///
+/// # Errors
+/// Returns [`ViewError`] never in practice (best-effort text scan); the `Result` signature is required
+/// by the `cached` compute contract in serve.
+#[allow(clippy::unnecessary_wraps)]
+pub(crate) fn schema_json(root: &Path) -> Result<String, ViewError> {
+    let mut types: Vec<(String, Vec<Json>)> = Vec::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("schema")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let mut depth: i32 = 0;
+        let mut cur: Option<(String, i32, Vec<Json>)> = None;
+        for line in text.lines() {
+            if cur.is_none() {
+                if let Some(name) = def_name(line) {
+                    cur = Some((name, depth, Vec::new()));
+                }
+            } else if let (Some((name, ty)), Some((_, _, attrs))) = (attr_field(line), cur.as_mut()) {
+                attrs.push(Json::Obj(vec![("name".to_string(), Json::s(name)), ("type".to_string(), Json::s(ty))]));
+            }
+            let opens = i32::try_from(line.matches('{').count()).unwrap_or(0);
+            let closes = i32::try_from(line.matches('}').count()).unwrap_or(0);
+            depth += opens - closes;
+            if let Some((_, body_depth, _)) = &cur {
+                if depth <= *body_depth {
+                    if let Some((name, _, attrs)) = cur.take() {
+                        types.push((name, attrs));
+                    }
+                }
+            }
+        }
+    }
+    types.sort_by(|a, b| a.0.cmp(&b.0));
+    let type_json: Vec<Json> = types
+        .into_iter()
+        .map(|(name, attrs)| Json::Obj(vec![("name".to_string(), Json::s(name)), ("attributes".to_string(), Json::Arr(attrs))]))
+        .collect();
+    Ok(Json::Obj(vec![
+        ("schema".to_string(), Json::s("declared item types + attribute fields (viewerSchemaApi/N-17) — the generative-UI substrate; pair with /api/launchables for actions".to_string())),
+        ("types".to_string(), Json::Arr(type_json)),
+    ])
+    .dump())
+}
+
 /// ISO-8601 (`YYYY-MM-DD…`) lexicographic date-range test: `val` in `[since, until]` (either bound
 /// optional). ISO-8601 sorts chronologically as strings, so no date parsing is needed (N-5).
 fn date_in_range(val: &str, since: Option<&str>, until: Option<&str>) -> bool {
@@ -4283,6 +4356,19 @@ mod tests {
         assert_eq!(configurable_slice(&model, "c", 9, &all, SliceDir::Up), names(&["a", "b", "c"]));
         // unknown seed -> empty
         assert!(configurable_slice(&model, "zzz", 5, &all, SliceDir::Both).is_empty());
+    }
+
+    #[test]
+    fn schema_scan_parses_defs_and_attributes() {
+        // viewerSchemaApi (N-17): the text-scan recognizes type-def headers + attribute fields.
+        assert_eq!(def_name("    part def Need :> TrackedRequirement {"), Some("Need".to_string()));
+        assert_eq!(def_name("requirement def SystemRequirement {"), Some("SystemRequirement".to_string()));
+        assert_eq!(def_name("    enum def NeedSource { customer; operator; }"), Some("NeedSource".to_string()));
+        assert_eq!(def_name("    part someInstance : Need {"), None); // an instance, not a def
+        assert_eq!(def_name("    // a comment mentioning def in prose"), None);
+        assert_eq!(attr_field("        attribute source : NeedSource;"), Some(("source".to_string(), "NeedSource".to_string())));
+        assert_eq!(attr_field("        attribute goals : String[*];"), Some(("goals".to_string(), "String".to_string())));
+        assert_eq!(attr_field("        part def X {"), None);
     }
 
     #[test]
