@@ -128,6 +128,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // viewerInProgramEdit (N-16/D0117) — scaffold a PROPOSED Decision via the keel record process
         .route("/api/decision", post(api_decision))
         .layer(middleware::from_fn(log_request))
+        // viewerKeelApi (D0114 shape B): let a separate local viewer app consume /api/* cross-port
+        .layer(middleware::from_fn(cors_localhost))
         .with_state(state);
     let addr = format!("127.0.0.1:{port}");
     let listener = match tokio::net::TcpListener::bind(&addr).await {
@@ -168,6 +170,51 @@ async fn log_request(req: Request, next: Next) -> Response {
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("keel-serve.log") {
         use std::io::Write as _;
         let _ = writeln!(f, "{line}");
+    }
+    resp
+}
+
+/// True for a browser `Origin` that is localhost/127.0.0.1 on any port (or none).
+fn is_localhost_origin(o: &str) -> bool {
+    matches!(o, "http://localhost" | "http://127.0.0.1")
+        || o.starts_with("http://localhost:")
+        || o.starts_with("http://127.0.0.1:")
+}
+
+/// Set the localhost-CORS response headers (reflect the caller's origin; allow the API's verbs + JSON).
+fn add_cors_headers(h: &mut axum::http::HeaderMap, origin: &str) {
+    use axum::http::header::{ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, VARY};
+    use axum::http::HeaderValue;
+    if let Ok(v) = HeaderValue::from_str(origin) {
+        h.insert(ACCESS_CONTROL_ALLOW_ORIGIN, v);
+    }
+    h.insert(ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST, OPTIONS"));
+    h.insert(ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("content-type"));
+    h.insert(VARY, HeaderValue::from_static("Origin"));
+}
+
+/// Localhost-only CORS middleware (`viewerKeelApi` / D0114 shape B): a SEPARATE viewer app served from
+/// another local port must be able to `fetch` `/api/*`. Reflects a localhost/127.0.0.1 `Origin` (any
+/// port), advertises the API's verbs, and short-circuits the `OPTIONS` preflight with 204. Non-local
+/// origins get no CORS headers — and the server is already `127.0.0.1`-bound, so this only enables the
+/// intended local-cross-port case (shape B), not remote access.
+async fn cors_localhost(req: Request, next: Next) -> Response {
+    let local_origin = req
+        .headers()
+        .get(axum::http::header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
+        .filter(|o| is_localhost_origin(o));
+    if req.method() == axum::http::Method::OPTIONS {
+        let mut resp = StatusCode::NO_CONTENT.into_response();
+        if let Some(o) = &local_origin {
+            add_cors_headers(resp.headers_mut(), o);
+        }
+        return resp;
+    }
+    let mut resp = next.run(req).await;
+    if let Some(o) = &local_origin {
+        add_cors_headers(resp.headers_mut(), o);
     }
     resp
 }
@@ -1044,7 +1091,18 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-    use super::{build_launch_prompt, claude_in_dirs, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
+    use super::{build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
+
+    #[test]
+    fn cors_reflects_localhost_origins_only() {
+        // viewerKeelApi (D0114 shape B): a separate local viewer (any port) is allowed; remote is not.
+        assert!(is_localhost_origin("http://localhost:5173"));
+        assert!(is_localhost_origin("http://127.0.0.1:8080"));
+        assert!(is_localhost_origin("http://localhost"));
+        assert!(!is_localhost_origin("http://evil.example.com"));
+        assert!(!is_localhost_origin("https://localhost.evil.com"));
+        assert!(!is_localhost_origin("http://10.0.0.5:8080"));
+    }
     use std::ffi::OsString;
 
     #[test]
