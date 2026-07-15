@@ -32,14 +32,14 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.9.0";
+pub const KEEL_API_VERSION: &str = "1.10.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
-    "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/critique-plan", "/api/boundary",
-    "/api/boundary-sweep", "/api/events",
+    "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/critique-plan",
+    "/api/boundary", "/api/boundary-sweep", "/api/events",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -120,6 +120,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/slice", get(api_slice))
         // viewerChangeImpact (N-10) — blast radius from a focus, grouped by distance
         .route("/api/change-impact", get(api_change_impact))
+        // viewerExportShare (N-12) — a viewpoint snapshot stamped with commit + as-of + scope
+        .route("/api/snapshot", get(api_snapshot))
         // viewerIterativeCritique (N-15) — deterministic iteration plan over a slice (axis + context + lens)
         .route("/api/critique-plan", get(api_critique_plan))
         // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
@@ -237,6 +239,18 @@ fn git_head(root: &Path) -> String {
         .ok()
         .filter(|o| o.status.success())
         .map_or_else(|| "uncommitted".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+}
+
+/// ISO-8601 commit date of HEAD (the snapshot's `as-of`); `"unknown"` if git fails.
+fn git_head_date(root: &Path) -> String {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["log", "-1", "--format=%cs", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map_or_else(|| "unknown".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string())
 }
 
 /// A disposition request from the console (the human's explicit verdict on a >= Medium finding).
@@ -956,6 +970,20 @@ async fn api_change_impact(State(s): State<AppState>, Query(q): Query<ChangeImpa
     let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("up"));
     match crate::view::change_impact_json(&s.root, &q.seed, &edges, dir) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// GET /api/snapshot?seed=NAME&depth=N&edges=a,b&dir=... (viewerExportShare / N-12) — the slice STAMPED
+/// with provenance (source commit + as-of date + scope) so it round-trips; oversized → capped subset + note.
+async fn api_snapshot(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Response {
+    let depth = q.depth.unwrap_or(2);
+    let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
+    let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
+    let commit = git_head(&s.root);
+    let as_of = git_head_date(&s.root);
+    match crate::view::snapshot_json(&s.root, &q.seed, depth, &edges, dir, &commit, &as_of) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

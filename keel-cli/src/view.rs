@@ -484,6 +484,62 @@ pub(crate) fn change_impact_json(root: &Path, seed: &str, edges: &HashSet<String
     .dump())
 }
 
+/// Viewpoint SNAPSHOT (viewerExportShare / N-12): the slice for `(seed, depth, edges, dir)` STAMPED with
+/// provenance — the source `commit`, its `as_of` date, and the scope — so it round-trips (re-running the
+/// scope at that commit reproduces the view). Oversized slices are capped to a scoped subset with a note.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub(crate) fn snapshot_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir, commit: &str, as_of: &str) -> Result<String, ViewError> {
+    const CAP: usize = 500;
+    let model = Model::build(root)?;
+    let mut names: Vec<String> = configurable_slice(&model, seed, depth, edges, dir).into_iter().collect();
+    names.sort();
+    let total = names.len();
+    let truncated = total > CAP;
+    names.truncate(CAP);
+    let nameset: HashSet<&String> = names.iter().collect();
+    let items: Vec<Json> = names
+        .iter()
+        .filter_map(|n| model.items.get(n).map(|info| Json::Obj(vec![
+            ("name".to_string(), Json::s(n.clone())),
+            ("type".to_string(), Json::s(info.type_name.clone())),
+            ("title".to_string(), Json::s(info.attrs.get("title").cloned().unwrap_or_default())),
+        ])))
+        .collect();
+    let edges_json: Vec<Json> = model
+        .edges
+        .iter()
+        .filter(|e| nameset.contains(&e.from) && nameset.contains(&e.to))
+        .map(|e| Json::Obj(vec![("kind".to_string(), Json::s(e.kind.clone())), ("from".to_string(), Json::s(e.from.clone())), ("to".to_string(), Json::s(e.to.clone()))]))
+        .collect();
+    let dir_label = match dir { SliceDir::Down => "down", SliceDir::Up => "up", SliceDir::Both => "both" };
+    let mut edge_list: Vec<&String> = edges.iter().collect();
+    edge_list.sort();
+    let scope = Json::Obj(vec![
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("depth".to_string(), Json::Int(i64::try_from(depth).unwrap_or(0))),
+        ("dir".to_string(), Json::s(dir_label.to_string())),
+        ("edges".to_string(), Json::Arr(edge_list.into_iter().map(|e| Json::s(e.clone())).collect())),
+    ]);
+    let snapshot = Json::Obj(vec![
+        ("commit".to_string(), Json::s(commit.to_string())),
+        ("asOf".to_string(), Json::s(as_of.to_string())),
+        ("scope".to_string(), scope),
+        ("itemCount".to_string(), Json::Int(i64::try_from(total).unwrap_or(0))),
+        ("truncated".to_string(), Json::Bool(truncated)),
+        ("note".to_string(), Json::s(if truncated { format!("scoped subset: {total} elements exceeded the {CAP} cap — re-run the scope at commit {commit} for the full view") } else { String::new() })),
+    ]);
+    Ok(Json::Obj(vec![
+        ("snapshot".to_string(), snapshot),
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("count".to_string(), Json::Int(i64::try_from(names.len()).unwrap_or(0))),
+        ("items".to_string(), Json::Arr(items)),
+        ("edges".to_string(), Json::Arr(edges_json)),
+    ])
+    .dump())
+}
+
 /// Parse a `… def <Name>` type-definition header line → `Name` (the declared item type). Recognises the
 /// `def` keywords used in `schema/core`; `None` for non-def lines. Powers the generative-UI schema
 /// exposure (`viewerSchemaApi`/N-17) — the parser skips type-def bodies, so this text-scans them.
