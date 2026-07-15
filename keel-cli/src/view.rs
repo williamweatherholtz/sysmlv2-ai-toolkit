@@ -426,6 +426,44 @@ pub(crate) fn slice_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<
     Ok(section_subgraph_json(&model, &names, seed, "slice"))
 }
 
+/// A deterministic ITERATION PLAN for iterative AI critique (viewerIterativeCritique, N-15): the ordered
+/// AXIS (the slice from `seed`) and, per element, its type + local context (neighbour names) + the lens.
+///
+/// keel supplies the plan (deterministic, testable, shape B); the viewer app drives the existing agent
+/// bridge (`/api/agent/stream?action=critique&target=<element>`) once per axis item. Powers UC-14 (a
+/// process + its downstream, best-practice lens) and UC-15 (a requirement + its downstream, sufficiency).
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+#[allow(clippy::implicit_hasher)]
+pub(crate) fn critique_plan_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir, lens: &str) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut axis: Vec<String> = configurable_slice(&model, seed, depth, edges, dir).into_iter().collect();
+    axis.sort();
+    let items: Vec<Json> = axis
+        .iter()
+        .map(|el| {
+            let mut ctx: Vec<String> = element_neighbourhood(&model, el).into_iter().collect();
+            ctx.sort();
+            let ty = model.items.get(el).map_or_else(String::new, |i| i.type_name.clone());
+            Json::Obj(vec![
+                ("element".to_string(), Json::s(el.clone())),
+                ("type".to_string(), Json::s(ty)),
+                ("target".to_string(), Json::s(format!("/api/agent/stream?action=critique&target={el}"))),
+                ("context".to_string(), Json::Arr(ctx.into_iter().map(Json::s).collect())),
+            ])
+        })
+        .collect();
+    Ok(Json::Obj(vec![
+        ("critiquePlan".to_string(), Json::s("deterministic iteration plan (viewerIterativeCritique/N-15); the viewer drives the agent bridge per axis item".to_string())),
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("lens".to_string(), Json::s(lens.to_string())),
+        ("count".to_string(), Json::Int(i64::try_from(items.len()).unwrap_or(i64::MAX))),
+        ("axis".to_string(), Json::Arr(items)),
+    ])
+    .dump())
+}
+
 /// A Need-SLICE boundary (sr19ServeWhiteboxBoundary).
 ///
 /// The Need + the `SystemRequirement`s that satisfy it + the Components those SRs are allocated to + the

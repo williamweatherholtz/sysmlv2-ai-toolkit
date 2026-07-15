@@ -32,13 +32,14 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.1.0";
+pub const KEEL_API_VERSION: &str = "1.2.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/orient", "/api/business", "/api/decisions", "/api/dispositions",
     "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
-    "/api/item/:name", "/api/section", "/api/slice", "/api/boundary", "/api/boundary-sweep", "/api/events",
+    "/api/item/:name", "/api/section", "/api/slice", "/api/critique-plan", "/api/boundary",
+    "/api/boundary-sweep", "/api/events",
 ];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
@@ -104,6 +105,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/section", get(api_section))
         // viewerConfigurableSlice (N-2/N-4/N-10) — seed + configurable depth/edges/direction
         .route("/api/slice", get(api_slice))
+        // viewerIterativeCritique (N-15) — deterministic iteration plan over a slice (axis + context + lens)
+        .route("/api/critique-plan", get(api_critique_plan))
         // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
         .route("/api/boundary", get(api_boundary))
         .route("/api/boundary-sweep", get(api_boundary_sweep))
@@ -724,6 +727,37 @@ async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Resp
     }
 }
 
+/// A critique-plan request (viewerIterativeCritique, N-15): the slice to iterate + the lens.
+#[derive(serde::Deserialize)]
+struct CritiquePlanReq {
+    seed: String,
+    depth: Option<usize>,
+    edges: Option<String>,
+    dir: Option<String>,
+    lens: Option<String>,
+}
+
+/// GET /api/critique-plan?seed=NAME&depth=N&edges=a,b&dir=&lens=L (viewerIterativeCritique, N-15) — the
+/// deterministic iteration plan (axis + per-element context + lens) the viewer drives the agent bridge
+/// over. Same seed semantics as /api/slice; `lens` default `best-practice`.
+async fn api_critique_plan(State(s): State<AppState>, Query(q): Query<CritiquePlanReq>) -> Response {
+    let depth = q.depth.unwrap_or(1);
+    let edges: std::collections::HashSet<String> = q
+        .edges
+        .as_deref()
+        .unwrap_or("")
+        .split(',')
+        .map(|e| e.trim().to_lowercase())
+        .filter(|e| !e.is_empty())
+        .collect();
+    let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
+    let lens = q.lens.as_deref().unwrap_or("best-practice");
+    match crate::view::critique_plan_json(&s.root, &q.seed, depth, &edges, dir, lens) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
 /// A Need-slice boundary request (sr19): the Need whose slice (internals + interfaces) to compute.
 #[derive(serde::Deserialize)]
 struct BoundaryReq {
@@ -961,6 +995,8 @@ mod tests {
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/version"), "contract must advertise itself");
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/orient"), "contract must include orient");
         assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/item/:name"), "contract must include item detail");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/slice"), "contract must include the configurable slice");
+        assert!(KEEL_API_READ_ENDPOINTS.contains(&"/api/critique-plan"), "contract must include the critique plan");
     }
 
     #[test]
