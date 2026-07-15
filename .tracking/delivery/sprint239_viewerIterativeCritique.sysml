@@ -1,0 +1,36 @@
+// ProjectDeliveryS239 — Sprint 239: viewerIterativeCritique — a viewer surface for iterative AI critique
+// (N-15). Renders keel's /api/critique-plan (the deterministic axis iteration) + drives the agent bridge
+// per element. Satisfies srViewerIterativeCritique. EXECUTE. 2 pts.
+package ProjectDeliveryS239 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from viewerIterativeCritiqueStory to srViewerIterativeCritique;
+
+    part viewerIterativeCritiqueStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c239-51627384c001";
+        :>> title = "Sprint 239: viewerIterativeCritique (2 pts) - iterative AI critique panel over a constrained query (one axis)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS239 {
+        action storyViewerIterativeCritique;
+        verification storyViewerIterativeCritiqueDoD : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c002"; :>> method = VerificationMethod::demo; :>> procedureText = "Satisfies srViewerIterativeCritique (N-15). keel already computes the deterministic iteration (view::critique_plan_json / GET /api/critique-plan: for a focus + axis + lens, the ordered elements to critique, each with its agent-bridge target + context). VIEWER (sysmlv2-viewer@d1d6caf): a Critique panel takes the focus + axis (down/up/both) + lens, fetches the plan, and renders each element with a 'Critique ▶' that opens keel's agent bridge (/api/agent/stream?action=critique&target=X) per element — streaming the AI critique into a log; findings land as tracked critiques (the bridge's apply-review behaviour). One finding per element along ONE chosen axis (e.g. 'critique each downstream item of a Need for completeness'). VERIFY (demo, live): Plan critique for nViewerEncodingViewpoints (down/completeness) rendered a 9-element iteration (d0120, d0124, keelViewerNeedsAccept5, …) each with a Critique ▶. AI EXECUTION reuses keel's agent bridge (needs `claude` on PATH + bridge enabled in Settings — off by default per the D0094 billing caveat; degrades gracefully with an 'agent bridge off' note). keel validate + guard + check-engine green. HONEST: the deterministic plan + per-element drive are delivered + verified; the LLM critique run depends on the (optional) agent bridge."; }
+        part storyViewerIterativeCritiqueDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification icRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c004"; :>> title = "Sprint 239 refine gate (DoR)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: keel's critique-plan + agent bridge exist; build the viewer surface to iterate + drive per element. #CharteredBy srViewerIterativeCritique. estimatedPoints=2. DoR met."; }
+    part icRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification icStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c006"; :>> title = "Sprint 239 standup gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: a Critique panel (focus+axis+lens) -> fetch /api/critique-plan -> render the ordered iteration -> per element an SSE to /api/agent/stream. Reuse the console's agent-event parsing. No blockers."; }
+    part icStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification icImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c008"; :>> title = "Sprint 239 implement gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::demo; :>> procedureText = "Critique panel + planCritique + runCritique (SSE) implemented. Live-verified: 9-element plan rendered with per-element Critique buttons. validate/guard/check-engine green."; }
+    part icImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification icReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c00a"; :>> title = "Sprint 239 review gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The deterministic iteration (keel's plan) + per-element drive (agent bridge) cleanly realise 'iterative critique over one axis'. Honest about the LLM-execution dependency (agent bridge, off by default) — the plan + wiring are delivered + verified, the run reuses the existing, approval-gated bridge. Findings record as tracked critiques (no second store). Clean."; }
+    part icReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification icCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c00c"; :>> title = "Sprint 239 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; iterative-critique surface delivered (srViewerIterativeCritique). Self-evidencing. NEXT (last item): viewerInProgramEdit (N-16) — complete the in-program write ops."; }
+    part icCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification icRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c239-51627384c00e"; :>> title = "Sprint 239 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: reused keel's existing critique-plan + agent bridge — the viewer just iterates + drives, no new AI plumbing. Verified the deterministic plan (the part that doesn't need an LLM) and was honest that the run depends on the optional bridge. AVOIDABLE-ISSUE (banked): the static server has no cache-busting, so a browser can serve a stale index.html — used a ?cb= param to force the new page during verification. LESSON: for an AI-driven feature, verify the deterministic scaffold live; the LLM step reuses the existing gated bridge. Estimate 2 pts. NEXT: viewerInProgramEdit."; }
+    part icRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c239-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bb92640"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+}
