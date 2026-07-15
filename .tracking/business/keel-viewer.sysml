@@ -163,4 +163,135 @@ package ProjectBusinessKeelViewer {
     // ── Business gate: human acceptance of the Needs (needs-before-architecture). ──
     verification keelViewerNeedsAccept : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000a"; :>> title = "keel-viewer Needs accepted (Business gate)"; :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts the 8 keel-viewer Needs (N-1..N-8: nViewerViewpointForm / nViewerExplorableGraph / nViewerTemporalState / nViewerCrossCuttingSlices / nViewerSeparation [must], nViewerQueryExpansion / nViewerMultiStakeholder / nViewerPersistedViewpoints [should]) AS-IS via the explicit 'Accept the Needs as-is' selection on 2026-07-14 — the Business gate. Architecture (SystemRequirements + the A/B/C Decision) may now be derived from these accepted Needs."; }
     part keelViewerNeedsAcceptR1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5f82eec"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
+
+    // =====================================================================
+    // EXPANSION (Sprint 210) — additional Personas + UseCases (scenarios) + Needs. The new Needs
+    // (N-9..N-14) are PENDING a SECOND acceptance gate — do NOT derive architecture for them until the
+    // human accepts (needs-before-architecture). Personas + UseCases inform; the Needs gate is the bar.
+    // =====================================================================
+
+    // ── New Personas. ──
+    part systemsEngineerArchitectPersona : Persona {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000c1";
+        :>> title = "Systems engineer / architect";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "Walks the full model, assesses coverage/gaps, and reasons about the blast radius of a change before making it.";
+        :>> goals = "Navigate deeply, see what's unverified/uncovered, and understand what a proposed change would affect.";
+    }
+    part programManagerPersona : Persona {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000c2";
+        :>> title = "Program / project manager";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "Tracks status, coverage, and what is overdue at a glance; non-technical depth, decision-support breadth.";
+        :>> goals = "See a scope's health (coverage %, overdue reviews, open gaps) without reading the model in detail.";
+    }
+    part complianceQualityManagerPersona : Persona {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000c3";
+        :>> title = "Compliance / quality manager";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "Owns regulatory/quality audits; needs evidence completeness, provenance (who reviewed/decided what, when), and exportable snapshots.";
+        :>> goals = "Prove coverage + provenance for an audit and export a defensible snapshot for records.";
+    }
+
+    // ── New Needs (N-9..N-14). PENDING acceptance — no architecture until accepted. ──
+    requirement nViewerCoverageGap : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000d9";
+        :>> title = "N-9: coverage / gap views over a scope";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A stakeholder must see, over a chosen scope, what is unsatisfied / unverified / uncovered (the gaps) — not just the present items — so coverage can be assessed and gaps closed. (keel computes assurance coverage today; this surfaces it explorably.)";
+        :>> priority = Priority::must;
+    }
+    requirement nViewerChangeImpact : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000da";
+        :>> title = "N-10: change-impact (blast radius)";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A user must see, for a given element, what depends on it (downstream dependents over typed edges) so the blast radius of a proposed change is visible before making it.";
+        :>> priority = Priority::should;
+    }
+    requirement nViewerNotifications : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000db";
+        :>> title = "N-11: subscribe to state-change / freshness events";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A stakeholder must be able to subscribe to state changes on a scope — a review became due/overdue, evidence went stale, a gap opened — and be notified, rather than having to poll. (Builds on N-3 temporal state.)";
+        :>> priority = Priority::should;
+    }
+    requirement nViewerExportShare : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000dc";
+        :>> title = "N-12: export / share a viewpoint snapshot";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A stakeholder must be able to export or share a point-in-time snapshot of a viewpoint (link / PDF / image) for someone who cannot or need not open the live tool — with the snapshot's as-of date recorded.";
+        :>> priority = Priority::should;
+    }
+    requirement nViewerBaselineCompare : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000dd";
+        :>> title = "N-13: compare a viewpoint across baselines / time";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A stakeholder must be able to compare a viewpoint between two points in time or baselines — what was added / removed / changed / re-verified since — so drift and progress are visible. (keel's git history is the substrate.)";
+        :>> priority = Priority::could;
+    }
+    requirement nViewerAuditProvenance : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000de";
+        :>> title = "N-14: audit-trail / provenance browsing";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::regulatory;
+        :>> statement = "An auditor must be able to browse the provenance of any element — who reviewed / decided / verified it, when, and against which commit — as first-class navigable history, so an audit can trace evidence to its author + date. (keel authors judgedBy/judgedAt/judgedAgainst today.)";
+        :>> priority = Priority::should;
+    }
+
+    // ── New UseCases (UC-7..UC-13) with scenarios (main success + alternate + exception). ──
+    use case ucCoverageGapDashboard : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000e7";
+        :>> title = "UC-7: Coverage / gap dashboard";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a program manager / auditor, I want a dashboard of what is unsatisfied / unverified / uncovered across a chosen scope, so that I can see health and target the gaps. (Serves N-9.)";
+        :>> mainSuccess = "Pick a scope; the dashboard shows coverage % and lists the uncovered/unverified/unsatisfied items, each drillable to the element.";
+        :>> extensions = "ALT: scope fully covered -> a green 'no gaps' state (not an empty screen). EXCEPTION: scope has no verifiable elements -> report 'nothing to cover here' rather than 0%. ALT: click a gap -> jump to the element in the explorable graph (UC-2/UC-3).";
+    }
+    use case ucChangeImpact : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000e8";
+        :>> title = "UC-8: Change-impact (blast radius)";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a systems engineer, I want to see everything that depends on a given element, so that I understand the blast radius before I change it. (Serves N-10; inverse-direction slice of N-4.)";
+        :>> mainSuccess = "Seed on an element; the view shows the downstream dependents over configurable typed edges, ranked/grouped by distance; each is drillable.";
+        :>> extensions = "ALT: no dependents -> 'safe to change, nothing depends on this'. EXCEPTION: a dependency cycle -> the cycle is shown, not infinite-expanded. ALT: filter impact to a type (e.g. only affected Tests/Requirements).";
+    }
+    use case ucFreshnessNotifications : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000e9";
+        :>> title = "UC-9: Subscribe to freshness / review-due events";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a process owner, I want to subscribe to a scope and be notified when a review comes due/overdue or evidence goes stale, so that I act without polling. (Serves N-11; builds on N-3.)";
+        :>> mainSuccess = "Subscribe to a scope; when temporal state crosses a threshold (due-soon/overdue/stale), a notification is delivered with the element + what changed.";
+        :>> extensions = "ALT: nothing due -> no noise (only fire on transitions). EXCEPTION: an element's cadence is undefined -> a one-time 'cannot compute due date, configure cadence' notice, not silence. ALT: digest vs immediate delivery preference.";
+    }
+    use case ucAuditProvenance : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000ea";
+        :>> title = "UC-12: Audit-trail / provenance browsing";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a compliance/quality manager or auditor, I want to browse who reviewed/decided/verified an element, when, and against which commit, so that I can trace evidence to its author + date for an audit. (Serves N-14.)";
+        :>> mainSuccess = "Open any element's provenance; see its ordered history of reviews/decisions/verifications with reviewer, date, and commit, each linking to the evidence.";
+        :>> extensions = "ALT: element never reviewed -> 'no recorded provenance' (a finding, not a blank). EXCEPTION: a judgedAgainst commit is unresolvable in git -> flag it as suspect provenance, don't hide it. ALT: export this provenance (UC-10).";
+    }
+    use case ucExportShare : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000eb";
+        :>> title = "UC-10: Export / share a viewpoint snapshot";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a stakeholder, I want to export or share a point-in-time snapshot of a viewpoint (link/PDF/image), so that someone who won't open the tool still gets the view. (Serves N-12.)";
+        :>> mainSuccess = "From a viewpoint, export a snapshot stamped with its as-of date + scope; share it as a link or file.";
+        :>> extensions = "ALT: share a live link (auth-gated) vs a frozen file. EXCEPTION: viewpoint too large to render statically -> export the scoped/filtered subset with a note. ALT: snapshot recorded so it is reproducible from the as-of commit.";
+    }
+    use case ucBaselineCompare : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000ec";
+        :>> title = "UC-11: Compare a viewpoint across baselines / time";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As an engineer/auditor, I want to compare a viewpoint between two times or baselines, so that I can see what was added/removed/changed/re-verified since. (Serves N-13; git history is the substrate.)";
+        :>> mainSuccess = "Pick two points (dates/baselines); the view diffs the viewpoint's contents and highlights added/removed/changed/re-verified elements.";
+        :>> extensions = "ALT: no change between the two points -> 'no drift'. EXCEPTION: one point predates an element's existence -> shown as 'added since'. ALT: scope the comparison to one type (e.g. only requirement changes).";
+    }
+    use case ucGuidedOrientation : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000ed";
+        :>> title = "UC-13: Guided orientation for a first-time stakeholder";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a non-technical stakeholder opening a viewpoint for the first time, I want a short guided tour of what I'm seeing and how to explore, so that I can self-serve without training. (Serves N-1, N-6.)";
+        :>> mainSuccess = "On first open, a brief tour explains the viewpoint's purpose, the key elements, and how to expand/filter/drill; dismissible + re-openable.";
+        :>> extensions = "ALT: returning user -> tour is skipped by default. EXCEPTION: an empty viewpoint -> the tour explains why it's empty + how to widen the scope.";
+    }
 }

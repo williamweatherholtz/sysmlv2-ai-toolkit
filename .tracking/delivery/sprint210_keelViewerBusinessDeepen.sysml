@@ -1,0 +1,38 @@
+// ProjectDeliveryS210 — Sprint 210: keelViewerBusinessDeepen — flesh out the keel-viewer Business model
+// (human-steered): +3 Personas (systems engineer/architect, program manager, compliance/quality manager),
+// +7 UseCases (UC-7..UC-13, with alternate/exception scenarios), +6 Needs (N-9..N-14, PENDING a second
+// acceptance gate). Business-workflow expansion via the business-architecture skill. EXECUTE. 1 pt.
+package ProjectDeliveryS210 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRequirements::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from keelViewerDeepenStory to keelViewerBrief;
+
+    part keelViewerDeepenStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c210-51627384c001";
+        :>> title = "Sprint 210: keelViewerBusinessDeepen (1 pt) - +3 Personas, +7 UseCases (scenarios), +6 Needs (pending acceptance)";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 1;
+    }
+
+    action def DeliveryRunS210 {
+        action storyKeelViewerBusinessDeepen;
+        verification storyKeelViewerBusinessDeepenDoD : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c002"; :>> method = VerificationMethod::inspect; :>> procedureText = "Human-steered fleshing-out of the keel-viewer Business model (business-architecture skill, Business workflow). AUTHORED into keel-viewer.sysml: +3 Personas (systemsEngineerArchitect / programManager / complianceQualityManager — the human's selection); +7 UseCases (UC-7 coverage/gap dashboard, UC-8 change-impact, UC-9 freshness/review notifications, UC-12 audit-trail/provenance, UC-10 export/share, UC-11 baseline/time compare, UC-13 guided orientation) EACH with scenarios (main success + ALTERNATE + EXCEPTION flows); +6 Needs (N-9 coverage/gap, N-10 change-impact, N-11 notifications, N-12 export/share, N-13 baseline-compare, N-14 audit/provenance). NEEDS-BEFORE-ARCHITECTURE: the new Needs N-9..N-14 are PENDING a SECOND human acceptance gate — NO SystemRequirement/architecture Decision derived for them until accepted (the N-1..N-8 architecture from Sprint 209 stands). Totals now: 7 Personas, 14 Needs, 13 UseCases. VERIFY: keel validate clean (227); guard all + check-engine green; authored items, not prose; the new Needs carry no acceptance TestResult yet (honest — pending)."; }
+        part storyKeelViewerBusinessDeepenDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification kvdRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c004"; :>> title = "Sprint 210 refine gate (DoR)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the human asked to flesh out the viewer's needs/personas/use-cases/scenarios and selected which to author (3 personas, 7 use-case groups, + propose new Needs). Business-workflow expansion. estimatedPoints=1. #CharteredBy keelViewerBrief. DoR met."; }
+    part kvdRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvdStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c006"; :>> title = "Sprint 210 standup gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: author the 3 selected Personas, 7 UseCases with alt/exception scenarios, and 6 new Needs (unaccepted); hold the second Needs-acceptance gate for the human. No blockers."; }
+    part kvdStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvdImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c008"; :>> title = "Sprint 210 implement gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "3 Personas + 7 UseCases (scenarios) + 6 Needs authored (7/14/13 totals). keel validate clean (227); guard all + check-engine green. New Needs carry no acceptance yet."; }
+    part kvdImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvdReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c00a"; :>> title = "Sprint 210 review gate"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The expansion was human-steered (the user picked the personas + use-case groups), authored as facts with real scenario depth (each new UseCase has alternate + exception flows, not just a happy path — the gap the original 6 had), and correctly HELD the needs-before-architecture line: the 6 new Needs are unaccepted, so no architecture was derived for them. Several new UseCases lean on capabilities keel already has the substrate for (assurance coverage -> UC-7; git history -> UC-11; judgedBy/At/Against -> UC-12), which will make their SRs cheaper. Clean."; }
+    part kvdReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvdCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c00c"; :>> title = "Sprint 210 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; the keel-viewer Business model is fleshed out (7 Personas / 14 Needs / 13 UseCases). keel validate + guard + check-engine green. Self-evidencing (D0051). GATE FOR THE HUMAN: accept the 6 new Needs (N-9..N-14) -> then their architecture (SRs) + backlog derive. issue061 already closed; this is additive design."; }
+    part kvdCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+    verification kvdRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c210-51627384c00e"; :>> title = "Sprint 210 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-14"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: the design deepened collaboratively — the human steered persona/use-case selection, and the new UseCases got proper scenarios (alternate + exception), fixing the original set's happy-path-only thinness. Needs-before-architecture held cleanly even mid-expansion (new Needs unaccepted -> no premature SRs). AVOIDABLE-ISSUE SCAN: none. LESSON: scenario depth (exception flows) is where use cases earn their keep; author it from the start next time. Estimate 1 pt held. NEXT: human accepts N-9..N-14 -> architecture for them; then implementation (viewerKeelApi first)."; }
+    part kvdRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c210-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32cd8a1"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+}
