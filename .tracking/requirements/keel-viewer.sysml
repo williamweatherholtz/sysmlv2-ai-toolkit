@@ -171,8 +171,17 @@ package ProjectRequirementsKeelViewer {
         :>> rationale = "N-18/D0120: auto-defaults get you 80%; precise, shareable views need targeted overrides (sort the enum, choose the palette, set bins).";
         :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::demo;
     }
+    requirement srEncodingModular : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af16";
+        :>> title = "encoding channels are MODULAR — new channel types added seamlessly";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The encoding engine shall be MODULAR: the set of visual channels (colour, position, swimlane, size, shape, …) is a REGISTRY of self-contained channel modules. Adding a new encoding type shall require adding ONE module (its role, accepted attribute kinds, value→style mapping, legend) with NO changes to the panel, the apply pass, or the legend — those are generated from the registry.";
+        :>> rationale = "The human directed (2026-07-15): 'these encoding types should be modular — I want to be able to add different types going forward.' A registry keeps the engine extensible + avoids channel-specific branches (which would rot as channels multiply).";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
+    }
     satisfy nViewerEncodingViewpoints by srEncodingSchemaSemantics;
     satisfy nViewerEncodingViewpoints by srEncodingSpec;
     satisfy nViewerEncodingViewpoints by srEncodingRender;
     satisfy nViewerEncodingViewpoints by srEncodingOverride;
+    satisfy nViewerEncodingViewpoints by srEncodingModular;
 }
