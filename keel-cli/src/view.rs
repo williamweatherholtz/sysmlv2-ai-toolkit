@@ -448,43 +448,176 @@ fn attr_field(line: &str) -> Option<(String, String)> {
 /// # Errors
 /// Returns [`ViewError`] never in practice (best-effort text scan); the `Result` signature is required
 /// by the `cached` compute contract in serve.
-#[allow(clippy::unnecessary_wraps)]
-pub(crate) fn schema_json(root: &Path) -> Result<String, ViewError> {
-    let mut types: Vec<(String, Vec<Json>)> = Vec::new();
+type SchemaTypeDef = (String, Vec<(String, String)>);
+type SchemaEnumDef = (String, Vec<String>);
+
+/// In-progress type-def accumulator during the schema text-scan.
+struct DefAcc {
+    name: String,
+    depth: i32,
+    attrs: Vec<(String, String)>,
+}
+
+/// Per-(type,attribute) observed-value aggregate over the instances.
+#[derive(Default)]
+struct AttrAgg {
+    count: usize,
+    distinct: std::collections::BTreeSet<String>,
+    min_num: Option<f64>,
+    max_num: Option<f64>,
+    min_str: Option<String>,
+    max_str: Option<String>,
+}
+
+/// Text-scan `schema/` for declared type defs (+ attribute fields) and enum defs (+ members), sorted.
+fn scan_schema_defs(root: &Path) -> (Vec<SchemaTypeDef>, Vec<SchemaEnumDef>) {
+    let mut types: Vec<SchemaTypeDef> = Vec::new();
+    let mut enums: Vec<SchemaEnumDef> = Vec::new();
     for path in crate::collect_sysml(&root.join(".engine").join("schema")) {
         let Ok(text) = std::fs::read_to_string(&path) else { continue };
         let mut depth: i32 = 0;
-        let mut cur: Option<(String, i32, Vec<Json>)> = None;
+        let mut cur: Option<DefAcc> = None;
         for line in text.lines() {
+            if let Some(e) = enum_def(line) {
+                if !enums.iter().any(|(n, _)| n == &e.0) {
+                    enums.push(e);
+                }
+            }
             if cur.is_none() {
                 if let Some(name) = def_name(line) {
-                    cur = Some((name, depth, Vec::new()));
+                    cur = Some(DefAcc { name, depth, attrs: Vec::new() });
                 }
-            } else if let (Some((name, ty)), Some((_, _, attrs))) = (attr_field(line), cur.as_mut()) {
-                attrs.push(Json::Obj(vec![("name".to_string(), Json::s(name)), ("type".to_string(), Json::s(ty))]));
+            } else if let (Some(pair), Some(acc)) = (attr_field(line), cur.as_mut()) {
+                acc.attrs.push(pair);
             }
-            let opens = i32::try_from(line.matches('{').count()).unwrap_or(0);
-            let closes = i32::try_from(line.matches('}').count()).unwrap_or(0);
-            depth += opens - closes;
-            if let Some((_, body_depth, _)) = &cur {
-                if depth <= *body_depth {
-                    if let Some((name, _, attrs)) = cur.take() {
-                        types.push((name, attrs));
-                    }
+            depth += i32::try_from(line.matches('{').count()).unwrap_or(0) - i32::try_from(line.matches('}').count()).unwrap_or(0);
+            if cur.as_ref().is_some_and(|acc| depth <= acc.depth) {
+                if let Some(acc) = cur.take() {
+                    types.push((acc.name, acc.attrs));
                 }
             }
         }
     }
     types.sort_by(|a, b| a.0.cmp(&b.0));
+    enums.sort_by(|a, b| a.0.cmp(&b.0));
+    (types, enums)
+}
+
+/// Classify a declared attribute type into an encoding scale kind (N-18/D0120).
+fn stat_kind(declared: &str, enum_names: &HashSet<String>) -> &'static str {
+    if enum_names.contains(declared) {
+        "enum"
+    } else if declared == "Integer" || declared == "Real" {
+        "numeric"
+    } else if declared == "Timestamp" {
+        "temporal"
+    } else {
+        "categorical"
+    }
+}
+
+/// Per-(type,attribute) value stats from the INSTANCES → JSON — the semantic metadata an auto-encoder
+/// needs to pick a scale (enum -> ordinal over members; Integer/Real -> continuous/binnable range;
+/// Timestamp -> temporal range; String -> categorical distinct). N-18/D0120 encoding-viewpoints.
+fn attribute_stats(model: &Model, decl: &HashMap<(String, String), String>, enum_names: &HashSet<String>) -> Vec<Json> {
+    let mut agg: std::collections::BTreeMap<(String, String), AttrAgg> = std::collections::BTreeMap::new();
+    for info in model.items.values() {
+        for (k, v) in &info.attrs {
+            let key = (info.type_name.clone(), k.clone());
+            if !decl.contains_key(&key) {
+                continue; // only declared attributes
+            }
+            let e = agg.entry(key).or_default();
+            e.count += 1;
+            if e.distinct.len() < 64 {
+                e.distinct.insert(v.clone());
+            }
+            if let Ok(n) = v.parse::<f64>() {
+                e.min_num = Some(e.min_num.map_or(n, |m| m.min(n)));
+                e.max_num = Some(e.max_num.map_or(n, |m| m.max(n)));
+            }
+            if e.min_str.as_ref().is_none_or(|s| v < s) {
+                e.min_str = Some(v.clone());
+            }
+            if e.max_str.as_ref().is_none_or(|s| v > s) {
+                e.max_str = Some(v.clone());
+            }
+        }
+    }
+    agg.into_iter()
+        .map(|((tn, an), a)| {
+            let declared = decl.get(&(tn.clone(), an.clone())).cloned().unwrap_or_default();
+            let kind = stat_kind(&declared, enum_names);
+            let truncated = a.distinct.len() >= 64;
+            let mut fields = vec![
+                ("type".to_string(), Json::s(tn)),
+                ("attribute".to_string(), Json::s(an)),
+                ("declaredType".to_string(), Json::s(declared)),
+                ("kind".to_string(), Json::s(kind.to_string())),
+                ("count".to_string(), Json::Int(i64::try_from(a.count).unwrap_or(i64::MAX))),
+            ];
+            if kind == "numeric" {
+                if let (Some(lo), Some(hi)) = (a.min_num, a.max_num) {
+                    fields.push(("min".to_string(), Json::s(format!("{lo}"))));
+                    fields.push(("max".to_string(), Json::s(format!("{hi}"))));
+                }
+            } else if kind == "temporal" {
+                fields.push(("min".to_string(), a.min_str.map_or(Json::Null, Json::s)));
+                fields.push(("max".to_string(), a.max_str.map_or(Json::Null, Json::s)));
+            } else {
+                fields.push(("distinct".to_string(), Json::Arr(a.distinct.into_iter().map(Json::s).collect())));
+                fields.push(("distinctTruncated".to_string(), Json::Bool(truncated)));
+            }
+            Json::Obj(fields)
+        })
+        .collect()
+}
+
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built (for the instance-derived attribute stats).
+pub(crate) fn schema_json(root: &Path) -> Result<String, ViewError> {
+    let (types, enums) = scan_schema_defs(root);
+    let enum_names: HashSet<String> = enums.iter().map(|(n, _)| n.clone()).collect();
+    let decl: HashMap<(String, String), String> = types
+        .iter()
+        .flat_map(|(tn, attrs)| attrs.iter().map(move |(an, at)| ((tn.clone(), an.clone()), at.clone())))
+        .collect();
+    let stats_json = attribute_stats(&Model::build(root)?, &decl, &enum_names);
     let type_json: Vec<Json> = types
-        .into_iter()
-        .map(|(name, attrs)| Json::Obj(vec![("name".to_string(), Json::s(name)), ("attributes".to_string(), Json::Arr(attrs))]))
+        .iter()
+        .map(|(name, attrs)| {
+            let aj: Vec<Json> = attrs
+                .iter()
+                .map(|(an, at)| Json::Obj(vec![("name".to_string(), Json::s(an.clone())), ("type".to_string(), Json::s(at.clone())), ("isEnum".to_string(), Json::Bool(enum_names.contains(at)))]))
+                .collect();
+            Json::Obj(vec![("name".to_string(), Json::s(name.clone())), ("attributes".to_string(), Json::Arr(aj))])
+        })
+        .collect();
+    let enum_json: Vec<Json> = enums
+        .iter()
+        .map(|(name, members)| Json::Obj(vec![("name".to_string(), Json::s(name.clone())), ("members".to_string(), Json::Arr(members.iter().map(|m| Json::s(m.clone())).collect()))]))
         .collect();
     Ok(Json::Obj(vec![
-        ("schema".to_string(), Json::s("declared item types + attribute fields (viewerSchemaApi/N-17) — the generative-UI substrate; pair with /api/launchables for actions".to_string())),
+        ("schema".to_string(), Json::s("declared item types + attribute fields + enum members + per-attribute value stats (viewerSchemaApi/N-17; encoding-semantics N-18/D0120) — the generative-UI + auto-encoding substrate; pair with /api/launchables for actions".to_string())),
         ("types".to_string(), Json::Arr(type_json)),
+        ("enums".to_string(), Json::Arr(enum_json)),
+        ("attributeStats".to_string(), Json::Arr(stats_json)),
     ])
     .dump())
+}
+
+/// Parse a single-line `enum def <Name> { a; b; c; }` → `(Name, [members])`; `None` otherwise.
+/// Powers the auto-encoding semantics (N-18/D0120): an enum-typed attribute's domain = its members.
+fn enum_def(line: &str) -> Option<(String, Vec<String>)> {
+    let rest = line.trim().strip_prefix("enum def ")?;
+    let (head, body) = rest.split_once('{')?;
+    let name = head.split_whitespace().next()?.to_string();
+    let members: Vec<String> = body.trim_end().trim_end_matches('}').split(';').map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).collect();
+    if name.is_empty() || members.is_empty() {
+        None
+    } else {
+        Some((name, members))
+    }
 }
 
 /// ISO-8601 (`YYYY-MM-DD…`) lexicographic date-range test: `val` in `[since, until]` (either bound
@@ -4501,6 +4634,17 @@ mod tests {
         assert_eq!(attr_field("        attribute source : NeedSource;"), Some(("source".to_string(), "NeedSource".to_string())));
         assert_eq!(attr_field("        attribute goals : String[*];"), Some(("goals".to_string(), "String".to_string())));
         assert_eq!(attr_field("        part def X {"), None);
+    }
+
+    #[test]
+    fn enum_def_parses_members() {
+        // encoding-semantics (N-18/D0120): an enum-typed attribute's domain = its declared members.
+        assert_eq!(enum_def("    enum def DecisionStatus { proposed; accepted; rejected; superseded; }"),
+            Some(("DecisionStatus".to_string(), vec!["proposed".to_string(), "accepted".to_string(), "rejected".to_string(), "superseded".to_string()])));
+        assert_eq!(enum_def("enum def ActorKind { human; ai; }"),
+            Some(("ActorKind".to_string(), vec!["human".to_string(), "ai".to_string()])));
+        assert_eq!(enum_def("    part def Need :> X {"), None);
+        assert_eq!(enum_def("    // enum def in a comment"), None);
     }
 
     #[test]

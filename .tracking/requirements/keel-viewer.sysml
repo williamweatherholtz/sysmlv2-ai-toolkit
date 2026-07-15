@@ -137,4 +137,42 @@ package ProjectRequirementsKeelViewer {
     satisfy nViewerInProgramEdit by srViewerInProgramEdit;
     satisfy nViewerGenerativeUi by srViewerSchemaApi;
     satisfy nViewerGenerativeUi by srViewerGenerativeUi;
+
+    // ── N-18 decomposition (axis→visual-encoding viewpoints; D0120). keel exposes semantics; the viewer encodes. ──
+    requirement srEncodingSchemaSemantics : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af12";
+        :>> title = "keel exposes encoding SEMANTICS: enum members + per-attribute value ranges";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "keel shall expose, via /api/schema, the semantic metadata an auto-encoder needs to choose a scale per attribute: enum defs with their MEMBERS; and per (type,attribute) VALUE STATS from the instances — kind (enum|numeric|temporal|categorical), observed distinct values (capped), and numeric/temporal min-max. Computed from the declared schema + instances; nothing hardcoded.";
+        :>> rationale = "N-18/D0120: auto-generation needs the attribute's domain/range — enum members (ordinal/categorical), numeric range (binnable continuous), temporal range (time), categorical distinct set. Without it the encoder cannot pick sensible default scales.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement srEncodingSpec : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af13";
+        :>> title = "the viewer models a declarative encoding spec (channel<-attribute bindings)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The viewer shall model an encoding viewpoint as a declarative spec: an ordered set of channel bindings (colour | x-position | y-position | swimlane | nested-swimlane | size | shape) each binding a visual channel to a model attribute + a scale, AUTO-GENERATED from the /api/schema semantics (srEncodingSchemaSemantics) with sensible defaults per kind.";
+        :>> rationale = "N-18/D0120: the spec is the reusable, declarable form of a viewpoint; auto-defaults from semantics keep authoring low-friction (D0054).";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
+    }
+    requirement srEncodingRender : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af14";
+        :>> title = "the viewer renders the encoding spec (positions, colours, swimlanes, nesting)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The viewer shall render an encoding spec to the graph: map attributes to node colours (enum/continuous scales), left-right position (date/continuous), horizontal swimlane bands (binned-continuous or enum), and a nested/superseding swimlane layer (a second attribute) via compound + nested-compound nodes.";
+        :>> rationale = "N-18/D0120: the visible payoff — strong analytical views. Grammar-of-graphics channels (colour/position/facet=swimlane) are well-established, lowering risk.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
+    }
+    requirement srEncodingOverride : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af15";
+        :>> title = "the viewer provides a manual override layer over auto-generated encodings";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The viewer shall let the user override the auto-generated encoding: reorder/relabel enum members, pin a colour to a specific enum value, set continuous colour ranges + bin boundaries, and set swimlane nesting order — layered on top of the semantic defaults.";
+        :>> rationale = "N-18/D0120: auto-defaults get you 80%; precise, shareable views need targeted overrides (sort the enum, choose the palette, set bins).";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::demo;
+    }
+    satisfy nViewerEncodingViewpoints by srEncodingSchemaSemantics;
+    satisfy nViewerEncodingViewpoints by srEncodingSpec;
+    satisfy nViewerEncodingViewpoints by srEncodingRender;
+    satisfy nViewerEncodingViewpoints by srEncodingOverride;
 }
