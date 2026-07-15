@@ -104,7 +104,27 @@ package ProjectRequirementsKeelViewer {
         :>> rationale = "N-13: keel already computes git-derived trends/drift; this presents a viewpoint-scoped diff.";
         :>> kind = RequirementKind::functional; :>> priority = Priority::could; :>> verificationMethod = VerificationMethod::test;
     }
+    // ── Critique SRs (from accepted Needs N-15, N-16; keelViewerNeedsAccept3R1). Reuse keel substrate. ──
+    requirement srViewerIterativeCritique : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ae01";
+        :>> title = "Iterative AI critique over a query, axis-iterated";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The system shall run AI critique ITERATIVELY over a constrained query result, iterating over ONE chosen axis (each element along that dimension), applying a chosen lens, and recording ONE tracked critique per element (via apply-review, with the independent-critic + provenance discipline). Supports process+downstream (best-practice lens) and requirement+downstream (semantic-sufficiency lens). Reuses keel's element-critique + the serve agent bridge.";
+        :>> rationale = "N-15: keel already critiques a single element with lenses + records findings; this drives that over a query set on an axis — the human's core goal.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement srViewerInProgramEdit : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ae02";
+        :>> title = "In-program modify + re-critique, write-back through keel";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The system shall let a user edit an element's fields and (re)critique it on the same surface, writing every change back through keel's write API + guards (never a second store); a guard-rejected edit is refused inline with the guard message, and a concurrent change flags a conflict (D0108).";
+        :>> rationale = "N-16: keel's apply-review already writes critiques/dispositions back through the guarded write API; this extends it to element edits so critique->fix->re-critique iterates in one place.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
+    }
+
     satisfy nViewerChangeImpact by srViewerChangeImpact;
     satisfy nViewerExportShare by srViewerExportShare;
     satisfy nViewerBaselineCompare by srViewerBaselineCompare;
+    satisfy nViewerIterativeCritique by srViewerIterativeCritique;
+    satisfy nViewerInProgramEdit by srViewerInProgramEdit;
 }

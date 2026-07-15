@@ -327,4 +327,34 @@ package ProjectBusinessKeelViewer {
         :>> statement = "A user must be able to MODIFY an element and (re)critique it WITHIN the viewer — edit-then-critique in one place — with every change written back through keel's write API + guards (never a second store), so critique and revision iterate tightly on the same surface.";
         :>> priority = Priority::must;
     }
+
+    // ── Business gate 3: human acceptance of N-15 + N-16 (needs-before-architecture). ──
+    verification keelViewerNeedsAccept3 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000002a"; :>> title = "keel-viewer critique Needs N-15 + N-16 accepted (Business gate 3)"; :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts N-15 (nViewerIterativeCritique) + N-16 (nViewerInProgramEdit), both must, via the explicit 'Accept N-15 + N-16 — build downstream' selection on 2026-07-14. Architecture (SystemRequirements + use cases + backlog) may now be derived, under shape B (D0114)."; }
+    part keelViewerNeedsAccept3R1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000002b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "83993ce"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
+
+    // ── UseCases for the accepted critique Needs (the human's #1/#2 examples + in-program edit). ──
+    use case ucCritiqueProcessDownstream : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000fa";
+        :>> title = "UC-14: Critique a process + its downstream for best practices";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a modeler/reviewer, I want to seed on a process and run AI critique over it AND its downstream members (best-practice lens), so that I improve the whole chain, not just one node. (Serves N-15; the human's example #1.)";
+        :>> mainSuccess = "Seed a process; the tool slices its downstream (configurable depth/edges) and iterates AI critique per element on a best-practice lens; each finding is recorded as a tracked critique (apply-review).";
+        :>> extensions = "ALT: findings ranked by severity across the chain. EXCEPTION: an element already critiqued at HEAD -> reuse/skip unless forced. ALT: accept/dismiss a finding inline (disposition).";
+    }
+    use case ucCritiqueRequirementComprehensiveness : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000fb";
+        :>> title = "UC-15: Critique requirement comprehensiveness (do downstream items satisfy it?)";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As an engineer, I want to seed on a requirement and have AI critique whether its downstream items SEMANTICALLY fully satisfy it, so that I find comprehensiveness gaps a coverage count would miss. (Serves N-15; the human's example #2.)";
+        :>> mainSuccess = "Seed a requirement; the tool gathers its satisfying/derived downstream and runs an AI critique judging semantic sufficiency; the verdict + gaps are recorded as a tracked critique.";
+        :>> extensions = "ALT: 'fully satisfied' -> a positive recorded finding. EXCEPTION: no downstream items -> critique reports the requirement is undecomposed. ALT: iterate the critique over each downstream item as the axis.";
+    }
+    use case ucModifyAndCritiqueInProgram : UseCase {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000fc";
+        :>> title = "UC-16: Modify and (re)critique an element in-program";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
+        :>> description = "As a modeler, I want to edit an element and immediately (re)critique it within the viewer, so that critique -> fix -> re-critique iterates on one surface. (Serves N-16.)";
+        :>> mainSuccess = "Open an element; edit a field (written back via the keel write API + guards); re-run critique; the new finding supersedes the prior, all on the same surface.";
+        :>> extensions = "ALT: an edit failing a guard is rejected inline with the guard message (no bad write lands). EXCEPTION: a concurrent change to the same element -> the edit rebases/flags a conflict (multi-thread, D0108). ALT: revert the edit if the re-critique is worse.";
+    }
 }
