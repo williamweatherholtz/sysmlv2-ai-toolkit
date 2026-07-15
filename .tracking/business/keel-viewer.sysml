@@ -365,4 +365,17 @@ package ProjectBusinessKeelViewer {
         :>> mainSuccess = "Open an element; edit a field (written back via the keel write API + guards); re-run critique; the new finding supersedes the prior, all on the same surface.";
         :>> extensions = "ALT: an edit failing a guard is rejected inline with the guard message (no bad write lands). EXCEPTION: a concurrent change to the same element -> the edit rebases/flags a conflict (multi-thread, D0108). ALT: revert the edit if the re-critique is worse.";
     }
+
+    // ── N-17: the overarching principle — the UI is GENERATED from the declared model (human, 2026-07-15). ──
+    requirement nViewerGenerativeUi : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000f";
+        :>> title = "N-17: model-driven GENERATIVE UI (evolves with the model, nothing hardcoded)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "The viewer must DYNAMICALLY generate its UI from keel's DECLARED model — item types + their attribute fields (schema), the declared processes/skills (the actionable set), and the write API — NOT hardcode views or actions. When the model EVOLVES (a process is added, a new attribute field appears, a new item type), it becomes viewable + manipulable in the UI with NO viewer code change. This is the engine premise (generalises srServeModelDrivenRegistry/D0109 from the launchable set to the WHOLE UI); N-16's in-program modification is realised through this generated surface (edits go via keel processes). Hard, but where the value is: evolution.";
+        :>> priority = Priority::must;
+    }
+
+    // ── Business gate 4: human acceptance of N-17 (needs-before-architecture). ──
+    verification keelViewerNeedsAccept4 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003a"; :>> title = "keel-viewer generative-UI Need N-17 accepted (Business gate 4)"; :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz directed N-17 (2026-07-15): 'it should dynamically integrate with keel data and processes and intelligently generate a UI... we're not hard coding actions, we're developing an engine. when a process is added, it should be manipulable in the UI. same for new attribute fields. evolution!' Accepting the model-driven generative-UI Need; architecture (D0117 + SRs) may derive."; }
+    part keelViewerNeedsAccept4R1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "38a31a2"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "wweatherholtz"; }
 }

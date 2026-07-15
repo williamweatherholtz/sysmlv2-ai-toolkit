@@ -112,9 +112,29 @@ package ProjectRequirementsKeelViewer {
         :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
     }
 
+    // ── Generative-UI SRs (from accepted N-17; D0117). keel EXPOSES the declared model; the viewer GENERATES. ──
+    requirement srViewerSchemaApi : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af01";
+        :>> title = "keel exposes the declared model machine-readably (types + attributes)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "keel shall expose its DECLARED model machine-readably: each item TYPE (part/requirement/use-case/... def) with its ATTRIBUTE fields (name + type + enum members where applicable), via /api/schema — alongside the existing /api/launchables (processes/skills). New types/attributes in schema/core appear automatically (no hardcoded list). This is the substrate a generative UI reads to build display + edit forms.";
+        :>> rationale = "N-17/D0117: the viewer can only GENERATE forms if keel tells it the types + fields. Parser skips type-def bodies today, so a text-scan of schema/core is the first mechanism (like build_dod_files).";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
+    }
+    requirement srViewerGenerativeUi : SystemRequirement {
+        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000af02";
+        :>> title = "The viewer GENERATES its display + manipulation UI from the declared model";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The viewer app shall GENERATE its display + manipulation surface from keel's declared model — types+attributes (/api/schema) drive forms/fields; declared processes/skills (/api/launchables) drive actions; the guarded write API + keel processes (N-16) drive changes — with NOTHING hardcoded per type/process/field, so model evolution is reflected without viewer code. (Mostly the viewer app, shape B; keel's part is srViewerSchemaApi + /api/launchables + the write API.)";
+        :>> rationale = "N-17: the engine premise — the UI is a projection of the declared model, so the model's evolution IS the UI's. Generalises D0109 (launchable set) to the whole UI.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
+    }
+
     satisfy nViewerChangeImpact by srViewerChangeImpact;
     satisfy nViewerExportShare by srViewerExportShare;
     satisfy nViewerBaselineCompare by srViewerBaselineCompare;
     satisfy nViewerIterativeCritique by srViewerIterativeCritique;
     satisfy nViewerInProgramEdit by srViewerInProgramEdit;
+    satisfy nViewerGenerativeUi by srViewerSchemaApi;
+    satisfy nViewerGenerativeUi by srViewerGenerativeUi;
 }
