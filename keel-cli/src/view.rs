@@ -540,6 +540,83 @@ pub(crate) fn snapshot_json(root: &Path, seed: &str, depth: usize, edges: &HashS
     .dump())
 }
 
+/// Build the model AS OF a git `commit` by checking that commit out into a throwaway `git worktree`,
+/// building the model there, and removing the worktree. Used by baseline-compare (N-13).
+fn model_at_commit(root: &Path, commit: &str, tag: &str) -> Result<Model, ViewError> {
+    let root_s = root.to_string_lossy().to_string();
+    let tmp = std::env::temp_dir().join(format!("keel-bl-{tag}-{}", commit.replace(|c: char| !c.is_alphanumeric(), "")));
+    let tmp_s = tmp.to_string_lossy().to_string();
+    let _ = std::process::Command::new("git").args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
+    let added = std::process::Command::new("git")
+        .args(["-C", &root_s, "worktree", "add", "--detach", "--quiet", &tmp_s, commit])
+        .output()
+        .is_ok_and(|o| o.status.success());
+    if !added {
+        return Err(ViewError::Track("baseline-compare".to_string(), format!("cannot check out commit '{commit}' (unknown ref?)")));
+    }
+    let model = Model::build(&tmp);
+    let _ = std::process::Command::new("git").args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
+    model
+}
+
+/// Baseline compare (viewerBaselineCompare / N-13): diff the viewpoint (the `(seed, depth, edges, dir)`
+/// slice) between two commits `from`→`to`, classifying each element added / removed / changed / reverified
+/// / unchanged from git history. An element in `to` but not `from` is "added since"; no differences reads
+/// "no drift".
+///
+/// # Errors
+/// Returns [`ViewError`] if either commit cannot be checked out or a model fails to build.
+pub(crate) fn baseline_compare_json(root: &Path, seed: &str, from: &str, to: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir) -> Result<String, ViewError> {
+    let m_from = model_at_commit(root, from, "from")?;
+    let m_to = model_at_commit(root, to, "to")?;
+    let s_from = configurable_slice(&m_from, seed, depth, edges, dir);
+    let s_to = configurable_slice(&m_to, seed, depth, edges, dir);
+    let mut union: Vec<String> = s_from.union(&s_to).cloned().collect();
+    union.sort();
+
+    let (mut added, mut removed, mut changed, mut reverified) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut unchanged = 0usize;
+    let entry = |n: &str, m: &Model| -> Json {
+        let ty = m.items.get(n).map_or("", |i| i.type_name.as_str());
+        Json::Obj(vec![("name".to_string(), Json::s(n.to_string())), ("type".to_string(), Json::s(ty.to_string()))])
+    };
+    for n in &union {
+        let in_from = s_from.contains(n);
+        let in_to = s_to.contains(n);
+        if in_to && !in_from {
+            added.push(entry(n, &m_to));
+        } else if in_from && !in_to {
+            removed.push(entry(n, &m_from));
+        } else {
+            let a = m_from.items.get(n);
+            let b = m_to.items.get(n);
+            let same = a.map(|i| (&i.type_name, &i.attrs)) == b.map(|i| (&i.type_name, &i.attrs));
+            if same {
+                unchanged += 1;
+            } else {
+                // a verification element whose judged basis moved = "re-verified"
+                let is_reverify = b.is_some_and(|i| i.type_name == "TestResult")
+                    && a.and_then(|i| i.attrs.get("judgedAgainst")) != b.and_then(|i| i.attrs.get("judgedAgainst"));
+                if is_reverify { reverified.push(entry(n, &m_to)); } else { changed.push(entry(n, &m_to)); }
+            }
+        }
+    }
+    let drift = added.len() + removed.len() + changed.len() + reverified.len();
+    Ok(Json::Obj(vec![
+        ("view".to_string(), Json::s("baseline-compare (srViewerBaselineCompare/N-13): the viewpoint diffed between two commits".to_string())),
+        ("seed".to_string(), Json::s(seed.to_string())),
+        ("from".to_string(), Json::s(from.to_string())),
+        ("to".to_string(), Json::s(to.to_string())),
+        ("note".to_string(), Json::s(if drift == 0 { "no drift".to_string() } else { String::new() })),
+        ("added".to_string(), Json::Arr(added)),
+        ("removed".to_string(), Json::Arr(removed)),
+        ("changed".to_string(), Json::Arr(changed)),
+        ("reverified".to_string(), Json::Arr(reverified)),
+        ("unchanged".to_string(), Json::Int(i64::try_from(unchanged).unwrap_or(0))),
+    ])
+    .dump())
+}
+
 /// Parse a `… def <Name>` type-definition header line → `Name` (the declared item type). Recognises the
 /// `def` keywords used in `schema/core`; `None` for non-def lines. Powers the generative-UI schema
 /// exposure (`viewerSchemaApi`/N-17) — the parser skips type-def bodies, so this text-scans them.

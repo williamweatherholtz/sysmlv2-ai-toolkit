@@ -1133,6 +1133,7 @@ package EngineBacklog {
         part viewerExportShareDoDR1 : TestResult { :>> id = "a863b201-4802-4041-8aba-e07bc66482ab"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "041978f"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
         action viewerBaselineCompare; // srViewerBaselineCompare (N-13): diff a viewpoint across two times/baselines.
         verification viewerBaselineCompareDoD : Test { :>> id = "a1c7018a-018a-418a-918a-51627384018a"; :>> method = VerificationMethod::test; :>> procedureText = "Satisfies srViewerBaselineCompare (N-13). Diff a viewpoint between two points (dates/baselines) using git history; highlight added/removed/changed/re-verified; predating element -> 'added since'. VERIFY: a known change between two commits is classified correctly; no-change reads 'no drift'; clippy + cargo test + keel validate + guard green. #Verify srViewerBaselineCompare."; }
+        part viewerBaselineCompareDoDR1 : TestResult { :>> id = "4086af91-5739-4937-8ff1-f4f94ef82f9d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e995440"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
 
         // ── keel-viewer CRITIQUE backlog (accepted Needs N-15, N-16; the human's core goal). Not yet done. ──
         action viewerIterativeCritique; // srViewerIterativeCritique (N-15): axis-iterated AI critique over a query.

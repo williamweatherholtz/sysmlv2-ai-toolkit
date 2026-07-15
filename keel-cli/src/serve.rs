@@ -32,14 +32,14 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.10.0";
+pub const KEEL_API_VERSION: &str = "1.11.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
-    "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/critique-plan",
-    "/api/boundary", "/api/boundary-sweep", "/api/events",
+    "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/baseline-compare",
+    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -122,6 +122,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/change-impact", get(api_change_impact))
         // viewerExportShare (N-12) — a viewpoint snapshot stamped with commit + as-of + scope
         .route("/api/snapshot", get(api_snapshot))
+        // viewerBaselineCompare (N-13) — diff the viewpoint between two commits
+        .route("/api/baseline-compare", get(api_baseline_compare))
         // viewerIterativeCritique (N-15) — deterministic iteration plan over a slice (axis + context + lens)
         .route("/api/critique-plan", get(api_critique_plan))
         // sr19 — Need-slice boundary (white-box internals + black-box interfaces) + the tier sweep
@@ -984,6 +986,29 @@ async fn api_snapshot(State(s): State<AppState>, Query(q): Query<SliceReq>) -> R
     let commit = git_head(&s.root);
     let as_of = git_head_date(&s.root);
     match crate::view::snapshot_json(&s.root, &q.seed, depth, &edges, dir, &commit, &as_of) {
+        Ok(json) => ok_json(json),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct BaselineReq {
+    seed: String,
+    from: String,
+    to: String,
+    depth: Option<usize>,
+    edges: Option<String>,
+    dir: Option<String>,
+}
+
+/// GET /api/baseline-compare?seed=NAME&from=COMMIT&to=COMMIT[&depth=&edges=&dir=] (viewerBaselineCompare
+/// / N-13) — diff the viewpoint between two commits: added / removed / changed / reverified / unchanged
+/// (via git worktrees); no differences → "no drift".
+async fn api_baseline_compare(State(s): State<AppState>, Query(q): Query<BaselineReq>) -> Response {
+    let depth = q.depth.unwrap_or(2);
+    let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
+    let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
+    match crate::view::baseline_compare_json(&s.root, &q.seed, &q.from, &q.to, depth, &edges, dir) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
