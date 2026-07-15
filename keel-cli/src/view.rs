@@ -414,15 +414,36 @@ fn configurable_slice(model: &Model, seed: &str, depth: usize, edges: &HashSet<S
     set
 }
 
+/// ISO-8601 (`YYYY-MM-DD…`) lexicographic date-range test: `val` in `[since, until]` (either bound
+/// optional). ISO-8601 sorts chronologically as strings, so no date parsing is needed (N-5).
+fn date_in_range(val: &str, since: Option<&str>, until: Option<&str>) -> bool {
+    since.is_none_or(|s| val >= s) && until.is_none_or(|u| val <= u)
+}
+
+/// An optional date-range filter for a slice (N-5 time-as-query-filter): keep members whose `attr` date
+/// (e.g. `judgedAt`) is in `[since, until]`. `attr = None` disables the filter.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct DateFilter<'a> {
+    pub attr: Option<&'a str>,
+    pub since: Option<&'a str>,
+    pub until: Option<&'a str>,
+}
+
 /// Configurable-slice view (viewerConfigurableSlice / `/api/slice`): the induced subgraph of
 /// [`configurable_slice`], emitted like a section.
+///
+/// TIME-AS-QUERY-FILTER (N-5, D0116): when `date_attr` is set, keep only members whose that-attribute
+/// (e.g. `judgedAt`, `createdAt`) falls in `[since, until]` — "reviewed/created since/until/in a range".
 ///
 /// # Errors
 /// Returns [`ViewError`] on a parse failure.
 #[allow(clippy::implicit_hasher)]
-pub(crate) fn slice_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir) -> Result<String, ViewError> {
+pub(crate) fn slice_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<String>, dir: SliceDir, df: DateFilter) -> Result<String, ViewError> {
     let model = Model::build(root)?;
-    let names = configurable_slice(&model, seed, depth, edges, dir);
+    let mut names = configurable_slice(&model, seed, depth, edges, dir);
+    if let Some(attr) = df.attr {
+        names.retain(|n| model.items.get(n).and_then(|i| i.attrs.get(attr)).is_some_and(|v| date_in_range(v, df.since, df.until)));
+    }
     Ok(section_subgraph_json(&model, &names, seed, "slice"))
 }
 
@@ -4262,6 +4283,16 @@ mod tests {
         assert_eq!(configurable_slice(&model, "c", 9, &all, SliceDir::Up), names(&["a", "b", "c"]));
         // unknown seed -> empty
         assert!(configurable_slice(&model, "zzz", 5, &all, SliceDir::Both).is_empty());
+    }
+
+    #[test]
+    fn date_in_range_iso_lexicographic() {
+        // N-5 time-as-query-filter: ISO-8601 dates compare chronologically as strings.
+        assert!(date_in_range("2026-07-15", Some("2026-01-01"), Some("2026-12-31")));
+        assert!(date_in_range("2026-07-15", Some("2026-07-15"), None)); // inclusive lower bound
+        assert!(!date_in_range("2025-12-31", Some("2026-01-01"), None)); // before `since`
+        assert!(!date_in_range("2027-01-01", None, Some("2026-12-31"))); // after `until`
+        assert!(date_in_range("2026-07-15", None, None)); // no bounds -> always in range
     }
 
     #[test]

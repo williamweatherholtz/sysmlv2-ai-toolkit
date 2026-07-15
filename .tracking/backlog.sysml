@@ -1122,6 +1122,7 @@ package EngineBacklog {
 
         action viewerDatePredicates; // srViewerDatePredicates (N-5): bounded date/range (+ likely OR) query predicates.
         verification viewerDatePredicatesDoD : Test { :>> id = "a1c70185-0185-4185-9185-516273840185"; :>> method = VerificationMethod::test; :>> procedureText = "Satisfies srViewerDatePredicates (N-5). Add date/range predicates (and likely OR) to the view query vocabulary — enough for temporal (N-3) + stakeholder filtering — while remaining a BOUNDED fixed vocabulary. RESOLVE open question Q3 first (the bound). VERIFY: a date-range viewpoint predicate selects correctly; the vocabulary stays fixed (no arbitrary expression); clippy + cargo test + keel validate + guard green. #Verify srViewerDatePredicates."; }
+        part viewerDatePredicatesDoDR1 : TestResult { :>> id = "c8f11456-7a08-41ae-8983-e54558818ea6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4d9e10b"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
 
         // ── keel-viewer expansion backlog (SRs from accepted Needs N-10, N-12, N-13; rest superseded by D0115). Not yet done. ──
         action viewerChangeImpact; // srViewerChangeImpact (N-10): downstream dependents of a seed (inverse slice).

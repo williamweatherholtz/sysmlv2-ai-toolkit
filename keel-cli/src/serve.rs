@@ -32,7 +32,7 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.2.0";
+pub const KEEL_API_VERSION: &str = "1.3.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
@@ -705,11 +705,16 @@ struct SliceReq {
     depth: Option<usize>,
     edges: Option<String>,
     dir: Option<String>,
+    dateattr: Option<String>,
+    since: Option<String>,
+    until: Option<String>,
 }
 
-/// GET /api/slice?seed=NAME&depth=N&edges=a,b&dir=down|up|both (viewerConfigurableSlice, N-2/N-4/N-10) —
-/// a configurable-depth, edge-filtered slice from a seed as JSON (`{seed, kind, count, items[], edges[]}`).
-/// `depth` default 1; `edges` empty = all kinds; `dir` default `both` (`up` = change-impact/dependents).
+/// GET /api/slice?seed=NAME&depth=N&edges=a,b&dir=down|up|both[&dateattr=judgedAt&since=D&until=D]
+/// (viewerConfigurableSlice N-2/N-4/N-10 + N-5 time-filter) — a configurable slice from a seed as JSON
+/// (`{seed, kind, count, items[], edges[]}`). `depth` default 1; `edges` empty = all; `dir` default
+/// `both` (`up` = change-impact). TIME FILTER (N-5): if `dateattr` is set (e.g. `judgedAt`), keep only
+/// members whose that-attribute is in the ISO date range `[since, until]` (either bound optional).
 async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Response {
     let depth = q.depth.unwrap_or(1);
     let edges: std::collections::HashSet<String> = q
@@ -721,7 +726,12 @@ async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Resp
         .filter(|e| !e.is_empty())
         .collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
-    match crate::view::slice_json(&s.root, &q.seed, depth, &edges, dir) {
+    let df = crate::view::DateFilter {
+        attr: q.dateattr.as_deref().filter(|a| !a.is_empty()),
+        since: q.since.as_deref().filter(|d| !d.is_empty()),
+        until: q.until.as_deref().filter(|d| !d.is_empty()),
+    };
+    match crate::view::slice_json(&s.root, &q.seed, depth, &edges, dir, df) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
