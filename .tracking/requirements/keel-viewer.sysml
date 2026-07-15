@@ -79,29 +79,13 @@ package ProjectRequirementsKeelViewer {
     satisfy nViewerCrossCuttingSlices by srViewerConfigurableSlice;
     satisfy nViewerQueryExpansion by srViewerDatePredicates;
 
-    // ── Expansion SRs (from the accepted Needs N-9..N-14; keelViewerNeedsAccept2R1). Shape B (D0114). ──
-    requirement srViewerCoverageGap : SystemRequirement {
-        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ad01";
-        :>> title = "Coverage / gap view over a scope";
-        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall present, over a chosen scope, the assurance-coverage result — coverage % and the enumerated unsatisfied / unverified / uncovered items — each drillable to its element, so gaps are visible and targetable. Reuses keel's assurance-coverage computation.";
-        :>> rationale = "N-9: keel computes assurance coverage today (keel assured / coverage); the viewer surfaces it explorably for PMs/auditors.";
-        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::test;
-    }
+    // ── Expansion SRs (from the accepted Needs N-10, N-12, N-13; the rest superseded by D0115). Shape B. ──
     requirement srViewerChangeImpact : SystemRequirement {
         :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ad02";
         :>> title = "Change-impact: downstream dependents of a seed";
         :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
         :>> statement = "From any seed element, the system shall compute the downstream dependents over configurable typed edges (the inverse-direction slice), grouped by distance, with cycles shown once (not infinitely expanded) — so a change's blast radius is visible before the change.";
         :>> rationale = "N-10: the inverse of the N-4 slice; keel's traversal engine already walks edges up/down.";
-        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::test;
-    }
-    requirement srViewerNotifications : SystemRequirement {
-        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ad03";
-        :>> title = "Subscribe + notify on temporal / freshness state transitions";
-        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall let a user subscribe to a scope and deliver a notification when an element's temporal state TRANSITIONS (current -> due-soon/overdue, or evidence -> stale) — firing only on transitions (no steady-state noise), with immediate or digest delivery. Builds on srViewerTemporalState.";
-        :>> rationale = "N-11: turns the N-3 temporal state into a push signal so owners act without polling.";
         :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::test;
     }
     requirement srViewerExportShare : SystemRequirement {
@@ -120,19 +104,7 @@ package ProjectRequirementsKeelViewer {
         :>> rationale = "N-13: keel already computes git-derived trends/drift; this presents a viewpoint-scoped diff.";
         :>> kind = RequirementKind::functional; :>> priority = Priority::could; :>> verificationMethod = VerificationMethod::test;
     }
-    requirement srViewerAuditProvenance : SystemRequirement {
-        :>> id = "6e51d1c0-0114-4c8b-9d2e-00000000ad06";
-        :>> title = "Provenance / audit-trail browsing per element";
-        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz";
-        :>> statement = "The system shall present, for any element, its ordered provenance — the reviews / decisions / verifications with reviewer (judgedBy), date (judgedAt), and commit (judgedAgainst) — as first-class navigable history; an unresolvable judgedAgainst is flagged as suspect provenance, not hidden.";
-        :>> rationale = "N-14: keel authors judgedBy/judgedAt/judgedAgainst on every result today; the viewer makes it browsable for audit.";
-        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::test;
-    }
-
-    satisfy nViewerCoverageGap by srViewerCoverageGap;
     satisfy nViewerChangeImpact by srViewerChangeImpact;
-    satisfy nViewerNotifications by srViewerNotifications;
     satisfy nViewerExportShare by srViewerExportShare;
     satisfy nViewerBaselineCompare by srViewerBaselineCompare;
-    satisfy nViewerAuditProvenance by srViewerAuditProvenance;
 }

@@ -298,4 +298,33 @@ package ProjectBusinessKeelViewer {
     // ── Business gate 2: human acceptance of the expansion Needs N-9..N-14 (needs-before-architecture). ──
     verification keelViewerNeedsAccept2 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000001a"; :>> title = "keel-viewer expansion Needs N-9..N-14 accepted (Business gate 2)"; :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz accepts the 6 expansion Needs (N-9 nViewerCoverageGap [must], N-10 nViewerChangeImpact / N-11 nViewerNotifications / N-12 nViewerExportShare / N-14 nViewerAuditProvenance [should], N-13 nViewerBaselineCompare [could]) AS-IS via the explicit 'Accept N-9..N-14 as-is' selection on 2026-07-14 — the second Business gate. Architecture (SystemRequirements) may now be derived from these accepted Needs, under the existing shape B (D0114)."; }
     part keelViewerNeedsAccept2R1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000001b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4510d0e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
+
+    // =====================================================================
+    // SCOPE REVISION (Sprint 212, D0115) — human feedback 2026-07-14. Four Needs superseded (out of
+    // current scope); two new Needs added (PENDING a third acceptance gate). See D0115 for the why.
+    // =====================================================================
+
+    // N-7 dropped (single-user, unauthenticated; saveable viewpoints = N-8); N-11 + N-14 deferred;
+    // N-9 refocused from a coverage dashboard onto AI critique (replaced by N-15/N-16).
+    #Supersede dependency from d0115 to nViewerMultiStakeholder;
+    #Supersede dependency from d0115 to nViewerNotifications;
+    #Supersede dependency from d0115 to nViewerAuditProvenance;
+    #Supersede dependency from d0115 to nViewerCoverageGap;
+
+    // ── New Needs (N-15, N-16) — the human's actual goal: AI-assisted critique of constrained systems.
+    //    PENDING acceptance (third gate); no architecture until accepted. ──
+    requirement nViewerIterativeCritique : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000f5";
+        :>> title = "N-15: iterative AI critique over a constrained query (axis-iterated)";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A user must be able to run AI critique ITERATIVELY over a constrained query result, iterating over ONE chosen axis (each element along that dimension) and recording a finding per element — e.g. critique each process + its downstream members for best practices, or critique whether a requirement's downstream items semantically fully satisfy it. Reuses keel's element-critique + agent bridge; findings land as tracked critiques (apply-review).";
+        :>> priority = Priority::must;
+    }
+    requirement nViewerInProgramEdit : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000f6";
+        :>> title = "N-16: modify AND critique elements in-program";
+        :>> createdAt = "2026-07-14"; :>> createdBy = "wweatherholtz"; :>> source = NeedSource::operator;
+        :>> statement = "A user must be able to MODIFY an element and (re)critique it WITHIN the viewer — edit-then-critique in one place — with every change written back through keel's write API + guards (never a second store), so critique and revision iterate tightly on the same surface.";
+        :>> priority = Priority::must;
+    }
 }
