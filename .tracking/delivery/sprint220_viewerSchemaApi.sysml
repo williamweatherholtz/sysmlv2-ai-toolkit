@@ -1,0 +1,38 @@
+// ProjectDeliveryS220 — Sprint 220: viewerSchemaApi — GET /api/schema exposes keel's DECLARED model
+// (every item type + its attribute fields) machine-readably. The first keel-side brick of the
+// generative-UI direction (N-17 / D0117): the viewer generates its UI from this, nothing hardcoded.
+// Satisfies srViewerSchemaApi. EXECUTE. 2 pts.
+package ProjectDeliveryS220 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRequirements::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from viewerSchemaApiStory to d0117;
+
+    part viewerSchemaApiStory : Story {
+        :>> id = "63940516-2c7d-4e8f-c220-51627384c001";
+        :>> title = "Sprint 220: viewerSchemaApi (2 pts) - GET /api/schema exposes declared types + attributes (generativity substrate)";
+        :>> createdAt = "2026-07-15"; :>> createdBy = "wweatherholtz"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p2; :>> owner = "claudeOpus"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS220 {
+        action storyViewerSchemaApi;
+        verification storyViewerSchemaApiDoD : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c002"; :>> method = VerificationMethod::test; :>> procedureText = "Satisfies srViewerSchemaApi (N-17/D0117). IMPLEMENTED: view::schema_json text-scans .engine/schema for every type def (def_name recognises part/requirement/use-case/enum/... def headers via brace-depth tracking, skips instances + prose) + its attribute fields (attr_field -> name+type), sorted by name; new types/attributes appear automatically (no hardcoded list). serve::api_schema serves GET /api/schema (cached per-fingerprint). Added /api/version 1.4.0 + /api/schema to the committed KEEL_API_READ_ENDPOINTS contract (D0114 shape B). Unit test schema_scan_parses_defs_and_attributes covers the scanner. VERIFY (test): clippy --workspace --all-targets -D warnings clean; cargo test green (schema_scan + api_version contract); live curl -> 93 types, Need shows statement/source/priority, /api/version=1.4.0 lists /api/schema. keel validate + guard + check-engine green. Code at 01f80d7."; }
+        part storyViewerSchemaApiDoDR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c003"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    }
+
+    verification vsaRefineGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c004"; :>> title = "Sprint 220 refine gate (DoR)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: D0117 accepted the generative-UI direction; keel's first increment is to expose the declared model machine-readably. viewerSchemaApi backlog action + srViewerSchemaApi + DoD present. estimatedPoints=2. #CharteredBy d0117. DoR met."; }
+    part vsaRefineGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c005"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification vsaStandupGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c006"; :>> title = "Sprint 220 standup gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: text-scan schema/core (parser skips type-def bodies, so a scan is the mechanism — same pattern as build_dod_files); emit {schema, types:[{name, attributes:[{name,type}]}]}; add to the versioned read contract + bump. No blockers."; }
+    part vsaStandupGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c007"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification vsaImplementGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c008"; :>> title = "Sprint 220 implement gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::test; :>> procedureText = "schema_json/def_name/attr_field + api_schema route + /api/version bump implemented + unit-tested. clippy -D warnings clean; cargo test green; live curl verified (93 types; Need -> statement/source/priority; /api/version 1.4.0 lists /api/schema). keel validate + guard + check-engine green."; }
+    part vsaImplementGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c009"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification vsaReviewGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c00a"; :>> title = "Sprint 220 review gate"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. /api/schema is the correct minimal generativity substrate: it exposes the model's TYPE + ATTRIBUTE structure so the viewer can build display/edit forms without a per-type code path, exactly as /api/launchables already does for actions (D0109 generalised by D0117). Text-scan is the honest mechanism today (the parser skips type-def bodies) and is documented as such; new attributes/types surface with zero code. Contract-versioned (1.4.0). Clean."; }
+    part vsaReviewGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c00b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification vsaCloseOutGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c00c"; :>> title = "Sprint 220 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049): DoD pass; /api/schema delivered + on the committed read contract; scanner unit-tested; live-verified. Self-evidencing (D0051). NEXT: viewerGenerativeUi is largely the viewer app (shape B, separate project); remaining keel-side viewer bricks are viewerChangeImpact / viewerExportShare / viewerBaselineCompare / viewerInProgramEdit (N-16 write ops via keel processes)."; }
+    part vsaCloseOutGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c00d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+    verification vsaRetroGate : Test { :>> id = "63940516-2c7d-4e8f-c220-51627384c00e"; :>> title = "Sprint 220 retro gate (autonomous, D0049)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049). WELL: turned the generative-UI principle (D0117) into a concrete, contract-versioned endpoint in one increment, reusing the established text-scan mechanism (build_dod_files) rather than blocking on a parser change — pragmatic + honest (documented that bodies are text-scanned). AVOIDABLE-ISSUE SCAN: the SysML-keyword clippy doc-lint nit recurred (backtick/reword camelCase + tool names in docs); already a known class, no systemic fix warranted beyond running authoritative clippy before commit (banked). LESSON: expose model STRUCTURE (types+attributes+actions), not per-type endpoints — generativity comes from the viewer reading structure. Estimate 2 pts held. NEXT: viewerInProgramEdit (N-16 write ops) or the viewer app itself (shape B)."; }
+    part vsaRetroGateR1 : TestResult { :>> id = "63940516-2c7d-4e8f-c220-51627384c00f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "01f80d7"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "claudeOpus"; }
+}
