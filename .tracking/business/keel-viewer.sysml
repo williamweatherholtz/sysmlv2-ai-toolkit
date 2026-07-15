@@ -394,5 +394,6 @@ package ProjectBusinessKeelViewer {
 
     // ── Business gate 5: PENDING human acceptance of N-18 (needs-before-architecture — NOT yet accepted). ──
     verification keelViewerNeedsAccept5 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003c"; :>> title = "keel-viewer encoding-viewpoints Need N-18 accepted (Business gate 5)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AWAITING wweatherholtz's explicit acceptance of N-18 (axis->visual-encoding viewpoints: colour/position/swimlanes/nesting, auto-generated + overridable). Directed 2026-07-15 as a 'HUGE feature'; captured as a Need before architecture. Design direction is D0120 (PROPOSED). No downstream build until this gate passes."; }
+    part keelViewerNeedsAccept5R1 : TestResult { :>> id = "12a80483-5bbe-4b02-b448-7283b10e2f16"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e40db8b"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "wweatherholtz"; :>> notes = "N-18 approved by wweatherholtz (2026-07-15, 'yes this is a huge need. approved') — axis-encoding viewpoints; unblocks D0120."; }
     // (no TestResult yet — N-18 is proposed/unaccepted; the human signs off at the sitting review.)
 }
