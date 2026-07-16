@@ -48,9 +48,9 @@ function renderAgentEvent(data){
   return '';
  }catch(_){return ''}
 }
-let active="orient", reportName="assurance", showAllReview=false;
+let active=TABS.some(([k])=>k===location.hash.slice(1))?location.hash.slice(1):"orient", reportName="assurance", showAllReview=false;
 const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
-TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;draw();render()};nav.appendChild(b)});
+TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;location.hash=k;draw();render()};nav.appendChild(b)});
 function draw(){[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===active))}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${d||''}</div></div>`}
