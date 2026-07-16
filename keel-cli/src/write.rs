@@ -773,6 +773,74 @@ fn sanitize_field(v: &str) -> String {
     v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// A request to create a new item (D0126, `viewerAuthoringEndpoints`).
+pub struct NewItem<'a> {
+    /// `SysML` declaration keyword matching the type's meta-kind: part, requirement, use-case, etc.
+    pub keyword: &'a str,
+    /// The declared type name (e.g. `Issue`, `Need`).
+    pub type_name: &'a str,
+    /// A hint for the element identifier (sanitized; falls back to `<type><uuid8>` if unusable).
+    pub name_hint: &'a str,
+    /// String-valued attributes (written as quoted, sanitized literals).
+    pub string_attrs: &'a [(String, String)],
+    /// Enum-valued attributes as `(attr, EnumType, member)` (written as `EnumType::member`).
+    pub enum_attrs: &'a [(String, String, String)],
+    /// Authoring actor (`createdBy`).
+    pub author: &'a str,
+    /// Authored ISO-8601 date (`createdAt`).
+    pub created_at: &'a str,
+}
+
+/// Create a new item of a declared type in `.tracking/authored.sysml` (D0126, `viewerAuthoringEndpoints`).
+///
+/// Writes the part block with a generated UUID + provenance into the authored-items file (created with
+/// broad imports if absent). String attrs are quoted+sanitized; enum attrs become `EnumType::member`
+/// literals. Additive only — never mutates an existing item; the human commits (guards / `/api/check`
+/// surface any incompleteness inline).
+///
+/// # Errors
+/// Returns [`WriteError`] on I/O failure or a missing insertion point.
+pub fn create_item(root: &Path, it: &NewItem) -> Result<(String, String), WriteError> {
+    use std::fmt::Write as _;
+    let uuid = gen_uuid();
+    let ident = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect() };
+    let mut name = ident(it.name_hint);
+    if name.is_empty() || name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        name = format!("{}{}", it.type_name.to_lowercase(), &uuid[..8.min(uuid.len())]);
+    }
+    let mut lines = String::new();
+    for (k, v) in it.string_attrs {
+        if v.trim().is_empty() { continue; }
+        let _ = writeln!(lines, "        :>> {k} = \"{}\";", sanitize_field(v));
+    }
+    for (k, enum_ty, v) in it.enum_attrs {
+        let (val, ty) = (ident(v), ident(enum_ty));
+        if val.is_empty() || ty.is_empty() { continue; }
+        let _ = writeln!(lines, "        :>> {k} = {ty}::{val};");
+    }
+    let (keyword, type_name, author, created_at) = (it.keyword, it.type_name, it.author, it.created_at);
+    let block = format!(
+        "    {keyword} {name} : {type_name} {{\n        :>> id = \"{uuid}\";\n        :>> createdAt = \"{created_at}\"; :>> createdBy = \"{author}\";\n{lines}    }}\n"
+    );
+    let file = root.join(".tracking").join("authored.sysml");
+    if file.exists() {
+        let content = std::fs::read_to_string(&file)?;
+        let idx = content.rfind('}').ok_or_else(|| WriteError::InsertionPointNotFound("authored.sysml".to_owned()))?;
+        let mut out = String::with_capacity(content.len() + block.len() + 1);
+        out.push_str(&content[..idx]);
+        out.push_str(&block);
+        out.push('\n');
+        out.push_str(&content[idx..]);
+        std::fs::write(&file, out)?;
+    } else {
+        let mut out = String::from("// ProjectAuthored — items created in-canvas via Architect Sure (POST /api/item, D0126).\n// New items land here with generated ids + provenance; relocate to a domain file as they mature.\npackage ProjectAuthored {\n    private import EngineElement::*;\n    private import EngineNeeds::*;\n    private import EngineRequirements::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n\n");
+        out.push_str(&block);
+        out.push_str("}\n");
+        std::fs::write(&file, out)?;
+    }
+    Ok((name, ".tracking/authored.sysml".to_owned()))
+}
+
 /// Next `NNNN` decision number in `<root>/.engine/decisions/` (highest `^\d{4}` + 1).
 fn next_decision_number(decisions_dir: &Path) -> u32 {
     let mut max = 0u32;

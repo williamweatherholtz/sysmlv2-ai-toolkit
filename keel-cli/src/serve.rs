@@ -32,7 +32,7 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.13.0";
+pub const KEEL_API_VERSION: &str = "1.14.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
@@ -48,8 +48,20 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
-    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge",
+    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item",
 ];
+
+/// The `SysML` declaration keyword for a created item, by its type's meta-kind (D0126, `/api/item`). Keeps
+/// CREATE generative + correct: a `requirement`/`use case`/`verification`-def type must be instantiated
+/// with the matching keyword (a bare `part` would not conform). Anything else defaults to `part`.
+fn item_keyword(type_name: &str) -> &'static str {
+    match type_name {
+        "Need" | "SystemRequirement" | "SubsystemRequirement" | "ComponentRequirement" | "Requirement" => "requirement",
+        "UseCase" => "use case",
+        "Test" | "TestPlan" => "verification",
+        _ => "part",
+    }
+}
 
 /// The marker edges the in-program write surface (`/api/edge`, N-16) is permitted to author. A closed
 /// whitelist — the viewer authors typed governance edges (supersede a Need/Decision, add a dependency /
@@ -146,6 +158,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/decision/reject", post(api_decision_reject))
         .route("/api/gate-result", post(api_gate_result))
         .route("/api/edge", post(api_edge))
+        .route("/api/item", post(api_create_item))
         .route("/api/check", get(api_check))
         .route("/api/fingerprint", get(api_fingerprint))
         .layer(middleware::from_fn(log_request))
@@ -430,6 +443,45 @@ async fn api_edge(State(s): State<AppState>, axum::Json(b): axum::Json<EdgeReq>)
     }
     match crate::write::append_marker_edge(&path, &b.marker, &b.from, &b.to) {
         Ok(()) => ok_json(format!("{{\"ok\":true,\"edge\":\"#{} {} -> {}\"}}", b.marker, b.from, b.to)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct StrAttr { name: String, value: String }
+#[derive(serde::Deserialize)]
+struct EnumAttr { name: String, #[serde(rename = "enumType")] enum_type: String, value: String }
+#[derive(serde::Deserialize)]
+struct CreateItemReq {
+    #[serde(rename = "type")]
+    type_name: String,
+    name: Option<String>,
+    #[serde(default)]
+    string_attrs: Vec<StrAttr>,
+    #[serde(default)]
+    enum_attrs: Vec<EnumAttr>,
+    author: Option<String>,
+    date: String,
+}
+
+/// POST /api/item (viewerAuthoringEndpoints, D0126) — create a new item of a declared type through the
+/// guarded write path (`write::create_item`): generated UUID + provenance, string + enum attrs, into
+/// `.tracking/authored.sysml`. Additive only, never auto-commits; run `/api/check` after to surface any
+/// guard obligation (e.g. an untriaged Issue) inline. The keyword is derived from the type's meta-kind.
+async fn api_create_item(State(s): State<AppState>, axum::Json(b): axum::Json<CreateItemReq>) -> Response {
+    let ty = b.type_name.trim();
+    if ty.is_empty() || !ty.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"type must be a declared type name\"}".to_string()).into_response();
+    }
+    let author = b.author.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let strs: Vec<(String, String)> = b.string_attrs.into_iter().map(|a| (a.name, a.value)).collect();
+    let enums: Vec<(String, String, String)> = b.enum_attrs.into_iter().map(|a| (a.name, a.enum_type, a.value)).collect();
+    let new_item = crate::write::NewItem {
+        keyword: item_keyword(ty), type_name: ty, name_hint: b.name.as_deref().unwrap_or(""),
+        string_attrs: &strs, enum_attrs: &enums, author: &author, created_at: &b.date,
+    };
+    match crate::write::create_item(&s.root, &new_item) {
+        Ok((name, path)) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"type\":\"{ty}\",\"path\":\"{path}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }
