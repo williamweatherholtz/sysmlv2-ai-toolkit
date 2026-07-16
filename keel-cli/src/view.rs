@@ -156,6 +156,17 @@ struct Edge {
     to: String,
 }
 
+/// The computed `displayLabel` view (schema §2.3 — declared but historically unbuilt; D0126). The human
+/// label for an element: its authored `title` when present + non-blank, else the immutable `name`
+/// identifier. Titles may duplicate (that is fine — identity is the `name`); `displayLabel` is never
+/// stored, always computed here so every surface labels elements the same way.
+fn display_label(name: &str, info: &ItemInfo) -> String {
+    match info.attrs.get("title") {
+        Some(t) if !t.trim().is_empty() => t.clone(),
+        _ => name.to_string(),
+    }
+}
+
 #[derive(Clone)]
 struct Model {
     items: HashMap<String, ItemInfo>,
@@ -997,6 +1008,7 @@ fn boundary_emit_json(model: &Model, need: &str, slice: &HashSet<String>, cut: &
                 let mut o = vec![
                     ("name".to_string(), Json::s((*n).clone())),
                     ("type".to_string(), Json::s(info.type_name.clone())),
+                    ("displayLabel".to_string(), Json::s(display_label(n, info))),
                 ];
                 if let Some(t) = info.attrs.get("title") {
                     o.push(("title".to_string(), Json::s(t.clone())));
@@ -1118,6 +1130,7 @@ fn section_subgraph_json(model: &Model, names: &HashSet<String>, seed: &str, kin
                 let mut o = vec![
                     ("name".to_string(), Json::s((*n).clone())),
                     ("type".to_string(), Json::s(info.type_name.clone())),
+                    ("displayLabel".to_string(), Json::s(display_label(n, info))),
                 ];
                 if let Some(t) = info.attrs.get("title") {
                     o.push(("title".to_string(), Json::s(t.clone())));
@@ -1942,6 +1955,8 @@ fn item_detail_json(model: &Model, name: &str) -> Json {
     Json::Obj(vec![
         ("found".to_string(), Json::Bool(true)),
         ("name".to_string(), Json::s(name.to_string())),
+        ("displayLabel".to_string(), Json::s(display_label(name, info))),
+        ("title".to_string(), info.attrs.get("title").filter(|t| !t.trim().is_empty()).map_or(Json::Null, |t| Json::s(t.clone()))),
         ("type".to_string(), Json::s(info.type_name.clone())),
         ("marker".to_string(), info.marker.clone().map_or(Json::Null, Json::s)),
         ("attrs".to_string(), Json::Arr(attrs)),
@@ -1949,6 +1964,53 @@ fn item_detail_json(model: &Model, name: &str) -> Json {
         ("outgoing".to_string(), Json::Arr(edges_for(true))),
         ("incoming".to_string(), Json::Arr(edges_for(false))),
     ])
+}
+
+/// The BROWSABLE INDEX (D0126 — browse-first discovery).
+///
+/// Every SUBSTANTIVE item with its computed `displayLabel`, type, authored `createdAt` date, and edge
+/// degree — the register the viewer lists so a user finds elements without knowing an identifier.
+/// Verification bookkeeping (`Test`/`TestResult`) and structural action shells are EXCLUDED by default
+/// (they are reachable via a parent's detail) so the register is about the architecture, not the ~5000
+/// test records. Filtering (type/text/date) is done by the consumer over this list.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn index_json(root: &Path) -> Result<String, ViewError> {
+    const EXCLUDE: [&str; 5] = ["Test", "TestResult", "action", "ActionDef", ""];
+    let model = Model::build(root)?;
+    // edge degree per item (in + out) — a cheap "how connected" signal for the register.
+    let mut degree: HashMap<&str, usize> = HashMap::new();
+    for e in &model.edges {
+        *degree.entry(e.from.as_str()).or_insert(0) += 1;
+        *degree.entry(e.to.as_str()).or_insert(0) += 1;
+    }
+    let mut rows: Vec<(&String, &ItemInfo)> = model
+        .items
+        .iter()
+        .filter(|(_, info)| !EXCLUDE.contains(&info.type_name.as_str()))
+        .collect();
+    rows.sort_by(|a, b| a.1.type_name.cmp(&b.1.type_name).then_with(|| display_label(a.0, a.1).cmp(&display_label(b.0, b.1))));
+    let items: Vec<Json> = rows
+        .iter()
+        .map(|(n, info)| {
+            let date = info.attrs.get("createdAt").or_else(|| info.attrs.get("judgedAt")).cloned().unwrap_or_default();
+            Json::Obj(vec![
+                ("name".to_string(), Json::s((*n).clone())),
+                ("displayLabel".to_string(), Json::s(display_label(n, info))),
+                ("title".to_string(), info.attrs.get("title").filter(|t| !t.trim().is_empty()).map_or(Json::Null, |t| Json::s(t.clone()))),
+                ("type".to_string(), Json::s(info.type_name.clone())),
+                ("date".to_string(), Json::s(date)),
+                ("edges".to_string(), Json::Int(i64::try_from(*degree.get(n.as_str()).unwrap_or(&0)).unwrap_or(0))),
+            ])
+        })
+        .collect();
+    Ok(Json::Obj(vec![
+        ("index".to_string(), Json::s("browsable register of substantive items (D0126); Test/TestResult + action shells excluded".to_string())),
+        ("count".to_string(), Json::Int(i64::try_from(items.len()).unwrap_or(0))),
+        ("items".to_string(), Json::Arr(items)),
+    ])
+    .dump())
 }
 
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
