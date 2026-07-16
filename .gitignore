@@ -62,3 +62,6 @@ __pycache__/
 /*.html
 /orient_output.json
 .playwright-mcp/
+
+# viewer screenshot artifacts (never source)
+architect-sure-*.png
