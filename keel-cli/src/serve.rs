@@ -32,14 +32,14 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.11.0";
+pub const KEEL_API_VERSION: &str = "1.12.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/baseline-compare",
-    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events",
+    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -48,8 +48,13 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
-    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver",
+    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge",
 ];
+
+/// The marker edges the in-program write surface (`/api/edge`, N-16) is permitted to author. A closed
+/// whitelist — the viewer authors typed governance edges (supersede a Need/Decision, add a dependency /
+/// derivation / cover) THROUGH the process, never arbitrary text. Extend by adding a declared marker here.
+const EDGE_MARKER_WHITELIST: &[&str] = &["Supersede", "DependsOn", "DerivedFrom", "Covers", "Resolves", "Dispositions"];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
 const AGENT_MAX_TURNS: &str = "30";
@@ -139,6 +144,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/decision/accept", post(api_decision_accept))
         .route("/api/decision/reject", post(api_decision_reject))
         .route("/api/gate-result", post(api_gate_result))
+        .route("/api/edge", post(api_edge))
+        .route("/api/check", get(api_check))
+        .route("/api/fingerprint", get(api_fingerprint))
         .layer(middleware::from_fn(log_request))
         // viewerKeelApi (D0114 shape B): let a separate local viewer app consume /api/* cross-port
         .layer(middleware::from_fn(cors_localhost))
@@ -392,6 +400,88 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
         Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct EdgeReq {
+    file: String,
+    marker: String,
+    from: String,
+    to: String,
+}
+
+/// POST /api/edge (viewerInProgramEdit, N-16) — author a typed governance marker edge THROUGH the guarded
+/// write API (append-only, idempotent). The primary use is SUPERSEDE: after `/api/decision` scaffolds a
+/// superseding Decision, this adds `#Supersede dependency from d{nnnn} to <need|decision>;` (§2.4 — scope
+/// = superseding Decisions, not a deletion). The `marker` is whitelisted (`EDGE_MARKER_WHITELIST`) and the
+/// endpoints are identifier-shaped — the viewer changes facts through the process, never by free text.
+/// Never auto-commits; run `/api/check` after to surface any guard rejection inline.
+async fn api_edge(State(s): State<AppState>, axum::Json(b): axum::Json<EdgeReq>) -> Response {
+    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    };
+    if !EDGE_MARKER_WHITELIST.contains(&b.marker.as_str()) {
+        return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"marker '{}' not permitted; allowed: {}\"}}", b.marker.replace('"', "'"), EDGE_MARKER_WHITELIST.join(", "))).into_response();
+    }
+    let ident = |x: &str| !x.is_empty() && x.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !ident(&b.from) || !ident(&b.to) {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"from and to must be bare SysML identifiers\"}".to_string()).into_response();
+    }
+    match crate::write::append_marker_edge(&path, &b.marker, &b.from, &b.to) {
+        Ok(()) => ok_json(format!("{{\"ok\":true,\"edge\":\"#{} {} -> {}\"}}", b.marker, b.from, b.to)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// GET /api/check (viewerInProgramEdit, N-16) — run the honest-state gates (parse-validate + all
+/// `GUARD_NAMES`) against the working tree and return the verdict, so an in-program write that would be
+/// REJECTED is surfaced inline (D0098 honest state — the same gates the pre-commit hook enforces). Returns
+/// `{ok, blocking:[{guard,violations[]}], warnings:[{guard,warnings[]}], parseErrors:[…]}`. Not cached
+/// (the point is to reflect the just-written working tree); `block_in_place` so guards' git shell-outs
+/// don't starve the runtime.
+async fn api_check(State(s): State<AppState>) -> Response {
+    let json = tokio::task::block_in_place(|| {
+        let root = s.root.as_path();
+        let report = crate::validate_root(root);
+        let mut parse_errors: Vec<Json> = report.errors.iter()
+            .map(|e| Json::s(format!("{}: {}", e.file.display(), e.message)))
+            .collect();
+        parse_errors.extend(report.diagnostics.iter().map(|(p, d)| Json::s(format!("{}: {}", p.display(), d.message))));
+        let mut blocking: Vec<Json> = Vec::new();
+        let mut warnings: Vec<Json> = Vec::new();
+        for name in crate::guards::GUARD_NAMES {
+            if let Some(rep) = crate::guards::run_one(name, root) {
+                if !rep.violations.is_empty() {
+                    blocking.push(Json::Obj(vec![
+                        ("guard".to_string(), Json::s(name.to_string())),
+                        ("violations".to_string(), Json::Arr(rep.violations.iter().map(|v| Json::s(v.clone())).collect())),
+                    ]));
+                }
+                if !rep.warnings.is_empty() {
+                    warnings.push(Json::Obj(vec![
+                        ("guard".to_string(), Json::s(name.to_string())),
+                        ("warnings".to_string(), Json::Arr(rep.warnings.iter().map(|v| Json::s(v.clone())).collect())),
+                    ]));
+                }
+            }
+        }
+        let ok = parse_errors.is_empty() && blocking.is_empty();
+        Json::Obj(vec![
+            ("ok".to_string(), Json::Bool(ok)),
+            ("parseErrors".to_string(), Json::Arr(parse_errors)),
+            ("blocking".to_string(), Json::Arr(blocking)),
+            ("warnings".to_string(), Json::Arr(warnings)),
+        ]).dump()
+    });
+    ok_json(json)
+}
+
+/// GET /api/fingerprint (viewerInProgramEdit, N-16 / D0108) — the model's current content fingerprint.
+/// A viewer captures it when a write form opens and re-checks at submit: a changed fingerprint means the
+/// model moved underneath (a possible concurrent edit, D0108) — the viewer flags a conflict rather than
+/// silently overwriting. Cheap (stat-only), never cached.
+async fn api_fingerprint(State(s): State<AppState>) -> Response {
+    ok_json(format!("{{\"fingerprint\":\"{}\"}}", fingerprint(&s.root)))
 }
 
 /// Resolve a repo-relative `.sysml` path safely (no absolute paths, no `..` traversal, stays under root).

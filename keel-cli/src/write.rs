@@ -541,8 +541,21 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
 /// # Errors
 /// `WriteError::InsertionPointNotFound` if the file has no closing brace; `WriteError::Io`.
 pub fn append_resolves_edge(path: &Path, from: &str, to: &str) -> Result<(), WriteError> {
+    append_marker_edge(path, "Resolves", from, to)
+}
+
+/// Append a typed marker edge `#<marker> dependency from <from> to <to>;` before the file's last `}`.
+///
+/// Append-only, idempotent — a no-op if the exact edge already exists. The generalized primitive behind
+/// `append_resolves_edge`; also carries `#Supersede` (viewerInProgramEdit, N-16 — supersede a
+/// Need/Decision via a superseding Decision + this edge) and any other declared marker edge. The CALLER
+/// (e.g. the serve endpoint) whitelists which markers are permitted — this helper stays generic.
+///
+/// # Errors
+/// Returns [`WriteError`] if the file cannot be read/written, or has no closing `}` insertion point.
+pub fn append_marker_edge(path: &Path, marker: &str, from: &str, to: &str) -> Result<(), WriteError> {
     let content = std::fs::read_to_string(path)?;
-    let edge = format!("#Resolves dependency from {from} to {to};");
+    let edge = format!("#{marker} dependency from {from} to {to};");
     if content.contains(&edge) {
         return Ok(()); // already linked
     }
