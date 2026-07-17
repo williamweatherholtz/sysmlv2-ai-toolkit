@@ -920,6 +920,44 @@ pub(crate) fn slice_json(root: &Path, seed: &str, depth: usize, edges: &HashSet<
     Ok(section_subgraph_json(&model, &names, seed, "slice"))
 }
 
+/// System-bound analysis slices (srViewerSystemBoundViews, D0126) — dynamic views from a shifting focus.
+///
+/// `kind`:
+/// - `children` — the DOWNSTREAM closure of the focus (what it decomposes into / governs).
+/// - `ancestry` — the UPSTREAM closure (the trace chain back to the governing Need/Decision).
+/// - `siblings` — items of the SAME TYPE as the focus that share a parent with it (same source of an
+///   incoming edge) — e.g. the other `SystemRequirement`s satisfying the same Need.
+///
+/// Pure computed views over the typed graph (no stored state); rendered in the slice subgraph shape so a
+/// client draws them identically. Elements superpose + compose linearly along typed edges (the human's
+/// intuition), so each analysis is just a directional/relational cut.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub(crate) fn relations_json(root: &Path, focus: &str, kind: &str) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    if !model.items.contains_key(focus) {
+        return Ok(section_subgraph_json(&model, &HashSet::new(), focus, kind));
+    }
+    let no_edges: HashSet<String> = HashSet::new();
+    let names: HashSet<String> = match kind {
+        "ancestry" => configurable_slice(&model, focus, 20, &no_edges, SliceDir::Up),
+        "siblings" => {
+            let ty = model.items.get(focus).map_or_else(String::new, |i| i.type_name.clone());
+            let parents: HashSet<&str> = model.edges.iter().filter(|e| e.to == focus).map(|e| e.from.as_str()).collect();
+            let mut set: HashSet<String> = std::iter::once(focus.to_string()).chain(parents.iter().map(|p| (*p).to_string())).collect();
+            for e in &model.edges {
+                if parents.contains(e.from.as_str()) && e.to != focus && model.items.get(&e.to).is_some_and(|i| i.type_name == ty) {
+                    set.insert(e.to.clone());
+                }
+            }
+            set
+        }
+        _ => configurable_slice(&model, focus, 20, &no_edges, SliceDir::Down), // "children" (default)
+    };
+    Ok(section_subgraph_json(&model, &names, focus, kind))
+}
+
 /// A deterministic ITERATION PLAN for iterative AI critique (viewerIterativeCritique, N-15): the ordered
 /// AXIS (the slice from `seed`) and, per element, its type + local context (neighbour names) + the lens.
 ///
