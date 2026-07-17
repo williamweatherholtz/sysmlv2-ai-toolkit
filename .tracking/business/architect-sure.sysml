@@ -127,9 +127,72 @@ package ProjectArchitectSure {
         :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
     }
 
+    // ── scope-aware authoring + system-bound analysis (human direction 2026-07-17) ──
+    use case ucAsCreateWithLinkage : UseCase {
+        :>> id = "0a5c000b-0114-4c8b-9d2e-000000000c0b";
+        :>> title = "Create an item together with its traceability edges";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> description = "Creating an item is only useful if it is CONNECTED. The user creates a new element and, in the same flow, links it upstream and/or downstream to existing items via typed edges — so it lands traceable, not orphaned.";
+        :>> mainSuccess = "New-item flow offers 'connect to' targets (upstream + downstream) with the edge kinds valid for the pair; on create, keel authors the item + the edges via /api/item + /api/edge; guards run inline.";
+        :>> extensions = "If a required edge is missing, /api/check flags the orphan/rootedness obligation inline before commit.";
+    }
+    use case ucAsScopedCreate : UseCase {
+        :>> id = "0a5c000c-0114-4c8b-9d2e-000000000c0c";
+        :>> title = "Scope- and process-aware creation (contextual to the active filter)";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> description = "Creation is contextual to what is in view. When the scope is filtered (e.g. to safety artifacts), the user can create items IN scope and the items those directly interface with at either end (upstream/downstream), and NOT arbitrary out-of-scope types. Example (a safety/STPA scope): create Loss Scenarios (in scope), downstream Safety/System Requirements, or upstream Losses — never a bare Need. The offered types + connectors come from a DECLARED relationship grammar (generic, read from the connected project), so this holds for any domain, not just safety.";
+        :>> mainSuccess = "Given the active scope + the declared grammar, the New-item picker offers only in-scope types + their valid upstream/downstream connectors; out-of-scope creation is not offered.";
+        :>> extensions = "With no scope filter, the full declared grammar is available. The grammar is declared once (metamodel) and drives every domain generatively.";
+    }
+    use case ucAsSystemBoundAnalysis : UseCase {
+        :>> id = "0a5c000d-0114-4c8b-9d2e-000000000c0d";
+        :>> title = "Sibling / children / ancestry analysis (view-modify-critique)";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> description = "The user runs system-bound analyses as DYNAMIC views with a shifting focus: SIBLINGS (same type sharing a parent), CHILDREN (the downstream of a focus), and ANCESTRY (the upstream traceability chain of a focus) — and can view, modify, or critique the items in that set. These are computed directional slices of the typed graph, exploiting that elements compose linearly along typed edges (superposition).";
+        :>> mainSuccess = "From a focused element, choose Siblings / Children / Ancestry -> the graph + a working set re-anchor to that computed slice; VMC actions apply to the set (e.g. critique all siblings for consistency).";
+        :>> extensions = "The focus shifts as the user drills; each analysis is a pure computed view (no stored state).";
+    }
+
+    requirement srViewerCreateLinkage : SystemRequirement {
+        :>> id = "0a5b0005-0114-4c8b-9d2e-000000000b05";
+        :>> title = "Create authors traceability edges (not orphans)";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The create flow shall let the user attach typed upstream/downstream edges to new (and existing) items in the same action, via the guarded edge-write API, so items land connected. Edge kinds offered are the closed algebra keel permits for the pair.";
+        :>> rationale = "The human (2026-07-17): 'I don't see a way to create linkage/traceability to other items.' An unconnected item is invisible to trace/coverage; linkage is the point of the model.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
+    }
+    requirement srViewerRelationshipGrammar : SystemRequirement {
+        :>> id = "0a5b0006-0114-4c8b-9d2e-000000000b06";
+        :>> title = "Declared relationship grammar (type x edge x type), exposed via the API";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> statement = "keel shall expose a DECLARED relationship grammar — which (sourceType, edgeKind, targetType) triples are valid — built on the existing closed edge algebra + EdgeRule/ElementRule layer, so a client can offer only valid connections/creations generically for ANY project's schema (not hardcoded per domain). The grammar is metamodel, declared once; the deliverable's domain vocabulary stays in the downstream project (CLAUDE.md §1).";
+        :>> rationale = "Enables scope/process-aware creation (srViewerScopedAuthoring) + valid-edge offers (srViewerCreateLinkage) generatively. Governed by a Decision (metamodel change).";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::demo;
+    }
+    requirement srViewerScopedAuthoring : SystemRequirement {
+        :>> id = "0a5b0007-0114-4c8b-9d2e-000000000b07";
+        :>> title = "Scope- and process-aware creation constrained to the active filter";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> statement = "Given an active scope filter, the viewer shall offer creation only of in-scope types + the types they directly interface with upstream/downstream (per the declared grammar), and shall not offer out-of-scope creation. With no filter, the full grammar is available.";
+        :>> rationale = "The human (2026-07-17): focus the scope, focus the actionable context to that scope, allow modification at that scope (+ the adjacent interfacing scope). Keeps authoring disciplined + on-topic per the current lens.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::demo;
+    }
+    requirement srViewerSystemBoundViews : SystemRequirement {
+        :>> id = "0a5b0008-0114-4c8b-9d2e-000000000b08";
+        :>> title = "Sibling / children / ancestry dynamic views with a shifting focus";
+        :>> createdAt = "2026-07-17"; :>> createdBy = "wweatherholtz";
+        :>> statement = "The viewer shall compute, from a focused element, SIBLING (same type + shared parent), CHILDREN (downstream closure), and ANCESTRY (upstream trace) slices as dynamic views with a shifting focus, and allow view/modify/critique over each set. Pure computed views over the typed graph (no stored state).";
+        :>> rationale = "The human (2026-07-17): system-bound analyses (sibling/children/ancestry VMC) are 'dynamic views of the data with a shifting focused element' — valuable because elements superpose + compose linearly along typed edges.";
+        :>> kind = RequirementKind::functional; :>> priority = Priority::should; :>> verificationMethod = VerificationMethod::demo;
+    }
+
     // ── satisfy edges: SR satisfies the upstream Need ────────────────
     satisfy nViewerExplorableGraph by srViewerContextActions;
     satisfy nViewerExplorableGraph by srViewerNavHistory;
     satisfy nViewerExplorableGraph by srViewerSearchDiscovery;
     satisfy nViewerInProgramEdit by srViewerAuthoringSurface;
+    satisfy nViewerInProgramEdit by srViewerCreateLinkage;
+    satisfy nViewerInProgramEdit by srViewerRelationshipGrammar;
+    satisfy nViewerInProgramEdit by srViewerScopedAuthoring;
+    satisfy nViewerExplorableGraph by srViewerSystemBoundViews;
 }
