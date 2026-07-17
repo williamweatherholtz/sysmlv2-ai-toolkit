@@ -63,10 +63,10 @@ fn item_keyword(type_name: &str) -> &'static str {
     }
 }
 
-/// The marker edges the in-program write surface (`/api/edge`, N-16) is permitted to author. A closed
-/// whitelist — the viewer authors typed governance edges (supersede a Need/Decision, add a dependency /
-/// derivation / cover) THROUGH the process, never arbitrary text. Extend by adding a declared marker here.
-const EDGE_MARKER_WHITELIST: &[&str] = &["Supersede", "DependsOn", "DerivedFrom", "Covers", "Resolves", "Dispositions"];
+/// The edge kinds the in-program write surface (`/api/edge`, N-16 + `viewerCreateLinkage` D0126) is
+/// permitted to author — the closed algebra: native `satisfy`/`allocate` + the governance markers. The
+/// viewer authors typed traceability THROUGH the process, never arbitrary text. Extend by adding a kind.
+const AUTHORABLE_EDGE_KINDS: &[&str] = &["satisfy", "allocate", "Supersede", "DependsOn", "DerivedFrom", "Covers", "Resolves", "Dispositions"];
 
 /// Per-action turn cap (the agent-bridge cost guardrail, D0094) + max concurrent agent runs.
 const AGENT_MAX_TURNS: &str = "30";
@@ -419,31 +419,35 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
 
 #[derive(serde::Deserialize)]
 struct EdgeReq {
-    file: String,
-    marker: String,
+    /// Target file (repo-relative .sysml); defaults to `.tracking/authored.sysml` when omitted.
+    file: Option<String>,
+    /// The edge kind (closed algebra): `satisfy`/`allocate` or a governance marker. `marker` is a legacy alias.
+    kind: Option<String>,
+    marker: Option<String>,
     from: String,
     to: String,
 }
 
-/// POST /api/edge (viewerInProgramEdit, N-16) — author a typed governance marker edge THROUGH the guarded
-/// write API (append-only, idempotent). The primary use is SUPERSEDE: after `/api/decision` scaffolds a
-/// superseding Decision, this adds `#Supersede dependency from d{nnnn} to <need|decision>;` (§2.4 — scope
-/// = superseding Decisions, not a deletion). The `marker` is whitelisted (`EDGE_MARKER_WHITELIST`) and the
-/// endpoints are identifier-shaped — the viewer changes facts through the process, never by free text.
-/// Never auto-commits; run `/api/check` after to surface any guard rejection inline.
+/// POST /api/edge (viewerInProgramEdit N-16 + viewerCreateLinkage D0126) — author a typed traceability
+/// edge THROUGH the guarded write API (append-only, idempotent): native `satisfy`/`allocate` or a
+/// governance marker (`#Kind dependency from…to…`). `kind` is whitelisted (`AUTHORABLE_EDGE_KINDS`),
+/// endpoints are identifier-shaped, and `file` defaults to `.tracking/authored.sysml` (created if absent)
+/// — the viewer changes facts through the process, never by free text. Never auto-commits; run `/api/check`.
 async fn api_edge(State(s): State<AppState>, axum::Json(b): axum::Json<EdgeReq>) -> Response {
-    let Some(path) = safe_repo_path(&s.root, &b.file) else {
-        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
-    };
-    if !EDGE_MARKER_WHITELIST.contains(&b.marker.as_str()) {
-        return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"marker '{}' not permitted; allowed: {}\"}}", b.marker.replace('"', "'"), EDGE_MARKER_WHITELIST.join(", "))).into_response();
+    let kind = b.kind.or(b.marker).unwrap_or_default();
+    if !AUTHORABLE_EDGE_KINDS.contains(&kind.as_str()) {
+        return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"edge kind '{}' not permitted; allowed: {}\"}}", kind.replace('"', "'"), AUTHORABLE_EDGE_KINDS.join(", "))).into_response();
     }
     let ident = |x: &str| !x.is_empty() && x.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
     if !ident(&b.from) || !ident(&b.to) {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"from and to must be bare SysML identifiers\"}".to_string()).into_response();
     }
-    match crate::write::append_marker_edge(&path, &b.marker, &b.from, &b.to) {
-        Ok(()) => ok_json(format!("{{\"ok\":true,\"edge\":\"#{} {} -> {}\"}}", b.marker, b.from, b.to)),
+    let file_rel = b.file.filter(|f| !f.is_empty()).unwrap_or_else(|| ".tracking/authored.sysml".to_string());
+    if safe_repo_path(&s.root, &file_rel).is_none() {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    }
+    match crate::write::author_edge(&s.root, &file_rel, &kind, &b.from, &b.to) {
+        Ok(()) => ok_json(format!("{{\"ok\":true,\"edge\":\"{kind} {} -> {}\"}}", b.from, b.to)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }

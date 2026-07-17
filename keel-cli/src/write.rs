@@ -540,8 +540,68 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
 ///
 /// # Errors
 /// `WriteError::InsertionPointNotFound` if the file has no closing brace; `WriteError::Io`.
+/// Header for the API-authored items/edges file (`.tracking/authored.sysml`), created on first write.
+const AUTHORED_HEADER: &str = "// ProjectAuthored — items + edges created in-canvas via Architect Sure (POST /api/item, /api/edge; D0126).\n// New items land here with generated ids + provenance; relocate to a domain file as they mature.\npackage ProjectAuthored {\n    private import EngineElement::*;\n    private import EngineNeeds::*;\n    private import EngineRequirements::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n\n";
+
+/// Append a `#Resolves` marker edge (a resolver → the Issue it resolves).
+///
+/// # Errors
+/// Returns [`WriteError`] if the file cannot be read/written or has no closing `}` insertion point.
 pub fn append_resolves_edge(path: &Path, from: &str, to: &str) -> Result<(), WriteError> {
     append_marker_edge(path, "Resolves", from, to)
+}
+
+/// The `SysML` text for a typed edge, per the closed algebra (D0126, `viewerCreateLinkage`).
+/// Native forms for `satisfy`/`allocate`; the marker form (`#Kind dependency from…to…`) otherwise.
+fn edge_line(kind: &str, from: &str, to: &str) -> String {
+    match kind.to_lowercase().as_str() {
+        "satisfy" => format!("satisfy {from} by {to};"),
+        "allocate" => format!("allocate {from} to {to};"),
+        _ => format!("#{kind} dependency from {from} to {to};"), // caller passes the PascalCase marker
+    }
+}
+
+/// Insert `line` (indented) before the file's last `}` — append-only, idempotent (no-op if already present).
+fn append_line_before_close(path: &Path, line: &str) -> Result<(), WriteError> {
+    let content = std::fs::read_to_string(path)?;
+    if content.contains(line) {
+        return Ok(());
+    }
+    let lines: Vec<&str> = content.lines().collect();
+    let close = lines.iter().rposition(|l| l.trim() == "}").ok_or_else(|| WriteError::InsertionPointNotFound(line.to_owned()))?;
+    let mut out = String::with_capacity(content.len() + line.len() + 6);
+    for (i, l) in lines.iter().enumerate() {
+        if i == close {
+            out.push_str("    ");
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str(l);
+        out.push('\n');
+    }
+    std::fs::write(path, out)?;
+    Ok(())
+}
+
+/// Author a typed edge (D0126, `viewerCreateLinkage`).
+///
+/// Native `satisfy`/`allocate` or a marker edge, appended into `file_rel` — creating
+/// `.tracking/authored.sysml` (with imports) if that is the target and absent. Additive, idempotent.
+///
+/// # Errors
+/// Returns [`WriteError`] on I/O failure, a missing insertion point, or an absent non-authored target.
+pub fn author_edge(root: &Path, file_rel: &str, kind: &str, from: &str, to: &str) -> Result<(), WriteError> {
+    let line = edge_line(kind, from, to);
+    let path = root.join(file_rel);
+    if path.exists() {
+        return append_line_before_close(&path, &line);
+    }
+    if file_rel.replace('\\', "/").ends_with("authored.sysml") {
+        let out = format!("{AUTHORED_HEADER}    {line}\n}}\n");
+        std::fs::write(&path, out)?;
+        return Ok(());
+    }
+    Err(WriteError::InsertionPointNotFound(file_rel.to_owned()))
 }
 
 /// Append a typed marker edge `#<marker> dependency from <from> to <to>;` before the file's last `}`.
@@ -554,25 +614,7 @@ pub fn append_resolves_edge(path: &Path, from: &str, to: &str) -> Result<(), Wri
 /// # Errors
 /// Returns [`WriteError`] if the file cannot be read/written, or has no closing `}` insertion point.
 pub fn append_marker_edge(path: &Path, marker: &str, from: &str, to: &str) -> Result<(), WriteError> {
-    let content = std::fs::read_to_string(path)?;
-    let edge = format!("#{marker} dependency from {from} to {to};");
-    if content.contains(&edge) {
-        return Ok(()); // already linked
-    }
-    let lines: Vec<&str> = content.lines().collect();
-    let close = lines.iter().rposition(|l| l.trim() == "}").ok_or_else(|| WriteError::InsertionPointNotFound(to.to_owned()))?;
-    let mut out = String::with_capacity(content.len() + edge.len() + 6);
-    for (i, line) in lines.iter().enumerate() {
-        if i == close {
-            out.push_str("    ");
-            out.push_str(&edge);
-            out.push('\n');
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    std::fs::write(path, out)?;
-    Ok(())
+    append_line_before_close(path, &edge_line(marker, from, to))
 }
 
 /// Append a `Measurement` datapoint for an Indicator (D0089) as new linked items.
@@ -833,7 +875,7 @@ pub fn create_item(root: &Path, it: &NewItem) -> Result<(String, String), WriteE
         out.push_str(&content[idx..]);
         std::fs::write(&file, out)?;
     } else {
-        let mut out = String::from("// ProjectAuthored — items created in-canvas via Architect Sure (POST /api/item, D0126).\n// New items land here with generated ids + provenance; relocate to a domain file as they mature.\npackage ProjectAuthored {\n    private import EngineElement::*;\n    private import EngineNeeds::*;\n    private import EngineRequirements::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n\n");
+        let mut out = String::from(AUTHORED_HEADER);
         out.push_str(&block);
         out.push_str("}\n");
         std::fs::write(&file, out)?;
