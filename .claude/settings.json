@@ -17,7 +17,8 @@
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python .engine/tools/triage_reminder.py" }
+          { "type": "command", "command": "python .engine/tools/triage_reminder.py" },
+          { "type": "command", "command": "python .engine/tools/out_of_band_check.py" }
         ]
       }
     ]
