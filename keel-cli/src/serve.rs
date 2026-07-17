@@ -32,7 +32,7 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.16.0";
+pub const KEEL_API_VERSION: &str = "1.17.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
@@ -48,7 +48,7 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
-    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item",
+    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item", "/api/item/attr",
 ];
 
 /// The `SysML` declaration keyword for a created item, by its type's meta-kind (D0126, `/api/item`). Keeps
@@ -161,6 +161,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/gate-result", post(api_gate_result))
         .route("/api/edge", post(api_edge))
         .route("/api/item", post(api_create_item))
+        .route("/api/item/attr", post(api_set_attr))
         .route("/api/check", get(api_check))
         .route("/api/fingerprint", get(api_fingerprint))
         .layer(middleware::from_fn(log_request))
@@ -488,6 +489,45 @@ async fn api_create_item(State(s): State<AppState>, axum::Json(b): axum::Json<Cr
     };
     match crate::write::create_item(&s.root, &new_item) {
         Ok((name, path)) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"type\":\"{ty}\",\"path\":\"{path}\"}}")),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+/// Types whose content is GOVERNED — an edit must go through a superseding Decision, not an in-place
+/// overwrite (D0126 `viewerEditItem` / §2.4). Other types are owner-of-record editable (D0108).
+const GOVERNED_TYPES: &[&str] = &["Decision", "Need", "SystemRequirement", "SubsystemRequirement"];
+
+#[derive(serde::Deserialize)]
+struct SetAttrReq {
+    item: String,
+    attr: String,
+    value: String,
+    #[serde(rename = "enumType")]
+    enum_type: Option<String>,
+    #[serde(rename = "itemType")]
+    item_type: Option<String>,
+}
+
+/// POST /api/item/attr (viewerEditItem, D0126) — set an attribute on an existing NON-GOVERNED item in
+/// place (owner-of-record, D0108). Governed types (`GOVERNED_TYPES`) are refused — they must supersede.
+/// String value quoted+sanitized; an `enumType` writes an `EnumType::member` literal. Never auto-commits;
+/// run `/api/check` after.
+async fn api_set_attr(State(s): State<AppState>, axum::Json(b): axum::Json<SetAttrReq>) -> Response {
+    if let Some(t) = b.item_type.as_deref() {
+        if GOVERNED_TYPES.contains(&t) {
+            return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{t} is governed — edit via Supersede (a superseding Decision), not in place\"}}")).into_response();
+        }
+    }
+    let ident_ok = |x: &str| !x.is_empty() && x.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !ident_ok(&b.item) || !ident_ok(&b.attr) {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"item and attr must be bare identifiers\"}".to_string()).into_response();
+    }
+    let literal = match b.enum_type.as_deref().filter(|t| !t.is_empty()) {
+        Some(ty) if ty.chars().all(|c| c.is_ascii_alphanumeric()) && b.value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') => format!("{ty}::{}", b.value),
+        _ => format!("\"{}\"", b.value.replace('"', "'").replace(['\n', '\r', '\t'], " ")),
+    };
+    match crate::write::set_attr(&s.root, &b.item, &b.attr, &literal) {
+        Ok(path) => ok_json(format!("{{\"ok\":true,\"item\":\"{}\",\"attr\":\"{}\",\"path\":\"{path}\"}}", b.item, b.attr)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }

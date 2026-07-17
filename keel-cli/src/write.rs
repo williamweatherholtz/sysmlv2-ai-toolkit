@@ -540,8 +540,50 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
 ///
 /// # Errors
 /// `WriteError::InsertionPointNotFound` if the file has no closing brace; `WriteError::Io`.
+/// Set (or insert) a single attribute on an existing item's part, in place (D0126, `viewerEditItem`).
+///
+/// Finds the item's declaration across `.tracking/`, then replaces the `:>> <attr> = …;` inside its block
+/// (or inserts it after the `{`). `literal` is the already-formed value (`"text"` or `EnumType::member`).
+/// Owner-of-record edit (D0108) — the CALLER refuses governed types (which must supersede). Never commits.
+///
+/// # Errors
+/// Returns [`WriteError::TaskNotFound`] if the item isn't found, or on I/O / malformed-block failure.
+pub fn set_attr(root: &Path, item: &str, attr: &str, literal: &str) -> Result<String, WriteError> {
+    let decl_kw = ["part ", "requirement ", "use case ", "action ", "verification "];
+    for file in crate::collect_sysml(&root.join(".tracking")) {
+        let content = std::fs::read_to_string(&file)?;
+        // locate the item's declaration line: a keyword line naming `<item> :`
+        let needle = format!("{item} :");
+        let Some(decl_off) = content.match_indices(&needle).find_map(|(i, _)| {
+            let line_start = content[..i].rfind('\n').map_or(0, |n| n + 1);
+            let line = &content[line_start..i];
+            decl_kw.iter().any(|k| line.trim_start().starts_with(k)).then_some(line_start)
+        }) else { continue; };
+        // block end: the first line that is a bare `}` at 4-space indent after the declaration
+        let after = &content[decl_off..];
+        let rel_end = after.find("\n    }").map_or(after.len(), |n| n + 6);
+        let block_end = decl_off + rel_end;
+        let block = &content[decl_off..block_end];
+        let attr_pat = format!(":>> {attr} ");
+        let new_attr = format!(":>> {attr} = {literal};");
+        let updated_block = if let Some(ap) = block.find(&attr_pat) {
+            // replace from `:>> attr` to the terminating `;`
+            let semi = block[ap..].find(';').map(|s| ap + s + 1).ok_or_else(|| WriteError::InsertionPointNotFound(attr.to_owned()))?;
+            format!("{}{}{}", &block[..ap], new_attr, &block[semi..])
+        } else {
+            // insert after the opening `{` of the declaration
+            let brace = block.find('{').ok_or_else(|| WriteError::InsertionPointNotFound(item.to_owned()))?;
+            format!("{}{{\n        {}{}", &block[..brace], new_attr, &block[brace + 1..])
+        };
+        let out = format!("{}{}{}", &content[..decl_off], updated_block, &content[block_end..]);
+        std::fs::write(&file, out)?;
+        return Ok(file.strip_prefix(root).unwrap_or(&file).to_string_lossy().replace('\\', "/"));
+    }
+    Err(WriteError::TaskNotFound(item.to_owned()))
+}
+
 /// Header for the API-authored items/edges file (`.tracking/authored.sysml`), created on first write.
-const AUTHORED_HEADER: &str = "// ProjectAuthored — items + edges created in-canvas via Architect Sure (POST /api/item, /api/edge; D0126).\n// New items land here with generated ids + provenance; relocate to a domain file as they mature.\npackage ProjectAuthored {\n    private import EngineElement::*;\n    private import EngineNeeds::*;\n    private import EngineRequirements::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n\n";
+const AUTHORED_HEADER: &str = "// ProjectAuthored — items + edges created in-canvas via Architect Sure (POST /api/item, /api/edge; D0126).\n// New items land here with generated ids + provenance; relocate to a domain file as they mature.\npackage ProjectAuthored {\n    private import EngineElement::*;\n    private import EngineNeeds::*;\n    private import EngineRequirements::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n    private import EngineArchitecture::*;\n    private import EngineIndicator::*;\n    private import EngineComputed::*;\n    private import EngineProcess::*;\n    private import EngineSkills::*;\n\n";
 
 /// Append a `#Resolves` marker edge (a resolver → the Issue it resolves).
 ///
