@@ -1168,5 +1168,6 @@ package EngineBacklog {
         part viewerSystemBoundViewsDoDR1 : TestResult { :>> id = "ce65bfc1-96d0-45dc-803c-390f013b2594"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d21ee73"; :>> judgedAt = "2026-07-17"; :>> judgedBy = "claudeOpus"; }
         action viewerCreateLinkage;
         verification viewerCreateLinkageDoD : Test { :>> id = "bc9eae8c-81f0-44fb-9a38-0a9a6a1d91d5"; :>> method = VerificationMethod::demo; :>> procedureText = "srViewerCreateLinkage (D0126): create authors traceability edges, not orphans. viewer: the New-item flow (+ a connect action on existing items) offers upstream/downstream 'connect to' targets with the valid edge kinds for the pair (closed algebra); on create, author the item (/api/item) + edges (/api/edge) in one flow; inline /api/check. Depends partly on srViewerRelationshipGrammar for which edge kinds are valid per pair (until then, offer the full algebra + let guards/check validate)."; }
+        part viewerCreateLinkageDoDR1 : TestResult { :>> id = "b516d19e-4c0c-4a21-ae4c-e92b1d4c89c3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1e7f524"; :>> judgedAt = "2026-07-17"; :>> judgedBy = "claudeOpus"; }
     }
 }
