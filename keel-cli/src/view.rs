@@ -2051,6 +2051,52 @@ pub fn index_json(root: &Path) -> Result<String, ViewError> {
     .dump())
 }
 
+/// The RELATIONSHIP GRAMMAR (D0126/D0127) — computed, not authored.
+///
+/// The distinct `(sourceType, edgeKind, targetType)` triples that ACTUALLY occur in the model, plus a
+/// per-type up/down summary. This is the observed grammar: what connects to what, derived from real
+/// structure (a view, §2.1) — so a client offers only valid, in-scope connections/creations generically
+/// for ANY project's schema, with zero authored metamodel. `byType[T].down` = kinds+types T points at;
+/// `byType[T].up` = kinds+types that point at T.
+///
+/// # Errors
+/// Returns [`ViewError`] on a parse failure.
+pub fn grammar_json(root: &Path) -> Result<String, ViewError> {
+    use std::collections::BTreeSet;
+    let model = Model::build(root)?;
+    let ty = |n: &str| model.items.get(n).map_or("", |i| i.type_name.as_str());
+    let mut triples: BTreeSet<(String, String, String)> = BTreeSet::new();
+    for e in &model.edges {
+        let (f, t) = (ty(&e.from), ty(&e.to));
+        if f.is_empty() || t.is_empty() { continue; }
+        triples.insert((f.to_string(), e.kind.clone(), t.to_string()));
+    }
+    let triples_json: Vec<Json> = triples.iter().map(|(f, k, t)| Json::Obj(vec![
+        ("from".to_string(), Json::s(f.clone())),
+        ("edge".to_string(), Json::s(k.clone())),
+        ("to".to_string(), Json::s(t.clone())),
+    ])).collect();
+    // per-type up/down
+    let mut types: BTreeSet<&str> = BTreeSet::new();
+    for (f, _, t) in &triples { types.insert(f); types.insert(t); }
+    let by_type: Vec<Json> = types.iter().map(|ty_name| {
+        let down: Vec<Json> = triples.iter().filter(|(f, _, _)| f == ty_name)
+            .map(|(_, k, t)| Json::Obj(vec![("edge".to_string(), Json::s(k.clone())), ("type".to_string(), Json::s(t.clone()))])).collect();
+        let up: Vec<Json> = triples.iter().filter(|(_, _, t)| t == ty_name)
+            .map(|(f, k, _)| Json::Obj(vec![("edge".to_string(), Json::s(k.clone())), ("type".to_string(), Json::s(f.clone()))])).collect();
+        Json::Obj(vec![
+            ("type".to_string(), Json::s((*ty_name).to_string())),
+            ("down".to_string(), Json::Arr(down)),
+            ("up".to_string(), Json::Arr(up)),
+        ])
+    }).collect();
+    Ok(Json::Obj(vec![
+        ("grammar".to_string(), Json::s("observed (sourceType, edge, targetType) triples — the computed relationship grammar (D0126/D0127)".to_string())),
+        ("triples".to_string(), Json::Arr(triples_json)),
+        ("byType".to_string(), Json::Arr(by_type)),
+    ]).dump())
+}
+
 // ── assurance coverage (D0079 C — the computed-state.md coverageState/satisfaction/gaps view) ──
 // For each Need / SystemRequirement / Decision: is there COMPLETE + PASSING + NON-STALE evidence
 // it has been addressed? Verifier kinds, strongest first:

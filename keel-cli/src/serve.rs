@@ -32,14 +32,14 @@ const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.15.0";
+pub const KEEL_API_VERSION: &str = "1.16.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/baseline-compare",
-    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations",
+    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations", "/api/grammar",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -137,6 +137,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/slice", get(api_slice))
         .route("/api/index", get(api_index))
         .route("/api/relations", get(api_relations))
+        .route("/api/grammar", get(api_grammar))
         // viewerChangeImpact (N-10) — blast radius from a focus, grouped by distance
         .route("/api/change-impact", get(api_change_impact))
         // viewerExportShare (N-12) — a viewpoint snapshot stamped with commit + as-of + scope
@@ -1111,6 +1112,13 @@ async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Resp
 /// elements without knowing an identifier. Cached per fingerprint like the other views.
 async fn api_index(State(s): State<AppState>) -> Response {
     cached(&s, "index", crate::view::index_json)
+}
+
+/// GET /api/grammar (srViewerRelationshipGrammar, D0126/D0127) — the computed relationship grammar:
+/// the observed (sourceType, edge, targetType) triples + per-type up/down summary. Drives scope-aware
+/// creation + valid-edge offers generically. Cached per fingerprint.
+async fn api_grammar(State(s): State<AppState>) -> Response {
+    cached(&s, "grammar", crate::view::grammar_json)
 }
 
 #[derive(serde::Deserialize)]
