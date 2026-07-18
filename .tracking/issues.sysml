@@ -794,4 +794,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from reviewQueueGoverningVersion to issue068;
+
+    part issue069 : Issue {
+        :>> id = "e0690069-0069-4e69-9069-516273840069";
+        :>> title = "keel has no `arch` view command group — a downstream's EngineCodeAudit CodeElement registry is authored but not computable (criticality/coupling/drift by hand)";
+        :>> createdAt = "2026-07-18";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Cross-repo request from the SelfSync self-build (its D0029 architecture-audit + docs/design-history/2026-07-18-architecture-audit-design.md). SelfSync authored a full CodeElement registry (169 elements, an optional EngineCodeAudit schema module + the audit_hash.py drift tool) — but the registry's INTENDED lenses (criticality = risk-class × Need-trace; coupling = Ca/Ce/instability/distance over #DependsOn; drift = codeHash vs the live @audit-hash; the captured STPA control-structure inputs) are all COMPUTED VIEWS that keel doesn't yet render, so today they're run by hand / via audit_hash.py. To make the capability reusable through keel (the owner's goal), the toolkit needs: (1) promote the EngineCodeAudit schema module into the engine's shipped schema so `keel init` gives every downstream the CodeElement type; (2) a `keel arch` view group (elements/criticality/coupling/drift/stpa-inputs/coverage), each a declared viewpoint, computed from authored CodeElement instances + the Needs graph + the in-code @audit-hash markers — keel never parses deliverable source. Not a defect; a planned feature (the follow-on Phase 1 of the SelfSync D0029 plan). Severity Low (enhancement).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "keelArchViews";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from keelArchViews to issue069;
 }
