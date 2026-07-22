@@ -65,3 +65,6 @@ __pycache__/
 
 # viewer screenshot artifacts (never source)
 architect-sure-*.png
+
+# personal per-project Claude Code overrides (local experiments / prototype hooks)
+.claude/settings.local.json
