@@ -806,4 +806,16 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from keelArchViews to issue069;
+
+    part issue070 : Issue {
+        :>> id = "e0700070-0070-4e70-9070-516273840070";
+        :>> title = "The engine has never run its own Deploy workflow — no release discipline (v0.1.0 ~a month stale; Deploy defined-but-unrun)";
+        :>> createdAt = "2026-07-27";
+        :>> createdBy = "claudeOpus";
+        :>> description = "Dogfooding gap surfaced 2026-07-27 (D0128, nReleaseDiscipline). keel pushes every commit (post-commit hook) but has NO release process: the only published release is v0.1.0 (tagged 2026-06-29, ~a month stale) — the entire Architect Sure line + the write API growth (v1.11->v1.17) are in NO release. CI only tests (clippy + cargo test + keel gates); it does not build or publish artifacts. The Deploy workflow is DEFINED (.engine/workflows/deploy.sysml) but has NO deploying process/skill and has never been run — the engine that governs Business->Architecture->Delivery->Deploy->Operate has never dogfooded its own Deploy. Downstreams (e.g. SelfSync) get a month-stale binary or must build from a random SHA. Resolved by keelReleaseProcess (a deploy process + skill + CI release job + semver + a recorded Release item).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "keelReleaseProcess";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from keelReleaseProcess to issue070;
 }

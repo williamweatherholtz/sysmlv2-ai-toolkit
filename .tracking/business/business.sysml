@@ -467,6 +467,37 @@ package ProjectBusiness {
         :>> priority = Priority::must;
     }
 
+    // ── directional needs from the 2026-07-27 design conversation (governed by the synthesis Decision) ──
+    requirement nProcessPortability : Need {
+        :>> id = "0e180001-0727-4b18-9e18-000000000e18";
+        :>> title = "Processes are portable, modular units projects import/activate a la carte";
+        :>> createdAt = "2026-07-27";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "A project can IMPORT / EXPORT / ACTIVATE / DISABLE individual processes (agile, STPA, requirements management, semver-CI release, employee reviews, doc-sync, remote builds, ...) from a curated PALETTE rather than inheriting the whole engine's process set monolithically at `keel init`. A process is a self-contained unit (definition + deploying skill + its declared rules/guards + metadata) whose enforcement travels with it (activate turns its guards on, disable off). Projects pick only what fits; AI helps select from a described goal; users author + publish their own; usage/popularity is (opt-in) observable. Extends n06ProcessAsData from monolithic to modular.";
+        :>> priority = Priority::should;
+    }
+
+    requirement nAiGovernanceInLoop : Need {
+        :>> id = "0e190001-0727-4b19-9e19-000000000e19";
+        :>> title = "AI process-compliance is enforced IN-LOOP, not just at commit / by prose";
+        :>> createdAt = "2026-07-27";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::customer;
+        :>> statement = "Governing an AI agent's adherence to process (no prose-as-truth, no working outside a defined process) is enforced by IN-LOOP gates that block at the action/turn boundary with corrective feedback — not left to soft CLAUDE.md context (weak, drifts) or only caught at commit (reactive). The required process + tools are DISCOVERABLE and self-describing to the agent (CLI + MCP surface serves discovery); the agent's natural narrative is CHANNELED into typed fields (a Decision's rationale) rather than leaking as shadow state. Distinguishes DISCOVERY (MCP helps) from COMPLIANCE (gates + affordances; MCP does not). Guard against over-governance thrash: block clear violations, warn the rest.";
+        :>> priority = Priority::must;
+    }
+
+    requirement nReleaseDiscipline : Need {
+        :>> id = "0e200001-0727-4b20-9e20-000000000e20";
+        :>> title = "The engine ships disciplined, versioned releases (its own Deploy workflow, dogfooded)";
+        :>> createdAt = "2026-07-27";
+        :>> createdBy = "wweatherholtz";
+        :>> source = NeedSource::internal;
+        :>> statement = "keel is released with discipline: semver versioning reconciled across the crate + API contract + embedded engine, a git tag, a CI-built + published artifact (binary + the engine `keel init` ships), and a recorded Release item through the Deploy workflow. Cadence is per-milestone/on-demand (not per-sprint). This operationalises the DEFINED-but-never-run Deploy workflow (a dogfooding gap: the engine governs Business->Architecture->Delivery->Deploy->Operate but has never run its own Deploy).";
+        :>> priority = Priority::should;
+    }
+
     // Root serve to its Needs (issue046): d0094 (the decision that built serve) #DerivedFrom these
     // Needs. (d0094 already carries #ProspectiveChange; the model allows one marker per item, so the
     // #Capability hard-gate marker — for greenfield capabilities — is not stacked here; serve's
