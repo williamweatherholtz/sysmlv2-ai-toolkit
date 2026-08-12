@@ -467,6 +467,11 @@ See `.engine/docs/keel-syntax-notes.md` for confirmed syntax do's/don'ts before 
   The validator commands in §5 must use this prefix — `conda run` as a bare word will not be found.
 - **NEVER pipe `conda run` output into a live cmdlet or redirect** (`| Select-String`,
   `| Out-Null`, `> $null`) — the kernel JVM holds the pipe and the shell HANGS. Run plain.
+  **This includes any command whose HOOKS invoke conda — notably `git commit`**, whose
+  `pre-commit` runs the kernel instance validator when `.engine/**.sysml` is staged. Piping
+  `git commit` into `tail`/`head` hangs for the same reason (cost: a 5-minute stall, sprint247
+  retro). Redirect to a FILE and read the file instead (`git commit -F msg > log 2>&1`), and
+  sweep afterwards with `python .engine/tools/kill_stale_kernels.py`.
 - Interrupted kernel runs can orphan JVMs: `python .engine/tools/kill_stale_kernels.py`.
 - SysML validation requires the `sysml` conda env (Jupyter SysML kernel, OpenJDK).
 - **Use absolute paths in shell commands; don't rely on cwd (issue013).** The Bash and
