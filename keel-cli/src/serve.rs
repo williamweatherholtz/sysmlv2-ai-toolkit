@@ -301,7 +301,12 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}'\"}}")).into_response(),
     };
     let sha = git_head(&s.root);
-    let judged_by = body.judged_by.filter(|b| !b.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let judged_by = match crate::actor::resolve(&s.root, body.judged_by.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let critiques = s.root.join(".tracking").join("critiques.sysml");
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
@@ -328,7 +333,12 @@ struct DecisionReq {
 /// acceptance event, and never auto-commits (the human reviews + commits). The generated UI proposes
 /// changes THROUGH the process, not by editing facts directly ("not going rogue").
 async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionReq>) -> Response {
-    let author = b.author.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let author = match crate::actor::resolve(&s.root, b.author.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     if b.slug.is_empty() || b.title.is_empty() || b.decision.is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"slug, title, and decision are required\"}".to_string()).into_response();
     }
@@ -354,7 +364,12 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     let Some(path) = safe_repo_path(&s.root, &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let sha = git_head(&s.root);
     match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
@@ -381,7 +396,12 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
     if b.rationale.trim().is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"a rejection rationale is required\"}".to_string()).into_response();
     }
-    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let sha = git_head(&s.root);
     match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
@@ -406,7 +426,12 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
     let Some(path) = safe_repo_path(&s.root, &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = b.judged_by.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let sha = git_head(&s.root);
     let note = b.note.as_deref().filter(|t| !t.is_empty());
     let verdict = match b.verdict.as_deref() {
@@ -480,7 +505,12 @@ async fn api_create_item(State(s): State<AppState>, axum::Json(b): axum::Json<Cr
     if ty.is_empty() || !ty.chars().all(|c| c.is_ascii_alphanumeric()) {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"type must be a declared type name\"}".to_string()).into_response();
     }
-    let author = b.author.filter(|a| !a.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let author = match crate::actor::resolve(&s.root, b.author.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let strs: Vec<(String, String)> = b.string_attrs.into_iter().map(|a| (a.name, a.value)).collect();
     let enums: Vec<(String, String, String)> = b.enum_attrs.into_iter().map(|a| (a.name, a.enum_type, a.value)).collect();
     let new_item = crate::write::NewItem {
@@ -1310,7 +1340,12 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
     let Some(file) = find_task_file(&s.root, &b.task) else {
         return (StatusCode::NOT_FOUND, format!("{{\"error\":\"no `action {}` found in .tracking\"}}", b.task.replace('"', "'"))).into_response();
     };
-    let by = b.judged_by.filter(|x| !x.is_empty()).unwrap_or_else(|| "wweatherholtz".to_string());
+    let by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+        Ok(a) => a,
+        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
+        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
+        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    };
     let sha = git_head(&s.root);
     match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),

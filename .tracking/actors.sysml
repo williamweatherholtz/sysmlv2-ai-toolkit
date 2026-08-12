@@ -12,4 +12,5 @@ package ProjectActors {
     part wweatherholtz : Person { :>> name = "William Weatherholtz"; :>> email = "0612@asirobots.com"; }
     part claudeOpus : Actor { :>> name = "Claude Opus 4.8"; :>> kind = ActorKind::ai; }
     part claudeSonnet46 : Actor { :>> name = "Claude Sonnet 4.6"; :>> kind = ActorKind::ai; }
+    part claudeOpus5 : Actor { :>> name = "Claude Opus 5"; :>> kind = ActorKind::ai; }
 }

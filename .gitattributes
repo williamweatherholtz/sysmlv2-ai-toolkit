@@ -1,3 +1,29 @@
+# Text normalization is declared HERE, in the repository — never left to each
+# contributor's per-machine core.autocrlf (issue076 / D0129, srDcPortableGate).
+#
+# Why it matters for a distributed team: .sysml files ARE the shared truth. A
+# contributor whose machine is configured differently commits CRLF, and every
+# shared model file becomes a whole-file phantom diff — a guaranteed, effectively
+# unresolvable conflict on exactly the files every contributor touches
+# (backlog.sysml, issues.sysml, critiques.sysml). Pinning it in-repo makes the
+# policy travel with the repo instead of depending on how each machine was set up.
+* text=auto
+
+# The model — the shared source of truth. Pinned explicitly, not merely auto-detected.
+*.sysml text eol=lf
+
+# Source + config kept LF so diffs are stable across a mixed-OS fleet.
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.py    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.txt   text eol=lf
+
 # Shell scripts must stay LF so the shebang works under git-for-windows.
 *.sh text eol=lf
-.githooks/post-commit text eol=lf
+.githooks/pre-commit       text eol=lf
+.githooks/pre-merge-commit text eol=lf
+.githooks/post-commit      text eol=lf

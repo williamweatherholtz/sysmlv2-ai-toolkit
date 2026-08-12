@@ -1,78 +1,106 @@
 #!/bin/sh
-# Engine process (CLAUDE.md §5, CR-11): validation green BEFORE commit — because
-# post-commit auto-pushes to canonical main, nothing unvalidated may land.
-# Runs only the layer(s) matching staged paths; commits touching no guarded files
-# are not slowed. Escape hatch: SKIP_VALIDATE=1.
+# Engine process (CLAUDE.md §5, CR-11): validation green BEFORE commit — because a commit
+# is pushed to canonical main, nothing unvalidated may land.
 #
-# Forward GUARDS are the Rust authority (D0074 M3/M4): `keel guard <name>` — the python
-# validate_*.py guards + query.py were retired at M4 (sprint58). The .engine SysML SEMANTIC
-# validators (schema/workflows/instances) remain kernel-based (deep semantics the Rust validator
-# does not cover) and still run via conda.
+# PORTABLE + HONEST (D0129/issue076, srDcPortableGate). Three prior defects, all fixed here:
+#   (1) NON-PORTABLE — an absolute conda path + a Windows-only binary name meant that on any
+#       other machine the gate either printed "guards skipped" and silently became NOTHING, or
+#       ABORTED every .engine commit and taught contributors to set SKIP_VALIDATE=1 (defeating
+#       the gate everywhere at once). Now: probe for the binary; the kernel layer is OPTIONAL.
+#   (2) SILENT PASS — a check that could not run used to pass. Now a missing engine binary is a
+#       LOUD non-zero failure with the remedy; bypass must be explicit (SKIP_VALIDATE=1).
+#   (3) MERGE-BLIND — `git merge` fires pre-merge-commit, which did not exist, so the riskiest
+#       commits in a distributed workflow (conflict resolutions) had no local gate. .githooks/
+#       pre-merge-commit now delegates here.
+#
+# Forward GUARDS are the Rust authority (D0074 M3/M4). The .engine SysML SEMANTIC validators
+# (schema/workflows/instances) remain kernel-based (deep semantics the Rust validator does not
+# cover) and are OPTIONAL — `keel check-engine` is the kernel-free backstop that always runs.
+# Escape hatch: SKIP_VALIDATE=1.
 [ "$SKIP_VALIDATE" = "1" ] && { echo "pre-commit: SKIP_VALIDATE=1 — validation skipped"; exit 0; }
 
 all_staged=$(git diff --cached --name-only --diff-filter=ACMR || true)
 sysml_staged=$(echo "$all_staged" | grep '\.sysml$' || true)
 rust_staged=$(echo "$all_staged" | grep -E '(\.rs$|Cargo\.toml$|Cargo\.lock$)' || true)
 
-CONDA="C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe"
+# ── locate the engine binary (portable: Windows, macOS, Linux; built or on PATH) ──
+KEEL=""
+for cand in "target/release/keel.exe" "target/release/keel" "target/debug/keel.exe" "target/debug/keel"; do
+    [ -x "$cand" ] && { KEEL="$cand"; break; }
+done
+[ -z "$KEEL" ] && command -v keel >/dev/null 2>&1 && KEEL="keel"
+
+# ── locate conda for the OPTIONAL deep-semantic kernel layer (never fatal) ──
+CONDA=""
+for cand in "$KEEL_CONDA" "C:/Users/WilliamWeatherholtz/miniforge3/Scripts/conda.exe" \
+            "$HOME/miniforge3/bin/conda" "$HOME/miniconda3/bin/conda"; do
+    [ -n "$cand" ] && [ -x "$cand" ] && { CONDA="$cand"; break; }
+done
+[ -z "$CONDA" ] && command -v conda >/dev/null 2>&1 && CONDA="conda"
 V=".engine/tools/validate"
-SYSMLV2="target/release/keel.exe"
 
 sysml_run() {
+    if [ -z "$CONDA" ]; then
+        echo "pre-commit: NOTICE — kernel validator '$1' SKIPPED (no conda found; set KEEL_CONDA to enable)."
+        echo "pre-commit:          keel check-engine is the kernel-free backstop and still runs below."
+        return 0
+    fi
     echo "pre-commit: $1"
     "$CONDA" run -n sysml --no-capture-output python "$V/$1" || {
         echo "pre-commit: VALIDATION FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 }
 
-# .engine schema/workflow/instance changes: kernel validators (deep SysML semantics).
+# ── the engine binary is REQUIRED when .sysml is staged: fail LOUDLY, never silently pass ──
+if [ -n "$sysml_staged" ] && [ -z "$KEEL" ]; then
+    echo "pre-commit: GATE CANNOT RUN — no keel binary found (looked in target/release, target/debug, PATH)."
+    echo "pre-commit:   REMEDY: cargo build --release   (or install keel on PATH)"
+    echo "pre-commit:   A gate that cannot run must not pass silently (D0129/issue076)."
+    echo "pre-commit:   Explicit bypass: SKIP_VALIDATE=1 git commit ..."
+    exit 1
+fi
+
+# .engine schema/workflow/instance changes: kernel validators (deep SysML semantics; optional layer).
 if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
 fi
 
-# .tracking changes: validated by the Rust authority (D0048) — fast, no JVM. Falls back to the
-# kernel validator only if the binary isn't built.
+# .tracking changes: validated by the Rust authority (D0048) — fast, no JVM. NO kernel fallback
+# (issue026/safeTrackingFallback): kernel validate_tracking validates per-file and FALSE-FAILS the
+# #CharteredBy charter edges (.tracking -> .engine Decisions) + baselines -> schema.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
-    if [ -x "$SYSMLV2" ]; then
-        echo "pre-commit: keel validate . (rust authority)"
-        "$SYSMLV2" validate . || {
-            echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
-    else
-        # NO kernel fallback (issue026/safeTrackingFallback): kernel validate_tracking validates
-        # per-file and FALSE-FAILS the #CharteredBy charter edges (.tracking -> .engine Decisions)
-        # + baselines -> schema. The Rust authority (D0048) is the sole correct .tracking validator.
-        echo "pre-commit: rust binary missing — .tracking validation SKIPPED (build target/release/keel to enforce)"
-    fi
+    echo "pre-commit: keel validate . (rust authority)"
+    "$KEEL" validate . || {
+        echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
-# Forward GUARDS — run the FULL enforced set (`keel guard`, ALL honest-state guards) whenever any
-# .sysml changes, so the LOCAL gate matches CI's `guard all` (issue048: a curated per-path subset
-# omitted viewpoint-renderer / manifest-coverage / critic-independence / process-skill / actors, so
-# a viewpoint-renderer violation passed the hook and only failed in CI). The Rust guards are kernel-
-# free + fast (<1s), so running all of them every .sysml commit is cheap. Binary-missing => skip.
-# (Assurance — critique-COVERAGE + `assured` readiness — is a NON-BLOCKING burndown, D0098, and is
-# deliberately NOT in this enforced set; run `keel assured` / `keel critique-coverage` on demand.)
+# Forward GUARDS — run the FULL enforced set whenever any .sysml changes, so the LOCAL gate matches
+# CI's `guard all` (issue048: a curated per-path subset let a viewpoint-renderer violation pass the
+# hook and fail only in CI). Kernel-free + fast (<1s). (Assurance — critique-COVERAGE + `assured`
+# readiness — is a NON-BLOCKING burndown, D0098, and is deliberately NOT in this enforced set.)
 if [ -n "$sysml_staged" ]; then
-    if [ -x "$SYSMLV2" ]; then
-        echo "pre-commit: keel guard (all enforced honest-state guards)"
-        "$SYSMLV2" guard || {
-            echo "pre-commit: GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
-        # .engine reference resolution, KERNEL-FREE (D0112 phase 2/issue067): catches unresolved type
-        # refs + unknown imports on .engine instances even when conda/kernel is unavailable.
-        echo "pre-commit: keel check-engine ."
-        "$SYSMLV2" check-engine . || {
-            echo "pre-commit: CHECK-ENGINE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
-    else
-        echo "pre-commit: rust binary missing — guards skipped (build target/release/keel to enforce)"
-    fi
+    echo "pre-commit: keel guard (all enforced honest-state guards)"
+    "$KEEL" guard || {
+        echo "pre-commit: GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    # .engine reference resolution, KERNEL-FREE (D0112 phase 2/issue067): catches unresolved type
+    # refs + unknown imports on .engine instances even when conda/kernel is unavailable.
+    echo "pre-commit: keel check-engine ."
+    "$KEEL" check-engine . || {
+        echo "pre-commit: CHECK-ENGINE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)
 if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
-    echo "pre-commit: cargo clippy"
-    cargo clippy --workspace --all-targets -- -D warnings || {
-        echo "pre-commit: CARGO CLIPPY FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    if command -v cargo >/dev/null 2>&1; then
+        echo "pre-commit: cargo clippy"
+        cargo clippy --workspace --all-targets -- -D warnings || {
+            echo "pre-commit: CARGO CLIPPY FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    else
+        echo "pre-commit: GATE CANNOT RUN — rust files staged but cargo not found."
+        echo "pre-commit:   REMEDY: install the rust toolchain. Explicit bypass: SKIP_VALIDATE=1"
+        exit 1
+    fi
 fi
 
 exit 0

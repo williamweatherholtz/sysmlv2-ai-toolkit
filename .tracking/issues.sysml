@@ -818,4 +818,140 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from keelReleaseProcess to issue070;
+
+    // ── distributed-collaboration audit, 2026-08-12 (D0129). Each entry was VERIFIED against
+    // code, not inferred; file:line citations are in the descriptions. Found by a two-lane
+    // research pass (external prior-art + internal audit) commissioned before operating keel
+    // with an async remote mostly-AI team. Per D0047 each needs a permanent guard, not a patch.
+    part issue071 : Issue {
+        :>> id = "e0710071-0071-4e71-9071-516273840071";
+        :>> title = "`keel orient` is MACHINE-DEPENDENT once history is rewritten — squash/rebase orphans judgedAgainst anchors, so the same model reports green on one clone and not-done on every other";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "EXISTENTIAL — this negates the engine's core claim that state is COMPUTED rather than authored. A task is `done` only while its passing TestResult's judgedAgainst SHA still RESOLVES (orient.rs:494-531; resolution via `git cat-file` at orient.rs:123); unresolvable => invalidEvidence => NOT done (orient.rs:38). Compose with: post-commit pushes fire-and-forget and on rejection merely prints 'run git push when able' (.githooks/post-commit:8-9) and nothing ever fetches; with several contributors non-fast-forward rejection is constant; the natural remedy (`git pull --rebase`) REWRITES local SHAs. The already-recorded judgedAgainst values then name pre-rebase commits that were never pushed: the rewriting machine still finds them as loose objects and reports GREEN, while every other clone reports invalidEvidence, re-lists finished work as ready, and a second contributor redoes it. Computed state stops being a function of the model and becomes a function of which working copy ran the query. VERIFIED SEPARATELY: the remote currently permits BOTH squash-merge and rebase-merge and `main` has NO branch protection (gh api, 2026-08-12) — the hazard is live and ungated. Prior art confirms the mechanism: Gerrit introduced Change-Id because SHAs die on rebase; git-notes needs notes.rewriteRef for the same reason. FIX: ancestry-preserving integration only (fast-forward or merge commit), enforced by remote configuration rather than convention; plus honest reporting of unsynchronized-vs-invalid anchors (issue-adjacent, srDcUnresolvedEvidenceClass).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcMergeOnlyIntegration";
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcMergeOnlyIntegration to issue071;
+
+    part issue072 : Issue {
+        :>> id = "e0720072-0072-4e72-9072-516273840072";
+        :>> title = "confirmation-authenticity is bypassable by an OMITTED parameter — write paths default the acting actor to a named human, so an AI records human acceptance silently";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "SECURITY-RELEVANT. The confirmation-authenticity guard (D0106/issue059) exists specifically so an accepted Decision's acceptance event must be judged by a human Person and can never be AI-fabricated. VERIFIED: seven serve.rs write endpoints default `author`/`judged_by` to the human \"wweatherholtz\" (serve.rs:304, 331, 357, 384, 409, 483, 1313); `record decision` defaults --author to the same (main.rs:967); five further paths default to \"keel-cli\", which is NOT in ProjectActors and would fail the actors guard (main.rs:910, 935, 1121, 1151); `reverify` defaults --by to claudeOpus (main.rs:429). An AI-driven API call that merely OMITS judged_by therefore records a HUMAN attestation, silently and by default. The guard does not fail loudly — it simply stops meaning anything, because the substrate it reads (attribution) is false. Note the capture side already exists (capture_user.py resolves and prints an actor id) but NOTHING consumes it: the gap is identity BINDING, not identity capture. Exposure multiplies with every added contributor. FIX: resolve the acting actor from an explicit per-machine binding or argument; REFUSE the write when unstated; remove every default naming a human or an unregistered actor.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcActorIdentityBinding";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcActorIdentityBinding to issue072;
+
+    part issue073 : Issue {
+        :>> id = "e0730073-0073-4e73-9073-516273840073";
+        :>> title = "Enrollment registers EVERY actor as `: Person` with no kind question — an onboarding AI is recorded as a human and then legitimately satisfies confirmation-authenticity";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "SECURITY-RELEVANT, and INDEPENDENT of issue072 — closing one does not close the other. VERIFIED: .engine/tools/capture_user.py derives identity from the git committer identity and appends the new actor to .tracking/actors.sysml hardcoded as `part <id> : Person { ... }` (its append_id function), with no question about actor kind and no AI branch at all. Since git identity on an agent's machine is simply whatever that machine is configured with, an AI agent enrolling itself is registered as a human Person. confirmation-authenticity then reads the registry, sees a Person, and correctly accepts that actor's acceptance attestations as human-judged — so the guard is satisfied by a false premise rather than bypassed by a bug. Enrollment is the single point at which actor kind becomes true or false for every subsequent authority check, which makes it the one place inference is unacceptable. (Its docstring is also stale: it claims to append to an `ActorId` enum, which CR-5 replaced with typed Person/Actor parts.) FIX: require kind explicitly at registration, never infer from git identity, never default to Person, and make registering an AI as a Person impossible through the sanctioned path.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcActorIdentityBinding";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcActorIdentityBinding to issue073;
+
+    part issue074 : Issue {
+        :>> id = "e0740074-0074-4e74-9074-516273840074";
+        :>> title = "No guard detects duplicate identity — two offline contributors mint the same decision number, git reports NO conflict, and the duplicate package is silently merged";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The failure class where the ABSENCE of a git conflict is the danger: git protects against concurrent edits to the same LINES, not against concurrent allocation of the same NAME. VERIFIED: `next_decision_number` is max-of-directory-scan plus one (write.rs:929-942), so two contributors working before synchronizing both mint the same NNNN; because their slugs differ the FILENAMES differ, so git reports no conflict and both land; the resulting duplicate `package DecisionNNNN` declarations are then SILENTLY MERGED by the registry via or_default() (keel-parser/src/registry.rs:52-53), and registry.validate checks only type refs and enums (registry.rs:74-110). The same shape applies to two `sprintNNN_*.sysml` files (both counted by in_progress_sprints, orient.rs:344) and to hand-appended issue numbers (no CLI verb allocates them). VERIFIED ABSENT: none of the seventeen guards scans for a duplicate element id, duplicate item name, duplicate package name, or duplicate allocated sequence number — the only duplicate check anywhere is add_task's same-file task-name check (write.rs:804). Corruption therefore lands GREEN and is undetectable afterwards. Compounding: gen_uuid has no host entropy (issue075), so a duplicate id is also possible and equally undetected. FIX: a hard-blocking duplicate-identity guard across all four classes, preferably sourced from a declared ElementRule (D0105/D0107).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcDuplicateIdentityGuard";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDuplicateIdentityGuard to issue074;
+
+    part issue075 : Issue {
+        :>> id = "e0750075-0075-4e75-9075-516273840075";
+        :>> title = "gen_uuid has NO host entropy — independent machines are not independent id sources, and identity is the one thing a collision corrupts";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "VERIFIED: gen_uuid (write.rs:63-99) constructs its two halves from clock seconds, sub-second nanos, process id, and an in-process atomic counter that is 0 for the first record of every CLI invocation; it self-documents as 'Not cryptographically random — suitable for dev-tooling identity only'. There is NO host or MAC component, so two machines generating concurrently are not independent sources, and small process ids collide readily across machines. Immutable `id` is the engine's identity invariant — items never collide on name precisely because they are distinguished by id (CLAUDE.md §2.3) — so a collision corrupts identity itself rather than merely producing a duplicate row. Likelihood is LOW; consequence is severe and, given issue074, entirely undetectable. That profile (cheap one-function fix, undetectable failure) justifies fixing pre-emptively rather than waiting for an occurrence. FIX: cryptographically-seeded random UUIDv4 from the OS RNG, emitted format unchanged so existing ids and parsers are unaffected.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcCollisionResistantIds";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCollisionResistantIds to issue075;
+
+    part issue076 : Issue {
+        :>> id = "e0760076-0076-4e76-9076-516273840076";
+        :>> title = "The local gate silently evaporates off this machine, merge commits are UNGATED, and *.sysml line endings depend on per-machine config";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Three defects in one control, all VERIFIED, all first-contact failures for a remote contributor. (1) NON-PORTABLE: .githooks/pre-commit:17-21 hardcodes an absolute conda path (C:/Users/WilliamWeatherholtz/miniforge3/...) and the Windows binary name target/release/keel.exe. On a non-Windows machine the binary is absent, so the hook prints 'rust binary missing — guards skipped' and the local gate silently becomes NOTHING (pre-commit:66-68) with only post-hoc CI behind it; on a machine without that conda path, any commit touching .engine/*.sysml ABORTS, which teaches contributors to set SKIP_VALIDATE=1 and thereby defeats the gate everywhere at once. The 'local gate == CI' invariant the hook's own comments assert (issue048) is therefore already false off this machine. (2) MERGE-BLIND: only pre-commit and post-commit are installed; `git merge` fires pre-merge-commit, which does not exist — so the conflict-resolution commits that distributed work generates, the ones an AI is most likely to get semantically wrong, are exactly the commits with NO local check. CI is push-triggered with no PR gate (.github/workflows/ci.yml:11-13). (3) UNPINNED TEXT: .gitattributes normalizes only *.sh, leaving *.sysml to each machine's core.autocrlf (true here, per-machine, not per-repo). A contributor configured differently commits CRLF, and every shared model file becomes a whole-file phantom diff — a guaranteed unresolvable conflict on precisely the files every contributor touches. FIX: probe for the binary, make the kernel layer optional-not-fatal, install pre-merge-commit, add `* text=auto` + `*.sysml text eol=lf`, and make an unrunnable check FAIL LOUDLY instead of passing silently.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcPortableGate";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPortableGate to issue076;
+
+    part issue077 : Issue {
+        :>> id = "e0770077-0077-4e77-9077-516273840077";
+        :>> title = "Markers that hard-blocking guards depend on are UNDECLARED — a misspelled marker validates clean and silently blinds the guard";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "VERIFIED 2026-08-12: of the metadata markers guards and views actually consume, only #View is declared (in .engine/workflows/_meta.sysml). #Capability (used in 15 files), #DerivedFrom (22 files), #Covers (6), #Dispositions (10) and #ProcessDefect (5) appear NOWHERE as a `metadata def` — the declared set in relationships.sysml is only DependsOn, Supersede, OrderingOnly, CharteredBy, Resolves, ProspectiveChange, SafetyChange. Yet #DerivedFrom is load-bearing for the HARD-BLOCKING requirement-rootedness guard (guards.rs:386-398; rootedness view at view.rs:3085-3116), #Covers for sitting-coverage, and #Dispositions for the typed disposition verdict path (D0092). Because markers are not type-checked by `keel validate` or `check-engine`, a misspelled marker (#DerivdFrom) validates CLEAN and silently removes that item from the guard's view — and a blind guard reports PASS, not a violation. This is the silent-gate-bypass class, and unlike a normal typo it scales with contributor count: any contributor's slip disables a gate for that item with no signal to anyone, including in review. NOTE: fixing this edits .engine/schema/core/relationships.sysml, and schema/core is FROZEN (CLAUDE.md §2.5), so it needs explicit human sign-off — it is deliberately excluded from the day-one set. FIX: declare every guard-consumed marker and make validation REJECT an undeclared/misspelled marker.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcDeclaredMarkers";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeclaredMarkers to issue077;
+
+    part issue078 : Issue {
+        :>> id = "e0780078-0078-4e78-9078-516273840078";
+        :>> title = "D0108's coordination contract is CONVENTION-ONLY (no guard, no rule) and the Issue-recording path it mandates does not exist";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0108 (accepted) states the correct multi-writer contract: each item is owned by its createdBy and only the owner edits its fields; a non-owner may only ADD items and typed edges or SUPERSEDE a Decision; shared files are append-or-rebase with a fetch before a shared-region edit; conflicting conclusions across threads become an Issue that the HUMAN adjudicates, neither thread silently winning. VERIFIED UNENFORCED: it appears in none of the seventeen guard names (guards.rs:885-886) and none of the eight declared rules (.engine/rules/rules.sysml:14-132); its entire enforcement is CLAUDE.md §4 prose plus the UserPromptSubmit triage reminder. D0047 is explicit that manual vigilance is not a control. Meanwhile in-place write paths that CAN clobber another actor's work exist and are defended only by a doc comment saying the caller should refuse: set_attr rewrites an attribute inside an existing item block (write.rs:551-583) and accept_decision flips the FIRST proposed status in a file via replacen (write.rs:1029). Worse, the adjudication path D0108 mandates has no implementation at all: `keel record decision` exists but there is NO command that records an Issue, so the sanctioned one-liner for 'record the conflict' does not exist — which is exactly the friction that guarantees the discipline is skipped (D0054). FIX: a git-diff-aware ownership guard (cf. the doc-sync guard's diff machinery, guards.rs:785+) plus `keel record issue`.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcMechanizeOwnership";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcMechanizeOwnership to issue078;
+
+    part issue079 : Issue {
+        :>> id = "e0790079-0079-4e79-9079-516273840079";
+        :>> title = "Validation verdict was FILESYSTEM-ORDER-DEPENDENT — a one-pass register+validate failed cross-package imports depending on visit order (green on Windows, flaked on CI's Linux order)";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Filed 2026-08-12 for a defect found AND fixed in an EARLIER session whose work is uncommitted in the working tree and was never recorded as an Issue — it existed only as a code comment. `validate_root` registered and validated each .tracking package in ONE pass, so name resolution depended on filesystem iteration order: a tracking file importing another package (requirements.sysml importing ProjectBusiness) failed when visited BEFORE that package was registered. It passed on Windows and flaked on CI's Linux file order — i.e. the same model produced a different validity verdict per machine, the SAME class as issue071 with the filesystem as the varying input instead of the git object store. FIX (already written, uncommitted at filing): two-pass — parse and register ALL tracking packages, THEN validate all (keel-cli/src/lib.rs validate_root; mirrored in keel-parser/tests/parse_engine_files.rs). NUMBERING NOTE: those two source comments originally cited this defect as 'issue071', which was never filed; issue071 was independently allocated in the model on 2026-08-12 for the machine-dependent-orient defect. This is a LIVE INSTANCE of issue074 (concurrent allocation of the same sequence number producing NO git conflict, because the two claims lived in different files) and it was caught only by manually reading a diff — nothing warned. Resolved on the principle that the MODEL is the register of record and a code comment is not an allocation: the model's issue071 stands, this defect takes 079, and the two comments were repointed here.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcTwoPassRegistration";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTwoPassRegistration to issue079;
+
+    part issue080 : Issue {
+        :>> id = "e0800080-0080-4e80-9080-516273840080";
+        :>> title = "18 bootstrap element ids are DUPLICATED across 26 locations — the identity invariant (§2.3) was already violated and nothing had ever detected it";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found the moment the new duplicate-identity guard (issue074's control) first ran, 2026-08-12. 18 distinct element ids appear at 26 locations across .tracking — hand-authored bootstrap ids that were copy-pasted between files as records were reused; `a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d` alone appears four times (backlog.sysml, delivery/delivery.sysml, delivery/rust_sprint6.sysml, issues.sysml). Immutable `id` is the invariant that lets items share a TITLE without colliding (CLAUDE.md §2.3), so duplicated ids mean those records are not distinctly addressable: any view, edge, or query keyed on id may resolve to the wrong element, and the ambiguity is invisible. FORWARD-ONLY HANDLING (the issue068 lesson — a new guard must not retroactively fail items authored under the process in force at the time): the guard GRANDFATHERS these 18 id values to WARNING level via GRANDFATHERED_DUPLICATE_IDS (keel-cli/src/guards.rs), so they are reported on every run and the debt stays visible, while any NEW duplicate is a hard violation. That list must never be extended. FIX (a MIGRATION, not a guard change — D0067): mint fresh ids for the later occurrences, repoint anything referencing them, reconcile control totals before and after, and validate green at each step; historical recorded data is never fabricated, so each re-id must preserve the record's provenance. Until then the grandfather list is the honest statement of known debt.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcRepairDuplicateIds";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRepairDuplicateIds to issue080;
+
+    part issue081 : Issue {
+        :>> id = "e0810081-0081-4e81-9081-516273840081";
+        :>> title = "The pre-commit KERNEL instance validator already FAILS 11 committed decision files — the gate is routinely bypassed with SKIP_VALIDATE=1";
+        :>> createdAt = "2026-08-12";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Hit live while committing D0129 (2026-08-12). .engine/tools/validate/validate_instances.py — run as a BLOCKING step by .githooks/pre-commit whenever .engine/decisions|processes|skills|docs|views/*.sysml is staged — validates each instance file IN ISOLATION, so any reference to an element declared in ANOTHER file cannot resolve. It consequently fails 11 files that are already committed and correct: 0114, 0116, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0125, on `Couldn't resolve reference to Element 'd0014'/'d0114'/'d0119'/'d0121'/'nViewerTemporalState'/...` and `Couldn't resolve reference to Type 'DerivedFrom'`. Since those commits exist, the gate must have been bypassed with SKIP_VALIDATE=1 — and SKIP_VALIDATE=1 skips EVERY layer, not just the failing one. That is exactly the dynamic issue076 describes: a gate that blocks correct work teaches contributors to bypass it, which defeats it everywhere at once, and it is far more dangerous with several contributors who will each learn the same habit. TWO CORROBORATING FINDINGS: (a) `keel check-engine` (D0112 phase 2, KERNEL-FREE) resolves references ACROSS files and passes all of these clean — the Rust path is both correct and stricter here, so the kernel step adds no assurance while costing a JVM start (~20s) and orphaning JVMs; (b) the kernel likewise cannot resolve `DerivedFrom`, independently confirming issue077 (the marker is consumed by a hard guard but never declared). FIX (a CHANGE — it alters what gates a commit): retire validate_instances.py from the blocking path in favour of check-engine (the D0112 phase-3 direction), or make it register all instance packages before validating (the two-pass shape of issue079). D0129 itself was committed with SKIP_VALIDATE=1 after the full Rust gate (validate + all 18 guards + check-engine + clippy + 146 tests) was run and confirmed green — the bypass is recorded here rather than left silent.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcStaleKernelInstanceGate";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcStaleKernelInstanceGate to issue081;
 }

@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
 use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
+pub mod actor;
 pub mod algo;
 pub mod govern;
 pub mod guards;
@@ -388,20 +389,27 @@ pub fn validate_root(root: &Path) -> Report {
         }
     }
 
-    // Phase 2 — register + validate every tracking file.
+    // Phase 2 — TWO-PASS (issue079): register ALL tracking packages first, THEN validate. A one-pass
+    // register+validate was filesystem-order-dependent — a tracking file importing another package
+    // (e.g. requirements.sysml importing ProjectBusiness) failed when validated before that package was
+    // registered. Two-pass makes cross-package imports resolve regardless of iteration order.
     let tracking_dir = root.join(".tracking");
     if tracking_dir.is_dir() {
+        let mut parsed: Vec<(std::path::PathBuf, Package)> = Vec::new();
         for path in collect_sysml(&tracking_dir) {
             match parse_pkg(&path) {
-                Ok(pkg) => {
-                    registry.register(&pkg);
-                    let diags = registry.validate(&pkg, &path.to_string_lossy());
-                    report.validated += 1;
-                    for d in diags {
-                        report.diagnostics.push((path.clone(), d));
-                    }
-                }
+                Ok(pkg) => parsed.push((path, pkg)),
                 Err(e) => report.errors.push(e),
+            }
+        }
+        for (_, pkg) in &parsed {
+            registry.register(pkg);
+        }
+        for (path, pkg) in &parsed {
+            let diags = registry.validate(pkg, &path.to_string_lossy());
+            report.validated += 1;
+            for d in diags {
+                report.diagnostics.push((path.clone(), d));
             }
         }
     }

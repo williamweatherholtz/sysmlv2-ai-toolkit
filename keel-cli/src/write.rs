@@ -9,8 +9,6 @@
 
 use std::fmt::Write as _;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use keel_parser::ast::{Item, Package};
 
@@ -60,42 +58,36 @@ impl From<std::io::Error> for WriteError {
 
 // ── UUID generation ───────────────────────────────────────────────────────────
 
-static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Generate a UUID v4 from `SystemTime` + monotone counter + process ID.
+/// Generate a cryptographically-random UUID v4 (RFC 4122), 122 bits of OS entropy.
 ///
-/// Not cryptographically random — suitable for dev-tooling identity only.
-#[allow(clippy::cast_possible_truncation)]
+/// # Distributed safety (issue075 / D0129)
+///
+/// The previous construction mixed only clock seconds, sub-second nanos, PID and an in-process
+/// counter that was 0 for the first record of every invocation. It had **no host component**, so
+/// two machines were not independent sources — and `id` is the engine's identity invariant (items
+/// never collide on name precisely because they are distinguished by id, CLAUDE.md §2.3), so a
+/// collision corrupts identity itself. With no duplicate-id detector (issue074) it would also be
+/// undetectable. Entropy now comes from the OS CSPRNG.
+///
+/// # Panics
+///
+/// If the OS CSPRNG is unavailable. That is deliberate: minting a weak identity silently is worse
+/// than failing loudly (the honest-gate principle, D0098).
+#[must_use]
+#[allow(clippy::expect_used)] // deliberate: a weak identity minted silently is worse than a loud abort
 pub fn gen_uuid() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let nanos = u64::from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .subsec_nanos(),
-    );
-    let c = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let pid = u64::from(std::process::id());
-
-    // Mix into two 64-bit halves with distinct multipliers.
-    let hi = secs
-        .wrapping_add(pid.wrapping_mul(0x9e37_79b9_7f4a_7c15))
-        .wrapping_add(c.wrapping_mul(0x6c62_272e_07bb_0142));
-    let lo = nanos
-        .wrapping_add(c.wrapping_mul(0x517c_c1b7_2722_0a95))
-        .wrapping_add(secs.wrapping_mul(0xb492_b66f_be98_f273));
-
-    // Intentional truncations: extracting 16/32-bit UUID fields from 64-bit halves.
-    let p1 = (hi >> 32) as u32;
-    let p2 = (hi >> 16) as u16;
-    let p3 = ((hi & 0x0fff) | 0x4000) as u16; // version 4
-    let p4 = ((lo >> 48 & 0x3fff) | 0x8000) as u16; // variant RFC 4122
-    let p5 = lo & 0x0000_ffff_ffff_ffff;
-
-    format!("{p1:08x}-{p2:04x}-{p3:04x}-{p4:04x}-{p5:012x}")
+    let mut b = [0u8; 16];
+    getrandom::fill(&mut b).expect("OS CSPRNG unavailable — refusing to mint a weak identity");
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // variant RFC 4122
+    let mut s = String::with_capacity(36);
+    for (i, byte) in b.iter().enumerate() {
+        if matches!(i, 4 | 6 | 8 | 10) {
+            s.push('-');
+        }
+        let _ = write!(s, "{byte:02x}");
+    }
+    s
 }
 
 // ── AST helpers ───────────────────────────────────────────────────────────────
@@ -1083,7 +1075,8 @@ pub fn reject_decision(
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_field;
+    use super::{gen_uuid, sanitize_field};
+    use std::collections::HashSet;
 
     #[test]
     fn sanitize_field_makes_a_safe_one_line_literal() {
@@ -1091,5 +1084,53 @@ mod tests {
         assert_eq!(sanitize_field("has \"quotes\""), "has 'quotes'");
         assert_eq!(sanitize_field("multi\n  line\t text"), "multi line text");
         assert_eq!(sanitize_field("  trimmed  "), "trimmed");
+    }
+
+    #[test]
+    fn gen_uuid_is_rfc4122_v4_shaped() {
+        // issue075/D0129: identity is the engine's foundational invariant (§2.3), so the format
+        // must be exactly right — 8-4-4-4-12 lowercase hex, version nibble 4, variant in [89ab].
+        let u = gen_uuid();
+        assert_eq!(u.len(), 36, "uuid must be 36 chars: {u}");
+        let parts: Vec<&str> = u.split('-').collect();
+        assert_eq!(parts.len(), 5, "uuid must have 5 groups: {u}");
+        assert_eq!(
+            parts.iter().map(|p| p.len()).collect::<Vec<_>>(),
+            vec![8, 4, 4, 4, 12],
+            "uuid group widths wrong: {u}"
+        );
+        assert!(
+            u.chars().all(|c| c.is_ascii_hexdigit() || c == '-'),
+            "uuid must be lowercase hex + dashes: {u}"
+        );
+        assert!(
+            u.chars().filter(char::is_ascii_alphabetic).all(char::is_lowercase),
+            "uuid hex must be lowercase: {u}"
+        );
+        assert_eq!(parts[2].as_bytes()[0], b'4', "version nibble must be 4: {u}");
+        assert!(
+            matches!(parts[3].as_bytes()[0], b'8' | b'9' | b'a' | b'b'),
+            "variant nibble must be 8/9/a/b: {u}"
+        );
+    }
+
+    #[test]
+    fn gen_uuid_does_not_collide_and_is_not_clock_correlated() {
+        // The pre-issue075 generator derived every id from clock + PID + an in-process counter that
+        // started at 0 each invocation, so ids minted in the same instant on two machines could
+        // collide — and with no duplicate-id detector (issue074) it would be silent. A CSPRNG-backed
+        // v4 must show no collisions and no shared prefix across a tight loop.
+        let n = 10_000;
+        let ids: HashSet<String> = (0..n).map(|_| gen_uuid()).collect();
+        assert_eq!(ids.len(), n, "gen_uuid produced a collision within {n} draws");
+
+        // Clock-derived ids share a leading prefix within the same second; random ones must not.
+        let first_group: HashSet<String> =
+            ids.iter().map(|u| u.split('-').next().unwrap().to_owned()).collect();
+        assert!(
+            first_group.len() > n * 9 / 10,
+            "first group is not well-distributed ({} distinct of {n}) — looks clock-derived",
+            first_group.len()
+        );
     }
 }

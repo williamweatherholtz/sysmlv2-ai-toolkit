@@ -1,0 +1,16 @@
+#!/bin/sh
+# Gate MERGE commits exactly like ordinary commits (D0129/issue076, srDcPortableGate).
+#
+# Why this file exists: only pre-commit and post-commit were installed, and `git merge` fires
+# pre-merge-commit — which did not exist. So in a distributed workflow the CONFLICT-RESOLUTION
+# commits, the riskiest commits in the system and the ones an AI is most likely to get semantically
+# wrong (a textually clean resolution can still drop a fact, duplicate an id, or break a reference),
+# were exactly the commits with NO local gate.
+#
+# It also delivers the gate-on-the-merged-tree property (srDcGateOnMergedTree): this runs with the
+# merged index staged, so the full enforced gate is evaluated against the tree that will actually
+# land — not against either contribution in isolation. Two contributions that each pass alone can
+# fail together, which is the whole reason merge queues exist; this is that check, client-side.
+#
+# Delegates to pre-commit so there is ONE gate definition, never two that can drift apart.
+exec "$(dirname "$0")/pre-commit" "$@"

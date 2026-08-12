@@ -317,6 +317,25 @@ The six workflows (see the spec for detail):
   `main`; the `post-commit` hook pushes every commit. No long-lived feature branches: everything
   is pushed and merged to `main` only. (This overrides the generic "branch off the default branch
   first" default — per explicit standing instruction, 2026-06-11.)
+- **NEVER rebase, squash, or force-push — integration must preserve commit ancestry (D0129/issue071).**
+  This is a CONSEQUENCE of the evidence model, not a style preference: a passing `TestResult` counts as
+  done only while its `judgedAgainst` SHA still RESOLVES (`orient.rs`), so an integration step that mints
+  new SHAs orphans the anchors of evidence already recorded. The rewriting machine still finds them as
+  loose objects and reports GREEN while every other clone reports `invalidEvidence` and re-lists finished
+  work as ready — computed state becomes a function of WHICH CLONE ran the query, which negates the
+  engine's core claim. **Rebase and squash are unsafe operations in this repo.** Enforced: squash-merge
+  and rebase-merge are disabled on the remote, `main` blocks force-push and deletion (admins included),
+  `post-commit` integrates a rejected push by MERGE and retries, and `pre-merge-commit` gates merge
+  commits (previously ungated — the riskiest commits in a distributed workflow).
+- **Provenance is never defaulted — bind an identity or the write REFUSES (D0129/issue072+073).** No
+  write path substitutes a default actor: `keel actor set <id>` binds this machine (`.keel/actor`,
+  gitignored, per-machine), `KEEL_ACTOR` sets it per session, or pass `--judged-by`/`--author`/`--by`.
+  Previously thirteen paths defaulted the actor — seven to a named HUMAN — so an AI-driven call that
+  merely omitted the field recorded a human attestation silently, which does not make
+  `confirmation-authenticity` (D0106) fail loudly, it makes it stop meaning anything. Actor KIND is asked,
+  never inferred: an AI is `Actor` with `kind = ActorKind::ai`, never a `Person`. Enroll a new contributor
+  (human or AI) with the **`actor-enrollment` skill**; run a multi-contributor session through the
+  **`distributed-collaboration` skill** (sync → claim → work → land by lane → escalate → close).
 - **Multi-thread coordination (D0108).** When more than one AI thread edits this model concurrently:
   each item is owned by its `createdBy` (owner-of-record) and only the owner edits its fields; a
   non-owner may only ADD items + typed edges referencing it, or SUPERSEDE a Decision (new one, D0070) —
@@ -343,8 +362,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL seventeen forward guards (no kernel) — 15 hard-blocking (exit≠0 on any violation) + 2 warning-only (decision-requirement-link, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL eighteen forward guards (no kernel) — 16 hard-blocking (exit≠0 on any violation) + 2 warning-only (decision-requirement-link, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -352,7 +371,7 @@ model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE.
 critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
 (`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
 state, never a commit blocker (don't fake a pass, don't block recording true state).
-The fifteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
+The sixteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
 plus `confirmation-authenticity` (D0106/issue059: an accepted Decision's acceptance event must be HUMAN-judged,
 never AI-fabricated; rule-sourced from `confirmationAuthenticityRule`) and `engine-lint` (D0112 phase 1: the
 first kernel-free port of the `.engine`-instance lints — HARD: every `.engine/decisions/*.sysml` imports
@@ -370,10 +389,14 @@ the engine is legitimately decision-driven, D0064; the full charter-source balan
 rationale — the why — not a blank/trivial field; guarantees the decision-record's basis for future
 improvement + reevaluation], confirmation-authenticity D0106/issue059 [an accepted Decision's acceptance
 event must be judged by a human `Person`, never AI-fabricated — the enforceable slice of D0106; the
-conversational parse-first part stays reminder-enforced]). A SIXTEENTH guard, `decision-requirement-link`
+conversational parse-first part stays reminder-enforced], and `duplicate-identity` [D0129/issue074: no repeated
+element `id`, item name within a package, `package` name across files, or allocated sequence number (decision/
+sprint) — the class where the ABSENCE of a git conflict is the danger, since two contributors allocating the same
+name in DIFFERENT files produces no conflict and the registry then silently MERGES same-named packages; FORWARD-ONLY,
+so the 18 pre-existing bootstrap duplicates warn (grandfathered, issue080) while anything new fails]). A SEVENTEENTH guard, `decision-requirement-link`
 (D0102/issue052), RUNS in `keel guard` every commit but is WARNING-level (visible, never blocks): it flags
 an accepted Decision that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance
-link that should be typed, not prose) — promotable to a hard gate once proven low-noise. A SEVENTEENTH guard,
+link that should be typed, not prose) — promotable to a hard gate once proven low-noise. An EIGHTEENTH guard,
 `doc-sync` (D0113), is the second WARNING-level member: a staged DEFINITIONAL change (`.engine/schema|processes|
 workflows/`) with NO co-committed doc update (CLAUDE.md / `.engine/docs/` / any README) is flagged — the doc-sync
 discipline made a control (was pure vigilance; doc drift was a HIGH critique finding), heuristic + warning-first,

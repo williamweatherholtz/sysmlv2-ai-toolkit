@@ -76,15 +76,22 @@ fn validate_all_tracking_with_registry() {
         registry.register(&pkg);
     }
 
-    // Phase 2 — register and validate every tracking file.
+    // Phase 2 — TWO-PASS so cross-file imports resolve regardless of filesystem iteration order
+    // (a one-pass register+validate was order-dependent: a tracking file importing another package —
+    // e.g. requirements.sysml importing ProjectBusiness — failed when visited before that package was
+    // registered; it flaked on CI's Linux file order while passing on Windows, issue079). Register ALL
+    // tracking packages first, THEN validate all.
     let tracking_files = sysml_files_under(&root.join(".tracking"));
     assert!(!tracking_files.is_empty(), "no .sysml files found under .tracking/");
+    let parsed: Vec<(std::path::PathBuf, keel_parser::ast::Package)> =
+        tracking_files.iter().map(|f| (f.clone(), parse_pkg(f))).collect();
+    for (_, pkg) in &parsed {
+        registry.register(pkg);
+    }
 
     let mut failures: Vec<String> = Vec::new();
-    for f in &tracking_files {
-        let pkg = parse_pkg(f);
-        registry.register(&pkg); // register tracking packages too (they may import each other)
-        let diags = registry.validate(&pkg, &f.to_string_lossy());
+    for (f, pkg) in &parsed {
+        let diags = registry.validate(pkg, &f.to_string_lossy());
         for d in diags {
             failures.push(format!(
                 "{}:{} — {} {}",

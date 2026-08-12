@@ -5,7 +5,7 @@
 //! report text. M3a ports the three no-git guards: `actors`, `acceptance-events`,
 //! `sprint-coverage`. M3b/M3c add ceremony/charter/keystone + a unified runner.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::algo::is_space;
@@ -872,6 +872,233 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
     }
 }
 
+// ── duplicate-identity guard (concurrent allocation otherwise lands GREEN) ─────────────────────
+
+/// Extract the value of a `:>> <attr> = "<value>";` assignment appearing anywhere in `line`.
+///
+/// Attributes are frequently written inline (`part x : TestResult { :>> id = "…"; :>> outcome = …; }`),
+/// so this searches the whole line rather than anchoring at the start.
+fn inline_attr(line: &str, attr: &str) -> Option<String> {
+    let mut rest = line;
+    while let Some(pos) = rest.find(":>>") {
+        let after = &rest[pos + 3..];
+        let trimmed = after.trim_start();
+        if let Some(tail) = trimmed.strip_prefix(attr) {
+            let tail = tail.trim_start();
+            if let Some(tail) = tail.strip_prefix('=') {
+                let tail = tail.trim_start();
+                if let Some(tail) = tail.strip_prefix('"') {
+                    if let Some(end) = tail.find('"') {
+                        return Some(tail[..end].to_owned());
+                    }
+                }
+            }
+        }
+        rest = after;
+    }
+    None
+}
+
+/// Declaration keywords whose following token is an instance/definition NAME.
+const DECL_KEYWORDS: [&str; 6] = ["part", "action", "verification", "requirement", "item", "use case"];
+
+/// Name declared by `line`, if it is an instance declaration (not a reference or an edge).
+fn declared_name(line: &str) -> Option<String> {
+    // Strip a leading metadata marker prefix (`#ProspectiveChange part d0129 : Decision {`).
+    let line = if line.starts_with('#') {
+        line.split_once(' ').map_or("", |(_, r)| r).trim_start()
+    } else {
+        line
+    };
+    // Edges and successions mention names but declare none.
+    for skip in ["first ", "flow ", "satisfy ", "verify ", "allocate ", "then ", "private ", "import ", "doc "] {
+        if line.starts_with(skip) {
+            return None;
+        }
+    }
+    for kw in DECL_KEYWORDS {
+        let Some(rest) = line.strip_prefix(kw) else { continue };
+        let rest = rest.trim_start();
+        // `part def Foo` / `action def Bar` declare a TYPE — still a name in the package scope.
+        let rest = rest.strip_prefix("def ").map_or(rest, str::trim_start);
+        let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if name.is_empty() {
+            continue;
+        }
+        // Must be followed by a declaration token, not more words (which would make it a phrase).
+        let after = rest[name.len()..].trim_start();
+        if after.starts_with(':') || after.starts_with(';') || after.starts_with('{') {
+            return Some(name);
+        }
+    }
+    None
+}
+
+/// Element ids that were ALREADY duplicated when this guard was introduced (D0129, 2026-08-12).
+///
+/// Grandfathered to WARNING, never suppressed. These are hand-authored bootstrap ids that were
+/// copy-pasted between files (`a1b2c3d4-…` appears four times), so the identity invariant (§2.3) was
+/// already violated 26 times and nothing detected it. They are reported every run so the debt stays
+/// visible, and they are tracked by issue080 for a proper migration (D0067) — repairing them means
+/// rewriting ids that other records may reference, which is a migration, not a guard's job.
+///
+/// FORWARD-ONLY, per the issue068 lesson: a new guard must never retroactively fail historical items
+/// governed by the process in force when they were authored. Anything NOT on this list is an ERROR.
+/// Do not extend this list — a new duplicate is a defect to fix, not to grandfather.
+const GRANDFATHERED_DUPLICATE_IDS: [&str; 18] = [
+    "63940516-2c7d-4e8f-ed03-5162738e0305",
+    "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+    "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+    "ad3e4f5a-b6c7-4d8e-a19c-3b4c5d6e7f8a",
+    "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+    "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e",
+    "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+    "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+    "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+    "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+    "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e",
+    "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+    "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+    "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f",
+    "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+    "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+];
+
+/// Guard: no repeated identity anywhere in the model (issue074 / D0129).
+///
+/// This is the failure class where the **absence** of a git conflict is the danger. Git protects
+/// against concurrent edits to the same LINES; it does not protect against concurrent allocation of
+/// the same NAME. Two contributors working offline both mint the next decision number by directory
+/// scan (`write.rs::next_decision_number`); because their slugs differ the FILENAMES differ, so git
+/// reports no conflict, both land, and the resulting duplicate `package DecisionNNNN` declarations
+/// are silently merged by the registry (`keel-parser/src/registry.rs`, `or_default()`). The same shape
+/// applies to two `sprintNNN_*` files (both counted by `in_progress_sprints`) and to hand-appended
+/// `issueNNN` names. Corruption therefore lands GREEN and is undetectable afterwards.
+///
+/// Four classes are detected:
+/// 1. repeated element `id` — identity itself (CLAUDE.md §2.3), also the backstop for a UUID collision
+/// 2. repeated declared item name within one package
+/// 3. repeated `package` name across files — the silently-merged case
+/// 4. repeated allocated sequence number (decision file `NNNN-`, sprint file `sprintNNN_`)
+///
+/// Per D0047 a recurrable defect class gets a permanent automated control, not vigilance — and this
+/// one bit the engine's own authors during D0129 (two workstreams both allocated `issue071`; nothing
+/// warned, because the two claims lived in different files).
+#[must_use]
+pub fn duplicate_identity(root: &Path) -> GuardReport {
+    let mut paths = crate::collect_sysml(&root.join(".tracking"));
+    paths.extend(crate::collect_sysml(&root.join(".engine")));
+    let scanned = paths.len();
+    let files: Vec<(String, String)> = paths
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| (relpath(root, p), t)))
+        .collect();
+
+    let (warnings, mut violations) = duplicate_scan(&files);
+
+    // Class 4 — allocated sequence numbers embedded in FILENAMES (no git conflict when slugs differ).
+    violations.extend(duplicate_sequence(root, &root.join(".engine").join("decisions"), "", 4));
+    violations.extend(duplicate_sequence(root, &root.join(".tracking").join("delivery"), "sprint", 0));
+
+    GuardReport { name: "duplicate-identity", scanned, warnings, violations }
+}
+
+/// Pure core of `duplicate_identity`: scan `(relpath, text)` pairs for repeated ids, item names and
+/// package names. Returns `(warnings, violations)` — grandfathered id duplicates warn, the rest fail.
+fn duplicate_scan(files: &[(String, String)]) -> (Vec<String>, Vec<String>) {
+    let mut violations = Vec::new();
+    let mut warnings = Vec::new();
+    let grandfathered: HashSet<&str> = GRANDFATHERED_DUPLICATE_IDS.iter().copied().collect();
+
+    let mut ids: HashMap<String, String> = HashMap::new();
+    let mut pkgs: HashMap<String, String> = HashMap::new();
+    let mut items: HashMap<(String, String), String> = HashMap::new();
+
+    for (rel, text) in files {
+        let mut cur_pkg = String::new();
+
+        for (i, raw) in text.lines().enumerate() {
+            let line = raw.trim();
+            if line.is_empty() || line.starts_with("//") || line.starts_with('*') || line.starts_with("/*") {
+                continue;
+            }
+            let loc = format!("{rel}:{}", i + 1);
+
+            if let Some(rest) = line.strip_prefix("package ") {
+                let name = rest.split_whitespace().next().unwrap_or("").trim_end_matches('{').trim();
+                if !name.is_empty() {
+                    if cur_pkg.is_empty() {
+                        name.clone_into(&mut cur_pkg);
+                    }
+                    if let Some(prev) = pkgs.insert(name.to_owned(), loc.clone()) {
+                        violations.push(format!(
+                            "{loc}: duplicate package name `{name}` (also declared at {prev}) — the registry SILENTLY MERGES same-named packages, so this corruption would land green (issue074)"
+                        ));
+                    }
+                }
+                continue;
+            }
+
+            if let Some(id) = inline_attr(line, "id") {
+                if let Some(prev) = ids.insert(id.clone(), loc.clone()) {
+                    if grandfathered.contains(id.as_str()) {
+                        warnings.push(format!(
+                            "{loc}: duplicate element id \"{id}\" (also at {prev}) — GRANDFATHERED bootstrap duplicate, pre-issue074; tracked by issue080 for migration"
+                        ));
+                    } else {
+                        violations.push(format!(
+                            "{loc}: duplicate element id \"{id}\" (also at {prev}) — identity is the invariant that lets items share a name (§2.3); a collision corrupts it"
+                        ));
+                    }
+                }
+            }
+
+            if let Some(name) = declared_name(line) {
+                let key = (cur_pkg.clone(), name.clone());
+                if let Some(prev) = items.insert(key, loc.clone()) {
+                    violations.push(format!(
+                        "{loc}: duplicate declared name `{name}` in package `{cur_pkg}` (also at {prev}) — concurrent allocation produces no git conflict, so nothing else would warn"
+                    ));
+                }
+            }
+        }
+    }
+
+    (warnings, violations)
+}
+
+/// Detect two files in `dir` that claim the same allocated sequence number.
+///
+/// `prefix` is stripped before reading digits (`sprint163_x` -> `163`); `width` > 0 requires exactly
+/// that many leading digits (decision files are zero-padded `0129-`).
+fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Vec<String> {
+    let mut seen: HashMap<String, String> = HashMap::new();
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    let mut paths: Vec<_> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+    paths.sort();
+    for path in paths {
+        if path.extension().and_then(|e| e.to_str()) != Some("sysml") {
+            continue;
+        }
+        let Some(stem) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(rest) = stem.strip_prefix(prefix) else { continue };
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        if digits.is_empty() || (width > 0 && digits.len() != width) {
+            continue;
+        }
+        let rel = relpath(root, &path);
+        if let Some(prev) = seen.insert(digits.clone(), rel.clone()) {
+            out.push(format!(
+                "{rel}: sequence number {prefix}{digits} already allocated by {prev} — two contributors allocated it independently; different slugs mean git reported NO conflict (issue074)"
+            ));
+        }
+    }
+    out
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). HONEST-STATE doctrine (D0098): the enforced set
@@ -882,8 +1109,8 @@ pub fn defect_guard_coverage(root: &Path) -> GuardReport {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 17] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "decision-requirement-link", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 18] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "duplicate-identity", "decision-requirement-link", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -904,6 +1131,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "process-skill" => Some(process_skill(root)),
         "requirement-rootedness" => Some(requirement_rootedness(root)),
         "decision-rationale" => Some(decision_rationale(root)), // hard (D0103)
+        "duplicate-identity" => Some(duplicate_identity(root)), // hard (D0129/issue074) — concurrent allocation lands green without it
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
@@ -1131,5 +1359,87 @@ mod tests {
         // All real -> clean.
         let clean = process_skill_violations(&["doc-sync.sysml".to_string()], "x .engine/processes/doc-sync.sysml, y");
         assert!(clean.is_empty(), "every process referenced -> clean");
+    }
+
+    #[test]
+    fn duplicate_scan_catches_each_identity_class() {
+        // issue074/D0129. The danger is that NONE of these produce a git conflict when the two
+        // claims live in different files, so without this guard the corruption lands green.
+        let a = (
+            "a.sysml".to_string(),
+            "package P {\n    part x : Need { :>> id = \"11111111-1111-4111-9111-111111111111\"; }\n}".to_string(),
+        );
+        // Same id in a different file -> collision of identity itself.
+        let dup_id = (
+            "b.sysml".to_string(),
+            "package Q {\n    part y : Need { :>> id = \"11111111-1111-4111-9111-111111111111\"; }\n}".to_string(),
+        );
+        // Same package name in a different file -> the registry silently MERGES these.
+        let dup_pkg = (
+            "c.sysml".to_string(),
+            "package P {\n    part z : Need { :>> id = \"22222222-2222-4222-9222-222222222222\"; }\n}".to_string(),
+        );
+        // Same declared name inside one package.
+        let dup_name = (
+            "d.sysml".to_string(),
+            "package R {\n    part dup : Need { :>> id = \"33333333-3333-4333-9333-333333333333\"; }\n    part dup : Need { :>> id = \"44444444-4444-4444-9444-444444444444\"; }\n}".to_string(),
+        );
+
+        let (_, v_id) = duplicate_scan(&[a.clone(), dup_id]);
+        assert!(v_id.iter().any(|m| m.contains("duplicate element id")), "duplicate id must fail: {v_id:?}");
+
+        let (_, v_pkg) = duplicate_scan(&[a.clone(), dup_pkg]);
+        assert!(v_pkg.iter().any(|m| m.contains("duplicate package name")), "duplicate package must fail: {v_pkg:?}");
+
+        let (_, v_name) = duplicate_scan(&[dup_name]);
+        assert!(v_name.iter().any(|m| m.contains("duplicate declared name")), "duplicate name must fail: {v_name:?}");
+
+        // A clean pair must stay silent — no false positives on distinct ids/names/packages.
+        let (w, v) = duplicate_scan(&[a, ("e.sysml".to_string(),
+            "package S {\n    part other : Need { :>> id = \"55555555-5555-4555-9555-555555555555\"; }\n}".to_string())]);
+        assert!(v.is_empty() && w.is_empty(), "distinct identities -> clean: {v:?} {w:?}");
+    }
+
+    #[test]
+    fn duplicate_scan_grandfathers_known_bootstrap_ids_as_warnings() {
+        // FORWARD-ONLY (the issue068 lesson): a new guard must not retroactively FAIL historical
+        // items. The 18 bootstrap ids already duplicated when the guard landed warn instead — the
+        // debt stays visible (issue080) without blocking every commit.
+        let gf = GRANDFATHERED_DUPLICATE_IDS[0];
+        let files = vec![
+            ("a.sysml".to_string(), format!("package P {{\n    part x : Need {{ :>> id = \"{gf}\"; }}\n}}")),
+            ("b.sysml".to_string(), format!("package Q {{\n    part y : Need {{ :>> id = \"{gf}\"; }}\n}}")),
+        ];
+        let (warnings, violations) = duplicate_scan(&files);
+        assert!(violations.is_empty(), "grandfathered id must NOT fail: {violations:?}");
+        assert!(
+            warnings.iter().any(|m| m.contains("GRANDFATHERED") && m.contains(gf)),
+            "grandfathered id must warn visibly: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn declared_name_ignores_edges_and_references() {
+        // Edges and successions MENTION names without declaring any; treating them as declarations
+        // would make the guard unusable through false positives.
+        assert_eq!(declared_name("part foo : Need {"), Some("foo".to_string()));
+        assert_eq!(declared_name("action bar;"), Some("bar".to_string()));
+        assert_eq!(declared_name("verification gate : Test {"), Some("gate".to_string()));
+        assert_eq!(declared_name("#ProspectiveChange part d0129 : Decision {"), Some("d0129".to_string()));
+        assert_eq!(declared_name("part def Thing :> Element {"), Some("Thing".to_string()));
+        assert_eq!(declared_name("first brief then personas;"), None);
+        assert_eq!(declared_name("satisfy nNeed by srReq;"), None);
+        assert_eq!(declared_name("flow from a.o to b.i;"), None);
+        assert_eq!(declared_name("private import EngineElement::*;"), None);
+        assert_eq!(declared_name(":>> id = \"x\";"), None);
+    }
+
+    #[test]
+    fn inline_attr_reads_attributes_written_mid_line() {
+        // Records are routinely written as one-liners, so anchoring at line start would miss them.
+        let line = "part r : TestResult { :>> id = \"abc-123\"; :>> outcome = VerdictKind::pass; }";
+        assert_eq!(inline_attr(line, "id"), Some("abc-123".to_string()));
+        assert_eq!(inline_attr(line, "title"), None);
+        assert_eq!(inline_attr("    :>> id  =  \"spaced\";", "id"), Some("spaced".to_string()));
     }
 }

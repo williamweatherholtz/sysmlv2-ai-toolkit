@@ -426,7 +426,7 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
 /// at HEAD and stamp a fresh `TestResult` on each drift-suspect task on green.
 fn cmd_reverify(args: &[String]) -> i32 {
     let mut task: Option<String> = None;
-    let mut by = "claudeOpus".to_string();
+    let mut by: Option<String> = None;
     let mut root: Option<PathBuf> = None;
     let mut i = 0;
     while let Some(a) = args.get(i) {
@@ -438,15 +438,21 @@ fn cmd_reverify(args: &[String]) -> i32 {
             }
             "--by" => {
                 i += 1;
-                if let Some(b) = args.get(i) {
-                    by.clone_from(b);
-                }
+                by = args.get(i).cloned();
             }
             other => root = Some(PathBuf::from(other)),
         }
         i += 1;
     }
     let root = root.or_else(find_repo_root).unwrap_or_else(|| PathBuf::from("."));
+    // reverify STAMPS a fresh TestResult, so it needs a true attributable actor (D0129/issue072).
+    let by = match keel_cli::actor::resolve(&root, by.as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
     keel_cli::reverify::run(&root, task.as_deref(), &by)
 }
 
@@ -907,7 +913,11 @@ fn cmd_append_result(args: &[String]) -> i32 {
     };
     let file = PathBuf::from(file_str);
     let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
-    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "keel-cli".to_owned());
+    // Provenance is never defaulted (D0129/issue072): refuse rather than attribute falsely.
+    let judged_by = match keel_cli::actor::resolve(&keel_cli::actor::root_for(&file), flag(args, "judged-by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
     // Callers should pass --judged-at for determinism; this is a safe fallback.
     let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
 
@@ -932,7 +942,11 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     };
     let file = PathBuf::from(file_str);
     let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_owned());
-    let judged_by = flag(args, "judged-by").unwrap_or_else(|| "keel-cli".to_owned());
+    // Provenance is never defaulted (D0129/issue072): refuse rather than attribute falsely.
+    let judged_by = match keel_cli::actor::resolve(&keel_cli::actor::root_for(&file), flag(args, "judged-by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
     // Callers should pass --judged-at for determinism; this is a safe fallback.
     let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
 
@@ -964,7 +978,11 @@ fn cmd_record(args: &[String]) -> i32 {
         return 2;
     };
     let date = flag(args, "date").unwrap_or_default();
-    let author = flag(args, "author").unwrap_or_else(|| "wweatherholtz".to_owned());
+    // NEVER default to a named human (D0129/issue072): that silently forges a human attestation.
+    let author = match keel_cli::actor::resolve(&root, flag(args, "author").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
     if date.is_empty() {
         eprintln!("error: --date YYYY-MM-DD required (the attestation time is its own irreducible fact)");
         return 2;
@@ -1118,7 +1136,10 @@ fn cmd_record_measurement(args: &[String]) -> i32 {
     );
     let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
     let source = flag(args, "source").unwrap_or_default();
-    let by = flag(args, "by").unwrap_or_else(|| "keel-cli".to_owned());
+    let by = match keel_cli::actor::resolve(&keel_cli::actor::root_for(&file), flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
     match w::append_measurement(&file, &indicator, &value, &at, &source, &by) {
         Ok(name) => {
             println!("{name}");
@@ -1148,7 +1169,10 @@ fn cmd_snapshot_indicators(args: &[String]) -> i32 {
     };
     let file = flag(args, "file").map_or_else(|| root.join(".tracking").join("indicators.sysml"), PathBuf::from);
     let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
-    let by = flag(args, "by").unwrap_or_else(|| "keel-cli".to_owned());
+    let by = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
     let keys = match keel_cli::view::computed_indicator_keys(&root) {
         Ok(k) => k,
         Err(e) => {
@@ -1471,6 +1495,8 @@ fn main() {
         Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("boundary-sweep") => cmd_query0(rest, "keel boundary-sweep [ROOT]", |r| keel_cli::view::boundary_sweep_json(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("reverify") => cmd_reverify(rest),
+        // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
+        Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),

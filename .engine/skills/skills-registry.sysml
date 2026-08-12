@@ -252,4 +252,20 @@ package EngineSkillRegistry {
         :>> triggerCondition = "A request means design/scope/figure-out X, 'what should we build', a new capability, requirements elicitation, or any architectural direction.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part actorEnrollmentSkill : AISkill {
+        :>> id = "0d610001-0812-4101-9b3e-000000110001";
+        :>> title = "actor-enrollment";
+        :>> purpose = "Deploy the Actor Enrollment process (D0129): take an uninitiated contributor — human or AI, on a machine that has never run the engine — to truthful authoring. Establish the acting identity EXPLICITLY (refuse if indeterminate; git identity is a suggestion, never authority); ASK actor KIND (human/ai) and ROLE rather than inferring, since kind is the only thing protecting human-only attestation authority; register the correctly-typed actor without duplicating; BIND the machine so no write path needs a default; and PROVE the local gate runs. Closes issue072 (write paths defaulting the actor to a named human) + issue073 (every enrolled actor registered as Person). Distinct from and PRIOR to `introduction`, which onboards a fresh PROJECT rather than establishing who is acting. The deploying skill for .engine/processes/actor-enrollment.sysml.";
+        :>> location = ".engine/skills/actor-enrollment/SKILL.md";
+        :>> triggerCondition = "A contributor acts from a machine with no engine identity binding; a new human or AI joins the project; `keel` reports no acting actor; or provenance/authority is in question.";
+        :>> writePolicy = WritePolicy::direct;
+    }
+    part distributedCollaborationSkill : AISkill {
+        :>> id = "0d610002-0812-4102-9b3e-000000110002";
+        :>> title = "distributed-collaboration";
+        :>> purpose = "Deploy the Distributed Collaboration session loop (D0129) for an asynchronous remote mostly-AI team where the git remote is the ONLY coordination medium: SYNC (fetch, state divergence, integrate ancestry-preservingly — never rebase, since evidence is anchored to commit identity — check gate parity, then orient); CLAIM (take work visibly before starting; the remote's atomic ref update supplies mutual exclusion, so first-to-land wins and no lock server is needed); WORK (sprint ceremony under D0108's ownership contract, with true provenance); LAND by LANE (facts to the trunk via the gate-on-merged-tree loop; definitional change + deliverable source via a reviewed proposal with an independent reviewer and recorded human acceptance); ESCALATE (textual conflicts resolved then fully re-gated; semantic conflicts recorded as an Issue for HUMAN adjudication, never settled by precedence); CLOSE (release the claim, leave nothing in conversation — D0018). The deploying skill for .engine/processes/distributed-collaboration.sysml.";
+        :>> location = ".engine/skills/distributed-collaboration/SKILL.md";
+        :>> triggerCondition = "A work session begins on a project with more than one contributor; a push is rejected; a conflict or contention arises; or work is about to be landed.";
+        :>> writePolicy = WritePolicy::direct;
+    }
 }

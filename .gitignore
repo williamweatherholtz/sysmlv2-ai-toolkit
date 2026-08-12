@@ -68,3 +68,7 @@ architect-sure-*.png
 
 # personal per-project Claude Code overrides (local experiments / prototype hooks)
 .claude/settings.local.json
+
+# Machine-local acting-actor binding (D0129). Per-machine by design: committing it would
+# re-create the shared-default provenance defect it exists to remove (issue072).
+.keel/

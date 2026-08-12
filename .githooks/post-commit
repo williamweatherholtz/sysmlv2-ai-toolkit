@@ -1,8 +1,62 @@
 #!/bin/sh
-# Engine process (CLAUDE.md §4): if a commit happens, a push happens.
-# Pushes the current branch to origin after every commit. Change-agnostic
-# (code, docs, schema — any commit) and non-fatal on failure (the commit
-# already succeeded; just push manually later if offline).
+# Engine process (CLAUDE.md §4 + D0129): if a commit happens, a push happens — and if the push is
+# REJECTED because another contributor landed first, integrate their work ANCESTRY-PRESERVINGLY
+# (merge, NEVER rebase) and retry.
+#
+# WHY NEVER REBASE (issue071 — the existential one): a passing TestResult counts as done only while
+# its `judgedAgainst` SHA still RESOLVES (keel-cli/src/orient.rs). `git pull --rebase` rewrites local
+# commit identity, so evidence already recorded points at pre-rebase commits that were never pushed.
+# The rewriting machine still finds them as loose objects and reports GREEN, while every other clone
+# reports invalidEvidence, re-lists finished work as ready, and a second contributor redoes it —
+# computed state becomes a function of WHICH CLONE ran the query, which negates the engine's core
+# claim. A merge preserves the original commits as reachable ancestors, so every anchor stays
+# resolvable in every clone.
+#
+# The merge below fires .githooks/pre-merge-commit, so the FULL enforced gate runs against the
+# MERGED tree before it lands (srDcGateOnMergedTree) — a green-alone/red-together pair is caught
+# here rather than on the trunk.
+#
+# Non-fatal throughout: the commit already succeeded. Bounded retries, then stop and report — never
+# force-push, never rebase, never leave a half-merged tree.
+
+# Recursion guard: the merge in the retry loop creates a commit, which fires post-commit again.
+[ "$KEEL_POST_COMMIT_ACTIVE" = "1" ] && exit 0
+KEEL_POST_COMMIT_ACTIVE=1
+export KEEL_POST_COMMIT_ACTIVE
+
 branch="$(git rev-parse --abbrev-ref HEAD)"
-echo "post-commit: pushing $branch -> origin"
-git push origin "$branch" || echo "post-commit: push failed; run 'git push' when able."
+max=3
+attempt=0
+
+while [ "$attempt" -lt "$max" ]; do
+    attempt=$((attempt + 1))
+    echo "post-commit: pushing $branch -> origin (attempt $attempt/$max)"
+    if git push origin "$branch"; then
+        exit 0
+    fi
+
+    echo "post-commit: push rejected — another contributor landed first. Integrating (merge, never rebase)."
+    if ! git fetch origin "$branch"; then
+        echo "post-commit: fetch failed (offline?). Run 'git pull --no-rebase && git push' when able."
+        exit 0
+    fi
+
+    if git merge --no-edit "origin/$branch"; then
+        continue    # gated by pre-merge-commit; loop round and push the merge
+    fi
+
+    # Conflict, or the gate refused the merged tree. Leave the tree clean and hand off to a human/agent.
+    echo "post-commit: MERGE COULD NOT BE COMPLETED AUTOMATICALLY."
+    echo "post-commit:   Either a textual conflict needs resolving, or pre-merge-commit refused the"
+    echo "post-commit:   merged tree (a semantic conflict: both sides green alone, red together)."
+    echo "post-commit:   DO: resolve keeping BOTH facts, run 'keel validate . && keel guard .', commit, push."
+    echo "post-commit:   For two conclusions that cannot both be true, record an Issue for HUMAN"
+    echo "post-commit:   adjudication (D0108) — do not settle it by precedence."
+    echo "post-commit:   NEVER 'git pull --rebase' here: it orphans evidence anchors (issue071)."
+    git merge --abort 2>/dev/null || true
+    exit 0
+done
+
+echo "post-commit: still rejected after $max attempts — heavy contention. Backing off."
+echo "post-commit:   Re-run 'git pull --no-rebase && git push' shortly. Never force-push."
+exit 0
