@@ -1006,4 +1006,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRetroToBacklog to issue085;
+
+    #ProcessDefect part issue086 : Issue {
+        :>> id = "e0860086-0086-4e86-9086-516273840086";
+        :>> title = "The response contract now exists in TWO places — D0130 made the output style canonical but CLAUDE.md section 3 still restates it";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Raised BY the sprint 249 retro, under the obligation issue085 established (a retro finding becomes a tracked, prioritized item rather than prose) — recorded here as the first exercise of that rule. D0130 decides that `.claude/output-styles/keel.md` is the CANONICAL home of the response contract and that CLAUDE.md merely REFERENCES it, and a pointer was added at the head of section 3. But the restated text was NOT removed: section 3's 'Strict process-boundedness' paragraph still spells out the `Parsed:` block mandate, the TRIVIAL/CHANGE/EXECUTE/RECORD/VIEW/ORIENT label vocabulary, and the trivial-exemption rule — all of which the output style now owns. So one rule has two live copies, which is the dual truth D0105 forbids, and the copy in the WEAKER layer (user-turn context) is the one that will silently drift out of agreement with the system-prompt copy. Mild irony worth recording: this is the same defect class as the four misses that motivated D0130 in the first place — a rule living in a place where nothing keeps it honest. FIX: reduce CLAUDE.md section 3 to the ROUTES (classification table + recurring-or-one-time check) plus the pointer, and DELETE the restated contract text rather than annotating it as superseded (no tombstones — state what IS). Then grep the wider doc surface for other restatements per the doc-sync skill. Deliberately ranked LOW: it is a documentation-consistency defect with no functional effect while the two copies still agree, so it sits below the four tracking-mechanism controls and the team-readiness work.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcContractDedup";
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcContractDedup to issue086;
 }
