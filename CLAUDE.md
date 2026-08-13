@@ -122,6 +122,16 @@ viewpoint-registry stays the concern-coverage index.)
 
 ## 3. The interaction loop ("main")
 
+> **The RESPONSE CONTRACT is not defined here (D0130).** Its canonical home is the output style
+> `.claude/output-styles/keel.md` (`outputStyle: keel`), which lands in the **system prompt** —
+> a strictly stronger layer than this file, which is injected as ordinary user-turn context and was
+> demonstrably bypassed four times (issue082–085). That file governs the `Parsed:` block, no-prose-state,
+> verify-don't-assert, never-fabricate-an-attestation, and correct-at-the-root. **Do not restate those
+> rules here** — one canonical home per fact (D0105). This section defines the **ROUTES** the contract
+> refers to. Enforcement is the `Stop` hook (`.engine/tools/stop_gate.py`): it runs `keel validate` +
+> `keel guard` at the turn boundary and blocks the turn while the model is dishonest — the only layer
+> that enforces rather than instructs, because the *harness* executes it.
+
 There is no executable "main" yet; **this is the main.** Do **not** assume a request
 means "do work in the current phase." **Classify every request first** — by *what it
 changes* — then follow that route:

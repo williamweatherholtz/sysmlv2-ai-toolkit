@@ -13,12 +13,25 @@
       "Skill(critic-traceability)"
     ]
   },
+  "outputStyle": "keel",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           { "type": "command", "command": "python .engine/tools/triage_reminder.py" },
           { "type": "command", "command": "python .engine/tools/out_of_band_check.py" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .engine/tools/stop_gate.py",
+            "timeout": 180,
+            "statusMessage": "in-loop honest-state gate"
+          }
         ]
       }
     ]
