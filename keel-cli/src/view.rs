@@ -2877,6 +2877,100 @@ pub fn decision_requirement_prose_links(root: &Path) -> Result<Vec<(String, Stri
     Ok(out)
 }
 
+/// `SystemRequirement`s a DELIVERED verification names in prose but does not `#Verify`-link to.
+///
+/// Closes issue082 (D0130): `work done` and `requirement verified` were DISCONNECTED. Sprint 247
+/// delivered six SRs with passing `DoD` `TestResult`s and CI green, yet `tier-satisfaction` correctly
+/// reported all six UNVERIFIED — because an SR counts as verified only when a Test `#Verify`-links TO
+/// IT, and the `DoD` Tests link to the backlog ACTION instead. The model therefore could not tell
+/// `requirement not yet delivered` from `requirement delivered but its verification was never traced
+/// upward`, and the gap was narrated to the human as though 34% meant functional verification.
+///
+/// Detection reuses the `decision-requirement-link` shape (D0102): prose names it, no typed edge.
+/// A verification counts as DELIVERED when its highest-numbered result passed — so this flags only
+/// requirements whose work is actually done, never merely planned ones (those are honest burndown).
+///
+/// Returns `(verification name, SystemRequirement name)` pairs.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn untraced_verification_links(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let phases = declared_workflow_phases(root);
+    Ok(untraced_links(&model, &phases))
+}
+
+/// Pure core of [`untraced_verification_links`], for self-test.
+fn untraced_links(model: &Model, phases: &[String]) -> Vec<(String, String)> {
+    // SRs carrying NO incoming verify edge — the same predicate tier-satisfaction reports as a gap.
+    let unverified: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(n, i)| i.type_name == "SystemRequirement" && !model.edges.iter().any(|e| e.kind == "verify" && &e.to == *n))
+        .map(|(n, _)| n)
+        .collect();
+    if unverified.is_empty() {
+        return Vec::new();
+    }
+
+    // PHASE gates (refine/standup/implement/review/closeOut/retro) verify the sprint PROCESS, not the
+    // requirement, so a gate merely mentioning an SR is not a claim to have discharged it — including
+    // them produced 37 of 103 findings, i.e. more than a third pure noise. Derived from the project's
+    // DECLARED phases, never a hardcoded list, so it adapts to a downstream's own workflow. DoD tests
+    // are deliberately KEPT: a passing DoD *is* the claim that the work is delivered.
+    let is_phase_gate = |name: &str| {
+        let lower = name.to_ascii_lowercase();
+        phases.iter().any(|p| lower.ends_with(&format!("{}gate", p.to_ascii_lowercase())))
+    };
+
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (vname, vinfo) in &model.items {
+        // Keyed on the SHAPE (carries a procedure, has a passing result) rather than a type name, so
+        // this cannot silently stop matching if verification typing changes.
+        let Some(text) = vinfo.attrs.get("procedureText") else { continue };
+        if is_phase_gate(vname) {
+            continue;
+        }
+        if latest_result(model, vname).as_ref().map(|(o, _)| o.as_str()) != Some("pass") {
+            continue; // not delivered -> an unverified SR here is honest incompleteness, not a gap
+        }
+        for sr in &unverified {
+            if contains_token(text, sr) && !model.edges.iter().any(|e| &e.from == vname && e.to == **sr) {
+                out.push((vname.clone(), (*sr).clone()));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// How each VERIFIED `SystemRequirement` is verified, as `(method, count)` pairs, plus the verified total.
+///
+/// Without this, `sr_verified_pct` reads as "requirements with passing tests" when in this repo the
+/// verified set is overwhelmingly `method=critique` from the D0080 backfill — the ambiguity that led to
+/// the metric being mis-narrated (issue082). Surfacing the mix makes the number self-describing.
+fn verified_method_mix(model: &Model) -> Vec<(String, usize)> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for e in &model.edges {
+        if e.kind != "verify" {
+            continue;
+        }
+        if model.items.get(&e.to).is_none_or(|i| i.type_name != "SystemRequirement") {
+            continue;
+        }
+        let method = model
+            .items
+            .get(&e.from)
+            .and_then(|i| i.attrs.get("method"))
+            .cloned()
+            .unwrap_or_else(|| "unstated".to_string());
+        *counts.entry(method).or_default() += 1;
+    }
+    let mut out: Vec<(String, usize)> = counts.into_iter().collect();
+    out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    out
+}
+
 /// Critical-finding targets lacking a non-aiModel critic (D0080/issue031 independence).
 ///
 /// An element verified by a `method=critique` Test with `severity=Critical` whose latest result is
@@ -3572,7 +3666,9 @@ fn compute_tier_satisfaction(model: &Model) -> Vec<TierStat> {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn tier_satisfaction(root: &Path) -> Result<String, ViewError> {
-    let stats = compute_tier_satisfaction(&Model::build(root)?);
+    let model = Model::build(root)?;
+    let stats = compute_tier_satisfaction(&model);
+    let mix = verified_method_mix(&model);
     let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
     let tiers: Vec<Json> = stats
         .iter()
@@ -3590,6 +3686,11 @@ pub fn tier_satisfaction(root: &Path) -> Result<String, ViewError> {
     let out = Json::Obj(vec![
         ("tier_satisfaction".to_string(), Json::s("tier-satisfaction comprehensiveness (D0098/issue047): STRUCTURAL downstream-satisfaction floor per tier — Needs decomposed into SystemRequirements (satisfy), SystemRequirements verified by Tests (verify). A leading indicator of insufficient implementation; thin downstream = predicted under-implementation. (Deeper 'do the SRs fully discharge the Need' is the AI white-box layer, not yet built.)")),
         ("tiers".to_string(), Json::Arr(tiers)),
+        // issue082/D0130: 'verified' means SOME Test #Verify-links the SR — it does NOT mean a passing
+        // functional test. Report the METHOD mix so the percentage is self-describing and cannot be
+        // read as functional verification when it is predominantly critique coverage.
+        ("verifiedByMethod".to_string(), Json::Obj(mix.iter().map(|(m, c)| (m.clone(), n(*c))).collect())),
+        ("verifiedByMethodNote".to_string(), Json::s("Counts verify edges into SystemRequirements by the verifying Test's method. sr_verified_pct counts ANY #Verify-linked Test — read this mix before treating it as functional-test coverage.")),
     ]);
     Ok(out.dump())
 }
@@ -5832,6 +5933,107 @@ mod tests {
         let (_total, via_guard) = compute_attestation(&model);
         assert_eq!(via_rule, via_guard);
         assert_eq!(via_rule, vec!["dGap".to_string()]);
+    }
+
+    /// Build a passing (or failing) result item for verification `v`, as `latest_result` reads it.
+    fn result_for(v: &str, outcome: &str) -> (String, ItemInfo) {
+        let mut attrs = HashMap::new();
+        attrs.insert("outcome".to_string(), outcome.to_string());
+        (format!("{v}R1"), ItemInfo { type_name: "TestResult".to_string(), attrs, marker: None, file: String::new() })
+    }
+
+    /// A verification carrying `procedureText`.
+    fn verification_named(text: &str) -> ItemInfo {
+        let mut attrs = HashMap::new();
+        attrs.insert("procedureText".to_string(), text.to_string());
+        ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() }
+    }
+
+    #[test]
+    fn untraced_links_flags_delivered_work_whose_requirement_has_no_verify_edge() {
+        // issue082/D0130: the six sprint-247 SRs were DELIVERED (passing DoD + CI green) yet reported
+        // unverified, because the DoD Tests #Verify-linked the backlog ACTION, not the requirement.
+        let phases: Vec<String> = ["refine", "review"].iter().map(|s| (*s).to_string()).collect();
+        let mut items = HashMap::new();
+        items.insert("srAlpha".to_string(), item("SystemRequirement", None)); // delivered, untraced
+        items.insert("srBeta".to_string(), item("SystemRequirement", None)); // already verified
+        items.insert("srGamma".to_string(), item("SystemRequirement", None)); // named by unfinished work
+        items.insert("doneDoD".to_string(), verification_named("delivers srAlpha and also srBeta"));
+        items.insert("openDoD".to_string(), verification_named("will deliver srGamma"));
+        items.insert("fooReviewGate".to_string(), verification_named("reviewed srAlpha"));
+        items.insert("tBeta".to_string(), item("Test", None));
+        for (n, i) in [result_for("doneDoD", "pass"), result_for("openDoD", "fail"), result_for("fooReviewGate", "pass")] {
+            items.insert(n, i);
+        }
+        let edges = vec![Edge { kind: "verify".to_string(), from: "tBeta".to_string(), to: "srBeta".to_string() }];
+        let model = Model { items, edges };
+
+        let out = untraced_links(&model, &phases);
+        assert_eq!(out, vec![("doneDoD".to_string(), "srAlpha".to_string())], "got {out:?}");
+        // srBeta excluded: already #Verify-linked, so nothing is missing.
+        // srGamma excluded: its work has NOT passed — an unverified planned requirement is honest
+        // burndown (D0098), not a traceability defect.
+        // fooReviewGate excluded: a declared PHASE gate verifies the sprint process, not the
+        // requirement (this filter removed 37 of 103 real-repo findings as noise).
+    }
+
+    #[test]
+    fn untraced_links_goes_clean_once_the_verify_edge_is_authored() {
+        // The fix path the guard's message prescribes must actually clear the finding.
+        let mut items = HashMap::new();
+        items.insert("srAlpha".to_string(), item("SystemRequirement", None));
+        items.insert("doneDoD".to_string(), verification_named("delivers srAlpha"));
+        let (rn, ri) = result_for("doneDoD", "pass");
+        items.insert(rn, ri);
+        let model = Model { items: items.clone(), edges: Vec::new() };
+        assert_eq!(untraced_links(&model, &[]).len(), 1, "flagged before the edge exists");
+
+        let linked = Model {
+            items,
+            edges: vec![Edge { kind: "verify".to_string(), from: "doneDoD".to_string(), to: "srAlpha".to_string() }],
+        };
+        assert!(untraced_links(&linked, &[]).is_empty(), "clean once #Verify-linked");
+    }
+
+    #[test]
+    fn untraced_links_requires_a_whole_token_match() {
+        // `srAlpha` must not match inside `srAlphaBeta`, or the guard would invent findings.
+        let mut items = HashMap::new();
+        items.insert("srAlpha".to_string(), item("SystemRequirement", None));
+        items.insert("doneDoD".to_string(), verification_named("delivers srAlphaBeta only"));
+        let (rn, ri) = result_for("doneDoD", "pass");
+        items.insert(rn, ri);
+        let model = Model { items, edges: Vec::new() };
+        assert!(untraced_links(&model, &[]).is_empty(), "substring must not count as a mention");
+    }
+
+    #[test]
+    fn verified_method_mix_distinguishes_critique_from_test() {
+        // issue082: `sr_verified_pct` counts ANY #Verify-linked Test, and in this repo the verified set
+        // is ~70% method=critique — the ambiguity that let 34% be narrated as functional verification.
+        let mut items = HashMap::new();
+        items.insert("srA".to_string(), item("SystemRequirement", None));
+        items.insert("srB".to_string(), item("SystemRequirement", None));
+        items.insert("nC".to_string(), item("Need", None)); // verify edges to non-SRs are ignored
+        let mut crit = HashMap::new();
+        crit.insert("method".to_string(), "critique".to_string());
+        items.insert("tCrit".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: crit, marker: None, file: String::new() });
+        let mut tst = HashMap::new();
+        tst.insert("method".to_string(), "test".to_string());
+        items.insert("tTest".to_string(), ItemInfo { type_name: "Test".to_string(), attrs: tst, marker: None, file: String::new() });
+        items.insert("tBare".to_string(), item("Test", None)); // no method attr -> "unstated"
+        let edges = vec![
+            Edge { kind: "verify".to_string(), from: "tCrit".to_string(), to: "srA".to_string() },
+            Edge { kind: "verify".to_string(), from: "tTest".to_string(), to: "srB".to_string() },
+            Edge { kind: "verify".to_string(), from: "tBare".to_string(), to: "srB".to_string() },
+            Edge { kind: "verify".to_string(), from: "tCrit".to_string(), to: "nC".to_string() },
+            Edge { kind: "satisfy".to_string(), from: "nC".to_string(), to: "srA".to_string() },
+        ];
+        let mix = verified_method_mix(&Model { items, edges });
+        let get = |k: &str| mix.iter().find(|(m, _)| m == k).map_or(0, |(_, c)| *c);
+        assert_eq!(get("critique"), 1, "the Need-targeted verify edge must NOT be counted: {mix:?}");
+        assert_eq!(get("test"), 1);
+        assert_eq!(get("unstated"), 1, "a method-less verifier is reported, not silently dropped");
     }
 
     #[test]

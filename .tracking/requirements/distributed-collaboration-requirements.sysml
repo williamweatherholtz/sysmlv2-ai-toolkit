@@ -222,4 +222,19 @@ package ProjectDistributedCollaborationRequirements {
     satisfy nAsyncHumanOversight by srDcTwoLaneIntegration;
     satisfy nUniformGate by srDcPortableGate;
     satisfy nUniformGate by srDcEngineVersionParity;
+
+    // ── verify edges: the DELIVERED requirements' verification, traced UPWARD (issue082/D0130) ──
+    // Sprint 247 recorded passing DoD TestResults for these six and CI green, but linked them to the
+    // backlog ACTION only — so `tier-satisfaction` reported the REQUIREMENTS unverified and the AI
+    // then narrated the number as functional verification. The new `verification-trace` guard flagged
+    // exactly these pairs; the edges below close them. Scoped DELIBERATELY to the six this thread
+    // delivered and can vouch for: the guard also surfaced ~60 pre-existing pairs across the viewer
+    // programme (issue087), and asserting another thread's verification would be a judgment this
+    // thread has no evidence for (D0108 — add, never speak for someone else's work).
+    #Verify dependency from dcMergeOnlyIntegrationDoD to srDcMergeOnlyIntegration;
+    #Verify dependency from dcDuplicateIdentityGuardDoD to srDcUniqueIdentityGuard;
+    #Verify dependency from dcCollisionResistantIdsDoD to srDcCollisionResistantIds;
+    #Verify dependency from dcActorIdentityBindingDoD to srDcActorIdentityBinding;
+    #Verify dependency from dcActorIdentityBindingDoD to srDcActorKindClassification;
+    #Verify dependency from dcPortableGateDoD to srDcPortableGate;
 }

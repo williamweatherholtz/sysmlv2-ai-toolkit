@@ -799,6 +799,36 @@ pub fn decision_requirement_link(root: &Path) -> GuardReport {
     }
 }
 
+// ── verification-trace guard (delivered work whose requirement carries no verification) ───────────
+
+/// Guard: a DELIVERED verification names a `SystemRequirement` in prose but never `#Verify`-links it.
+///
+/// Closes issue082 (D0130). Sprint 247 delivered six SRs with passing `DoD` `TestResult`s and CI green,
+/// yet `tier-satisfaction` reported all six UNVERIFIED — because an SR is verified only when a Test
+/// `#Verify`-links TO IT, and the `DoD` Tests linked to the backlog ACTION instead. So the model could
+/// not distinguish *requirement not yet delivered* from *requirement delivered but its verification was
+/// never traced upward*, and the AI then reported `sr_verified_pct` to the human as though it meant
+/// functional verification. This makes that specific, previously-invisible state visible.
+///
+/// WARNING-level and non-blocking, on two independent grounds: completeness is honest-state burndown
+/// that must never gate a commit (D0098), and prose-name matching is a heuristic, so it follows the
+/// D0102 promote-once-low-noise pattern. A compute error IS a violation.
+#[must_use]
+pub fn verification_trace(root: &Path) -> GuardReport {
+    match crate::view::untraced_verification_links(root) {
+        Ok(pairs) => {
+            let warnings = pairs
+                .iter()
+                .map(|(v, sr)| {
+                    format!("{v} PASSED and names {sr} in its procedure, but no #Verify edge reaches {sr} — the work is verified, the REQUIREMENT is not (issue082); author `#Verify dependency from {v} to {sr};`")
+                })
+                .collect();
+            GuardReport { name: "verification-trace", scanned: pairs.len(), warnings, violations: Vec::new() }
+        }
+        Err(e) => GuardReport { name: "verification-trace", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing verification trace: {e}")] },
+    }
+}
+
 // ── process-skill guard (D0059/issue036: no inert process — every process has a deploying skill) ──
 
 /// Every `.engine/processes/<file>.sysml` path referenced anywhere in the skills-registry text.
@@ -1109,8 +1139,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 18] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "duplicate-identity", "decision-requirement-link", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 19] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "duplicate-identity", "decision-requirement-link", "verification-trace", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1133,6 +1163,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-rationale" => Some(decision_rationale(root)), // hard (D0103)
         "duplicate-identity" => Some(duplicate_identity(root)), // hard (D0129/issue074) — concurrent allocation lands green without it
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
+        "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
         "doc-sync" => Some(doc_sync(root)), // WARNING-level member of GUARD_NAMES (D0113) — definitional change w/o doc update
