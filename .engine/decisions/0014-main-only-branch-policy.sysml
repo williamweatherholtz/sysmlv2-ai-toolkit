@@ -6,7 +6,7 @@ package Decision0014 {
     part d0014 : Decision {
         :>> id = "e92f5006-c0f2-4945-8aac-b74d2a540f3f";
         :>> title = "main is the canonical branch; everything pushes and merges to main only";
-        :>> status = DecisionStatus::accepted;
+        :>> status = DecisionStatus::superseded;  // superseded by D0129 (accepted 2026-08-13): its model was explicitly SOLO-scoped ("this solo+AI project") and is replaced by two-lane integration — facts land on the trunk via the gate-on-merged-tree loop, CHANGE-class + deliverable source go through a reviewed proposal with an independent reviewer. Ancestry-preserving integration is now mandatory (no squash/rebase/force). supersede back-reference is computed.
         :>> context = "Work had accumulated on a feature branch (engine-restructure) under a don't-merge-until-told caution; the user found work stranded on side branches counterproductive for this solo+AI project.";
         :>> decision = "Commit accepted work directly to main; the post-commit hook pushes every commit; no long-lived feature branches. main is the canonical branch and everything pushes and merges to main only.";
         :>> rationale = "Work had stranded on a feature branch (engine-restructure) under a don't-merge-until-told caution, which the user found counterproductive for this solo+AI project. Acceptance still gates each CHANGE - this changes where commits land, not whether they need acceptance. Standing instruction from the user, 2026-06-11 (commit ae01dee; engine-restructure fast-forwarded into main).";

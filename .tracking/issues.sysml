@@ -954,4 +954,56 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcStaleKernelInstanceGate to issue081;
+
+    // ── sprint 247 process-adherence review, 2026-08-13 (human direction: "if we're
+    // inaccurately identifying work, we need to be fixing our tracking mechanisms so that
+    // these mistakes aren't missed"). Each is a MISS THAT HAPPENED, not a hypothetical;
+    // each gets a permanent automated control per D0047, never a reminder.
+    #ProcessDefect part issue082 : Issue {
+        :>> id = "e0820082-0082-4e82-9082-516273840082";
+        :>> title = "`work done` and `requirement verified` are DISCONNECTED — a delivered SR shows unverified because DoD Tests #Verify-link the backlog action, not the requirement";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 247 delivered six SystemRequirements (srDcMergeOnlyIntegration, srDcUniqueIdentityGuard, srDcCollisionResistantIds, srDcActorIdentityBinding, srDcActorKindClassification, srDcPortableGate) with passing DoD TestResults at b518c23 and CI green — yet `keel tier-satisfaction` correctly reports all six as UNVERIFIED, because an SR counts as verified only when a Test #Verify-links TO IT (view.rs compute_tier_satisfaction), and the DoD Tests link to the backlog ACTION instead. So the model cannot distinguish 'requirement not yet delivered' from 'requirement delivered but its verification was never traced upward'. CONSEQUENCE (realized): the AI then reported sr_verified_pct=34% to the human as though it meant functional verification, when in this repo the 24 'verified' SRs are verified overwhelmingly by method=critique (414 critique verifications in critiques.sysml) rather than by functional tests — an inaccurate account of what is and is not done, which is exactly the failure the human flagged. TWO defects in one: (a) the missing upward trace is authored-edge debt the AI created; (b) the view does not expose WHAT verified an SR, so no reader could catch (a). FIX: a computed check flagging a done work item whose charter/satisfy chain reaches an SR carrying no #Verify edge, plus a method breakdown in tier-satisfaction. Non-blocking (honest-state completeness, D0098).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcVerificationTrace";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVerificationTrace to issue082;
+
+    #ProcessDefect part issue083 : Issue {
+        :>> id = "e0830083-0083-4e83-9083-516273840083";
+        :>> title = "An acceptance event with an EMPTY procedureText passes every guard — a contentless human attestation looks complete";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-13 in the human's own acceptance record. d0129Accept was authored with `procedureText = \"\"` (d0128Accept carries only the bare token \"william weatherholtz\"), and BOTH passed every enforced guard — acceptance-events (D0066) and confirmation-authenticity (D0106/issue059) included, since those check that an acceptance EXISTS and is HUMAN-judged, never that it SAYS anything. For method=confirmation the attestation text IS the evidence (D0016: test/analysis/inspection carry their own evidence; confirmation's evidence is the attestation itself), so an empty procedureText is an unsupported claim wearing the shape of a complete record — and it is the highest-consequence record type in the engine, since accepted Decisions govern everything downstream. Note the asymmetry the engine already fixed elsewhere: decision-rationale (D0103) hard-fails a Decision with a blank/trivial context or rationale precisely so the WHY cannot be empty; the same substantive-field test was never applied to the acceptance event that makes that Decision binding. FIX: extend the acceptance/confirmation check to require a SUBSTANTIVE procedureText, forward-only (grandfather existing thin attestations to warning per the issue068 lesson; hard-fail only new ones).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcAttestationSubstance";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAttestationSubstance to issue083;
+
+    #ProcessDefect part issue084 : Issue {
+        :>> id = "e0840084-0084-4e84-9084-516273840084";
+        :>> title = "Backlog priority was set by ACCIDENT OF APPEND LOCATION, and the AI narrated priority in prose instead of reordering the file (D0052 ignored)";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0052 (accepted 2026-06-16) states that backlog DECLARATION ORDER IS priority, that orient/whats-next rank the ready frontier by it, and that the AI AUTO-FOLLOWS the top ready item rather than asking or asserting which work matters. Sprint 247 ignored all three: it appended 15 new actions at the file tail, so the ready frontier ranked `keelArchViews` (issue069, Low) FIRST — purely because an earlier session had appended it to the end of the COMPLETED EngineBuild block — while `dcStaleKernelInstanceGate` (issue081, HIGH: an enforced commit gate being routinely bypassed) ranked 14th and the team-readiness items ranked below unrelated feature work. The AI then told the human in PROSE which items were 'highest-leverage', which is precisely the prose-shadow-truth D0018 forbids: an authored mechanism for priority existed and was bypassed in favour of narration. ROOT CAUSE: nothing computes whether recorded order agrees with recorded severity, so a mis-ordered backlog is indistinguishable from a curated one. Both inputs ARE recorded facts (Issue.severity, declaration order), so the inversion is computable. FIX: a computed priority-inversion check (a ready item whose #Resolves-linked Issue is >= High while a lower-severity or issue-free ready item outranks it), warning-level and surfaced in orient — priority is judgment, so it must be made VISIBLE rather than blocked. Immediate remediation: the backlog was physically reordered on 2026-08-13 (dcStaleKernelInstanceGate to #5, keelArchViews demoted to last).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcPriorityInversion";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPriorityInversion to issue084;
+
+    #ProcessDefect part issue085 : Issue {
+        :>> id = "e0850085-0085-4e85-9085-516273840085";
+        :>> title = "Sprint-retro findings escaped the model into prose — two of three avoidable issues became CLAUDE.md text and AI memory instead of prioritized backlog items";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The sprint 247 retro gate named three AVOIDABLE-ISSUEs. One (the issue074 collision reproducing live) already had a control. The other two — piping `git commit` into `tail` hanging the kernel JVM for five minutes, and a bare `cat >` blocking on stdin for two — were written into CLAUDE.md §6 prose and the AI's own memory, i.e. OUTSIDE the tracked model. Consequences: they carry no severity, no priority, no resolver, no UUID; they are invisible to orient, whats-next, coverage and the burndown; and AI memory is not project truth at all (it is per-agent and unreviewable), so for a distributed team those lessons effectively do not exist. That is the prose-shadow-truth failure D0018 exists to prevent, committed inside the very ceremony meant to prevent recurrence. The human's direction makes the obligation explicit: 'the sprint retro should identify any potential recurring or serious issues and put it properly prioritized backlog items to resolve them.' ROOT CAUSE: the retro obligation is stated in D0049/the sprint-retro skill as a narrative expectation with no defined artifact and no check, so a retro that merely DESCRIBES a lesson passes its gate identically to one that TRACKS it. FIX: define the artifact in .engine/processes/agile-workflow.sysml's retro step + the sprint-retro skill (a retro's avoidable issues become tracked, prioritized items), and add a git-diff-aware warning check that a retro naming an avoidable issue co-records a tracked Issue or backlog action in the same commit — the doc-sync guard's shape (D0113), heuristic and warning-first.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcRetroToBacklog";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRetroToBacklog to issue085;
 }
