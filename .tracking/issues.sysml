@@ -1030,4 +1030,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcBackfillVerifyEdges to issue087;
+
+    #ProcessDefect part issue088 : Issue {
+        :>> id = "e0880088-0088-4e88-9088-516273840088";
+        :>> title = "tier-satisfaction counts SUPERSEDED (deliberately descoped) Needs as undecomposed gaps — the burndown understates completeness and points at cut work";
+        :>> createdAt = "2026-08-13";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-13 while decomposing the three D0128 Needs at the human's request. With those done, 6 Need gaps remained — and 5 of them (nViewerAuditProvenance, nViewerCoverageGap, nViewerMultiStakeholder, nViewerNotifications, nViewerTemporalState) carry an incoming #Supersede edge from d0115 or d0116. They were DELIBERATELY DESCOPED. §2.4 makes a superseding Decision the engine's own mechanism for expressing scope ('scope = superseding Decisions, not a separate type'), so counting descoped work as an unmet obligation contradicts the engine's own model of scope. TWO HARMS, the second worse than the first: (a) the headline number is wrong — real decomposition is 47/48 = 98%, reported as 47/53 = 88%, and that figure has been quoted repeatedly this sitting; (b) the metric points at WRONG WORK — a contributor trying to close the gap would author SystemRequirements for scope that was explicitly cut, which is worse than leaving the number alone. Note this is the mirror image of issue082: there the burndown UNDERSTATED delivery by missing a trace; here it understates it by counting a non-obligation. Both make the same underlying error — treating an absent edge as an unmet requirement without asking whether the requirement still stands. FIX: exclude Needs with an incoming #Supersede edge from the Need tier's denominator and gap set, and report the superseded count SEPARATELY so descoping stays visible rather than silently vanishing — an excluded item must not become an invisible one. Check rootedness/coverage/assured for the same blind spot.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcSupersededNeedGaps";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSupersededNeedGaps to issue088;
 }
