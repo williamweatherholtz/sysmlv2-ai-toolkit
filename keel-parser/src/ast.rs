@@ -162,6 +162,18 @@ pub struct EnumDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeDef {
     pub name: String,
+    /// The `:>` specialization target, if declared (issue102/D0140).
+    ///
+    /// Previously skipped along with the rest of the body, so the TYPE HIERARCHY was unread: 52 such
+    /// clauses exist in the engine's own schema and none was visible to any guard or view. That matters
+    /// beyond tidiness because `:>` is the derivation form D0140 names as the only valid replacement for
+    /// `#DerivedFrom` — a migration onto a relationship the parser cannot read would have lost every
+    /// edge silently.
+    ///
+    /// Only the FIRST target is captured. `SysML` v2 permits multiple, but nothing in this schema
+    /// declares more than one, and inventing multi-supertype support with no instance to test it against
+    /// is how unused schema accumulates (the `OrderingRule` precedent, rules.sysml:63-66).
+    pub specializes: Option<String>,
     pub span: Span,
     pub line: u32,
 }

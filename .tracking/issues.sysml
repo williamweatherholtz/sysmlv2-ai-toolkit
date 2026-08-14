@@ -1210,4 +1210,16 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcParserSkipVisibility to issue102;
+
+    #ProcessDefect part issue103 : Issue {
+        :>> id = "e1030103-0103-4f03-9103-516273840103";
+        :>> title = "A package could not reference its OWN declarations — a latent scope bug that only surfaced once `:>` became a checked reference";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while verifying the `:>` capture (issue102/sprint 269), by running the positive control rather than only the negative one. `registry.validate` built its type scope from `resolve_scope(&namespaces)`, which walks IMPORTED namespaces only — the package's own `TypeDef`/`ActionDef` declarations were never added. So `package Pr { part def Base { } part def A :> Base { } }` reported `unresolved type reference Base`, for a type declared two tokens earlier in the same file. WHY IT STAYED LATENT FOR THE WHOLE PROJECT'S LIFE: instances live in `.tracking` and their types live in `.engine`, so in practice EVERY type reference crossed a package boundary and resolved through an import. The one construct that routinely references a sibling in the same package is `:>` — `.engine/schema/core/rules.sysml:58` is `part def ElementRule :> Rule`, same package — and `:>` was precisely the construct the parser discarded, so the reference was never checked and the scope gap was never exercised. Two defects hiding each other: the unread construct concealed the broken scope, and the broken scope would have produced false failures the moment the construct was read. FIX: the package's own TypeDef and ActionDef names are inserted into `available_types` before validation. VERIFIED with BOTH polarities, which is the whole lesson — undeclared supertype FAILS, declared same-package supertype PASSES, no clause at all PASSES, and the real repo plus `.engine` stay clean. GENERAL LESSON: capturing a construct is what reveals whether the surrounding machinery was ever correct for it, and a negative test alone would have shipped this — the undeclared case failed correctly for the WRONG reason, because everything failed. A positive control is not a formality.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcParserReadSpecialize";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcParserReadSpecialize to issue103;
 }

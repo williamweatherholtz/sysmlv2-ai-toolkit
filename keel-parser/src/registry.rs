@@ -93,7 +93,26 @@ impl PackageRegistry {
         }
 
         // Build the effective scope: everything visible through imports.
-        let (available_types, available_enums) = self.resolve_scope(&namespaces);
+        let (mut available_types, available_enums) = self.resolve_scope(&namespaces);
+
+        // ...PLUS the package's own declarations. A package can always reference what it declares, and
+        // omitting that was a latent scope bug: `resolve_scope` walks IMPORTED namespaces only, so
+        // `part def ElementRule :> Rule` (rules.sysml:58, same package) had no way to resolve `Rule`.
+        // It stayed latent because instances live in `.tracking` and their types live in `.engine`, so
+        // every type reference in practice crossed a package boundary and went through an import. It
+        // surfaced the moment `:>` became a checked reference (issue102) — capturing a construct is what
+        // reveals whether the surrounding machinery was ever correct for it.
+        for item in &pkg.items {
+            match item {
+                Item::TypeDef(td) => {
+                    available_types.insert(td.name.as_str());
+                }
+                Item::ActionDef(ad) => {
+                    available_types.insert(ad.name.as_str());
+                }
+                _ => {}
+            }
+        }
 
         // Validate package-level and action-def-body items.
         for item in &pkg.items {
@@ -123,6 +142,14 @@ impl PackageRegistry {
                             Self::check_attr(attr, file, &available_enums, &mut diags);
                         }
                     }
+                }
+                // A `:>` specialization target is a TYPE REFERENCE and is now resolved like any other
+                // (issue102). Until the parser captured the clause this was unreachable, so a definition
+                // could specialize a type that did not exist and nothing noticed — and `:>` is the
+                // derivation form D0140 names as the replacement for `#DerivedFrom`, so the edge that
+                // migration depends on was the one edge nothing checked.
+                Item::TypeDef(td) => {
+                    Self::check_type_ref(td.specializes.as_deref(), td.line, file, &available_types, &mut diags);
                 }
                 _ => {}
             }

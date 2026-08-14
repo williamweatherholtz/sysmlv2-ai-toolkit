@@ -375,8 +375,14 @@ fn parse_succession(p: &mut Parser, filename: &str, is_ordering_only: bool) -> R
 fn skip_item(p: &mut Parser) {
     // Record BEFORE consuming: once the loop runs, the leading token is gone and with it the only
     // evidence of what was dropped.
+    // Record only when the LEADING token is something we failed to understand. A `{` means we are
+    // discarding the BODY of a construct whose header we did parse, and a `;` is a bare terminator —
+    // neither is an unread statement, and counting them inflates the figure with work that is not
+    // missing. This was measured, not assumed: capturing `:>` moved 52 records from `ColonGt` to
+    // `LBrace` without changing the total, which is what exposed the metric as counting skip_item
+    // INVOCATIONS rather than unread statements.
     let tok = p.peek_token();
-    if !matches!(tok.kind, TokenKind::RBrace | TokenKind::Eof) {
+    if !matches!(tok.kind, TokenKind::RBrace | TokenKind::Eof | TokenKind::LBrace | TokenKind::Semicolon) {
         let lead = token_label(&tok.kind);
         let line = tok.line;
         p.skipped.push(SkippedStatement { line, lead });
@@ -431,6 +437,28 @@ fn skip_brace_block(p: &mut Parser) {
 
 /// Extract an ident-or-keyword name at the current position and advance.
 /// Returns `None` (without advancing) when the current token is neither.
+/// Consume a `:> Supertype` clause if present, returning the supertype name.
+///
+/// Called immediately after a def's name, which is the only position the clause may occupy. Returns
+/// `None` when absent — an unspecialized definition is legitimate, not an error.
+fn parse_specializes(p: &mut Parser) -> Option<String> {
+    if !p.eat(&TokenKind::ColonGt) {
+        return None;
+    }
+    extract_ident_name(p)
+}
+
+/// Finish a `<kind> def` header: name, optional `:> Supertype`, then discard the body.
+///
+/// Extracted because six call sites repeated it verbatim once specialization capture was added — the
+/// duplication was introduced by that change, so removing it belongs to the same change.
+fn type_def_tail(p: &mut Parser, start: Span, start_line: u32) -> Option<Item> {
+    let name = extract_ident_name(p);
+    let specializes = parse_specializes(p);
+    skip_item(p);
+    name.map(|n| Item::TypeDef(TypeDef { name: n, specializes, span: start, line: start_line }))
+}
+
 fn extract_ident_name(p: &mut Parser) -> Option<String> {
     match p.peek().clone() {
         TokenKind::Ident(s) => { p.advance(); Some(s) }
@@ -606,9 +634,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
         TokenKind::Part => {
             if matches!(p.peek_next(), TokenKind::Def) {
                 p.advance(); p.advance(); // consume 'part' 'def'
-                let name = extract_ident_name(p);
-                skip_item(p);
-                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+                return Ok(type_def_tail(p, start, start_line));
             }
             if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
@@ -620,9 +646,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
         TokenKind::Verification => {
             if matches!(p.peek_next(), TokenKind::Def) {
                 p.advance(); p.advance(); // consume 'verification' 'def'
-                let name = extract_ident_name(p);
-                skip_item(p);
-                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+                return Ok(type_def_tail(p, start, start_line));
             }
             if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
@@ -635,9 +659,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             p.advance(); // consume 'attribute'
             if matches!(p.peek(), TokenKind::Def) {
                 p.advance();
-                let name = extract_ident_name(p);
-                skip_item(p);
-                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+                return Ok(type_def_tail(p, start, start_line));
             }
             skip_item(p);
             Ok(None)
@@ -650,9 +672,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             p.advance();
             if matches!(p.peek(), TokenKind::Def) {
                 p.advance();
-                let name = extract_ident_name(p);
-                skip_item(p);
-                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+                return Ok(type_def_tail(p, start, start_line));
             }
             if had_abstract { skip_item(p); return Ok(None); }
             let (n, tn, a, sp) = parse_typed_item_body(p, filename, start)?;
@@ -665,9 +685,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             if matches!(p.peek(), TokenKind::Case) { p.advance(); } // consume 'case'
             if matches!(p.peek(), TokenKind::Def) {
                 p.advance();
-                let name = extract_ident_name(p);
-                skip_item(p);
-                return Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })));
+                return Ok(type_def_tail(p, start, start_line));
             }
             skip_item(p);
             Ok(None)
@@ -679,9 +697,7 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
         // TypeDef so `: Name` references resolve (bug fix, Sprint 17 / issue005).
         TokenKind::Ident(_) if matches!(p.peek_next(), TokenKind::Def) => {
             p.advance(); p.advance(); // consume <ident> 'def'
-            let name = extract_ident_name(p);
-            skip_item(p);
-            Ok(name.map(|n| Item::TypeDef(TypeDef { name: n, span: start, line: start_line })))
+            Ok(type_def_tail(p, start, start_line))
         }
 
         _ => { skip_item(p); Ok(None) }
