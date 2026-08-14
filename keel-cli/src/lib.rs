@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
 use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
+pub mod activation;
 pub mod actor;
 pub mod algo;
 pub mod govern;

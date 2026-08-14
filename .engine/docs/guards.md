@@ -1,6 +1,6 @@
 # Guard reference
 
-`keel guard` runs **24** forward guards, kernel-free. **18 hard-blocking** (exit ≠ 0 on any violation)
+`keel guard` runs **25** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
 and **6 warning-only** (visible every commit, never blocking). `keel version` reports this split
 computed from the enforced set, so it cannot drift from what actually runs.
 
@@ -28,6 +28,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `duplicate-identity` | No repeated id, item name, package name, or sequence number (D0129/issue074) |
 | `marker-vocabulary` | Every marker used is declared — the engine's own algebra is **builtin** and needs no declaration; project markers declare in any project file (D0133/issue077, D0136/issue089) |
 | `engine-lint` | `.engine/decisions/*.sysml` import `EngineWork` (D0112 phase 1) |
+| `activation-manifest` | The activation contracts are well-formed — no unknown process or guard name (D0138). Hard because every check is exact set membership, and because a typo would *silently disable a control*, which is worse than a loud failure. Absent files are not a violation |
 
 ## Warning-only
 
@@ -79,6 +80,31 @@ hard. A misspelled `#Verify` would silently report a delivered requirement as *u
 > D0136 fixed a regression here: D0133 originally read the declared set only from project schema, so an
 > existing project with an older `.engine/` plus a newer binary hit 566 violations and could not commit
 > at all. A control shipped in the binary must not depend on content the binary cannot guarantee.
+
+## What this project has ADOPTED (D0138)
+
+A guard is either **core** or **process-bound**. Core guards protect the integrity of the model itself —
+identity, provenance, vocabulary, rootedness, well-formedness — and always run. Process-bound guards
+belong to a process unit and run only while that process is active:
+
+```
+keel activation [ROOT]          # which processes are active; which guards are core
+keel activate <process>         # adopt a process as a UNIT: skill + declared rules + guards
+keel deactivate <process>
+```
+
+`.engine/contracts/process-units.toml` (engine fact) says what each process brings.
+`.engine/contracts/activation.toml` (project choice) says which are active. **No file means everything
+is active**, so an existing project is unaffected by upgrading.
+
+A skipped guard is always *reported* as `NOT ACTIVE`, never silently dropped — "this control is off" is
+precisely what a project needs to be able to see, and `orient` carries `inactive_processes` for the same
+reason. Core guards are deliberately in no unit: activation exists to stop enforcing procedures you have
+not adopted, **not** to make truthfulness optional. That distinction is what keeps this from becoming the
+all-or-nothing bypass that `issue081` cost eight commits to learn about.
+
+This supersedes inference-from-file-presence. Issues 089 and 090 were both really "what has this project
+adopted?", answered by guessing from whether a file existed; now it is declared.
 
 ## Declared rules
 

@@ -625,6 +625,19 @@ fn cmd_guard(args: &[String]) -> i32 {
         return 2;
     };
     report.print();
+    // Asking for ONE guard by name is a diagnostic, so the check still RUNS and its findings are still
+    // shown — but the exit code must agree with the enforced gate (D0138). Without this, `keel guard
+    // issues` exits 1 on a project that never adopted issue-resolution while `keel guard` exits 0, and a
+    // script wired to the single-guard form would block on a control the project deliberately does not
+    // enforce.
+    if let keel_cli::activation::GuardState::Inactive(p) =
+        keel_cli::activation::Activation::load(&root).guard_state(name)
+    {
+        println!(
+            "[guard:{name}] NOT ACTIVE — process `{p}` is not in this project's active set, so the findings above are informational and do NOT block (`keel activate {p}` to enforce them)"
+        );
+        return 0;
+    }
     i32::from(!report.ok())
 }
 
@@ -1703,6 +1716,106 @@ fn cmd_init(args: &[String]) -> i32 {
     0
 }
 
+/// Header kept at the top of a generated `activation.toml` — the file must explain itself, because the
+/// consequence of editing it wrongly (a control silently off) is not obvious from its contents.
+const ACTIVATION_HEADER: &str = "\
+# Process activation (D0138) — which processes THIS project has adopted.
+#
+# What activating a process does: turns on its whole unit (skill + declared rules + guards), as defined
+# by the engine in `.engine/contracts/process-units.toml`. Deactivating one stops its guards running,
+# and `keel guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
+#
+# DELETE THIS FILE to return to \"everything is active\", which is also the behaviour when no file
+# exists — so an existing project that never declares one is unaffected.
+#
+# CORE guards (identity, provenance, vocabulary, rootedness, well-formedness) are in no unit and CANNOT
+# be deactivated here. Activation exists to stop enforcing procedures you have not adopted; it is not a
+# switch that makes truthfulness optional.
+#
+# Edit by hand, or use `keel activate <process>` / `keel deactivate <process>`.
+";
+
+/// Write `activation.toml` with `active` set to exactly `set`.
+fn write_activation(root: &Path, set: &[String]) -> std::io::Result<()> {
+    let dir = root.join(".engine/contracts");
+    std::fs::create_dir_all(&dir)?;
+    let list = set.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
+    std::fs::write(dir.join("activation.toml"), format!("{ACTIVATION_HEADER}\n[processes]\nactive = [{list}]\n"))
+}
+
+/// `keel activate <process>` / `keel deactivate <process>` / `keel activation` (D0138).
+///
+/// The subtle case is activating when NO manifest exists. Absence means "everything is active", so
+/// writing a manifest containing only the named process would silently DEACTIVATE every other control —
+/// the opposite of what the caller asked for. So a first write MATERIALISES the current effective state
+/// (all declared units) and then applies the change, and says that it did.
+fn cmd_activation(mode: &str, args: &[String]) -> i32 {
+    let (target, root_arg) = match mode {
+        "activation" => (None, args.first()),
+        _ => (args.first(), args.get(1)),
+    };
+    let Some(root) = resolve_guard_root(root_arg.map(String::from).as_ref()) else {
+        eprintln!("error: no .engine/ directory found. usage: keel {mode} [<process>] [ROOT]");
+        return 2;
+    };
+    let act = keel_cli::activation::Activation::load(&root);
+
+    if mode == "activation" {
+        println!("declared manifest: {}", if act.is_declared() { "yes" } else { "no — everything present is active" });
+        for p in act.unit_names() {
+            let unit = act.unit(&p);
+            let n_guards = unit.map_or(0, |u| u.guards.len());
+            println!(
+                "  [{}] {p}  ({n_guards} guard(s))",
+                if act.is_process_active(&p) { "active  " } else { "INACTIVE" }
+            );
+        }
+        println!("\ncore guards (never deactivatable):");
+        for g in keel_cli::guards::GUARD_NAMES {
+            if act.guard_state(g) == keel_cli::activation::GuardState::Core {
+                println!("  {g}");
+            }
+        }
+        return 0;
+    }
+
+    let Some(target) = target else {
+        eprintln!("usage: keel {mode} <process> [ROOT]");
+        return 2;
+    };
+    if act.unit(target).is_none() {
+        eprintln!(
+            "error: `{target}` is not a declared process unit. Declared: {}",
+            act.unit_names().join(", ")
+        );
+        return 2;
+    }
+
+    let materialising = !act.is_declared();
+    let mut set: Vec<String> = act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect();
+    match mode {
+        "activate" => {
+            if !set.iter().any(|p| p == target) {
+                set.push(target.clone());
+            }
+        }
+        _ => set.retain(|p| p != target),
+    }
+    set.sort();
+    if let Err(e) = write_activation(&root, &set) {
+        eprintln!("error writing .engine/contracts/activation.toml: {e}");
+        return 1;
+    }
+    if materialising {
+        println!(
+            "No manifest existed (everything was active), so one was written with the current effective\nstate before applying the change — behaviour is otherwise unchanged."
+        );
+    }
+    println!("{mode}d `{target}`. Active: {}", if set.is_empty() { "(none)".to_string() } else { set.join(", ") });
+    println!("Read it back: keel activation | keel guard");
+    0
+}
+
 /// `keel version` (also `--version` / `-V`) — report which build this is.
 ///
 /// Exists because a downstream project could not answer "am I running the fix?": three versioned
@@ -1748,6 +1861,10 @@ fn main() {
         // have may be standing anywhere, including outside a keel project.
         Some("version" | "--version" | "-V") => cmd_version(rest),
         Some("init") => cmd_init(rest),
+        // D0138: what has this project ADOPTED — declared, not inferred from file presence.
+        Some("activation") => cmd_activation("activation", rest),
+        Some("activate") => cmd_activation("activate", rest),
+        Some("deactivate") => cmd_activation("deactivate", rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
         Some("hook") => cmd_hook(rest), // D0134: in-loop gates in the BINARY, no python runtime
@@ -1805,6 +1922,8 @@ fn main() {
             eprintln!("keel <subcommand> [args]");
             eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
+            eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
             eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
             eprintln!("  check FILE...                parse-check one or more .sysml files");

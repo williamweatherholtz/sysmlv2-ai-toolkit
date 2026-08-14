@@ -50,6 +50,10 @@ pub struct Output {
     /// Compact non-blocking BURNDOWN summary (D0098) — a raw JSON-object fragment (tier-satisfaction
     /// pcts + rootedness counts), always visible so incompleteness can't be silently ignored.
     pub burndown: String,
+    /// Processes this project has NOT activated (D0138). Emitted so orientation states what is NOT
+    /// being enforced: a computed view that showed only findings would read as "all controls checked"
+    /// on a project running a deliberate subset.
+    pub inactive_processes: Vec<String>,
 }
 
 impl Output {
@@ -73,7 +77,7 @@ impl Output {
         };
         let burndown = if self.burndown.is_empty() { "{}" } else { self.burndown.as_str() };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
@@ -82,6 +86,7 @@ impl Output {
             self.done,
             self.outstanding,
             burndown,
+            str_array(&self.inactive_processes),
         )
     }
 }
@@ -579,6 +584,8 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         outstanding,
         // Compact non-blocking burndown (D0098); empty -> "{}" on render if it can't be computed.
         burndown: crate::view::burndown_summary_json(repo).unwrap_or_default(),
+        // D0138: state what is NOT enforced, so a subset-activated project cannot read as fully checked.
+        inactive_processes: crate::activation::Activation::load(repo).inactive_processes(),
     }
 }
 

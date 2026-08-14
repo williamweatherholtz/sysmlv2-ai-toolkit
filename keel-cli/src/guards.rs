@@ -1468,8 +1468,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 24] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity"];
+pub const GUARD_NAMES: [&str; 25] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest"];
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1566,6 +1566,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
+        "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control
         "hook-config-integrity" => Some(hook_config_integrity(root)), // warning-only (D0047/issue093) — a hook pointing at a deleted script
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
@@ -1580,7 +1581,46 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
 /// Run all enforced guards over `root`, returning their reports in `GUARD_NAMES` order.
 #[must_use]
 pub fn run_all(root: &Path) -> Vec<GuardReport> {
-    GUARD_NAMES.iter().filter_map(|n| run_one(n, root)).collect()
+    let act = crate::activation::Activation::load(root);
+    GUARD_NAMES
+        .iter()
+        .filter_map(|n| match act.guard_state(n) {
+            // A process the project has not adopted: SKIP the check, but say so. Silence here would be
+            // the issue090 defect inverted — instead of failing a project for a control it never
+            // adopted, we would be passing it while hiding that the control is off (D0138).
+            crate::activation::GuardState::Inactive(p) => Some(GuardReport {
+                name: n,
+                scanned: 0,
+                warnings: vec![format!(
+                    "NOT ACTIVE — process `{p}` is not in this project's active set, so this control was NOT checked (D0138; `keel activate {p}` to adopt it)"
+                )],
+                violations: Vec::new(),
+            }),
+            _ => run_one(n, root),
+        })
+        .collect()
+}
+
+/// HARD: the activation manifest itself must be well-formed (D0138).
+///
+/// Hard-blocking is safe here because every check is EXACT set-membership against `GUARD_NAMES` and the
+/// processes on disk — no heuristic. And it must be hard: a typo in either contract file silently
+/// disables a control, which is strictly worse than the control failing loudly. Absence of either file
+/// is NOT a violation (the issue090 lesson: a project that never adopted a control has not violated it).
+fn activation_manifest(root: &Path) -> GuardReport {
+    let act = crate::activation::Activation::load(root);
+    let scanned = act.unit_names().len();
+    let mut warnings = Vec::new();
+    if act.is_declared() {
+        let inactive = act.inactive_processes();
+        if !inactive.is_empty() {
+            warnings.push(format!(
+                "this project has NOT activated: {} — their guards are skipped (visible above, never silent)",
+                inactive.join(", ")
+            ));
+        }
+    }
+    GuardReport { name: "activation-manifest", scanned, warnings, violations: act.errors }
 }
 
 // ── engine-lint guard (D0112 phase 1: the mechanical .engine instance lints, ported kernel-free) ──
