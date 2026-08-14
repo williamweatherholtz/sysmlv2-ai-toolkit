@@ -1174,4 +1174,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcMarkerCensusView to issue099;
+
+    #ProcessDefect part issue100 : Issue {
+        :>> id = "e1000100-0100-4f00-9100-516273840100";
+        :>> title = "`ready` ignored #Supersede entirely — a task recorded as retired stayed on the auto-followed frontier forever";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND immediately, by reading the computed view back after authoring D0140's supersede edges instead of trusting that they had taken effect. D0140 superseded dcMigrateVerifyToBase and dcMigrateDerivedFromToBase — two items whose execution would have silently deleted 493 verification and derivation edges — and `keel whats-next` still listed BOTH as ready. MECHANISM: readiness is computed in orient.rs from successions and done-state only; `#Supersede` is consumed in view.rs, guards.rs, serve.rs and write.rs but was referenced NOWHERE in orient.rs or indexer.rs, so a supersede edge had no effect on the frontier at all. WHY THIS IS A HAZARD AND NOT A COSMETIC GAP: the AI auto-follows the ranked frontier by design (D0052, and the response contract forbids asking which ready item to work). So an item a Decision has explicitly forbidden remained scheduled, at a rank determined by declaration order, waiting to be picked up by the next session — and the two items in question were precisely the ones whose execution the whole three-critic panel had just concluded must not happen. The authored fact said 'retired'; the computed view said 'do this next'. That is the dual-truth failure the engine exists to prevent, in the one view that drives what gets worked. FIX: `view::superseded_names` returns the targets of `#Supersede` edges, and `ready` excludes them — conservative on error, so a failure to read the model cannot silently make everything ready again. Verified by reading the frontier back: ready 27 -> 25, both items gone, `outstanding` unchanged at 27 because they are RETIRED, not DONE, and reporting them as done would be a lie. NOTED AND DELIBERATELY NOT FIXED HERE: a retired item now counts as outstanding forever, which slowly inflates the burndown with work nobody will ever do. That is a real but separate question about what `outstanding` should mean, and folding it into this fix would change a headline count under cover of a defect repair. GENERAL LESSON: authoring an edge is not the same as the edge having an effect, and the read-back is the only thing that distinguishes them. This is the same discipline that caught `objective` declaring rather than referencing (issue098), one level up — there the construct parsed but carried no link; here the link existed but no consumer read it.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcSupersededNotReady";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSupersededNotReady to issue100;
 }

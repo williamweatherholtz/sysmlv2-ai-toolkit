@@ -529,12 +529,16 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         }
     }
 
-    // Step 2: compute ready.
+    // Step 2: compute ready. A SUPERSEDED task is never ready (issue100) — a `#Supersede` edge is the
+    // authored statement that the work is deliberately retired (§1.4), and the frontier is auto-followed
+    // (D0052), so leaving it ready schedules work a Decision has forbidden. Conservative on error:
+    // failing to read the model must not silently make everything ready again.
+    let superseded = crate::view::superseded_names(repo).unwrap_or_default();
     let mut ready: Vec<String> = Vec::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
         let is_invalid = invalid_evidence.contains(name);
-        if !is_done && !is_invalid {
+        if !is_done && !is_invalid && !superseded.contains(name) {
             let all_deps_done = all_deps_satisfied(name, data, &done_map);
             if all_deps_done {
                 ready.push(name.clone());

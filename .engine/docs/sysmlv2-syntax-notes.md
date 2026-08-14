@@ -37,7 +37,7 @@ constructs real SysML v2 rejects — that error put an invalid migration target 
 | perform action | `perform action s : Step;` | ✗ |
 | action usage | `action s : Step;` | ✗ |
 | succession | `first a then b;` | ✅ |
-| verification | `verification def V { subject s : P; objective r; }` — **the only valid verification shape** | ✗ |
+| verification | `verification def V { subject s : P; objective r; }` — valid syntax, but **`objective` DECLARES a member and carries NO reference**; see below | ✗ |
 | ports | `port def Pt;` · `port p : Pt;` | declared only |
 | interface | `interface def If { end a : Pt; end b : Pt; }` | ✗ |
 | connect | `connect x.p to y.p;` | ✗ |
@@ -52,6 +52,26 @@ is *"A requirement verification must be in the objective of a verification case"
 
 The multi-valued `ref` row is the consequential one: it is **valid SysML v2 that our own parser rejects**,
 so the gap that made markers look unavoidable is a keel-parser defect, not a language limitation.
+
+### "Parses" ≠ "expresses the relationship" — test with an UNDECLARED name
+
+The costliest error made in this repo was treating *valid syntax* as *a working edge*. They are different
+questions and only the second usually matters. `objective r;` parses — and carries no reference at all:
+
+```
+verification def V { subject s; objective zzz; }   → PASSES (nothing named zzz exists anywhere)
+part p : NoSuchTypeAnywhere                        → FAILS
+satisfy r by zzz3                                  → FAILS  "Couldn't resolve reference to Element"
+```
+
+The controls prove the kernel *does* resolve references, so `objective` and `subject` simply declare
+nested members. Migrating `#Verify` onto that shape would have deleted all 456 verification links while
+both toolchains reported clean (issue098, D0140).
+
+**The discriminator is one kernel cell: give the construct a name that is declared nowhere.** Passes ⇒ it
+declares, and is not an edge. Fails ⇒ it resolves a reference, and is. Run this before claiming any
+construct can replace any edge. Forms that DO resolve: `objective :>> r` and `objective :> r` — both
+require a **requirement-typed** target.
 - Metadata application: the **prefix** form `#MarkerName <element>` (including a `#Marker` on a
   `dependency`, a `first..then` succession, or a `part`) is portable — it validates in BOTH the
   rust authority (D0048) and the kernel. The **member** form `<element> { @MarkerName; }` parses

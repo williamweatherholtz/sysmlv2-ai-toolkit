@@ -4,12 +4,23 @@
 // only where it does not. Spiked: _spike_trace.py / _spike_verify.py.
 //
 //   satisfy   -> NATIVE `satisfy <req> by <element>` (renders SatisfyRequirementUsage)
-//   verify    -> NATIVE, STRUCTURAL: a requirement-verification must be in the
-//                `objective` of a verification case — `verification def V {
-//                subject s; objective r; }`. (`verify X by Y` is NOT valid.)
-//   derive/   -> use `:>` (specialization). The v1 keywords derive/refine/trace
-//   refine/      are ABSENT from the v2 pilot grammar; revisit on a newer toolchain.
-//   trace
+//   verify    -> NO BASE FORM EXISTS for this edge. #Verify is a JUSTIFIED last resort (D0140).
+//                Corrected 2026-08-14 (issue098): the line previously here said a requirement-
+//                verification "must be in the `objective` of a verification case", which is true of
+//                the SYNTAX and false of the SEMANTICS — `objective r;` DECLARES a nested member and
+//                carries NO reference. Kernel-proven with the cheapest possible discriminator: an
+//                UNDECLARED name. `verification def V { subject s; objective zzz; }` PASSES, while
+//                `satisfy r by zzz3` FAILS with "Couldn't resolve reference to Element" — so the
+//                kernel does resolve references and `objective` does not take one. Migrating #Verify
+//                onto that shape would delete all 456 links while both toolchains reported clean.
+//                The reference-bearing forms `objective :>> r` / `:> r` DO resolve, but require a
+//                REQUIREMENT-TYPED target, and 309 of 456 #Verify edges target `part Decision`.
+//                No standalone `verify` form parses at all. See _spike_objective_binding.py.
+//   derive/   -> use `:>` (specialization) where the metaclasses allow it. The v1 keywords
+//   refine/      derive/refine/trace are ABSENT from the v2 pilot grammar (re-confirmed 2026-08-14,
+//   trace        _spike_base_algebra.py). #DerivedFrom is a JUSTIFIED last resort (D0140): all 37 of
+//                its edges are CROSS-metaclass (Decision/Story/UseCase -> Need) and `:>` cannot cross
+//                metaclasses — see the D0055 note at element.sysml:48-53.
 //   allocate  -> NATIVE `allocate <fn> to <comp>` (parses - _spike_remaining; the
 //                old #Allocate marker was redundant and is gone).
 //   dependsOn / supersede -> metadata markers below (no native pilot form;

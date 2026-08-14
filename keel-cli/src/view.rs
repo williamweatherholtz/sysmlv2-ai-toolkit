@@ -1712,6 +1712,21 @@ pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<S
     Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
 }
 
+/// Names that are the TARGET of a `#Supersede` edge — i.e. deliberately retired (§1.4).
+///
+/// Exists because `ready` ignored supersede entirely (issue100): a task recorded as superseded stayed
+/// on the ranked frontier forever, so the authored fact said "retired" while the computed view said
+/// "do this next". Since the AI auto-follows the frontier (D0052), that is not a cosmetic
+/// disagreement — it actively schedules work a Decision has forbidden. Found when D0140 superseded two
+/// migration items that would have silently deleted 493 edges, and they stayed ready.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn superseded_names(root: &Path) -> Result<HashSet<String>, ViewError> {
+    let model = Model::build(root)?;
+    Ok(model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.clone()).collect())
+}
+
 /// `(total_issues, untriaged)` — issues with NO `#Resolves` edge at all (D0077). Pure structure
 /// (no done-set needed); the `issues` guard fails on a non-empty untriaged list.
 ///
