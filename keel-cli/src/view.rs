@@ -6132,10 +6132,23 @@ mod tests {
         let found: Vec<String> = used(text).into_iter().map(|(m, _)| m).collect();
         assert_eq!(found, vec!["Verify", "Capability", "DerivdFrom"], "got {found:?}");
 
-        // The declared set comes from `metadata def` lines.
+        // The declared set comes from `metadata def` lines PLUS the engine's builtin algebra.
         let schema = vec!["package R {\n    metadata def Verify;\n    metadata def Capability;\n}\n".to_string()];
         let dec = declared(&schema);
         assert!(dec.contains("Verify") && dec.contains("Capability"));
+
+        // D0136/issue089: the ENGINE's own markers are valid with NO project declaration at all.
+        // D0133 shipped a hard guard in the BINARY whose passing condition was project-side schema
+        // content, so an existing downstream project (old .engine, new binary) hit 566 violations and
+        // every commit blocked — on the engine's own shipped files — with the only remedy being an
+        // edit to FROZEN schema/core. The engine's algebra is the engine's contract; the binary owns it.
+        let none: Vec<String> = Vec::new();
+        let bare = declared(&none);
+        for m in ["Verify", "DerivedFrom", "CharteredBy", "Resolves", "Capability", "JustifiedBy"] {
+            assert!(bare.contains(m), "engine marker #{m} must be valid without any project declaration");
+        }
+        // ...and a misspelling is still in NEITHER set, so the typo protection survives the fix.
+        assert!(!bare.contains("DerivdFrom"), "a misspelling must never become valid");
         // The misspelling is exactly what must NOT be in the declared set — this is the real
         // failure mode: `#DerivdFrom` validated clean and silently removed its item from the HARD
         // requirement-rootedness guard's view.

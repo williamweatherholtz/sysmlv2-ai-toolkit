@@ -824,6 +824,42 @@ fn strip_string_literals(line: &str) -> String {
 /// Syntactic positions in which a `#Marker` names a real edge or a marked item.
 const MARKER_FOLLOWERS: [&str; 5] = ["dependency", "part", "item", "verification", "requirement"];
 
+/// The ENGINE's own marker algebra — always valid, known to the binary (D0136 / issue089).
+///
+/// These are the markers the engine's OWN guards and views consume: `#Verify` drives
+/// tier-satisfaction and verification-trace, `#DerivedFrom` drives the hard requirement-rootedness
+/// guard, `#Resolves` drives issue triage, and so on. They are part of the engine's CONTRACT, so the
+/// binary must know them intrinsically rather than requiring each project to re-declare them.
+///
+/// Why this exists: D0133 shipped `marker-vocabulary` as a HARD guard in the BINARY whose passing
+/// condition was `metadata def` lines in the PROJECT's schema files. `include_dir!` embeds `.engine`
+/// at build time, so a v0.2.0 binary carried the declarations — but an existing downstream project
+/// keeps its own on-disk `.engine/schema/`, which upgrading the binary never touches. Reproduced: a
+/// pre-v0.2.0 schema plus a v0.2.0 binary yields **566 violations and every commit blocked**, on the
+/// engine's own shipped files. Worse, the obvious remedy meant editing FROZEN `schema/core`, so the
+/// guard forced every downstream project into a frozen-schema sign-off just to keep committing.
+const ENGINE_MARKERS: [&str; 17] = [
+    // edge algebra where the pilot grammar has no native form
+    "DependsOn",
+    "Supersede",
+    "OrderingOnly",
+    "CharteredBy",
+    "Resolves",
+    "Verify",
+    "DerivedFrom",
+    "Measures",
+    "Informs",
+    "JustifiedBy",
+    "Dispositions",
+    "Covers",
+    // item-level classifiers the guards read
+    "ProspectiveChange",
+    "SafetyChange",
+    "Capability",
+    "ProcessDefect",
+    "View",
+];
+
 /// Marker names USED in real syntactic positions in `text`, as `(marker, 1-based line)`.
 fn markers_used(text: &str) -> Vec<(String, usize)> {
     let mut out = Vec::new();
@@ -850,7 +886,8 @@ fn markers_used(text: &str) -> Vec<(String, usize)> {
 
 /// Marker names DECLARED as `metadata def <Name>;` in `texts`.
 fn markers_declared(texts: &[String]) -> HashSet<String> {
-    let mut out = HashSet::new();
+    // The engine's own algebra is always valid — a project must never have to re-declare it (D0136).
+    let mut out: HashSet<String> = ENGINE_MARKERS.iter().map(|m| (*m).to_string()).collect();
     for text in texts {
         for raw in text.lines() {
             let line = raw.trim();
@@ -882,18 +919,13 @@ fn markers_declared(texts: &[String]) -> HashSet<String> {
 /// Safe to make hard because the check is exact (a declared-name set membership), not heuristic.
 #[must_use]
 pub fn marker_vocabulary(root: &Path) -> GuardReport {
-    let mut schema_texts: Vec<String> = Vec::new();
-    for dir in [root.join(".engine").join("schema"), root.join(".engine").join("workflows")] {
-        for p in crate::collect_sysml(&dir) {
-            if let Ok(t) = std::fs::read_to_string(&p) {
-                schema_texts.push(t);
-            }
-        }
-    }
-    let declared = markers_declared(&schema_texts);
-
+    // Project-declared markers may be declared ANYWHERE in .engine or .tracking (D0136): a downstream
+    // project must be able to declare its OWN vocabulary in its OWN files, without being forced into a
+    // frozen-schema (§2.5) change just to keep committing.
     let mut files = crate::collect_sysml(&root.join(".tracking"));
     files.extend(crate::collect_sysml(&root.join(".engine")));
+    let declared_texts: Vec<String> = files.iter().filter_map(|p| std::fs::read_to_string(p).ok()).collect();
+    let declared = markers_declared(&declared_texts);
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
@@ -903,7 +935,7 @@ pub fn marker_vocabulary(root: &Path) -> GuardReport {
             scanned += 1;
             if !declared.contains(&marker) {
                 violations.push(format!(
-                    "{rel}:{line}: marker `#{marker}` is NOT declared as a `metadata def` — markers are not type-checked, so an undeclared or MISSPELLED marker validates clean and silently removes this item from whatever guard or view depends on it (issue077/D0133). Declare it in .engine/schema/core/relationships.sysml, or fix the spelling."
+                    "{rel}:{line}: marker `#{marker}` is NOT declared as a `metadata def` — markers are not type-checked, so an undeclared or MISSPELLED marker validates clean and silently removes this item from whatever guard or view depends on it (issue077/D0133). If it is a TYPO, fix the spelling. If it is your project's own marker, declare `metadata def {marker};` in any of your own .engine or .tracking files — you do NOT need to touch frozen schema/core (D0136). The engine's own markers are always valid without declaration."
                 ));
             }
         }

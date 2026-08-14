@@ -1042,4 +1042,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSupersededNeedGaps to issue088;
+
+    #ProcessDefect part issue089 : Issue {
+        :>> id = "e0890089-0089-4e89-9089-516273840089";
+        :>> title = "D0133 BLOCKED a downstream project entirely — a hard guard in the BINARY whose passing condition was the PROJECT's schema content (566 violations, every commit)";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED FROM THE FIELD 2026-08-14: another project using keel found D0133 blocking their work. Reproduced exactly by simulating their state in this repo — an existing project's on-disk `.engine/schema/` predating D0133, with an upgraded v0.2.0 binary: 566 violations, `keel guard` exit 1, EVERY COMMIT BLOCKED, including on the engine's own shipped files (.engine/rules/rules.sysml). MECHANISM: `marker-vocabulary` is a HARD guard that lives in the BINARY, but its passing condition is `metadata def` lines in the PROJECT's schema files. `include_dir!` embeds `.engine` at BUILD time, so a v0.2.0 binary carries the nine declarations D0133 added — but upgrading the binary never touches an existing project's on-disk `.engine/schema/`. In THIS repo the guard and the declarations landed in the same commit, so the split was never visible. Downstream they version independently, and the guard fails closed. TWO REASONS THIS IS WORSE THAN A NORMAL REGRESSION: (a) it fails on `#Verify`, `#DerivedFrom`, `#CharteredBy` — the engine's OWN edge algebra, consumed by the binary's OWN guards; requiring each project to re-declare the engine's vocabulary is backwards, since that vocabulary is the engine's contract. (b) The obvious remedy — add the declarations — means editing `schema/core`, which is FROZEN (§2.5) and requires the downstream project's own human sign-off. So the guard forced every downstream project into a frozen-schema change purely to keep committing, and no acceptance from anyone could have fixed that. FIX (D0136): the engine's marker algebra becomes a builtin set known to the binary (always valid, no declaration needed); project-declared markers may be declared in ANY of the project's own .engine or .tracking files, so no frozen-core edit is needed; the guard stays HARD because with those two the only remaining failures are genuine typos. Verified: the reproduced downstream state goes 566 -> 0 violations, while `#DerivdFrom` still hard-fails with exit 1 in that same state. GENERAL LESSON: a control shipped in the binary must not depend on content the binary cannot guarantee is present or current — the same coupling class as issue076 (a gate depending on a runtime that may be absent), arriving through data rather than through a runtime.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "dcEngineMarkerBuiltins";
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcEngineMarkerBuiltins to issue089;
 }

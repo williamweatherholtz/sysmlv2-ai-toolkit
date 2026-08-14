@@ -25,7 +25,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `requirement-rootedness` | A `#Capability` feature carries `#DerivedFrom`→Need (D0098/D0099). Rule-sourced |
 | `decision-rationale` | Every Decision has a substantive context + rationale (D0103). Rule-sourced |
 | `duplicate-identity` | No repeated id, item name, package name, or sequence number (D0129/issue074) |
-| `marker-vocabulary` | Every marker used is declared as a `metadata def` (D0133/issue077) |
+| `marker-vocabulary` | Every marker used is declared — the engine's own algebra is **builtin** and needs no declaration; project markers declare in any project file (D0133/issue077, D0136/issue089) |
 | `engine-lint` | `.engine/decisions/*.sysml` import `EngineWork` (D0112 phase 1) |
 
 ## Warning-only
@@ -60,6 +60,23 @@ it — which is how `issue081` cost eight bypassed commits.
 **`sr_verified_pct` is not test coverage.** An SR counts as verified when *any* Test `#Verify`-links it,
 and in this repo that set is ~70% `method=critique`. Always read `keel tier-satisfaction`'s
 `verifiedByMethod` alongside the percentage.
+
+## Marker vocabulary
+
+The engine's own algebra (`#Verify`, `#DerivedFrom`, `#CharteredBy`, `#Resolves`, `#Measures`,
+`#Informs`, `#JustifiedBy`, `#Dispositions`, `#Covers`, `#DependsOn`, `#Supersede`, `#OrderingOnly`,
+`#ProspectiveChange`, `#SafetyChange`, `#Capability`, `#ProcessDefect`, `#View`) is **builtin to the
+binary** and always valid — it is the engine's contract, so a project never re-declares it.
+
+Your **own** markers: add `metadata def YourMarker;` in *any* of your `.engine` or `.tracking` files.
+You never need to touch frozen `schema/core`.
+
+Anything in neither set is a violation — that's the typo class, and it is the reason this guard is
+hard. A misspelled `#Verify` would silently report a delivered requirement as *unverified*.
+
+> D0136 fixed a regression here: D0133 originally read the declared set only from project schema, so an
+> existing project with an older `.engine/` plus a newer binary hit 566 violations and could not commit
+> at all. A control shipped in the binary must not depend on content the binary cannot guarantee.
 
 ## Declared rules
 
