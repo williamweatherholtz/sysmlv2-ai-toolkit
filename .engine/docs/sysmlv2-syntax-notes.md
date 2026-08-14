@@ -17,14 +17,41 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
   (the idiomatic v2 replacement for v1 `deriveReqt`/`refine`/`trace`).
 - `:>>` redefinition; `[*]` and `[0..1]` multiplicity.
 - `ref name : Type[0..1];` — reference (non-compositional) features.
-- **BASE relationships that parse clean in the rust authority** (verified 2026-08-14, issue095). Reach
-  for these BEFORE inventing a marker — a custom edge is a last resort, not a default:
-  `satisfy X by Y;` · `verify X by Y;` · `refine X by Y;` · `allocate X to Y;` · `dependency X to Y;`
-  · `assert constraint c : Ok;` (inside a part) · `require constraint c : Ok;` (inside a requirement)
-  · `perform action s : Step;` · `include use case u : U;`
-  Of these, only `satisfy`, `allocate` and `dependency` are actually used in the repo today. `verify`
-  and `refine` are used **zero** times while the custom `#Verify` (613×) and `#DerivedFrom` (91×)
-  markers cover the same ground — see issue095.
+### KERNEL-VERIFIED base constructs (`_spike_base_algebra.py`, 2026-08-14)
+
+**Read this before inventing a marker (D0139 base-first).** These verdicts come from the KERNEL, the only
+conformance oracle. Do **not** substitute `keel check`: the rust authority is PERMISSIVE and accepts
+constructs real SysML v2 rejects — that error put an invalid migration target into an accepted Decision
+(issue097). Re-run the spike to re-measure; never assert from the rust parser alone.
+
+**VALID — reach for these first:**
+
+| Construct | Form | Used today |
+|---|---|---|
+| satisfy | `satisfy r by p;` | ✅ 263× |
+| allocate | `allocate a to b;` | ✅ 69× |
+| dependency | `dependency a to b;` / `dependency from a to b;` | ✅ |
+| specialization | `requirement b :> a;` | ✅ — **this is the derivation form** |
+| assert constraint | `assert constraint c : Ok;` (in a part **or** at package level) | ✗ |
+| require constraint | `require constraint c : Ok;` (in a requirement) | ✗ |
+| perform action | `perform action s : Step;` | ✗ |
+| action usage | `action s : Step;` | ✗ |
+| succession | `first a then b;` | ✅ |
+| verification | `verification def V { subject s : P; objective r; }` — **the only valid verification shape** | ✗ |
+| ports | `port def Pt;` · `port p : Pt;` | declared only |
+| interface | `interface def If { end a : Pt; end b : Pt; }` | ✗ |
+| connect | `connect x.p to y.p;` | ✗ |
+| use case | `include use case u : U;` · `subject s : Sys;` | ✗ |
+| metadata prefix | `#M dependency from a to b;` · `#M part a : P;` | ✅ |
+| multi-valued ref | `ref e : C[*];` + `:>> e = (c1, c2);` | ✗ — **valid SysML v2, REJECTED by keel-parser** |
+
+**INVALID — do not use, they are v1 keywords absent from the v2 pilot grammar:**
+`refine X by Y` · `trace X to Y` · `derive X from Y` · and every standalone `verify` form
+(`verify r by v`, `verify r;` in a verification, `verify v;` in a requirement — the kernel's own message
+is *"A requirement verification must be in the objective of a verification case"*).
+
+The multi-valued `ref` row is the consequential one: it is **valid SysML v2 that our own parser rejects**,
+so the gap that made markers look unavoidable is a keel-parser defect, not a language limitation.
 - Metadata application: the **prefix** form `#MarkerName <element>` (including a `#Marker` on a
   `dependency`, a `first..then` succession, or a `part`) is portable — it validates in BOTH the
   rust authority (D0048) and the kernel. The **member** form `<element> { @MarkerName; }` parses
