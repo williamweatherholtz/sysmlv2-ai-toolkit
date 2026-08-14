@@ -186,14 +186,32 @@ package EngineAgileProcess {
                     + "process/convention changes.";
         :>> cadence = Cadence::perSprint;
     }
+    part retroIdentify : ProcessStep {
+        :>> id = "0d6b0001-0813-4b01-9b3e-0000001b0001";
+        :>> title = "Identify avoidable issues";
+        :>> order = 1;
+        :>> triggerCondition = "End of sprint (autonomous, D0049 — no human input).";
+        :>> actionText = "Name what went well and, specifically, what was AVOIDABLE — a defect, rework, or friction that a guard, rule, skill, doc or check could have prevented. Distinguish avoidable from merely difficult: only the avoidable class produces an obligation. State each finding plainly, including findings against this thread's own earlier work.";
+        :>> producedArtifact = "A recorded retro gate (method=analyze) naming each avoidable issue.";
+        :>> owner = Owner::ai;
+    }
+    part retroTrack : ProcessStep {
+        :>> id = "0d6b0002-0813-4b02-9b3e-0000001b0002";
+        :>> title = "Every finding becomes a tracked, prioritized item — or says why not";
+        :>> order = 2;
+        :>> triggerCondition = "The retro named at least one avoidable issue.";
+        :>> actionText = "For EACH avoidable issue, either (a) record a tracked `Issue` (with severity) plus the resolving backlog action, placed at its correct PRIORITY — declaration order IS priority (D0052), so ranking it means putting it in the right place in the file, never describing it as important; or (b) state explicitly in the retro why no item is needed (a control already exists, or it is a one-off with no recurrable class). What is FORBIDDEN is the third path taken in sprint 247: writing the lesson into prose — a doc, a commit message, or agent memory — where it carries no severity, no priority, no resolver and no id, is invisible to orient and the burndown, and is not project truth at all. A lesson that terminates in prose has not been retained (D0018, issue085). Per D0047 an avoidable issue with a recurrable class ALSO needs a permanent automated control, not a reminder.";
+        :>> producedArtifact = "A tracked Issue + prioritized backlog action per avoidable issue, or a recorded justification for none.";
+        :>> owner = Owner::ai;
+    }
     part retroPromote : ProcessStep {
         :>> id = "5d66f22d-22db-4532-936d-8fc00b2b3a8e";
-        :>> title = "Promote learnings";
-        :>> order = 1;
-        :>> triggerCondition = "End of sprint; a learning changes future behavior.";
-        :>> actionText = "Create a Decision; update Process/schema if needed.";
+        :>> title = "Promote learnings that change the process";
+        :>> order = 3;
+        :>> triggerCondition = "A learning changes future BEHAVIOR (not just this sprint's outcome).";
+        :>> actionText = "Where a finding changes how work is done, record a Decision and update the Process/schema through the Change Request path. Autonomous per D0049 — the retro itself is AI-recorded with no human sign-off; only a resulting CHANGE carries the usual human acceptance gate.";
         :>> producedArtifact = "Tracked Decision; improved workflow.";
-        :>> owner = Owner::human;
+        :>> owner = Owner::ai;
     }
 
     // ---- Staleness sweep (continuous) -------------------------------

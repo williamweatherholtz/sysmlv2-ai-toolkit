@@ -6113,6 +6113,27 @@ mod tests {
     }
 
     #[test]
+    fn retro_backlog_warns_only_when_a_finding_is_neither_tracked_nor_justified() {
+        use crate::guards::retro_backlog_warnings_for_test as warn;
+        let sprint = |t: &str| vec![(".tracking/delivery/sprint999_x.sysml".to_string(), t.to_string())];
+        let staged_sprint_only = vec![".tracking/delivery/sprint999_x.sysml".to_string()];
+        let staged_with_item = vec![
+            ".tracking/delivery/sprint999_x.sysml".to_string(),
+            ".tracking/issues.sysml".to_string(),
+        ];
+
+        // A finding with nothing tracked and no reason -> warn (the sprint-247 failure).
+        assert_eq!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
+        // Same finding, but a tracked item co-recorded in this commit -> clean.
+        assert!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).is_empty());
+        // Same finding, explicitly justified as needing none -> clean. The obligation is that the
+        // CHOICE is stated, not that an item always exists (a duplicate control is noise).
+        assert!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded.")).is_empty());
+        // A retro naming nothing avoidable -> clean; the guard must not demand findings.
+        assert!(warn(&staged_sprint_only, &sprint("WELL: everything went fine.")).is_empty());
+    }
+
+    #[test]
     fn inversion_pairs_flags_lower_severity_work_ranked_above_high() {
         // issue084: order and severity are BOTH recorded, so disagreement between them is computable.
         // `ready` is in declaration/priority order (D0052), so "outranks" == "appears earlier".

@@ -133,7 +133,7 @@ package EngineSkillRegistry {
     part sprintRetro : AISkill {
         :>> id = "b719ej5e-2a67-4d9b-cd02-2a59a6j5i222";
         :>> title = "sprint-retro";
-        :>> purpose = "Autonomously retro the just-finished sprint (D0049): identify AVOIDABLE issues (preventable by a guard/skill/doc/check), create tracked Issue + backlog items for the fixes, record the retro gate (method=analysis, AI-judged) — no human input.";
+        :>> purpose = "Autonomously retro the just-finished sprint (D0049/D0131), deploying the retrospective in .engine/processes/agile-workflow.sysml: retroIdentify (name what was AVOIDABLE — preventable by a guard/rule/skill/doc/check — including findings against this thread's own earlier work), retroTrack (EACH avoidable issue becomes a tracked Issue with severity PLUS its resolving backlog action placed at its correct PRIORITY, since declaration order IS priority (D0052) — or the retro states explicitly why no item is needed; writing a lesson into a doc, a commit message or agent memory INSTEAD of tracking it is forbidden, because a lesson that terminates in prose is not retained (D0018/issue085)), retroPromote (a behavior-changing finding becomes a Decision via the Change Request path). Record the retro gate (method=analyze, AI-judged) — no human input. Backstopped by guard:retro-backlog.";
         :>> location = ".engine/skills/sprint-retro/SKILL.md";
         :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
         :>> writePolicy = WritePolicy::direct;

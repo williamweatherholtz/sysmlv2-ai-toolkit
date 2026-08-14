@@ -799,6 +799,74 @@ pub fn decision_requirement_link(root: &Path) -> GuardReport {
     }
 }
 
+// ── retro-backlog guard (a retro finding that terminates in prose) ────────────────────────────────
+
+/// Markers a retro uses to name something it learned.
+const RETRO_FINDING_MARKERS: &[&str] = &["AVOIDABLE-ISSUE", "AVOIDABLE ISSUE", "LESSON:"];
+
+/// Phrases by which a retro EXPLICITLY justifies raising no tracked item.
+///
+/// The obligation is not "always create an item" — sometimes a control already exists, and adding a
+/// duplicate is noise. The obligation is that the choice is STATED rather than left silent, so a
+/// reader can tell a considered decision from an omission.
+const RETRO_NO_ITEM_JUSTIFICATIONS: &[&str] = &["no new item", "no item needed", "already tracked", "no further item"];
+
+/// Warnings for staged sprint records whose retro names a finding with nothing tracked and no reason.
+fn retro_backlog_warnings(changed: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
+    let tracked_co_staged = changed
+        .iter()
+        .any(|p| p.ends_with(".tracking/issues.sysml") || p.ends_with(".tracking/backlog.sysml"));
+    if tracked_co_staged {
+        return Vec::new(); // a tracked item WAS co-recorded in this commit
+    }
+    let mut out = Vec::new();
+    for (path, text) in sprint_texts {
+        let upper = text.to_uppercase();
+        if !RETRO_FINDING_MARKERS.iter().any(|m| upper.contains(m)) {
+            continue;
+        }
+        let lower = text.to_lowercase();
+        if RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(j)) {
+            continue; // explicitly justified as needing no item
+        }
+        out.push(format!(
+            "{path}: the retro names a finding (AVOIDABLE-ISSUE / LESSON) but this commit records NO tracked Issue or backlog action, and gives no reason — a retro finding must become a tracked, prioritized item or say explicitly why it needs none (issue085; D0018 — never let a lesson terminate in prose)"
+        ));
+    }
+    out
+}
+
+/// Test-only re-export of the pure warning builder (the view self-tests exercise it).
+#[doc(hidden)]
+#[must_use]
+pub fn retro_backlog_warnings_for_test(changed: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
+    retro_backlog_warnings(changed, sprint_texts)
+}
+
+/// Guard: a sprint retro's findings must become tracked items, not prose (issue085 / D0130).
+///
+/// Sprint 247's retro named three avoidable issues; only one had a control, and the other two were
+/// written into CLAUDE.md prose and the AI's own memory — OUTSIDE the model, carrying no severity, no
+/// priority, no resolver and no id, invisible to orient and the burndown, inside the very ceremony
+/// meant to prevent recurrence. That is the prose-shadow-truth D0018 forbids.
+///
+/// Git-diff-aware, heuristic and WARNING-level — the `doc-sync` (D0113) shape. It is satisfied either
+/// by co-recording a tracked item or by SAYING why none is needed, so what it really enforces is that
+/// the choice is explicit. Reads the working tree, which equals the index for staged-and-unmodified
+/// files (the pre-commit case); a partially-staged sprint file could be misread, which is one more
+/// reason this warns rather than blocks.
+#[must_use]
+pub fn retro_backlog(root: &Path) -> GuardReport {
+    let changed = staged_files(root);
+    let sprint_texts: Vec<(String, String)> = changed
+        .iter()
+        .filter(|p| p.contains(".tracking/delivery/sprint") && std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
+        .filter_map(|p| std::fs::read_to_string(root.join(p)).ok().map(|t| (p.clone(), t)))
+        .collect();
+    let scanned = sprint_texts.len();
+    GuardReport { name: "retro-backlog", scanned, warnings: retro_backlog_warnings(&changed, &sprint_texts), violations: Vec::new() }
+}
+
 // ── priority-inversion guard (recorded order disagreeing with recorded severity) ──────────────────
 
 /// Guard: a ready item outranks work that resolves a >= High Issue (issue084 / D0130).
@@ -1220,8 +1288,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 21] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 22] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1247,6 +1315,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
+        "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
         "doc-sync" => Some(doc_sync(root)), // WARNING-level member of GUARD_NAMES (D0113) — definitional change w/o doc update

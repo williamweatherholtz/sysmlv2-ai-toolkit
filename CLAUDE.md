@@ -372,8 +372,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL twenty-one forward guards (no kernel) — 17 hard-blocking (exit≠0 on any violation) + 4 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL twenty-two forward guards (no kernel) — 17 hard-blocking (exit≠0 on any violation) + 5 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, retro-backlog D0131, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | retro-backlog (warning-only, D0131) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -428,6 +428,12 @@ resolves a >= High Issue. D0052 makes declaration order the priority, but nothin
 recorded SEVERITY, so a mis-ordered backlog looked identical to a curated one — `keelArchViews` (Low) ranked #1 by
 append accident while `dcStaleKernelInstanceGate` (High) ranked 14th. Never blocking: deferring a High item behind an
 enabler can be correct; the point is that the trade-off is VISIBLE rather than left to whoever last appended.
+A TWENTY-SECOND guard, `retro-backlog` (D0131/issue085), is the fifth WARNING-level member: a staged sprint record
+whose retro names a finding (AVOIDABLE-ISSUE / LESSON) while the commit records NO tracked Issue or backlog action
+and gives no reason. Satisfied EITHER by co-recording an item OR by saying why none is needed, so what it enforces
+is that the CHOICE is explicit. Backs D0131's rewritten retrospective (retroIdentify -> retroTrack -> retroPromote,
+all Owner::ai per D0049): a lesson written into a doc, a commit message or agent memory instead of being tracked has
+NOT been retained (D0018) — it carries no severity, priority, resolver or id and is invisible to orient.
 (Relatedly, `critique_suspect`
 honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
 `#DependsOn` finding→critique edge — no longer induces suspicion.)
