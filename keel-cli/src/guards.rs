@@ -799,6 +799,35 @@ pub fn decision_requirement_link(root: &Path) -> GuardReport {
     }
 }
 
+// ── priority-inversion guard (recorded order disagreeing with recorded severity) ──────────────────
+
+/// Guard: a ready item outranks work that resolves a >= High Issue (issue084 / D0130).
+///
+/// D0052 makes backlog DECLARATION ORDER the priority and requires the AI to auto-follow the ranked
+/// frontier, but nothing compared recorded ORDER against recorded SEVERITY — so a mis-ordered backlog
+/// looked exactly like a curated one. It was mis-ordered: `keelArchViews` (issue069, Low) ranked FIRST
+/// because an earlier session appended it to the end of a COMPLETED block, while
+/// `dcStaleKernelInstanceGate` (issue081, High) ranked 14th.
+///
+/// WARNING-level and never blocking: priority IS a human judgment and deferring a High item behind an
+/// enabler can be entirely correct. The point is to make the trade-off visible rather than leave it to
+/// whoever last appended to the file. A compute error IS a violation.
+#[must_use]
+pub fn priority_inversion(root: &Path) -> GuardReport {
+    match crate::view::priority_inversions(root) {
+        Ok(pairs) => {
+            let warnings = pairs
+                .iter()
+                .map(|(lower, high, sev)| {
+                    format!("{lower} outranks {high}, which resolves a {sev} issue — if that is deliberate say so, otherwise reorder the backlog (D0052: declaration order IS priority; reordering is how you reprioritize)")
+                })
+                .collect();
+            GuardReport { name: "priority-inversion", scanned: pairs.len(), warnings, violations: Vec::new() }
+        }
+        Err(e) => GuardReport { name: "priority-inversion", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing priority inversions: {e}")] },
+    }
+}
+
 // ── attestation-substance guard (a confirmation that attests nothing) ─────────────────────────────
 
 /// Attestations already thin when this guard landed (2026-08-13), grandfathered to WARNING.
@@ -1191,8 +1220,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 20] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 21] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1217,6 +1246,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "duplicate-identity" => Some(duplicate_identity(root)), // hard (D0129/issue074) — concurrent allocation lands green without it
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
+        "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
         "doc-sync" => Some(doc_sync(root)), // WARNING-level member of GUARD_NAMES (D0113) — definitional change w/o doc update

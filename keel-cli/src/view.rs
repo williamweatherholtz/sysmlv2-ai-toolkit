@@ -3875,6 +3875,67 @@ fn at_least_medium(sev: &str) -> bool {
     matches!(sev, "Critical" | "High" | "Medium")
 }
 
+/// `true` if a severity string is >= High — the tier a priority inversion is reported against.
+#[allow(clippy::missing_const_for_fn)] // cannot match on `str` in a const fn
+fn at_least_high(sev: &str) -> bool {
+    matches!(sev, "Critical" | "High")
+}
+
+/// Ready items outranking a >= High-severity item while carrying lower or no severity.
+///
+/// Pure core of [`priority_inversions`]. `ready` is in PRIORITY ORDER (declaration order, D0052),
+/// so "outranks" is simply "appears earlier". Returns `(outranking item, high item, its severity)`.
+fn inversion_pairs(ready: &[(String, Option<String>)]) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    for (i, (high, sev)) in ready.iter().enumerate() {
+        let Some(s) = sev.as_deref().filter(|s| at_least_high(s)) else { continue };
+        for (lower, lsev) in ready.iter().take(i) {
+            if lsev.as_deref().is_none_or(|l| !at_least_high(l)) {
+                out.push((lower.clone(), high.clone(), s.to_string()));
+            }
+        }
+    }
+    out
+}
+
+/// Backlog priority inversions: a ready item ranked ABOVE work that resolves a >= High Issue.
+///
+/// Closes issue084 (D0130). D0052 makes backlog DECLARATION ORDER the priority and requires the AI to
+/// auto-follow the ranked frontier — but nothing computed whether recorded ORDER agreed with recorded
+/// SEVERITY, so a mis-ordered backlog was indistinguishable from a curated one. It was mis-ordered:
+/// `keelArchViews` (issue069, Low) ranked FIRST purely because an earlier session appended it to the
+/// end of a COMPLETED block, while `dcStaleKernelInstanceGate` (issue081, High — an enforced commit
+/// gate being routinely bypassed) ranked 14th, and the AI then narrated priority in prose instead of
+/// reordering the file. Both inputs are recorded facts, so the inversion is COMPUTABLE.
+///
+/// Reported, never enforced: priority is a human judgment and ordering may be deliberate (a High item
+/// can be legitimately deferred behind an enabler). The value is that the trade-off becomes VISIBLE
+/// instead of resting on whoever last appended to the file.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn priority_inversions(root: &Path) -> Result<Vec<(String, String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let ready = crate::orient::compute(root).ready; // already in declaration/priority order
+    let severity_of = |task: &str| -> Option<String> {
+        model
+            .edges
+            .iter()
+            .filter(|e| e.kind == "resolves" && e.from == task)
+            .filter_map(|e| model.items.get(&e.to))
+            .filter_map(|i| i.attrs.get("severity").cloned())
+            .max_by_key(|s| match s.as_str() {
+                "Critical" => 4,
+                "High" => 3,
+                "Medium" => 2,
+                "Low" => 1,
+                _ => 0,
+            })
+    };
+    let pairs: Vec<(String, Option<String>)> = ready.iter().map(|t| (t.clone(), severity_of(t))).collect();
+    Ok(inversion_pairs(&pairs))
+}
+
 struct ReadinessBlockers {
     coverage_gaps: Vec<String>,
     critique_gaps: Vec<String>,
@@ -6049,6 +6110,44 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("name".to_string(), display.to_string());
         ItemInfo { type_name: "Person".to_string(), attrs, marker: None, file: String::new() }
+    }
+
+    #[test]
+    fn inversion_pairs_flags_lower_severity_work_ranked_above_high() {
+        // issue084: order and severity are BOTH recorded, so disagreement between them is computable.
+        // `ready` is in declaration/priority order (D0052), so "outranks" == "appears earlier".
+        let sev = |s: &str| Some(s.to_string());
+        let ready = vec![
+            ("enabler".to_string(), None),                 // no issue at all
+            ("cosmetic".to_string(), sev("Low")),
+            ("urgent".to_string(), sev("High")),           // outranked by both above
+            ("later".to_string(), sev("Medium")),
+        ];
+        let out = inversion_pairs(&ready);
+        assert_eq!(
+            out,
+            vec![
+                ("enabler".to_string(), "urgent".to_string(), "High".to_string()),
+                ("cosmetic".to_string(), "urgent".to_string(), "High".to_string()),
+            ],
+            "got {out:?}"
+        );
+        // `later` (Medium) is NOT reported: the threshold is >= High, so ordinary triage ordering
+        // does not generate noise — only work resolving a High/Critical issue being outranked does.
+    }
+
+    #[test]
+    fn inversion_pairs_clean_when_severity_matches_order() {
+        let sev = |s: &str| Some(s.to_string());
+        let ready = vec![
+            ("critical".to_string(), sev("Critical")),
+            ("urgent".to_string(), sev("High")),
+            ("enabler".to_string(), None),
+            ("cosmetic".to_string(), sev("Low")),
+        ];
+        assert!(inversion_pairs(&ready).is_empty(), "severity-ordered frontier must be clean");
+        // Two >= High items may outrank each other freely — relative order among them is judgment.
+        assert!(inversion_pairs(&[("a".to_string(), sev("High")), ("b".to_string(), sev("Critical"))]).is_empty());
     }
 
     #[test]

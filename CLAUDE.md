@@ -372,8 +372,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL twenty forward guards (no kernel) — 17 hard-blocking (exit≠0 on any violation) + 3 warning-only (decision-requirement-link, verification-trace D0130, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL twenty-one forward guards (no kernel) — 17 hard-blocking (exit≠0 on any violation) + 4 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -422,7 +422,13 @@ member: a DELIVERED verification (a passing DoD) that names a `SystemRequirement
 was once narrated to the human as functional verification. Declared PHASE gates are excluded (they verify the sprint
 process, not the requirement — that filter removed 37 of 103 first-run findings). Relatedly `keel tier-satisfaction`
 now emits `verifiedByMethod`: an SR counts as verified when ANY Test `#Verify`-links it, and in this repo that set is
-~70% `method=critique`, so the percentage must be read WITH the mix, never as functional-test coverage. (Relatedly, `critique_suspect`
+~70% `method=critique`, so the percentage must be read WITH the mix, never as functional-test coverage. A TWENTY-FIRST
+guard, `priority-inversion` (D0130/issue084), is the fourth WARNING-level member: a ready item outranking work that
+resolves a >= High Issue. D0052 makes declaration order the priority, but nothing compared recorded ORDER against
+recorded SEVERITY, so a mis-ordered backlog looked identical to a curated one — `keelArchViews` (Low) ranked #1 by
+append accident while `dcStaleKernelInstanceGate` (High) ranked 14th. Never blocking: deferring a High item behind an
+enabler can be correct; the point is that the trade-off is VISIBLE rather than left to whoever last appended.
+(Relatedly, `critique_suspect`
 honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
 `#DependsOn` finding→critique edge — no longer induces suspicion.)
 **Declarative controls (D0105/D0107).** Controls are being migrated from bespoke Rust predicates to
