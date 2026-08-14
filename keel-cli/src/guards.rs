@@ -5,7 +5,7 @@
 //! report text. M3a ports the three no-git guards: `actors`, `acceptance-events`,
 //! `sprint-coverage`. M3b/M3c add ceremony/charter/keystone + a unified runner.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::algo::is_space;
@@ -1468,8 +1468,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 26] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity"];
+pub const GUARD_NAMES: [&str; 27] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage"];
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1566,6 +1566,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
+        "parser-coverage" => Some(parser_coverage(root)), // warning-only (issue102) — what the engine cannot read
         "sequence-multiplicity" => Some(sequence_multiplicity(root)), // warning-only (issue101) — sequences are newly enabled
         "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control
         "hook-config-integrity" => Some(hook_config_integrity(root)), // warning-only (D0047/issue093) — a hook pointing at a deleted script
@@ -1624,6 +1625,58 @@ fn named_attr_bearers(pkg: &keel_parser::ast::Package) -> Vec<(&str, &[keel_pars
         }
     }
     out
+}
+
+/// WARNING-level: statements the parser could not read, grouped by leading token (issue102).
+///
+/// The parser recognises a fixed statement set and skips the rest — silently, until now. Measured with
+/// an undeclared target, `ref e : NoSuchType`, `port p : NoSuchPortDef`, `assert constraint c :
+/// NoSuchConstraint` and `connect ghostA.p to ghostB.p` ALL validate clean, while the control
+/// (`part x : NoSuchType`) correctly produces a diagnostic. So those statements are not merely
+/// unresolved — they are invisible.
+///
+/// This is the safety property that makes the rest of the base-first pass survivable. Every construct
+/// D0139 converts toward is currently in that invisible set, so a conversion landing before the reader
+/// would make its edges parse clean and vanish while every guard reported green — the failure mode this
+/// project exists to prevent, and the one issue027 already fixed for items dropped outside a package.
+///
+/// Reports a per-lead-token count rather than one line per statement: the engine's own schema skips 29
+/// statements today, and a 29-line warning block every run would train its reader to ignore the guard.
+/// The counts are what shows a conversion going wrong — a lead token appearing where it did not before.
+fn parser_coverage(root: &Path) -> GuardReport {
+    let mut by_lead: BTreeMap<String, usize> = BTreeMap::new();
+    let mut scanned = 0usize;
+    for dir in [root.join(".tracking"), root.join(".engine")] {
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in crate::collect_sysml(&dir) {
+            let Ok(pkg) = crate::parse_pkg(&path) else { continue };
+            scanned += 1;
+            for sk in &pkg.skipped {
+                *by_lead.entry(sk.lead.clone()).or_default() += 1;
+            }
+        }
+    }
+    let total: usize = by_lead.values().sum();
+    let mut warnings = Vec::new();
+    if total > 0 {
+        // Rank by count and show only the head. The tail is dominated by element NAMES — a skipped
+        // `use case <name> : T` reports its own name as the lead token — which produces dozens of
+        // singletons that bury the kinds worth acting on. Collapsing them keeps the guard readable,
+        // which is the difference between a control someone reads and one they learn to scroll past.
+        let mut ranked: Vec<(&String, &usize)> = by_lead.iter().collect();
+        ranked.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        let head: Vec<String> = ranked.iter().take(8).map(|(l, n)| format!("{l}×{n}")).collect();
+        let tail: usize = ranked.iter().skip(8).map(|(_, n)| **n).sum();
+        let tail_note =
+            if tail > 0 { format!(", and {tail} more across {} kind(s)", ranked.len() - 8) } else { String::new() };
+        warnings.push(format!(
+            "{total} statement(s) across {scanned} file(s) are SKIPPED by keel-parser and therefore invisible to every guard and view: {}{tail_note}. A base-first conversion onto any of these would parse clean and lose its edges (issue102/D0139)",
+            head.join(", ")
+        ));
+    }
+    GuardReport { name: "parser-coverage", scanned, warnings, violations: Vec::new() }
 }
 
 /// WARNING-level: every multi-valued feature assignment `:>> f = (a, b, c)` in the model (issue101).

@@ -1,7 +1,7 @@
 # Guard reference
 
-`keel guard` runs **26** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
-and **7 warning-only** (visible every commit, never blocking). `keel version` reports this split
+`keel guard` runs **27** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
+and **8 warning-only** (visible every commit, never blocking). `keel version` reports this split
 computed from the enforced set, so it cannot drift from what actually runs.
 
 Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands.
@@ -43,6 +43,7 @@ Visible on every commit, never blocking — the D0102 *promote-once-low-noise* p
 | `doc-sync` | A staged definitional change with no co-committed doc update (D0113) |
 | `hook-config-integrity` | A `.claude/settings*.json` hook command referencing a script that does not exist, so it fails every time it fires (D0047/issue093). Warning-level because this config is machine-local and partly gitignored: CI cannot see it, and one contributor's personal hook must never block another's commit |
 | `sequence-multiplicity` | Every multi-valued assignment `:>> f = (a, b, c)` in the model (issue101). Enabling the sequence form removed a crude safety property — `(` used to be a parse error everywhere, so it could not be written into a *single-valued* attribute; now `createdBy = ("you", "ghost")` parses clean and `actors` passes. The exact check needs multiplicity metadata the AST does not yet carry, so every sequence is reported instead — useful, not a placeholder, because the model contains **zero** today. AST-based on purpose: grepping `= (` matches the prose that *discusses* sequences (the issue099 self-inflating-census error). Retire when multiplicity lands |
+| `parser-coverage` | Statements keel-parser cannot read, grouped by leading token (issue102). The parser recognises a fixed set and skips the rest — silently, until now. Measured with an undeclared target, `ref`, `port`, `assert constraint` and `connect` all validate CLEAN while the control (`part x : NoSuchType`) correctly diagnoses, so they are invisible, not merely unresolved. Every construct D0139 converts toward is in that set, so this is the safety property that makes the base-first pass survivable. Currently reports 165 skipped statements — including 52 `:>` specialization clauses and 57 `use case` usages |
 
 ## Non-blocking burndown (runnable, never gating)
 

@@ -190,4 +190,27 @@ pub struct Package {
     pub name: String,
     pub items: Vec<Item>,
     pub span: Span,
+    /// Statements the parser did not understand and skipped (issue102).
+    ///
+    /// The parser recognises a fixed set of statements and `skip_item`s everything else, which was
+    /// SILENT: `ref e : C;`, `port p : Pt;`, `assert constraint c : Ok;` and `connect x.p to y.p;` all
+    /// parse "clean" and resolve nothing. Measured with an undeclared target, each one validates clean
+    /// while the control (`part x : NoSuchType`) correctly produces a diagnostic — so the content is not
+    /// merely unresolved, it is invisible.
+    ///
+    /// That matters because those are precisely the BASE `SysML` v2 constructs the base-first programme
+    /// (D0139) converts toward. A conversion landing before the reader would make ~1,500 edges parse
+    /// clean and vanish while every guard reported green. Recording what was skipped turns that from
+    /// silence into a reported count — the same fix issue027 applied to items dropped OUTSIDE the
+    /// package, one level in.
+    pub skipped: Vec<SkippedStatement>,
+}
+
+/// One statement the parser skipped, with enough detail to find and judge it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkippedStatement {
+    /// 1-indexed source line of the statement's first token.
+    pub line: u32,
+    /// The leading token, as source text (e.g. `ref`, `port`, `connect`, `assert`).
+    pub lead: String,
 }

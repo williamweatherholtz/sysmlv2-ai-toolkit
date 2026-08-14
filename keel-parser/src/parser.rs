@@ -1,6 +1,6 @@
 use crate::ast::{
     ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, EnumDef, Import, Item,
-    Package, Part, SatisfyEdge, Succession, TypeDef, Value, Verification,
+    Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef, Value, Verification,
 };
 use crate::error::ParseError;
 use crate::token::{Span, Token, TokenKind};
@@ -10,12 +10,15 @@ use crate::token::{Span, Token, TokenKind};
 struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    /// Statements `skip_item` discarded (issue102). Collected here rather than threaded through every
+    /// call site, because `skip_item` is the single choke point through which all of them pass.
+    skipped: Vec<SkippedStatement>,
 }
 
 impl Parser {
     #[allow(clippy::missing_const_for_fn)] // Vec is not const-constructible in stable Rust
     fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, pos: 0 }
+        Self { tokens, pos: 0, skipped: Vec::new() }
     }
 
     fn peek(&self) -> &TokenKind {
@@ -370,6 +373,14 @@ fn parse_succession(p: &mut Parser, filename: &str, is_ordering_only: bool) -> R
 /// consume) when a `{...}` block ends the construct; stops without consuming
 /// on `}` or EOF (the caller's closing delimiter).
 fn skip_item(p: &mut Parser) {
+    // Record BEFORE consuming: once the loop runs, the leading token is gone and with it the only
+    // evidence of what was dropped.
+    let tok = p.peek_token();
+    if !matches!(tok.kind, TokenKind::RBrace | TokenKind::Eof) {
+        let lead = token_label(&tok.kind);
+        let line = tok.line;
+        p.skipped.push(SkippedStatement { line, lead });
+    }
     loop {
         match p.peek() {
             TokenKind::Semicolon => { p.advance(); break; }
@@ -378,6 +389,19 @@ fn skip_item(p: &mut Parser) {
             TokenKind::LBracket => skip_bracket_block(p),
             _ => { p.advance(); }
         }
+    }
+}
+
+/// Source text for a leading token, for the skipped-statement report. Keywords render as themselves;
+/// an identifier renders as its name, which is what makes `ref`/`port`/`connect` legible in the report
+/// even though they lex as identifiers rather than keywords.
+fn token_label(k: &TokenKind) -> String {
+    match k {
+        TokenKind::Ident(s) => s.clone(),
+        TokenKind::Str(_) => "<string>".to_owned(),
+        TokenKind::Int(_) => "<int>".to_owned(),
+        other if is_keyword(other) => keyword_text(other).to_owned(),
+        other => format!("{other:?}"),
     }
 }
 
@@ -675,7 +699,14 @@ fn parse_package(p: &mut Parser, filename: &str) -> Result<Package, ParseError> 
         if let Some(item) = parse_item(p, filename)? { items.push(item); }
     }
     let end = p.expect(&TokenKind::RBrace, filename)?;
-    Ok(Package { name: pkg_name, items, span: Span { start: pkg_start.start, end: end.start } })
+    Ok(Package {
+        name: pkg_name,
+        items,
+        span: Span { start: pkg_start.start, end: end.start },
+        // Move the collector out rather than cloning: the parser is finished with it, and the Package is
+        // the only thing that outlives this call.
+        skipped: std::mem::take(&mut p.skipped),
+    })
 }
 
 // ── public entry point ─────────────────────────────────────────────────────
