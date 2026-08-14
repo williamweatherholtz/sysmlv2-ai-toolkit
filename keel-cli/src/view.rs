@@ -3596,6 +3596,32 @@ pub fn is_launchable(root: &Path, target: &str) -> Result<bool, ViewError> {
 ///
 /// # Errors
 /// [`ViewError`] on a parse failure, an unknown rule name, or an unsupported predicate/scope.
+/// Like [`rule_violations`], but `Ok(None)` when the named rule is simply NOT DECLARED.
+///
+/// Closes issue090 (D0136's class, second instance). Six hard guards are rule-sourced, and a missing
+/// rule made `rule_violations` return `Err`, which those guards reported as a VIOLATION — so a project
+/// whose `.engine/rules/` is absent, older, or authored fresh got six hard failures and every commit
+/// blocked, with messages naming internal rule names that mean nothing to it. A project that never
+/// adopted a control has not violated it.
+///
+/// The distinction matters in both directions: an ABSENT rule means the control is not adopted (the
+/// caller should pass, but say so visibly, so deleting a rule to dodge a gate is never silent), while a
+/// MALFORMED rule is a real error and must still fail.
+///
+/// # Errors
+/// Returns [`ViewError`] for a genuine parse/compute failure — never for mere absence.
+pub fn rule_violations_opt(root: &Path, rule_name: &str) -> Result<Option<(usize, Vec<String>)>, ViewError> {
+    if !Model::build(root)?.items.contains_key(rule_name) {
+        return Ok(None);
+    }
+    rule_violations(root, rule_name).map(Some)
+}
+
+/// Violations of a single declared rule, as `(scanned, violating element names)`.
+///
+/// # Errors
+/// Returns [`ViewError`] if the rule is not declared, is malformed, or a tracking file fails to parse.
+/// Prefer [`rule_violations_opt`] in a GUARD: absence means the control is not adopted, not violated.
 pub fn rule_violations(root: &Path, rule_name: &str) -> Result<(usize, Vec<String>), ViewError> {
     let model = Model::build(root)?;
     let Some(info) = model.items.get(rule_name) else {

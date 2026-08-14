@@ -153,15 +153,19 @@ pub fn actors(root: &Path) -> GuardReport {
 /// inherently un-gatable at commit and stays reminder-enforced.
 #[must_use]
 pub fn confirmation_authenticity(root: &Path) -> GuardReport {
-    match crate::view::rule_violations(root, "confirmationAuthenticityRule") {
-        Ok((scanned, bad)) => {
+    match crate::view::rule_violations_opt(root, "confirmationAuthenticityRule") {
+        Ok(Some((scanned, bad))) => {
             let violations = bad
                 .into_iter()
                 .map(|d| format!("{d}: accepted but its acceptance event is not human-judged — a sign-off must be a real human attestation, never AI-fabricated (D0106/D0016)"))
                 .collect();
             GuardReport { name: "confirmation-authenticity", scanned, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading confirmation-authenticity rule: {e}")] },
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: vec!["declared rule `confirmationAuthenticityRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading confirmation-authenticity rule: {e}")] },
     }
 }
 
@@ -169,8 +173,8 @@ pub fn confirmation_authenticity(root: &Path) -> GuardReport {
 #[must_use]
 pub fn acceptance_events(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared acceptanceEventRule (single gate source).
-    match crate::view::rule_violations(root, "acceptanceEventRule") {
-        Ok((total, mut missing)) => {
+    match crate::view::rule_violations_opt(root, "acceptanceEventRule") {
+        Ok(Some((total, mut missing))) => {
             missing.sort();
             let violations = missing
                 .into_iter()
@@ -178,7 +182,11 @@ pub fn acceptance_events(root: &Path) -> GuardReport {
                 .collect();
             GuardReport { name: "acceptance-events", scanned: total, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport {
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "acceptance-events", scanned: 0, warnings: vec!["declared rule `acceptanceEventRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport {
             name: "acceptance-events",
             scanned: 0,
             warnings: Vec::new(),
@@ -369,15 +377,19 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
 /// — the single gate source; the bespoke charter predicate was retired after parity (sprints 178-183).
 #[must_use]
 pub fn charter(root: &Path) -> GuardReport {
-    match crate::view::rule_violations(root, "charterRule") {
-        Ok((scanned, uncharted)) => {
+    match crate::view::rule_violations_opt(root, "charterRule") {
+        Ok(Some((scanned, uncharted))) => {
             let violations = uncharted
                 .into_iter()
                 .map(|s| format!("Story '{s}' has no #CharteredBy edge — a delivery Story must charter to its originating Decision/Need/Requirement, or (a research spike) to an Issue/proposed-Decision (D0068/issue055)"))
                 .collect();
             GuardReport { name: "charter", scanned, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport { name: "charter", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading charter rule: {e}")] },
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "charter", scanned: 0, warnings: vec!["declared rule `charterRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport { name: "charter", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading charter rule: {e}")] },
     }
 }
 
@@ -391,15 +403,19 @@ pub fn charter(root: &Path) -> GuardReport {
 #[must_use]
 pub fn requirement_rootedness(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared capabilityRootednessRule (single gate source).
-    match crate::view::rule_violations(root, "capabilityRootednessRule") {
-        Ok((_scanned, gaps)) => {
+    match crate::view::rule_violations_opt(root, "capabilityRootednessRule") {
+        Ok(Some((_scanned, gaps))) => {
             let violations = gaps
                 .into_iter()
                 .map(|c| format!("{c}: #Capability with no #DerivedFrom edge to a Need — state the driving Need (D0099)"))
                 .collect();
             GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing rootedness: {e}")] },
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "requirement-rootedness", scanned: 0, warnings: vec!["declared rule `capabilityRootednessRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing rootedness: {e}")] },
     }
 }
 
@@ -525,15 +541,19 @@ pub fn doc_sync(root: &Path) -> GuardReport {
 #[must_use]
 pub fn issues(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared issuesTriagedRule (single gate source), not a bespoke predicate.
-    match crate::view::rule_violations(root, "issuesTriagedRule") {
-        Ok((total, untriaged)) => {
+    match crate::view::rule_violations_opt(root, "issuesTriagedRule") {
+        Ok(Some((total, untriaged))) => {
             let violations = untriaged
                 .into_iter()
                 .map(|i| format!("{i}: untriaged — no #Resolves edge (D0077; link a resolving action or Decision)"))
                 .collect();
             GuardReport { name: "issues", scanned: total, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport { name: "issues", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading issues: {e}")] },
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "issues", scanned: 0, warnings: vec!["declared rule `issuesTriagedRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport { name: "issues", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading issues: {e}")] },
     }
 }
 
@@ -767,15 +787,19 @@ pub fn critique_rigor(root: &Path) -> GuardReport {
 #[must_use]
 pub fn decision_rationale(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared decisionRationaleRule (single gate source).
-    match crate::view::rule_violations(root, "decisionRationaleRule") {
-        Ok((total, weak)) => {
+    match crate::view::rule_violations_opt(root, "decisionRationaleRule") {
+        Ok(Some((total, weak))) => {
             let violations = weak
                 .into_iter()
                 .map(|d| format!("{d}: blank/trivial context or rationale (D0103 — a Decision must state a substantive why; >=20 chars each)"))
                 .collect();
             GuardReport { name: "decision-rationale", scanned: total, warnings: Vec::new(), violations }
         }
-        Err(e) => GuardReport { name: "decision-rationale", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading decision rationale: {e}")] },
+                // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
+        // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
+        // visible) and pass; a MALFORMED rule still fails via Err below.
+        Ok(None) => GuardReport { name: "decision-rationale", scanned: 0, warnings: vec!["declared rule `decisionRationaleRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
+Err(e) => GuardReport { name: "decision-rationale", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading decision rationale: {e}")] },
     }
 }
 

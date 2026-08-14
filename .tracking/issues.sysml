@@ -1054,4 +1054,16 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcEngineMarkerBuiltins to issue089;
+
+    #ProcessDefect part issue090 : Issue {
+        :>> id = "e0900090-0090-4e90-9090-516273840090";
+        :>> title = "SIX more hard guards blocked any project without this repo's .engine/rules/ — an absent declared rule was reported as a VIOLATION";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The SECOND instance of D0136's coupling class, found by deliberately hunting for more instances after issue089 instead of assuming it was isolated — and it has the same blast radius. Six HARD guards are rule-sourced (charter, issues, requirement-rootedness, decision-rationale, acceptance-events, confirmation-authenticity, D0107). Each called `rule_violations`, which returns Err when the named rule is not declared, and each guard mapped Err to a VIOLATION. REPRODUCED on a fresh `keel init` project with `.engine/rules/` removed: SIX hard failures, `keel guard` exit 1, every commit blocked, with messages naming internal rule names (acceptanceEventRule, charterRule, capabilityRootednessRule, ...) that mean nothing to a downstream reader and suggest no action. This would hit any project whose `.engine/rules/` is absent, predates the D0105/D0107 rule migration, or was authored fresh — which D0093 explicitly invites ('your project authors its OWN decisions fresh'). SEMANTIC ERROR AT THE ROOT: a project that never ADOPTED a control has not VIOLATED it. Absence and violation were being conflated. FIX (D0136's rule, applied a second time): `rule_violations_opt` returns Ok(None) on absence; the guards map it to a WARNING naming the control as NOT ADOPTED, plus a pass — deliberately never silent, so deleting a rule to escape a gate remains visible on every run — while a MALFORMED rule still hard-fails. Verified in all four states including a negative test proving a declared-and-violated rule still fails with exit 1. NOTE FOR FUTURE GUARDS: this is now the third distinct instance of a control coupled to something the binary cannot guarantee (issue076 runtime, issue081 bypass-scope, issue089 project data, issue090 project data) — a new guard must state what it depends on and whether the binary can guarantee it.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcRuleAbsenceNotViolation";
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcRuleAbsenceNotViolation to issue090;
 }
