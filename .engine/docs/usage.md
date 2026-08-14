@@ -45,6 +45,7 @@ the layer you touched.
 
 | You want to... | Do this |
 |---|---|
+| Know which build you're running | `keel version` (also `--version` / `-V`, `--json`) — release version, build commit, and the guard inventory this binary carries. **The first step in any "keel is blocking me" report**: a guard's behaviour is a property of the BINARY, so the version is what makes the report actionable. `+dirty` = built from a modified tree; `unknown` commit = built off-git. Cross-check the commit against `.tracking/baselines.sysml`. |
 | Add work | Add an `action` task to a `.tracking` backlog `action def`, with a one-line `verification <task>DoD : Test` criterion |
 | Order work | `first taskA then taskB;` (succession) |
 | See what's next | Rust-native (no kernel): `keel orient [ROOT]` (JSON) / `keel whats-next [ROOT]` (ready list, one per line) |

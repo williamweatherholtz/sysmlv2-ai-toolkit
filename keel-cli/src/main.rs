@@ -1703,10 +1703,50 @@ fn cmd_init(args: &[String]) -> i32 {
     0
 }
 
+/// `keel version` (also `--version` / `-V`) — report which build this is.
+///
+/// Exists because a downstream project could not answer "am I running the fix?": three versioned
+/// releases shipped with no version identification in the artifact, so a project still on the blocked
+/// version was INDISTINGUISHABLE from one that had upgraded. Reports the release version, the build
+/// commit (baked by `build.rs`; `unknown` off-git, `+dirty` from a modified tree — never guessed), and
+/// the CONTROL INVENTORY this binary carries, computed from `GUARD_NAMES` rather than restated, so it
+/// cannot drift from the guards that actually run.
+fn cmd_version(args: &[String]) -> i32 {
+    let hard = keel_cli::guards::GUARD_NAMES.len() - WARNING_ONLY_GUARDS.len();
+    if args.iter().any(|a| a == "--json") {
+        println!(
+            "{{\"version\":\"{}\",\"buildCommit\":\"{}\",\"guards\":{},\"guardsHardBlocking\":{},\"guardsWarningOnly\":{}}}",
+            env!("CARGO_PKG_VERSION"),
+            env!("KEEL_BUILD_COMMIT"),
+            keel_cli::guards::GUARD_NAMES.len(),
+            hard,
+            WARNING_ONLY_GUARDS.len(),
+        );
+        return 0;
+    }
+    println!("keel {}", env!("CARGO_PKG_VERSION"));
+    println!("build commit: {}", env!("KEEL_BUILD_COMMIT"));
+    println!(
+        "guards: {} ({hard} hard-blocking, {} warning-only)",
+        keel_cli::guards::GUARD_NAMES.len(),
+        WARNING_ONLY_GUARDS.len(),
+    );
+    0
+}
+
+/// The warning-only members of `GUARD_NAMES` — they RUN on every commit and are visible, but never
+/// block (the D0102 promote-once-low-noise pattern). Named here so `keel version` can report the
+/// hard-vs-warning split without a hand-maintained count.
+const WARNING_ONLY_GUARDS: [&str; 5] =
+    ["decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "doc-sync"];
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
     let code = match args.get(1).map(String::as_str) {
+        // Version must answer BEFORE any root resolution — a caller establishing which binary they
+        // have may be standing anywhere, including outside a keel project.
+        Some("version" | "--version" | "-V") => cmd_version(rest),
         Some("init") => cmd_init(rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
@@ -1763,6 +1803,7 @@ fn main() {
         Some("record") => cmd_record(rest),
         _ => {
             eprintln!("keel <subcommand> [args]");
+            eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
             eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
             eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
@@ -1808,6 +1849,25 @@ mod tests {
         // Everything else is scaffolded unchanged.
         assert_eq!(remap_engine_path(Path::new("schema/core/element.sysml")), Path::new("schema/core/element.sysml"));
         assert_eq!(remap_engine_path(Path::new("processes/introduction.sysml")), Path::new("processes/introduction.sysml"));
+    }
+
+    #[test]
+    fn version_guard_split_cannot_drift_from_the_guards_that_run() {
+        // `keel version` reports the hard-vs-warning split by SUBTRACTING the warning list from
+        // GUARD_NAMES. If a name in the warning list is not an actual enforced guard the reported hard
+        // count silently overstates enforcement — and a longer warning list would underflow the
+        // subtraction outright. Both are the same defect class as the version gap this command fixes:
+        // a number a reader would trust that nothing checks.
+        for w in super::WARNING_ONLY_GUARDS {
+            assert!(
+                keel_cli::guards::GUARD_NAMES.contains(&w),
+                "warning-only guard `{w}` is not in GUARD_NAMES — the reported hard count would be wrong"
+            );
+        }
+        assert!(
+            super::WARNING_ONLY_GUARDS.len() < keel_cli::guards::GUARD_NAMES.len(),
+            "warning list must be a strict subset — otherwise the hard count underflows"
+        );
     }
 
     #[test]

@@ -17,7 +17,10 @@ the AI — it's what turns raw output into clean forward motion.
 
 **1. Get `keel`.** Download the prebuilt binary for your platform from the latest
 [GitHub Release](https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases), *or* build
-from source (see [Build from source](#build-from-source)).
+from source (see [Build from source](#build-from-source)). Confirm what you got with `keel version`
+— it prints the release version, the commit it was built from, and the guard inventory it carries.
+Quote that output in any bug report: guard behaviour is a property of the binary, so the version is
+what makes a "keel is blocking me" report diagnosable.
 
 **2. Scaffold a project.**
 ```
