@@ -469,7 +469,7 @@ D0112 phase 3), on demand / in the pre-commit hook (each starts the pilot kernel
 $conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills
+& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills — OPT-IN ONLY (KEEL_KERNEL_VALIDATE=1), D0132/issue081: it validates each file IN ISOLATION so cross-file refs never resolve, failing 11 CORRECT committed decisions (0114, 0116-0125) and forcing SKIP_VALIDATE=1 — which skips EVERY layer. `keel check-engine` is the ENFORCED instance gate: kernel-free, resolves refs ACROSS files, exits non-zero on a real unresolved reference. validate_schema.py / validate_workflows.py still BLOCK on schema/workflow changes.
 & $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking (kernel cross-check / fallback when the rust binary is unbuilt)
 ```
 

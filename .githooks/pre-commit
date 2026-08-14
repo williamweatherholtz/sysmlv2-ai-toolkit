@@ -59,10 +59,25 @@ if [ -n "$sysml_staged" ] && [ -z "$KEEL" ]; then
     exit 1
 fi
 
-# .engine schema/workflow/instance changes: kernel validators (deep SysML semantics; optional layer).
+# .engine schema/workflow changes: kernel validators (deep SysML semantics; optional layer).
 if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/schema/'    && sysml_run validate_schema.py
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
+fi
+
+# .engine INSTANCE files: `keel check-engine` (below) is the ENFORCED gate. The kernel's
+# validate_instances.py is OPT-IN (KEEL_KERNEL_VALIDATE=1) — D0132/issue081.
+#
+# It validates each instance file IN ISOLATION, so ANY cross-file reference fails to resolve. It
+# therefore fails 11 files that are already committed and CORRECT (decisions 0114, 0116-0125) on
+# `Couldn't resolve reference to Element 'd0014'` and similar. Those commits could only have landed
+# via SKIP_VALIDATE=1 — which skips EVERY layer, not just the broken one. So a gate that was bypassed
+# 100% of the time was also destroying the assurance of validate, guard, check-engine and clippy each
+# time it was bypassed. Removing it from the blocking path strictly INCREASES total enforcement.
+#
+# `keel check-engine` is kernel-free, resolves references ACROSS files (which the kernel cannot here),
+# and exits non-zero on a genuine unresolved reference — verified by negative test at D0132.
+if [ "$KEEL_KERNEL_VALIDATE" = "1" ] && [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
 fi
 
