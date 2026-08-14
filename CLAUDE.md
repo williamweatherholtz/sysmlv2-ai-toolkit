@@ -372,8 +372,8 @@ canonical validator for `.tracking/` (D0048) — fast, no JVM:**
 ```
 .\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
 .\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL twenty-two forward guards (no kernel) — 17 hard-blocking (exit≠0 on any violation) + 5 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, retro-backlog D0131, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | retro-backlog (warning-only, D0131) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
+.\target\release\keel.exe guard                                                               # ALL twenty-three forward guards (no kernel) — 18 hard-blocking (exit≠0 on any violation) + 5 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, retro-backlog D0131, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
+.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | marker-vocabulary (D0133) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | retro-backlog (warning-only, D0131) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
 .\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
 ```
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
@@ -381,7 +381,7 @@ model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE.
 critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
 (`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
 state, never a commit blocker (don't fake a pass, don't block recording true state).
-The seventeen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
+The eighteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
 plus `confirmation-authenticity` (D0106/issue059: an accepted Decision's acceptance event must be HUMAN-judged,
 never AI-fabricated; rule-sourced from `confirmationAuthenticityRule`) and `engine-lint` (D0112 phase 1: the
 first kernel-free port of the `.engine`-instance lints — HARD: every `.engine/decisions/*.sysml` imports
@@ -409,26 +409,30 @@ acceptance was authored EMPTY and passed every guard, because acceptance-events 
 that an acceptance EXISTS and is HUMAN-judged, never that it SAYS anything, and for a confirmation the attestation
 text IS the evidence (D0016). Three independent reasons — empty, a bare actor name (which restates judgedBy rather
 than evidencing it), a stock affirmation, or under 25 chars — because length alone misses a 20-char bare name.
-FORWARD-ONLY: the 9 pre-existing thin attestations warn (grandfathered), anything new hard-fails]). A SEVENTEENTH guard, `decision-requirement-link`
+FORWARD-ONLY: the 9 pre-existing thin attestations warn (grandfathered), anything new hard-fails], and
+`marker-vocabulary` [D0133/issue077: every metadata marker used in a real syntactic position must be DECLARED as a
+`metadata def`. Markers were never type-checked, so a MISSPELLED marker validated clean and silently removed that
+item from the depending control's view — a blind guard reports PASS. `#Verify` alone carries 456 edges and is what
+tier-satisfaction/sr_verified_pct and verification-trace all key on, so one typo would report a DELIVERED requirement
+as unverified. HARD because the check is exact set-membership, not heuristic; string literals are stripped first so
+markers discussed in `procedureText` prose are not false positives]). A WARNING-LEVEL guard, `decision-requirement-link`
 (D0102/issue052), RUNS in `keel guard` every commit but is WARNING-level (visible, never blocks): it flags
 an accepted Decision that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance
-link that should be typed, not prose) — promotable to a hard gate once proven low-noise. An EIGHTEENTH guard,
-`doc-sync` (D0113), is the second WARNING-level member: a staged DEFINITIONAL change (`.engine/schema|processes|
+link that should be typed, not prose) — promotable to a hard gate once proven low-noise. A further warning-level guard,
+`doc-sync` (D0113): a staged DEFINITIONAL change (`.engine/schema|processes|
 workflows/`) with NO co-committed doc update (CLAUDE.md / `.engine/docs/` / any README) is flagged — the doc-sync
 discipline made a control (was pure vigilance; doc drift was a HIGH critique finding), heuristic + warning-first,
-promotable once low-noise. A NINETEENTH guard, `verification-trace` (D0130/issue082), is the third WARNING-level
-member: a DELIVERED verification (a passing DoD) that names a `SystemRequirement` in its procedureText but never
+promotable once low-noise. `verification-trace` (D0130/issue082) likewise WARNS: a DELIVERED verification (a passing DoD) that names a `SystemRequirement` in its procedureText but never
 `#Verify`-links it — the state where the WORK is verified and the REQUIREMENT is not, which is why `sr_verified_pct`
 was once narrated to the human as functional verification. Declared PHASE gates are excluded (they verify the sprint
 process, not the requirement — that filter removed 37 of 103 first-run findings). Relatedly `keel tier-satisfaction`
 now emits `verifiedByMethod`: an SR counts as verified when ANY Test `#Verify`-links it, and in this repo that set is
-~70% `method=critique`, so the percentage must be read WITH the mix, never as functional-test coverage. A TWENTY-FIRST
-guard, `priority-inversion` (D0130/issue084), is the fourth WARNING-level member: a ready item outranking work that
+~70% `method=critique`, so the percentage must be read WITH the mix, never as functional-test coverage. `priority-inversion` (D0130/issue084) WARNS on: a ready item outranking work that
 resolves a >= High Issue. D0052 makes declaration order the priority, but nothing compared recorded ORDER against
 recorded SEVERITY, so a mis-ordered backlog looked identical to a curated one — `keelArchViews` (Low) ranked #1 by
 append accident while `dcStaleKernelInstanceGate` (High) ranked 14th. Never blocking: deferring a High item behind an
 enabler can be correct; the point is that the trade-off is VISIBLE rather than left to whoever last appended.
-A TWENTY-SECOND guard, `retro-backlog` (D0131/issue085), is the fifth WARNING-level member: a staged sprint record
+`retro-backlog` (D0131/issue085) WARNS on: a staged sprint record
 whose retro names a finding (AVOIDABLE-ISSUE / LESSON) while the commit records NO tracked Issue or backlog action
 and gives no reason. Satisfied EITHER by co-recording an item OR by saying why none is needed, so what it enforces
 is that the CHOICE is explicit. Backs D0131's rewritten retrospective (retroIdentify -> retroTrack -> retroPromote,

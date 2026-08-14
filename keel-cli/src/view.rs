@@ -6113,6 +6113,36 @@ mod tests {
     }
 
     #[test]
+    fn marker_scan_ignores_prose_and_catches_a_misspelling() {
+        use crate::guards::{markers_declared_for_test as declared, markers_used_for_test as used};
+
+        // Real syntactic positions are picked up; a marker QUOTED IN PROSE is not. That distinction is
+        // load-bearing: procedureText fields legitimately discuss markers (`#Marker dependency from a
+        // to b`), and without stripping string literals those alone produce false violations on a
+        // HARD guard.
+        let text = concat!(
+            "package P {\n",
+            "    #Verify dependency from t1 to sr1;\n",
+            "    #Capability part feature : Story { }\n",
+            "    verification x : Test { :>> procedureText = \"authored via #Marker dependency from a to b\"; }\n",
+            "    // a comment mentioning #Covers dependency should not count\n",
+            "    #DerivdFrom dependency from d1 to n1;\n",
+            "}\n"
+        );
+        let found: Vec<String> = used(text).into_iter().map(|(m, _)| m).collect();
+        assert_eq!(found, vec!["Verify", "Capability", "DerivdFrom"], "got {found:?}");
+
+        // The declared set comes from `metadata def` lines.
+        let schema = vec!["package R {\n    metadata def Verify;\n    metadata def Capability;\n}\n".to_string()];
+        let dec = declared(&schema);
+        assert!(dec.contains("Verify") && dec.contains("Capability"));
+        // The misspelling is exactly what must NOT be in the declared set — this is the real
+        // failure mode: `#DerivdFrom` validated clean and silently removed its item from the HARD
+        // requirement-rootedness guard's view.
+        assert!(!dec.contains("DerivdFrom"), "a misspelling must not resolve as declared");
+    }
+
+    #[test]
     fn retro_backlog_warns_only_when_a_finding_is_neither_tracked_nor_justified() {
         use crate::guards::retro_backlog_warnings_for_test as warn;
         let sprint = |t: &str| vec![(".tracking/delivery/sprint999_x.sysml".to_string(), t.to_string())];

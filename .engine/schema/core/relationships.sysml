@@ -53,4 +53,38 @@ package EngineRelationships {
     // entirely, so issue021 dissolves. List: `query.py process-changes`.
     metadata def ProspectiveChange;
     metadata def SafetyChange;
+
+    // ── D0133/issue077: the markers guards + computed views CONSUME, now DECLARED ──
+    // These were used in anger for months while appearing nowhere as a `metadata def`. Because
+    // markers were not type-checked, a MISSPELLED marker validated clean and silently removed that
+    // item from the depending check's view — and a blind guard reports PASS, not a violation. The
+    // exposure was not theoretical: `#Verify` alone carries 456 edges and is what
+    // tier-satisfaction/sr_verified_pct and the verification-trace guard key on, so one typo would
+    // report a DELIVERED requirement as unverified. Declared here under the §2.5 frozen-schema
+    // sign-off (declaredMarkersSchemaSignOff, 2026-08-13), and `keel validate`/`check-engine` now
+    // REJECT an undeclared marker, so a typo fails loudly instead of blinding a control.
+
+    // #Verify: a Test -> the element it verifies. `#Verify dependency from <test> to <element>;`
+    // Load-bearing for tier-satisfaction (an SR is verified iff a Test #Verify-links it), the
+    // verification-trace guard, critique coverage and critic independence.
+    metadata def Verify;
+    // #DerivedFrom: a derived item -> the upstream it derives from (Decision/SR -> Need). Load-bearing
+    // for the HARD requirement-rootedness guard and the rootedness burndown.
+    metadata def DerivedFrom;
+    // #Capability: marks a user-facing feature whose rootedness is HARD-gated (D0099) — it must carry
+    // a #DerivedFrom edge to a Need. Unmarked decision-driven work is exempt (D0064).
+    metadata def Capability;
+    // #Dispositions: a typed disposition verdict -> the finding it dispositions (D0092).
+    metadata def Dispositions;
+    // #Covers: a per-sitting review -> the sprint(s) it covers (D0049/issue040 sitting-coverage).
+    metadata def Covers;
+    // #ProcessDefect: marks an Issue as a recurrable PROCESS defect, which per D0047 must resolve to a
+    // guard-producing action (defect-guard-coverage reads this).
+    metadata def ProcessDefect;
+    // #Measures: a Measurement datapoint -> the Indicator it measures (D0089/D0091).
+    metadata def Measures;
+    // #Informs: an Indicator -> the Decision it informs by direction (D0088 — monitored, not gated).
+    metadata def Informs;
+    // #JustifiedBy: a declared Rule -> the Decision that justifies it (D0105/D0107).
+    metadata def JustifiedBy;
 }

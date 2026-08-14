@@ -799,6 +799,130 @@ pub fn decision_requirement_link(root: &Path) -> GuardReport {
     }
 }
 
+// ── marker-vocabulary guard (an undeclared/misspelled marker silently blinds a control) ───────────
+
+/// Remove `SysML` string literals from a line, so markers QUOTED IN PROSE are not mistaken for edges.
+///
+/// Essential, not cosmetic: `procedureText` fields legitimately discuss markers (`#Marker dependency
+/// from a to b`, `#Kind dependency`, `#Changes dependency`), and a naive scan reports each as an
+/// undeclared marker. Those three alone would have produced 9 false violations on a hard guard.
+fn strip_string_literals(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut in_str = false;
+    for c in line.chars() {
+        if c == '"' {
+            in_str = !in_str;
+            continue;
+        }
+        if !in_str {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Syntactic positions in which a `#Marker` names a real edge or a marked item.
+const MARKER_FOLLOWERS: [&str; 5] = ["dependency", "part", "item", "verification", "requirement"];
+
+/// Marker names USED in real syntactic positions in `text`, as `(marker, 1-based line)`.
+fn markers_used(text: &str) -> Vec<(String, usize)> {
+    let mut out = Vec::new();
+    for (i, raw) in text.lines().enumerate() {
+        let line = strip_string_literals(raw);
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") {
+            continue; // a comment may legitimately name a marker
+        }
+        for (pos, _) in line.match_indices('#') {
+            let rest = &line[pos + 1..];
+            let name: String = rest.chars().take_while(|c| c.is_alphanumeric()).collect();
+            if name.is_empty() {
+                continue;
+            }
+            let after = rest[name.len()..].trim_start();
+            if MARKER_FOLLOWERS.iter().any(|f| after.starts_with(f)) {
+                out.push((name, i + 1));
+            }
+        }
+    }
+    out
+}
+
+/// Marker names DECLARED as `metadata def <Name>;` in `texts`.
+fn markers_declared(texts: &[String]) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for text in texts {
+        for raw in text.lines() {
+            let line = raw.trim();
+            if line.starts_with("//") {
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("metadata def ") {
+                let name: String = rest.trim().chars().take_while(|c| c.is_alphanumeric()).collect();
+                if !name.is_empty() {
+                    out.insert(name);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Guard: every metadata marker used must be DECLARED (D0133 / issue077).
+///
+/// Markers were never type-checked, so a MISSPELLED marker validated clean and silently removed that
+/// item from the depending control's view — and a blind guard reports PASS, not a violation. The
+/// exposure was concentrated: `#Verify` carries 456 edges and is what `tier-satisfaction`,
+/// `sr_verified_pct` and the `verification-trace` guard all key on, so a single typo would report a
+/// DELIVERED requirement as unverified. `#DerivedFrom` (37 edges) is load-bearing for the HARD
+/// `requirement-rootedness` guard.
+///
+/// HARD-blocking: a typo that blinds a control makes the model's computed state a lie, which is
+/// ill-formed STATE rather than incomplete work — squarely inside the honest-state gate (D0098).
+/// Safe to make hard because the check is exact (a declared-name set membership), not heuristic.
+#[must_use]
+pub fn marker_vocabulary(root: &Path) -> GuardReport {
+    let mut schema_texts: Vec<String> = Vec::new();
+    for dir in [root.join(".engine").join("schema"), root.join(".engine").join("workflows")] {
+        for p in crate::collect_sysml(&dir) {
+            if let Ok(t) = std::fs::read_to_string(&p) {
+                schema_texts.push(t);
+            }
+        }
+    }
+    let declared = markers_declared(&schema_texts);
+
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let rel = relpath(root, path);
+        for (marker, line) in markers_used(&text) {
+            scanned += 1;
+            if !declared.contains(&marker) {
+                violations.push(format!(
+                    "{rel}:{line}: marker `#{marker}` is NOT declared as a `metadata def` — markers are not type-checked, so an undeclared or MISSPELLED marker validates clean and silently removes this item from whatever guard or view depends on it (issue077/D0133). Declare it in .engine/schema/core/relationships.sysml, or fix the spelling."
+                ));
+            }
+        }
+    }
+    GuardReport { name: "marker-vocabulary", scanned, warnings: Vec::new(), violations }
+}
+
+/// Test-only re-exports of the pure marker scanners.
+#[doc(hidden)]
+#[must_use]
+pub fn markers_used_for_test(text: &str) -> Vec<(String, usize)> {
+    markers_used(text)
+}
+#[doc(hidden)]
+#[must_use]
+pub fn markers_declared_for_test(texts: &[String]) -> HashSet<String> {
+    markers_declared(texts)
+}
+
 // ── retro-backlog guard (a retro finding that terminates in prose) ────────────────────────────────
 
 /// Markers a retro uses to name something it learned.
@@ -1288,8 +1412,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 22] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 23] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1310,6 +1434,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "process-skill" => Some(process_skill(root)),
         "requirement-rootedness" => Some(requirement_rootedness(root)),
         "decision-rationale" => Some(decision_rationale(root)), // hard (D0103)
+        "marker-vocabulary" => Some(marker_vocabulary(root)), // hard (D0133/issue077) — an undeclared marker silently blinds a control
         "attestation-substance" => Some(attestation_substance(root)), // hard (D0130/issue083) — a confirmation must attest something
         "duplicate-identity" => Some(duplicate_identity(root)), // hard (D0129/issue074) — concurrent allocation lands green without it
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
