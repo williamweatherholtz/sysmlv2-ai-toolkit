@@ -1468,8 +1468,77 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 23] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 24] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity"];
+
+/// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
+/// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
+/// commands already probe for, whereas a script is committed source that must exist to be referenced.
+const HOOK_SCRIPT_EXTS: [&str; 6] = ["py", "sh", "ps1", "js", "mjs", "rb"];
+
+/// WARNING-level: a hook command referencing a script that DOES NOT EXIST (issue093).
+///
+/// Why this guard exists, and why it is a guard rather than a reminder (D0047): migrating the in-loop
+/// gates into the binary (D0134) deleted `.engine/tools/stop_gate.py`, and `.claude/settings.json` got
+/// the replacement — but `.claude/settings.local.json` ALSO declared a Stop hook pointing at the
+/// deleted script. Claude Code MERGES hooks across settings files, so both fired and the stale one
+/// failed on every single turn end. It survived because `settings.local.json` is GITIGNORED: it never
+/// appeared in `git status`, never in a diff, and the doc-sync sweep covers the tracked surface only.
+/// So the delete-completely discipline had a blind spot exactly where hook wiring lives.
+///
+/// WARNING, not hard-blocking, and the level is the point: this config is machine-local and partly
+/// gitignored, so CI cannot see it and one contributor's personal hook must never block another's
+/// commit. A warning still surfaces on every `keel guard` — including inside the Stop hook itself,
+/// which is what makes a sibling hook's breakage self-reporting rather than something the human has to
+/// notice in scrollback.
+fn hook_config_integrity(root: &Path) -> GuardReport {
+    let mut warnings = Vec::new();
+    let mut scanned = 0usize;
+
+    for rel in [".claude/settings.json", ".claude/settings.local.json"] {
+        let path = root.join(rel);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue; // absent is fine — neither file is required
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+            warnings.push(format!("{rel}: not valid JSON — every hook declared here is silently inert"));
+            continue;
+        };
+        let Some(events) = json.get("hooks").and_then(serde_json::Value::as_object) else {
+            continue;
+        };
+        for (event, groups) in events {
+            for group in groups.as_array().into_iter().flatten() {
+                for hook in group.get("hooks").and_then(serde_json::Value::as_array).into_iter().flatten() {
+                    let Some(cmd) = hook.get("command").and_then(serde_json::Value::as_str) else {
+                        continue;
+                    };
+                    scanned += 1;
+                    for tok in cmd.split([' ', '"', '\'', '\t', ';', '|', '&', '(', ')']) {
+                        let t = tok.trim();
+                        if !Path::new(t).extension().is_some_and(|e| {
+                            HOOK_SCRIPT_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))
+                        }) {
+                            continue;
+                        }
+                        // Only repo-relative references are checkable; an absolute path may live on a
+                        // machine we are not inspecting, so claiming it is missing would be wrong.
+                        if Path::new(t).is_absolute() {
+                            continue;
+                        }
+                        if !root.join(t).exists() {
+                            warnings.push(format!(
+                                "{rel}: {event} hook references `{t}`, which does not exist — that hook FAILS every time it fires (issue093)"
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    GuardReport { name: "hook-config-integrity", scanned, warnings, violations: Vec::new() }
+}
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1497,6 +1566,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
+        "hook-config-integrity" => Some(hook_config_integrity(root)), // warning-only (D0047/issue093) — a hook pointing at a deleted script
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
         "engine-lint" => Some(engine_lint(root)), // hard import-check + warn missing-id (D0112 phase 1, kernel-free)
         "doc-sync" => Some(doc_sync(root)), // WARNING-level member of GUARD_NAMES (D0113) — definitional change w/o doc update

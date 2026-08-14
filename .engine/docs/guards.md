@@ -1,7 +1,8 @@
 # Guard reference
 
-`keel guard` runs **23** forward guards, kernel-free. **18 hard-blocking** (exit ≠ 0 on any violation)
-and **5 warning-only** (visible every commit, never blocking).
+`keel guard` runs **24** forward guards, kernel-free. **18 hard-blocking** (exit ≠ 0 on any violation)
+and **6 warning-only** (visible every commit, never blocking). `keel version` reports this split
+computed from the enforced set, so it cannot drift from what actually runs.
 
 Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands.
 
@@ -39,6 +40,7 @@ Visible on every commit, never blocking — the D0102 *promote-once-low-noise* p
 | `priority-inversion` | A ready item outranking work that resolves a ≥ High Issue (D0130/issue084) |
 | `retro-backlog` | A retro naming a finding with no tracked item and no stated reason (D0131/issue085) |
 | `doc-sync` | A staged definitional change with no co-committed doc update (D0113) |
+| `hook-config-integrity` | A `.claude/settings*.json` hook command referencing a script that does not exist, so it fails every time it fires (D0047/issue093). Warning-level because this config is machine-local and partly gitignored: CI cannot see it, and one contributor's personal hook must never block another's commit |
 
 ## Non-blocking burndown (runnable, never gating)
 
