@@ -1102,4 +1102,16 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcHookConfigIntegrity to issue093;
+
+    #ProcessDefect part issue094 : Issue {
+        :>> id = "e0940094-0094-4e94-9094-516273840094";
+        :>> title = "Host/shell adaptation errors recurred three times in one sitting — and the prior retro wrongly concluded the class was not automatable";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THREE instances in one sitting, the class of the now-closed issue065 (CLAUDE.md §6 calls host/shell adaptation the #1 avoidable-friction class): (1) an MSYS path `/c/Users/.../proj/.engine/...` handed to Windows Python, which cannot resolve it — I reported the resulting FileNotFoundError as a finding ('keel init ships no relationships.sysml') before checking my own path form, so a probe error was briefly published as a product defect; (2) `/tmp/out.txt` written by bash then read by Windows Python, same failure; (3) PowerShell's `&` call operator embedded in a bash command, producing `syntax error near unexpected token '&'`. Cost: one false finding stated to the human, one wasted round trip, and a stalled command. WHY THIS IS AN ISSUE AND NOT JUST NOISE: sprint 263's retro examined instance (2), concluded the class was 'NOT automatable: the defect lives in throwaway diagnostic shell commands, not in any committed artifact, so a control could only be a reminder, which D0047 rejects', and recorded that a third instance should become an INDICATOR. That reasoning is WRONG, and the error is worth recording because it would have permanently mis-dispositioned a recurring defect: it assumes a control must inspect ARTIFACTS, whereas the in-loop gates established by D0134 inspect TOOL CALLS — and a shell command IS a tool call, available for inspection before it runs. PROPOSED RESOLUTION (dcShellAdaptationGate): a PreToolUse check on Bash commands detecting the two observed forms — an MSYS-style `/c/...`, `/tmp/...` or `/mnt/...` path passed as an argument to a Windows executable, and PowerShell-only syntax (a leading `&` call operator, `$env:`, backtick line continuation) inside a bash command — emitting an ADVISORY message naming the fix (`cygpath -w`, or use the PowerShell tool). ADVISORY, not blocking, deliberately: a heuristic that blocks every shell command is precisely the issue076/issue081 dynamic where an over-strict gate trains its actor to disable it, and unlike marker-vocabulary or duplicate-identity this check cannot be exact. GENERAL LESSON: 'not automatable' is a conclusion that deserves the same scepticism as any other computed claim — here it was reached by assuming the wrong inspection surface, and the correct surface was already in use elsewhere in the same system.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcShellAdaptationGate";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcShellAdaptationGate to issue094;
 }
