@@ -374,6 +374,7 @@ package EngineBacklog {
         part rustS5CLIDoDR9 : TestResult { :>> id = "4533d9b1-25be-4bbe-848d-8862f72d567d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
         part rustS5CLIDoDR10 : TestResult { :>> id = "18e83796-de8a-435b-94b2-1a7735d5a671"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
         part rustS5CLIDoDR11 : TestResult { :>> id = "140c5a5e-29a8-4693-97d5-2c8af9d50d55"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part rustS5CLIDoDR12 : TestResult { :>> id = "de6c223d-9c5e-4a52-bcce-4c8919c828cc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
         verification rustS5CLIRetroGate : Test { :>> id = "12345bcd-6789-4dea-f012-3456789abcde"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 5 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
         verification rustS6OrientDoR : Test { :>> id = "23456cde-789a-4efb-0123-456789abcdef"; :>> method = VerificationMethod::inspect; :>> procedureText = "orient subcommand approach agreed: reads .tracking/state.sysml cursor + backlog.sysml outstanding/ready; outputs current phase, ready items, suspect items; exit 0; DoD accepted"; }
         part rustS6OrientDoRR1 : TestResult { :>> id = "f0e1d2c3-b4a5-4f6e-7d8c-9b0a1f2e3d4c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "38609e7"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
@@ -398,6 +399,7 @@ package EngineBacklog {
         part rustS7QueryAlignDoDR7 : TestResult { :>> id = "a8365374-a732-4a04-b607-09badabb3fac"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "464d71b"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         part rustS7QueryAlignDoDR8 : TestResult { :>> id = "1df8280d-3534-4e42-a787-0bd154b3309b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
         part rustS7QueryAlignDoDR9 : TestResult { :>> id = "ecd0a8ba-391e-4918-af61-6668d652c72a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part rustS7QueryAlignDoDR10 : TestResult { :>> id = "fc19f92a-d42e-4237-bec9-84b61b6aaf20"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
         verification rustS7QueryAlignRetroGate : Test { :>> id = "c7d8e9f0-a1b2-4c3d-be4f-5a6b7c8d9e0f"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 7 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
         verification rustS8runtimeParserDoR : Test { :>> id = "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d"; :>> method = VerificationMethod::inspect; :>> procedureText = "approach agreed: Succession.is_ordering_only field added (D0025); indexer.rs AST-based extractor replaces orient.rs text-scan; orient::compute wired to indexer; 8 orient BDD scenarios green; parity verified (60 done, same ready list); DoD accepted"; }
         part rustS8runtimeParserDoRR1 : TestResult { :>> id = "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "276c833"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
@@ -421,6 +423,7 @@ package EngineBacklog {
         part rustS9writeApiDoDR6 : TestResult { :>> id = "35ed6001-a3b4-4783-9f44-b29656b84759"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "447effd"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         part rustS9writeApiDoDR7 : TestResult { :>> id = "f6bc7669-44aa-40c6-8a80-8f3fb3cacfd9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
         part rustS9writeApiDoDR8 : TestResult { :>> id = "5932cfe8-40d9-4a5a-80de-282002870f5b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part rustS9writeApiDoDR9 : TestResult { :>> id = "258923cb-b830-4e24-8f04-49d906453589"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
@@ -498,6 +501,7 @@ package EngineBacklog {
         part writeApiDoDR6 : TestResult { :>> id = "be5d1fb0-241e-438b-9f44-b296663cd465"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "447effd"; :>> judgedAt = "2026-06-20"; :>> judgedBy = "claudeOpus"; }
         part writeApiDoDR7 : TestResult { :>> id = "a8451321-6396-45cf-8506-4c8bf240f8c0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
         part writeApiDoDR8 : TestResult { :>> id = "9e594572-580a-4e20-b554-6d4593f8d8da"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part writeApiDoDR9 : TestResult { :>> id = "7b163038-bd59-4529-b864-de6d2fa24bf0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
         verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
         part toolchainWatchDoDR1 : TestResult { :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "aba9e6f"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
@@ -537,6 +541,7 @@ package EngineBacklog {
         part rustToolchainFixDoDR10 : TestResult { :>> id = "056e0ce1-4f81-4c68-9778-efbfcc41c124"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f4fc380"; :>> judgedAt = "2026-06-29"; :>> judgedBy = "claudeOpus"; }
         part rustToolchainFixDoDR11 : TestResult { :>> id = "854a5ec4-e645-449d-a62e-dc2e5f554d5a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9391588"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "claudeOpus"; }
         part rustToolchainFixDoDR12 : TestResult { :>> id = "c594f716-4894-4b9c-925a-e9d732eed16c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part rustToolchainFixDoDR13 : TestResult { :>> id = "d5becbdd-b87e-4f38-81b8-d246d5a8b1f7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
         verification deliverySkillsDoD : Test { :>> id = "b2c3d4e5-f607-4819-ab1c-2d3e4f506172"; :>> method = VerificationMethod::inspect; :>> procedureText = "build skill (cargo build + validators) and test/verify skill (cargo test + BDD + parity) created under .engine/skills/ and registered in skills-registry.sysml; each carries purpose/triggerCondition/writePolicy; repo-push reconciled to the main-only policy (issue009); doc-sync complete; validate_all green"; }
         part deliverySkillsDoDR1 : TestResult { :>> id = "c3d4e5f6-0718-492a-bc2d-3e4f50617294"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "14b7050"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
         verification auditSkillDoD : Test { :>> id = "c3d4e5f6-0718-492a-bc2d-3e4f50617283"; :>> method = VerificationMethod::inspect; :>> procedureText = "architectural-critique SKILL.md created under .engine/skills/ and registered; encodes CAE (Goal->Strategy->Evidence) + GQM metric checks (gate-coverage, satisfy-coverage, deliverable-parity) + ATAM scenario walkthrough; critique process rewritten so findings are recorded as tracked Issue/Decision instances (not a prose doc); validate_all green"; }
@@ -886,6 +891,7 @@ package EngineBacklog {
         part serveItemActionsDoDR1 : TestResult { :>> id = "51e2f2f1-11d0-4e24-8900-afebc93dc440"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7642f1c"; :>> judgedAt = "2026-06-23"; :>> judgedBy = "claudeOpus"; }
         part serveItemActionsDoDR2 : TestResult { :>> id = "cf80c4c5-5420-434a-ad7a-12ae10f7d237"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "edd7b75"; :>> judgedAt = "2026-06-25"; :>> judgedBy = "claudeOpus"; }
         part serveItemActionsDoDR3 : TestResult { :>> id = "31f71e44-504f-4cde-a3d7-ab8e63543d71"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cb5720e"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "claudeOpus"; }
+        part serveItemActionsDoDR4 : TestResult { :>> id = "ed6647e7-c81e-4b83-95cc-50eacc2b59de"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "1f1cd66"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
 
         // ── D0095 deferred rename (its own gated D0067 migration) ──
         action engineRename; // D0095: rename sysmlv2 -> keel (binary/package/docs/scaffold/CLAUDE.md) as a gated bulk migration.
