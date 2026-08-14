@@ -1,522 +1,184 @@
 # CLAUDE.md — how to work in this repo
 
-This repo **is a work-tracking engine** built on SysML v2 text files. It tracks the work of
-building things — and is being built using its own discipline. Read this before doing anything.
+**keel** is a work-tracking engine whose truth is plain-text SysML v2 files in git and whose state is
+**computed**, never stored. It tracks the work of building things, and is built using its own discipline.
 
-> **Status: sprint discipline in force (D0064).** The tracking engine exists and is the
-> authority (D0048): the Rust toolchain computes views (`keel orient`/`whats-next`/`suspect`)
-> and the write API records facts (`append-result`/`add-task`/`append-gate-result`/`apply-review`); four layer
-> validators gate every change. (The indexer and GUI don't exist yet; neither is needed for the
-> discipline.) **All substantive work — CHANGE, delivery, and engine work — goes through a sprint**
-> (refine→standup→implement→review→closeOut→retro); only trivial one-off edits are exempt, and
-> triage-first is mandatory (§3). Full per-interaction enforcement (the no-sprint guard + a triage
-> hook) is sprint30 (issue020); until then some rules bind by you + convention + the validators.
+Two models, never conflated: the **engine model** tracks the work; the **deliverable** is what the work
+produces. The deliverable's domain vocabulary never enters the engine.
 
----
+- **`.engine/`** — the reusable engine: schema, workflows, processes, skills, rules, decisions. Infrastructure
+  (like `.git/`) and this project's deliverable. Committed.
+- **`.tracking/`** — instance data from running the process on *this* project (needs, requirements, work
+  items, decisions, test results). Committed here because the self-build's history is its evidence;
+  downstream projects choose their own policy. See `.tracking/README.md`.
 
-## 1. What you're looking at
-
-- **`.engine/`** — the engine: the reusable schema, workflow definitions, contracts, processes,
-  skills, and decisions. This is infrastructure (like `.git/`) and the deliverable of this
-  project. Committed.
-- **`.tracking/`** — instance data that falls out of running the process on *this* project
-  (personas, needs, requirements, work items, decisions, test results, workflow state).
-  **Committed in THIS repo** (the self-build's construction history is part of its evidence;
-  recorded 2026-06-11). Downstream projects choose their own tracked-vs-ignored policy.
-  See `.tracking/README.md` for layout + authoring rules.
-- **Two models, never conflated:** the *engine model* tracks the work; the *deliverable* is
-  what the work produces. The deliverable's domain vocabulary never enters the engine.
-
-Authoritative reading order: this file → `.engine/README.md` → `.engine/decisions/`
-(0001–0018) → the critiques in `docs/design-history/`. (The original design spec
-`docs/design-history/2026-06-04-process-model-design-retired.md` is retired —
-superseded in full by decisions 0001–0018; decisions win.)
-**Orient** (where things stand / what's next) is never read from prose — compute it.
-The **Rust toolchain is the sole authority (D0048; query.py retired at M4/D0074)**, no kernel required:
-`keel orient [ROOT]` (JSON) / `keel whats-next [ROOT]` (ready list).
-`orient` suspect covers BOTH .sysml drift AND deliverable-source drift (D0050): a Rust
-verification task (listed in `.engine/deliverable-manifest.txt`) is suspect when the
-source changed since it was verified — re-verify at HEAD to clear it. For REPRODUCIBLE
-`method=test` drift, `keel reverify [--all-drift | --task NAME]` (D0101) re-runs the gate
-declared in `.engine/contracts/reverify.toml` and, on green, stamps a fresh judged-at-HEAD
-`TestResult` per drift task (honest — never fabricated; judgment methods stay manual).
-Views are formally DECLARED (D0056/D0057, `.engine/views/viewpoint-registry.sysml`) and the
-Rust tooling computes them: `keel orphans` renders the orphans viewpoint (needs/requirements/
-tasks/issues missing required edges); `keel view <name>`, `audit`, `attestation-coverage`,
-`governing-version`, `reprocess-candidates`, `suspect`, `concern-coverage` (D0057/issue035 — which
-declared viewpoint concerns are served vs planned), `dispositions` (D0092 — which ≥Medium findings
-carry a typed ACT/ACCEPT-RISK/DISMISS verdict vs undispositioned), `sitting-coverage` (D0049/issue040
-— which delivery sprints have a covering per-sitting review via `#Covers` vs await one), `rootedness`
-(D0098/D0099 — the charter-source burndown + the `#Capability`-without-Need hard-gate set) and
-`tier-satisfaction` (D0098 — the downward burndown: are Needs decomposed into SRs and SRs verified, a
-leading indicator of insufficient implementation) are the other computed lenses
-(`suspect` also flags elements with an unresolved failing critique — `critique_suspect`, D0086). Any declared view
-renders as an interactive artifact via `keel render <view> --mode graph|table|review` (D0086;
-the `diagram` is the whole-model graph preset), and a human review round-trips back as linked
-critiques via `keel apply-review` (the review viewpoint + render skill). Human-digestible
-AGGREGATE scorecards (coverage %, critique %, traceability, debt, volatility, flow) come from
-`keel report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`
-(D0087, the `report` viewpoint; health vs opportunity; `--trend` = git-derived sparklines; `friction`
-is the D0054/issue029 write-path-vs-spreadsheet benchmark). (The SysML
-viewpoint-registry stays the concern-coverage index.)
+**Your response contract is not in this file.** It lives in the output style
+`.claude/output-styles/keel.md` (system prompt, D0130) — parse-first routing, no prose state,
+verify-don't-assert, never fabricate an attestation, correct-at-the-root. Enforcement is the `Stop` hook.
+Don't restate those rules here: one canonical home per fact (D0105).
 
 ---
 
-## 2. How to interpret the architecture (the invariants)
+## 1. Invariants
 
-1. **Text is truth; everything derivable is a view.** Author only *irreducible decisions*:
-   atomic items, typed edges, test results, recorded judgments. **Never author a document,
-   matrix, baseline, ICD, BOM, or report** — those are *computed views*. Test: *can it be
-   regenerated from other authored facts + git?* Yes → it's a view; don't store it.
-2. **Atomic items, typed edges only.** Edge algebra: `:>` (specialize/derive), `satisfy`,
-   `verify`, `allocate`, `dependency`, `supersede`. No checklist blobs inside items.
-3. **Identity:** every item has an immutable `id` (UUID) — *items never collide on name*.
-   `title` is an authored human string (may duplicate). `displayLabel` is a computed view.
-4. **Capture decisions even when they cause no action.** "We won't do X" is a first-class
-   `Decision` that `supersede`s the need. Scope = superseding Decisions, not a separate type.
-5. **`schema/core` is frozen.** Changes to schema or process definitions are architectural and
-   go through the Change Request path (§4).
-6. **Reference procedure; don't embed it.** Record what *is* — facts, conditions, typed edges;
-   let the referenced, modular process decide what to *do*. Anything that names an action,
-   verdict, or sequence — `ready`, `blocked`, `done`, `needs-review`, execution order — is a
-   *computed view* or a *reference*, never an authored field. (A phase's gate/DoD = its
-   `verify`-linked Tests passing; execution order/parallelism = the dependency DAG, computed
-   from the `succession` graph + typed edges. "Test" is the universal verifiable condition,
-   distinguished by `method` and `verify` target — so gate-checks and critics are Tests too.)
-   **Materialized views are allowed** — a derived answer (status, trace matrix, baseline) MAY
-   be cached/rendered for legibility, performance, or tool interop, *provided* it is clearly
-   marked as derived (`#View`) and regenerable from authored facts + git. Materializing a view
-   is not authoring truth; only *irreducible* facts and recorded judgments are authored.
-6. **Requirement vs constraint vs indicator (the measure spectrum, D0088).** A **constraint** is an
-   executable true/false predicate over the model — our **guards** ARE the engine's constraint layer
-   (SysML-v2-style "requirements-as-evaluable-constraints," realized as CI-enforced Rust predicates);
-   the §2 invariants are constraints stated in prose + enforced by guards. A **requirement** is a
-   constraint elevated to a verified stakeholder contract (Need/SystemRequirement + satisfy/verify).
-   An **indicator** is a *monitored* measure with no enforced threshold — a first-class `Indicator`
-   item (D0089) that informs by DIRECTION (goal), viewed via `keel indicators [--trend]`. The
-   indicator set is the CANONICAL monitored-measure watchlist (D0090); a single shared computation
-   (`metric_value`) feeds both the indicators and the reports, so each scalar metric is computed once,
-   and reports *render* the indicators (+ point-in-time structure) rather than re-defining the metrics.
-   Datapoints accumulate in a `Measurement` BANK: pulled/manual observations via `record-measurement`,
-   and computed readings via `keel snapshot-indicators` (a recorded *observation*, not a cache —
-   D0091, a controlled compute-don't-store exception). `keel indicators` is bank-first + emits the
-   full series. Its data
-   arrives by a measurement METHOD: `computed` (objective, repo-derived — series via the report/trend
-   engine, no stored datapoints), `pulled` (objective, external API/scraper — recorded `Measurement`
-   datapoints via `keel record-measurement`), or `manual` (subjective, e.g. a survey — recorded).
-   `Measurement`s are irreducible point-in-time observations (authored, with provenance) for pulled/
-   manual; computed series recompute from the repo. When a metric's "good enough" boundary can't yet
-   be defensibly set, it stays an **indicator** — promote to a requirement/guard only when a justified
-   boundary emerges (D0088; avoid the Goodhart trap). Parametric constraints (mass/power budgets, MoEs)
-   are *deliverable-domain* (D0054), not modeled in the work/process engine.
-7. **Dual surface, one truth (D0093).** The **CLI/JSON is the authority + automation substrate** (the
-   AI agent's surface — every fact authored via the write API, every state computed by the Rust
-   toolchain); **HTML is the human's ergonomic oversight lens** (orient/review/decide). HTML NEVER
-   stores truth — it renders computed `#View`s (`diagram`, `render`, `report`, `orient --html`) and
-   wraps the write API (`apply-review`); it never becomes a second store or a second authority. The
-   engine **spins up** on a new project via `keel init DIR` (binary-embedded; engine architecture
-   decisions ship as read-only `.engine/reference/`, the new project authors its own fresh), and a
-   newcomer is onboarded by the guided, project-based `introduction` skill (D0093).
+1. **Text is truth; everything derivable is a view.** Author only *irreducible* facts — atomic items,
+   typed edges, test results, recorded judgments. **Never author a document, matrix, baseline, ICD, BOM,
+   or report.** Test: *can it be regenerated from other authored facts + git?* Yes → it's a view.
+   Materialized views are allowed if marked `#View` and regenerable.
+2. **Atomic items, typed edges only.** Edge algebra: `:>` (specialize/derive), `satisfy`, `verify`,
+   `allocate`, `dependency`, `supersede`. No checklist blobs inside items.
+3. **Identity is an immutable UUID `id`.** Items never collide on name. `title` is a human string and may
+   duplicate; `displayLabel` is computed.
+4. **Capture decisions even when they cause no action.** "We won't do X" is a first-class `Decision` that
+   `supersede`s the need. Scope = superseding Decisions, not a separate type.
+5. **`schema/core` is frozen.** Schema and process-definition changes go through Change Request (§3) and
+   need explicit human sign-off.
+6. **Reference procedure; don't embed it.** Record what *is* — facts, conditions, typed edges. Anything
+   naming an action, verdict, or sequence (`ready`, `blocked`, `done`, execution order) is computed or a
+   reference, never an authored field. A phase's gate = its `verify`-linked Tests passing.
+7. **Requirement vs constraint vs indicator (D0088).** A **constraint** is an executable predicate — the
+   guards *are* the constraint layer. A **requirement** is a constraint elevated to a verified stakeholder
+   contract (Need/SystemRequirement + satisfy/verify). An **indicator** is monitored with no enforced
+   threshold (`keel indicators`). When a "good enough" boundary can't be defensibly set, it stays an
+   indicator — promote only when a justified boundary emerges (avoid Goodhart).
+8. **Dual surface, one truth (D0093).** CLI/JSON is the authority and automation substrate; HTML is the
+   human's oversight lens. HTML never stores truth — it renders `#View`s and wraps the write API.
 
 ---
 
-## 3. The interaction loop ("main")
-
-> **The RESPONSE CONTRACT is not defined here (D0130).** Its canonical home is the output style
-> `.claude/output-styles/keel.md` (`outputStyle: keel`), which lands in the **system prompt** —
-> a strictly stronger layer than this file, which is injected as ordinary user-turn context and was
-> demonstrably bypassed four times (issue082–085). That file governs the `Parsed:` block, no-prose-state,
-> verify-don't-assert, never-fabricate-an-attestation, and correct-at-the-root. **Do not restate those
-> rules here** — one canonical home per fact (D0105). This section defines the **ROUTES** the contract
-> refers to. Enforcement is the `Stop` hook (`.engine/tools/stop_gate.py`): it runs `keel validate` +
-> `keel guard` at the turn boundary and blocks the turn while the model is dishonest — the only layer
-> that enforces rather than instructs, because the *harness* executes it.
-
-There is no executable "main" yet; **this is the main.** Do **not** assume a request
-means "do work in the current phase." **Classify every request first** — by *what it
-changes* — then follow that route:
+## 2. Orient — never read state from prose
 
 ```
-request
-  ├─ changes a workflow / phase / gate / schema definition ........ CHANGE    → §3a
-  ├─ produces the active phase's typed artifact (tracked work) ..... EXECUTE   → §3b
-  ├─ records ONE atomic fact (decision / test result / issue) ...... RECORD    → §3c
-  ├─ asks for a computed answer (status, trace, stale set, a doc) .. VIEW      → §3d
-  └─ asks where things stand / what is next ..................... ORIENT    → §3f
+keel orient [ROOT]        # in-progress sprints + ready/suspect frontier + non-blocking burndown
+keel whats-next [ROOT]    # the ready list, in PRIORITY order (declaration order IS priority, D0052)
 ```
 
-If a request spans categories, **split it** and route each part, and flag anything that
-doesn't cleanly map (§3). Engine work (building the engine's own runtime/tooling) is routed
-by *what it changes* (schema/process ⇒ CHANGE §3a; otherwise ⇒ EXECUTE §3b) and goes through
-a sprint; only trivial one-off edits skip a sprint.
-When unsure of the category, say so and ask rather than defaulting to EXECUTE.
+The AI **auto-follows** the ranked frontier (D0052). Do not ask which ready item to work. Pause only for
+a content gate (frozen schema, a direction Decision) or an empty frontier.
 
-**Recurring-or-one-time check (D0040 — mandatory before EXECUTE or VIEW).**
-After classifying, ask: *will this task recur?* If yes and no skill exists → treat
-as CHANGE first: create/update a skill that encodes the approach, then execute using
-it. If clearly one-time → execute directly. If ambiguous → ask the user.
-
-| Example request                       | Recurring? | Route                                    |
-|---------------------------------------|------------|------------------------------------------|
-| "I'm on Windows"                      | Yes        | Permanent fact → CLAUDE.md §6 or memory |
-| "Make an HTML status report"          | Recurring  | CREATE skill first (status-report)       |
-| "Review sprint transcript"            | Recurring  | Existing skill: sprint-review            |
-| "Deploy to GitHub"                    | Recurring  | Existing skill: repo-push                |
-| "Rename this one variable"            | One-time   | Execute directly                         |
-| "Generate the architecture diagram"   | Ambiguous  | Ask: recurring or one-time?              |
-
-This rule exists because every recurring task executed without a skill leaks process
-knowledge into conversation history, where it cannot be enforced, reviewed, or
-improved. Skills are the durable encoding of how we do things.
-
-**Strict process-boundedness — PARSE first, on EVERY request (D0106, reframes D0064).** The AI's
-role is: **parse/interpret input → route each part to a defined process (DEFINE a new process when
-none fits) → execute** (in parallel where the dependency DAG allows), leveraging skills. **No action
-is ever proposed or taken that is not tied to a defined process.** Open **every** response with a
-visible, enumerated **`Parsed:`** decomposition — one line per part, each **labelled by kind**
-(`TRIVIAL` / `CHANGE` / `EXECUTE` / `RECORD` / `VIEW` / `ORIENT`) with its route, e.g.:
-
-> **Parsed:** 1. `TRIVIAL` — rename process X to Y. 2. `CHANGE` — add test A to block ii of process Y → §3a.
-
-Then act. Rules: **(a)** when a non-trivial part maps to no existing process, **DEFINE the process**
-(a process definition is the AI's creative output — not an ad-hoc action); it runs through the
-discipline like any CHANGE. **(b)** Only **strictly-trivial** one-off edits (a typo, a single rename,
-one doc line) use the fast-path — and are still **labelled `TRIVIAL`** in the parse so the exemption
-is visible, never silent. **(c)** **Human sign-off is an explicit process STEP** — a declared
-`method=confirmation` gate whose passing `TestResult` carries the attestation (D0016/D0066); **never
-inferred** from a general instruction. Never infer-and-act silently (recording a confirmation never
-given, or doing work with **no sprint/process** — issue020). The `engine-triage` skill encodes this;
-it is invoked (and fired every turn by the `UserPromptSubmit` hook) at the start of every request.
-
-**§3a — CHANGE.** Never freelance an edit to a workflow / phase / gate / schema. Route
-through **Change Request** (§4): state the change + rationale, research alternatives if
-non-trivial, get **explicit human acceptance**, then apply (create / `supersede` items),
-validate green (§5), record a `Decision`, and commit `CR:`. `schema/core` is frozen
-(human sign-off required); the Change Request workflow itself is frozen (out-of-band
-Decision only — §4). A tooling change that alters the *meaning* of a computed view
-(what counts as done / ready / suspect / satisfied) is CHANGE too — it shifts process
-behavior as surely as editing a gate.
-
-**§3b — EXECUTE.** The core loop:
-1. **Orient** — run `keel orient [ROOT]` to
-   compute in-progress sprint ceremony status + ready/outstanding backlog frontier.
-   (No cursor file — orientation is fully computed from delivery file TestResults, D0045.)
-2. **Act within the appropriate phase** — produce its defined artifact(s) as items + edges;
-   don't invent artifacts the phase doesn't call for. If the request targets a *different*
-   phase than the current frontier, **surface the mismatch** — don't silently jump;
-   switching work items is itself a recorded `Decision`.
-3. **Record back** the items/edges + a recorded judgment (what, why) with authorship +
-   timestamp into `.tracking/`. You are a task tool: you execute the phase, you don't
-   redefine it.
-4. **Gate** — exit only when the phase's gate passes (trace complete, verification criteria
-   present, critics clear, decision recorded).
-
-**§3c — RECORD.** Author one atomic item (`Decision` / `TestResult` / `Issue`) + a
-judgment. A "won't do / reduce scope" is a `Decision` that `supersede`s the Need — capture
-it even though it produces no action. Never a document blob.
-An **`Issue` must be TRIAGED** (issue-resolution process/skill, D0077/D0078): give it a
-`#Resolves` edge from a resolving **action** (create one if none) or a mooting **Decision** —
-`#Resolves dependency from <resolver> to <issueNNN>;`. Resolution is then COMPUTED (resolved
-iff the resolver is done/accepted; `keel open-issues` / `orient` open_issues), never a prose
-"RESOLVED" note; `keel guard issues` fails on an untriaged Issue. When a Decision moots an
-Issue, record `#Resolves` from the Decision (for a Need/Requirement, `supersede`) — not prose.
-
-- **Confirmation results require explicit human sign-off.** A `method=confirmation`
-  verification *is* a recorded human attestation — its evidence is the human's word.
-  Record it only on the human's explicit confirmation of that *specific* claim; never infer
-  it from an instruction to "do the sign-offs," from the underlying work being done, or from
-  your own judgment. (test / analysis / inspection / demonstration are recorded from their
-  own evidence; confirmation's evidence is the attestation itself, so you must hold it.)
-  A sixth method, `critique` (D0080), records an antagonistic lens-tagged verification of a
-  tracked element by an *independent* critic; its findings become severity-carrying `Issue`s,
-  and any finding ≥ Medium needs a human disposition (run the `element-critique` skill). The
-  REQUIRED lenses per element type are a DECLARED, downstream-overridable policy
-  (`.engine/contracts/critique-policy.toml`, D0097 — default Core-3: Need/SystemRequirement →
-  completeness/correctness/testability, Decision → completeness/correctness/feasibility); the
-  lens vocabulary itself (`CritiqueLens`) is the generic requirement-quality canon in schema/core.
-  `keel critique-policy` shows the active policy; `keel critique-coverage` + `guard critique` read it. A
-  disposition is itself a TYPED recorded judgment (D0092): a `method=confirmation` verification
-  carrying `disposition : DispositionKind` (`act`/`acceptRisk`/`dismiss`), `#Dispositions`-linked
-  to the finding, written via `keel apply-review` — never prose. ACCEPT-RISK/DISMISS close the
-  finding; ACT also needs a `#Resolves` resolver. `keel dispositions` + `assured` read the verdict.
-- **Sprint ceremony is autonomous; the human gate is the per-sitting review (D0049).**
-  Per-sprint closeOut (`method=inspect`) and retro (`method=analysis`) are AI-recorded with
-  NO human sign-off — a sprint closes when its DoD passes, and the retro autonomously turns
-  *avoidable* issues into tracked items. The single human `confirmation` is the per-**sitting**
-  sprint review (a sitting = one work session, ≥1 sprint), where the human accepts the
-  sitting's content (batchable, D0019). Do not pause to confirm individual sprint ends.
-- **Confirm only what tests can't (D0051).** `method=test/inspect/analyze` items are
-  self-evidencing — their automated runs (cargo test, clippy, `keel validate`, `keel
-  guard`) ARE the evidence; never ask a human to confirm a green test. The
-  only confirmation-worthy class is non-test-verifiable judgment — Decisions / direction —
-  where the evidence IS the human's word (D0016). A sitting of all-tested work with
-  inline-accepted decisions has nothing to confirm.
-- **Every recorded fact carries provenance:** *who* (`authoredBy` / `verifiedBy`), *when*
-  (an authored ISO-8601 `*At` timestamp — the attestation time is its own irreducible fact,
-  distinct from the commit date), and the commit it was made against (`verifiedAtCommit`,
-  which also drives suspicion).
-
-**§3d — VIEW.** Compute the answer from authored facts + git and present it. **Never store
-it and never mutate** — status, trace matrix, suspicion / stale set, coverage, ICD, MSRD,
-baseline are all views (§2.1).
-
-**§3f — ORIENT.** Compute from authored facts — `keel orient [ROOT]` returns in-progress sprint ceremony status (which gate each live sprint is pending) + the ready/outstanding backlog frontier + a non-blocking `burndown` block (D0098 — tier-satisfaction pcts, unrooted capabilities, orphan stories; the always-visible "what's incomplete" headline). No cursor file; no mutation.
-
-The six workflows (see the spec for detail):
-**Business** (needs / "what-why") → **Architecture** (Data·Application·Technology / "how") →
-**Delivery** (build/verify, continuous) → **Deploy** (release, config, V&V) →
-**Operate** (field feedback); **Change Request** is cross-cutting.
+Other computed lenses: `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
+`tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
+`governing-version`, `open-issues`, `indicators`. Human-facing scorecards: `keel report
+<assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any declared view
+renders interactively via `keel render <view> --mode graph|table|review`, and a human review round-trips
+back as linked critiques via `keel apply-review`.
 
 ---
 
-## 4. Working rules (sprint discipline in force, D0064)
+## 3. Route every request
 
-- **The write API is the sanctioned write path (Sprint 9, 2026-06-15).** Use `keel append-result`
-  to append a `TestResult` to an action task, `keel append-gate-result` to append a `TestResult`
-  to a ceremony gate (`verification` — the `{gate}R{n}` form, used by sprint closeOut/retro), and
-  `keel add-task` to add a task + `DoD` to an action def, and `keel record decision` (the D0105/D0106
-  RMWX `record` axis, issue054) to scaffold a **proposed** Decision file (auto NNNN + UUID) in one call —
-  all enforce UUID generation and append-only semantics automatically. (`keel record decision` writes the
-  Decision as `status=proposed`; ACCEPTANCE stays a separate explicit human gate — it never fabricates the
-  acceptance event, D0106.) Direct editing of `.sysml` / instance files is still possible but is no longer
-  the primary path; use it only when the write API does not yet cover the operation (schema changes).
-- **Every change to schema or a workflow/process definition MUST:**
-  1. be recorded as a `Decision` **file in `.engine/decisions/`** (a Change Request with its
-     rationale — capture the decision even if small; commit messages and memory are NOT
-     decision records — this lapsed once for ~11 CRs and was a HIGH critique finding), and
-  2. carry its **recorded acceptance** — who accepted, when, at what commit (the Decision
-     file or a confirmation-method DoD is the artifact), and
-  3. **validate green** before commit (§5).
-- **Commit convention:** prefix commits that change process/schema with `CR: <short rationale>`
-  so the audit trail exists before the engine can enforce it.
-- **Doc-sync rides every change (run the `doc-sync` skill):** when you create or change an item
-  type, schema, workflow, process, skill, tool, template, or a superseding decision/convention,
-  run the **`doc-sync` skill** (which deploys `.engine/processes/doc-sync.sysml`) — grep the doc
-  surface and fix every doc claim the change invalidates **in the same commit**. Documentation
-  drift was a recorded HIGH critique finding (2026-06-11).
-- **Every process has a downstream deploying skill (D0059).** A process defined without a skill
-  is inert (applied by vigilance, inconsistently). Each process is deployed by its own skill
-  (doc-sync→doc-sync, architectural-critique→architectural-critique) or a consuming ceremony skill
-  (DoR→sprint-planning, DoD→sprint-closeout, agile-workflow→sprint-*). A process with no deploying
-  skill is an orphan. Cement recurring process work in skills (generalizes D0040).
-- **Corrections become permanent guards (D0047):** a defect or correction found mid-work that
-  reveals a *recurrable* process gap MUST be (1) logged as a tracked `Issue` and (2) given a
-  permanent automated guard (validator / pre-commit check / lint) — never patched silently.
-  Trivial one-off edits (typos, wording) are exempt; the test is *"could this class recur?"*
-  Manual vigilance is not a control (the Sprint 14 → 16 repeat proved it).
-- **Bulk migrations follow the migration process (run the `migration` skill, D0067):** any change
-  that edits the same field/shape across many instances/files (rename/split/drop/add) goes through
-  the gated expand/migrate/contract lifecycle — a committed transform script, a dry-run that
-  reconciles control totals (counts must balance), green at every step, backfill-before-tighten,
-  and historical/recorded data is **never fabricated** (grandfather or backfill-with-recorded-basis).
-  Deploys `.engine/processes/migration.sysml`.
-- **Authoring friction is the #1 risk (D0054).** The benchmark research found the dominant
-  MBSE failure mode is not bad architecture but *adoption friction* — JPL's Europa Clipper
-  partially reverted requirements/architecture to spreadsheets because authoring cost more
-  than they were worth. Our architecture matches flagship practice (JPL OpenMBEE/openCAESAR,
-  NASA NPR 7123.1, DoD ASoT), so we inherit the same risk. **The write path must stay lower-
-  friction than a spreadsheet** — prefer the Rust no-kernel authority + `append-result`/`append-gate-result`/`add-task`
-  write API over hand-editing; if recording a fact is harder than a spreadsheet edit, fix that
-  first (issue015). Friction is a first-class quality, not an afterthought.
-- **Git is a sanctioned tool; changes still need acceptance.** Running git (stage/commit) while
-  implementing *accepted* work needs no separate permission. But green-lighting an
-  *investigation* or *experiment* is not blanket approval of the resulting changes — each CHANGE
-  (process / schema / decision, §3a) needs human acceptance before commit; when unsure, treat it
-  as needing acceptance.
-- **`main` is the canonical branch — work on it directly.** Commit accepted work straight to
-  `main`; the `post-commit` hook pushes every commit. No long-lived feature branches: everything
-  is pushed and merged to `main` only. (This overrides the generic "branch off the default branch
-  first" default — per explicit standing instruction, 2026-06-11.)
-- **NEVER rebase, squash, or force-push — integration must preserve commit ancestry (D0129/issue071).**
-  This is a CONSEQUENCE of the evidence model, not a style preference: a passing `TestResult` counts as
-  done only while its `judgedAgainst` SHA still RESOLVES (`orient.rs`), so an integration step that mints
-  new SHAs orphans the anchors of evidence already recorded. The rewriting machine still finds them as
-  loose objects and reports GREEN while every other clone reports `invalidEvidence` and re-lists finished
-  work as ready — computed state becomes a function of WHICH CLONE ran the query, which negates the
-  engine's core claim. **Rebase and squash are unsafe operations in this repo.** Enforced: squash-merge
-  and rebase-merge are disabled on the remote, `main` blocks force-push and deletion (admins included),
-  `post-commit` integrates a rejected push by MERGE and retries, and `pre-merge-commit` gates merge
-  commits (previously ungated — the riskiest commits in a distributed workflow).
-- **Provenance is never defaulted — bind an identity or the write REFUSES (D0129/issue072+073).** No
-  write path substitutes a default actor: `keel actor set <id>` binds this machine (`.keel/actor`,
-  gitignored, per-machine), `KEEL_ACTOR` sets it per session, or pass `--judged-by`/`--author`/`--by`.
-  Previously thirteen paths defaulted the actor — seven to a named HUMAN — so an AI-driven call that
-  merely omitted the field recorded a human attestation silently, which does not make
-  `confirmation-authenticity` (D0106) fail loudly, it makes it stop meaning anything. Actor KIND is asked,
-  never inferred: an AI is `Actor` with `kind = ActorKind::ai`, never a `Person`. Enroll a new contributor
-  (human or AI) with the **`actor-enrollment` skill**; run a multi-contributor session through the
-  **`distributed-collaboration` skill** (sync → claim → work → land by lane → escalate → close).
-- **Multi-thread coordination (D0108).** When more than one AI thread edits this model concurrently:
-  each item is owned by its `createdBy` (owner-of-record) and only the owner edits its fields; a
-  non-owner may only ADD items + typed edges referencing it, or SUPERSEDE a Decision (new one, D0070) —
-  never overwrite another thread's item in place. Shared files (`issues.sysml`, `backlog.sysml`) are
-  append-or-rebase (`git fetch` before a shared-region edit; never force-overwrite). Conflicting
-  conclusions across threads → record an `Issue`; the HUMAN adjudicates, neither thread silently wins.
-- **The meta-process is frozen:** do not use Change Request to modify the
-  Change Request workflow itself — that goes through a plain Decision + human edit, out of band.
-- **There is NO prose state/handoff document — the model is the only tracker (Decision 0018).**
-  `RESUME.md` was deleted 2026-06-11: it shadow-tracked the backlog (critique finding A7,
-  reproduced once even after the critique). Where things stand is COMPUTED
-  (`keel orient [ROOT]` / `keel whats-next [ROOT]`); what's next is the backlog's ready frontier;
-  how to work here is THIS file; mechanics live in `.tracking/README.md`,
-  `.engine/docs/` and `.engine/decisions/`. Never author a status/worklist/handoff doc —
-  if resuming requires knowledge, it belongs in the model, a Decision, or these docs.
+Classify by **what it changes**, then follow that route:
+
+| Route | When | What to do |
+|---|---|---|
+| `CHANGE` §3a | workflow / phase / gate / schema / rule / the *meaning* of a computed view | Change Request: state change + rationale, get **explicit human acceptance**, apply, validate, record a `Decision`, commit `CR:` |
+| `EXECUTE` §3b | produces the active phase's typed artifact | orient → act within the phase → record items + edges + judgment → exit when the gate passes |
+| `RECORD` §3c | one atomic fact (Decision / TestResult / Issue) | author it + provenance. Never a document blob |
+| `VIEW` §3d | asks for a computed answer | compute and present. Never store, never mutate |
+| `ORIENT` §3f | where things stand / what's next | `keel orient` |
+| `TRIVIAL` | a typo, one rename, one doc line | do it — but label it so the exemption is visible |
+
+Split a multi-part request and route each part. If a non-trivial part maps to no existing process,
+**define the process** — that is the creative output, not an ad-hoc action.
+
+**Recurring-or-one-time (D0040, before EXECUTE or VIEW).** Will this recur? Yes and no skill exists →
+treat as CHANGE: create the skill first, then execute using it. Clearly one-time → execute. Ambiguous →
+ask. Every recurring task done without a skill leaks process knowledge into conversation history, where
+it cannot be enforced, reviewed, or improved.
+
+An **`Issue` must be triaged**: give it a `#Resolves` edge from a resolving action or a mooting Decision.
+Resolution is then computed, never a prose "RESOLVED" note.
+
+Six workflows: **Business** (needs/what-why) → **Architecture** (how) → **Delivery** (build/verify) →
+**Deploy** (release) → **Operate** (field feedback); **Change Request** is cross-cutting and is itself
+frozen (modify it only by out-of-band Decision).
 
 ---
 
-## 5. Validation (mandatory for every `.sysml` change)
+## 4. Working rules
 
-A change is not done until it parses with zero `ERROR:`. **The Rust toolchain is the
-canonical validator for `.tracking/` (D0048) — fast, no JVM:**
+- **The write API is the sanctioned write path.** `keel append-result`, `append-gate-result`, `add-task`,
+  `record decision`, `apply-review`, `actor set`. Direct file editing is for what the API doesn't cover.
+- **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
+  (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
+  Commit messages and memory are **not** decision records.
+- **Commit convention:** prefix process/schema commits `CR: <rationale>`.
+- **Doc-sync rides every change.** Change an item type, schema, workflow, process, skill, tool, or
+  convention → grep the doc surface and fix every claim it invalidates **in the same commit**.
+- **Corrections become permanent guards (D0047).** A defect revealing a recurrable gap must become (a) a
+  tracked `Issue` and (b) an automated control. Manual vigilance is not a control.
+- **Bulk migrations follow the migration process (D0067).** Gated expand/migrate/contract, a committed
+  transform, a dry run reconciling control totals, green at every step. Never fabricate historical data.
+- **Authoring friction is the #1 risk (D0054).** The dominant MBSE failure mode is adoption friction, not
+  bad architecture. If recording a fact is harder than a spreadsheet edit, fix that first.
+- **`main` is canonical; commit directly to it.** No long-lived branches.
+- **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
+  while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
+  **machine-dependent** — green on one clone, not-done on every other. Enforced by remote config and
+  hooks. Integrate by merge.
+- **Provenance is never defaulted (D0129).** `keel actor set <id>` binds this machine, `KEEL_ACTOR` sets
+  it per session, or pass `--judged-by`/`--author`/`--by`. Otherwise the write **refuses**. Actor KIND is
+  asked, never inferred: an AI is `Actor` with `kind = ActorKind::ai`, never a `Person`.
+- **Multi-contributor work (D0108/D0129).** Each item is owned by its `createdBy`; only the owner edits
+  its fields. A non-owner may ADD items and typed edges, or SUPERSEDE — never overwrite in place.
+  `git fetch` before a shared-region edit. Conflicting conclusions → record an `Issue`; the human
+  adjudicates. Run a multi-contributor session through the **`distributed-collaboration`** skill; enroll a
+  contributor with **`actor-enrollment`**.
+- **Confirmation results need explicit human sign-off.** A `method=confirmation` verification *is* a human
+  attestation — record it only on their explicit confirmation of that specific claim, never inferred from
+  an instruction or from the work being done. **Confirm only what tests can't (D0051):** never ask a human
+  to confirm a green test. Sprint closeOut and retro are AI-recorded and autonomous (D0049); the single
+  human gate is the per-**sitting** review.
+- **There is no prose state document (D0018).** Where things stand is computed; what's next is the ranked
+  frontier; how to work here is this file. Never author a status, worklist, or handoff doc — if resuming
+  requires knowledge, it belongs in the model.
+
+---
+
+## 5. Validation — mandatory for every `.sysml` change
 
 ```
-.\target\release\keel.exe validate .                                                          # .tracking/*.sysml — AUTHORITY (no kernel)
-.\target\release\keel.exe check-engine .                                                      # .engine INSTANCE files (decisions/processes/views/registry/template) — KERNEL-FREE semantic ref-resolution (D0112 phase 2/issue067): unresolved type refs + unknown imports. Runs in the hook + CI (SKIP_VALIDATE-proof backstop). The kernel remains only for the DEEPER type-conformance/specialization residual (D0112 phase 3).
-.\target\release\keel.exe guard                                                               # ALL twenty-three forward guards (no kernel) — 18 hard-blocking (exit≠0 on any violation) + 5 warning-only (decision-requirement-link, verification-trace + priority-inversion D0130, retro-backlog D0131, doc-sync D0113); confirmation-authenticity (D0106/issue059) is rule-sourced from confirmationAuthenticityRule
-.\target\release\keel.exe guard <name>                                                        # one guard: actors | acceptance-events | sprint-coverage | ceremony | charter | process-change | issues | viewpoint-renderer | manifest-coverage | critic-independence | process-skill | requirement-rootedness | decision-rationale (D0103) | attestation-substance (D0130) | marker-vocabulary (D0133) | duplicate-identity (D0129) | engine-lint (D0112 phase 1) | decision-requirement-link (warning-only, D0102) | verification-trace (warning-only, D0130) | priority-inversion (warning-only, D0130) | retro-backlog (warning-only, D0131) | doc-sync (warning-only, D0113)  (+ runnable burndown/diagnostics, NOT enforced: assured, critique, critique-rigor, defect-guard-coverage)
-.\target\release\keel.exe reverify --all-drift                                                 # D0101: re-run the .engine/contracts/reverify.toml gate at HEAD; on green, stamp a fresh TestResult per drift-suspect task (honest auto-re-verify; reproducible method=test only)
+keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
+keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
+keel guard             # all 23 forward guards — see .engine/docs/guards.md
+keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary (~0.35s)
+keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
+
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
-model is TRUTHFUL / well-formed / traceable — never that the work is COMPLETE. Completeness (coverage,
-critique-coverage, readiness) is a NON-BLOCKING burndown surfaced in `orient` + run on demand
-(`keel assured`/`keel critique-coverage`); incomplete implementation flagged AS incomplete is honest
-state, never a commit blocker (don't fake a pass, don't block recording true state).
-The eighteen hard-blocking honest-state guards are the Rust authority (D0074 M3/M4; D0098) — the thirteen below
-plus `confirmation-authenticity` (D0106/issue059: an accepted Decision's acceptance event must be HUMAN-judged,
-never AI-fabricated; rule-sourced from `confirmationAuthenticityRule`) and `engine-lint` (D0112 phase 1: the
-first kernel-free port of the `.engine`-instance lints — HARD: every `.engine/decisions/*.sysml` imports
-EngineWork; WARN: tracked instances carry an `:>> id`): `keel guard` (actors
-D0037, acceptance-events D0066, sprint-coverage D0064/issue020, ceremony D0047/issue010+011, charter
-D0068, process-change D0070 keystone, issues D0077/D0078 [every recorded problem accounted for],
-viewpoint-renderer D0056/issue034 [renderers must name a real `keel` command, no retired query.py/
-report.py], manifest-coverage D0050/issue033 [the deliverable-suspicion manifest stays valid — no dead
-task/path entries], critic-independence D0080/issue031 [a critique must be by an INDEPENDENT critic —
-honesty], process-skill D0059/issue036 [no inert process — every `.engine/processes/*.sysml` is named
-by a deploying skill's purpose], requirement-rootedness D0098/D0099/issue047 [a `#Capability`-marked
-user-facing feature must carry a `#DerivedFrom`→Need edge; UNMARKED decision-driven work is exempt —
-the engine is legitimately decision-driven, D0064; the full charter-source balance is the non-blocking
-`keel rootedness` burndown], decision-rationale D0103 [every Decision must carry a SUBSTANTIVE context +
-rationale — the why — not a blank/trivial field; guarantees the decision-record's basis for future
-improvement + reevaluation], confirmation-authenticity D0106/issue059 [an accepted Decision's acceptance
-event must be judged by a human `Person`, never AI-fabricated — the enforceable slice of D0106; the
-conversational parse-first part stays reminder-enforced], and `duplicate-identity` [D0129/issue074: no repeated
-element `id`, item name within a package, `package` name across files, or allocated sequence number (decision/
-sprint) — the class where the ABSENCE of a git conflict is the danger, since two contributors allocating the same
-name in DIFFERENT files produces no conflict and the registry then silently MERGES same-named packages; FORWARD-ONLY,
-so the 18 pre-existing bootstrap duplicates warn (grandfathered, issue080) while anything new fails], and
-`attestation-substance` [D0130/issue083: a PASSING `method=confirmation` must actually attest something — an
-acceptance was authored EMPTY and passed every guard, because acceptance-events + confirmation-authenticity check
-that an acceptance EXISTS and is HUMAN-judged, never that it SAYS anything, and for a confirmation the attestation
-text IS the evidence (D0016). Three independent reasons — empty, a bare actor name (which restates judgedBy rather
-than evidencing it), a stock affirmation, or under 25 chars — because length alone misses a 20-char bare name.
-FORWARD-ONLY: the 9 pre-existing thin attestations warn (grandfathered), anything new hard-fails], and
-`marker-vocabulary` [D0133/issue077: every metadata marker used in a real syntactic position must be DECLARED as a
-`metadata def`. Markers were never type-checked, so a MISSPELLED marker validated clean and silently removed that
-item from the depending control's view — a blind guard reports PASS. `#Verify` alone carries 456 edges and is what
-tier-satisfaction/sr_verified_pct and verification-trace all key on, so one typo would report a DELIVERED requirement
-as unverified. HARD because the check is exact set-membership, not heuristic; string literals are stripped first so
-markers discussed in `procedureText` prose are not false positives]). A WARNING-LEVEL guard, `decision-requirement-link`
-(D0102/issue052), RUNS in `keel guard` every commit but is WARNING-level (visible, never blocks): it flags
-an accepted Decision that names a Need/SystemRequirement in its prose with NO typed edge to it (a governance
-link that should be typed, not prose) — promotable to a hard gate once proven low-noise. A further warning-level guard,
-`doc-sync` (D0113): a staged DEFINITIONAL change (`.engine/schema|processes|
-workflows/`) with NO co-committed doc update (CLAUDE.md / `.engine/docs/` / any README) is flagged — the doc-sync
-discipline made a control (was pure vigilance; doc drift was a HIGH critique finding), heuristic + warning-first,
-promotable once low-noise. `verification-trace` (D0130/issue082) likewise WARNS: a DELIVERED verification (a passing DoD) that names a `SystemRequirement` in its procedureText but never
-`#Verify`-links it — the state where the WORK is verified and the REQUIREMENT is not, which is why `sr_verified_pct`
-was once narrated to the human as functional verification. Declared PHASE gates are excluded (they verify the sprint
-process, not the requirement — that filter removed 37 of 103 first-run findings). Relatedly `keel tier-satisfaction`
-now emits `verifiedByMethod`: an SR counts as verified when ANY Test `#Verify`-links it, and in this repo that set is
-~70% `method=critique`, so the percentage must be read WITH the mix, never as functional-test coverage. `priority-inversion` (D0130/issue084) WARNS on: a ready item outranking work that
-resolves a >= High Issue. D0052 makes declaration order the priority, but nothing compared recorded ORDER against
-recorded SEVERITY, so a mis-ordered backlog looked identical to a curated one — `keelArchViews` (Low) ranked #1 by
-append accident while `dcStaleKernelInstanceGate` (High) ranked 14th. Never blocking: deferring a High item behind an
-enabler can be correct; the point is that the trade-off is VISIBLE rather than left to whoever last appended.
-`retro-backlog` (D0131/issue085) WARNS on: a staged sprint record
-whose retro names a finding (AVOIDABLE-ISSUE / LESSON) while the commit records NO tracked Issue or backlog action
-and gives no reason. Satisfied EITHER by co-recording an item OR by saying why none is needed, so what it enforces
-is that the CHOICE is explicit. Backs D0131's rewritten retrospective (retroIdentify -> retroTrack -> retroPromote,
-all Owner::ai per D0049): a lesson written into a doc, a commit message or agent memory instead of being tracked has
-NOT been retained (D0018) — it carries no severity, priority, resolver or id and is invisible to orient.
-(Relatedly, `critique_suspect`
-honors dispositions, D0102: a `fail` critique whose finding is ACCEPT-RISK'd/DISMISSED — via a typed
-`#DependsOn` finding→critique edge — no longer induces suspicion.)
-**Declarative controls (D0105/D0107).** Controls are being migrated from bespoke Rust predicates to
-DECLARED rules (`.engine/rules/*.sysml` — `EdgeRule`/`ElementRule`; a third `OrderingRule` kind was
-removed as dead schema, issue060) evaluated generically
-by `keel rules` (the `keel check` name is taken by the spec-compat checker; reconciliation is a follow-up).
-The migration is PARTIAL (D0107, accepted): **5 guards are now sourced from their declared rule** (the
-single gate source, via `view::rule_violations`) — `requirement-rootedness`→`capabilityRootednessRule`,
-`issues`→`issuesTriagedRule`, `decision-rationale`→`decisionRationaleRule`, `acceptance-events`→
-`acceptanceEventRule`, `charter`→`charterRule`. The other ~8 guards stay Rust (bad-fit: relational /
-external-file / text-blob / git-co-commit / prose / per-file — D0105 rollback criterion). Guard NAMES +
-commit-gating are unchanged; downstream projects can declare their own rules. Two further declared rules
-run WARNING-ONLY in `keel rules` (visible, non-gating — the D0102 promote-once-low-noise pattern):
-`decisionNoVerdictProseRule` (issue058 dual-truth detector) and `researchSpikeCharterRule` (D0111/issue055 —
-a `WorkKind::research` spike must charter to a legitimate governing source: Decision/Need/SystemRequirement/
-Issue; via the `whereKind` scope + `charterTargetType` predicate).
+model is truthful, well-formed, and traceable — **never** that the work is complete. Completeness is a
+non-blocking burndown surfaced in `orient`. Don't fake a pass; don't block recording true state.
 
-RUNNABLE BURNDOWN / diagnostics (computed, surfaced in orient, NEVER blocking — D0098): `assured`
-D0079c [composite readiness], `critique` D0080/D0079 [critique-COVERAGE; note INDEPENDENCE stays
-enforced above]; plus `critique-rigor` D0080/issue030 [low-rigor critiques + affirming-only critics];
-`defect-guard-coverage` D0047/issue039 [a #ProcessDefect finding must resolve to a guard-producing
-action]. The python `validate_*.py` guards, `query.py`, and `parity_check.py` were RETIRED at M4
-(sprint58, issue012 closed) — the Rust path is the sole gate.
+In-loop gating (D0128/D0130/D0134): `keel hook post-edit` runs the fast tier after each `.sysml` edit;
+`keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest.
+Both live in the binary — no extra runtime.
 
-**`.engine/` changes: the reference/name-resolution layer is now KERNEL-FREE** (`keel check-engine`,
-D0112 phase 2/issue067 — unresolved type refs + unknown imports across schema+instances, runs in the
-hook + CI). The **kernel validators** remain the authoritative SysML oracle only for the DEEPER residual
-(full type-conformance / specialization / multiplicity that the Rust registry does not yet cover —
-D0112 phase 3), on demand / in the pre-commit hook (each starts the pilot kernel, ~20s):
+The JVM **kernel** validators are the deeper SysML oracle for the type-conformance residual, and are
+**opt-in** (`KEEL_KERNEL_VALIDATE=1`, D0132/issue081) — the per-file instance validator was demoted
+because it fails correct files, forcing an all-or-nothing bypass that disabled every other layer.
+`validate_schema.py` / `validate_workflows.py` still block on schema/workflow changes:
 
 ```
-$conda = "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe"
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py      # schema/core + safety
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_workflows.py   # workflows/*.sysml + _meta
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_instances.py   # .engine decisions/processes/skills — OPT-IN ONLY (KEEL_KERNEL_VALIDATE=1), D0132/issue081: it validates each file IN ISOLATION so cross-file refs never resolve, failing 11 CORRECT committed decisions (0114, 0116-0125) and forcing SKIP_VALIDATE=1 — which skips EVERY layer. `keel check-engine` is the ENFORCED instance gate: kernel-free, resolves refs ACROSS files, exits non-zero on a real unresolved reference. validate_schema.py / validate_workflows.py still BLOCK on schema/workflow changes.
-& $conda run -n sysml --no-capture-output python .engine\tools\validate\validate_tracking.py    # .tracking (kernel cross-check / fallback when the rust binary is unbuilt)
+& "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe" run -n sysml --no-capture-output python .engine\tools\validate\validate_schema.py
 ```
 
-(Run through the full miniforge3 conda path — §6 explains why bare `conda` is not on PATH.
-The kernel calls bare `java`. Sandbox must be disabled. The legacy `validate_sysml.py` was
-retired 2026-06-11 — it predates the flat-package split.)
-See `.engine/docs/keel-syntax-notes.md` for confirmed syntax do's/don'ts before authoring.
+See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
 
 ---
 
-## 6. Environment notes
+## 6. Environment
 
-- **Adapt commands to the HOST OS/shell — the #1 avoidable-friction class (issue065).** Detect the
-  host before assuming syntax: which shell tool is active (Bash vs PowerShell), and what the target
-  program expects. Command *forms* are OS/shell-specific — path separators, env-var syntax (`$VAR` vs
-  `$env:VAR`), null device (`/dev/null` vs `$null`), the call operator (`&`), quoting/escaping, and
-  which characters trigger substitution (backticks are literal in POSIX single-quotes but run commands
-  in a double-quoted Bash string — a real self-inflicted bug this project hit). If a shell tool errors
-  or hangs, switch to the other tool rather than re-issuing the same form. This principle is
-  OS-agnostic; the specifics BELOW are THIS repo's host (Windows). A downstream project restates its
-  own host's specifics.
-- This repo's host: **Windows + PowerShell.** Use PowerShell syntax (`$null`, `$env:VAR`, backtick line-continuation).
-- **`conda` is NOT on `$env:PATH`** in PowerShell sessions that don't run conda init (e.g.
-  Claude Code's shell). Use the full miniforge3 path every time:
-  ```
-  & "C:\Users\WilliamWeatherholtz\miniforge3\Scripts\conda.exe" run -n sysml --no-capture-output python ...
-  ```
-  Installation root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, **not** miniconda3).
-  The validator commands in §5 must use this prefix — `conda run` as a bare word will not be found.
-- **NEVER pipe `conda run` output into a live cmdlet or redirect** (`| Select-String`,
-  `| Out-Null`, `> $null`) — the kernel JVM holds the pipe and the shell HANGS. Run plain.
-  **This includes any command whose HOOKS invoke conda — notably `git commit`**, whose
-  `pre-commit` runs the kernel instance validator when `.engine/**.sysml` is staged. Piping
-  `git commit` into `tail`/`head` hangs for the same reason (cost: a 5-minute stall, sprint247
-  retro). Redirect to a FILE and read the file instead (`git commit -F msg > log 2>&1`), and
-  sweep afterwards with `python .engine/tools/kill_stale_kernels.py`.
-- Interrupted kernel runs can orphan JVMs: `python .engine/tools/kill_stale_kernels.py`.
-- SysML validation requires the `sysml` conda env (Jupyter SysML kernel, OpenJDK).
-- **Use absolute paths in shell commands; don't rely on cwd (issue013).** The Bash and
-  PowerShell tools share one working directory, so a `cd` in one silently changes the cwd
-  the other sees and breaks later relative-path commands. Pass absolute paths to scripts
-  and files (the `keel` binary takes an explicit `[ROOT]`, and the kernel validators self-locate the repo, so cwd doesn't matter to them).
-- **Validation-path tools must be kernel-free where possible (D0048).** A tool that gates
-  commits or routine checks should not start the JVM kernel — it's slow and orphans JVMs
-  (the leak W1 fixed). The forward guards + views are all kernel-free Rust (`keel guard` /
-  `keel validate`); the JVM kernel runs only for deep `.engine` SysML semantics.
+- **Adapt commands to the host OS/shell — the #1 avoidable-friction class (issue065).** Detect which shell
+  is active and what the target program expects. Path separators, env-var syntax (`$VAR` vs `$env:VAR`),
+  null device, quoting, and backtick behaviour are all shell-specific. If a shell tool errors or hangs,
+  switch tools rather than re-issuing the same form. This host: **Windows + PowerShell + git-bash**.
+- **`conda` is not on `PATH`** in Claude Code shells. Use the full miniforge3 path (above). Installation
+  root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, not miniconda3).
+- **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
+  invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
+  file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with
+  `python .engine/tools/kill_stale_kernels.py`.
+- **Use absolute paths; don't rely on cwd (issue013).** The Bash and PowerShell tools share one working
+  directory, so a `cd` in one changes what the other sees.
+- **Validation-path tools must be kernel-free where possible (D0048).** Anything gating a commit should
+  not start the JVM.
