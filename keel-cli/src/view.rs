@@ -194,6 +194,12 @@ fn value_to_string(v: &Value) -> String {
         Value::Str(s) | Value::Ident(s) => s.clone(),
         Value::Int(n) => n.to_string(),
         Value::EnumLit { member, .. } => member.clone(),
+        // A multi-valued assignment rendered as a single scalar is a lossy view by nature. Joining
+        // with ", " keeps every element VISIBLE rather than showing the first and dropping the rest,
+        // which is the failure a caller would not notice. Callers needing the elements individually —
+        // reference resolution, edge building — must match on `Value::Seq` directly; this function is
+        // for display and for attribute lookups that are single-valued by schema.
+        Value::Seq(items) => items.iter().map(value_to_string).collect::<Vec<_>>().join(", "),
     }
 }
 

@@ -1468,8 +1468,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 25] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest"];
+pub const GUARD_NAMES: [&str; 26] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity"];
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1566,6 +1566,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
+        "sequence-multiplicity" => Some(sequence_multiplicity(root)), // warning-only (issue101) — sequences are newly enabled
         "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control
         "hook-config-integrity" => Some(hook_config_integrity(root)), // warning-only (D0047/issue093) — a hook pointing at a deleted script
         "confirmation-authenticity" => Some(confirmation_authenticity(root)), // hard (D0106/issue059) — rule-sourced
@@ -1599,6 +1600,76 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
             _ => run_one(n, root),
         })
         .collect()
+}
+
+/// Every `(name, attributes)` pair in a package, including those nested inside an `action def` body —
+/// which is where the backlog and every sprint record actually live, so a top-level-only walk would
+/// inspect almost nothing.
+fn named_attr_bearers(pkg: &keel_parser::ast::Package) -> Vec<(&str, &[keel_parser::ast::Attribute])> {
+    use keel_parser::ast::Item;
+    let mut out: Vec<(&str, &[keel_parser::ast::Attribute])> = Vec::new();
+    for item in &pkg.items {
+        match item {
+            Item::Part(p) => out.push((p.name.as_str(), &p.attributes)),
+            Item::Verification(v) => out.push((v.name.as_str(), &v.attributes)),
+            Item::ActionDef(d) => {
+                for p in &d.parts {
+                    out.push((p.name.as_str(), &p.attributes));
+                }
+                for v in &d.verifications {
+                    out.push((v.name.as_str(), &v.attributes));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// WARNING-level: every multi-valued feature assignment `:>> f = (a, b, c)` in the model (issue101).
+///
+/// Enabling the sequence form (issue095) removed a crude safety property: `(` used to be a parse error
+/// EVERYWHERE, so a sequence could not be written into a single-valued attribute. Now it can, and it is
+/// accepted silently — `createdBy = ("you", "ghost")` parses clean and the `actors` guard passes, so an
+/// unregistered actor slips through. The precise check — reject a sequence where the schema declares no
+/// `[*]` multiplicity — is not yet possible: neither the AST nor the registry captures multiplicity.
+///
+/// So this reports every sequence instead. That is genuinely useful rather than a placeholder, because
+/// the model contains ZERO sequences today: any hit is new, and reviewing it is exactly the check that
+/// multiplicity metadata will later automate. Deliberately AST-based, not a text scan — grepping for
+/// `= (` matches the prose in Decisions and definition-of-done text that discusses the sequence form, which is the
+/// self-inflating-census error of issue099 in miniature.
+///
+/// Retire this guard when multiplicity lands and the exact check replaces it.
+fn sequence_multiplicity(root: &Path) -> GuardReport {
+    use keel_parser::ast::Value;
+    let mut warnings = Vec::new();
+    let mut scanned = 0usize;
+    for dir in [root.join(".tracking"), root.join(".engine")] {
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in crate::collect_sysml(&dir) {
+            let Ok(pkg) = crate::parse_pkg(&path) else {
+                continue; // parse errors are validate's business, not this guard's
+            };
+            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            for (item_name, attrs) in named_attr_bearers(&pkg) {
+                for a in attrs {
+                    if let Value::Seq(items) = &a.value {
+                        scanned += 1;
+                        warnings.push(format!(
+                            "{rel}:{}: {item_name}.{} is a {}-element sequence — confirm the schema declares this feature multi-valued ([*]); a sequence in a single-valued attribute is accepted silently today (issue101)",
+                            a.line,
+                            a.name,
+                            items.len()
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    GuardReport { name: "sequence-multiplicity", scanned, warnings, violations: Vec::new() }
 }
 
 /// HARD: the activation manifest itself must be well-formed (D0138).

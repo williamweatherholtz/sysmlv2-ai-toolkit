@@ -66,6 +66,12 @@ pub enum TokenKind {
     LBracket,
     /// `]`
     RBracket,
+    /// `(`
+    LParen,
+    /// `)`
+    RParen,
+    /// `,`
+    Comma,
     /// `;`
     Semicolon,
     /// `.`

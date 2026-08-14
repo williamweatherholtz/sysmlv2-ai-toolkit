@@ -334,7 +334,11 @@ pub fn orient_root(root: &Path) -> OrientReport {
 
 // ── internal parse helper ─────────────────────────────────────────────────────
 
-fn parse_pkg(path: &Path) -> Result<Package, CheckError> {
+/// Read and parse one `.sysml` file into a [`Package`].
+///
+/// # Errors
+/// Returns [`CheckError`] if the file cannot be read, or if tokenizing/parsing fails.
+pub fn parse_pkg(path: &Path) -> Result<Package, CheckError> {
     let src = std::fs::read_to_string(path).map_err(|e| CheckError {
         file: path.to_path_buf(),
         message: e.to_string(),

@@ -24,6 +24,15 @@ pub enum Value {
         /// The member part (e.g. `pass`).
         member: String,
     },
+    /// A parenthesised sequence: `:>> phases = (a, b, c)` — the multi-valued feature assignment.
+    ///
+    /// Valid `SysML` v2 (kernel-confirmed) that this parser previously rejected outright, which removed
+    /// `ref` features from consideration for any one-to-many edge and left metadata markers looking
+    /// like the only option (issue095). Elements are themselves [`Value`]s, so a sequence of enum
+    /// literals or strings parses as naturally as a sequence of element references — nesting is
+    /// permitted by the grammar but has no meaning in this schema, so consumers flatten or reject it
+    /// explicitly rather than silently.
+    Seq(Vec<Self>),
 }
 
 // ── per-item attribute assignment ──────────────────────────────────────────

@@ -196,6 +196,28 @@ fn parse_value(p: &mut Parser, filename: &str) -> Result<Value, ParseError> {
                 Ok(Value::Ident(name))
             }
         }
+        // `( a, b, c )` — multi-valued feature assignment (issue095). An EMPTY sequence `()` is
+        // accepted and means "no values", which is a deliberate choice: it is the honest way to author
+        // a multi-valued feature that currently has no targets, and rejecting it would push authors
+        // toward omitting the assignment entirely, which says something different. A trailing comma is
+        // accepted for the same reason it is in Rust — it makes a one-per-line list editable without
+        // touching the neighbouring line.
+        TokenKind::LParen => {
+            p.advance();
+            let mut items: Vec<Value> = Vec::new();
+            loop {
+                if p.eat(&TokenKind::RParen) {
+                    break;
+                }
+                items.push(parse_value(p, filename)?);
+                if p.eat(&TokenKind::Comma) {
+                    continue;
+                }
+                p.expect(&TokenKind::RParen, filename)?;
+                break;
+            }
+            Ok(Value::Seq(items))
+        }
         other => Err(ParseError::Expected {
             expected: "value (string, integer, identifier, or enum literal)".into(),
             got: format!("{other:?}").into(),

@@ -185,6 +185,12 @@ impl<'src> Lexer<'src> {
             '}' => TokenKind::RBrace,
             '[' => TokenKind::LBracket,
             ']' => TokenKind::RBracket,
+            // Multi-valued feature assignment `:>> f = (a, b, c)` — valid SysML v2 the kernel accepts
+            // and this parser rejected, which is why `ref` features were never a candidate for
+            // one-to-many edges and metadata markers looked unavoidable (issue095).
+            '(' => TokenKind::LParen,
+            ')' => TokenKind::RParen,
+            ',' => TokenKind::Comma,
             ';' => TokenKind::Semicolon,
             '.' => TokenKind::Dot,
             '*' => TokenKind::Star,

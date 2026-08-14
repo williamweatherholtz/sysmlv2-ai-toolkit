@@ -1186,4 +1186,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSupersededNotReady to issue100;
+
+    #ProcessDefect part issue101 : Issue {
+        :>> id = "e1010101-0101-4f01-9101-516273840101";
+        :>> title = "Enabling the sequence form removed a crude safety property — a sequence in a SINGLE-valued attribute now parses clean and slips an unregistered actor past the actors guard";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY ME, in the same sprint that caused it, by testing the negative case rather than only the feature. Adding multi-valued assignment support (issue095 — `:>> f = (a, b, c)` is valid SysML v2 that keel-parser rejected) necessarily removed a property the rejection had provided ACCIDENTALLY: because `(` was a lex error EVERYWHERE, a sequence could not be written into a single-valued attribute either. Now it can. MEASURED on a fresh `keel init` project: `createdBy = (\"you\", \"ghostActorNotRegistered\")` — where `createdBy` is declared `String[0..1]` — passes `keel validate` clean AND passes `guard actors`, so an unregistered actor enters the model silently. That guard exists specifically to make provenance non-forgeable (D0037), and provenance is never-defaulted under D0129, so this is not a cosmetic hole. WHY THE PRECISE FIX IS NOT AVAILABLE YET: the correct rule is 'a sequence is permitted only where the schema declares the feature multi-valued', and NEITHER the AST NOR the registry captures multiplicity — `ref e : C[*]` and `attribute a : String` are indistinguishable to every consumer once parsed. There is also no attribute-declaration validation at all, so nothing today checks an assignment against its declared feature. That is a real gap, larger than this Issue, and it is the same gap that will need closing before `ref` features can carry edges. INTERIM CONTROL (dcSequenceMultiplicityGuard, delivered with this Issue): a warning-level `sequence-multiplicity` guard reporting EVERY sequence in the model. That is genuinely useful rather than a placeholder because the model contains ZERO sequences today — any hit is new, and reviewing it is exactly the check that multiplicity metadata will later automate. Deliberately AST-based rather than a text scan: grepping `= (` matches the prose in Decisions and DoD text that DISCUSSES the sequence form, which is issue099's self-inflating-census error in miniature — and it did, returning 4 hits that were all prose. The guard is warning-level because it cannot be exact, and a hard guard that fires on a legitimate multi-valued `ref` would train its author to disable it (issue081). GENERAL LESSON: a crude restriction can be load-bearing in ways nobody recorded, so lifting one should be accompanied by asking what it was incidentally preventing. Here the answer was findable in one negative test, and I only ran it because the DoD demanded the edge cases be 'decided and tested, not incidental'.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcSequenceMultiplicityGuard";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSequenceMultiplicityGuard to issue101;
 }

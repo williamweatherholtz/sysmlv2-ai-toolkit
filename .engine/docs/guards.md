@@ -1,7 +1,7 @@
 # Guard reference
 
-`keel guard` runs **25** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
-and **6 warning-only** (visible every commit, never blocking). `keel version` reports this split
+`keel guard` runs **26** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
+and **7 warning-only** (visible every commit, never blocking). `keel version` reports this split
 computed from the enforced set, so it cannot drift from what actually runs.
 
 Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands.
@@ -42,6 +42,7 @@ Visible on every commit, never blocking — the D0102 *promote-once-low-noise* p
 | `retro-backlog` | A retro naming a finding with no tracked item and no stated reason (D0131/issue085) |
 | `doc-sync` | A staged definitional change with no co-committed doc update (D0113) |
 | `hook-config-integrity` | A `.claude/settings*.json` hook command referencing a script that does not exist, so it fails every time it fires (D0047/issue093). Warning-level because this config is machine-local and partly gitignored: CI cannot see it, and one contributor's personal hook must never block another's commit |
+| `sequence-multiplicity` | Every multi-valued assignment `:>> f = (a, b, c)` in the model (issue101). Enabling the sequence form removed a crude safety property — `(` used to be a parse error everywhere, so it could not be written into a *single-valued* attribute; now `createdBy = ("you", "ghost")` parses clean and `actors` passes. The exact check needs multiplicity metadata the AST does not yet carry, so every sequence is reported instead — useful, not a placeholder, because the model contains **zero** today. AST-based on purpose: grepping `= (` matches the prose that *discusses* sequences (the issue099 self-inflating-census error). Retire when multiplicity lands |
 
 ## Non-blocking burndown (runnable, never gating)
 
