@@ -117,6 +117,200 @@ fn cmd_validate(args: &[String]) -> i32 {
 /// files (decisions/processes/views + registry + template) against the schema, KERNEL-FREE — the Rust
 /// backstop for the `unresolved` reference class the JVM `validate_instances.py` used to be the sole
 /// source of.
+/// `keel hook <stop|post-edit>` (D0134) — the in-loop gates, IN THE BINARY.
+///
+/// These were python wrappers. The CHECKING was always Rust; python only parsed the hook's stdin
+/// JSON and emitted the response — pure glue, bought with a SECOND RUNTIME DEPENDENCY on every
+/// contributor's machine. That is the issue076 class inside the governance layer again: where python
+/// is absent the gate silently does not run, and D0129 puts five mixed-OS machines in scope. Since
+/// `keel` is already a hard requirement for these gates to mean anything, and `serde_json` is already
+/// a dependency, the glue belongs here and the dependency goes away.
+///
+/// Reads the hook payload on stdin, writes the hook protocol on stdout, and NEVER fails a turn:
+/// any internal error exits 0 silently.
+fn cmd_hook(args: &[String]) -> i32 {
+    use std::io::Read as _;
+    let Some(event) = args.first().map(String::as_str) else {
+        eprintln!("usage: keel hook <stop|post-edit>");
+        return 2;
+    };
+    let mut raw = String::new();
+    let _ = std::io::stdin().read_to_string(&mut raw);
+    let payload: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    if !root.join(".tracking").is_dir() {
+        return 0; // not a keel project -> silent no-op, correctly
+    }
+
+    match event {
+        "post-edit" => hook_post_edit(&payload, &root),
+        "stop" => hook_stop(&payload, &root),
+        "user-prompt" => hook_user_prompt(&root),
+        other => {
+            eprintln!("unknown hook event '{other}' (expected stop|post-edit)");
+            2
+        }
+    }
+}
+
+/// `UserPromptSubmit`: inject the route-first checklist, plus a warning about out-of-band writes.
+///
+/// ASCII-only on purpose: this text is injected into the model's context via stdout, and a non-UTF-8
+/// Windows console turns non-ASCII into mojibake.
+fn hook_user_prompt(root: &Path) -> i32 {
+    // D0064/D0106: routing is structural, fired every turn rather than left to vigilance.
+    println!(
+        "[engine-triage -- route FIRST (D0064)] Break the request into parts and route EACH before \
+acting: CHANGE (sec 3a: workflow/phase/gate/schema) | EXECUTE (sec 3b: tracked artifact, sprinted) \
+| RECORD (sec 3c: one atomic fact -- decision/test result/issue) | VIEW (sec 3d: computed answer) | \
+ORIENT (sec 3f: where things stand). Flag anything that does NOT cleanly map -- ask, don't \
+force-fit. Substantive work goes through a sprint (only trivial one-off edits are exempt). \
+method=confirmation needs explicit human sign-off. Invoke the engine-triage skill if unsure."
+    );
+
+    // While `keel serve` is live the human authors facts straight into the tree (accepting Decisions,
+    // editing items). Those land uncommitted with no signal, and a blanket `git add -A` once swept an
+    // accepted D0126/D0127 into a sprint commit unnoticed. Silent when the tree is clean.
+    let git = |args: &[&str]| -> String {
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .unwrap_or_default()
+    };
+    let status = git(&["status", "--porcelain", "--", ".tracking", ".engine"]);
+    let status = status.trim();
+    if status.is_empty() {
+        return 0;
+    }
+    println!("[out-of-band-writes] Uncommitted changes in .tracking/.engine at turn start - possibly authored");
+    println!("via keel serve (human accepts/edits/creates), NOT by me. Run `git diff` and stage DELIBERATELY;");
+    println!("do NOT blanket `git add -A` over human-attested writes (accepted Decisions, edits). Changed:");
+    for line in status.lines().take(40) {
+        println!("  {line}");
+    }
+
+    // Surface acceptance/status changes specifically: those are the HUMAN's sign-off and must stay
+    // attributed to them, never folded silently into an AI commit.
+    let diff = git(&["diff", "--", ".engine/decisions"]);
+    let accepts: Vec<&str> = diff
+        .lines()
+        .filter(|l| {
+            l.starts_with('+')
+                && (l.contains("DecisionStatus::accepted")
+                    || l.contains("DecisionStatus::rejected")
+                    || l.contains("Accept :")
+                    || l.contains("Reject :")
+                    || l.contains("judgedBy"))
+        })
+        .take(20)
+        .collect();
+    if !accepts.is_empty() {
+        println!("DECISION ACCEPTANCE / STATUS CHANGES (human sign-off - verify + keep as THEIR attributed record):");
+        for l in accepts {
+            println!("  {l}");
+        }
+    }
+    0
+}
+
+/// Emit a hook-protocol JSON object and exit 0 (the harness reads stdout).
+fn hook_emit(v: &serde_json::Value) -> i32 {
+    println!("{v}");
+    0
+}
+
+/// Run the fast gate over an edited `.sysml` file; block with the violations if it broke the model.
+fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
+    let path = payload
+        .pointer("/tool_input/file_path")
+        .or_else(|| payload.pointer("/tool_response/filePath"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    if !std::path::Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")) {
+        return 0; // only model files are gated
+    }
+
+    let mut problems: Vec<String> = Vec::new();
+    let report = keel_cli::validate_root(root);
+    for (p, d) in &report.diagnostics {
+        problems.push(format!("ERROR: {}:{} — {}", p.display(), d.line, d.message));
+    }
+    for e in &report.errors {
+        problems.push(format!("PARSE: {} — {}", e.file.display(), e.message));
+    }
+    // Only the EXACT guards — a per-edit gate must never fire on a heuristic (see cmd_gate).
+    for name in ["duplicate-identity", "marker-vocabulary"] {
+        if let Some(r) = keel_cli::guards::run_one(name, root) {
+            for v in &r.violations {
+                problems.push(format!("GUARD [{name}]: {v}"));
+            }
+        }
+    }
+    if problems.is_empty() {
+        return 0; // clean -> silent, so a passing gate costs nothing
+    }
+    let mut body = problems.join("\n");
+    body.truncate(2000);
+    hook_emit(&serde_json::json!({
+        "decision": "block",
+        "reason": format!(
+            "[edit gate] That edit left the model broken — fix it now, at the point of the edit:\n\n{body}\n\nThis is the FAST tier (validate + duplicate-identity + marker-vocabulary, all exact). Author through the keel write API where one exists."
+        )
+    }))
+}
+
+/// Turn-boundary gate: refuse to end the turn while the model is dishonest. Loop-safe.
+fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
+    let already = payload.get("stop_hook_active").and_then(serde_json::Value::as_bool).unwrap_or(false);
+
+    let mut problems: Vec<String> = Vec::new();
+    let report = keel_cli::validate_root(root);
+    if !report.diagnostics.is_empty() || !report.errors.is_empty() {
+        use std::fmt::Write as _;
+        let mut s = String::from("keel validate:\n");
+        for (p, d) in report.diagnostics.iter().take(10) {
+            let _ = writeln!(s, "  {}:{} — {}", p.display(), d.line, d.message);
+        }
+        for e in report.errors.iter().take(10) {
+            let _ = writeln!(s, "  {} — {}", e.file.display(), e.message);
+        }
+        problems.push(s);
+    }
+    let mut failing: Vec<String> = Vec::new();
+    for name in keel_cli::guards::GUARD_NAMES {
+        if let Some(r) = keel_cli::guards::run_one(name, root) {
+            for v in r.violations.iter().take(5) {
+                failing.push(format!("  [{name}] {v}"));
+            }
+        }
+    }
+    if !failing.is_empty() {
+        problems.push(format!("keel guard:\n{}", failing.join("\n")));
+    }
+
+    if problems.is_empty() {
+        return 0; // green -> allow the stop
+    }
+    if already {
+        // Second consecutive red: allow the stop with a loud warning rather than trapping the agent.
+        return hook_emit(&serde_json::json!({
+            "systemMessage": "[in-loop gate] Still red after a correction pass — allowing the stop to avoid a loop. Do NOT commit until keel validate + guard are green."
+        }));
+    }
+    let mut body = problems.join("\n\n");
+    body.truncate(4000);
+    hook_emit(&serde_json::json!({
+        "decision": "block",
+        "reason": format!(
+            "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (append-result / add-task / record decision); run `keel guard <name>` for detail. Then end the turn."
+        )
+    }))
+}
+
 /// `keel gate --fast [ROOT]` (D0128 Tier-2) — the per-EDIT in-loop gate.
 ///
 /// Runs only the checks that are (a) fast enough for every edit and (b) EXACT, so blocking is safe:
@@ -1516,6 +1710,7 @@ fn main() {
         Some("init") => cmd_init(rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
+        Some("hook") => cmd_hook(rest), // D0134: in-loop gates in the BINARY, no python runtime
         Some("gate") => cmd_gate(rest), // D0128 Tier-2: the fast per-edit in-loop gate
         Some("check-engine") => cmd_check_engine(rest),
         Some("check") => cmd_check(rest),

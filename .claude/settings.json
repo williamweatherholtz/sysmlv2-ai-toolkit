@@ -18,8 +18,13 @@
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python .engine/tools/triage_reminder.py" },
-          { "type": "command", "command": "python .engine/tools/out_of_band_check.py" }
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook user-prompt || true",
+            "timeout": 30,
+            "statusMessage": "route-first checklist"
+          }
         ]
       }
     ],
@@ -29,7 +34,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .engine/tools/edit_gate.py",
+            "shell": "bash",
+            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook post-edit || true",
             "timeout": 120,
             "statusMessage": "in-loop edit gate"
           }
@@ -41,7 +47,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .engine/tools/stop_gate.py",
+            "shell": "bash",
+            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook stop || true",
             "timeout": 180,
             "statusMessage": "in-loop honest-state gate"
           }
