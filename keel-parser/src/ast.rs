@@ -83,6 +83,26 @@ pub struct Verification {
     pub line: u32,
 }
 
+/// A `use case name : Type { ... }` usage (issue102 construct 2/6).
+///
+/// Its own variant rather than reusing [`Part`]: a use case is not a structural part, and the whole
+/// point of the base-first programme is that the model should say what it means. Following the
+/// precedent already set by [`Verification`], which exists for exactly this reason. 56 of these were
+/// skipped entirely — only `use case def` was handled — so every use case in the model was invisible to
+/// type resolution and attribute validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseCaseUsage {
+    /// Declared name.
+    pub name: String,
+    /// Optional `: Type` annotation.
+    pub type_name: Option<String>,
+    /// Attribute assignments in the body.
+    pub attributes: Vec<Attribute>,
+    pub span: Span,
+    /// 1-indexed source line of the `use` keyword.
+    pub line: u32,
+}
+
 /// An `action name;` bare declaration (no body).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDecl {
@@ -127,6 +147,25 @@ pub struct DependencyAnnotation {
     pub span: Span,
 }
 
+/// A `flow from A.out to B.in;` item flow (issue102 construct 6/6).
+///
+/// All 18 in the model sit inside `action def` workflow bodies and were skipped, so the workflows
+/// declared their stage-to-stage item flow and nothing could read it — the one place the repo already
+/// modelled behaviour in base `SysML` v2 rather than in strings was invisible.
+///
+/// Endpoints are stored as their FULL dotted text (`dataArch.sysReq`). Resolving a dotted feature path
+/// needs feature-level resolution the registry does not have; storing the text keeps the fact intact
+/// and lets consumers take the root, which IS a known item. Storing only the root would discard the
+/// port and could not be recovered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowEdge {
+    /// Source endpoint as written, e.g. `brief.o`.
+    pub from: String,
+    /// Target endpoint as written, e.g. `personas.i`.
+    pub to: String,
+    pub span: Span,
+}
+
 /// `private import Namespace::*;`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Import {
@@ -144,6 +183,8 @@ pub struct ActionDef {
     pub parts: Vec<Part>,
     pub verifications: Vec<Verification>,
     pub successions: Vec<Succession>,
+    /// `flow from A.x to B.y;` edges declared in the body (issue102).
+    pub flows: Vec<FlowEdge>,
     pub span: Span,
 }
 
@@ -185,6 +226,8 @@ pub enum Item {
     ActionDef(ActionDef),
     Part(Part),
     Verification(Verification),
+    /// `use case name : Type { ... }` usage.
+    UseCase(UseCaseUsage),
     ActionDecl(ActionDecl),
     Succession(Succession),
     Satisfy(SatisfyEdge),

@@ -308,6 +308,11 @@ impl Model {
             match item {
                 Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref(), file),
                 Item::Verification(v) => add_item(items, &v.name, v.type_name.as_deref(), &v.attributes, None, file),
+                // issue102 construct 2/6: use case USAGES were skipped entirely, so all 56 were absent
+                // from the model — no type, no attributes, unreachable by any view or trace. Ingested
+                // exactly like any other typed item; the model keys on `type_name`, so they surface as
+                // `UseCase` rather than as parts.
+                Item::UseCase(u) => add_item(items, &u.name, u.type_name.as_deref(), &u.attributes, None, file),
                 Item::ActionDecl(a) => add_item_typed(items, &a.name, "action", file),
                 Item::ActionDef(ad) => {
                     add_item_typed(items, &ad.name, "ActionDef", file);
@@ -329,6 +334,15 @@ impl Model {
                     for s in &ad.successions {
                         let kind = if s.is_ordering_only { "ordering" } else { "succession" };
                         edges.push(Edge { kind: kind.to_string(), from: s.first.clone(), to: s.then.clone() });
+                    }
+                    // `flow from A.out to B.in` (issue102): emit at the granularity the model actually
+                    // has. Endpoints are dotted feature paths, and the model knows the ROOT (an action
+                    // in this def) but not its ports, so the edge connects the roots. Taking the root
+                    // rather than the whole path is what makes the edge resolvable at all; the full
+                    // path stays in the AST for any consumer that later gains feature resolution.
+                    for f in &ad.flows {
+                        let root = |s: &str| s.split('.').next().unwrap_or(s).to_string();
+                        edges.push(Edge { kind: "flow".to_string(), from: root(&f.from), to: root(&f.to) });
                     }
                 }
                 Item::Satisfy(e) => edges.push(Edge { kind: "satisfy".to_string(), from: e.need.clone(), to: e.by.clone() }),

@@ -129,6 +129,15 @@ impl PackageRegistry {
                         Self::check_attr(attr, file, &available_enums, &mut diags);
                     }
                 }
+                // Use case usages resolve their type and validate their attributes like any other typed
+                // item (issue102). Until the parser captured them, 56 usages carried unchecked type
+                // references and unchecked enum literals.
+                Item::UseCase(u) => {
+                    Self::check_type_ref(u.type_name.as_deref(), u.line, file, &available_types, &mut diags);
+                    for attr in &u.attributes {
+                        Self::check_attr(attr, file, &available_enums, &mut diags);
+                    }
+                }
                 Item::ActionDef(adef) => {
                     for p_item in &adef.parts {
                         Self::check_type_ref(p_item.type_name.as_deref(), p_item.line, file, &available_types, &mut diags);

@@ -1,6 +1,8 @@
 use crate::ast::{
     ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, EnumDef, Import, Item,
-    Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef, Value, Verification,
+    FlowEdge, Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef, UseCaseUsage,
+    Value,
+    Verification,
 };
 use crate::error::ParseError;
 use crate::token::{Span, Token, TokenKind};
@@ -306,6 +308,7 @@ fn parse_action_def_body(
     let mut parts = Vec::new();
     let mut verifications = Vec::new();
     let mut successions = Vec::new();
+    let mut flows = Vec::new();
     loop {
         match p.peek().clone() {
             TokenKind::RBrace => { p.advance(); break; }
@@ -340,6 +343,9 @@ fn parse_action_def_body(
             TokenKind::First => {
                 if let Some(s) = parse_succession(p, filename, false)? { successions.push(s); }
             }
+            TokenKind::Ident(ref w) if w == "flow" => {
+                if let Some(f) = parse_flow(p, filename)? { flows.push(f); }
+            }
             TokenKind::Hash => {
                 p.advance();
                 let (marker, _) = p.expect_ident(filename)?;
@@ -354,7 +360,7 @@ fn parse_action_def_body(
         }
     }
     let end = p.current_span();
-    Ok(ActionDef { name, actions, parts, verifications, successions,
+    Ok(ActionDef { name, actions, parts, verifications, successions, flows,
         span: Span { start: start.start, end: end.start } })
 }
 
@@ -437,6 +443,40 @@ fn skip_brace_block(p: &mut Parser) {
 
 /// Extract an ident-or-keyword name at the current position and advance.
 /// Returns `None` (without advancing) when the current token is neither.
+/// Parse `flow from A.x to B.y;`, positioned on the `flow` identifier.
+///
+/// `flow` lexes as an IDENTIFIER, not a keyword, so it is matched by name rather than by token kind.
+/// That is deliberate: promoting it to a keyword would change how the word behaves everywhere,
+/// including as an attribute or element name, for one construct's benefit.
+fn parse_flow(p: &mut Parser, filename: &str) -> Result<Option<FlowEdge>, ParseError> {
+    let s = p.current_span();
+    p.advance(); // consume `flow`
+    if !p.eat(&TokenKind::From) {
+        skip_item(p);
+        return Ok(None);
+    }
+    let from = parse_dotted_path(p, filename)?;
+    if !p.eat(&TokenKind::To) {
+        skip_item(p);
+        return Ok(None);
+    }
+    let to = parse_dotted_path(p, filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(Some(FlowEdge { from, to, span: Span { start: s.start, end: end.start } }))
+}
+
+/// Read `a.b.c` as written. Dotted feature paths are kept whole; see [`FlowEdge`].
+fn parse_dotted_path(p: &mut Parser, filename: &str) -> Result<String, ParseError> {
+    let (mut path, _) = p.expect_ident(filename)?;
+    while p.eat(&TokenKind::Dot) {
+        let (seg, _) = p.expect_ident(filename)?;
+        path.push('.');
+        path.push_str(&seg);
+    }
+    Ok(path)
+}
+
 /// Consume a `:> Supertype` clause if present, returning the supertype name.
 ///
 /// Called immediately after a def's name, which is the only position the clause may occupy. Returns
@@ -679,7 +719,9 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: start_line })))
         }
 
-        // `use case def Name ...` → TypeDef
+        // `use case def Name ...` → TypeDef; `use case name : Type { ... }` → UseCase USAGE.
+        // Usages were skipped entirely (issue102 construct 2/6), so all 56 in the model carried
+        // unchecked type references and unchecked enum literals, and were absent from every view.
         TokenKind::Use => {
             p.advance(); // consume 'use'
             if matches!(p.peek(), TokenKind::Case) { p.advance(); } // consume 'case'
@@ -687,8 +729,11 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
                 p.advance();
                 return Ok(type_def_tail(p, start, start_line));
             }
-            skip_item(p);
-            Ok(None)
+            if had_abstract { skip_item(p); return Ok(None); }
+            // `use` and `case` are consumed, so the parser sits on the NAME — exactly where
+            // `parse_typed_item_body` expects to start.
+            let (n, tn, a, sp) = parse_typed_item_body(p, filename, start)?;
+            Ok(Some(Item::UseCase(UseCaseUsage { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
         }
 
         // Generic `<classifier-kind> def Name ...` where the kind word lexes as an

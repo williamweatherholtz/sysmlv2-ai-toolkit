@@ -1222,4 +1222,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcParserReadSpecialize to issue103;
+
+    #ProcessDefect part issue104 : Issue {
+        :>> id = "e1040104-0104-4f04-9104-516273840104";
+        :>> title = "`.engine/workflows` is absent from the Model's source directories — the one place this repo models behaviour in base SysML v2 is invisible to every view";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while verifying that newly-parsed `flow` edges reached the Model (issue102 construct 6/6). They did not, and the reason is not the parser: `Model::build` (view.rs:271-278) ingests `.tracking` plus `.engine/{decisions,processes,views,skills,rules}` and NOT `.engine/workflows`. So the six workflow definitions — `action def` bodies with typed `in`/`out` parameters, `first..then` successions and `flow from X to Y`, which the panel's antagonist identified as the ONE place the repo already uses base SysML v2 behaviour correctly rather than encoding procedure in strings — contribute nothing to any computed view, trace, diagram or guard. WHY IT MATTERS BEYOND THE FLOWS: the human's stated goal is a model that renders meaningfully in a standard viewer, and the workflow layer is the part most likely to render WELL, since it is genuinely behavioural. It is also the layer the deliverable's own six-workflow structure (Business/Architecture/Delivery/Deploy/Operate/Change Request) is documented in terms of, so the engine describes a structure its own views cannot see. NOT FIXED IN THIS SPRINT, deliberately: adding a directory to the Model changes what EVERY guard and view evaluates at once — workflow actions would newly appear as items subject to charter, rootedness and critique coverage — and folding that into a parser sprint would mix a large blast radius into a change whose whole point was making the parser trustworthy. It needs its own sprint with before/after guard output reconciled item by item. The flow-edge emission added in view.rs is correct and simply unexercised until then, which is stated here so nobody later reads it as dead code and deletes it.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcModelIngestWorkflows";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcModelIngestWorkflows to issue104;
 }
