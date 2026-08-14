@@ -117,6 +117,56 @@ fn cmd_validate(args: &[String]) -> i32 {
 /// files (decisions/processes/views + registry + template) against the schema, KERNEL-FREE — the Rust
 /// backstop for the `unresolved` reference class the JVM `validate_instances.py` used to be the sole
 /// source of.
+/// `keel gate --fast [ROOT]` (D0128 Tier-2) — the per-EDIT in-loop gate.
+///
+/// Runs only the checks that are (a) fast enough for every edit and (b) EXACT, so blocking is safe:
+/// `validate` (227ms — parse + semantic reference resolution), `duplicate-identity` (128ms) and
+/// `marker-vocabulary` (140ms). Measured total ~0.5s, against 1.9s for the full guard suite — which is
+/// why the full set stays at the TURN boundary (Tier-3 Stop hook) and commit, not per edit.
+///
+/// Deliberately excludes every heuristic/warning-level guard: a per-edit gate that fires on a prose
+/// heuristic would block work mid-thought and train the actor to disable it — the issue076/issue081
+/// dynamic that cost eight bypassed commits this sitting.
+fn cmd_gate(args: &[String]) -> i32 {
+    let fast = args.iter().any(|a| a == "--fast");
+    let root = args
+        .iter()
+        .find(|a| !a.starts_with("--"))
+        .map(PathBuf::from)
+        .or_else(find_repo_root)
+        .unwrap_or_else(|| PathBuf::from("."));
+    if !fast {
+        eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary)");
+        return 2;
+    }
+
+    let report = keel_cli::validate_root(&root);
+    let mut failed = false;
+    for (path, d) in &report.diagnostics {
+        println!("ERROR: {}:{} — {}", path.display(), d.line, d.message);
+        failed = true;
+    }
+    for e in &report.errors {
+        println!("PARSE: {} — {}", e.file.display(), e.message);
+        failed = true;
+    }
+    // The two EXACT guards — set membership and duplicate detection, no heuristics.
+    for name in ["duplicate-identity", "marker-vocabulary"] {
+        if let Some(r) = keel_cli::guards::run_one(name, &root) {
+            for v in &r.violations {
+                println!("GUARD [{name}]: {v}");
+                failed = true;
+            }
+        }
+    }
+    if failed {
+        println!("\ngate: FAST GATE FAILED — fix before continuing (this is the per-edit tier; the full guard set runs at turn end + commit).");
+        return 1;
+    }
+    println!("gate: fast gate clean ({} file(s))", report.validated);
+    0
+}
+
 fn cmd_check_engine(args: &[String]) -> i32 {
     let root = match args.first() {
         Some(p) => PathBuf::from(p),
@@ -1466,6 +1516,7 @@ fn main() {
         Some("init") => cmd_init(rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
+        Some("gate") => cmd_gate(rest), // D0128 Tier-2: the fast per-edit in-loop gate
         Some("check-engine") => cmd_check_engine(rest),
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),

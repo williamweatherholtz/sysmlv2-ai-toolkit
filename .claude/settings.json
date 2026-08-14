@@ -23,6 +23,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .engine/tools/edit_gate.py",
+            "timeout": 120,
+            "statusMessage": "in-loop edit gate"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
