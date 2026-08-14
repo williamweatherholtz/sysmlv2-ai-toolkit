@@ -17,6 +17,14 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
   (the idiomatic v2 replacement for v1 `deriveReqt`/`refine`/`trace`).
 - `:>>` redefinition; `[*]` and `[0..1]` multiplicity.
 - `ref name : Type[0..1];` — reference (non-compositional) features.
+- **BASE relationships that parse clean in the rust authority** (verified 2026-08-14, issue095). Reach
+  for these BEFORE inventing a marker — a custom edge is a last resort, not a default:
+  `satisfy X by Y;` · `verify X by Y;` · `refine X by Y;` · `allocate X to Y;` · `dependency X to Y;`
+  · `assert constraint c : Ok;` (inside a part) · `require constraint c : Ok;` (inside a requirement)
+  · `perform action s : Step;` · `include use case u : U;`
+  Of these, only `satisfy`, `allocate` and `dependency` are actually used in the repo today. `verify`
+  and `refine` are used **zero** times while the custom `#Verify` (613×) and `#DerivedFrom` (91×)
+  markers cover the same ground — see issue095.
 - Metadata application: the **prefix** form `#MarkerName <element>` (including a `#Marker` on a
   `dependency`, a `first..then` succession, or a `part`) is portable — it validates in BOTH the
   rust authority (D0048) and the kernel. The **member** form `<element> { @MarkerName; }` parses
@@ -39,7 +47,12 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
 - `:>` specialization from an **`abstract part def`** base (e.g. `part def Workflow :> MetaElement`).
 - **Ordered multiplicity** feature: `ref phases : Phase[*] ordered;`.
 - **Instance population of a `[*]` feature with a sequence:** `:>> phases = (a, b, c);`
-  (and a single value also works: `:>> exitGate = gateA;`).
+  — **KERNEL ONLY.** The rust authority (D0048) REJECTS it: `unexpected character '('`. This entry was
+  confirmed 2026-06-09 against the kernel alone, before the rust parser existed, and the qualification
+  was never added — so it read as portable for two months. Nothing in the repo uses it, and anything
+  gating a commit runs the rust parser, so treat the sequence form as UNAVAILABLE until keel-parser
+  supports it (issue095). A single value DOES work in both: `:>> exitGate = gateA;`, and several
+  single-valued `ref` features work where a multi-valued one would be natural.
 - Instances via `part x : T { :>> attr = v; :>> ref = other; }` (the `:>>` redefines
   inherited features; `ref` features take element references).
 - Closed sets are `enum def` types (pilot-confirmed 2026-06-10: `enum def X { a; b; }`
