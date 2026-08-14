@@ -33,6 +33,16 @@ package ProjectBaselines {
         :>> purpose = "Fixes a v0.2.0 regression reported from the field: marker-vocabulary was a HARD guard in the BINARY whose passing condition was `metadata def` lines in the PROJECT's schema, and upgrading the binary never updates an existing project's on-disk .engine/schema/. Reproduced at 566 violations with every commit blocked, including on the engine's own shipped files, with the only apparent remedy being an edit to FROZEN schema/core. The engine's 17-marker algebra is now BUILTIN to the binary and always valid undeclared; project markers may be declared in any .engine or .tracking file. Typo protection unchanged — an undeclared or misspelled marker still hard-fails. Upgrading requires NO action in a downstream project.";
     }
 
+    // v0.2.2 — patch: second downstream unblock (issue090/D0136).
+    part release022 : Release {
+        :>> id = "0d7b0001-0814-5b01-9b3e-0000002b0001";
+        :>> title = "v0.2.2 — an absent declared rule is not a violation";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> commit = "b98f526";
+        :>> purpose = "Six HARD guards are rule-sourced and reported a MISSING rule as a VIOLATION, so any project whose .engine/rules/ is absent, older, or authored fresh hit six hard failures and could not commit — with messages naming internal rule names that suggest no action. A project that never ADOPTED a control has not VIOLATED it: an absent rule now yields a visible NOT-ADOPTED warning and a pass, while a malformed rule and a declared-but-violated rule both still hard-fail. Also confirmed this release: a fresh `keel init` project passes its own full gate. Upgrading requires NO action in a downstream project.";
+    }
+
     // Schema green (34 items done): all initial backlog items complete.
     part schemaCompleteBaseline : Release {
         :>> id = "7b4c5d6e-8f9a-4b0c-1d2e-3f4a5b6c7d8e";
