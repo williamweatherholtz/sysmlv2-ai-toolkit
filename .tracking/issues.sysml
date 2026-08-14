@@ -1126,4 +1126,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcBaseFirstVocabulary to issue095;
+
+    #ProcessDefect part issue096 : Issue {
+        :>> id = "e0960096-0096-4e96-9096-516273840096";
+        :>> title = "The console has no surface for decisions AWAITING human acceptance — the one class that requires the human is the one it omits";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-08-14 while the human asked for `keel serve` in order to review two decisions I had twice directed them to review there. MEASURED: `/api/decisions` (the `keel decisions` governance scorecard) returns 132 rows and OMITS d0138 and d0139, the two `proposed` decisions; the declared view `keel view decisions` returns 139 and includes them (132 accepted + 5 superseded + 2 proposed). The scorecard filtering to accepted is DEFENSIBLE on its own terms — it scores citations, charters and critique coverage, which are meaningful only for a committed decision. The defect is at the level above: the console is designated the HUMAN'S OVERSIGHT LENS (D0093 dual-surface), and its Decisions surface is wired to the scorecard, so a decision awaiting acceptance appears NOWHERE in the console. The human therefore could not have found what I sent them to find, twice. WHY THIS IS WORSE THAN A MISSING TAB: acceptance is the single human gate in an otherwise autonomous loop (D0049 makes closeOut and retro AI-recorded; the per-sitting review and Decision acceptance are what the human actually owns). An oversight surface that renders everything EXCEPT the items requiring action inverts its own purpose, and the failure is silent — nothing says '2 decisions are waiting', so the absence reads as 'nothing to do'. It also cannot be noticed from inside the loop: I read the model through the CLI, where `keel view decisions` shows all three statuses, so the console's filtered view was invisible to me until I checked it on the human's behalf. PROPOSED FIX (dcPendingAcceptanceSurface): orient and the console both report PENDING ACCEPTANCES as a first-class count with the decision names, sourced from the declared view rather than the scorecard, so a proposed decision is impossible to miss and the count is computed rather than remembered. The scorecard keeps its accepted-only scope. GENERAL LESSON, and this is the third instance this sitting of the same shape: I verified a surface I do not inhabit only when the human reported friction with it — the hook config (issue093), the published release asset (issue092), and now the console. Each was checkable at any time from inside my own loop, and in each case I had asserted the surface worked.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "dcPendingAcceptanceSurface";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPendingAcceptanceSurface to issue096;
 }
