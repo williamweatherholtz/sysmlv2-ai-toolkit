@@ -43,6 +43,16 @@ package ProjectBaselines {
         :>> purpose = "Six HARD guards are rule-sourced and reported a MISSING rule as a VIOLATION, so any project whose .engine/rules/ is absent, older, or authored fresh hit six hard failures and could not commit — with messages naming internal rule names that suggest no action. A project that never ADOPTED a control has not VIOLATED it: an absent rule now yields a visible NOT-ADOPTED warning and a pass, while a malformed rule and a declared-but-violated rule both still hard-fail. Also confirmed this release: a fresh `keel init` project passes its own full gate. Upgrading requires NO action in a downstream project.";
     }
 
+    // v0.2.3 — the first release VERIFIED by obtaining the published asset and asking it what it is.
+    part release023 : Release {
+        :>> id = "0d7f0001-0814-5f01-9b3e-0000002f0001";
+        :>> title = "v0.2.3 — keel version: a released artifact that can identify itself";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> commit = "b006f10";
+        :>> purpose = "Adds `keel version` (also --version / -V / --json): the release version, the commit the binary was built from, and the guard inventory it carries. The three prior releases shipped with NO version identification — `--version` printed usage — so a downstream project told to upgrade could not confirm which binary it was running, and neither could the maintainer; a project still on the blocked version was indistinguishable from one that had upgraded. Since a guard's behaviour is a property of the BINARY (the mechanism behind issue089 and issue090), that is the first diagnostic step for any blocked-downstream report, and it was unavailable to both sides. The BUILD COMMIT is the load-bearing part: the version string alone cannot separate the published artifact from a stale local build claiming the same number; it degrades honestly (`unknown` off-git, `+dirty` from a modified tree) and is checkable against these Release facts. The guard inventory is computed from GUARD_NAMES, so it cannot drift from the guards that run. ALSO verified this release, against the DOWNLOADED v0.2.2 asset rather than a local build: a fresh `keel init` project passes its own full gate, and both downstream blocker states pass (.engine/rules/ absent; marker declarations absent from project schema). This is the FIRST release whose published asset was obtained and asked to identify itself — the prior three were verified only by confirming files existed at a URL, which is the process gap issue091 records. Upgrading requires NO action in a downstream project.";
+    }
+
     // Schema green (34 items done): all initial backlog items complete.
     part schemaCompleteBaseline : Release {
         :>> id = "7b4c5d6e-8f9a-4b0c-1d2e-3f4a5b6c7d8e";

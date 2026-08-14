@@ -1066,4 +1066,28 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcRuleAbsenceNotViolation to issue090;
+
+    #ProcessDefect part issue091 : Issue {
+        :>> id = "e0910091-0091-4e91-9091-516273840091";
+        :>> title = "Three versioned releases shipped with no way to ask the binary its version — the first diagnostic step for every blocked-downstream report was unavailable to both sides";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while verifying, against the DOWNLOADED v0.2.2 asset rather than a local build, that the issue089/issue090 fixes actually reached downstream: `keel --version` printed usage. So did `-V` and `version`. v0.2.0, v0.2.1 and v0.2.2 all shipped with NO version identification in the artifact. WHY THIS MATTERS MORE THAN A MISSING CONVENIENCE FLAG: a guard's behaviour is a property of the BINARY (that is the whole mechanism of issue089 and issue090 — a control shipped in the binary depending on project-side content), so the FIRST diagnostic step for any 'keel is blocking me' report is establishing which binary is in play. That step was answerable by NEITHER side: a project still running the blocked version was indistinguishable from one that had upgraded, so 'upgrade to v0.2.2' was unverifiable advice and a persistent report could not be separated from a failed upgrade. Both prior field reports were diagnosed only because they were reproducible in THIS repo by simulation; a non-reproducible one would have had no starting point. FIX: `keel version` (also --version / -V / --json) reports the release version, the build commit (new keel-cli/build.rs; `unknown` off-git and `+dirty` from a modified tree, degrading honestly rather than guessing) and the guard inventory computed from GUARD_NAMES. The COMMIT is the load-bearing part: the version string alone cannot separate the published artifact from a stale local build claiming the same number, and the commit is checkable against the recorded Release facts in baselines.sysml. ROOT CAUSE, and it is a PROCESS gap not a code gap: the deploy process (D0135) step `relTagPublish` requires verifying the assets are ATTACHED but never that a published asset is the RIGHT BUILD — so three releases were verified by checking that files existed at a URL, and the first actual download of a published asset happened only now. A release is the one artifact that cannot be quietly re-verified later, which is exactly the argument the process itself makes in `relGate`. The process change (require obtaining a published asset and confirming it self-identifies as the tagged version) is a SEPARATE resolvable defect, tracked as issue092 — recorded separately rather than as a second half of this one, because resolution is COMPUTED from the resolver, so a single Issue would have computed as RESOLVED the moment the code landed while the process gap remained.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcVersionIdentification";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVersionIdentification to issue091;
+
+    #ProcessDefect part issue092 : Issue {
+        :>> id = "e0920092-0092-4e92-9092-516273840092";
+        :>> title = "The deploy process verifies release assets are ATTACHED but never that a published asset is the RIGHT BUILD — three releases were verified by confirming files existed at a URL";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The ROOT of issue091, recorded separately because it has its own resolver and its own resolution condition. `relTagPublish` (.engine/processes/deploy.sysml, D0135) says: 'Verify the workflow succeeded and the assets are attached; a tag whose build failed is worse than no tag, because the version now exists but is unobtainable.' That check is satisfied by a green workflow plus a non-empty asset list — so for v0.2.0, v0.2.1 and v0.2.2 the verification consisted of confirming that files existed at a URL, and no published asset was ever DOWNLOADED OR EXECUTED. Everything asserted about those releases' behaviour was measured on a LOCAL build and attributed to the published one, with nothing establishing the two were the same artifact. The process makes the counter-argument itself in `relGate`: 'A release is the one artifact that cannot be quietly re-verified later: downstream users have the binary.' That reasoning applies to the PUBLISHED BINARY, not only to the tree that was tagged — the tree is what you still have, the asset is what they get. Concretely missed by the current check: an asset built from the wrong ref, a stale or partially-uploaded upload, a cross-compiled target that does not execute, and (the instance actually hit) a binary that cannot state which build it is. PROPOSED FIX, a CHANGE requiring human acceptance and therefore NOT applied: extend `relTagPublish` to require obtaining a published asset and confirming it self-identifies as the tagged version and commit — `keel version`, available as of v0.2.3 — before a release counts as published, turning 'the file is there' into 'the right thing is there'. Doing exactly that for v0.2.3 is what confirmed the tag/asset match at b006f10, and separately confirmed that the v0.2.2 asset genuinely fixes issue089 and issue090 in their reproduced states rather than only fixing them on my disk.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcReleaseAssetVerification";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcReleaseAssetVerification to issue092;
 }
