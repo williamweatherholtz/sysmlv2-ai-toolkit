@@ -53,6 +53,20 @@ git tag -a vX.Y.Z -m "<one line>" && git push origin vX.Y.Z
 attaches all three. **Verify the run succeeded and the assets are attached** — a tag whose build failed
 is worse than no tag, because the version exists but is unobtainable.
 
+**Then download a published asset and ask it what it is** (D0137/issue092):
+
+```
+gh release download vX.Y.Z --pattern "keel-<platform>" --dir <tmp>
+<tmp>/keel-<platform> version     # must report vX.Y.Z and the tag's commit
+```
+
+"The assets are attached" is satisfied by files existing at a URL — a different claim from "the right
+thing is there." v0.2.0, v0.2.1 and v0.2.2 all passed the weaker check while no published asset was ever
+executed, so every behavioural claim about them was measured on a local build and attributed to the
+published one. This catches an asset built from the wrong ref, a stale or partial upload, a target that
+doesn't run, and a binary that can't say which build it is. **A mismatch means NOT published** — fix and
+re-tag; don't record it.
+
 This is what makes the portable-gate guarantee real for a distributed team (D0129): a contributor gets a
 matching gate by download, not by installing a Rust toolchain.
 
@@ -70,4 +84,6 @@ is amended.
 | Hand-list what the release contained | Derivable from git — a stored copy drifts (§2.1) |
 | Release per sprint | Cadence is per-milestone; a tag per sprint means nothing |
 | Assume the workflow succeeded | Check the run and the attached assets |
+| Verify a release by checking the assets exist | Files at a URL isn't the right build — download one and run `keel version` (D0137) |
+| Claim behaviour measured on a local build | Downstream runs the published asset; the two are only the same artifact once checked |
 | Make the crate and API versions equal | They are different contracts with different consumers |
