@@ -2801,6 +2801,93 @@ pub fn decisions_weak_rationale(root: &Path) -> Result<(usize, Vec<String>), Vie
     Ok((decisions.len(), weak))
 }
 
+/// Minimum characters for an attestation to be treated as stating anything (issue083).
+///
+/// The corpus motivates the number rather than taste: of 234 `method=confirmation` verifications, the
+/// non-substantive ones cluster at 0-20 chars (empty, the bare token "accepted", a bare actor name at
+/// exactly 20) and the next-shortest genuine attestation is 33 ("schema types aligned with natives").
+/// 25 sits in that gap, so the threshold separates the two populations instead of splitting either.
+const MIN_ATTESTATION_CHARS: usize = 25;
+
+/// Stock affirmations that assert agreement without recording WHAT was agreed.
+const STOCK_AFFIRMATIONS: &[&str] = &[
+    "accepted", "approved", "ok", "okay", "yes", "confirmed", "agreed", "signed off", "signoff",
+    "lgtm", "done", "acknowledged", "ack", "fine", "good", "proceed", "accept",
+];
+
+/// Normalize an attestation for comparison: lowercase, punctuation stripped, whitespace collapsed.
+fn normalize_attestation(s: &str) -> String {
+    let cleaned: String = s.chars().map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { ' ' }).collect();
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `method=confirmation` verifications with a PASSING result whose attestation says nothing.
+///
+/// Closes issue083 (D0130). `d0129Accept` was authored with an EMPTY `procedureText` and passed every
+/// enforced guard, because `acceptance-events` and `confirmation-authenticity` check that an acceptance
+/// EXISTS and is HUMAN-judged — never that it says anything. For `method=confirmation` the attestation
+/// text IS the evidence (D0016: test/analysis/inspection carry their own evidence; a confirmation's
+/// evidence is the attestation itself), so a contentless acceptance is an unsupported claim wearing the
+/// shape of a complete record — on the highest-consequence record type in the engine, since accepted
+/// Decisions govern everything downstream. `decision-rationale` (D0103) already applies exactly this
+/// substantive-field test to a Decision's *why*; it was never applied to the event that makes the
+/// Decision binding.
+///
+/// Three INDEPENDENT reasons, because length alone is the wrong test — a bare actor name is not
+/// evidence at any length, and `d0128Accept` ("william weatherholtz") is exactly 20 characters.
+/// Only verifications with a passing result are considered: an unanswered confirmation is a pending
+/// human obligation, not a defect.
+///
+/// Returns `(verification name, reason)`.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn thin_attestations(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
+    Ok(thin_attestation_list(&Model::build(root)?))
+}
+
+/// Pure core of [`thin_attestations`], for self-test.
+fn thin_attestation_list(model: &Model) -> Vec<(String, String)> {
+    // Actor ids AND display names — a bare attribution restates `judgedBy`, it does not evidence it.
+    let mut actor_forms: HashSet<String> = HashSet::new();
+    for (name, info) in &model.items {
+        if info.type_name == "Person" || info.type_name == "Actor" {
+            actor_forms.insert(normalize_attestation(name));
+            if let Some(display) = info.attrs.get("name") {
+                actor_forms.insert(normalize_attestation(display));
+            }
+        }
+    }
+
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (vname, vinfo) in &model.items {
+        if vinfo.attrs.get("method").map(String::as_str) != Some("confirmation") {
+            continue;
+        }
+        if latest_result(model, vname).as_ref().map(|(o, _)| o.as_str()) != Some("pass") {
+            continue; // unanswered confirmation = pending human obligation, not a defect
+        }
+        let text = vinfo.attrs.get("procedureText").map_or("", String::as_str).trim();
+        let norm = normalize_attestation(text);
+        let reason = if text.is_empty() {
+            Some("empty — a confirmation's evidence IS its attestation text (D0016)".to_string())
+        } else if actor_forms.contains(&norm) {
+            Some(format!("only names an actor (\"{text}\") — that restates judgedBy, it does not evidence the attestation"))
+        } else if STOCK_AFFIRMATIONS.contains(&norm.as_str()) {
+            Some(format!("stock affirmation (\"{text}\") — records agreement without recording WHAT was agreed"))
+        } else if text.chars().count() < MIN_ATTESTATION_CHARS {
+            Some(format!("too thin to state what was attested ({} chars, minimum {MIN_ATTESTATION_CHARS}): \"{text}\"", text.chars().count()))
+        } else {
+            None
+        };
+        if let Some(r) = reason {
+            out.push((vname.clone(), r));
+        }
+    }
+    out.sort();
+    out
+}
+
 /// Governance verbs (D0104): a Decision GOVERNS a requirement (vs merely mentioning it) when one of these
 /// sits near the requirement name. Matched as a lowercase substring so inflections count (amended/descoped).
 const GOV_VERBS: &[&str] = &["amend", "supersede", "descope", "revise", "cancel", "replace", "retire", "rescope", "moot"];
@@ -5947,6 +6034,72 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("procedureText".to_string(), text.to_string());
         ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() }
+    }
+
+    /// A `method=confirmation` verification carrying `text`.
+    fn confirmation(text: &str) -> ItemInfo {
+        let mut attrs = HashMap::new();
+        attrs.insert("method".to_string(), "confirmation".to_string());
+        attrs.insert("procedureText".to_string(), text.to_string());
+        ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() }
+    }
+
+    /// A registered human actor, as the bare-name check reads it.
+    fn person(display: &str) -> ItemInfo {
+        let mut attrs = HashMap::new();
+        attrs.insert("name".to_string(), display.to_string());
+        ItemInfo { type_name: "Person".to_string(), attrs, marker: None, file: String::new() }
+    }
+
+    #[test]
+    fn thin_attestation_list_catches_empty_stock_and_bare_name() {
+        // issue083: `acceptance-events` and `confirmation-authenticity` verify an acceptance EXISTS and
+        // is HUMAN-judged, never that it SAYS anything — so d0129Accept passed every guard while empty.
+        // Length alone is the wrong test: "william weatherholtz" is exactly 20 chars and is not evidence.
+        let mut items = HashMap::new();
+        items.insert("wweatherholtz".to_string(), person("William Weatherholtz"));
+        items.insert("aEmpty".to_string(), confirmation(""));
+        items.insert("bStock".to_string(), confirmation("accepted"));
+        items.insert("cBareName".to_string(), confirmation("william weatherholtz"));
+        items.insert("dBareId".to_string(), confirmation("wweatherholtz"));
+        items.insert("eShort".to_string(), confirmation("what done means"));
+        items.insert("fGood".to_string(), confirmation("wweatherholtz attests acceptance of d0130 after reading its full text"));
+        for n in ["aEmpty", "bStock", "cBareName", "dBareId", "eShort", "fGood"] {
+            let (rn, ri) = result_for(n, "pass");
+            items.insert(rn, ri);
+        }
+        let flagged: Vec<String> = thin_attestation_list(&Model { items, edges: Vec::new() }).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(flagged, vec!["aEmpty", "bStock", "cBareName", "dBareId", "eShort"], "got {flagged:?}");
+
+        // Each reason is reported distinctly, so the fix is obvious from the message.
+        let mut items2 = HashMap::new();
+        items2.insert("wweatherholtz".to_string(), person("William Weatherholtz"));
+        items2.insert("cBareName".to_string(), confirmation("William Weatherholtz"));
+        let (rn, ri) = result_for("cBareName", "pass");
+        items2.insert(rn, ri);
+        let out = thin_attestation_list(&Model { items: items2, edges: Vec::new() });
+        assert!(out[0].1.contains("only names an actor"), "reason should name the cause: {out:?}");
+    }
+
+    #[test]
+    fn thin_attestation_list_ignores_unanswered_and_non_confirmation() {
+        // An unanswered confirmation is a PENDING HUMAN OBLIGATION, not a defect — flagging it would
+        // punish the human for not having signed off yet. And a thin procedureText on a method=test
+        // verification is fine: a test carries its own evidence (D0016).
+        let mut items = HashMap::new();
+        items.insert("pending".to_string(), confirmation("")); // no result at all
+        items.insert("failed".to_string(), confirmation(""));
+        items.insert("aTest".to_string(), {
+            let mut a = HashMap::new();
+            a.insert("method".to_string(), "test".to_string());
+            a.insert("procedureText".to_string(), "ok".to_string());
+            ItemInfo { type_name: "Test".to_string(), attrs: a, marker: None, file: String::new() }
+        });
+        let (rn, ri) = result_for("failed", "fail");
+        items.insert(rn, ri);
+        let (rn2, ri2) = result_for("aTest", "pass");
+        items.insert(rn2, ri2);
+        assert!(thin_attestation_list(&Model { items, edges: Vec::new() }).is_empty());
     }
 
     #[test]

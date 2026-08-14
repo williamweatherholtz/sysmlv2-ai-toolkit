@@ -799,6 +799,58 @@ pub fn decision_requirement_link(root: &Path) -> GuardReport {
     }
 }
 
+// ── attestation-substance guard (a confirmation that attests nothing) ─────────────────────────────
+
+/// Attestations already thin when this guard landed (2026-08-13), grandfathered to WARNING.
+///
+/// FORWARD-ONLY per the issue068 lesson: a new guard must never retroactively fail items authored
+/// under the process in force at the time. Nine of 234 `method=confirmation` verifications — seven bare
+/// "accepted", one empty (`d0129Accept`), one bare actor name (`d0128Accept`). They warn
+/// on every run so the debt stays visible; anything NEW is a hard violation. Do not extend this list:
+/// a new contentless attestation is a defect to fix, not to grandfather.
+const GRANDFATHERED_THIN_ATTESTATIONS: [&str; 9] = [
+    "d0118Accept",
+    "d0119Accept",
+    "d0120Accept",
+    "d0121Accept",
+    "d0124Accept",
+    "d0125Accept",
+    "d0127Accept",
+    "d0128Accept",
+    "d0129Accept",
+];
+
+/// Guard: a passing `method=confirmation` must actually attest something (issue083 / D0130).
+///
+/// `d0129Accept` was authored with an EMPTY `procedureText` and passed every enforced guard — because
+/// `acceptance-events` and `confirmation-authenticity` verify that an acceptance EXISTS and is
+/// HUMAN-judged, never that it says anything. For a confirmation the attestation text IS the evidence
+/// (D0016), so a contentless acceptance is an unsupported claim in the shape of a complete record, on
+/// the record type that governs everything downstream.
+///
+/// HARD-blocking, matching `decision-rationale` (D0103), which applies the same substantive-field test
+/// to a Decision's *why*: a contentless attestation is ill-formed STATE, not incomplete work, so it is
+/// squarely inside the honest-state gate (D0098) rather than the burndown.
+#[must_use]
+pub fn attestation_substance(root: &Path) -> GuardReport {
+    let grandfathered: HashSet<&str> = GRANDFATHERED_THIN_ATTESTATIONS.iter().copied().collect();
+    match crate::view::thin_attestations(root) {
+        Ok(found) => {
+            let mut warnings = Vec::new();
+            let mut violations = Vec::new();
+            for (name, reason) in &found {
+                if grandfathered.contains(name.as_str()) {
+                    warnings.push(format!("{name}: {reason} — GRANDFATHERED (pre-issue083); state what was attested when this record is next touched"));
+                } else {
+                    violations.push(format!("{name}: {reason} — a confirmation records a HUMAN's word, so it must say what was attested and to what (D0016/issue083)"));
+                }
+            }
+            GuardReport { name: "attestation-substance", scanned: found.len(), warnings, violations }
+        }
+        Err(e) => GuardReport { name: "attestation-substance", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading attestations: {e}")] },
+    }
+}
+
 // ── verification-trace guard (delivered work whose requirement carries no verification) ───────────
 
 /// Guard: a DELIVERED verification names a `SystemRequirement` in prose but never `#Verify`-links it.
@@ -1139,8 +1191,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 19] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "duplicate-identity", "decision-requirement-link", "verification-trace", "confirmation-authenticity", "engine-lint", "doc-sync"];
+pub const GUARD_NAMES: [&str; 20] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "duplicate-identity", "decision-requirement-link", "verification-trace", "confirmation-authenticity", "engine-lint", "doc-sync"];
 
 /// Run a single guard by name, or `None` if the name is unknown.
 #[must_use]
@@ -1161,6 +1213,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "process-skill" => Some(process_skill(root)),
         "requirement-rootedness" => Some(requirement_rootedness(root)),
         "decision-rationale" => Some(decision_rationale(root)), // hard (D0103)
+        "attestation-substance" => Some(attestation_substance(root)), // hard (D0130/issue083) — a confirmation must attest something
         "duplicate-identity" => Some(duplicate_identity(root)), // hard (D0129/issue074) — concurrent allocation lands green without it
         "decision-requirement-link" => Some(decision_requirement_link(root)), // warning-only member of GUARD_NAMES (D0102)
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
