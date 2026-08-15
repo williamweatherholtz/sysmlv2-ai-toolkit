@@ -354,3 +354,111 @@ active = [\"isue-resolution\"]
         assert!(a.errors[0].contains("isue-resolution"));
     }
 }
+
+/// The declared authority policy for one attestation class (D0146/D0129).
+pub struct ClassPolicy {
+    pub kinds: Vec<String>,
+    pub roles: Vec<String>,
+}
+
+/// Read `.engine/contracts/attestation-policy.toml`.
+///
+/// AN ABSENT FILE IS THE BUILT-IN FLOOR, never "no policy". A missing contract must not silently
+/// disable an authority check — absence is a legitimate state meaning the DEFAULT (the issue090
+/// lesson), and the default here is human-only, which is what D0106 and D0092 require regardless of
+/// whether a project has written the file.
+#[must_use]
+pub fn attestation_policy(root: &Path, class: &str) -> ClassPolicy {
+    let default = || ClassPolicy { kinds: vec!["human".to_owned()], roles: Vec::new() };
+    let path = root.join(".engine").join("contracts").join("attestation-policy.toml");
+    let Ok(text) = std::fs::read_to_string(path) else { return default() };
+    let Ok(v) = text.parse::<toml::Value>() else { return default() };
+    let Some(tbl) = v.get(class) else { return default() };
+    let list = |k: &str| -> Vec<String> {
+        tbl.get(k)
+            .and_then(toml::Value::as_array)
+            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
+            .unwrap_or_default()
+    };
+    let kinds = list("kinds");
+    ClassPolicy {
+        // A class with no permitted kind could never be satisfied, so an empty list falls back
+        // rather than locking the class shut — a typo in the contract must not become a deadlock.
+        kinds: if kinds.is_empty() { default().kinds } else { kinds },
+        roles: list("roles"),
+    }
+}
+
+/// Does `actor` satisfy `policy`? Returns the reason it does NOT, or `None` if it does.
+///
+/// ROLES: an empty `roles` list means ANY role, INCLUDING an actor with none recorded. That is what
+/// keeps this forward-only (issue068) — actors enrolled before D0146 carry no role and must not be
+/// retro-failed. Once a class names roles, an actor with no recorded role no longer satisfies it,
+/// and the message says so rather than reporting a generic mismatch.
+#[must_use]
+pub fn authority_gap(model_kind: Option<&str>, model_role: Option<&str>, policy: &ClassPolicy) -> Option<String> {
+    let kind = model_kind.unwrap_or("");
+    let kind_ok = policy.kinds.iter().any(|k| kind.ends_with(k.as_str()));
+    if !kind_ok {
+        return Some(format!(
+            "kind is '{}' and this class permits {:?}",
+            if kind.is_empty() { "unrecorded" } else { kind },
+            policy.kinds
+        ));
+    }
+    if policy.roles.is_empty() {
+        return None;
+    }
+    match model_role {
+        Some(r) if policy.roles.iter().any(|p| p == r) => None,
+        Some(r) => Some(format!("role is '{r}' and this class permits {:?}", policy.roles)),
+        None => Some(format!(
+            "no role is recorded, and this class permits only {:?} — enroll with `keel enroll --role` (D0146)",
+            policy.roles
+        )),
+    }
+}
+
+#[cfg(test)]
+mod authority_policy_tests {
+    use super::{authority_gap, ClassPolicy};
+
+    fn p(kinds: &[&str], roles: &[&str]) -> ClassPolicy {
+        ClassPolicy {
+            kinds: kinds.iter().map(|s| (*s).to_owned()).collect(),
+            roles: roles.iter().map(|s| (*s).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn an_empty_role_list_admits_an_actor_with_no_role() {
+        // FORWARD-ONLY (issue068). Every actor enrolled before D0146 carries no role, and a class
+        // that names no roles must admit them — otherwise adding the attribute would retro-fail
+        // every attestation in the repo's history.
+        assert_eq!(authority_gap(Some("human"), None, &p(&["human"], &[])), None);
+        assert_eq!(authority_gap(Some("ActorKind::human"), Some("anything"), &p(&["human"], &[])), None);
+    }
+
+    #[test]
+    fn a_named_role_list_refuses_a_mismatch_and_an_absence() {
+        let pol = p(&["human"], &["supervisor"]);
+        assert_eq!(authority_gap(Some("human"), Some("supervisor"), &pol), None);
+        let mismatch = authority_gap(Some("human"), Some("contributor"), &pol).unwrap();
+        assert!(mismatch.contains("contributor") && mismatch.contains("supervisor"), "{mismatch}");
+        // An UNRECORDED role is a distinct message from a wrong one: the remedy differs (enroll vs
+        // re-enroll), and a generic "mismatch" would send the reader looking for a role that is not
+        // there to find.
+        let absent = authority_gap(Some("human"), None, &pol).unwrap();
+        assert!(absent.contains("no role is recorded") && absent.contains("keel enroll --role"), "{absent}");
+    }
+
+    #[test]
+    fn kind_is_checked_before_role_and_an_ai_never_passes_a_human_class() {
+        let pol = p(&["human"], &["supervisor"]);
+        // Even with the RIGHT role, an AI fails a human-only class — role never launders kind.
+        let gap = authority_gap(Some("ActorKind::ai"), Some("supervisor"), &pol).unwrap();
+        assert!(gap.contains("kind is"), "kind must be reported first: {gap}");
+        // An unrecorded kind is not a pass either.
+        assert!(authority_gap(None, Some("supervisor"), &pol).is_some());
+    }
+}

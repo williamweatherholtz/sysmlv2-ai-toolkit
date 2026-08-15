@@ -30,6 +30,10 @@ pub struct Enrollment<'a> {
     pub actor: &'a str,
     pub name: &'a str,
     pub kind: Kind,
+    /// The function this actor fills while doing tracked work. REQUIRED, never defaulted — the
+    /// enrollment process says of kind and role that "neither may be defaulted", and role became
+    /// recordable with D0146 (issue110).
+    pub role: &'a str,
     pub email: Option<&'a str>,
 }
 
@@ -58,9 +62,12 @@ impl Kind {
 #[must_use]
 pub fn declaration(e: &Enrollment) -> String {
     let email = e.email.map_or_else(String::new, |m| format!(" :>> email = \"{m}\";"));
+    // D0146: role is written for BOTH kinds. It is what the actor DOES, independent of what they
+    // ARE, and the enrollment process requires it recorded rather than known.
+    let role = format!(" :>> role = \"{}\";", e.role);
     match e.kind {
-        Kind::Human => format!("    part {} : Person {{ :>> name = \"{}\";{email} }}\n", e.actor, e.name),
-        Kind::Ai => format!("    part {} : Actor {{ :>> name = \"{}\";{email} :>> kind = ActorKind::ai; }}\n", e.actor, e.name),
+        Kind::Human => format!("    part {} : Person {{ :>> name = \"{}\";{email}{role} }}\n", e.actor, e.name),
+        Kind::Ai => format!("    part {} : Actor {{ :>> name = \"{}\";{email} :>> kind = ActorKind::ai;{role} }}\n", e.actor, e.name),
     }
 }
 
@@ -120,21 +127,26 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).map(String::as_str).map(str::trim).filter(|s| !s.is_empty())
     };
     let (actor, name, kind_raw) = (get("--actor"), get("--name"), get("--kind"));
+    let role = get("--role");
     let email = get("--email");
 
-    if actor.is_none() || name.is_none() || kind_raw.is_none() {
-        eprintln!("usage: keel enroll --actor <id> --name \"<display name>\" --kind human|ai [--email <addr>] [ROOT]");
+    if actor.is_none() || name.is_none() || kind_raw.is_none() || role.is_none() {
+        eprintln!("usage: keel enroll --actor <id> --name \"<display name>\" --kind human|ai --role <role> [--email <addr>] [ROOT]");
         eprintln!();
         eprintln!("Every field is REQUIRED and none is defaulted. In particular `--kind` is asked, never inferred:");
         eprintln!("  it decides what you may ATTEST — accepting a Decision, dispositioning a finding, adjudicating a");
         eprintln!("  conflict are human-only, and nothing else protects them. An AI enrolls as `--kind ai`, which");
         eprintln!("  registers an Actor, never a Person (issue073).");
         eprintln!();
+        eprintln!("`--role` is the function you fill while doing tracked work — contributor, supervisor,");
+        eprintln!("  integrator, reviewer, or a role this project declares. It is model data, not tribal");
+        eprintln!("  knowledge, and the enrollment process says of kind and role that neither may be defaulted.");
+        eprintln!();
         eprintln!("Git committer identity is deliberately NOT consulted: on an agent's machine it is whatever that");
         eprintln!("machine was configured with, which is precisely how an AI gets recorded as a human.");
         return 2;
     }
-    let (Some(actor), Some(name), Some(kind_raw)) = (actor, name, kind_raw) else { return 2 };
+    let (Some(actor), Some(name), Some(kind_raw), Some(role)) = (actor, name, kind_raw, role) else { return 2 };
     let Some(kind) = Kind::parse(kind_raw) else {
         eprintln!("error: --kind must be `human` or `ai` (got '{kind_raw}'). It is never guessed: see `keel enroll` with no arguments.");
         return 2;
@@ -144,7 +156,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         println!("note: --email on an AI actor is unusual; it will be recorded, but `kind = ActorKind::ai` is what governs authority.");
     }
 
-    let e = Enrollment { actor, name, kind, email };
+    let e = Enrollment { actor, name, kind, role, email };
     let registry_path = root.join(".tracking").join("actors.sysml");
 
     // Step 5 FIRST: prove the gate runs before writing anything. Registering onto a gate that does
@@ -220,9 +232,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
             println!("  recording one anyway is a fabricated attestation, not a shortcut.");
         }
     }
-    println!("  ROLE is not recorded: `Actor` has no `role` attribute yet. See the proposed Decision in");
-    println!("  `keel orient` -> pendingAcceptances; role stays unrecorded until that is signed off, rather");
-    println!("  than being written somewhere it cannot be queried.");
+    println!("  Recorded role: {role}.");
     println!("  Next: `keel orient .` to see where things stand, then the `distributed-collaboration` skill.");
     println!("  note: {} is machine-local and must never be committed.", crate::actor::BINDING_PATH);
     0
@@ -235,14 +245,29 @@ mod tests {
     /// The single most important property in this module: an AI is never written as a `Person`.
     #[test]
     fn an_ai_is_registered_as_an_actor_never_a_person() {
-        let ai = declaration(&Enrollment { actor: "botX", name: "Bot X", kind: Kind::Ai, email: None });
+        let ai = declaration(&Enrollment { actor: "botX", name: "Bot X", kind: Kind::Ai, role: "contributor", email: None });
         assert!(ai.contains("part botX : Actor"), "{ai}");
         assert!(ai.contains("kind = ActorKind::ai"), "{ai}");
         assert!(!ai.contains("Person"), "an AI must never be a Person (issue073): {ai}");
 
-        let human = declaration(&Enrollment { actor: "jo", name: "Jo", kind: Kind::Human, email: Some("jo@x.com") });
+        let human = declaration(&Enrollment { actor: "jo", name: "Jo", kind: Kind::Human, role: "supervisor", email: Some("jo@x.com") });
         assert!(human.contains("part jo : Person"), "{human}");
         assert!(human.contains("email = \"jo@x.com\""), "{human}");
+    }
+
+    /// D0146: role is recorded for BOTH kinds, and it is what the actor DOES rather than what they
+    /// ARE — so it must not be inferable from `kind`. The enrollment process requires it recorded
+    /// as model data, and a role written into a display name would be neither queryable nor this.
+    #[test]
+    fn role_is_recorded_as_its_own_attribute_for_both_kinds() {
+        for (kind, role) in [(Kind::Ai, "contributor"), (Kind::Human, "supervisor")] {
+            let d = declaration(&Enrollment { actor: "a", name: "A", kind, role, email: None });
+            assert!(d.contains(&format!("role = \"{role}\"")), "role must be its own attribute: {d}");
+        }
+        // A human may be a contributor and an AI may not be a supervisor — but that is a POLICY
+        // question, not a schema one, so the writer records what it is told rather than deciding.
+        let d = declaration(&Enrollment { actor: "h", name: "H", kind: Kind::Human, role: "contributor", email: None });
+        assert!(d.contains("role = \"contributor\"") && d.contains(": Person"), "{d}");
     }
 
     #[test]

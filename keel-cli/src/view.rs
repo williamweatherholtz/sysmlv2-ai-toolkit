@@ -5971,6 +5971,7 @@ pub fn attr_value_string(v: &Value) -> String {
 }
 
 /// `(disposition, issue, judgedBy)` for one offending disposition.
+/// `(disposition, issue, gap)` — the gap is WHY the judge fails the declared policy, not merely who.
 pub type AiJudgedDisposition = (String, String, String);
 
 /// Dispositions of findings at or above Medium whose result is NOT judged by a registered `Person`.
@@ -5984,6 +5985,7 @@ pub type AiJudgedDisposition = (String, String, String);
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDisposition>), ViewError> {
     let model = Model::build(root)?;
+    let policy = crate::activation::attestation_policy(root, "findingDisposition");
     let mut scanned = 0usize;
     let mut bad = Vec::new();
     let mut edges: Vec<&Edge> = model.edges.iter().filter(|e| e.kind == "dispositions").collect();
@@ -6000,9 +6002,19 @@ pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDi
         scanned += 1;
         let result = format!("{}R1", e.from);
         let judged_by = model.items.get(&result).and_then(|i| i.attrs.get("judgedBy")).cloned().unwrap_or_default();
-        let is_person = model.items.get(&judged_by).is_some_and(|a| a.type_name == "Person");
-        if !is_person {
-            bad.push((e.from.clone(), e.to.clone(), judged_by));
+        // Check the actor against the DECLARED policy rather than a hardcoded "is a Person"
+        // (D0146/srDcAuthorityFromRegistry: kind AND role, against the policy for this class).
+        // A `Person`'s schema pins `kind = ActorKind::human`, so an actor typed Person satisfies the
+        // kind test even without the attribute written out.
+        let actor = model.items.get(&judged_by);
+        let kind = actor.map(|a| {
+            a.attrs.get("kind").cloned().unwrap_or_else(|| {
+                if a.type_name == "Person" { "human".to_owned() } else { String::new() }
+            })
+        });
+        let role = actor.and_then(|a| a.attrs.get("role")).cloned();
+        if let Some(gap) = crate::activation::authority_gap(kind.as_deref(), role.as_deref(), &policy) {
+            bad.push((e.from.clone(), e.to.clone(), format!("{judged_by} ({gap})")));
         }
     }
     Ok((scanned, bad))

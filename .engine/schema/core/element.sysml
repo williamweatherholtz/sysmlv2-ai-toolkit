@@ -86,6 +86,14 @@ package EngineElement {
         attribute name : String;
         attribute email : String[0..1];
         attribute kind : ActorKind;
+        // D0146 (accepted 2026-08-15): the FUNCTION this actor fills while doing tracked work —
+        // contributor, supervisor, integrator, reviewer, or a role the project declares. The
+        // actor-enrollment process requires it recorded as model data ("not tribal knowledge") and
+        // had nowhere to put it (issue110). A free String rather than an enum, deliberately: the
+        // process explicitly permits a project-declared role, and a closed vocabulary in FROZEN core
+        // would force every project with its own role names through a schema sign-off to use them.
+        // Optional so every actor recorded before this stays valid without migration.
+        attribute role : String[0..1];
     }
     part def Person :> Actor {
         :>> kind = ActorKind::human;

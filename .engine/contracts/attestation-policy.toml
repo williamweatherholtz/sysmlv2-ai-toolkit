@@ -1,0 +1,37 @@
+# attestation-policy — who may make each kind of attestation (D0146/D0129 srDcAuthorityFromRegistry).
+#
+# WHY DECLARED RATHER THAN HARDCODED. srDcAuthorityFromRegistry requires the acting actor's recorded
+# KIND AND ROLE to be checked "against the declared policy for that class". A policy compiled into
+# the binary is not declared — a project could not see it, could not tighten it, and could not tell
+# which of its own actors satisfy it. This file is the policy; `keel guard attestation-authority`
+# reads it. Same precedent as `.engine/contracts/critique-policy.toml` (D0097).
+#
+# ABSENT FILE = the built-in floor, never "no policy". A missing contract must not silently disable
+# an authority check (the issue090 lesson: absence is a legitimate state, and it means the DEFAULT,
+# not the empty set). With this file deleted, human-only still holds for both classes below.
+#
+# `kinds`  — the ActorKind values permitted. Empty is not allowed; a class with no permitted kind
+#            could never be satisfied.
+# `roles`  — the roles permitted. EMPTY MEANS ANY ROLE, including an actor with none recorded, which
+#            is what keeps this forward-only (issue068): actors enrolled before D0146 carry no role
+#            and must not be retro-failed. Naming roles here starts constraining immediately.
+
+[decisionAcceptance]
+# Accepting a Decision. Human-only under D0106 — an AI cannot supply a human's sign-off, and
+# `confirmation-authenticity` enforces the kind half independently of this file.
+kinds = ["human"]
+roles = ["supervisor"]
+
+[findingDisposition]
+# Dispositioning a finding at or above the Medium threshold (D0092). Human-only, and D0080 permits
+# an AI to disposition a LOW finding — that threshold lives in the guard, not here, because it is a
+# property of the FINDING rather than of the actor.
+kinds = ["human"]
+roles = ["supervisor"]
+
+[contentionAdjudication]
+# Adjudicating a contributor conflict (D0108 clause 5). Human-only: no contributor may resolve a
+# contention in favour of its own conclusion, and an AI resolving one would be doing exactly that
+# whenever it holds a side.
+kinds = ["human"]
+roles = ["supervisor"]

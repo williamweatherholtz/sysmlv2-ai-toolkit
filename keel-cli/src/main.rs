@@ -1918,6 +1918,78 @@ fn cmd_record_issue(args: &[String]) -> i32 {
     }
 }
 
+/// `keel accept <decision> --note "<the human's words>" --by <humanActor> --date YYYY-MM-DD`
+///
+/// THE SINGLE HUMAN GATE HAD NO CLI. `write::accept_decision` existed and was reachable only through
+/// `keel serve`'s HTTP API, so recording the one attestation this engine treats as irreducibly human
+/// required either running a web server or hand-editing the decision file. That is the same defect
+/// `record issue` had (sprint 291): a mandated path with no implementation is the friction that
+/// guarantees non-compliance (D0054), and here it applies to the gate the whole autonomous loop
+/// pauses for.
+///
+/// # This command records a human's word; it cannot create one
+///
+/// `--note` must carry what the human actually said, and `--by` must name a `Person`. The
+/// `confirmation-authenticity` guard independently checks that the acceptance result is judged by a
+/// Person-typed actor, so an AI accepting its own proposal fails the gate rather than passing it —
+/// this command makes the honest path easy without making the dishonest one possible.
+fn cmd_accept(args: &[String]) -> i32 {
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    let Some(decision) = args.first().filter(|a| !a.starts_with("--")) else {
+        eprintln!("usage: keel accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
+        eprintln!();
+        eprintln!("Records a HUMAN's acceptance of a proposed Decision (D0106). The note must be what they");
+        eprintln!("actually said — it IS the attestation, and `confirmation-authenticity` independently checks");
+        eprintln!("that `--by` names a Person, so this cannot be used to self-accept an AI's own proposal.");
+        return 2;
+    };
+    let (Some(note), Some(date)) = (flag(args, "note"), flag(args, "date")) else {
+        eprintln!("error: --note and --date are both required. The note is the attestation; the date is when it was given.");
+        return 2;
+    };
+    let judged_by = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
+    // Find the decision's file rather than making the caller supply it: a path argument here is a
+    // chance to accept the wrong file, and the name is unambiguous.
+    let mut found = None;
+    for p in keel_cli::collect_sysml(&root.join(".engine").join("decisions")) {
+        if std::fs::read_to_string(&p).is_ok_and(|t| t.contains(&format!("part {decision} : Decision"))) {
+            found = Some(p);
+            break;
+        }
+    }
+    let Some(path) = found else {
+        eprintln!("error: no Decision '{decision}' under .engine/decisions/.");
+        return 2;
+    };
+    let sha = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .unwrap_or_default();
+    match keel_cli::write::accept_decision(&path, decision, &sha, &date, &judged_by, &note) {
+        Ok(_) => {
+            println!("accepted {decision} (judged by {judged_by} at {date}, against {sha})");
+            println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
+            println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
 /// `keel enroll` — the trailing ROOT is only honoured when it actually looks like a keel project,
 /// so a stray argument cannot silently redirect an enrollment into the wrong tree.
 fn cmd_enroll(rest: &[String]) -> i32 {
@@ -1928,6 +2000,58 @@ fn cmd_enroll(rest: &[String]) -> i32 {
         .filter(|a| Path::new(a.as_str()).join(".tracking").is_dir())
         .map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
     keel_cli::enroll::cmd(rest, &root)
+}
+
+/// The subcommand catalogue, printed when no arm matches.
+///
+/// Extracted from `main` because a dispatcher whose fallback is thirty lines of `eprintln!` makes
+/// the DISPATCH unreadable — the lint that forced this out is doing the right job.
+fn print_usage() -> i32 {
+    eprintln!("keel <subcommand> [args]");
+            eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
+            eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
+            eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
+            eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
+            eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
+            eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
+            eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
+            eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
+            eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
+            eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
+            eprintln!("  check FILE...                parse-check one or more .sysml files");
+        eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
+            eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
+            eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
+            eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
+            eprintln!("  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)");
+            eprintln!("  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)");
+            eprintln!("  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)");
+            eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
+            eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");
+            eprintln!("  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)");
+            eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
+            eprintln!("  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
+            eprintln!("  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance (D0106)");
+            eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");
+    2
+}
+
+/// A read-only view subcommand: run `f` against the repo root and print its JSON, or the error as
+/// JSON so a consumer parsing stdout gets a parseable answer either way.
+fn cmd_view0(
+    rest: &[String],
+    name: &'static str,
+    f: fn(&Path) -> Result<String, keel_cli::view::ViewError>,
+) -> i32 {
+    // `cmd_query0` takes a fn POINTER, and a closure capturing `f` is not one — so the root is
+    // resolved here and the view invoked directly, rather than threading a capture through it.
+    let Some(root) = rest.first().map(PathBuf::from).or_else(find_repo_root) else {
+        eprintln!("usage: keel {name} [ROOT]");
+        return 2;
+    };
+    println!("{}", f(&root).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")));
+    0
 }
 
 /// The repo a git-touching subcommand acts on: the first non-flag argument, else the discovered root.
@@ -2008,10 +2132,10 @@ fn main() {
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("critique-policy") => cmd_critique_policy(rest),
         Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("assumptions") => cmd_query0(rest, "keel assumptions [ROOT]", |r| keel_cli::view::assumptions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("authority-queue") => cmd_query0(rest, "keel authority-queue [ROOT]", |r| keel_cli::view::authority_queue(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("contentions") => cmd_query0(rest, "keel contentions [ROOT]", |r| keel_cli::view::contentions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("marker-census") => cmd_query0(rest, "keel marker-census [ROOT]", |r| keel_cli::view::marker_census(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+        Some("assumptions") => cmd_view0(rest, "assumptions", keel_cli::view::assumptions),
+        Some("authority-queue") => cmd_view0(rest, "authority-queue", keel_cli::view::authority_queue),
+        Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
+        Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
@@ -2038,36 +2162,9 @@ fn main() {
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
+        Some("accept") => cmd_accept(rest),
         Some("record") => cmd_record(rest),
-        _ => {
-            eprintln!("keel <subcommand> [args]");
-            eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
-            eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
-            eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
-            eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
-            eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
-            eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
-            eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
-            eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
-            eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
-            eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
-            eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
-            eprintln!("  check FILE...                parse-check one or more .sysml files");
-        eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
-            eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
-            eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
-            eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
-            eprintln!("  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)");
-            eprintln!("  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)");
-            eprintln!("  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)");
-            eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
-            eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");
-            eprintln!("  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)");
-            eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
-            eprintln!("  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
-            eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");
-            2
-        }
+        _ => print_usage(),
     };
     process::exit(code);
 }

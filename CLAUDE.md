@@ -98,7 +98,7 @@ frozen (modify it only by out-of-band Decision).
 ## 4. Working rules
 
 - **The write API is the sanctioned write path.** `keel append-result`, `append-gate-result`, `add-task`,
-  `record decision`, `record issue`, `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
+  `record decision`, `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
   Commit messages and memory are **not** decision records.

@@ -105,4 +105,11 @@ package ProjectVerifyBackfill {
     #Verify dependency from storyPortabilityDoD to srPortModularProcessUnit;
     #Verify dependency from keelProcessPortabilityDoD to srPortCatalogExchange;
     #Verify dependency from keelProcessPortabilityDoD to srPortModularProcessUnit;
+    // Completed by sprint 299: role is now recorded (D0146), so both DoDs discharge their
+    // requirement's kind AND role clause. Held back in sprint 296 precisely because they did not.
+    #Verify dependency from dcEnrollmentDoD to srDcEnrollment;
+    #Verify dependency from storyEnrollmentDoD to srDcEnrollment;
+    #Verify dependency from dcMechanizeOwnershipDoD to srDcAuthorityFromRegistry;
+    #Verify dependency from storyOwnershipDoD to srDcAuthorityFromRegistry;
+    #Verify dependency from storyActorRoleDoD to srDcAuthorityFromRegistry;
 }

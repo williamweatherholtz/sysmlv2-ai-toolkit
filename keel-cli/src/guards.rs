@@ -1677,14 +1677,20 @@ pub fn ownership(root: &Path) -> GuardReport {
 /// `claudeOpus`, whose own text says "Low doc-accuracy finding, AI-dispositioned (no human gate for
 /// Low, D0080)". A guard requiring a human on every disposition would have failed a correct,
 /// documented judgement and forced either a false attestation or a bypass. Medium and above only.
+/// The threshold stays in the guard rather than in the policy file because it is a property of the
+/// FINDING, not of the actor — the contract answers "who may attest", not "what needs attesting".
+///
+/// D0146: the check is now against the DECLARED policy (kind AND role) rather than a hardcoded
+/// `is a Person`, which is what srDcAuthorityFromRegistry asks for. An absent contract falls back to
+/// human-only, so deleting the file cannot disable the check.
 #[must_use]
 pub fn attestation_authority(root: &Path) -> GuardReport {
     match crate::view::ai_judged_high_dispositions(root) {
         Ok((scanned, bad)) => {
             let violations = bad
                 .into_iter()
-                .map(|(disp, issue, judge)| format!(
-                    "{disp}: dispositions '{issue}' (>= Medium) but its result is judged by '{judge}', which is not a registered Person — a disposition at or above the threshold is a HUMAN verdict (D0092/D0080). An AI actor cannot supply it."
+                .map(|(disp, issue, gap)| format!(
+                    "{disp}: dispositions '{issue}' (>= Medium) but its judge does not satisfy the declared authority policy — {gap}. See .engine/contracts/attestation-policy.toml [findingDisposition] (D0092/D0146)."
                 ))
                 .collect();
             GuardReport { name: "attestation-authority", scanned, warnings: Vec::new(), violations }
