@@ -194,6 +194,7 @@ pub fn cmd_sync(repo: &Path) -> i32 {
 
 /// `keel land [ROOT]` — push; on rejection integrate and retry, bounded. Never rewrites history.
 #[must_use]
+// @audit-hash ceLandGate
 pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     let branch = git(repo, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "HEAD".to_string());
     for attempt in 1..=max_attempts {

@@ -53,6 +53,7 @@ pub struct ClaimView {
 ///
 /// # Errors
 /// Returns [`crate::view::ViewError`] if a tracking file fails to parse.
+// @audit-hash ceClaimHolderRule
 pub fn claims(root: &Path) -> Result<Vec<ClaimView>, crate::view::ViewError> {
     let today = crate::view::repo_today_pub(root);
     let mut rows = crate::view::claim_rows(root)?;

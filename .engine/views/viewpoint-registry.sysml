@@ -195,4 +195,58 @@ package EngineViewpoints {
         :>> sources = "this viewpoint registry: each Viewpoint's renderer classified served (names a keel command) vs unserved (planned), with a coverage %";
         :>> renderer = "keel concern-coverage";
     }
+    part archElementsVP : Viewpoint {
+        :>> id = "c58f7043-8c0c-4853-8730-5082bae8d7e6";
+        :>> title = "arch-elements";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "What code has someone taken responsibility for, and where does it live?";
+        :>> audience = "maintainer / auditor";
+        :>> sources = "authored CodeElement instances (EngineCodeAudit, D0148)";
+        :>> renderer = "keel arch elements [--kind K] [--file F]";
+    }
+    part archCriticalityVP : Viewpoint {
+        :>> id = "17a5aae3-5eb6-4073-addb-9338f95a8af3";
+        :>> title = "arch-criticality";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which code units should be audited first?";
+        :>> audience = "maintainer / safety reviewer";
+        :>> sources = "CodeElement.riskClass, ranked worst-first, bumped one tier where the element traces to a `must` Need";
+        :>> renderer = "keel arch criticality";
+    }
+    part archCouplingVP : Viewpoint {
+        :>> id = "a32cbe7c-51c5-4812-9b48-d77dde78f330";
+        :>> title = "arch-coupling";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which units are entangled, and which sit far from the main sequence?";
+        :>> audience = "architect";
+        :>> sources = "#DependsOn edges among catalogued elements; authored abstractness where present";
+        :>> renderer = "keel arch coupling";
+    }
+    part archDriftVP : Viewpoint {
+        :>> id = "625ba256-1c94-4514-8fa6-0e03e01d8b4a";
+        :>> title = "arch-drift";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which audited units have changed since they were audited?";
+        :>> audience = "maintainer";
+        :>> sources = "CodeElement.codeHash vs a re-hash of the block under the live // @audit-hash marker";
+        :>> renderer = "keel arch drift";
+    }
+    part archStpaInputsVP : Viewpoint {
+        :>> id = "01edfc83-4aac-41f2-bda7-aba3b60a415d";
+        :>> title = "arch-stpa-inputs";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "What control structure has been captured for a later STPA analysis?";
+        :>> audience = "safety analyst";
+        :>> sources = "CodeElement.stpaRole + controlActions + #Controls/#Feedback edges. A HAND-OFF, not an analysis";
+        :>> renderer = "keel arch stpa-inputs";
+    }
+    part archCoverageVP : Viewpoint {
+        :>> id = "6a6879b9-bab4-450d-b561-bd622783acbf";
+        :>> title = "arch-coverage";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "How much of the codebase does the registry actually speak for?";
+        :>> audience = "maintainer";
+        :>> sources = "catalogued elements vs a HEURISTIC top-level-def scan of the files they name; non-blocking indicator, never a gate";
+        :>> renderer = "keel arch coverage";
+    }
 }

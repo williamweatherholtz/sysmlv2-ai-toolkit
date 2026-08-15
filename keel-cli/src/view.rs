@@ -6020,6 +6020,92 @@ pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDi
     Ok((scanned, bad))
 }
 
+/// One authored `CodeElement`, flattened for the `arch` views (D0148/`EngineCodeAudit`).
+pub struct CodeElementRow {
+    pub name: String,
+    pub label: String,
+    pub kind: String,
+    pub file: String,
+    pub code_hash: String,
+    pub risk_class: String,
+    pub invariant_safety: String,
+    pub stpa_role: String,
+    pub design_pattern: String,
+    pub control_actions: Vec<String>,
+    pub marker: Option<String>,
+    /// Authored 0.0..1.0, or `None` where nobody recorded one — the distinction `arch coupling`
+    /// prints as `-` rather than defaulting to a number it would then present as measured.
+    pub abstractness: Option<f64>,
+}
+
+/// Everything the `arch` views compute over, from ONE model build.
+///
+/// Bundled rather than exposed as three accessors because each `Model::build` re-parses every
+/// tracking file, and six subcommands each rebuilding three times is a visible cost on a repo this
+/// size for no gain — the three pieces are always wanted together.
+pub struct ArchModel {
+    pub elements: Vec<CodeElementRow>,
+    /// Every typed edge as `(kind, from, to)`.
+    pub edges: Vec<(String, String, String)>,
+    /// `Need` name -> authored `MoSCoW` `priority`, for the criticality bump.
+    pub need_priority: HashMap<String, String>,
+}
+
+/// Read an attribute that may be authored as a scalar or as a `(a, b)` list.
+///
+/// The parser flattens attributes to strings, so a `String[0..*]` arrives as whatever the author
+/// wrote. Handling both shapes here keeps that detail out of every caller, and means a registry
+/// authored either way computes the same.
+#[must_use]
+pub fn attr_list(raw: &str) -> Vec<String> {
+    let t = raw.trim();
+    let inner = t.strip_prefix('(').and_then(|s| s.strip_suffix(')')).unwrap_or(t);
+    inner
+        .split(',')
+        .map(|p| p.trim().trim_matches('"').trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect()
+}
+
+/// The authored code-audit registry plus the graph the `arch` views need.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking file fails to parse.
+pub fn arch_model(root: &Path) -> Result<ArchModel, ViewError> {
+    let model = Model::build(root)?;
+    let mut elements: Vec<CodeElementRow> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "CodeElement")
+        .map(|(n, i)| {
+            let g = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
+            CodeElementRow {
+                name: n.clone(),
+                label: display_label(n, i),
+                kind: g("kind"),
+                file: g("filePath"),
+                code_hash: g("codeHash"),
+                risk_class: g("riskClass"),
+                invariant_safety: g("invariantSafety"),
+                stpa_role: g("stpaRole"),
+                design_pattern: g("designPattern"),
+                control_actions: attr_list(&g("controlActions")),
+                marker: i.marker.clone(),
+                abstractness: i.attrs.get("abstractness").and_then(|v| v.trim().parse::<f64>().ok()),
+            }
+        })
+        .collect();
+    elements.sort_by(|a, b| a.name.cmp(&b.name));
+    let need_priority = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Need")
+        .map(|(n, i)| (n.clone(), i.attrs.get("priority").cloned().unwrap_or_default()))
+        .collect();
+    let edges = model.edges.iter().map(|e| (e.kind.clone(), e.from.clone(), e.to.clone())).collect();
+    Ok(ArchModel { elements, edges, need_priority })
+}
+
 /// One claim as authored: `(name, item, by, at, against)`. Liveness is NOT here — it is computed.
 pub type ClaimRow = (String, String, String, String, String);
 

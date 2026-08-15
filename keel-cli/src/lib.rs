@@ -27,6 +27,7 @@ use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 pub mod activation;
 pub mod actor;
 pub mod algo;
+pub mod arch;
 pub mod claim;
 pub mod enroll;
 pub mod govern;

@@ -2039,6 +2039,8 @@ fn print_usage() -> i32 {
             eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
             eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
             eprintln!("  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)");
+            eprintln!("  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>");
+            eprintln!("                                   computed views over an AUTHORED CodeElement registry (D0148)");
     eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
             eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
             eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
@@ -2172,6 +2174,9 @@ fn main() {
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        // `repo_arg(rest)` would take the SUBCOMMAND as the path — `arch elements .` resolved the
+        // root to `./elements`, whose empty model then printed "no CodeElement instances authored".
+        Some("arch") => keel_cli::arch::cmd(rest, &repo_arg(rest.get(1..).unwrap_or(&[]))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),

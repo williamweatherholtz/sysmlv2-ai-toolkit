@@ -628,6 +628,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
     "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness", "tier-satisfaction", "recent",
+    "arch", // D0148 — the six `arch` views register as viewpoints; the group name is what `keel <cmd>` matches
 ];
 
 /// The quoted value of `:>> {key} = "..."` on a line.

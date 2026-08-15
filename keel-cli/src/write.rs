@@ -1259,6 +1259,7 @@ mod issue_tests {
 ///
 /// # Errors
 /// `WriteError::Io` on filesystem errors.
+// @audit-hash ceRecordClaim
 pub fn record_claim(root: &Path, item: &str, actor: &str) -> Result<(String, String), WriteError> {
     let dir = root.join(".tracking").join("claims");
     std::fs::create_dir_all(&dir)?;

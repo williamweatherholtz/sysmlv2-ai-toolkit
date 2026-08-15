@@ -25,6 +25,8 @@ SCHEMA_ORDER = [
     "schema/core/indicator.sysml",
     "schema/core/baseline.sysml",
     "schema/safety/stpa.sysml",
+    # Optional module (D0148). After core/element.sysml, which it specializes; independent of safety.
+    "schema/codeaudit/codeelement.sysml",
 ]
 
 

@@ -1373,4 +1373,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from workClaimStory to issue116;
+
+    part issue117 : Issue {
+        :>> id = "c48b019d-b805-49c5-8901-9bbda6132bbd";
+        :>> title = "keelArchViews was verified against keel's own registry, not SelfSync's as its DoD requires";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keelArchViewsDoD says to verify the six arch views 'on SelfSync's authored registry'. SelfSync is a different project and this repo does not hold its data, so the acceptance criterion is unreachable from here - D0148's own consequences flagged this and said the item should be re-scoped to name where it will be verified. RE-SCOPED to keel's own source: a 12-element registry over keel-cli and keel-parser, authored at .tracking/architecture/code-registry.sysml, with real risk judgments about modules whose failure would actually matter. This is the alternative D0148 accepted and not the one it rejected - the rejected option was a synthetic probe registry, which would show the commands run rather than that they compute anything true. WHAT IS THEREFORE NOT YET PROVEN: that the views compute correctly over a registry authored by a DIFFERENT project with different conventions, which is the portability claim keelArchViews was actually about. keel's own registry was authored by the same author as the views, so it cannot detect an assumption shared between them. Resolving this needs either SelfSync's registry or a second project's, and until then the portability claim rests on the schema module shipping through keel init rather than on a demonstration.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "keelArchViews";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from archViewsStory to issue117;
 }
