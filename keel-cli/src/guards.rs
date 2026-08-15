@@ -1462,8 +1462,80 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 31] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority"];
+pub const GUARD_NAMES: [&str; 32] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision"];
+
+
+// ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
+
+/// A `<kind> def <Name>` declaration line's name.
+fn declared_type_name(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    let t = trimmed.strip_prefix("abstract ").unwrap_or(trimmed);
+    let mut it = t.split_whitespace();
+    let first = it.next()?;
+    if !first.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return None;
+    }
+    let mut next = it.next()?;
+    if next == "case" {
+        next = it.next()?; // `use case def X`
+    }
+    if next != "def" {
+        return None;
+    }
+    let name = it.next()?;
+    let name = name.trim_end_matches(|c: char| !c.is_alphanumeric() && c != '_');
+    (!name.is_empty() && name.chars().next().is_some_and(char::is_alphabetic)).then_some(name)
+}
+
+/// Guard: a PROJECT type must not shadow an ENGINE type (D0128 userDefinedTypedefs).
+///
+/// A project declaring its own domain types in `.tracking/` is supported and wanted — that is the
+/// whole point of userDefinedTypedefs, and it already resolves. What is NOT safe is a project
+/// declaring a name the engine already defines. Measured before building this: a project
+/// `part def Story :> Element` validates CLEAN today and passes every guard, while `Story` is the
+/// type `orient` counts work by. Whichever definition wins, the other is silently ignored, and a
+/// computed view starts counting something other than what the reader believes — with no diagnostic
+/// anywhere. Silence is the defect; the collision itself is easy to fix once seen.
+///
+/// HARD, and it starts at zero: 91 engine defs against 305 project defs in this repo produce no
+/// collision today, so nothing is grandfathered and nothing needs to be (issue068 protects work that
+/// was correct when written; there is none to protect here).
+///
+/// Names only, deliberately. Whether the project MEANT to extend or to replace the engine type is
+/// not decidable from the text, and a guard that guessed would be wrong in one direction or the
+/// other. Reporting the shadow and letting the author rename is exact.
+#[must_use]
+pub fn type_collision(root: &Path) -> GuardReport {
+    let mut engine: HashMap<String, String> = HashMap::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("schema")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+        for (i, line) in text.lines().enumerate() {
+            if let Some(n) = declared_type_name(line) {
+                engine.entry(n.to_owned()).or_insert_with(|| format!("{rel}:{}", i + 1));
+            }
+        }
+    }
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+        for (i, line) in text.lines().enumerate() {
+            let Some(n) = declared_type_name(line) else { continue };
+            scanned += 1;
+            if let Some(where_engine) = engine.get(n) {
+                violations.push(format!(
+                    "{rel}:{}: project type `{n}` SHADOWS the engine type declared at {where_engine} — whichever definition wins, the other is silently ignored and a computed view starts counting something other than what the reader believes. Rename the project type (D0128: projects extend the model, they do not redefine it)",
+                    i + 1
+                ));
+            }
+        }
+    }
+    GuardReport { name: "type-collision", scanned, warnings: Vec::new(), violations }
+}
 
 // ── ownership + attestation authority (D0129 srDcAuthorityFromRegistry; mechanizes D0108) ────────
 
@@ -1724,6 +1796,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
         "base-first-justification" => Some(base_first_justification(root)), // warning-only (D0139(B))
         "edge-endpoints" => Some(edge_endpoints(root)), // hard (issue109) — an edge asserting a relationship to nothing
+        "type-collision" => Some(type_collision(root)), // hard (D0128) — a project type shadowing an engine type, silently
         "ownership" => Some(ownership(root)), // hard (D0108/D0129) — a non-owner overwriting another actor's fields
         "attestation-authority" => Some(attestation_authority(root)), // hard (D0092) — a human-only verdict judged by an AI
         "parser-coverage" => Some(parser_coverage(root)), // warning-only (issue102) — what the engine cannot read
