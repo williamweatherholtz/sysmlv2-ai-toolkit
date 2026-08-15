@@ -13,4 +13,22 @@ package ProjectActors {
     part claudeOpus : Actor { :>> name = "Claude Opus 4.8"; :>> kind = ActorKind::ai; }
     part claudeSonnet46 : Actor { :>> name = "Claude Sonnet 4.6"; :>> kind = ActorKind::ai; }
     part claudeOpus5 : Actor { :>> name = "Claude Opus 5"; :>> kind = ActorKind::ai; }
+
+    // The three-critic panel the human commissioned on 2026-08-14 (commit ec7d548). Registered as
+    // actors so the panel's findings can be attributed rather than left in chat history (D0018).
+    //
+    // WHAT THEY ACTUALLY WERE, stated so a later reader cannot mistake them for independent
+    // reviewers: three separate subagent CONTEXTS of the SAME model as the author (Claude Opus 5),
+    // each given a different brief and launched BEFORE the author wrote their own analysis, so the
+    // findings were not anchored to the author's framing. Distinct context and distinct brief —
+    // NOT a distinct model, and not a distinct judgement substrate. `name` says so on each record
+    // rather than only in this comment, because the name is what a viewer renders.
+    part panelAntagonist : Actor { :>> name = "Panel antagonist (Opus 5 subagent context, not an independent model)"; :>> kind = ActorKind::ai; }
+    part panelProtagonist : Actor { :>> name = "Panel protagonist (Opus 5 subagent context, not an independent model)"; :>> kind = ActorKind::ai; }
+    part panelCorrectness : Actor { :>> name = "Panel technical-correctness critic (Opus 5 subagent context, not an independent model)"; :>> kind = ActorKind::ai; }
+
+    // The OMG SysML v2 pilot kernel is NOT registered here, and that is the schema working rather
+    // than a gap: `ActorKind` is human|ai deliberately, and tool-ness belongs on the CRITIQUE
+    // (`critiquedBy = CriticKind::tool`) while the identity in `judgedBy` stays the actor who ran
+    // it. A kernel-adjudicated critique is recorded that way — see .tracking/panel-critiques.sysml.
 }
