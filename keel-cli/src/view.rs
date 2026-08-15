@@ -275,6 +275,11 @@ impl Model {
             root.join(".engine").join("views"),
             root.join(".engine").join("skills"),
             root.join(".engine").join("rules"),   // D0105: declared EdgeRule/ElementRule/OrderingRule instances (`keel check`)
+            // issue104: the six workflow definitions are the ONE place this repo models behaviour in
+            // base SysML v2 — `action def` with typed in/out parameters, `first..then` successions and
+            // `flow` — and they contributed nothing to any view, trace, diagram or guard because this
+            // list omitted them. The flow edges emitted in sprint 270 had nowhere to land.
+            root.join(".engine").join("workflows"),
         ];
         let mut items: HashMap<String, ItemInfo> = HashMap::new();
         let mut edges: Vec<Edge> = Vec::new();
