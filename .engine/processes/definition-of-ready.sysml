@@ -27,7 +27,7 @@ package EngineDoR {
     action dorTests : ProcessStep {
         :>> id = "4aba2383-2c35-47ea-a173-db53762a95b1";
         :>> title = "Acceptance criteria exist as Tests";
-        :>> actionText = "[computed: query.py item] The task has a method-tagged DoD criterion; no bare text blobs.";
+        :>> actionText = "[computed: keel item] The task has a method-tagged DoD criterion; no bare text blobs.";
         :>> owner = Owner::ai;
     }
     action dorDeps : ProcessStep {
@@ -36,6 +36,24 @@ package EngineDoR {
         :>> actionText = "[judgment] Upstream successions authored; no unstated prerequisites.";
         :>> owner = Owner::ai;
     }
+    // CONSUMER-FIRST (D0144). Added after three instances in one pass where a PRODUCER was built and
+    // the consumer turned out to be unable to read it: flow edges emitted into a Model that does not
+    // ingest `.engine/workflows` (issue104); the schema retyped before the parser could read
+    // `action def X :> Y`; and a 6132-value provenance migration whose reference target lives in a
+    // package `.engine` may not import (issue106). Each was cheap to check and expensive to discover.
+    action dorConsumer : ProcessStep {
+        :>> id = "7f3c1e08-5a24-4bd6-9e17-0c86b2495df3";
+        :>> title = "The consumer can actually consume it";
+        :>> actionText = "[judgment] If this item PRODUCES anything another component must read — an edge, "
+                       + "an attribute, a file, an emitted artifact, a new construct — name that consumer "
+                       + "and confirm it can read the thing as specified, BEFORE building. Check the "
+                       + "direction of any dependency the change would create: a producer in `.engine` "
+                       + "may not depend on `.tracking`. Where a computed proxy exists, use it: "
+                       + "`keel guard parser-coverage` says whether the parser reads a construct, and the "
+                       + "dead-schema rule (rules.sysml) says whether anything instantiates a type.";
+        :>> owner = Owner::either;
+    }
+
     action dorSized : ProcessStep {
         :>> id = "99661c95-ff8f-413d-a367-79d74b1dedd3";
         :>> title = "Sized";
@@ -78,7 +96,8 @@ package EngineDoR {
     // dor: step order, native succession (D0143 — was `order : Integer`)
     first dorClarity then dorTests;
     first dorTests then dorDeps;
-    first dorDeps then dorSized;
+    first dorDeps then dorConsumer;
+    first dorConsumer then dorSized;
     first dorSized then dorCodeIO;
     first dorCodeIO then dorResearchQ;
     first dorResearchQ then dorDecision;

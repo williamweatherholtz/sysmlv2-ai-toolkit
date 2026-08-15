@@ -27,14 +27,14 @@ package EngineDoD {
     action dodVerified : ProcessStep {
         :>> id = "46ec4593-4d12-42c2-9248-492db952f02e";
         :>> title = "Satisfaction == verified";
-        :>> actionText = "[computed: query.py] The item's LATEST appended TestResult is a "
+        :>> actionText = "[computed: keel] The item's LATEST appended TestResult is a "
                        + "pass and it is not suspect (D0005 material-change suspicion).";
         :>> owner = Owner::ai;
     }
     action dodStaleness : ProcessStep {
         :>> id = "a6b3bdc1-0454-4b66-bffa-fbbc9be27e7a";
         :>> title = "Downstream staleness cleared";
-        :>> actionText = "[computed: query.py suspect] Items this change put into suspect "
+        :>> actionText = "[computed: keel suspect] Items this change put into suspect "
                        + "are re-verified (appended results) or have follow-up tasks.";
         :>> owner = Owner::either;
     }

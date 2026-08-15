@@ -30,10 +30,10 @@ This skill produces *evidence*; recording the TestResult itself is `test-result`
 | BDD scenarios    | cucumber-rs scenarios (run via `cargo test`) | all green |
 | Self-consistency | `keel orient .` total == structural `action` count | matches |
 
-**Rust is the sole authority (D0048; query.py + parity_check retired at M4/D0074).** There is
+**Rust is the sole authority (D0048; keel + parity_check retired at M4/D0074).** There is
 no second implementation to diff against any more — verification is `cargo test` + `cargo clippy`
 + `keel` self-consistency (the orient total equals the distinct `action` declarations). When
-porting query.py logic earlier (M2.2/M3), parity vs query.py WAS the gate; post-M4 the python
+porting keel logic earlier (M2.2/M3), parity vs keel WAS the gate; post-M4 the python
 reference is gone, so a port's evidence is its tests + the deletion's green commit.
 
 **Evidence before assertion (D0016 spirit):** a DoD `method=test` result is only
