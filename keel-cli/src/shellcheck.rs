@@ -49,6 +49,27 @@ fn is_msys_path(tok: &str) -> bool {
         && b.get(2) == Some(&b'/')
 }
 
+/// An MSYS path appearing INSIDE a larger token, e.g. `io.open('/tmp/cc.json')` in a heredoc body.
+///
+/// Deliberately only `/tmp/` and `/mnt/`, never the single-letter drive form `/c/`. A drive-letter
+/// substring match would fire on any URL path segment (`http://host/c/thing`) and on ordinary prose,
+/// and this hook is worthless the moment it becomes noise the reader skips — the module doc says so
+/// and it is the reason to keep the embedded check narrower than the whole-word one.
+fn embedded_msys_path(word: &str) -> Option<String> {
+    for marker in ["/tmp/", "/mnt/"] {
+        if let Some(i) = word.find(marker) {
+            let tail: String = word[i..]
+                .chars()
+                .take_while(|c| !matches!(c, '\'' | '"' | ')' | ',' | ';' | ' '))
+                .collect();
+            if tail.len() > marker.len() {
+                return Some(tail);
+            }
+        }
+    }
+    None
+}
+
 /// The program a command word invokes, stripped of any directory part.
 fn program_of(word: &str) -> &str {
     let w = word.trim_matches(|c| c == '"' || c == '\'');
@@ -82,10 +103,18 @@ pub fn inspect(command: &str) -> Vec<Advisory> {
             continue;
         }
         for arg in words {
-            if is_msys_path(arg) {
+            // An MSYS path as a whole word (`python /tmp/x.py`) OR EMBEDDED IN ONE — which is the
+            // shape that actually kept biting (issue126): the path lives inside a HEREDOC BODY, as
+            // `io.open('/tmp/cc.json')`, so it is never a bare argument and the whole-word check
+            // never saw it. A heredoc body has no shell operators in it, so it stays inside the same
+            // segment as the program that consumes it, and scoping the scan to the segment is what
+            // keeps this from firing on an unrelated bash-only /tmp use elsewhere in the command.
+            let embedded = embedded_msys_path(arg);
+            let hit = if is_msys_path(arg) { Some(arg.to_string()) } else { embedded };
+            if let Some(path) = hit {
                 out.push(Advisory {
-                    what: format!("`{prog}` is Windows-native and cannot open the MSYS path `{arg}`"),
-                    fix: format!("convert it: `$(cygpath -w '{arg}')`, or pass a Windows path with forward slashes (C:/...). /tmp/ in particular does not exist for a Windows process."),
+                    what: format!("`{prog}` is Windows-native and cannot open the MSYS path `{path}`"),
+                    fix: format!("convert it: `$(cygpath -w '{path}')`, or pass a Windows path with forward slashes (C:/...). /tmp/ in particular does not exist for a Windows process — write the file with the Write tool, or use a path both shells resolve."),
                 });
                 break; // one advisory per segment is enough to make the point
             }
@@ -209,5 +238,34 @@ mod tests {
         assert_eq!(inspect("Get-ChildItem -Recurse").len(), 1);
         // `&&` must never be read as the call operator.
         assert!(inspect("make && make test").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod scratch_path_tests {
+    use super::*;
+
+    /// The exact shape that failed three times in one session (issue126): a file written to an MSYS
+    /// path in one segment and read by a Windows-native interpreter in the next.
+    #[test]
+    fn a_tmp_redirect_feeding_a_windows_program_is_flagged() {
+        let cmd = "./target/release/keel.exe critique-coverage . > /tmp/cc.json 2>&1; python - <<'PY'\nimport io\nd=io.open('/tmp/cc.json')\nPY";
+        let a = inspect(cmd);
+        assert!(!a.is_empty(), "the /tmp redirect must be advised on, got nothing");
+        assert!(a.iter().any(|x| x.what.contains("/tmp/cc.json")), "{:?}", a.iter().map(|x| &x.what).collect::<Vec<_>>());
+    }
+
+    /// A heredoc body naming an MSYS path, with no such path as a command ARGUMENT.
+    #[test]
+    fn a_tmp_path_only_inside_a_heredoc_body_is_flagged() {
+        let cmd = "python - <<'PY'\nimport io\nio.open('/tmp/data.json','w').write('x')\nPY";
+        let a = inspect(cmd);
+        assert!(!a.is_empty(), "an MSYS path inside a heredoc read by python must be advised on");
+    }
+
+    /// Pure-bash use of /tmp is fine and must stay silent — bash can read its own /tmp.
+    #[test]
+    fn pure_bash_tmp_use_stays_silent() {
+        assert!(inspect("echo hi > /tmp/x && cat /tmp/x").is_empty(), "no Windows program involved");
     }
 }
