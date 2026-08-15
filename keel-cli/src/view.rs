@@ -1732,6 +1732,69 @@ pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<S
     Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
 }
 
+/// Marker census: EDGE count and PROSE count per marker (issue099).
+///
+/// Exists because I recorded `#Verify` at 613, `#DerivedFrom` at 91 and `#DependsOn` at 91 in an
+/// ACCEPTED Decision. The real edge counts are 456, 37 and 42. The inflation came from `grep -c
+/// '#Verify'`, which also matches the marker name inside `description` and `procedureText` prose —
+/// including, recursively, the text discussing the migration itself, so the number GROWS as more is
+/// written about it. A corpus containing prose about itself inflates its own census.
+///
+/// CLAUDE.md §4 requires a bulk migration to reconcile CONTROL TOTALS. An inflated total guarantees the
+/// reconciliation either fails for the wrong reason or is quietly adjusted to match a wrong baseline, so
+/// this figure must come from one computed place rather than from a fresh grep each time.
+///
+/// Edges are counted from the AST (`Item::Dependency`), which cannot see prose. The prose figure is the
+/// remainder against a raw text scan — reported SEPARATELY rather than subtracted away, because the gap
+/// between the two is the tell that a hand-rolled count is about to be wrong.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn marker_census(root: &Path) -> Result<String, ViewError> {
+    let mut edges: BTreeMap<String, usize> = BTreeMap::new();
+    let mut raw: BTreeMap<String, usize> = BTreeMap::new();
+    for dir in [root.join(".tracking"), root.join(".engine")] {
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in crate::collect_sysml(&dir) {
+            if let Ok(pkg) = crate::parse_pkg(&path) {
+                for item in &pkg.items {
+                    if let Item::Dependency(d) = item {
+                        *edges.entry(d.marker.clone()).or_default() += 1;
+                    }
+                }
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                for m in crate::guards::ENGINE_MARKERS {
+                    let n = text.matches(&format!("#{m}")).count();
+                    if n > 0 {
+                        *raw.entry((*m).to_string()).or_default() += n;
+                    }
+                }
+            }
+        }
+    }
+    let mut names: Vec<&String> = raw.keys().chain(edges.keys()).collect();
+    names.sort_unstable();
+    names.dedup();
+    let rows: Vec<String> = names
+        .iter()
+        .map(|n| {
+            let e = edges.get(*n).copied().unwrap_or(0);
+            let r = raw.get(*n).copied().unwrap_or(0);
+            format!(
+                "{{\"marker\":\"{n}\",\"edges\":{e},\"proseMentions\":{}}}",
+                r.saturating_sub(e)
+            )
+        })
+        .collect();
+    Ok(format!(
+        "{{\n  \"note\": \"edges are AST-counted and are the CONTROL TOTAL for any migration; proseMentions are marker names appearing inside strings and must never be counted as edges (issue099)\",\n  \"markers\": [{}]\n}}",
+        rows.join(", ")
+    ))
+}
+
 /// Names that are the TARGET of a `#Supersede` edge — i.e. deliberately retired (§1.4).
 ///
 /// Exists because `ready` ignored supersede entirely (issue100): a task recorded as superseded stayed

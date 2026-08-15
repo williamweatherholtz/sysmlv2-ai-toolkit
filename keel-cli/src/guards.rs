@@ -862,7 +862,7 @@ const MARKER_FOLLOWERS: [&str; 5] = ["dependency", "part", "item", "verification
 /// pre-v0.2.0 schema plus a v0.2.0 binary yields **566 violations and every commit blocked**, on the
 /// engine's own shipped files. Worse, the obvious remedy meant editing FROZEN `schema/core`, so the
 /// guard forced every downstream project into a frozen-schema sign-off just to keep committing.
-const ENGINE_MARKERS: [&str; 17] = [
+pub const ENGINE_MARKERS: [&str; 17] = [
     // edge algebra where the pilot grammar has no native form
     "DependsOn",
     "Supersede",

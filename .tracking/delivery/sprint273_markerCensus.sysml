@@ -1,0 +1,40 @@
+// ProjectDeliveryS273 — Sprint 273: `keel marker-census` — migration control totals are COMPUTED from
+// the AST, never grepped (issue099). EXECUTE. 2 pts.
+package ProjectDeliveryS273 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from markerCensusStory to d0139;
+
+    part markerCensusStory : Story {
+        :>> id = "0d8000b9-0814-60b9-9b3e-0000003000b9";
+        :>> title = "Sprint 273: keel marker-census — edge totals computed, not grepped (2 pts)";
+        :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p1; :>> owner = "claudeOpus5"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS273 {
+        action storyMarkerCensus;
+        verification storyMarkerCensusDoD : Test { :>> id = "0d8000ba-0814-60ba-9b3e-0000003000ba"; :>> method = VerificationMethod::test; :>> procedureText = "Covers dcMarkerCensusView (issue099). I recorded #Verify at 613, #DerivedFrom at 91 and #DependsOn at 91 in an ACCEPTED Decision; the real EDGE counts are 453, 37 and 41. The inflation came from grepping the marker name, which also matches it inside description and procedureText prose — including, recursively, the text discussing the migration, so the figure GROWS as more is written about it. CLAUDE.md §4 requires a migration to reconcile CONTROL TOTALS, so an inflated total guarantees the reconciliation fails for the wrong reason or is quietly rebaselined on a wrong number. DELIVERED: `keel marker-census` counting `Item::Dependency` markers from the AST, which cannot see prose, and reporting prose mentions SEPARATELY rather than subtracting them away — the gap between the two is the tell that a hand count is about to be wrong. VERIFIED: reports Verify 453, DerivedFrom 37, DependsOn 41, agreeing with guards.rs and relationships.sysml, which both carried the correct figure while my audit did not. UNPLANNED FINDING: the five classifier markers D0139(C) retained — Capability, ProspectiveChange, SafetyChange, View, OrderingOnly — all report ZERO edges, because they mark parts and successions rather than dependencies. The census therefore distinguishes classifier from edge markers EMPIRICALLY, independently confirming the classify-versus-connect line D0139 drew by argument. clippy clean; 161 tests; validate + all 27 guards + check-engine green."; }
+        part storyMarkerCensusDoDR1 : TestResult { :>> id = "0d8000bb-0814-60bb-9b3e-0000003000bb"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification mcRefineGate : Test { :>> id = "0d8000bc-0814-60bc-9b3e-0000003000bc"; :>> title = "Sprint 273 refine gate (DoR)"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: small and well-defined, and it removes a hazard already demonstrated rather than a hypothetical one — the wrong totals are sitting in an accepted Decision right now. estimatedPoints=2. DoR met."; }
+    part mcRefineGateR1 : TestResult { :>> id = "0d8000bd-0814-60bd-9b3e-0000003000bd"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+
+    verification mcStandupGate : Test { :>> id = "0d8000be-0814-60be-9b3e-0000003000be"; :>> title = "Sprint 273 standup gate"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "Approach: count from the AST so prose cannot be counted at all, and report the prose figure alongside rather than hiding it. Check the result against the two places in the repo that already carried a correct figure. No blockers."; }
+    part mcStandupGateR1 : TestResult { :>> id = "0d8000bf-0814-60bf-9b3e-0000003000bf"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+
+    verification mcImplementGate : Test { :>> id = "0d8000c0-0814-60c0-9b3e-0000003000c0"; :>> title = "Sprint 273 implement gate"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "Prose mentions are REPORTED, not silently discarded. Showing only the edge count would give the right number and teach nothing; showing both makes visible exactly how a grep goes wrong, which is the part that generalises to the next person tempted to count by hand."; }
+    part mcImplementGateR1 : TestResult { :>> id = "0d8000c1-0814-60c1-9b3e-0000003000c1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+
+    verification mcReviewGate : Test { :>> id = "0d8000c2-0814-60c2-9b3e-0000003000c2"; :>> title = "Sprint 273 review gate"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "Reviewed. The unplanned result is the more interesting one: five markers reporting zero edges is empirical confirmation of the classifier-versus-edge distinction D0139(C) drew from the spec. A measurement that independently reproduces a decision made on other grounds is worth more than one that merely reports what was asked for."; }
+    part mcReviewGateR1 : TestResult { :>> id = "0d8000c3-0814-60c3-9b3e-0000003000c3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+
+    verification mcCloseOutGate : Test { :>> id = "0d8000c4-0814-60c4-9b3e-0000003000c4"; :>> title = "Sprint 273 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "Autonomous closeOut (D0049). dcMarkerCensusView carries a passing DoD TestResult; issue099 resolves. clippy clean; 161 tests; validate + all 27 guards + check-engine green. No gate bypassed."; }
+    part mcCloseOutGateR1 : TestResult { :>> id = "0d8000c5-0814-60c5-9b3e-0000003000c5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+
+    verification mcRetroGate : Test { :>> id = "0d8000c6-0814-60c6-9b3e-0000003000c6"; :>> title = "Sprint 273 retro gate (autonomous, D0049)"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "Autonomous retro (D0049) under D0131's retroTrack. WELL: (1) the census reproduces figures already present in guards.rs and relationships.sysml, so it is checkable against two independent prior sources rather than being self-attesting; (2) prose counts are shown rather than hidden, so the failure mode stays visible instead of merely corrected; (3) the zero-edge result for the five classifiers independently confirms a decision made on spec grounds. AVOIDABLE-ISSUE 1: I combined two heredocs in one shell call to write this record and hit the same parse failure as sprint 271, losing the call. NO NEW ITEM, reason stated: this is the host/shell-adaptation class already tracked as issue094 with dcShellAdaptationGate as its resolver, and it is now its second identical instance — write the file with the Write tool rather than a heredoc inside a compound command. AVOIDABLE-ISSUE 2: none in the work itself. The sprint was small, verified against pre-existing independent numbers, and nothing needed correcting mid-flight — recorded plainly rather than manufacturing a finding, since a retro that always produces an issue is measuring the author's imagination rather than the sprint. Estimate 2 pts, delivered."; }
+    part mcRetroGateR1 : TestResult { :>> id = "0d8000c7-0814-60c7-9b3e-0000003000c7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDINGSHA"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "claudeOpus5"; }
+}

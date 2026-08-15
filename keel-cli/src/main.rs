@@ -1892,6 +1892,7 @@ fn main() {
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("critique-policy") => cmd_critique_policy(rest),
+        Some("marker-census") => cmd_query0(rest, "keel marker-census [ROOT]", |r| keel_cli::view::marker_census(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
@@ -1931,6 +1932,7 @@ fn main() {
             eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
             eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
+            eprintln!("  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)");
             eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
             eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");
             eprintln!("  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)");
