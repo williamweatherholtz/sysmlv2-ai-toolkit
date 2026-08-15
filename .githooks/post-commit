@@ -19,6 +19,23 @@
 # Non-fatal throughout: the commit already succeeded. Bounded retries, then stop and report — never
 # force-push, never rebase, never leave a half-merged tree.
 
+# ONE IMPLEMENTATION (D0134): the loop below now lives in the binary as `keel land`, which also gates
+# the MERGED tree itself rather than relying on pre-merge-commit — a contributor who has not run
+# `git config core.hooksPath .githooks` has no hook, and would otherwise push a broken trunk while
+# reporting success. The shell path beneath survives ONLY as a degradation for a machine with no
+# `keel` binary; two live copies of this loop would be the dual-truth defect the engine exists to
+# remove, so the binary is authoritative wherever it exists.
+KEEL=""
+command -v keel >/dev/null 2>&1 && KEEL=keel
+[ -z "$KEEL" ] && [ -x ./target/release/keel.exe ] && KEEL=./target/release/keel.exe
+[ -z "$KEEL" ] && [ -x ./target/release/keel ] && KEEL=./target/release/keel
+if [ -n "$KEEL" ]; then
+    KEEL_POST_COMMIT_ACTIVE=1 export KEEL_POST_COMMIT_ACTIVE
+    "$KEEL" land . || true   # non-fatal: the commit already succeeded
+    exit 0
+fi
+echo "post-commit: no keel binary on PATH — falling back to the shell land loop (no merged-tree gate)."
+
 # Recursion guard: the merge in the retry loop creates a commit, which fires post-commit again.
 [ "$KEEL_POST_COMMIT_ACTIVE" = "1" ] && exit 0
 KEEL_POST_COMMIT_ACTIVE=1

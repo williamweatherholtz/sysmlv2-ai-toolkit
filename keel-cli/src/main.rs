@@ -1847,6 +1847,25 @@ fn cmd_migrate(args: &[String]) -> i32 {
     keel_cli::migrate::cmd(&root, &ENGINE_DIR, dry_run)
 }
 
+/// `keel enroll` — the trailing ROOT is only honoured when it actually looks like a keel project,
+/// so a stray argument cannot silently redirect an enrollment into the wrong tree.
+fn cmd_enroll(rest: &[String]) -> i32 {
+    let root = rest
+        .iter()
+        .rev()
+        .find(|a| !a.starts_with("--"))
+        .filter(|a| Path::new(a.as_str()).join(".tracking").is_dir())
+        .map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
+    keel_cli::enroll::cmd(rest, &root)
+}
+
+/// The repo a git-touching subcommand acts on: the first non-flag argument, else the discovered root.
+fn repo_arg(rest: &[String]) -> PathBuf {
+    rest.iter()
+        .find(|a| !a.starts_with("--"))
+        .map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from)
+}
+
 fn cmd_version(args: &[String]) -> i32 {
     let hard = keel_cli::guards::GUARD_NAMES.len() - WARNING_ONLY_GUARDS.len();
     if args.iter().any(|a| a == "--json") {
@@ -1884,6 +1903,8 @@ fn main() {
         // have may be standing anywhere, including outside a keel project.
         Some("version" | "--version" | "-V") => cmd_version(rest),
         Some("init") => cmd_init(rest),
+        Some("sync") => keel_cli::sync::cmd_sync(&repo_arg(rest)),
+        Some("land") => keel_cli::sync::cmd_land(&repo_arg(rest), 3),
         Some("migrate") => cmd_migrate(rest),
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
         Some("activation") => cmd_activation("activation", rest),
@@ -1927,11 +1948,7 @@ fn main() {
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        Some("enroll") => {
-            let root = rest.iter().rev().find(|a| !a.starts_with("--")).filter(|a| Path::new(a.as_str()).join(".tracking").is_dir());
-            let root = root.map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
-            keel_cli::enroll::cmd(rest, &root)
-        }
+        Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
@@ -1954,6 +1971,8 @@ fn main() {
             eprintln!("keel <subcommand> [args]");
             eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
+            eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
             eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
             eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
             eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");

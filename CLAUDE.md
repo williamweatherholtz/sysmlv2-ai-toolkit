@@ -112,6 +112,10 @@ frozen (modify it only by out-of-band Decision).
 - **Authoring friction is the #1 risk (D0054).** The dominant MBSE failure mode is adoption friction, not
   bad architecture. If recording a fact is harder than a spreadsheet edit, fix that first.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
+- **`keel sync` / `keel land` are the integration path (D0129).** `sync` fetches, reports divergence,
+  integrates by **merge**, and gates the result; `land` pushes and, on rejection, merges and **gates the
+  MERGED tree** before retrying — two contributions that pass alone can fail together. `orient` reports
+  its own `sync` position, so every computed answer states the tree it was computed against.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by remote config and

@@ -58,6 +58,13 @@ pub struct Output {
     /// absence must be STATED, not implied — a field that disappears when the list is empty reads
     /// identically to a field nobody computed, which is the D0138 lesson.
     pub pending_acceptances: Vec<String>,
+    /// This clone's divergence from its upstream, as a raw JSON fragment (issue... / D0129
+    /// srDcSyncAwareOrient). EVERY computed answer above was computed against THIS tree, so the
+    /// tree's position relative to the remote is part of the answer rather than context for it: a
+    /// frontier computed 40 commits behind is a frontier for work someone else may already have done.
+    /// Read from the last fetch and never fetches itself — a view that silently performs network I/O
+    /// is a view you stop running.
+    pub sync: String,
 }
 
 impl Output {
@@ -81,13 +88,14 @@ impl Output {
         };
         let burndown = if self.burndown.is_empty() { "{}" } else { self.burndown.as_str() };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"pendingAcceptances\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"pendingAcceptances\": {},\n  \"sync\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
             str_array(&self.invalid_evidence),
             str_array(&self.open_issues),
             str_array(&self.pending_acceptances),
+            if self.sync.is_empty() { "null" } else { self.sync.as_str() },
             self.done,
             self.outstanding,
             burndown,
@@ -605,6 +613,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         // here an empty list is the benign reading. Reporting "nothing pending" when the model
         // could not be read would be the silent failure issue096 is about, so a failure surfaces
         // as a named sentinel the human will notice rather than as a clean zero.
+        sync: crate::sync::divergence(repo).to_json(),
         pending_acceptances: crate::view::pending_acceptances(repo)
             .unwrap_or_else(|_| vec!["<unreadable: could not compute pending acceptances>".to_owned()]),
     }
