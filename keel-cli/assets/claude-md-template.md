@@ -83,6 +83,18 @@ keel orient .      # where things stand + what's ready + the burndown
 
 Run these before considering any change done. keel is kernel-free for these — fast, no JVM.
 
+**When you upgrade the `keel` binary**, bring this project's `.engine/` with it — it is a copy taken
+at `keel init` time and does not move on its own:
+
+```
+keel migrate . --dry-run    # what would change, and what it cannot change
+keel migrate .              # apply, then run the gate above
+```
+
+It detects the vintage from the tree (nothing is stamped), refuses on a dirty tree, never deletes a
+file it does not ship, and where the engine REMOVED a type it refuses and lists each affected item
+with its replacement rather than guessing. A second run is a no-op.
+
 ---
 
 ## 6. Environment — adapt to your host OS/shell

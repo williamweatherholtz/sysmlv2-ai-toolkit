@@ -19,6 +19,21 @@ newcomer from zero to first value: a 1-minute mental model → capture the proje
 doing the first real item, not by reading the decision log. (Cold-start scaffolding via `keel init`
 + the `orient --html` dashboard are the sibling D0093 milestones.)
 
+**Keeping a project current.** `.engine/` is a COPY taken when you ran `keel init`, so it diverges
+from the binary the moment the engine changes. `keel migrate [ROOT] [--dry-run]` closes that gap:
+
+```
+keel migrate . --dry-run    # what would change, and what it cannot change
+keel migrate .              # apply, then run your own gate
+```
+
+Nothing is stamped with a version — the vintage is DETECTED from the tree's content, which is also
+what makes a second run a no-op. It refuses on a dirty tree (commit or stash first; `--dry-run` is
+safe on a dirty tree), it never deletes a file it does not ship, and where the engine removed a type
+outright it REFUSES rather than guessing: it lists every affected item with `file:line` and the
+replacement, and writes nothing until you have resolved them. After a run, your own
+`keel validate . && keel guard && keel check-engine .` is the test that matters.
+
 Instance data lives in **`.tracking/`** (see `.tracking/README.md`). Copy authoring
 idioms from `.engine/docs/tracking-template.sysml` — it parses green. A typical file:
 

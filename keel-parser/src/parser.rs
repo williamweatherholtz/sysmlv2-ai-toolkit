@@ -792,7 +792,11 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
         TokenKind::Private if !had_abstract =>
             parse_import(p, filename).map(|i| Some(Item::Import(i))),
 
-        TokenKind::Action if !had_abstract => parse_action_item(p, filename),
+        // `abstract` only ever prefixes a DEF, and `parse_action_item` handles `action def`. Excluding
+        // it here (as the other arms must, since their usages cannot be abstract) sent
+        // `abstract action def TrackedAction` — the base of Process/ProcessStep (D0143) — to
+        // `skip_item`, making the abstract base invisible to every view and guard.
+        TokenKind::Action => parse_action_item(p, filename),
 
         TokenKind::First if !had_abstract =>
             parse_succession(p, filename, false).map(|s| s.map(Item::Succession)),
@@ -883,6 +887,21 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             // `parse_typed_item_body` expects to start.
             let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, start)?;
             Ok(Some(Item::UseCase(UseCaseUsage { name: n, type_name: tn, attributes: attrs_v, members: mem, span: sp, line: start_line })))
+        }
+
+        // `occurrence <name> : <Type> { ... }` — a typed occurrence USAGE. `Release` is an
+        // `occurrence def` (it is a point in time, not a part), so its instances arrive with this
+        // keyword; `keel migrate` emits exactly this shape when converting an older project. Without
+        // this arm they fell to `skip_item` and every migrated Release became invisible to the model
+        // while both `validate` and `guard` reported clean — the issue102 failure mode precisely.
+        // Deliberately NOT generalised to any `<ident> <ident>` pair: `connect a to b` has that shape
+        // too, and a speculative list of classifier kinds would be a producer with no consumer. When
+        // another kind appears, `parser-coverage` warns and it gets added then.
+        TokenKind::Ident(kind) if kind == "occurrence" && matches!(p.peek_next(), TokenKind::Ident(_)) => {
+            let s = p.current_span();
+            p.advance(); // consume 'occurrence'
+            let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, s)?;
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: attrs_v, members: mem, marker: None, span: sp, line: start_line })))
         }
 
         // Generic `<classifier-kind> def Name ...` where the kind word lexes as an
@@ -1095,6 +1114,48 @@ mod tests {
     fn missing_closing_brace_error() {
         let tokens = tokenize("package P {", "test").expect("lex");
         assert!(parse(tokens, "test").is_err());
+    }
+
+    /// `abstract action def X` must parse, not be skipped.
+    ///
+    /// It was skipped from the moment `TrackedAction` was introduced (D0143): the dispatch arm read
+    /// `TokenKind::Action if !had_abstract`, so an `abstract` prefix fell through to `skip_item` and
+    /// the abstract base of `Process`/`ProcessStep` was invisible to every view and guard. Nothing
+    /// FAILED — `parser-coverage` warned, and a warning is not a block.
+    #[test]
+    fn abstract_action_def_is_not_skipped() {
+        let src = "package P {\n    abstract action def TrackedAction {\n        attribute id : Uuid;\n    }\n}";
+        let pkg = parse_src(src);
+        assert!(pkg.skipped.is_empty(), "skipped: {:?}", pkg.skipped);
+        let Item::ActionDef(adef) = &pkg.items[0] else { panic!("expected an ActionDef, got {:?}", pkg.items[0]) };
+        assert_eq!(adef.name, "TrackedAction");
+    }
+
+    /// `occurrence <name> : <Type>` is a typed USAGE and must land in the model.
+    ///
+    /// `Release` is an `occurrence def`, and `keel migrate` converts an older project's
+    /// `part v1 : Release` to this shape — which was skipped, so every migrated Release vanished
+    /// from the model while `validate` and `guard` both reported clean.
+    #[test]
+    fn occurrence_usage_parses_as_a_typed_item() {
+        let src = "package P {\n    occurrence v1 : Release {\n        :>> id = \"u\";\n        :>> title = \"v1.0\";\n    }\n}";
+        let pkg = parse_src(src);
+        assert!(pkg.skipped.is_empty(), "skipped: {:?}", pkg.skipped);
+        let Item::Part(part) = &pkg.items[0] else { panic!("expected a Part, got {:?}", pkg.items[0]) };
+        assert_eq!(part.name, "v1");
+        assert_eq!(part.type_name.as_deref(), Some("Release"));
+        assert_eq!(part.attributes.len(), 2);
+    }
+
+    /// The arm is deliberately narrow: `connect a to b` is also `<ident> <ident>` and must NOT be
+    /// swallowed as an occurrence usage.
+    #[test]
+    fn occurrence_arm_does_not_capture_other_ident_pairs() {
+        let src = "package P {\n    connect a to b;\n    occurrence r : Release { :>> id = \"u\"; }\n}";
+        let pkg = parse_src(src);
+        assert_eq!(pkg.items.len(), 1, "only the occurrence usage is an item");
+        let Item::Part(part) = &pkg.items[0] else { panic!() };
+        assert_eq!(part.name, "r");
     }
 
     #[test]

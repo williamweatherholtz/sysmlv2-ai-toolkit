@@ -30,6 +30,7 @@ pub mod algo;
 pub mod govern;
 pub mod guards;
 pub mod indexer;
+pub mod migrate;
 mod json;
 pub mod orient;
 pub mod queries;

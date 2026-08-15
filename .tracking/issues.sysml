@@ -1258,4 +1258,26 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcActorTraceView to issue106;
+
+    #ProcessDefect part issue107 : Issue {
+        :>> id = "e1070107-0107-4f07-9107-516273840107";
+        :>> title = "`abstract action def` was invisible to the parser for four sprints, and `parser-coverage` had been warning about it the whole time";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while verifying `keel migrate` against a downstream fixture. `parse_item`'s dispatch arm read `TokenKind::Action if !had_abstract`, so `abstract action def TrackedAction` — the base type introduced with the Process-as-behaviour conversion (D0143) — fell through to `skip_item` and never entered the model. The abstract base of `Process` and `ProcessStep` was therefore invisible to every view, trace and guard, exactly the issue102 failure mode: nothing errors, both toolchains report clean, and the construct simply is not there. THE CONTROL WORKED AND THE READER DID NOT. `keel guard parser-coverage` is warning-only by design (a skipped statement is a gap, not a dishonest model), and it had been reporting `1 statement(s) ... SKIPPED ... action×1` on every run since the conversion landed. I read its EXIT CODE on each of those runs and reported `guard exit=0`, which was true and uninformative. The defect surfaced only because a downstream fixture pushed the count from 1 to 2 and I read the message to find out why. FIXED in the same sprint (the arm now dispatches regardless of the `abstract` prefix, since `abstract` only ever precedes a def and `parse_action_item` already handles defs) with three regression tests. THE RESIDUAL, and it is the part that will recur: a warning-only guard whose count is persistently non-zero reads as background noise, and `guard exit=0` is the summary I actually act on. Either a non-zero warning count needs a surface I cannot skim past, or these specific warnings need to become blocking once the backlog is zero — which it now is, for the first time, at 0 skipped statements across all 491 files.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcProjectMigrationTool";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcProjectMigrationTool to issue107;
+
+    #ProcessDefect part issue108 : Issue {
+        :>> id = "e1080108-0108-4f08-9108-516273840108";
+        :>> title = "D0142's leanness sweep left dead residue: a hollow `risk.sysml`, an orphan `RiskLevel`, and two docs naming types it deleted";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while deriving the migration's removal set from the schema diff, which required enumerating exactly what D0142 deleted. FOUR pieces of residue, all in or around the sweep's own commit: (1) `.engine/schema/core/risk.sysml` is hollow — its header and doc string still describe `Risk`, `Mitigation` and the relationship between them, all three deleted, and the file's only remaining content is `enum def RiskStatus` which nothing references; (2) `RiskLevel` in `element.sysml` is likewise orphaned, its only consumers having been `Risk.likelihood`/`impact`/`residual`; (3) `architecture.sysml`'s header comment still lists `DesignElement`, deleted in the same sweep; (4) `sysmlv2-syntax-notes.md` still lists `EngineRisk` among the packages to import. THE PATTERN IS THE ONE D0144 CONTROLS, one layer down: the sweep removed each type and fixed the consumer it was looking at, without enumerating the rest. It is the third instance in this pass of a change that did not check its consumers, and the second found inside D0142's own work — the first was the four stale `query.py` citations retired in sprint 279. NOT FIXED HERE, deliberately: removing a `schema/core` file is a schema change and belongs in its own sprint with its own gate, not bundled into a migration-tool sprint where it would ride in unexamined. NOTE for whoever fixes it: deleting `risk.sysml` from the engine does NOT strand a downstream project, because `keel migrate` never deletes a file it does not ship — the project keeps its copy and the resync reports it as unrecognised.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
 }

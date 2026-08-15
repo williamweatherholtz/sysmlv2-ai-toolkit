@@ -1588,24 +1588,10 @@ fn cmd_apply_review(args: &[String]) -> i32 {
 /// Write one embedded engine file into `dst_engine`, remapping `decisions/*` -> `reference/decisions/*`
 /// (read-only reference, NOT instance — the engine's architecture decisions must not enter the new
 /// project's computed views, which scan `.engine/decisions`; D0093 engine/instance boundary).
-/// Remap an embedded engine-relative path for scaffolding: `decisions/*` -> `reference/decisions/*`
-/// (read-only reference, not instance — D0093 boundary); everything else is unchanged.
-fn remap_engine_path(rel: &Path) -> PathBuf {
-    rel.strip_prefix("decisions")
-        .map_or_else(|_| rel.to_path_buf(), |rest| Path::new("reference").join("decisions").join(rest))
-}
-
-/// Engine-DEV-only embedded paths EXCLUDED from the `keel init` scaffold (D0093 boundary): the kernel/
-/// Python toolchain (`.engine/tools/` — validators, spikes, probes, migrations) + any compiled-Python
-/// cache. Downstream projects use the Rust path (`keel validate`/`guard`, D0048) and never need these;
-/// shipping them would baffle a conda-less consumer. The reusable engine (schema/workflows/processes/
-/// skills/decisions->reference/docs/views/contracts) still scaffolds.
-fn is_engine_dev_only(rel: &Path) -> bool {
-    rel.components().any(|c| {
-        let s = c.as_os_str().to_string_lossy();
-        s == "tools" || s == "__pycache__"
-    }) || rel.extension().is_some_and(|e| e == "pyc")
-}
+// The scaffold path rules live in `migrate` — `keel migrate` resyncs a downstream `.engine/` from
+// this same embedded tree, so it must map and exclude paths identically to `keel init` or a migrated
+// project would differ from a freshly inited one. One definition, both callers.
+use keel_cli::migrate::{is_engine_dev_only, remap_engine_path};
 
 fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
     let rel = f.path();
@@ -1824,6 +1810,18 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
 /// commit (baked by `build.rs`; `unknown` off-git, `+dirty` from a modified tree — never guessed), and
 /// the CONTROL INVENTORY this binary carries, computed from `GUARD_NAMES` rather than restated, so it
 /// cannot drift from the guards that actually run.
+/// `keel migrate [ROOT] [--dry-run]` — bring a DOWNSTREAM project up to this binary's engine vintage.
+///
+/// Deliberately NOT defaulted to the discovered repo root: `find_repo_root` walks upward looking for
+/// `.engine/`, which from inside a downstream project's subdirectory is right, but from anywhere in
+/// the self-build repo would point this at the engine SOURCE. `migrate` refuses the self-build repo
+/// anyway, but a command that rewrites authored facts should take its target explicitly.
+fn cmd_migrate(args: &[String]) -> i32 {
+    let dry_run = args.iter().any(|a| a == "--dry-run");
+    let root = args.iter().find(|a| !a.starts_with("--")).map_or_else(|| PathBuf::from("."), PathBuf::from);
+    keel_cli::migrate::cmd(&root, &ENGINE_DIR, dry_run)
+}
+
 fn cmd_version(args: &[String]) -> i32 {
     let hard = keel_cli::guards::GUARD_NAMES.len() - WARNING_ONLY_GUARDS.len();
     if args.iter().any(|a| a == "--json") {
@@ -1861,6 +1859,7 @@ fn main() {
         // have may be standing anywhere, including outside a keel project.
         Some("version" | "--version" | "-V") => cmd_version(rest),
         Some("init") => cmd_init(rest),
+        Some("migrate") => cmd_migrate(rest),
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
         Some("activation") => cmd_activation("activation", rest),
         Some("activate") => cmd_activation("activate", rest),
@@ -1925,6 +1924,7 @@ fn main() {
             eprintln!("keel <subcommand> [args]");
             eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
             eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
             eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
             eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
