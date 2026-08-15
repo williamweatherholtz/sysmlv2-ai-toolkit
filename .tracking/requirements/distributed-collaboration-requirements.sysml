@@ -139,8 +139,8 @@ package ProjectDistributedCollaborationRequirements {
         :>> id = "0d5d000e-0812-4d0e-9b3e-00000000d00e";
         :>> title = "Work is claimed as an authored fact, and first-to-land wins";
         :>> createdAt = "2026-08-12"; :>> createdBy = "claudeOpus5";
-        :>> statement = "A contributor shall be able to claim a ready item by recording a claim fact (claiming actor, item, time, and the commit it was claimed against) and landing it. Mutual exclusion shall be provided by the remote accepting exactly one of two concurrent claims; the rejected contributor shall re-synchronize, observe the winning claim, and select other work. The ready frontier shall be filterable to exclude items claimed by others.";
-        :>> rationale = "Verified: the ready frontier is one global list with no owner and no claim concept (orient.rs:33-45), so several contributors rationally select the same top item and the duplication surfaces only at integration. A claim is a legitimate AUTHORED fact — an irreducible observation of who took what, when, against which commit — while its liveness is COMPUTED, so this fits CLAUDE.md 2.6 rather than excepting it. No lock server is needed or wanted: git's atomic ref update already provides compare-and-swap, which is the one coordination primitive available when the remote is the only shared medium.";
+        :>> statement = "A contributor shall be able to claim a ready item by recording a claim fact (claiming actor, item, time, and the commit it was claimed against) and landing it. Mutual exclusion over a claimed item shall be COMPUTED from the authored claims — the holder is the earliest un-expired claim, tie-broken deterministically so that every clone reaches the same holder without coordinating — and the rejected contributor shall re-synchronize, read the computed holder, and select other work. The ready frontier shall be filterable to exclude items claimed by others.";
+        :>> rationale = "Verified: the ready frontier is one global list with no owner and no claim concept (orient.rs:33-45), so several contributors rationally select the same top item and the duplication surfaces only at integration. A claim is a legitimate AUTHORED fact — an irreducible observation of who took what, when, against which commit — while its liveness is COMPUTED, so this fits CLAUDE.md 2.6 rather than excepting it. No lock server is needed or wanted. CORRECTED BY D0149 after a two-clone test disproved the original wording, which said exclusion came from the remote accepting exactly one of two concurrent claims: git's atomic ref update does provide compare-and-swap, and that genuinely gives first-to-land-wins over the TRUNK, but it gives no exclusion over a claimed ITEM, because claims land in per-actor files (srDcPerActorWriteTargets) precisely so concurrent appends do not collide — so the loser merges, retries, and both claims land. Exclusion is therefore computed, and 'whoever landed first' is not recoverable from merged history: parallel claims are siblings of equal ancestry depth and their commit timestamps tie within a second.";
         :>> kind = RequirementKind::functional; :>> priority = Priority::must; :>> verificationMethod = VerificationMethod::demo;
     }
 
@@ -241,10 +241,11 @@ package ProjectDistributedCollaborationRequirements {
     #Verify dependency from dcWorkClaimDoD to srDcStaleClaimExpiry;
     #Verify dependency from dcWorkClaimDoD to srDcPerActorWriteTargets;
 
-    // srDcWorkClaim is DELIBERATELY NOT linked yet. Its statement says "Mutual exclusion shall be
-    // provided by the remote accepting exactly one of two concurrent claims" — the clause sprint 300's
-    // two-clone test disproved. Authoring a #Verify edge to it would compute the requirement as
-    // verified when its central clause was not met as written. It waits on D0149 (issue115).
+    // srDcWorkClaim was held back from #Verify while its statement still contained the clause sprint
+    // 300's two-clone test disproved — linking it then would have computed the requirement as verified
+    // when its central clause was not met as written. D0149 corrected the statement to what was
+    // actually built and verified, so the edge is now honest.
+    #Verify dependency from dcWorkClaimDoD to srDcWorkClaim;
     #Verify dependency from dcActorIdentityBindingDoD to srDcActorIdentityBinding;
     #Verify dependency from dcActorIdentityBindingDoD to srDcActorKindClassification;
     #Verify dependency from dcPortableGateDoD to srDcPortableGate;

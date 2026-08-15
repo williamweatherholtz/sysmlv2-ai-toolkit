@@ -42,7 +42,17 @@ fail together. Run the full gate *after* integrating the trunk, *before* pushing
 
 A third fact makes the whole thing work: **a rejected push is a compare-and-swap failure, not an
 error.** Git's atomic ref update is the one coordination primitive a remote gives you — so
-first-to-land-wins gives real mutual exclusion with no lock server.
+first-to-land-wins gives real mutual exclusion **over the trunk**, with no lock server.
+
+**But that exclusion stops at the trunk, and it does NOT extend to a claimed item (D0149).** Claims
+are written to per-actor files so concurrent appends never collide, which removes the very contention
+the argument depends on: if two contributors claim the same item, both claims LAND — the loser's push
+is rejected, they merge, they retry, and their claim ends up exactly as valid as the winner's. A
+two-clone test proved it. So who *holds* an item is **computed**, not decided by the push: the
+earliest un-expired `claimedAt`, tie-broken by the lower claim UUID, which every clone computes
+identically without coordinating. Do not try to recover who landed first from git — parallel claims
+are siblings of equal ancestry depth, and their commit timestamps tie when the work happens in the
+same second. Read the holder with `keel claim --list`; a rejected push tells you to re-sync, not who won.
 
 ## The loop
 

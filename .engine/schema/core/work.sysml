@@ -56,9 +56,12 @@ package EngineWork {
     // it summarises, which §1.6 forbids — and here it would disagree constantly, because expiry is a
     // function of the clock rather than of anything a writer knows.
     //
-    // MUTUAL EXCLUSION NEEDS NO FIELD AND NO LOCK SERVER: the remote accepts exactly one of two
-    // concurrent claims because a git ref update is a compare-and-swap. A rejected push IS the
-    // exclusion working, not an error to handle.
+    // MUTUAL EXCLUSION NEEDS NO FIELD AND NO LOCK SERVER — but it does not come from the push either
+    // (D0149, correcting the original comment here). Claims land in PER-ACTOR files so concurrent
+    // appends never collide, so two claims on one item BOTH land: the loser's push is rejected, they
+    // merge, they retry, and their claim is as valid as the winner's. A two-clone test proved it.
+    // Who HOLDS the item is computed from these fields — earliest un-expired claim, tie-broken by the
+    // lower id — which is why no status field is needed and why every clone agrees without talking.
     part def Claim :> Element {
         attribute claimedItem : String;      // the item name this claim is on
         attribute claimedBy : String;        // actor id — same String form as all other provenance

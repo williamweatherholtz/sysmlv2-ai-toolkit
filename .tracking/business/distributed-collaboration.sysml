@@ -181,7 +181,7 @@ package ProjectDistributedCollaboration {
         :>> title = "Two contributors claim the same item at the same time";
         :>> createdAt = "2026-08-12"; :>> createdBy = "claudeOpus5";
         :>> description = "Two contributors independently compute the same ready frontier and attempt to claim the same top item within the same moment. Exactly one must proceed, without a lock server and without a human arbitrating.";
-        :>> mainSuccess = "Both attempt to land their claim; the remote accepts exactly one; the loser's attempt is rejected, so it re-synchronizes, observes the winning claim, and selects different work. No duplicated effort, no human involved.";
+        :>> mainSuccess = "Both attempt to land their claim; BOTH claims land, because per-actor files remove the write contention (D0149 — the original wording said the remote accepts exactly one, and a two-clone test disproved it); the loser's push is rejected, so it re-synchronizes, merges, retries, and then reads the COMPUTED holder — the earliest un-expired claim, which every clone derives identically — and selects different work if someone else holds it. No human is involved at any point.";
         :>> extensions = "Repeated rejection under heavy contention: back off rather than spinning, and report the contention. Both claims somehow land (distinct anchors): the condition is detected and surfaced as contention for adjudication, not silently tolerated.";
     }
     use case ucDcLandFacts : UseCase {
