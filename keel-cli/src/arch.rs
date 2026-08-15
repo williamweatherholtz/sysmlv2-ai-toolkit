@@ -16,19 +16,21 @@ use crate::view::{ArchModel, CodeElementRow};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-/// Worst-first, DERIVED from the `RiskClass` enum's DECLARATION ORDER — `arch criticality` ranks on
-/// this sequence, so the schema is where the ranking is decided, not a literal here that happened to
-/// agree with it (issue120).
-fn risk_order() -> &'static Vec<String> {
-    static R: std::sync::LazyLock<Vec<String>> =
-        std::sync::LazyLock::new(|| crate::schema::enum_members("RiskClass"));
-    &R
+/// Worst-first, DERIVED from the `RiskClass` enum's DECLARATION ORDER — the schema decides the
+/// ranking, not a literal here that happened to agree with it (issue120).
+///
+/// Read from THE PROJECT's schema, falling back to the engine's (issue128). A project's risk
+/// taxonomy is its own judgment, and imposing the engine's produced a confidently wrong answer on
+/// real downstream data: `SelfSync`'s 15 `durability` and 8 `concurrency` elements ranked below
+/// `cosmetic` and printed as `unclassified` in the view whose whole job is what-to-audit-first.
+fn risk_order(root: &Path) -> Vec<String> {
+    crate::schema::project_enum_members(root, "RiskClass")
 }
 
 /// Rank of a risk class, lower = worse. Unknown/absent sorts last, never first: an element whose
 /// risk nobody recorded must not outrank one someone judged to be critical.
-fn risk_rank(risk: &str) -> usize {
-    risk_order().iter().position(|r| r == risk).unwrap_or_else(|| risk_order().len())
+fn risk_rank(order: &[String], risk: &str) -> usize {
+    order.iter().position(|r| r == risk).unwrap_or(order.len())
 }
 
 /// FNV-1a over whitespace-normalised text.
@@ -169,7 +171,7 @@ fn cmd_elements(m: &ArchModel, args: &[String]) -> i32 {
     0
 }
 
-fn cmd_criticality(m: &ArchModel) -> i32 {
+fn cmd_criticality(m: &ArchModel, order: &[String]) -> i32 {
     // The ranked audit frontier: risk class, bumped one tier when the element traces to a `must`
     // Need. A bump can only ever RAISE criticality — an element with no Need trace keeps its
     // authored risk rather than being demoted, because absence of a trace is missing information,
@@ -179,14 +181,14 @@ fn cmd_criticality(m: &ArchModel) -> i32 {
         .iter()
         .map(|e| {
             let bumped = traced_need_priority(&e.name, m).as_deref() == Some("must");
-            let base = risk_rank(&e.risk_class);
+            let base = risk_rank(order, &e.risk_class);
             (if bumped { base.saturating_sub(1) } else { base }, bumped, e)
         })
         .collect();
     rows.sort_by(|a, b| a.0.cmp(&b.0).then(a.2.name.cmp(&b.2.name)));
     println!("audit frontier, most critical first ({} element(s)):", rows.len());
     for (rank, bumped, e) in rows {
-        let tier = risk_order().get(rank).map_or("unclassified", String::as_str);
+        let tier = order.get(rank).map_or("unclassified", String::as_str);
         let why = if bumped { "  <- bumped: traces to a `must` Need" } else { "" };
         let safety = if e.invariant_safety.is_empty() { "-" } else { e.invariant_safety.as_str() };
         println!("  {tier:<12} {:<28} invariants={safety}{why}", e.label);
@@ -264,12 +266,22 @@ fn cycles<'a>(deps: &[(&'a str, &'a str)]) -> Vec<Vec<&'a str>> {
 }
 
 fn cmd_drift(m: &ArchModel, root: &Path) -> i32 {
-    let (mut drifted, mut unaudited, mut unmarked, mut ok) = (0, 0, 0, 0);
+    let (mut drifted, mut unaudited, mut unmarked, mut ok, mut unlocated) = (0, 0, 0, 0, 0);
     println!("re-audit frontier:");
     for e in &m.elements {
         if e.code_hash.is_empty() {
             unaudited += 1;
             println!("  UNAUDITED  {:<28} (catalogued, never hashed)", e.label);
+            continue;
+        }
+        // NO PATH AT ALL is not a missing file, and conflating them made this view lie on real data
+        // (issue130): a downstream registry that records the path under a different attribute name
+        // yielded an empty `file`, `root.join("")` resolved to the repo root, reading a DIRECTORY
+        // failed, and all 169 elements reported as `MISSING ... not readable` — a confident wrong
+        // answer about files that were never named rather than files that were absent.
+        if e.file.trim().is_empty() {
+            unlocated += 1;
+            println!("  UNLOCATED  {:<28} no filePath authored — nothing to hash against", e.label);
             continue;
         }
         let Ok(src) = std::fs::read_to_string(root.join(&e.file)) else {
@@ -293,7 +305,7 @@ fn cmd_drift(m: &ArchModel, root: &Path) -> i32 {
             }
         }
     }
-    println!("  {drifted} drifted, {unaudited} unaudited, {unmarked} unmarked, {ok} current");
+    println!("  {drifted} drifted, {unaudited} unaudited, {unmarked} unmarked, {unlocated} unlocated, {ok} current");
     0
 }
 
@@ -392,7 +404,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
     let rest = args.get(1..).unwrap_or(&[]);
     match sub {
         "elements" => cmd_elements(&m, rest),
-        "criticality" => cmd_criticality(&m),
+        "criticality" => cmd_criticality(&m, &risk_order(root)),
         "coupling" => cmd_coupling(&m),
         "drift" => cmd_drift(&m, root),
         "stpa-inputs" => cmd_stpa_inputs(&m),
@@ -411,8 +423,9 @@ mod tests {
 
     #[test]
     fn risk_order_is_worst_first_and_unknown_never_outranks() {
-        assert!(risk_rank("dataLoss") < risk_rank("security"));
-        assert!(risk_rank("cosmetic") < risk_rank("not-a-class"));
+        let o = risk_order(&repo_root());
+        assert!(risk_rank(&o, "dataLoss") < risk_rank(&o, "security"));
+        assert!(risk_rank(&o, "cosmetic") < risk_rank(&o, "not-a-class"));
     }
 
     #[test]
@@ -472,7 +485,8 @@ mod tests {
         if m.elements.is_empty() {
             return;
         }
-        let mut ranked: Vec<usize> = m.elements.iter().map(|e| risk_rank(&e.risk_class)).collect();
+        let o = risk_order(&root);
+        let mut ranked: Vec<usize> = m.elements.iter().map(|e| risk_rank(&o, &e.risk_class)).collect();
         ranked.sort_unstable();
         assert_eq!(ranked[0], 0, "the registry must classify at least one dataLoss element");
         assert!(
@@ -485,5 +499,18 @@ mod tests {
     fn a_wrong_root_is_an_error_not_an_empty_registry() {
         let bogus = repo_root().join("definitely-not-a-repo-root");
         assert!(matches!(load(&bogus), Err(2)), "a wrong path must not read as an empty registry");
+    }
+
+    #[test]
+    fn a_projects_own_risk_taxonomy_wins_over_the_engines() {
+        // issue128: ranking a downstream project against the ENGINE's RiskClass sorted its
+        // `durability` elements below `cosmetic` and printed them as `unclassified`, in the one view
+        // whose purpose is what-to-audit-first. A project's risk taxonomy is its own judgement.
+        let engine = crate::schema::enum_members("RiskClass");
+        assert!(!engine.contains(&"durability".to_string()), "the engine does not declare durability");
+        let o = risk_order(&repo_root());
+        assert_eq!(o.first().map(String::as_str), Some("dataLoss"), "this repo declares no override");
+        // An unknown class must sort LAST, never first — absence of a judgement is not safety.
+        assert!(risk_rank(&o, "not-a-declared-class") >= o.len());
     }
 }

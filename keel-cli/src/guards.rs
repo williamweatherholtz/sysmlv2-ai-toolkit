@@ -2451,7 +2451,7 @@ pub fn attribute_vocabulary(root: &Path) -> GuardReport {
                     .collect();
                 let owner = line_owner.as_ref().map(|(n, ty)| (n, ty)).or_else(|| stack.last().map(|(n, ty, _)| (n, ty)));
                 let Some((owner, ty)) = owner else { continue };
-                let Some(declared) = crate::schema::declared_attrs(ty) else { continue };
+                let Some(declared) = crate::schema::declared_attrs_in(root, ty) else { continue };
                 scanned += 1;
                 if !attr.is_empty() && !declared.contains(&attr) {
                     let hint = nearest_attr(&attr, &declared).map_or_else(

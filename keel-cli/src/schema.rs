@@ -11,14 +11,20 @@
 //!
 //! Deriving instead of restating makes that drift UNREPRESENTABLE rather than merely detectable.
 //!
-//! # Why the EMBEDDED schema and never the project's
+//! # Whose schema: the engine's for its OWN vocabulary, the project's for the project's judgment
 //!
-//! `include_dir!` bakes the engine's own `schema/` into the binary at build time. Reading the
-//! DOWNSTREAM PROJECT's on-disk `.engine/schema/` instead is exactly what caused issue090: a newer
-//! binary met an older on-disk schema and produced 566 violations, blocking every commit, with the
-//! only remedy being a frozen-core edit. So the engine's vocabulary travels WITH the engine. A
-//! project's own additions are read from its files separately, where they are additive and cannot
-//! take the engine's vocabulary away.
+//! `include_dir!` bakes the engine's own `schema/` into the binary at build time, and for ENGINE
+//! VOCABULARY that is the only safe source. Reading the downstream project's on-disk copy instead is
+//! exactly what caused issue090: a newer binary met an older on-disk schema and produced 566
+//! violations, blocking every commit, with the only remedy being a frozen-core edit. So markers and
+//! edge kinds travel WITH the engine, and a project cannot take them away.
+//!
+//! The reverse holds for a PROJECT-DECLARED enum whose ORDER encodes the project's own judgment.
+//! `project_enum_members` reads the project first and falls back to the engine, because imposing the
+//! engine's taxonomy there produces a confidently wrong answer rather than a missing one — measured
+//! on real downstream data in issue128. The distinction is not a compromise between the two rules:
+//! engine vocabulary is the engine's to guarantee, and a project's risk taxonomy is the project's to
+//! declare.
 //!
 //! # Parsing, and why it is not the real parser
 //!
@@ -163,6 +169,43 @@ fn walk(dir: &Dir<'_>, v: &mut Vocabulary) {
     }
 }
 
+/// The PROJECT's own schema vocabulary, parsed once per root and MEMOISED.
+///
+/// The cache is not an optimisation, it is a correctness-of-behaviour requirement. Without it
+/// `declared_attrs_in` re-read and re-parsed the whole project schema directory FOR EVERY ATTRIBUTE
+/// ASSIGNMENT — 41141 of them in this repo — and the pre-commit gate stopped completing inside ten
+/// minutes. A guard slow enough to time out is a guard someone disables, which is the issue076/
+/// issue081 dynamic this project has already paid for once.
+///
+/// Keyed by root and never invalidated within a process: a single `keel` invocation reads one tree,
+/// and the schema does not change underneath it mid-run.
+fn project_vocab(root: &std::path::Path) -> std::sync::Arc<Vocabulary> {
+    static CACHE: LazyLock<std::sync::Mutex<HashMap<std::path::PathBuf, std::sync::Arc<Vocabulary>>>> =
+        LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+    let key = root.to_path_buf();
+    if let Ok(g) = CACHE.lock() {
+        if let Some(v) = g.get(&key) {
+            return std::sync::Arc::clone(v);
+        }
+    }
+    let mut v = Vocabulary {
+        enums: HashMap::new(),
+        markers: HashSet::new(),
+        attrs: HashMap::new(),
+        supertype: HashMap::new(),
+    };
+    for path in crate::collect_sysml(&root.join(".engine").join("schema")) {
+        if let Ok(src) = std::fs::read_to_string(&path) {
+            parse(&src, &mut v);
+        }
+    }
+    let arc = std::sync::Arc::new(v);
+    if let Ok(mut g) = CACHE.lock() {
+        g.insert(key, std::sync::Arc::clone(&arc));
+    }
+    arc
+}
+
 /// The engine's schema vocabulary, parsed once.
 pub static VOCAB: LazyLock<Vocabulary> = LazyLock::new(|| {
     let mut v = Vocabulary {
@@ -206,10 +249,101 @@ pub fn enum_members(name: &str) -> Vec<String> {
     VOCAB.enums.get(name).cloned().unwrap_or_default()
 }
 
+/// The members of an enum as THE PROJECT declares them, falling back to the engine's own.
+///
+/// # This is the opposite of the marker rule, deliberately
+///
+/// `engine_markers()` reads the EMBEDDED schema and never the project's, because engine vocabulary
+/// must travel with the binary — a project that cannot see `#Verify` would be locked out of its own
+/// history (issue090). A project-declared ENUM is the reverse case: `RiskClass` is the project's own
+/// risk taxonomy and its ORDER is the project's judgment about what matters most. Imposing the
+/// engine's ordering on it produces a confidently wrong answer rather than a missing one.
+///
+/// Measured on a real downstream project (issue128): `SelfSync` declares `RiskClass { dataLoss;
+/// security; durability; concurrency; correctness; availability; cosmetic }`. Ranked against the
+/// engine's own list, its 15 `durability` and 8 `concurrency` elements — `Vault::commit`,
+/// `Vault::verify_and_gc`, `write_mirror` among them — sorted BELOW `cosmetic` and printed as
+/// `unclassified`, in the one view whose entire purpose is to say what to audit first.
+///
+/// Falls back to the embedded declaration when the project declares nothing, so a project that never
+/// touched the module still gets a sensible order.
+#[must_use]
+pub fn project_enum_members(root: &std::path::Path, name: &str) -> Vec<String> {
+    let dir = root.join(".engine").join("schema");
+    let mut found: Vec<String> = Vec::new();
+    for path in crate::collect_sysml(&dir) {
+        let Ok(src) = std::fs::read_to_string(&path) else { continue };
+        let body = strip_comments(&src);
+        let needle = format!("enum def {name}");
+        let Some(i) = body.find(&needle) else { continue };
+        let after = &body[i + needle.len()..];
+        let Some(open) = after.find('{') else { continue };
+        let Some(close) = after[open..].find('}') else { continue };
+        found = after[open + 1..open + close]
+            .split(';')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !found.is_empty() {
+            break;
+        }
+    }
+    if found.is_empty() {
+        enum_members(name)
+    } else {
+        found
+    }
+}
+
 /// Every attribute name declared for `type_name`, following `:>` supertypes.
 ///
 /// Returns `None` when the type is not in the engine schema at all — a PROJECT-DECLARED type, whose
 /// attributes the engine cannot know and must not judge.
+/// Attributes for `type_name` as the ENGINE declares them UNIONED with the PROJECT's own declaration.
+///
+/// # This union is not a nicety; without it the guard locks a project out of its own repo
+///
+/// Measured, after `attribute-vocabulary` had already shipped: run against a real downstream project
+/// it produced **1287 violations** (issue129). Its `.engine/schema/` declares `ProcessStep` with an
+/// `order` attribute and `CodeElement` with `file`, `name`, `auditRound`, `auditedAt` and
+/// `riskRationale` — all legitimate in that project, none of them in the engine's copy. Judging the
+/// project's instances against the engine's vocabulary alone is precisely the issue090 failure the
+/// marker guard already learned: a newer binary meets an older or extended on-disk schema and blocks
+/// every commit, with the only remedy being an edit to frozen core.
+///
+/// The marker guard's answer was ENGINE ∪ PROJECT — the engine guarantees its own vocabulary and a
+/// project may DECLARE MORE. The same rule applies here, and it costs nothing in detection: a
+/// misspelling like `codeHsah` appears in neither set, which is the case the guard exists for.
+#[must_use]
+pub fn declared_attrs_in(root: &std::path::Path, type_name: &str) -> Option<HashSet<String>> {
+    let project = project_vocab(root);
+    let walk_up = |v: &Vocabulary| -> Option<HashSet<String>> {
+        let mut cur = type_name.to_string();
+        let mut seen = HashSet::new();
+        let mut out = HashSet::new();
+        let mut found = false;
+        while let Some(direct) = v.attrs.get(&cur) {
+            found = true;
+            out.extend(direct.iter().cloned());
+            let Some(next) = v.supertype.get(&cur) else { break };
+            if !seen.insert(cur.clone()) {
+                break;
+            }
+            cur.clone_from(next);
+        }
+        found.then_some(out)
+    };
+    match (declared_attrs(type_name), walk_up(&project)) {
+        // (arms below)
+        (None, None) => None, // neither declares it — a project type the engine must not judge
+        (a, b) => {
+            let mut out = a.unwrap_or_default();
+            out.extend(b.unwrap_or_default());
+            Some(out)
+        }
+    }
+}
+
 #[must_use]
 pub fn declared_attrs(type_name: &str) -> Option<HashSet<String>> {
     let mut cur = type_name.to_string();

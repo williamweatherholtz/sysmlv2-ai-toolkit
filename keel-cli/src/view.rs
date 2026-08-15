@@ -3558,7 +3558,15 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let stale = compute_stale_verifications(root, &model);
     let cov = compute_critique_coverage(&model, &stale, &policy);
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
-    let in_scope = |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element);
+    // SUPERSEDED ELEMENTS ARE OUT OF SCOPE (issue127). `compute_coverage` and
+    // `compute_tier_satisfaction` both build this same descoped set and filter by it; this view did
+    // not, so a retired element stayed in the denominator permanently and its critique had to be
+    // maintained to stop the number falling. Superseded means RETIRED — the engine says so everywhere
+    // else, and three computed views disagreeing about what is in scope is dual truth about scope.
+    let descoped: HashSet<&str> =
+        model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.as_str()).collect();
+    let in_scope =
+        |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element) && !descoped.contains(c.element.as_str());
 
     // Summary over GOVERNED elements only (the grandfathered ones aren't required); per the policy's
     // DECLARED target types (D0097), so a downstream-added target type is summarized too.

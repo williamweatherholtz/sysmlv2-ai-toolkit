@@ -1511,4 +1511,37 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcCritiqueCoverageSupersede to issue127;
+
+    part issue128 : Issue {
+        :>> id = "0c033446-1496-4fb7-a9b2-201c8ffd0b3f";
+        :>> title = "arch criticality ranked a downstream project's own risk classes as unclassified";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by running the six arch views against a REAL second project's registry (obsidian-livesync / SelfSync, 169 authored CodeElements) - the portability test keelArchViews always specified and issue117 recorded as unreachable. It was reachable: the project exists on this machine and holds its own .engine/schema/codeaudit copy. THE VIEWS RAN WITH NO CHANGE TO KEEL, which is the portability claim verified. But arch criticality ranked 23 of their 169 elements LAST, as 'unclassified'. Cause: D0150 made risk_order derive from the EMBEDDED RiskClass enum, and SelfSync declares its own - dataLoss, security, durability, concurrency, correctness, availability, cosmetic - with durability and concurrency that the engine does not have. Their 15 durability and 8 concurrency elements, including Vault::commit (durable file commit), Vault::verify_and_gc (corruption and orphan detect) and write_mirror (atomic mirror write), sorted BELOW cosmetic in the one view whose entire purpose is to say what to audit first. Deriving from the embedded schema is right for ENGINE vocabulary - markers and edge kinds must travel with the binary or a project gets locked out of its own history (issue090) - and wrong for a PROJECT-DECLARED enum whose order is the project's own judgment about what matters most. Fixed by reading the project's RiskClass first and falling back to the engine's.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcArchRegistryPortability to issue128;
+
+    part issue129 : Issue {
+        :>> id = "0ce9518a-c7c9-4de8-ac61-9b377cec16df";
+        :>> title = "attribute-vocabulary locked a downstream project out of its own repo (1287 violations)";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "SHIPPED EARLIER TODAY IN SPRINT 303 AND FOUND THE SAME DAY by running the guard against a real downstream project. The attribute-vocabulary guard judged that project's instances against the ENGINE's attribute vocabulary alone and produced 1287 violations, which would have blocked every commit in that repo on a binary upgrade. Its .engine/schema declares ProcessStep with an order attribute and CodeElement with file, name, auditRound, auditedAt and riskRationale - all legitimate there, none in the engine's copy. This is precisely the issue090 failure the MARKER guard already learned and whose lesson D0133 recorded: a newer binary meets an older or extended on-disk schema and locks the project out, with the only remedy being an edit to frozen core. I read that lesson while building this guard, wrote it into the module doc as the reason to read the EMBEDDED schema, and still shipped the same lockout in the other direction - because reading the embedded schema protects the ENGINE's vocabulary from removal but says nothing about a project ADDING to it. FIXED: declared_attrs_in unions the engine's declaration with the project's, exactly as the marker guard does. Detection is unaffected - a misspelling like codeHsah is in neither set, which is the only case the guard exists for - and the downstream project goes from 1287 violations to 0 while this repo stays clean at 41141 assignments scanned.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcArchRegistryPortability to issue129;
+
+    part issue130 : Issue {
+        :>> id = "d7f8268b-edbb-44bc-8dbf-3010439f474d";
+        :>> title = "arch drift reported elements with no filePath as missing files";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by running arch drift against a downstream registry that records the source path under a different attribute name than the shipped module uses. Their 169 elements therefore had an empty filePath; root.join('') resolved to the repo root; reading a DIRECTORY failed; and every element reported as MISSING - not readable. The view stated 169 files were absent when in truth no file had ever been named. Another instance of the session's recurring shape: a confident wrong answer rather than an error. FIXED: an element with no filePath now reports UNLOCATED with its own counter, distinct from MISSING, because never-named and named-but-absent call for different work - the first is a registry that has not recorded where its code lives, the second is a stale path.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcArchRegistryPortability to issue130;
 }
