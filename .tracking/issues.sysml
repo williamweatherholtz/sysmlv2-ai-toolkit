@@ -1489,4 +1489,15 @@ package ProjectIssues {
     #DependsOn dependency from issue123 to srServeApproveGateCompletenessCritique;
     #DependsOn dependency from issue124 to srServeOutputSchemaValidateCompletenessCritique;
     #DependsOn dependency from issue125 to srServeScopedContextCompletenessCritique;
+
+    part issue126 : Issue {
+        :>> id = "154d8e14-fb4e-4777-bede-c7b93e8316c4";
+        :>> title = "A git-bash /tmp path read by Windows python fails, and has recurred three times";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The Bash tool runs git-bash and the python/PowerShell tools are native Windows, so a file written to /tmp by a heredoc is invisible to a later python step reading the same path. This has now failed three times in one session - in sprint 301 while splicing test code, and twice in sprint 305 while authoring critiques - each time costing a failed step and a retry. The remedy (use the Write tool for any file a later step must read, or a scratchpad path both shells resolve) was RECORDED IN A RETRO after the first occurrence and did not prevent the next two, which is the textbook D0047 case: manual vigilance is not a control. The pre-bash hook already exists to advise on exactly this class of host adaptation (issue094) and is where the check belongs. Severity Low because it is self-announcing - the step fails loudly with FileNotFoundError rather than producing a wrong answer silently - so it costs time rather than correctness.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcScratchPathControl to issue126;
 }
