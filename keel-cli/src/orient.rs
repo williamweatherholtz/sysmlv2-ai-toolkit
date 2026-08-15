@@ -54,6 +54,10 @@ pub struct Output {
     /// being enforced: a computed view that showed only findings would read as "all controls checked"
     /// on a project running a deliberate subset.
     pub inactive_processes: Vec<String>,
+    /// Decisions awaiting the human acceptance gate (issue096). ALWAYS emitted, empty included:
+    /// absence must be STATED, not implied — a field that disappears when the list is empty reads
+    /// identically to a field nobody computed, which is the D0138 lesson.
+    pub pending_acceptances: Vec<String>,
 }
 
 impl Output {
@@ -77,12 +81,13 @@ impl Output {
         };
         let burndown = if self.burndown.is_empty() { "{}" } else { self.burndown.as_str() };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"open_issues\": {},\n  \"pendingAcceptances\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
             str_array(&self.invalid_evidence),
             str_array(&self.open_issues),
+            str_array(&self.pending_acceptances),
             self.done,
             self.outstanding,
             burndown,
@@ -590,6 +595,13 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
         burndown: crate::view::burndown_summary_json(repo).unwrap_or_default(),
         // D0138: state what is NOT enforced, so a subset-activated project cannot read as fully checked.
         inactive_processes: crate::activation::Activation::load(repo).inactive_processes(),
+        // Conservative on error, and deliberately the OPPOSITE default from `superseded_names`:
+        // a model-read failure there had to avoid silently restoring everything to ready, whereas
+        // here an empty list is the benign reading. Reporting "nothing pending" when the model
+        // could not be read would be the silent failure issue096 is about, so a failure surfaces
+        // as a named sentinel the human will notice rather than as a clean zero.
+        pending_acceptances: crate::view::pending_acceptances(repo)
+            .unwrap_or_else(|_| vec!["<unreadable: could not compute pending acceptances>".to_owned()]),
     }
 }
 

@@ -2020,6 +2020,41 @@ pub fn superseded_names(root: &Path) -> Result<HashSet<String>, ViewError> {
     Ok(model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.clone()).collect())
 }
 
+/// Decisions with `status = proposed` — the ones WAITING on the single human gate (issue096).
+///
+/// Acceptance is the one human gate in an otherwise autonomous loop, and the console's Decisions
+/// surface was wired to the `keel decisions` SCORECARD, which filters to accepted and therefore
+/// rendered everything except what needs action. It failed silently too: nothing anywhere stated
+/// that decisions were waiting, so an unattended proposal is indistinguishable from none.
+///
+/// Sourced from the model rather than from the scorecard on purpose. The scorecard's accepted-only
+/// scope is CORRECT for what it does — scoring citations and critique coverage is meaningful only
+/// for a committed decision — so this reads the same authored facts by a different question instead
+/// of widening a view that is right as it stands.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn pending_acceptances(root: &Path) -> Result<Vec<String>, ViewError> {
+    Ok(proposed_decisions(&Model::build(root)?))
+}
+
+/// Pure core of [`pending_acceptances`], for self-test.
+///
+/// Matches on the suffix because the authored value is the enum path `DecisionStatus::proposed`,
+/// and matching the bare word would also catch a status like `counterproposed` if one were ever
+/// added — while matching the full path would silently stop working if the enum were renamed.
+fn proposed_decisions(model: &Model) -> Vec<String> {
+    let mut pending: Vec<String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision")
+        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
+        .map(|(n, _)| n.clone())
+        .collect();
+    pending.sort();
+    pending
+}
+
 /// `(total_issues, untriaged)` — issues with NO `#Resolves` edge at all (D0077). Pure structure
 /// (no done-set needed); the `issues` guard fails on a non-empty untriaged list.
 ///
@@ -4791,6 +4826,21 @@ pub fn orient_html(root: &Path) -> Result<String, ViewError> {
         card("Ready to start", o.ready.len().to_string(), format!("unblocked now: {}", preview(&o.ready, 6)), if o.ready.is_empty() { "warn" } else { "good" }),
         card("Sprints in progress", o.in_progress_sprints.len().to_string(), if wip.is_empty() { "none".to_string() } else { preview(&wip, 4) }, if o.in_progress_sprints.len() <= 2 { "good" } else { "warn" }),
         card("Open issues", o.open_issues.len().to_string(), format!("unresolved: {}", preview(&o.open_issues, 6)), if o.open_issues.is_empty() { "good" } else { "warn" }),
+        // Acceptance is the ONE human gate in an otherwise autonomous loop (D0049), so a proposal
+        // nobody has seen is the single thing on this dashboard the human alone can clear. It gets a
+        // card of its own rather than a line inside the Decisions surface, because that surface is
+        // the accepted-only scorecard — it rendered everything EXCEPT what needs action (issue096).
+        // "bad" and not "warn" when non-empty: this blocks the loop, it does not merely age.
+        card(
+            "Awaiting your acceptance",
+            o.pending_acceptances.len().to_string(),
+            if o.pending_acceptances.is_empty() {
+                "no decision is waiting on you".to_string()
+            } else {
+                format!("proposed: {}", preview(&o.pending_acceptances, 6))
+            },
+            if o.pending_acceptances.is_empty() { "good" } else { "bad" },
+        ),
         card("Suspect / stale", suspect_total.to_string(), format!("{} drift/criterion + {} invalid-evidence \u{2014} re-verify", o.suspect.len(), o.invalid_evidence.len()), if suspect_total == 0 { "good" } else { "warn" }),
         card(
             "Assurance readiness",
@@ -6707,5 +6757,34 @@ mod tests {
         let sr = stats.iter().find(|t| t.tier == "SystemRequirement").unwrap();
         assert_eq!((sr.total, sr.satisfied), (2, 1));
         assert_eq!(sr.gaps, vec!["sr2".to_string()]);
+    }
+
+    #[test]
+    fn pending_acceptances_are_the_proposed_decisions_only() {
+        // issue096: the console rendered the accepted-only scorecard, so it showed everything EXCEPT
+        // what needs the human. Only `proposed` is waiting — rejected and superseded are settled, and
+        // counting them would recreate the same uselessness from the other direction.
+        let with_status = |ty: &str, status: &str| {
+            let mut a = HashMap::new();
+            a.insert("status".to_string(), status.to_string());
+            ItemInfo { type_name: ty.to_string(), attrs: a, marker: None, file: String::new() }
+        };
+        let mut items = HashMap::new();
+        items.insert("d0002".to_string(), with_status("Decision", "DecisionStatus::proposed"));
+        items.insert("d0001".to_string(), with_status("Decision", "DecisionStatus::accepted"));
+        items.insert("d0003".to_string(), with_status("Decision", "DecisionStatus::rejected"));
+        items.insert("d0004".to_string(), with_status("Decision", "DecisionStatus::superseded"));
+        items.insert("d0005".to_string(), with_status("Decision", "DecisionStatus::proposed"));
+        // A non-Decision carrying the same attribute must not leak in.
+        items.insert("someStory".to_string(), with_status("Story", "DecisionStatus::proposed"));
+        let model = Model { items, edges: Vec::new() };
+        assert_eq!(proposed_decisions(&model), vec!["d0002".to_string(), "d0005".to_string()]);
+
+        // And the empty case returns an EMPTY list rather than anything absent: orient always emits
+        // the field, because a field that vanishes when empty is indistinguishable from one nobody
+        // computed (the D0138 lesson).
+        let mut only_accepted = HashMap::new();
+        only_accepted.insert("d0001".to_string(), with_status("Decision", "DecisionStatus::accepted"));
+        assert!(proposed_decisions(&Model { items: only_accepted, edges: Vec::new() }).is_empty());
     }
 }
