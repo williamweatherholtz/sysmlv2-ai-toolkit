@@ -173,6 +173,20 @@ pub fn cmd_sync(repo: &Path) -> i32 {
             return 1;
         }
     }
+    // Now that a fetch has actually happened, an anchor that still does not resolve is genuinely
+    // dangling rather than merely unfetched. This is the ONLY place that distinction can be drawn
+    // (issue113): `orient` never fetches, so from there the honest answer is always "unverifiable
+    // from here".
+    let o = crate::orient::compute_after_fetch(repo, true);
+    if o.invalid_evidence.is_empty() {
+        println!("  evidence: every anchor resolves.");
+    } else {
+        println!("  evidence: {} task(s) anchored to a commit NOBODY has — genuinely dangling, not unfetched:", o.invalid_evidence.len());
+        for t in o.invalid_evidence.iter().take(10) {
+            println!("      {t}");
+        }
+        println!("      These re-enter the frontier as outstanding: a passing result whose anchor is gone is not evidence (issue071).");
+    }
     println!();
     println!("  now run `keel orient .` — its answers are computed against this tree.");
     0
