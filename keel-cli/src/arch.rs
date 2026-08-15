@@ -16,14 +16,19 @@ use crate::view::{ArchModel, CodeElementRow};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-/// Worst-first. `arch criticality` ranks on this order, so it is load-bearing, not cosmetic.
-const RISK_ORDER: [&str; 6] =
-    ["dataLoss", "security", "correctness", "availability", "performance", "cosmetic"];
+/// Worst-first, DERIVED from the `RiskClass` enum's DECLARATION ORDER — `arch criticality` ranks on
+/// this sequence, so the schema is where the ranking is decided, not a literal here that happened to
+/// agree with it (issue120).
+fn risk_order() -> &'static Vec<String> {
+    static R: std::sync::LazyLock<Vec<String>> =
+        std::sync::LazyLock::new(|| crate::schema::enum_members("RiskClass"));
+    &R
+}
 
 /// Rank of a risk class, lower = worse. Unknown/absent sorts last, never first: an element whose
 /// risk nobody recorded must not outrank one someone judged to be critical.
 fn risk_rank(risk: &str) -> usize {
-    RISK_ORDER.iter().position(|r| *r == risk).unwrap_or(RISK_ORDER.len())
+    risk_order().iter().position(|r| r == risk).unwrap_or_else(|| risk_order().len())
 }
 
 /// FNV-1a over whitespace-normalised text.
@@ -181,7 +186,7 @@ fn cmd_criticality(m: &ArchModel) -> i32 {
     rows.sort_by(|a, b| a.0.cmp(&b.0).then(a.2.name.cmp(&b.2.name)));
     println!("audit frontier, most critical first ({} element(s)):", rows.len());
     for (rank, bumped, e) in rows {
-        let tier = RISK_ORDER.get(rank).copied().unwrap_or("unclassified");
+        let tier = risk_order().get(rank).map_or("unclassified", String::as_str);
         let why = if bumped { "  <- bumped: traces to a `must` Need" } else { "" };
         let safety = if e.invariant_safety.is_empty() { "-" } else { e.invariant_safety.as_str() };
         println!("  {tier:<12} {:<28} invariants={safety}{why}", e.label);

@@ -1392,4 +1392,37 @@ package ProjectIssues {
     // Retargeted: sprint 301 verified against keel's own registry, which is what issue117 RECORDS
     // as the gap. Only a second project's registry closes it.
     #Resolves dependency from dcArchRegistryPortability to issue117;
+
+    part issue118 : Issue {
+        :>> id = "84b7cbee-d036-4260-a018-bf98af8f85ac";
+        :>> title = "A misspelled attribute passes every layer and silently drops the value";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PROVEN by probe: a CodeElement authored with codeHsah (typo of codeHash) and riskClas (typo of riskClass) passes keel validate, all 32 guards, AND the fast edit gate - 329 files reported clean. The element then computes with its riskClass silently absent: the intended dataLoss classification vanished and the element sits in the arch criticality frontier as correctness, which is a safety-relevant misclassification that no layer reported. codeHsah likewise made the element report as UNAUDITED (never hashed) when the author believed a hash was recorded. This is the SAME failure class as issue077/D0133 - an undeclared marker validates clean and silently removes the item from whatever depends on it - which was fixed for markers and for enum values (an unknown enum member IS rejected) but never for attribute NAMES. It is the direct cause of the recurring surprise that new schema elements are not picked up: the author believes they authored a fact, every gate agrees the model is honest, and the fact is not there.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSchemaReconciliation to issue118;
+
+    part issue119 : Issue {
+        :>> id = "17a0b752-0942-4958-828b-f0bd3def5922";
+        :>> title = "The EdgeKind enum is inert and KNOWN_EDGES has drifted from it in both directions";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The schema declares enum def EdgeKind with twelve values. NO Rust code reads it - the enum is inert, a schema declaration with no consumer, which is exactly what D0142 spent a sprint deleting and what D0144's dorConsumer check exists to prevent. The actual authority for declared views is a hardcoded KNOWN_EDGES list in view.rs, and it has drifted from the schema in BOTH directions. Declared in EdgeKind but REJECTED by the view layer: derivedFrom, covers, dispositions, specialize. Accepted by KNOWN_EDGES but never declared in EdgeKind: ordering, prospectiveChange, safetyChange. PROVEN by probe: a declared view traversing derivedFrom fails with 'references unknown edge kind' and lists the eleven it will accept. The blind spot is 166 real edges - 97 DerivedFrom, 28 Covers, 41 Dispositions - which exist in the model, are read by guards, and cannot be reached from the declared-view layer at all. A user reading the schema would reasonably declare a viewpoint over derivedFrom and be told by the tool that the schema's own vocabulary is unknown.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSchemaReconciliation to issue119;
+
+    part issue120 : Issue {
+        :>> id = "1365b14c-e511-4d49-8727-380311b3f3db";
+        :>> title = "Hardcoded lists mirror schema vocabulary with nothing reconciling them";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "At least three constants in the binary restate schema vocabulary and nothing checks that they still agree with it: KNOWN_EDGES (view.rs) mirrors the EdgeKind enum and HAS drifted (issue119); ENGINE_MARKERS (guards.rs) mirrors the declared metadata defs and is missing Controls, Feedback and Restructure, the three markers shipped with the codeaudit module in sprint 301; RISK_ORDER (arch.rs) mirrors the RiskClass enum and happens to agree today by nothing more than my having written both in the same hour. Each is a bespoke restatement where an intrinsic derivation or a reconciliation check belongs. Note ENGINE_MARKERS cannot simply be deleted in favour of reading the project's schema - that is precisely what caused issue090 (566 violations, every commit blocked, when a new binary met an older on-disk .engine), which is why the list exists - so the fix is reconciliation against the EMBEDDED schema, not removal. RECORDED ABOUT MY OWN METHOD TOO: the ad-hoc python used to run this very audit produced two false findings before it was correct, first by matching only five of the seven def kinds (missing occurrence def TestResult) and then by keying enum bodies to a first-line match so RiskClass reported InvariantSafety's values. An audit worth running belongs in the binary as a keel command, not in a script that has to be debugged each time it is used (D0040).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSchemaReconciliation to issue120;
 }

@@ -200,21 +200,18 @@ fn model_dirs(root: &Path) -> [std::path::PathBuf; 7] {
     ]
 }
 
-/// Known edge kinds (canonical, lowercase) the AST currently extracts. View edge names are
-/// matched case-insensitively against this set; anything else is a hard error (fail-loud).
-const KNOWN_EDGES: &[&str] = &[
-    "satisfy",
-    "verify",
-    "allocate",
-    "dependency",
-    "ordering",
-    "charteredby",
-    "resolves",
-    "prospectivechange",
-    "safetychange",
-    "dependson",
-    "supersede",
-];
+/// Known edge kinds (canonical, lowercase), DERIVED from the schema — never restated here.
+///
+/// This was a hardcoded list, and it had drifted from the schema in BOTH directions (issue119): it
+/// rejected `derivedFrom`, `covers`, `dispositions` and `specialize`, which the schema declares and
+/// which 166 edges in the model use, while accepting three kinds the schema never declared. A user
+/// who read the schema and declared a viewpoint over `derivedFrom` was told the schema's own
+/// vocabulary was unknown. Deriving makes that class of drift unrepresentable.
+fn known_edges() -> &'static std::collections::HashSet<String> {
+    static K: std::sync::LazyLock<std::collections::HashSet<String>> =
+        std::sync::LazyLock::new(crate::schema::edge_kinds);
+    &K
+}
 
 fn value_to_string(v: &Value) -> String {
     match v {
@@ -1345,11 +1342,13 @@ fn validate_edges(view: &str, tr: &Traverse) -> Result<Vec<String>, ViewError> {
     let mut out = Vec::new();
     for e in &tr.edges {
         let lc = e.to_lowercase();
-        if !KNOWN_EDGES.contains(&lc.as_str()) {
+        if !known_edges().contains(&lc) {
+            let mut known: Vec<&str> = known_edges().iter().map(String::as_str).collect();
+            known.sort_unstable();
             return Err(ViewError::UnknownEdge {
                 view: view.to_string(),
                 edge: e.clone(),
-                known: KNOWN_EDGES.join(", "),
+                known: known.join(", "),
             });
         }
         out.push(lc);
@@ -1907,10 +1906,10 @@ pub fn marker_census(root: &Path) -> Result<String, ViewError> {
                 }
             }
             if let Ok(text) = std::fs::read_to_string(&path) {
-                for m in crate::guards::ENGINE_MARKERS {
+                for m in crate::guards::engine_markers() {
                     let n = text.matches(&format!("#{m}")).count();
                     if n > 0 {
-                        *raw.entry((*m).to_string()).or_default() += n;
+                        *raw.entry(m.clone()).or_default() += n;
                     }
                 }
             }

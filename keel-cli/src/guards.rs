@@ -888,27 +888,20 @@ const MARKER_FOLLOWERS: [&str; 5] = ["dependency", "part", "item", "verification
 /// pre-v0.2.0 schema plus a v0.2.0 binary yields **566 violations and every commit blocked**, on the
 /// engine's own shipped files. Worse, the obvious remedy meant editing FROZEN `schema/core`, so the
 /// guard forced every downstream project into a frozen-schema sign-off just to keep committing.
-pub const ENGINE_MARKERS: [&str; 17] = [
-    // edge algebra where the pilot grammar has no native form
-    "DependsOn",
-    "Supersede",
-    "OrderingOnly",
-    "CharteredBy",
-    "Resolves",
-    "Verify",
-    "DerivedFrom",
-    "Measures",
-    "Informs",
-    "JustifiedBy",
-    "Dispositions",
-    "Covers",
-    // item-level classifiers the guards read
-    "ProspectiveChange",
-    "SafetyChange",
-    "Capability",
-    "ProcessDefect",
-    "View",
-];
+/// The engine's own marker vocabulary, DERIVED from the `metadata def`s in the schema baked into
+/// this binary — never restated as a literal list.
+///
+/// It was a hardcoded 17-entry list and had already fallen behind: `Controls`, `Feedback` and
+/// `Restructure` shipped with the codeaudit module and were never added (issue120). Deriving keeps
+/// the property this list exists for — the vocabulary travels WITH the binary, so upgrading the
+/// binary against an older on-disk `.engine/` cannot produce the issue090 lockout — while removing
+/// the second place that had to be remembered.
+#[must_use]
+pub fn engine_markers() -> &'static HashSet<String> {
+    static M: std::sync::LazyLock<HashSet<String>> =
+        std::sync::LazyLock::new(|| crate::schema::VOCAB.markers.clone());
+    &M
+}
 
 /// Marker names USED in real syntactic positions in `text`, as `(marker, 1-based line)`.
 fn markers_used(text: &str) -> Vec<(String, usize)> {
@@ -937,7 +930,7 @@ fn markers_used(text: &str) -> Vec<(String, usize)> {
 /// Marker names DECLARED as `metadata def <Name>;` in `texts`.
 fn markers_declared(texts: &[String]) -> HashSet<String> {
     // The engine's own algebra is always valid — a project must never have to re-declare it (D0136).
-    let mut out: HashSet<String> = ENGINE_MARKERS.iter().map(|m| (*m).to_string()).collect();
+    let mut out: HashSet<String> = engine_markers().clone();
     for text in texts {
         for raw in text.lines() {
             let line = raw.trim();
@@ -1463,8 +1456,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 32] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision"];
+pub const GUARD_NAMES: [&str; 33] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1803,6 +1796,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
         "base-first-justification" => Some(base_first_justification(root)), // warning-only (D0139(B))
         "edge-endpoints" => Some(edge_endpoints(root)), // hard (issue109) — an edge asserting a relationship to nothing
+        "attribute-vocabulary" => Some(attribute_vocabulary(root)), // hard (issue118) — an undeclared attribute is silently LOST
         "type-collision" => Some(type_collision(root)), // hard (D0128) — a project type shadowing an engine type, silently
         "ownership" => Some(ownership(root)), // hard (D0108/D0129) — a non-owner overwriting another actor's fields
         "attestation-authority" => Some(attestation_authority(root)), // hard (D0092) — a human-only verdict judged by an AI
@@ -1885,7 +1879,7 @@ fn named_attr_bearers(pkg: &keel_parser::ast::Package) -> Vec<(&str, &[keel_pars
 /// parser increment; until it lands, a text scan is the honest option, and it is scoped to the lines
 /// immediately around the declaration rather than the whole file.
 fn base_first_justification(root: &Path) -> GuardReport {
-    let engine: HashSet<&str> = ENGINE_MARKERS.iter().copied().collect();
+    let engine: HashSet<&str> = engine_markers().iter().map(String::as_str).collect();
     let mut warnings = Vec::new();
     let mut scanned = 0usize;
     for dir in [root.join(".tracking"), root.join(".engine")] {
@@ -2345,5 +2339,195 @@ mod tests {
         assert_eq!(inline_attr(line, "id"), Some("abc-123".to_string()));
         assert_eq!(inline_attr(line, "title"), None);
         assert_eq!(inline_attr("    :>> id  =  \"spaced\";", "id"), Some("spaced".to_string()));
+    }
+}
+
+// ── attribute-vocabulary guard (issue118) ────────────────────────────────────
+
+/// Nearest declared attribute to `name`, for the "did you mean" hint.
+///
+/// Edit distance capped at 2 relative to length: a typo is a slip of a character or two, and
+/// suggesting a name three edits away is noise that teaches the reader to skim the message.
+fn nearest_attr<'a>(name: &str, declared: &'a HashSet<String>) -> Option<&'a str> {
+    let budget = if name.len() <= 4 { 1 } else { 2 };
+    declared
+        .iter()
+        .map(|d| (edit_distance(name, d), d.as_str()))
+        .filter(|(d, _)| *d <= budget)
+        .min_by_key(|(d, s)| (*d, s.len()))
+        .map(|(_, s)| s)
+}
+
+/// Levenshtein distance, two rows. Index-free so a panic is not reachable by construction — this
+/// runs over authored text, where an unexpected shape must never abort the gate.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut cur = vec![0usize; b.len() + 1];
+    for (i, ca) in a.iter().enumerate() {
+        if let Some(first) = cur.first_mut() {
+            *first = i + 1;
+        }
+        for (j, cb) in b.iter().enumerate() {
+            let sub = prev.get(j).copied().unwrap_or(0) + usize::from(ca != cb);
+            let del = prev.get(j + 1).copied().unwrap_or(0) + 1;
+            let ins = cur.get(j).copied().unwrap_or(0) + 1;
+            if let Some(slot) = cur.get_mut(j + 1) {
+                *slot = sub.min(del).min(ins);
+            }
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    prev.last().copied().unwrap_or(0)
+}
+
+/// Guard (issue118): every `:>> name =` on an ENGINE-typed element names an attribute that type
+/// actually declares.
+///
+/// # Why this is not covered by anything else
+///
+/// The engine checked MARKERS (D0133) and ENUM MEMBERS, but never attribute NAMES. Proven by probe:
+/// a `CodeElement` authored with `codeHsah` and `riskClas` passed `validate`, all 32 guards and the
+/// fast edit gate — 329 files reported clean — while silently losing its risk classification, so the
+/// element sat in the audit frontier as `correctness` when its author had written `dataLoss`. That is
+/// the whole "new schema elements are not being picked up" surprise: the author believes a fact was
+/// recorded, every gate agrees the model is honest, and the fact is not there.
+///
+/// # What it deliberately does NOT judge
+///
+/// A type the engine schema does not declare is a PROJECT type (D0136/sprint 298), whose attributes
+/// the engine cannot know. Those are skipped entirely — judging them would recreate the issue090
+/// lockout, where a binary's opinion about a project's own vocabulary blocked every commit.
+#[must_use]
+pub fn attribute_vocabulary(root: &Path) -> GuardReport {
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let rel = relpath(root, path);
+        // The type of the element whose braces we are inside, with the depth it opened at.
+        let mut stack: Vec<(String, String, i32)> = Vec::new();
+        let mut depth: i32 = 0;
+        for (i, raw) in text.lines().enumerate() {
+            let line = strip_string_literals(raw);
+            let t = line.trim_start();
+            if t.starts_with("//") {
+                continue;
+            }
+            // THE ELEMENT DECLARED ON THIS LINE, if any. Records in this repo are overwhelmingly
+            // authored on ONE line — `verification x : Test { :>> id = ...; :>> method = ...; }` —
+            // so a scanner that only credits `:>>` to a previously-pushed stack frame misses them
+            // all. The first cut did exactly that: 8088 of 41036 assignments scanned, and it
+            // reported PASS over the 80% it never looked at, which is precisely the silent-coverage
+            // failure this guard exists to prevent.
+            let mut line_owner: Option<(String, String)> = None;
+            if let Some((decl, rest)) = t.split_once(':') {
+                let decl_t = decl.trim().trim_start_matches('#');
+                let is_usage = ["part", "verification", "occurrence", "requirement", "action", "item", "use case"]
+                    .iter()
+                    .any(|k| decl_t.starts_with(k) && !decl_t.contains(" def "));
+                if is_usage && !rest.starts_with('>') {
+                    let name: String = decl_t.split_whitespace().nth(1).unwrap_or("").to_string();
+                    let ty: String =
+                        rest.trim().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                    if !ty.is_empty() && line.contains('{') {
+                        line_owner = Some((name.clone(), ty.clone()));
+                        // Push only if the block stays OPEN past this line; a single-line record
+                        // opens and closes here and must not linger on the stack.
+                        if line.matches('{').count() > line.matches('}').count() {
+                            stack.push((name, ty, depth));
+                        }
+                    }
+                }
+            }
+            // EVERY `:>>` on the line, not just a line-leading one.
+            for (pos, _) in line.match_indices(":>>") {
+                let attr: String = line[pos + 3..]
+                    .trim_start()
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                let owner = line_owner.as_ref().map(|(n, ty)| (n, ty)).or_else(|| stack.last().map(|(n, ty, _)| (n, ty)));
+                let Some((owner, ty)) = owner else { continue };
+                let Some(declared) = crate::schema::declared_attrs(ty) else { continue };
+                scanned += 1;
+                if !attr.is_empty() && !declared.contains(&attr) {
+                    let hint = nearest_attr(&attr, &declared).map_or_else(
+                        || format!("`{ty}` declares: {}", sorted_list(&declared)),
+                        |n| format!("did you mean `{n}`?"),
+                    );
+                    violations.push(format!(
+                        "{rel}:{}: `{owner} : {ty}` sets `{attr}`, which `{ty}` does not declare — {hint} An undeclared attribute is accepted silently and the value is simply LOST: the element computes as though it were never authored (issue118).",
+                        i + 1
+                    ));
+                }
+            }
+            depth += i32::try_from(line.matches('{').count()).unwrap_or(0)
+                - i32::try_from(line.matches('}').count()).unwrap_or(0);
+            while stack.last().is_some_and(|(_, _, d)| depth <= *d) {
+                stack.pop();
+            }
+        }
+    }
+    GuardReport { name: "attribute-vocabulary", scanned, warnings: Vec::new(), violations }
+}
+
+fn sorted_list(s: &HashSet<String>) -> String {
+    let mut v: Vec<&str> = s.iter().map(String::as_str).collect();
+    v.sort_unstable();
+    v.join(", ")
+}
+
+#[cfg(test)]
+mod attribute_vocabulary_tests {
+    use super::*;
+
+    fn probe(body: &str) -> GuardReport {
+        let dir = std::env::temp_dir().join(format!("keel-attrvocab-{}", body.len()));
+        let tracking = dir.join(".tracking");
+        std::fs::create_dir_all(&tracking).expect("scratch dir");
+        std::fs::write(tracking.join("probe.sysml"), body).expect("write probe");
+        let r = attribute_vocabulary(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        r
+    }
+
+    #[test]
+    fn a_misspelled_attribute_is_caught_with_the_nearest_name() {
+        let r = probe("part p : Claim {\n    :>> claimedItm = \"x\";\n}\n");
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+        assert!(r.violations[0].contains("did you mean `claimedItem`?"), "{}", r.violations[0]);
+    }
+
+    #[test]
+    fn correctly_spelled_attributes_pass_including_inherited_ones() {
+        let r = probe("part p : Claim {\n    :>> id = \"x\";\n    :>> claimedItem = \"y\";\n}\n");
+        assert!(r.violations.is_empty(), "id is inherited from Element: {:?}", r.violations);
+    }
+
+    #[test]
+    fn single_line_records_are_scanned() {
+        // THE REGRESSION THAT MATTERS. The first cut only credited `:>>` to a stack frame pushed on
+        // an EARLIER line, so single-line records — the dominant form in this repo — were invisible:
+        // 8088 of 41036 assignments scanned, reporting PASS over the 80% it never read.
+        let r = probe("part p : Claim { :>> id = \"x\"; :>> claimedItm = \"y\"; }\n");
+        assert_eq!(r.scanned, 2, "both assignments on the one line must be scanned");
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+    }
+
+    #[test]
+    fn a_project_declared_type_is_never_judged() {
+        // Judging a vocabulary the engine cannot know is how issue090 blocked every commit.
+        let r = probe("part p : SomeProjectType {\n    :>> whateverTheyLike = \"x\";\n}\n");
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
+        assert_eq!(r.scanned, 0, "an unknown type is skipped, not scanned");
+    }
+
+    #[test]
+    fn prose_naming_an_attribute_is_not_an_assignment() {
+        let r = probe("// :>> notReal = \"in a comment\";\npart p : Claim { :>> id = \"x\"; }\n");
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
     }
 }
