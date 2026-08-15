@@ -9,7 +9,13 @@ package ProjectDeliveryS171 {
     private import EngineVerification::*;
     private import EngineRelationships::*;
 
-    #CharteredBy dependency from postReleaseBurndownStory to postReleaseBurndown;
+    // The #CharteredBy edge here targeted `postReleaseBurndown`, a backlog action that was never
+    // declared in any commit — so the charter asserted an origin that does not exist, and the
+    // charter guard passed because it checks that the EDGE is present, not that its target resolves.
+    // REMOVED rather than repointed: this sprint's originating driver is stated in its own refine
+    // gate (the v0.1.0 release added D0102/D0103/D0104 and left two drift tasks suspect), and
+    // inventing a charter target to satisfy a guard would fabricate provenance to pass a check —
+    // which is the one thing a charter must never do. See issue109.
 
     part postReleaseBurndownStory : Story {
         :>> id = "63940516-2c7d-4e8f-c171-51627384d001";

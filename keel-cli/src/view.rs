@@ -173,6 +173,33 @@ struct Model {
     edges: Vec<Edge>,
 }
 
+/// The directories whose `.sysml` files ARE the model.
+///
+/// Authored instances live in `.tracking` and in the `.engine` INSTANCE dirs. Parsing is syntactic
+/// (no import resolution), so `.engine` instance files parse standalone. Schema files are the
+/// vocabulary rather than instances, and are excluded.
+///
+/// Shared rather than inlined in `Model::build`, because a check that resolves names against the
+/// model must scan exactly what the model contains. Walking `.engine` wholesale instead made
+/// `edge-endpoints` fire on `docs/tracking-template.sysml` — an authoring EXAMPLE whose
+/// `exampleNeed` placeholders are undeclared on purpose. Four violations against a file the model
+/// never loads is how a new guard teaches its reader to ignore it.
+///
+/// issue104: `.engine/workflows` belongs here. The six workflow definitions are the one place this
+/// repo models behaviour in the base language (an `action def` with successions), so omitting them
+/// left their flow edges nowhere to land.
+fn model_dirs(root: &Path) -> [std::path::PathBuf; 7] {
+    [
+        root.join(".tracking"),
+        root.join(".engine").join("decisions"),
+        root.join(".engine").join("processes"),
+        root.join(".engine").join("views"),
+        root.join(".engine").join("skills"),
+        root.join(".engine").join("rules"), // D0105: declared EdgeRule/ElementRule instances
+        root.join(".engine").join("workflows"),
+    ]
+}
+
 /// Known edge kinds (canonical, lowercase) the AST currently extracts. View edge names are
 /// matched case-insensitively against this set; anything else is a hard error (fail-loud).
 const KNOWN_EDGES: &[&str] = &[
@@ -265,22 +292,7 @@ impl Model {
     }
 
     fn build_uncached(root: &Path) -> Result<Self, ViewError> {
-        // Authored instances live in .tracking AND in the .engine instance dirs (decisions,
-        // processes, views, skills). Parsing is syntactic (no import resolution), so .engine
-        // instance files parse standalone. The schema + workflow DEFS are not instances — skip.
-        let dirs = [
-            root.join(".tracking"),
-            root.join(".engine").join("decisions"),
-            root.join(".engine").join("processes"),
-            root.join(".engine").join("views"),
-            root.join(".engine").join("skills"),
-            root.join(".engine").join("rules"),   // D0105: declared EdgeRule/ElementRule/OrderingRule instances (`keel check`)
-            // issue104: the six workflow definitions are the ONE place this repo models behaviour in
-            // base SysML v2 — `action def` with typed in/out parameters, `first..then` successions and
-            // `flow` — and they contributed nothing to any view, trace, diagram or guard because this
-            // list omitted them. The flow edges emitted in sprint 270 had nowhere to land.
-            root.join(".engine").join("workflows"),
-        ];
+        let dirs = model_dirs(root);
         let mut items: HashMap<String, ItemInfo> = HashMap::new();
         let mut edges: Vec<Edge> = Vec::new();
         let paths: Vec<_> = dirs.iter().flat_map(|d| crate::collect_sysml(d)).collect();
@@ -1922,6 +1934,75 @@ pub fn marker_census(root: &Path) -> Result<String, ViewError> {
         "{{\n  \"note\": \"edges are AST-counted and are the CONTROL TOTAL for any migration; proseMentions are marker names appearing inside strings and must never be counted as edges (issue099)\",\n  \"markers\": [{}]\n}}",
         rows.join(", ")
     ))
+}
+
+/// Typed-edge endpoints that resolve to NO declared item (issue109).
+///
+/// A `#Marker dependency from A to B;` whose endpoint is declared nowhere is a claim about a
+/// relationship that does not exist, and it is worse than a missing edge because every consumer
+/// treats it as present: `issue060` read as TRIAGED by a resolver that had never been declared, and
+/// sprint171's Story read as CHARTERED by an origin no commit ever contained. Both passed
+/// `keel validate`, `keel check-engine` and all 28 guards, because each of those checks that the
+/// EDGE is present and none checked that its endpoints resolve.
+///
+/// Found by the conformance lane rather than by any Rust check — the kernel resolves references and
+/// said so, which is exactly the oracle gap issue097 named.
+///
+/// Reads `Item::Dependency` from the AST, so a marker written inside a `description` string cannot
+/// produce a false hit. That is not incidental: a text scan for the same thing reports two extra
+/// hits from D0133's own prose ABOUT edges, which is the identical self-referential-corpus trap
+/// that inflated the census in issue099.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn dangling_edge_endpoints(root: &Path) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    // A DOWNSTREAM project resolves endpoints against one more place than the Model views: the
+    // engine's own decisions, which `keel init` scaffolds read-only to `.engine/reference/decisions/`
+    // and which `model_dirs` excludes ON PURPOSE (D0093 — the engine's 144 architecture decisions
+    // must not enter a project's computed views). The shipped `.engine/rules/rules.sysml` carries
+    // `#JustifiedBy` edges to those decisions, so on a freshly inited project every one of them
+    // looked dangling and this guard failed the init smoke test.
+    //
+    // They are NOT dangling: `d0066` is declared, it is simply out of VIEW scope for a different
+    // reason. Excluding a name from the views and asserting it does not exist are different claims,
+    // and conflating them would have made a new hard guard fail every downstream project on day one —
+    // the issue089/issue090 failure this engine has already paid for twice.
+    let mut declared_elsewhere: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("reference").join("decisions")) {
+        if let Ok(pkg) = crate::parse_pkg(&path) {
+            for item in &pkg.items {
+                if let Item::Part(p) = item {
+                    declared_elsewhere.insert(p.name.clone());
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for dir in model_dirs(root) {
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in crate::collect_sysml(&dir) {
+            let Ok(pkg) = crate::parse_pkg(&path) else { continue };
+            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            for item in &pkg.items {
+                if let Item::Dependency(d) = item {
+                    for (side, name) in [("from", &d.from), ("to", &d.to)] {
+                        // Qualified names (`Pkg::name`) resolve on their last segment, which is how
+                        // the rest of the Model keys items.
+                        let base = name.rsplit("::").next().unwrap_or(name);
+                        if !model.items.contains_key(base) && !declared_elsewhere.contains(base) {
+                            out.push(format!("{rel}: #{} dependency {side} `{base}` — declared nowhere", d.marker));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out.sort_unstable();
+    out.dedup();
+    Ok(out)
 }
 
 /// Names that are the TARGET of a `#Supersede` edge — i.e. deliberately retired (§1.4).

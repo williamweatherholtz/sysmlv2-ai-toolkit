@@ -1280,4 +1280,16 @@ package ProjectIssues {
         :>> discoveredInField = false;
         :>> severity = Severity::Low;
     }
+
+    #ProcessDefect part issue109 : Issue {
+        :>> id = "e1090109-0109-4f09-9109-516273840109";
+        :>> title = "A typed edge could point at a name declared nowhere, and every check treated it as present";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY THE CONFORMANCE LANE on its first real run, which is the clearest possible argument for the lane existing. The kernel resolves references and reported `Couldn't resolve reference to Element 'postReleaseBurndown'`; no Rust check had ever said anything. TWO REAL INSTANCES, both live for months: (1) `.tracking/issues.sysml` carried `#Resolves dependency from declarativeControlsRoiOrRescope to issue060` while `action declarativeControlsRoiOrRescope;` was never declared — its DoD and a PASSING TestResult sat in the backlog with no action line above them — so issue060 read as TRIAGED by a resolver that did not exist, and the `issues` guard passed on a phantom; (2) `.tracking/delivery/sprint171_postReleaseBurndown.sysml` carried `#CharteredBy ... to postReleaseBurndown`, a backlog action declared in NO commit, so a delivery Story read as chartered by an origin that never existed and the `charter` guard passed. WHY EVERYTHING MISSED IT: `issues` checks that a #Resolves edge is PRESENT; `charter` checks that a #CharteredBy edge is PRESENT; `validate` and `check-engine` resolve item TYPES and imports. Not one of them resolved an edge ENDPOINT. A dangling edge is strictly worse than a missing one, because a missing edge is visible as a gap while a dangling edge is counted as satisfied by the very guard meant to detect the gap. FIXED: (1) restored — the action line was re-added, since the DoD and result are committed records of what it was and that it was done; (2) REMOVED rather than repointed — nothing named postReleaseBurndown exists in any commit, and inventing a charter target to satisfy a guard would fabricate provenance to pass a check, which is the one thing a charter must never do. CONTROL (D0047): new hard guard `edge-endpoints`, AST-based so prose inside a description cannot produce a false hit — a text scan of the same thing reports two extra hits from D0133's own prose ABOUT edges, the identical self-referential-corpus trap as issue099. Verified live by negative test: reintroducing a dangling edge fails the guard; removing it passes. Starts at zero with no grandfathering, and none was warranted: issue068 forbids retro-failing work that was CORRECT when written, and this work was not correct when written, only undetected.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcKernelConformanceGate";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcKernelConformanceGate to issue109;
 }

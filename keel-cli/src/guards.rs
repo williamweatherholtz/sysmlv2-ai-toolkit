@@ -579,6 +579,31 @@ pub fn critique(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard (issue109): every typed-edge endpoint resolves to a declared item.
+///
+/// HARD, and it is an honest-state gate rather than a completeness one: a dangling edge does not
+/// mean work is unfinished, it means the model asserts a relationship that is not there. `issue060`
+/// read as triaged by a resolver declared in no commit; a delivery Story read as chartered by an
+/// origin that never existed. Both survived every existing check, because `issues` and `charter`
+/// each verify that the EDGE is present and neither resolves its endpoints.
+///
+/// Both were fixed before this guard was added, so it starts at zero — no grandfathering needed and
+/// none granted (issue068 forbids retro-failing work that was correct when written; this work was
+/// not correct when written, it was undetected).
+#[must_use]
+pub fn edge_endpoints(root: &Path) -> GuardReport {
+    match crate::view::dangling_edge_endpoints(root) {
+        Ok(bad) => {
+            let violations = bad
+                .into_iter()
+                .map(|e| format!("{e} — a typed edge must connect two declared items; declare the item or remove the edge, never repoint it at something convenient"))
+                .collect();
+            GuardReport { name: "edge-endpoints", scanned: 0, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "edge-endpoints", scanned: 0, warnings: Vec::new(), violations: vec![format!("error resolving edge endpoints: {e}")] },
+    }
+}
+
 /// Guard: the composite assurance-readiness gate (D0079 c).
 ///
 /// Reports the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
@@ -1468,8 +1493,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 28] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification"];
+pub const GUARD_NAMES: [&str; 29] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints"];
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1567,6 +1592,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
         "base-first-justification" => Some(base_first_justification(root)), // warning-only (D0139(B))
+        "edge-endpoints" => Some(edge_endpoints(root)), // hard (issue109) — an edge asserting a relationship to nothing
         "parser-coverage" => Some(parser_coverage(root)), // warning-only (issue102) — what the engine cannot read
         "sequence-multiplicity" => Some(sequence_multiplicity(root)), // warning-only (issue101) — sequences are newly enabled
         "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control

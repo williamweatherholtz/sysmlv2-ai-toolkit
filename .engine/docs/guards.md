@@ -1,6 +1,6 @@
 # Guard reference
 
-`keel guard` runs **28** forward guards, kernel-free. **19 hard-blocking** (exit ≠ 0 on any violation)
+`keel guard` runs **29** forward guards, kernel-free. **20 hard-blocking** (exit ≠ 0 on any violation)
 and **9 warning-only** (visible every commit, never blocking). `keel version` reports this split
 computed from the enforced set, so it cannot drift from what actually runs.
 
@@ -29,6 +29,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `marker-vocabulary` | Every marker used is declared — the engine's own algebra is **builtin** and needs no declaration; project markers declare in any project file (D0133/issue077, D0136/issue089) |
 | `engine-lint` | `.engine/decisions/*.sysml` import `EngineWork` (D0112 phase 1) |
 | `activation-manifest` | The activation contracts are well-formed — no unknown process or guard name (D0138). Hard because every check is exact set membership, and because a typo would *silently disable a control*, which is worse than a loud failure. Absent files are not a violation |
+| `edge-endpoints` | Every typed-edge endpoint resolves to a declared item (issue109). A `#Marker dependency from A to B;` whose endpoint is declared nowhere asserts a relationship that is not there, and is worse than a missing edge because every consumer treats it as present: an Issue read as *triaged* by a resolver declared in no commit, and a Story read as *chartered* by an origin that never existed. Both passed validate, check-engine and all 28 other guards, because each checks that the EDGE is present and none resolved its endpoints. Found by the conformance lane, not by any Rust check. AST-based, so a marker written inside a `description` string cannot produce a false hit — a text scan for the same thing reports two extra hits from D0133's own prose about edges, the self-referential-corpus trap that inflated the census in issue099 |
 
 ## Warning-only
 

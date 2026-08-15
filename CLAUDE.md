@@ -140,7 +140,7 @@ frozen (modify it only by out-of-band Decision).
 ```
 keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
-keel guard             # all 28 forward guards — see .engine/docs/guards.md
+keel guard             # all 29 forward guards — see .engine/docs/guards.md
 keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary (~0.35s)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
@@ -148,6 +148,22 @@ keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh Test
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
 model is truthful, well-formed, and traceable — **never** that the work is complete. Completeness is a
 non-blocking burndown surfaced in `orient`. Don't fake a pass; don't block recording true state.
+
+**What the Rust authority does NOT check (issue097).** `keel validate`/`check` are the ENGINE's semantic
+authority — reference resolution, identity, provenance, edge algebra. They are **not** a SysML v2
+conformance check, so *"validate is green"* never means *"this is valid SysML v2"*. The Rust parser
+accepts `verify X by Y` at package level; the kernel rejects it. That gap is how a non-conformant
+construct reached an accepted Decision as a migration target (D0139 clause E). **Never adopt a new base
+construct on the Rust parser's acceptance alone** — kernel-check it first:
+
+```
+conda run -n sysml --no-capture-output python .engine/tools/validate/conformance_lane.py --construct snippet.sysml > out.txt 2>&1
+```
+
+The same tool with no arguments is the **conformance lane**: it sweeps every instance file, reports the
+constructs the kernel rejects, and never blocks. Its number is tracked as `conformanceIndicator`
+(`keel indicators`) rather than gated, because a rejection may be the pilot kernel's gap rather than
+ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 
 In-loop gating (D0128/D0130/D0134): `keel hook post-edit` runs the fast tier after each `.sysml` edit;
 `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest.

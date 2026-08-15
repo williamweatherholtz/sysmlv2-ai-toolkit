@@ -102,6 +102,27 @@ package ProjectIndicators {
     part avRegulationCountM2 : Measurement { :>> id = "1d1c0004-0004-4004-9004-5162738400a2"; :>> value = "47"; :>> measuredAt = "2026-06-01"; :>> source = "regulations.gov AV docket (manual seed)"; :>> createdBy = "claudeOpus"; }
     #Measures dependency from avRegulationCountM2 to avRegulationCount;
 
+    // SysML v2 CONFORMANCE (issue097). PULLED rather than computed, and the distinction is the
+    // point: the number comes from the OMG pilot kernel via `.engine/tools/validate/conformance_lane.py`,
+    // and the Rust binary cannot compute it — the validation path is kernel-free by D0048, so any
+    // `computed` indicator here would be the Rust parser grading its own homework, which is the exact
+    // confusion issue097 was raised about. INDICATOR and not a requirement (D0088): no defensible
+    // threshold exists, because a kernel rejection may be the pilot kernel's gap rather than the
+    // model's, and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
+    part conformanceIndicator : Indicator {
+        :>> id = "1d1c0109-0109-4109-9109-516273840109";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> measures = "Instance files whose CONSTRUCTS the OMG SysML v2 kernel accepts (%) — the portability the Rust authority does not check";
+        :>> goal = IndicatorGoal::maximize;
+        :>> unit = "%";
+        :>> method = MeasurementMethod::pulled;
+        :>> collectionRef = "conda run -n sysml python .engine/tools/validate/conformance_lane.py (kernel-side; redirect, never pipe)";
+    }
+    #Informs dependency from conformanceIndicator to d0132;
+    part conformanceIndicatorM1 : Measurement { :>> id = "1d1c0109-0109-4109-9109-5162738400b1"; :>> value = "100.0"; :>> measuredAt = "2026-08-14"; :>> source = "conformance_lane.py at 1cb73e4 — 470/470 instance files, no construct rejected"; :>> createdBy = "claudeOpus5"; }
+    #Measures dependency from conformanceIndicatorM1 to conformanceIndicator;
+
     // ── MANUAL (subjective; recorded periodic assessment — the original friction case, D0054/D0088) ──
     part authoringFriction : Indicator {
         :>> id = "1d1c0005-0005-4005-9005-516273840005";
