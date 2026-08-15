@@ -1493,8 +1493,149 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 29] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints"];
+pub const GUARD_NAMES: [&str; 31] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority"];
+
+// ── ownership + attestation authority (D0129 srDcAuthorityFromRegistry; mechanizes D0108) ────────
+
+/// Item name -> (`createdBy`, its attribute assignments) parsed from one `.sysml` source.
+///
+/// Deliberately AST-based rather than diff-line based: a diff hunk does not know which item a
+/// changed line belongs to, and guessing from indentation would misattribute an edit — the one
+/// thing an ownership check must never do.
+fn items_with_attrs(src: &str, filename: &str) -> HashMap<String, (String, Vec<String>)> {
+    let mut out = HashMap::new();
+    let Ok(tokens) = keel_parser::tokenize(src, filename) else { return out };
+    let Ok(pkg) = keel_parser::parse(tokens, filename) else { return out };
+    let mut note = |name: &str, attrs: &[keel_parser::ast::Attribute]| {
+        let mut pairs: Vec<String> = attrs
+            .iter()
+            .map(|a| format!("{}={}", a.name, crate::view::attr_value_string(&a.value)))
+            .collect();
+        pairs.sort();
+        let created_by = attrs
+            .iter()
+            .find(|a| a.name == "createdBy")
+            .map(|a| crate::view::attr_value_string(&a.value))
+            .unwrap_or_default();
+        out.insert(name.to_owned(), (created_by, pairs));
+    };
+    for item in &pkg.items {
+        match item {
+            keel_parser::ast::Item::Part(p) => note(&p.name, &p.attributes),
+            keel_parser::ast::Item::Verification(v) => note(&v.name, &v.attributes),
+            keel_parser::ast::Item::UseCase(u) => note(&u.name, &u.attributes),
+            keel_parser::ast::Item::ActionUsage(a) => note(&a.name, &a.attributes),
+            // Items nested inside a delivery `action def` — where every sprint's gates live, and so
+            // the densest concentration of owned fields in the model.
+            keel_parser::ast::Item::ActionDef(d) => {
+                for p in &d.parts {
+                    note(&p.name, &p.attributes);
+                }
+                for v in &d.verifications {
+                    note(&v.name, &v.attributes);
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The file's content at HEAD, or `None` if it is newly added.
+fn head_blob(root: &Path, path: &str) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["show", &format!("HEAD:{path}")])
+        .output()
+        .ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Guard (D0108/D0129): only an item's OWNER edits its fields.
+///
+/// D0108's coordination contract — owner-of-record edits fields, a non-owner may ADD items and typed
+/// edges or SUPERSEDE, never overwrite in place — was CONVENTION ONLY: absent from every guard and
+/// every declared rule, enforced by prose plus a reminder hook. D0047 is explicit that manual
+/// vigilance is not a control, and in-place write paths exist that can clobber another actor's item.
+///
+/// WHAT PASSES, deliberately: adding a new item, adding a typed edge, and superseding all leave every
+/// existing item's fields untouched, so they are invisible to this check by construction rather than
+/// by an exemption list that could drift. Only a CHANGED attribute on an item someone else created
+/// is a violation.
+///
+/// Compares the staged file against its HEAD blob AST-to-AST. A diff hunk does not know which item a
+/// line belongs to; attributing an edit to the wrong owner would be worse than not checking.
+#[must_use]
+pub fn ownership(root: &Path) -> GuardReport {
+    let actor = crate::actor::resolve(root, None).ok();
+    let staged: Vec<String> = staged_files(root)
+        .into_iter()
+        .filter(|p| std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
+        .collect();
+    let mut violations = Vec::new();
+    let mut scanned = 0usize;
+    for path in &staged {
+        let Some(before) = head_blob(root, path) else { continue }; // newly added file — all additions
+        let Ok(after) = std::fs::read_to_string(root.join(path)) else { continue };
+        let old = items_with_attrs(&before, path);
+        let new = items_with_attrs(&after, path);
+        for (name, (owner, new_attrs)) in &new {
+            let Some((old_owner, old_attrs)) = old.get(name) else { continue }; // added item
+            scanned += 1;
+            if old_attrs == new_attrs {
+                continue;
+            }
+            let owner = if old_owner.is_empty() { owner } else { old_owner };
+            if owner.is_empty() {
+                continue; // no recorded owner — nothing to enforce against, and inventing one is worse
+            }
+            match &actor {
+                Some(a) if a == owner => {}
+                Some(a) => violations.push(format!(
+                    "{path}: '{name}' is owned by '{owner}' and its fields were edited by '{a}' — D0108: a non-owner ADDS items and typed edges or SUPERSEDES, never overwrites in place. Author a superseding item, or have the owner make the change."
+                )),
+                None => violations.push(format!(
+                    "{path}: '{name}' (owned by '{owner}') had fields edited, but this machine has no bound actor, so the edit cannot be attributed. Run `keel actor set <id>` — provenance is never defaulted (D0129)."
+                )),
+            }
+        }
+    }
+    GuardReport { name: "ownership", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard (D0092/D0106/D0129): a human-only attestation must be judged by a HUMAN.
+///
+/// `confirmation-authenticity` already enforces this for Decision ACCEPTANCE. This extends the same
+/// rule to the other authority D0129 names: DISPOSITION of a finding at or above the threshold.
+///
+/// THE THRESHOLD IS LOAD-BEARING AND WAS ALMOST GOT WRONG. D0080 explicitly permits an AI to
+/// disposition a LOW finding — this repo contains exactly such a case, `issue043Disp1R1` judged by
+/// `claudeOpus`, whose own text says "Low doc-accuracy finding, AI-dispositioned (no human gate for
+/// Low, D0080)". A guard requiring a human on every disposition would have failed a correct,
+/// documented judgement and forced either a false attestation or a bypass. Medium and above only.
+#[must_use]
+pub fn attestation_authority(root: &Path) -> GuardReport {
+    match crate::view::ai_judged_high_dispositions(root) {
+        Ok((scanned, bad)) => {
+            let violations = bad
+                .into_iter()
+                .map(|(disp, issue, judge)| format!(
+                    "{disp}: dispositions '{issue}' (>= Medium) but its result is judged by '{judge}', which is not a registered Person — a disposition at or above the threshold is a HUMAN verdict (D0092/D0080). An AI actor cannot supply it."
+                ))
+                .collect();
+            GuardReport { name: "attestation-authority", scanned, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport {
+            name: "attestation-authority",
+            scanned: 0,
+            warnings: Vec::new(),
+            violations: vec![format!("error reading dispositions: {e}")],
+        },
+    }
+}
+
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1593,6 +1734,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
         "base-first-justification" => Some(base_first_justification(root)), // warning-only (D0139(B))
         "edge-endpoints" => Some(edge_endpoints(root)), // hard (issue109) — an edge asserting a relationship to nothing
+        "ownership" => Some(ownership(root)), // hard (D0108/D0129) — a non-owner overwriting another actor's fields
+        "attestation-authority" => Some(attestation_authority(root)), // hard (D0092) — a human-only verdict judged by an AI
         "parser-coverage" => Some(parser_coverage(root)), // warning-only (issue102) — what the engine cannot read
         "sequence-multiplicity" => Some(sequence_multiplicity(root)), // warning-only (issue101) — sequences are newly enabled
         "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control

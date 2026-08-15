@@ -5929,6 +5929,54 @@ mod authority_queue_tests {
     }
 }
 
+/// Render an attribute value as the string a comparison should use.
+///
+/// Public because the ownership guard compares two ASTs of the same file and needs the identical
+/// rendering on both sides — two renderings that could drift would make an unchanged field look
+/// edited, which is the one false positive an ownership check cannot afford.
+#[must_use]
+pub fn attr_value_string(v: &Value) -> String {
+    value_to_string(v)
+}
+
+/// `(disposition, issue, judgedBy)` for one offending disposition.
+pub type AiJudgedDisposition = (String, String, String);
+
+/// Dispositions of findings at or above Medium whose result is NOT judged by a registered `Person`.
+///
+/// Returns `(scanned, [(disposition, issue, judgedBy)])`.
+///
+/// D0080 permits an AI to disposition a LOW finding and this repo contains a correct example, so the
+/// severity filter is not a nicety — without it the guard would fail documented, legitimate work.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDisposition>), ViewError> {
+    let model = Model::build(root)?;
+    let mut scanned = 0usize;
+    let mut bad = Vec::new();
+    let mut edges: Vec<&Edge> = model.edges.iter().filter(|e| e.kind == "dispositions").collect();
+    edges.sort_by(|a, b| a.from.cmp(&b.from));
+    for e in edges {
+        let above_threshold = model
+            .items
+            .get(&e.to)
+            .and_then(|i| i.attrs.get("severity"))
+            .is_some_and(|s| s.ends_with("Critical") || s.ends_with("High") || s.ends_with("Medium"));
+        if !above_threshold {
+            continue;
+        }
+        scanned += 1;
+        let result = format!("{}R1", e.from);
+        let judged_by = model.items.get(&result).and_then(|i| i.attrs.get("judgedBy")).cloned().unwrap_or_default();
+        let is_person = model.items.get(&judged_by).is_some_and(|a| a.type_name == "Person");
+        if !is_person {
+            bad.push((e.from.clone(), e.to.clone(), judged_by));
+        }
+    }
+    Ok((scanned, bad))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
