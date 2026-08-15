@@ -28,6 +28,7 @@ pub mod activation;
 pub mod actor;
 pub mod algo;
 pub mod arch;
+pub mod history;
 pub mod claim;
 pub mod enroll;
 pub mod govern;

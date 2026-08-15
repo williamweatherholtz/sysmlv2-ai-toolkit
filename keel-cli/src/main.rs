@@ -2039,6 +2039,7 @@ fn print_usage() -> i32 {
             eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
             eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
             eprintln!("  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)");
+            eprintln!("  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)");
             eprintln!("  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>");
             eprintln!("                                   computed views over an AUTHORED CodeElement registry (D0148)");
     eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
@@ -2177,6 +2178,7 @@ fn main() {
         // `repo_arg(rest)` would take the SUBCOMMAND as the path — `arch elements .` resolved the
         // root to `./elements`, whose empty model then printed "no CodeElement instances authored".
         Some("arch") => keel_cli::arch::cmd(rest, &repo_arg(rest.get(1..).unwrap_or(&[]))),
+        Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
