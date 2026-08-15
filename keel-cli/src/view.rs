@@ -2793,7 +2793,15 @@ fn compute_coverage<S: std::hash::BuildHasher>(
         "Decision" => i.attrs.get("status").map(String::as_str) == Some("accepted"),
         _ => false,
     };
-    let mut targets: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| is_target(i)).collect();
+    // issue088, second half: a Need or SystemRequirement carrying an incoming `#Supersede` edge was
+    // DESCOPED by a Decision (§2.4), and is no more an active commitment than a superseded Decision
+    // is — the exact reasoning the comment above already applies one type over. Found by checking
+    // whether the tier-satisfaction blind spot was shared; it was, in this view but not in
+    // `rootedness` (which measures charter over Stories, not decomposition).
+    let descoped: HashSet<&str> =
+        model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.as_str()).collect();
+    let mut targets: Vec<(&String, &ItemInfo)> =
+        model.items.iter().filter(|(n, i)| is_target(i) && !descoped.contains(n.as_str())).collect();
     targets.sort_by(|a, b| a.0.cmp(b.0));
     for (name, info) in &targets {
         if info.type_name == "Need" {
@@ -4139,24 +4147,43 @@ struct TierStat {
     total: usize,
     satisfied: usize,
     gaps: Vec<String>,
+    /// Items excluded from `total` and `gaps` because a Decision DESCOPED them (issue088).
+    ///
+    /// Reported rather than dropped: §2.4 makes a superseding Decision the engine's own scope
+    /// mechanism, so descoped work is a legitimate outcome — but an excluded item that becomes an
+    /// INVISIBLE item is how a metric starts quietly flattering itself. The count keeps the descoping
+    /// on screen next to the number it improves.
+    superseded: Vec<String>,
 }
 
 fn compute_tier_satisfaction(model: &Model) -> Vec<TierStat> {
     let has_out = |kind: &str, from: &str| model.edges.iter().any(|e| e.kind == kind && e.from == from);
     let has_in = |kind: &str, to: &str| model.edges.iter().any(|e| e.kind == kind && e.to == to);
+    // A `#Supersede` edge INTO an item is the authored statement that it was deliberately cut (§2.4).
+    // Counting a descoped Need as an undecomposed gap understates completeness AND — the worse half —
+    // points a future contributor at authoring SystemRequirements for work that was explicitly
+    // dropped. The metric was actively recommending wrong work (issue088).
+    let superseded_item = |n: &str| model.edges.iter().any(|e| e.kind == "supersede" && e.to == n);
     let tier = |ty: &str, relation: &'static str, pred: &dyn Fn(&str) -> bool, label: &'static str| -> TierStat {
         let mut names: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == ty).map(|(n, _)| n).collect();
         names.sort();
         let mut gaps: Vec<String> = Vec::new();
+        let mut superseded: Vec<String> = Vec::new();
         let mut satisfied = 0;
+        let mut total = 0;
         for n in &names {
+            if superseded_item(n) {
+                superseded.push((*n).clone());
+                continue;
+            }
+            total += 1;
             if pred(n) {
                 satisfied += 1;
             } else {
                 gaps.push((*n).clone());
             }
         }
-        TierStat { tier: label, relation, total: names.len(), satisfied, gaps }
+        TierStat { tier: label, relation, total, satisfied, gaps, superseded }
     };
     vec![
         // A Need is decomposed iff some SystemRequirement satisfies it (satisfy edge Need->SR).
@@ -4188,6 +4215,10 @@ pub fn tier_satisfaction(root: &Path) -> Result<String, ViewError> {
                 ("satisfied".to_string(), n(t.satisfied)),
                 ("pct".to_string(), Json::Int(i64::from(pct(t.satisfied, t.total)))),
                 ("gaps".to_string(), Json::Arr(t.gaps.iter().map(|g| Json::s(g.clone())).collect())),
+                // Descoped items, kept ON SCREEN beside the number they improve (issue088): an
+                // excluded item that becomes invisible is how a metric starts flattering itself.
+                ("supersededExcluded".to_string(), n(t.superseded.len())),
+                ("superseded".to_string(), Json::Arr(t.superseded.iter().map(|s| Json::s(s.clone())).collect())),
             ])
         })
         .collect();
@@ -7193,6 +7224,28 @@ mod tests {
         assert_eq!(get("critique"), 1, "the Need-targeted verify edge must NOT be counted: {mix:?}");
         assert_eq!(get("test"), 1);
         assert_eq!(get("unstated"), 1, "a method-less verifier is reported, not silently dropped");
+    }
+
+    #[test]
+    fn a_descoped_need_is_excluded_from_the_gaps_and_reported_separately() {
+        // issue088: counting a DESCOPED Need as an undecomposed gap understates completeness and —
+        // the worse half — points a future contributor at authoring SystemRequirements for work that
+        // was explicitly cut. The metric was recommending wrong work.
+        let mut items = HashMap::new();
+        items.insert("nKept".to_string(), item("Need", None)); // genuinely undecomposed
+        items.insert("nCut".to_string(), item("Need", None)); // descoped by a Decision
+        items.insert("nDone".to_string(), item("Need", None)); // decomposed
+        items.insert("sr1".to_string(), item("SystemRequirement", None));
+        let edges = vec![
+            Edge { kind: "satisfy".to_string(), from: "nDone".to_string(), to: "sr1".to_string() },
+            Edge { kind: "supersede".to_string(), from: "someDecision".to_string(), to: "nCut".to_string() },
+        ];
+        let stats = compute_tier_satisfaction(&Model { items, edges });
+        let need = stats.iter().find(|t| t.tier == "Need").unwrap();
+        assert_eq!(need.total, 2, "the descoped Need leaves the DENOMINATOR, not just the gap list");
+        assert_eq!(need.satisfied, 1);
+        assert_eq!(need.gaps, vec!["nKept".to_string()], "an undecomposed Need with no supersede edge STAYS a gap");
+        assert_eq!(need.superseded, vec!["nCut".to_string()], "and the descoping stays visible — excluded must not mean invisible");
     }
 
     #[test]
