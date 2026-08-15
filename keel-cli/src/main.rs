@@ -1244,8 +1244,12 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
 /// --consequences Q --date YYYY-MM-DD --author A [--root ROOT]` → writes a proposed Decision file
 /// (auto NNNN + UUID), killing point-of-decision friction (D0054). Acceptance stays a separate human gate.
 fn cmd_record(args: &[String]) -> i32 {
+    if args.first().map(String::as_str) == Some("issue") {
+        return cmd_record_issue(args);
+    }
     if args.first().map(String::as_str) != Some("decision") {
         eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
+        eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
         return 2;
     }
     let root = flag(args, "root").map_or_else(
@@ -1847,6 +1851,73 @@ fn cmd_migrate(args: &[String]) -> i32 {
     keel_cli::migrate::cmd(&root, &ENGINE_DIR, dry_run)
 }
 
+/// `keel record issue` — the sanctioned path for D0108 clause 5, which mandates that conflicting
+/// conclusions be recorded as an Issue for human adjudication and had no implementation.
+///
+/// REFUSES on an unknown `--resolver` rather than authoring a dangling edge: the `issues` guard is
+/// satisfied by the PRESENCE of a `#Resolves` edge, so an edge pointing at nothing would read as
+/// triaged while resolving nothing — exactly the phantom issue109 found twice in this repo.
+fn cmd_record_issue(args: &[String]) -> i32 {
+    let root = flag(args, "root").map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
+    let req = |n: &str| flag(args, n);
+    let (Some(title), Some(description), Some(severity), Some(resolver)) =
+        (req("title"), req("description"), req("severity"), req("resolver"))
+    else {
+        eprintln!("error: --title --description --severity --resolver are all required.");
+        eprintln!("  --resolver names the EXISTING item that resolves this issue. It is required because the");
+        eprintln!("  `issues` guard fails on an untriaged Issue, so recording one without triage would hand you");
+        eprintln!("  a red gate as the command's output (D0077).");
+        return 2;
+    };
+    if !["Critical", "High", "Medium", "Low"].contains(&severity.as_str()) {
+        eprintln!("error: --severity must be Critical | High | Medium | Low (got '{severity}')");
+        return 2;
+    }
+    let Some(date) = flag(args, "date").filter(|d| !d.is_empty()) else {
+        eprintln!("error: --date YYYY-MM-DD required (when it was found is its own irreducible fact)");
+        return 2;
+    };
+    // NEVER default the actor (D0129/issue072): an unattributable fact looks like evidence.
+    let author = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => { eprintln!("{msg}"); return 2; }
+    };
+    match keel_cli::view::item_exists(&root, &resolver) {
+        Ok(true) => {}
+        Ok(false) => {
+            eprintln!("error: resolver '{resolver}' is declared nowhere in the model.");
+            eprintln!("  Authoring the edge anyway would make this Issue read as TRIAGED by something that does not");
+            eprintln!("  exist (issue109). Declare the resolving action or Decision first, then re-run.");
+            return 2;
+        }
+        Err(e) => { eprintln!("error: cannot read the model to check the resolver: {e}"); return 2; }
+    }
+    // Bound to locals so the borrows outlive the struct; the inline form silently collapsed both to
+    // None (they type-checked and were wrong — a flag the caller passed would have been dropped).
+    let related_task = flag(args, "related-task");
+    let marker = flag(args, "marker");
+    let n = keel_cli::write::NewIssue {
+        title: &title,
+        description: &description,
+        severity: &severity,
+        resolver: &resolver,
+        related_task: related_task.as_deref(),
+        date: &date,
+        author: &author,
+        marker: marker.as_deref(),
+        in_field: args.iter().any(|a| a == "--in-field"),
+    };
+    match keel_cli::write::record_issue(&root, &n) {
+        Ok((name, path)) => {
+            println!("recorded {name} -> {path}");
+            println!("  triaged on arrival: `#Resolves dependency from {resolver} to {name};`");
+            println!("  run `keel validate . && keel guard .` to confirm; nothing was committed.");
+            0
+        }
+        Err(e) => { eprintln!("error: {e}"); 1 }
+    }
+}
+
 /// `keel enroll` — the trailing ROOT is only honoured when it actually looks like a keel project,
 /// so a stray argument cannot silently redirect an enrollment into the wrong tree.
 fn cmd_enroll(rest: &[String]) -> i32 {
@@ -1939,6 +2010,7 @@ fn main() {
         Some("critique-policy") => cmd_critique_policy(rest),
         Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("assumptions") => cmd_query0(rest, "keel assumptions [ROOT]", |r| keel_cli::view::assumptions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+        Some("contentions") => cmd_query0(rest, "keel contentions [ROOT]", |r| keel_cli::view::contentions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("marker-census") => cmd_query0(rest, "keel marker-census [ROOT]", |r| keel_cli::view::marker_census(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),

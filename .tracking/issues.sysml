@@ -3,7 +3,7 @@
 // Convention: author a `part <name> : Issue { ... }` for each open
 // issue. The `relatedTask` field names the backlog action that should
 // address it. `discoveredInField = true` for issues found in production use.
-// Surface with: python .engine/tools/query.py issues
+// Surface with: `keel open-issues` (query.py was retired at D0074).
 // =====================================================================
 package ProjectIssues {
     private import EngineElement::*;

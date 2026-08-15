@@ -1134,3 +1134,111 @@ mod tests {
         );
     }
 }
+
+// ── record issue (D0129 srDcContentionAdjudication) ───────────────────────────
+
+/// A new `Issue`, with the triage that makes it well-formed on arrival.
+pub struct NewIssue<'a> {
+    pub title: &'a str,
+    pub description: &'a str,
+    /// `Critical` | `High` | `Medium` | `Low`.
+    pub severity: &'a str,
+    /// An EXISTING item that resolves it — the `#Resolves` edge is authored with the Issue.
+    pub resolver: &'a str,
+    pub related_task: Option<&'a str>,
+    pub date: &'a str,
+    pub author: &'a str,
+    /// Optional engine marker prefix, e.g. `ProcessDefect`.
+    pub marker: Option<&'a str>,
+    /// Discovered in production use rather than by an internal check.
+    pub in_field: bool,
+}
+
+/// Next free `issueNNN` name in the issues file.
+fn next_issue_number(text: &str) -> u32 {
+    let mut max = 0u32;
+    let mut from = 0usize;
+    while let Some(hit) = text[from..].find("part issue") {
+        let at = from + hit + "part issue".len();
+        let digits: String = text[at..].chars().take_while(char::is_ascii_digit).collect();
+        if let Ok(n) = digits.parse::<u32>() {
+            max = max.max(n);
+        }
+        from = at;
+    }
+    max + 1
+}
+
+/// `keel record issue` — author a TRIAGED Issue plus its `#Resolves` edge, in one call.
+///
+/// D0108 clause 5 MANDATES that conflicting conclusions across contributors be recorded as an Issue
+/// for human adjudication, and there was no command that records an Issue at all — `record decision`
+/// existed, `record issue` did not. A sanctioned path with no implementation is the friction that
+/// guarantees non-compliance (D0054): the rule was reachable only by hand-editing a 1300-line file.
+///
+/// The `#Resolves` edge is written WITH the Issue rather than left for later, because the `issues`
+/// guard fails on an untriaged Issue — so a command that produced one would hand the caller a red
+/// gate as its output. Triage-on-arrival is what makes "green in one call" true.
+///
+/// # Errors
+/// `WriteError::Io` on filesystem errors; `WriteError::TaskNotFound` if the issues file has no
+/// package close to insert before.
+pub fn record_issue(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
+    let path = root.join(".tracking").join("issues.sysml");
+    let text = std::fs::read_to_string(&path)?;
+    let num = next_issue_number(&text);
+    let name = format!("issue{num:03}");
+    let uuid = gen_uuid();
+    let s = sanitize_field;
+    let marker = n.marker.map_or_else(String::new, |m| format!("#{m} "));
+    let related = n
+        .related_task
+        .map_or_else(String::new, |t| format!("        :>> relatedTask = \"{}\";\n", s(t)));
+    let block = format!(
+        "\n    {marker}part {name} : Issue {{\n\
+         \x20       :>> id = \"{uuid}\";\n\
+         \x20       :>> title = \"{title}\";\n\
+         \x20       :>> createdAt = \"{date}\";\n\
+         \x20       :>> createdBy = \"{author}\";\n\
+         \x20       :>> description = \"{desc}\";\n\
+         \x20       :>> discoveredInField = {in_field};\n\
+         {related}\
+         \x20       :>> severity = Severity::{sev};\n\
+         \x20   }}\n\
+         \x20   #Resolves dependency from {resolver} to {name};\n",
+        title = s(n.title),
+        date = s(n.date),
+        author = s(n.author),
+        desc = s(n.description),
+        in_field = n.in_field,
+        sev = s(n.severity),
+        resolver = s(n.resolver),
+    );
+    let close = text
+        .rfind('}')
+        .ok_or_else(|| WriteError::TaskNotFound("issues.sysml (no package close)".to_owned()))?;
+    let mut out = String::with_capacity(text.len() + block.len());
+    out.push_str(text[..close].trim_end());
+    out.push('\n');
+    out.push_str(&block);
+    out.push_str(&text[close..]);
+    std::fs::write(&path, out)?;
+    Ok((name, ".tracking/issues.sysml".to_owned()))
+}
+
+#[cfg(test)]
+mod issue_tests {
+    use super::next_issue_number;
+
+    #[test]
+    fn issue_numbering_takes_the_max_not_the_count() {
+        // Counting would collide the moment an issue is ever removed or numbered out of order, and a
+        // duplicate id is its own corruption class (issue074). Max+1 is stable under both.
+        assert_eq!(next_issue_number("part issue001 : Issue"), 2);
+        assert_eq!(next_issue_number("part issue001\npart issue007\npart issue003"), 8);
+        assert_eq!(next_issue_number("no issues here"), 1);
+        // A mention inside prose must not drive the counter — the self-referential-corpus trap that
+        // inflated the marker census in issue099. `part issue` is the declaration form.
+        assert_eq!(next_issue_number("description = \"see issue900 for context\""), 1);
+    }
+}

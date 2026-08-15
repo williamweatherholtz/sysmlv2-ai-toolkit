@@ -2038,6 +2038,19 @@ pub fn pending_acceptances(root: &Path) -> Result<Vec<String>, ViewError> {
     Ok(proposed_decisions(&Model::build(root)?))
 }
 
+/// Is `name` a declared item in the model?
+///
+/// Exists so a write path can REFUSE before authoring rather than leave the `edge-endpoints` guard
+/// to catch it afterwards: `keel record issue` must produce a triaged Issue whose `#Resolves` edge
+/// actually lands somewhere, and an edge to a name declared nowhere is worse than a missing edge
+/// because every consumer treats it as present (issue109).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn item_exists(root: &Path, name: &str) -> Result<bool, ViewError> {
+    Ok(Model::build(root)?.items.contains_key(name))
+}
+
 /// Pure core of [`pending_acceptances`], for self-test.
 ///
 /// Matches on the suffix because the authored value is the enum path `DecisionStatus::proposed`,
@@ -5555,6 +5568,104 @@ fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>
         .replace("/*CONCERN*/", &json_esc(&spec.concern))
         .replace("/*COLS*/", &Json::Arr(cols.iter().map(|c| Json::s(c.clone())).collect()).dump())
         .replace("/*ROWS*/", &Json::Arr(rows).dump())
+}
+
+// ── contention (D0129 srDcContentionAdjudication) ────────────────────────────
+
+/// Contentions: places where two contributors have reached conclusions that cannot both stand, and
+/// which D0108 clause 5 says a HUMAN adjudicates — never the contributor who holds one of them.
+///
+/// # What is computed, and what deliberately is not
+///
+/// The item names three dimensions. Two are exactly computable and are computed:
+///
+/// * **contradictory judgments** — one verification carrying passing AND failing results from
+///   DIFFERENT actors. Same actor, different outcomes over time is a re-judgement, not a contention,
+///   and conflating them would flood this view with ordinary re-verification.
+/// * **rival proposals** — two still-`proposed` Decisions resolving the SAME Issue. Two open answers
+///   to one question is a contention even when neither author knows about the other, which is the
+///   normal case in an asynchronous team.
+///
+/// The third — two live CLAIMS on one item — cannot be computed: there is no `Claim` type, and
+/// D0147 proposing one is itself awaiting human sign-off. It is REPORTED AS NOT COMPUTED with the
+/// reason rather than omitted, because a view listing two of three dimensions and saying nothing
+/// about the third reads as "no claim contentions exist" (the D0138 lesson, and the reason `orient`
+/// emits an empty `pendingAcceptances` rather than dropping the key).
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn contentions(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut rows: Vec<String> = Vec::new();
+
+    // (1) Contradictory judgments on one verification, by different actors.
+    let mut by_verification: BTreeMap<String, Vec<(&String, &str, &str)>> = BTreeMap::new();
+    for e in model.edges.iter().filter(|e| e.kind == "resultof") {
+        if let Some(r) = model.items.get(&e.from) {
+            let outcome = r.attrs.get("outcome").map_or("", String::as_str);
+            let by = r.attrs.get("judgedBy").map_or("", String::as_str);
+            by_verification.entry(e.to.clone()).or_default().push((&e.from, outcome, by));
+        }
+    }
+    // Results are also named `<verification>R<n>`, which is how most of this repo links them.
+    for (name, info) in &model.items {
+        if info.type_name != "TestResult" {
+            continue;
+        }
+        if let Some(v) = name.rfind('R').and_then(|i| name.get(..i)).filter(|v| model.items.contains_key(*v)) {
+            let outcome = info.attrs.get("outcome").map_or("", String::as_str);
+            let by = info.attrs.get("judgedBy").map_or("", String::as_str);
+            let entry = by_verification.entry(v.to_owned()).or_default();
+            if !entry.iter().any(|(n, _, _)| *n == name) {
+                entry.push((name, outcome, by));
+            }
+        }
+    }
+    for (verification, results) in &by_verification {
+        let passes: Vec<&str> = results.iter().filter(|(_, o, _)| o.ends_with("pass")).map(|(_, _, b)| *b).collect();
+        let fails: Vec<&str> = results.iter().filter(|(_, o, _)| o.ends_with("fail")).map(|(_, _, b)| *b).collect();
+        if passes.is_empty() || fails.is_empty() {
+            continue;
+        }
+        // Different ACTORS, or it is one actor re-judging their own work over time.
+        let contended = passes.iter().any(|p| fails.iter().any(|f| p != f && !p.is_empty() && !f.is_empty()));
+        if contended {
+            rows.push(format!(
+                "{{\"kind\":\"contradictoryJudgment\",\"subject\":\"{verification}\",\"passedBy\":[{}],\"failedBy\":[{}]}}",
+                passes.iter().map(|a| format!("\"{a}\"")).collect::<Vec<_>>().join(","),
+                fails.iter().map(|a| format!("\"{a}\"")).collect::<Vec<_>>().join(",")
+            ));
+        }
+    }
+
+    // (2) Two still-proposed Decisions resolving the same Issue.
+    let proposed: HashSet<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision")
+        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
+        .map(|(n, _)| n)
+        .collect();
+    let mut per_issue: BTreeMap<&String, Vec<&String>> = BTreeMap::new();
+    for e in model.edges.iter().filter(|e| e.kind == "resolves") {
+        if proposed.contains(&e.from) {
+            per_issue.entry(&e.to).or_default().push(&e.from);
+        }
+    }
+    for (issue, decisions) in &per_issue {
+        if decisions.len() > 1 {
+            rows.push(format!(
+                "{{\"kind\":\"rivalProposals\",\"subject\":\"{issue}\",\"decisions\":[{}]}}",
+                decisions.iter().map(|d| format!("\"{d}\"")).collect::<Vec<_>>().join(",")
+            ));
+        }
+    }
+
+    Ok(format!(
+        "{{\n  \"contentions\": [{}],\n  \"count\": {},\n  \"notComputed\": [{{\"dimension\":\"liveClaimCollision\",\"reason\":\"no Claim type exists; D0147 proposes one and is awaiting human sign-off. Reported rather than omitted so this view is not read as 'no claim contentions exist'.\"}}],\n  \"note\": \"D0108 clause 5: a contention is adjudicated by a HUMAN, recorded as a Decision. No contributor may resolve one in favour of its own conclusion.\"\n}}",
+        rows.join(", "),
+        rows.len()
+    ))
 }
 
 #[cfg(test)]
