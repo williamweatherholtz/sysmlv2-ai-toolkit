@@ -1425,4 +1425,68 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSchemaReconciliation to issue120;
+
+    part issue121 : Issue {
+        :>> id = "004ed0d1-3e20-47ab-96d9-4ff5a1260416";
+        :>> title = "C1: srServeModelDrivenRegistry requires an output schema the model cannot hold";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the independent completeness critique of srServeModelDrivenRegistry (critic claudeOpus5, author wweatherholtz). The requirement demands keel serve compute each launchable process's expected OUTPUT SCHEMA from the declared model. No schema type can hold one: action def Process declares purpose and cadence; ProcessStep declares triggerCondition, actionText, producedArtifact and owner, and producedArtifact is a free-text sentence describing the artifact change, not a machine-readable schema anything can validate against. Nothing in .engine/schema carries an output schema or a schema reference. Half of this Tier-1 contract is therefore not computable as written, and because srServeOutputSchemaValidate and srServeLauncherDefinedOnly both #DependsOn it, the whole tier inherits an unbuildable prerequisite. Same class as D0146/D0147/D0148 in sprint 298 - a process definition demanding data the schema cannot hold - and the same shape as issue114, where an item's first line was an unmeetable prereq. Closing it needs either a frozen-core schema addition with its own Decision, or a re-scope of the requirement to the launchable set alone.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcServeRequirementRework to issue121;
+
+    part issue122 : Issue {
+        :>> id = "cda3d6ce-9dd2-4674-87e5-295ab32c60bb";
+        :>> title = "C2: srServeLauncherDefinedOnly states a universal negative that no test can demonstrate";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the independent testability critique of srServeLauncherDefinedOnly. The requirement says there shall be no code path that spawns the agent on a freeform, un-routed prompt. That is a universal negative over the whole codebase: a test can show the documented entry point rejects an undeclared target, but nothing can show no OTHER path exists. Demonstrating it requires exhaustive review, which this engine classes as manual vigilance rather than a control (D0047). As written the requirement is unfalsifiable and will read as satisfied on the strength of whichever single path someone remembered to test. It becomes testable if restated as a structural property a guard can assert - for example, exactly one function may spawn the agent and it takes a validated target type rather than a string - so that a new bypass path breaks a check instead of passing silently.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcServeRequirementRework to issue122;
+
+    part issue123 : Issue {
+        :>> id = "7c59728d-f7f7-4997-ba46-ee5c6f69ff9d";
+        :>> title = "C3: srServeApproveGate never requires the approving operator to be human";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the independent completeness critique of srServeApproveGate. The requirement demands an explicit operator approve action before execution but never constrains the operator to a HUMAN. The term operator is undefined across the Needs and requirements, and NeedSource::operator is a source category rather than an actor kind. Nothing as written prevents an AI actor from supplying the approval, which defeats the exact property the parent Need nServeApproveBeforeExecute states: the agent never silently acts on its own interpretation. An agent approving its own routing IS acting on its own interpretation, and would now have a recorded approval to evidence it. The engine has since acquired the vocabulary to close this: D0146 added Actor.role, and .engine/contracts/attestation-policy.toml declares per-class kinds=human with the attestation-authority guard checking KIND before ROLE so an AI holding the right role still fails a human-only class. The requirement needs that binding, or the gate is satisfiable by the very thing it exists to restrain.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcServeRequirementRework to issue123;
+
+    part issue124 : Issue {
+        :>> id = "cf424fd2-bd1c-46ac-b88c-224bdd7b9ceb";
+        :>> title = "C4: srServeOutputSchemaValidate ignores side effects already taken by a failed attempt";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the independent completeness critique of srServeOutputSchemaValidate. The requirement governs only the RESULT - never record, commit or surface a schema-invalid result - and is silent on side effects the failing attempt already caused. An agent that wrote files, appended records or pushed during attempt 1 has already changed the world, and rejecting its output and retrying undoes none of it; after the bounded retries are exhausted, the required explicit error leaves those partial effects in place with nothing recorded to say they happened. For an engine whose premise is that the model must be truthful about state, silently orphaned partial writes are the worst residue a retry loop can leave. The requirement needs to say what happens to work already performed: isolate the attempt, record the partial effects as facts, or permit retries only for processes with no side effects until the output is accepted.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcServeRequirementRework to issue124;
+
+    part issue125 : Issue {
+        :>> id = "f09a7689-d044-4840-b548-dfc08062a138";
+        :>> title = "C5: srServeScopedContext bounds passed-in context but not what a launched agent can read";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the independent completeness critique of srServeScopedContext. The requirement bounds only what is passed in - only its declared inputs as context - while a launched agent's dominant context channel is what it can READ. An agent with file-read and shell access reconstitutes arbitrary repository context however narrow its declared inputs were, so the stated goal that a task cannot drift on a diffuse long-running goal is not achieved by input scoping alone. The requirement should either bound the agent's reachable surface too, or state honestly that it constrains only the launcher's contribution to context and that drift-by-exploration is out of scope and handled elsewhere. As written it claims a property it cannot deliver, which is more dangerous than claiming less.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcServeRequirementRework to issue125;
+
+    // D0102 typed finding -> critique links: each finding points at the critique that raised it, so a
+    // later ACCEPT-RISK/DISMISS disposition clears the target's critique_suspect through a typed path
+    // rather than prose. All five are >= Medium and AWAIT HUMAN DISPOSITION (D0092) - never inferred.
+    #DependsOn dependency from issue121 to srServeModelDrivenRegistryCompletenessCritique;
+    #DependsOn dependency from issue122 to srServeLauncherDefinedOnlyTestabilityCritique;
+    #DependsOn dependency from issue123 to srServeApproveGateCompletenessCritique;
+    #DependsOn dependency from issue124 to srServeOutputSchemaValidateCompletenessCritique;
+    #DependsOn dependency from issue125 to srServeScopedContextCompletenessCritique;
 }
