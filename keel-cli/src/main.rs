@@ -2010,6 +2010,7 @@ fn main() {
         Some("critique-policy") => cmd_critique_policy(rest),
         Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("assumptions") => cmd_query0(rest, "keel assumptions [ROOT]", |r| keel_cli::view::assumptions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+        Some("authority-queue") => cmd_query0(rest, "keel authority-queue [ROOT]", |r| keel_cli::view::authority_queue(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("contentions") => cmd_query0(rest, "keel contentions [ROOT]", |r| keel_cli::view::contentions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("marker-census") => cmd_query0(rest, "keel marker-census [ROOT]", |r| keel_cli::view::marker_census(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),

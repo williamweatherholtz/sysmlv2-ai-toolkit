@@ -5668,6 +5668,267 @@ pub fn contentions(root: &Path) -> Result<String, ViewError> {
     ))
 }
 
+// ── human-authority queue (D0129 srDcHumanAuthorityQueue) ────────────────────
+
+/// The date each human obligation came into force — the Decision that created it.
+///
+/// ISSUE068'S LESSON, APPLIED AS A FILTER. A new obligation must never retro-fail work that was
+/// correct when written, and this queue is where that rule bites hardest: 287 sprints predate the
+/// per-sitting review requirement and 54 findings predate the disposition lifecycle. Listing them
+/// all as "awaiting human authority" would hand a human ~340 items nobody ever owed — which is not
+/// thoroughness but the rubber-stamping this item exists to prevent, since a queue nobody can work
+/// is a queue nobody reads.
+const OBLIGATION_FROM: &[(&str, &str, &str)] = &[
+    ("perSittingReview", "2026-06-18", "D0073"),
+    ("findingDisposition", "2026-06-22", "D0092"),
+];
+
+fn in_force_from(kind: &str) -> (&'static str, &'static str) {
+    OBLIGATION_FROM
+        .iter()
+        .find(|(k, _, _)| *k == kind)
+        .map_or(("0000-00-00", "-"), |(_, d, dec)| (*d, *dec))
+}
+
+/// Whole days between two ISO dates, or 0 if either is unparseable.
+///
+/// Dates only: the model records dates, and reporting a finer resolution than the data carries would
+/// be false precision. Uses the standard civil-date algorithm rather than a dependency.
+fn days_between(from: &str, to: &str) -> i64 {
+    let parse = |s: &str| -> Option<(i64, i64, i64)> {
+        let mut it = s.split('-');
+        Some((it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?))
+    };
+    let to_days = |(y, m, d): (i64, i64, i64)| -> i64 {
+        let y = if m <= 2 { y - 1 } else { y };
+        let era = if y >= 0 { y } else { y - 399 } / 400;
+        let yoe = y - era * 400;
+        let mp = (m + 9) % 12;
+        let doy = (153 * mp + 2) / 5 + d - 1;
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        era * 146_097 + doe - 719_468
+    };
+    match (parse(from), parse(to)) {
+        (Some(a), Some(b)) => to_days(b) - to_days(a),
+        _ => 0,
+    }
+}
+
+/// "Now", taken from git rather than the wall clock (D0013): the HEAD commit date.
+///
+/// Deterministic — two contributors computing this queue against the same commit get the same ages,
+/// which a clock would not give them.
+fn repo_today(root: &Path) -> String {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["log", "-1", "--format=%cs"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| s.len() == 10)
+        .unwrap_or_default()
+}
+
+/// Escalation threshold in days. It MARKS rather than blocks: human judgment is the one resource in
+/// a mostly-AI team that cannot be scaled by adding contributors, so it must never sit on the
+/// critical path of a unit of work — a contributor stalling on the queue would make the bottleneck
+/// worse, not visible.
+const ESCALATE_AFTER_DAYS: i64 = 14;
+
+/// One row of the queue.
+struct Awaiting {
+    kind: String,
+    item: String,
+    origin: String,
+    since: String,
+    note: String,
+}
+
+/// The two per-item obligation classes, split out to keep `authority_queue` readable.
+fn collect_decision_and_finding_obligations(model: &Model, awaiting: &mut Vec<Awaiting>) {
+    // (1) Decisions awaiting acceptance. NOT grandfathered: a proposed Decision is a live request
+    // whenever it was raised, and no obligation post-dates it — it is the obligation.
+    let mut pending: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision")
+        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
+        .map(|(n, _)| n)
+        .collect();
+    pending.sort();
+    for d in pending {
+        let info = model.items.get(d);
+        awaiting.push(Awaiting {
+            kind: "decisionAcceptance".to_owned(),
+            item: d.clone(),
+            origin: info.and_then(|i| i.attrs.get("createdBy")).cloned().unwrap_or_default(),
+            since: info.and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default(),
+            note: "an AI actor cannot supply this (D0106)".to_owned(),
+        });
+    }
+
+    // (2) Findings at or above the disposition threshold, undispositioned and in force (D0092).
+    let (disp_from, disp_dec) = in_force_from("findingDisposition");
+    let mut findings: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Issue")
+        .filter(|(_, i)| {
+            i.attrs.get("severity").is_some_and(|s| s.ends_with("Critical") || s.ends_with("High") || s.ends_with("Medium"))
+        })
+        .map(|(n, _)| n)
+        .collect();
+    findings.sort();
+    for f in findings {
+        if issue_disposition(model, f).is_some() {
+            continue;
+        }
+        let info = model.items.get(f);
+        let since = info.and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default();
+        if since.is_empty() || days_between(disp_from, &since) < 0 {
+            continue; // predates the obligation — issue068: never retro-fail correct-when-written work
+        }
+        awaiting.push(Awaiting {
+            kind: "findingDisposition".to_owned(),
+            item: f.clone(),
+            origin: info.and_then(|i| i.attrs.get("createdBy")).cloned().unwrap_or_default(),
+            since,
+            note: format!("in force from {disp_from} ({disp_dec})"),
+        });
+    }
+
+}
+
+/// Everything genuinely awaiting HUMAN authority, with waiting age and originating contributor.
+///
+/// # What is deliberately excluded
+///
+/// Anything an automated check already settles. D0051 is explicit — confirm only what tests cannot —
+/// and asking a human to re-affirm a passing test degrades review into rubber-stamping, which
+/// launders unreviewed work as reviewed. So a gate that passed by `method=test` never appears here;
+/// only obligations REQUIRING a human verdict do: accepting a Decision, dispositioning a finding at
+/// or above the threshold, adjudicating a contention, and the per-sitting review.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let today = repo_today(root);
+    let mut awaiting: Vec<Awaiting> = Vec::new();
+    collect_decision_and_finding_obligations(&model, &mut awaiting);
+
+    // (3) Contentions — D0108 clause 5: a human adjudicates, never a contributor holding one side.
+    let contention_rows = contentions(root)?.matches("\"kind\"").count();
+    if contention_rows > 0 {
+        awaiting.push(Awaiting {
+            kind: "contentionAdjudication".to_owned(),
+            item: "see `keel contentions`".to_owned(),
+            origin: "multiple".to_owned(),
+            since: String::new(),
+            note: format!("{contention_rows} contention(s); no contributor may resolve one in favour of its own conclusion (D0108)"),
+        });
+    }
+
+    // (4) Per-sitting reviews still owed, in force from D0073. Reported as ONE batched row, because
+    // D0049 makes the review per SITTING rather than per sprint — a row per sprint would misstate
+    // the ask by two orders of magnitude and invite exactly the rubber-stamping being avoided.
+    let (rev_from, rev_dec) = in_force_from("perSittingReview");
+    let covered = covered_sprints(&model);
+    let mut sprints: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
+    sprints.sort();
+    let mut owed = 0usize;
+    let mut oldest = String::new();
+    for s in sprints {
+        if covered.contains(s.as_str()) {
+            continue;
+        }
+        let since = model.items.get(s).and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default();
+        if since.is_empty() || days_between(rev_from, &since) < 0 {
+            continue; // grandfathered: predates the per-sitting review obligation
+        }
+        owed += 1;
+        if oldest.is_empty() || since < oldest {
+            oldest.clone_from(&since);
+        }
+    }
+    if owed > 0 {
+        awaiting.push(Awaiting {
+            kind: "perSittingReview".to_owned(),
+            item: format!("{owed} sprint(s) awaiting a sitting review"),
+            origin: "multiple".to_owned(),
+            since: oldest,
+            note: format!("BATCHED per sitting (D0049), not per sprint — in force from {rev_from} ({rev_dec})"),
+        });
+    }
+
+    let mut escalated = 0usize;
+    let rows: Vec<Json> = awaiting
+        .iter()
+        .map(|a| {
+            let age = if today.is_empty() || a.since.is_empty() { -1 } else { days_between(&a.since, &today) };
+            let esc = age >= ESCALATE_AFTER_DAYS;
+            if esc {
+                escalated += 1;
+            }
+            Json::Obj(vec![
+                ("kind".to_owned(), Json::s(a.kind.clone())),
+                ("item".to_owned(), Json::s(a.item.clone())),
+                ("origin".to_owned(), Json::s(a.origin.clone())),
+                ("waitingSince".to_owned(), Json::s(a.since.clone())),
+                ("waitingDays".to_owned(), Json::Int(age)),
+                ("escalated".to_owned(), Json::Bool(esc)),
+                ("note".to_owned(), Json::s(a.note.clone())),
+            ])
+        })
+        .collect();
+    let count = rows.len();
+    Ok(Json::Obj(vec![
+        ("asOf".to_owned(), Json::s(today)),
+        ("asOfSource".to_owned(), Json::s("HEAD commit date (D0013 — git-derived, so two contributors computing this against the same commit agree)".to_owned())),
+        ("escalateAfterDays".to_owned(), Json::Int(ESCALATE_AFTER_DAYS)),
+        ("awaiting".to_owned(), Json::Arr(rows)),
+        ("count".to_owned(), Json::Int(i64::try_from(count).unwrap_or(i64::MAX))),
+        ("escalated".to_owned(), Json::Int(i64::try_from(escalated).unwrap_or(i64::MAX))),
+        ("excluded".to_owned(), Json::s("anything a passing automated check already settles (D0051: confirm only what tests cannot), and obligations that post-date the work (issue068 grandfathering)".to_owned())),
+    ])
+    .dump())
+}
+
+#[cfg(test)]
+mod authority_queue_tests {
+    use super::{days_between, in_force_from};
+
+    #[test]
+    fn day_arithmetic_is_exact_across_months_and_leap_years() {
+        assert_eq!(days_between("2026-08-15", "2026-08-15"), 0);
+        assert_eq!(days_between("2026-06-18", "2026-08-15"), 58);
+        assert_eq!(days_between("2026-02-28", "2026-03-01"), 1, "2026 is not a leap year");
+        assert_eq!(days_between("2024-02-28", "2024-03-01"), 2, "2024 is");
+        // NEGATIVE means the item predates the obligation — that is the grandfathering test, so the
+        // sign has to be right or issue068's rule inverts and every historical item is resurrected.
+        assert!(days_between("2026-06-22", "2026-06-01") < 0);
+        assert!(days_between("2026-06-22", "2026-07-01") > 0);
+        // Unparseable dates yield 0 rather than a panic or a wild number: an item with a malformed
+        // date must not silently escalate.
+        assert_eq!(days_between("", "2026-08-15"), 0);
+        assert_eq!(days_between("not-a-date", "2026-08-15"), 0);
+    }
+
+    #[test]
+    fn every_obligation_names_the_decision_that_created_it() {
+        for kind in ["perSittingReview", "findingDisposition"] {
+            let (from, dec) = in_force_from(kind);
+            assert_eq!(from.len(), 10, "{kind} must carry a real in-force date");
+            assert!(dec.starts_with('D'), "{kind} must name its Decision, so the filter can be audited");
+        }
+        // An unknown obligation grandfathers NOTHING rather than everything: the fallback date is
+        // before any possible item, so a typo cannot silently empty the queue.
+        assert_eq!(in_force_from("nonexistent").0, "0000-00-00");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
