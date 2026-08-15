@@ -1892,6 +1892,7 @@ fn main() {
         Some("coverage") => cmd_coverage(rest),
         Some("critique-coverage") => cmd_critique_coverage(rest),
         Some("critique-policy") => cmd_critique_policy(rest),
+        Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("assumptions") => cmd_query0(rest, "keel assumptions [ROOT]", |r| keel_cli::view::assumptions(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("marker-census") => cmd_query0(rest, "keel marker-census [ROOT]", |r| keel_cli::view::marker_census(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
@@ -1933,6 +1934,7 @@ fn main() {
             eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
             eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
             eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
+            eprintln!("  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)");
             eprintln!("  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)");
             eprintln!("  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)");
             eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");

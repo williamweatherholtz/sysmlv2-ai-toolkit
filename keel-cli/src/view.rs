@@ -1735,6 +1735,53 @@ pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<S
     Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
 }
 
+/// ACTOR TRACE — everything an actor authored or judged, computed from provenance (issue106).
+///
+/// The panel's finding (e) was that `createdBy` / `owner` / `judgedBy` are Strings while `part def Actor`
+/// exists, so "you cannot select an actor and see what they authored" — the one trace that survives a
+/// provenance audit is the one with no edge. The complaint is right. The proposed fix, `ref createdBy :
+/// Actor`, is NOT available: `.engine` carries 137 provenance values and the registry is `ProjectActors`,
+/// declared as per-project INSTANCE data. Making it a reference would force every engine decision file to
+/// import a project's actor registry, inverting the D0093 engine/instance boundary — `.engine` ships to
+/// downstream projects via `keel init`, where this project's `claudeOpus5` does not exist.
+///
+/// So the navigability is delivered as a COMPUTATION over the strings instead, which is the same answer
+/// the human reached for `Assumption` (issue105): if it is derivable, derive it. This needs no schema
+/// change, no layering violation, and cannot go stale.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn actor_trace(root: &Path, actor: &str) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut authored: Vec<&String> = Vec::new();
+    let mut judged: Vec<&String> = Vec::new();
+    let mut owned: Vec<&String> = Vec::new();
+    for (name, info) in &model.items {
+        for (field, bucket) in
+            [("createdBy", &mut authored), ("judgedBy", &mut judged), ("owner", &mut owned)]
+        {
+            if info.attrs.get(field).is_some_and(|v| v == actor) {
+                bucket.push(name);
+            }
+        }
+    }
+    for b in [&mut authored, &mut judged, &mut owned] {
+        b.sort_unstable();
+    }
+    let arr = |v: &[&String]| {
+        v.iter().map(|n| format!("\"{n}\"")).collect::<Vec<_>>().join(", ")
+    };
+    Ok(format!(
+        "{{\n  \"actor\": \"{actor}\",\n  \"note\": \"computed from provenance attributes (issue106). Provenance stays a STRING because `.engine` cannot import a project's actor registry without inverting the D0093 engine/instance boundary; navigability is delivered by computing it.\",\n  \"counts\": {{\"authored\": {}, \"judged\": {}, \"owned\": {}}},\n  \"authored\": [{}],\n  \"judged\": [{}],\n  \"owned\": [{}]\n}}",
+        authored.len(),
+        judged.len(),
+        owned.len(),
+        arr(&authored),
+        arr(&judged),
+        arr(&owned)
+    ))
+}
+
 /// ASSUMPTIONS — accepted, unverified, and depended upon (issue105).
 ///
 /// The `Assumption` TYPE was deleted as dead schema in D0142, and I recorded that as "the one genuine
