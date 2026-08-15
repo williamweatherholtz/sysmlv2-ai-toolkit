@@ -54,6 +54,20 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook pre-bash || true",
+            "timeout": 15,
+            "statusMessage": "shell-adaptation advisory"
+          }
+        ]
+      }
     ]
   }
 }

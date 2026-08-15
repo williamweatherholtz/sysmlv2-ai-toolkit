@@ -166,8 +166,9 @@ constructs the kernel rejects, and never blocks. Its number is tracked as `confo
 ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 
 In-loop gating (D0128/D0130/D0134): `keel hook post-edit` runs the fast tier after each `.sysml` edit;
-`keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest.
-Both live in the binary — no extra runtime.
+`keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest;
+`keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) — **advisory, never
+blocking**, and silent unless it has something to say. All live in the binary — no extra runtime.
 
 The JVM **kernel** validators are the deeper SysML oracle for the type-conformance residual, and are
 **opt-in** (`KEEL_KERNEL_VALIDATE=1`, D0132/issue081) — the per-file instance validator was demoted

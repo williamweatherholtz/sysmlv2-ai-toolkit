@@ -131,7 +131,7 @@ fn cmd_validate(args: &[String]) -> i32 {
 fn cmd_hook(args: &[String]) -> i32 {
     use std::io::Read as _;
     let Some(event) = args.first().map(String::as_str) else {
-        eprintln!("usage: keel hook <stop|post-edit>");
+        eprintln!("usage: keel hook <stop|post-edit|pre-bash|user-prompt>");
         return 2;
     };
     let mut raw = String::new();
@@ -146,11 +146,36 @@ fn cmd_hook(args: &[String]) -> i32 {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
         "user-prompt" => hook_user_prompt(&root),
+        "pre-bash" => hook_pre_bash(&payload),
         other => {
-            eprintln!("unknown hook event '{other}' (expected stop|post-edit)");
+            eprintln!("unknown hook event '{other}' (expected stop|post-edit|pre-bash|user-prompt)");
             2
         }
     }
+}
+
+/// `PreToolUse` on Bash: advise on host/shell adaptation before the command runs (issue094).
+///
+/// ADVISORY ONLY — always returns 0. A blocking heuristic over shell commands is the issue076/
+/// issue081 dynamic where an over-strict gate trains its actor to disable it, and the checks here
+/// cannot be exact: whether an MSYS path is wrong depends on what reads it.
+///
+/// Prints nothing when there is nothing to say, which is the common case and the point: a hook that
+/// comments on ordinary commands becomes noise the reader skips, at which point it looks like
+/// coverage while providing none.
+fn hook_pre_bash(payload: &serde_json::Value) -> i32 {
+    let cmd = payload.pointer("/tool_input/command").and_then(serde_json::Value::as_str).unwrap_or_default();
+    let advisories = keel_cli::shellcheck::inspect(cmd);
+    if advisories.is_empty() {
+        return 0;
+    }
+    println!("[shell-adaptation -- CLAUDE.md sec 6, the #1 avoidable-friction class (issue094)]");
+    for a in &advisories {
+        println!("  {}", a.what);
+        println!("    fix: {}", a.fix);
+    }
+    println!("  Advisory only -- nothing is blocked. If the command errors or hangs, SWITCH TOOLS rather than re-issuing the same form.");
+    0
 }
 
 /// `UserPromptSubmit`: inject the route-first checklist, plus a warning about out-of-band writes.

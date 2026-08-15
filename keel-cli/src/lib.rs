@@ -36,6 +36,7 @@ pub mod orient;
 pub mod queries;
 pub mod reverify;
 pub mod serve;
+pub mod shellcheck;
 pub mod view;
 pub mod write;
 
