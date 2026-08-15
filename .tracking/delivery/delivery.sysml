@@ -14,7 +14,7 @@ package ProjectDelivery {
     // The Story being run through the loop
     // ====================================================================
     part foldWhatsNextStory : Story {
-        :>> id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+        :>> id = "412d390a-1e6b-4f24-9af6-fc5ab279946f";
         :>> title = "foldWhatsNext: merge whats_next.py into query.py workflows subcommand";
         :>> createdAt = "2026-06-11";
         :>> createdBy = "claudeOpus";
@@ -30,7 +30,7 @@ package ProjectDelivery {
     // ====================================================================
     action def DeliveryRun {
         action storyFoldWhatsNext;
-        verification storyFoldWhatsNextDoD : Test { :>> id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs with parity to whats_next.py; whats_next.py retired; validate_all green; single query tool"; }
+        verification storyFoldWhatsNextDoD : Test { :>> id = "7069d5ef-41a8-4a5f-96e2-6335681de0d9"; :>> method = VerificationMethod::test; :>> procedureText = "query.py workflows subcommand resolves the six workflow DAGs with parity to whats_next.py; whats_next.py retired; validate_all green; single query tool"; }
         part storyFoldWhatsNextR1 : TestResult { :>> id = "5c6d7e8f-9a0b-4c1d-2e3f-4a5b6c7d8e9f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5282ad3"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
     }
 
@@ -39,17 +39,17 @@ package ProjectDelivery {
     // TestResults appended when each phase closes.
     // ====================================================================
     verification refineGate : Test {
-        :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f";
+        :>> id = "84457426-a219-4a22-9abe-06eb5483ccff";
         :>> title = "refine phase gate (DoR)";
         :>> createdAt = "2026-06-11";
         :>> createdBy = "claudeOpus";
         :>> method = VerificationMethod::inspect;
         :>> procedureText = "Story title clear; DoD criterion exists with method; no unmet dependencies; code I/O defined; DoR passes.";
     }
-    part refineGateR1 : TestResult { :>> id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "65a4f78"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
+    part refineGateR1 : TestResult { :>> id = "f615ad49-05a1-43ab-aa82-0c8945448990"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "65a4f78"; :>> judgedAt = "2026-06-11"; :>> judgedBy = "claudeOpus"; }
 
     verification standupGate : Test {
-        :>> id = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b";
+        :>> id = "baa94f76-9569-429b-b272-18af645735b6";
         :>> title = "standup phase gate";
         :>> createdAt = "2026-06-11";
         :>> createdBy = "claudeOpus";

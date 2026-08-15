@@ -1318,37 +1318,6 @@ fn declared_name(line: &str) -> Option<String> {
     None
 }
 
-/// Element ids that were ALREADY duplicated when this guard was introduced (D0129, 2026-08-12).
-///
-/// Grandfathered to WARNING, never suppressed. These are hand-authored bootstrap ids that were
-/// copy-pasted between files (`a1b2c3d4-…` appears four times), so the identity invariant (§2.3) was
-/// already violated 26 times and nothing detected it. They are reported every run so the debt stays
-/// visible, and they are tracked by issue080 for a proper migration (D0067) — repairing them means
-/// rewriting ids that other records may reference, which is a migration, not a guard's job.
-///
-/// FORWARD-ONLY, per the issue068 lesson: a new guard must never retroactively fail historical items
-/// governed by the process in force when they were authored. Anything NOT on this list is an ERROR.
-/// Do not extend this list — a new duplicate is a defect to fix, not to grandfather.
-const GRANDFATHERED_DUPLICATE_IDS: [&str; 18] = [
-    "63940516-2c7d-4e8f-ed03-5162738e0305",
-    "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-    "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-    "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
-    "ad3e4f5a-b6c7-4d8e-a19c-3b4c5d6e7f8a",
-    "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-    "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
-    "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e",
-    "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-    "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
-    "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
-    "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
-    "df6b7c8d-e9f0-4a1b-cd2e-3f4a5b6c7d8e",
-    "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-    "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
-    "ef7c8d9e-f0a1-4b2c-de3f-4a5b6c7d8e9f",
-    "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
-    "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-];
 
 /// Guard: no repeated identity anywhere in the model (issue074 / D0129).
 ///
@@ -1390,12 +1359,14 @@ pub fn duplicate_identity(root: &Path) -> GuardReport {
 }
 
 /// Pure core of `duplicate_identity`: scan `(relpath, text)` pairs for repeated ids, item names and
-/// package names. Returns `(warnings, violations)` — grandfathered id duplicates warn, the rest fail.
+/// package names. Returns `(warnings, violations)`.
+///
+/// The warnings channel is retained but now always empty for ids: issue080's 18 bootstrap duplicates
+/// were re-identified by a D0067 migration, so there is no exemption path left and every duplicate
+/// fails. The tuple shape is kept because the item-name and package-name scans share this function.
 fn duplicate_scan(files: &[(String, String)]) -> (Vec<String>, Vec<String>) {
     let mut violations = Vec::new();
-    let mut warnings = Vec::new();
-    let grandfathered: HashSet<&str> = GRANDFATHERED_DUPLICATE_IDS.iter().copied().collect();
-
+    let warnings = Vec::new();
     let mut ids: HashMap<String, String> = HashMap::new();
     let mut pkgs: HashMap<String, String> = HashMap::new();
     let mut items: HashMap<(String, String), String> = HashMap::new();
@@ -1427,15 +1398,13 @@ fn duplicate_scan(files: &[(String, String)]) -> (Vec<String>, Vec<String>) {
 
             if let Some(id) = inline_attr(line, "id") {
                 if let Some(prev) = ids.insert(id.clone(), loc.clone()) {
-                    if grandfathered.contains(id.as_str()) {
-                        warnings.push(format!(
-                            "{loc}: duplicate element id \"{id}\" (also at {prev}) — GRANDFATHERED bootstrap duplicate, pre-issue074; tracked by issue080 for migration"
-                        ));
-                    } else {
-                        violations.push(format!(
-                            "{loc}: duplicate element id \"{id}\" (also at {prev}) — identity is the invariant that lets items share a name (§2.3); a collision corrupts it"
-                        ));
-                    }
+                    // No grandfather list any more (issue080 RESOLVED): the 18 bootstrap duplicates
+                    // across 26 records were re-identified by a D0067 migration, so every duplicate
+                    // from here is a live corruption and fails. Keeping an empty exemption list
+                    // around would be an invitation to refill it.
+                    violations.push(format!(
+                        "{loc}: duplicate element id \"{id}\" (also at {prev}) — identity is the invariant that lets items share a name (§2.3); a collision corrupts it"
+                    ));
                 }
             }
 
@@ -1570,8 +1539,29 @@ fn head_blob(root: &Path, path: &str) -> Option<String> {
 #[must_use]
 pub fn ownership(root: &Path) -> GuardReport {
     let actor = crate::actor::resolve(root, None).ok();
-    let staged: Vec<String> = staged_files(root)
-        .into_iter()
+    let all_staged = staged_files(root);
+    // A GOVERNED MIGRATION is the sanctioned exception, and it needs one because these two controls
+    // genuinely collide: D0108 forbids a non-owner editing another actor's fields, while D0067
+    // REQUIRES bulk transforms that cross every ownership boundary at once (repairing 26 duplicated
+    // ids is exactly that). Blocking a migration would have made D0067 unexecutable; exempting on a
+    // flag would have made D0108 optional.
+    //
+    // The exemption is therefore the same keystone shape `process-change` already uses: the change
+    // is permitted only when a transform under `.engine/tools/migrations/` is CO-COMMITTED, which is
+    // what D0067 demands anyway (a committed transform, a dry run, reconciled control totals). It
+    // cannot be claimed — it has to be in the commit, where a reviewer can read it.
+    let migration_co_committed = all_staged.iter().any(|p| p.starts_with(".engine/tools/migrations/"));
+    if migration_co_committed {
+        return GuardReport {
+            name: "ownership",
+            scanned: 0,
+            warnings: vec![
+                "cross-owner edits ALLOWED: a migration transform under .engine/tools/migrations/ is co-committed (D0067). Ownership (D0108) is suspended for this commit and the transform is the record of why.".to_owned(),
+            ],
+            violations: Vec::new(),
+        };
+    }
+    let staged: Vec<String> = all_staged.into_iter()
         .filter(|p| std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
         .collect();
     let mut violations = Vec::new();
@@ -2233,21 +2223,23 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_scan_grandfathers_known_bootstrap_ids_as_warnings() {
-        // FORWARD-ONLY (the issue068 lesson): a new guard must not retroactively FAIL historical
-        // items. The 18 bootstrap ids already duplicated when the guard landed warn instead — the
-        // debt stays visible (issue080) without blocking every commit.
-        let gf = GRANDFATHERED_DUPLICATE_IDS[0];
+    fn a_duplicate_id_now_fails_with_no_exemption_list() {
+        // issue080 RESOLVED. The 18 bootstrap duplicates across 26 records were re-identified by a
+        // D0067 migration (control totals reconciled: 7135 records before and after, distinct ids
+        // 7109 -> 7135), so the grandfather list is GONE rather than emptied — an empty exemption
+        // list is an invitation to refill it. Every duplicate from here is a live corruption.
+        let id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"; // one of the 18, now unique in the model
         let files = vec![
-            ("a.sysml".to_string(), format!("package P {{\n    part x : Need {{ :>> id = \"{gf}\"; }}\n}}")),
-            ("b.sysml".to_string(), format!("package Q {{\n    part y : Need {{ :>> id = \"{gf}\"; }}\n}}")),
+            ("a.sysml".to_string(), format!("package P {{
+    part x : Need {{ :>> id = \"{id}\"; }}
+}}")),
+            ("b.sysml".to_string(), format!("package Q {{
+    part y : Need {{ :>> id = \"{id}\"; }}
+}}")),
         ];
         let (warnings, violations) = duplicate_scan(&files);
-        assert!(violations.is_empty(), "grandfathered id must NOT fail: {violations:?}");
-        assert!(
-            warnings.iter().any(|m| m.contains("GRANDFATHERED") && m.contains(gf)),
-            "grandfathered id must warn visibly: {warnings:?}"
-        );
+        assert_eq!(violations.len(), 1, "a formerly-grandfathered id must now FAIL: {violations:?}");
+        assert!(!warnings.iter().any(|m| m.contains("GRANDFATHERED")), "no exemption path remains: {warnings:?}");
     }
 
     #[test]

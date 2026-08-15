@@ -150,7 +150,7 @@ package ProjectBusiness {
     // Phase 4: Use Cases
     // ====================================================================
     use case uc01Orient : UseCase {
-        :>> id = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c";
+        :>> id = "f7792ede-c1e8-4aee-a835-168cd41bafb0";
         :>> title = "Orient — get the ready/suspect frontier";
         :>> createdAt = "2026-06-11";
         :>> createdBy = "wweatherholtz";

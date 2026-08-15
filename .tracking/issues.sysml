@@ -20,7 +20,7 @@ package ProjectIssues {
     }
 
     part issue002 : Issue {
-        :>> id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+        :>> id = "8d3f7668-ea8a-4b4b-a93f-a72bea0e18ed";
         :>> title = "status dashboard lacks process traceability view — no visibility into which processes sprints used, subversions, or evolution";
         :>> createdAt = "2026-06-16";
         :>> createdBy = "wweatherholtz";
@@ -30,7 +30,7 @@ package ProjectIssues {
     }
 
     part issue003 : Issue {
-        :>> id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+        :>> id = "1c7e2eb0-589c-4e27-a1cd-534eb9f9e1a4";
         :>> title = "EngineWork::Release and EngineBaseline::Release are two conflicting Release types";
         :>> createdAt = "2026-06-16";
         :>> createdBy = "claudeSonnet46";
@@ -1328,4 +1328,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcBlockedFrontier to issue112;
+
+    #ProcessDefect part issue113 : Issue {
+        :>> id = "4eec3622-71aa-4eaf-8765-c17683c9458a";
+        :>> title = "The ownership guard blocked a governed D0067 migration — two controls that both had to hold";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND when sprint 295's duplicate-id migration was blocked by the ownership guard sprint 293 had built two sprints earlier. Both controls were RIGHT. D0108 forbids a non-owner editing another actor's item fields, and the migration edited 26 records owned by wweatherholtz, claudeOpus and claudeSonnet46. D0067 REQUIRES bulk transforms, and a duplicate-id repair crosses every ownership boundary at once by its nature. Blocking the migration would have made D0067 unexecutable; exempting on a flag would have made D0108 optional — the issue081 dynamic where an over-strict gate is disabled and takes every other layer with it. RESOLVED by the keystone shape this repo already uses for process changes: cross-owner edits are permitted only when a transform under .engine/tools/migrations/ is CO-COMMITTED, which is exactly what D0067 demands anyway (a committed transform, a dry run, reconciled control totals). The exemption cannot be claimed — it has to be in the commit where a reviewer can read it — and it is announced as a WARNING rather than passing silently, so a reader sees that ownership was suspended and why. VERIFIED both ways: with the transform staged the guard passes with the warning; with it unstaged the same 26 edits produce 13 violations. THE GENERAL LESSON, which is why this is recorded rather than just fixed: a new hard guard can make an EXISTING sanctioned process unexecutable, and neither the guard's own tests nor the process's own tests will show it, because each is correct in isolation. It surfaced only when a real migration ran into a real guard.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRepairDuplicateIds to issue113;
 }
