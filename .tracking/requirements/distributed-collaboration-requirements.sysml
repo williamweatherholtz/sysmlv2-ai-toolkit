@@ -234,6 +234,17 @@ package ProjectDistributedCollaborationRequirements {
     #Verify dependency from dcMergeOnlyIntegrationDoD to srDcMergeOnlyIntegration;
     #Verify dependency from dcDuplicateIdentityGuardDoD to srDcUniqueIdentityGuard;
     #Verify dependency from dcCollisionResistantIdsDoD to srDcCollisionResistantIds;
+
+    // Sprint 300 verified these two directly: the stale-expiry test aged a holder's claim past the
+    // window and watched the item return to the frontier with every recorded fact intact, and claims
+    // land in per-actor files that two clones merged without a textual conflict.
+    #Verify dependency from dcWorkClaimDoD to srDcStaleClaimExpiry;
+    #Verify dependency from dcWorkClaimDoD to srDcPerActorWriteTargets;
+
+    // srDcWorkClaim is DELIBERATELY NOT linked yet. Its statement says "Mutual exclusion shall be
+    // provided by the remote accepting exactly one of two concurrent claims" — the clause sprint 300's
+    // two-clone test disproved. Authoring a #Verify edge to it would compute the requirement as
+    // verified when its central clause was not met as written. It waits on D0149 (issue115).
     #Verify dependency from dcActorIdentityBindingDoD to srDcActorIdentityBinding;
     #Verify dependency from dcActorIdentityBindingDoD to srDcActorKindClassification;
     #Verify dependency from dcPortableGateDoD to srDcPortableGate;
