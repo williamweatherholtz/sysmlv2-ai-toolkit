@@ -1361,7 +1361,10 @@ package ProjectIssues {
         :>> relatedTask = "dcWorkClaim";
         :>> severity = Severity::High;
     }
-    #Resolves dependency from workClaimStory to issue115;
+    // Retargeted: sprint 300 FOUND this, it did not fix it. The process text still teaches the
+    // disproved mechanism, so pointing the edge at the finding sprint would have computed the issue
+    // as resolved by the work that discovered it.
+    #Resolves dependency from dcCorrectExclusionText to issue115;
 
     part issue116 : Issue {
         :>> id = "f74eab6b-351c-4175-ad1d-60c0ff2e7ff5";
@@ -1372,7 +1375,9 @@ package ProjectIssues {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from workClaimStory to issue116;
+    // Retargeted for the same reason, and this one mattered more: the resolution issue116 asks for
+    // is an automated control, and no control was built in sprint 300. The edge asserted otherwise.
+    #Resolves dependency from dcGateEvidenceControl to issue116;
 
     part issue117 : Issue {
         :>> id = "c48b019d-b805-49c5-8901-9bbda6132bbd";
@@ -1384,5 +1389,7 @@ package ProjectIssues {
         :>> relatedTask = "keelArchViews";
         :>> severity = Severity::Medium;
     }
-    #Resolves dependency from archViewsStory to issue117;
+    // Retargeted: sprint 301 verified against keel's own registry, which is what issue117 RECORDS
+    // as the gap. Only a second project's registry closes it.
+    #Resolves dependency from dcArchRegistryPortability to issue117;
 }
