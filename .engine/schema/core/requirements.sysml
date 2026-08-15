@@ -32,7 +32,6 @@ package EngineRequirements {
 
     requirement def SystemRequirement :> Requirement;
     requirement def SubsystemRequirement :> Requirement;
-    requirement def ComponentRequirement :> Requirement;
 
     // CHECKABLE REQUIREMENTS (checkableReqs 2026-06-10): a concrete requirement MAY carry
     // native `require constraint { <predicate over its attributes/subject> }` and/or
@@ -47,9 +46,4 @@ package EngineRequirements {
     // input to the suspicion engine).
     enum def Confidence { high; medium; low; }
 
-    part def Assumption :> Element {
-        attribute statement : String;
-        attribute confidence : Confidence;
-        attribute validUntil : Timestamp[0..1];      // optional review date
-    }
 }

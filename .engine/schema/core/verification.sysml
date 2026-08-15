@@ -6,7 +6,7 @@
 // The RESULT is a SEPARATE engine record (TestResult) — never folded into the def,
 // because a verdict is a property of ONE performance against ONE version, not of
 // the reusable spec. "Current pass/fail status" is therefore a COMPUTED VIEW over
-// the latest result + git ancestry (what query.py does), never a stored field.
+// the latest result + git ancestry (what keel does), never a stored field.
 // Native enums: VerdictKind = {pass, fail, inconclusive, error};
 // VerificationMethodKind = {inspect, analyze, demo, test} — engine ADDS
 // `confirmation` (human sign-off). Closed sets are enum-typed (EngineElement).
@@ -42,7 +42,6 @@ package EngineVerification {
 
     // TestPlan — a suite: a verification that composes member verifications
     // (native grouping idiom; SysML has no dedicated suite type).
-    verification def TestPlan :> TrackedVerification;
 
     // TestResult — the engine's atomic immutable RECORD of ONE execution,
     // appended never overwritten, SEPARATE from the verification process.

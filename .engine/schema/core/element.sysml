@@ -80,7 +80,4 @@ package EngineElement {
     part def Person :> Actor {
         :>> kind = ActorKind::human;
     }
-    part def Role {
-        attribute name : String;          // a function filled while doing tracked work
-    }
 }

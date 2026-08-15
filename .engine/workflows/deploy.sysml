@@ -4,7 +4,11 @@
 // then converge into deliver. Baseline/notes/safety-case are views. See spec §8.
 // =====================================================================
 package DeployWorkflow {
-    private import EngineWork::*;           // Release
+    private import EngineBaseline::*;       // Release — the OCCURRENCE def, which is the one every
+                                            // authored release actually binds. This workflow used to
+                                            // import EngineWork's `part def Release`, a 0-instance
+                                            // duplicate now deleted: the Deploy workflow declared an
+                                            // artifact type nobody produced (D0142).
     private import EngineArtifacts::*;      // SafetyCase, ReleaseNotes (#View)
 
     action def Deploy {

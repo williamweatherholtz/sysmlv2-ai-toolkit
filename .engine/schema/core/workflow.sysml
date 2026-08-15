@@ -8,7 +8,7 @@
 // passing, CLAUDE.md §2.6, not an authored type.)
 // =====================================================================
 package EngineState {
-    doc /* Modular workflow states as data (WorkflowState/WorkflowDefinition). Element state is a computed view, never authored. StateCursor retired by D0045 — orient now computes sprint ceremony status from delivery file TestResults. */
+    doc /* Modular workflow states as data (WorkflowState). Element state is a computed view, never authored. StateCursor retired by D0045 — orient now computes sprint ceremony status from delivery file TestResults. */
 
     private import ScalarValues::*;
 
@@ -19,11 +19,6 @@ package EngineState {
         attribute description : String;
     }
 
-    part def WorkflowDefinition {
-        attribute name : String;
-        ref states : WorkflowState[*];     // typed refs (M4)
-        attribute transitions : String[*]; // "from->to" strings (native state-def spike deferred)
-    }
 
     // StateCursor RETIRED by D0045 (2026-06-16). orient now computes sprint ceremony
     // status from delivery file TestResults — no hand-maintained pointer needed.

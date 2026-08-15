@@ -11,15 +11,5 @@ package EngineRisk {
 
     enum def RiskStatus { open; mitigated; accepted; materialized; }
 
-    part def Risk :> Element {
-        attribute statement : String;
-        attribute likelihood : RiskLevel;
-        attribute impact : RiskLevel;
-        attribute residual : RiskLevel;        // remaining after mitigation
-        attribute status : RiskStatus;
-    }
 
-    part def Mitigation :> Element {
-        attribute statement : String;     // an action/requirement that reduces a Risk
-    }
 }

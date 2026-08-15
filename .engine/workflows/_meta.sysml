@@ -12,9 +12,16 @@
 // usages; results are appended TestResult records — EngineVerification.)
 // =====================================================================
 package EngineArtifacts {
-    metadata def View;            // marks an artifact whose nature is computed, not authored
+    // #View now lives in the declared marker home (D0142); import it rather than re-declaring,
+    // which is the whole point of having one canonical home.
+    private import EngineRelationships::*;
 
-    #View item def ICD;               // computed from ports/connections
+    // ICD: the Architecture workflow's declared interface-control output (architecture.sysml:19).
+    // Its COMPUTATION is not implemented — the repo has no ports and no `connect` statements — but
+    // the workflow legitimately declares the artifact it produces, so this is an unbuilt capability,
+    // not dead schema. The old comment claimed it was 'computed from ports/connections', which was
+    // a promise rather than a fact (D0142).
+    #View item def ICD;
     #View item def AllocationMatrix;  // computed from allocate edges
     #View item def Baseline;          // computed from Release + commit match
     #View item def SafetyCase;        // computed (curated view; see parked critique findings)

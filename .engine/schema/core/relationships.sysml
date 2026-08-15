@@ -61,7 +61,7 @@ package EngineRelationships {
     // process-def change must co-commit such a Decision, or the commit fails). This SUPERSEDES
     // D0069's stored `#... dependency from dNNNN to <Process>` edge (which forced a floating
     // .tracking file — issue021); the member-marker form removes the cross-package reference
-    // entirely, so issue021 dissolves. List: `query.py process-changes`.
+    // entirely, so issue021 dissolves. List: `keel process-changes`.
     metadata def ProspectiveChange;
     metadata def SafetyChange;
 
@@ -96,6 +96,12 @@ package EngineRelationships {
     metadata def Measures;
     // #Informs: an Indicator -> the Decision it informs by direction (D0088 — monitored, not gated).
     metadata def Informs;
+    // #View: marks an artifact whose nature is COMPUTED, not authored (D0015). Moved here from
+    // workflows/_meta.sysml, which declares workflow-local artifact types only — a marker is not one,
+    // and splitting the vocabulary across two files meant an audit from this file undercounted by one
+    // marker and 73 uses (D0105 one-canonical-home).
+    metadata def View;
+
     // #JustifiedBy: a declared Rule -> the Decision that justifies it (D0105/D0107).
     metadata def JustifiedBy;
 }

@@ -2,7 +2,7 @@
 // EngineRules — declarative controls (D0105). The `keel check` evaluator reads DECLARED Rule elements
 // instead of bespoke Rust guards. Two rule kinds (EdgeRule + ElementRule) + a bounded SCOPE sub-language + an exemption
 // mechanism (per the sprint172 spike: predicates stay small, complexity lives in SCOPE). This is the
-// EXPAND phase of the D0067 guards->rules migration — the 14 guards still run until `keel check`
+// EXPAND phase of the D0067 guards->rules migration — the 28 guards still run until `keel check`
 // reaches PARITY on each (guardsToRulesMigration); nothing is retired by adding this schema.
 //
 // Each Rule carries its WHY as a typed edge (#JustifiedBy rule -> Decision), authored separately —
@@ -19,7 +19,7 @@ package EngineRules {
     // the typed-edge literals are `Edge`-suffixed to stay valid identifiers. The # markers are plain camelCase.
     enum def EdgeKind {
         specializeEdge;                                                        // :>
-        satisfyEdge; verifyEdge; allocateEdge; dependencyEdge; supersedeEdge;  // typed edges
+        satisfyEdge; verifyEdge; allocateEdge; dependencyEdge; supersedeEdge;  // satisfy/allocate/dependency are NATIVE; verify/supersede are metadata markers (D0140) — the suffix avoids the reserved words, it does not claim nativeness
         derivedFrom; charteredBy; resolves; dispositions; dependsOn; covers;   // # markers
     }
     enum def EdgeDirection { outgoing; incoming; }         // subject -> object, or object -> subject

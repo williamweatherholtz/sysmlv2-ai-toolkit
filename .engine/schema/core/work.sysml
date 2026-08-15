@@ -3,7 +3,7 @@
 // All :> Element, so id/title/createdAt/authoredBy are inherited (state is computed).
 // =====================================================================
 package EngineWork {
-    doc /* Work-item types (Epic/Story/Task), Decision (immutable ADR; replaced via supersede), ChangeRequest, Issue, Release (baseline is a computed view). */
+    doc /* Work-item type (Story), Decision (immutable ADR; replaced via supersede), ChangeRequest, Issue, Release (baseline is a computed view). */
 
     private import ScalarValues::*;
     private import EngineElement::*;
@@ -17,9 +17,6 @@ package EngineWork {
         attribute priority : WorkPriority;
         attribute owner : String;         // Actor id
     }
-    part def Epic :> WorkItem {
-        attribute themeArea : String;     // aggregate progress is COMPUTED from children
-    }
     part def Story :> WorkItem {
         // Acceptance criteria are NOT a text blob — each is an atomic Test
         // linked by `verify` (EngineVerification + EngineRelationships).
@@ -29,11 +26,6 @@ package EngineWork {
         attribute estimatedPoints : Integer[0..1];
         attribute actualPoints : Integer[0..1];
         attribute actualHours : Real[0..1];
-    }
-    part def Task :> WorkItem {
-        // [0..1] is SysML multiplicity (optional field), NOT a value bound.
-        // estimatedHours may hold any positive Real (e.g. 40.0 for a week).
-        attribute estimatedHours : Real[0..1];
     }
 
     // Decision (ADR). Immutable once accepted; replaced via the `supersede`
@@ -60,7 +52,4 @@ package EngineWork {
 
     // A Release is a declaration + a membership rule. The baseline, release
     // notes, and pack are VIEWS computed from this + commit match (spec §8).
-    part def Release :> Element {
-        attribute membershipRule : String;   // "items matching X at commit Y"
-    }
 }

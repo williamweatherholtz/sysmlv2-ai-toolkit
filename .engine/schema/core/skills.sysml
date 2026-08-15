@@ -18,7 +18,4 @@ package EngineSkills {
         attribute writePolicy : WritePolicy;
     }
 
-    part def Agent :> AISkill {
-        ref subagents : AISkill[*];             // typed refs, not name-strings (M4)
-    }
 }
