@@ -1500,4 +1500,15 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcScratchPathControl to issue126;
+
+    part issue127 : Issue {
+        :>> id = "e8cfebd1-0a9c-443b-89a5-2b8d202e2cf5";
+        :>> title = "critique-coverage counts superseded elements; coverage and tier-satisfaction do not";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Three computed views disagree about whether a superseded element is in scope. compute_coverage collects a descoped set from supersede edges and filters its targets by it; compute_tier_satisfaction does the same; critique_coverage filters only by governed(), the created-after-D0080 charter-time rule, with no supersede exclusion at all. Found by acting on the sprint 305 critique findings: five serve-discipline requirements were superseded by corrected ones, and the retired originals still report governed=true in critique-coverage, so the governed count rose 65 to 70 rather than staying at 65 with five in and five out. The consequence is that a retired element sits in the critique-coverage denominator permanently, its critique has to be maintained to keep the number from falling, and the view overstates how much outstanding critique work exists. Fixing it changes a computed view's numbers, so it is a section 3a change needing sign-off rather than a silent correction.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCritiqueCoverageSupersede to issue127;
 }
