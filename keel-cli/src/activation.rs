@@ -90,10 +90,42 @@ fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
         if !guards.is_empty() {
             guards.sort();
             guards.dedup();
-            units.insert(stem, Unit { skills: Vec::new(), rules: Vec::new(), guards });
+            let skills = deploying_skills(root, &stem);
+            units.insert(stem, Unit { skills, rules: Vec::new(), guards });
         }
     }
     units
+}
+
+/// The skill file(s) that DEPLOY `process`, from the skill registry.
+///
+/// A unit reported `skills: []` for every process, which made `keel process export` copy the
+/// definition and leave the deploying skill behind — exactly the failure srPortModularProcessUnit
+/// names ("without leaving its enforcement behind"). The correspondence already exists and is
+/// already machine-checked: the `process-skill` guard requires a deploying skill's `purpose` to name
+/// the `.engine/processes/<name>.sysml` it deploys, so this reads the same registry by the same
+/// convention rather than inventing a second mapping that could disagree with the guard.
+fn deploying_skills(root: &Path, process: &str) -> Vec<String> {
+    let reg = root.join(".engine").join("skills").join("skills-registry.sysml");
+    let Ok(text) = std::fs::read_to_string(reg) else { return Vec::new() };
+    let needle = format!(".engine/processes/{process}.sysml");
+    let mut out = Vec::new();
+    // Each skill is a `part <name> : AISkill { ... }` block; the one whose purpose names this
+    // process carries the `location` of its SKILL.md.
+    for block in text.split("part ").skip(1) {
+        if !block.contains(&needle) {
+            continue;
+        }
+        if let Some(loc) = block.split(":>> location = \"").nth(1).and_then(|s| s.split('"').next()) {
+            // Store the skill DIRECTORY name, which is what the exporter joins onto .engine/skills.
+            if let Some(dir) = loc.strip_prefix(".engine/skills/").and_then(|s| s.split('/').next()) {
+                out.push(dir.to_owned());
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// `sprintCoverage` -> `sprint-coverage`. ASCII-only by construction: every guard name is ASCII.

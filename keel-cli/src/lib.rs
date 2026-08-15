@@ -34,6 +34,7 @@ pub mod indexer;
 pub mod migrate;
 mod json;
 pub mod orient;
+pub mod process_cmd;
 pub mod queries;
 pub mod reverify;
 pub mod serve;

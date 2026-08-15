@@ -101,4 +101,8 @@ package ProjectVerifyBackfill {
     #Verify dependency from viewerSchemaApiDoD to srViewerSchemaApi;
     #Verify dependency from viewerSystemBoundViewsDoD to srViewerSystemBoundViews;
     #Verify dependency from viewerVisualViewpointDoD to srViewerVisualViewpoint;
+    #Verify dependency from storyPortabilityDoD to srPortCatalogExchange;
+    #Verify dependency from storyPortabilityDoD to srPortModularProcessUnit;
+    #Verify dependency from keelProcessPortabilityDoD to srPortCatalogExchange;
+    #Verify dependency from keelProcessPortabilityDoD to srPortModularProcessUnit;
 }

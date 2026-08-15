@@ -1978,9 +1978,8 @@ fn main() {
         Some("land") => keel_cli::sync::cmd_land(&repo_arg(rest), 3),
         Some("migrate") => cmd_migrate(rest),
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
-        Some("activation") => cmd_activation("activation", rest),
-        Some("activate") => cmd_activation("activate", rest),
-        Some("deactivate") => cmd_activation("deactivate", rest),
+        Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
         Some("hook") => cmd_hook(rest), // D0134: in-loop gates in the BINARY, no python runtime
@@ -2048,6 +2047,7 @@ fn main() {
             eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
             eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
             eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
+            eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
             eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
             eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
             eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");

@@ -56,6 +56,22 @@ package MyProjectNeeds {
 canonical vocabulary. Validate every change (CLAUDE.md §5) with the validator covering
 the layer you touched.
 
+## Processes are movable units
+
+```
+keel process list                       # this project's palette, and what is ACTIVE
+keel process search <term>              # by name, purpose, guard or skill
+keel process show <name>                # the unit: definition + skill + rules + guards
+keel process export <name> --out <dir>  # a portable bundle + unit.toml
+keel process import <dir>               # install it here (then `keel activate <name>`)
+```
+
+A process carries its definition, its deploying skill and the guards it owns. Export writes all of
+them plus a manifest naming the guards; **import installs, it does not adopt** — run
+`keel activate <name>` to turn the enforcement on, so adoption stays declared rather than inferred
+(D0138). Importing a name the project already has is REFUSED: two processes of one name are a
+collision, not a merge.
+
 ## Day-to-day
 
 | You want to... | Do this |
