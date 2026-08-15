@@ -1732,6 +1732,80 @@ pub fn open_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<S
     Ok(compute_issue_resolution(&model, done).into_iter().filter(|i| i.open).map(|i| i.issue).collect())
 }
 
+/// ASSUMPTIONS — accepted, unverified, and depended upon (issue105).
+///
+/// The `Assumption` TYPE was deleted as dead schema in D0142, and I recorded that as "the one genuine
+/// loss" because `requirements.sysml` had argued the type was first-class: when an assumption breaks,
+/// everything derived from it should go suspect. The human's correction is decisive and this function
+/// is it — *any accepted unverified requirement that has downstream non-verification dependencies IS an
+/// assumption*, so the class is COMPUTABLE and §1.1 makes it a view, not an authored type: "can it be
+/// regenerated from other authored facts? Yes → it's a view."
+///
+/// Nothing was lost, and the capability was never missing. Suspicion ALREADY propagates downstream along
+/// satisfy / verify / `:>` / allocate / semantic dependsOn, so "when this breaks, everything derived from
+/// it goes suspect" has been working the whole time. What was missing is a lens that NAMES the class, and
+/// authoring a type per assumption would have been the dual-truth error the engine exists to prevent —
+/// a stored fact restating what the edges already say.
+///
+/// An element qualifies when NOTHING verifies it and at least one other item depends on it through a
+/// non-verification edge. Verification edges are excluded from the dependency test on purpose: a Test
+/// pointing at a requirement is what DISCHARGES the assumption, so counting it as a dependent would
+/// make every verified requirement look like an assumption.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn assumptions(root: &Path) -> Result<String, ViewError> {
+    // Types where verification is the expected discharge. A Story is not here: its discharge is a DoD
+    // TestResult, not a `#Verify` edge, so including it would report the entire backlog.
+    const SUBJECT_TYPES: [&str; 4] = ["Need", "SystemRequirement", "SubsystemRequirement", "Decision"];
+    // Edges that make something DEPEND on the target. `satisfy` runs Need -> SR, so a Need is depended
+    // upon when it is the `from`; the rest point AT the thing depended upon.
+    const DEPENDS_INBOUND: [&str; 4] = ["derivedfrom", "charteredby", "dependency", "allocate"];
+
+    let model = Model::build(root)?;
+    let mut rows: Vec<String> = Vec::new();
+    let mut names: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| SUBJECT_TYPES.contains(&i.type_name.as_str()))
+        .map(|(n, _)| n)
+        .collect();
+    names.sort_unstable();
+    for name in names {
+        if model.edges.iter().any(|e| e.kind == "verify" && &e.to == name) {
+            continue; // verified — the assumption is discharged
+        }
+        let mut deps: Vec<String> = model
+            .edges
+            .iter()
+            .filter(|e| {
+                (&e.to == name && DEPENDS_INBOUND.contains(&e.kind.as_str()))
+                    || (&e.from == name && e.kind == "satisfy")
+            })
+            .map(|e| {
+                let other = if &e.to == name { &e.from } else { &e.to };
+                format!("{{\"kind\":\"{}\",\"item\":\"{}\"}}", e.kind, other)
+            })
+            .collect();
+        if deps.is_empty() {
+            continue; // unverified but nothing rests on it — not an assumption, just unverified
+        }
+        deps.sort();
+        deps.dedup();
+        let ty = model.items.get(name).map_or("", |i| i.type_name.as_str());
+        rows.push(format!(
+            "{{\"name\":\"{name}\",\"type\":\"{ty}\",\"dependentCount\":{},\"dependents\":[{}]}}",
+            deps.len(),
+            deps.join(", ")
+        ));
+    }
+    Ok(format!(
+        "{{\n  \"note\": \"an ASSUMPTION is computed, never authored (issue105): unverified, and something depends on it through a non-verification edge. Suspicion already propagates downstream, so this lens names the class rather than creating it.\",\n  \"count\": {},\n  \"assumptions\": [{}]\n}}",
+        rows.len(),
+        rows.join(", ")
+    ))
+}
+
 /// Marker census: EDGE count and PROSE count per marker (issue099).
 ///
 /// Exists because I recorded `#Verify` at 613, `#DerivedFrom` at 91 and `#DependsOn` at 91 in an

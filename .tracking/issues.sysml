@@ -1234,4 +1234,16 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcModelIngestWorkflows to issue104;
+
+    #ProcessDefect part issue105 : Issue {
+        :>> id = "e1050105-0105-4f05-9105-516273840105";
+        :>> title = "I called the deleted `Assumption` type 'a genuine loss' — it is a COMPUTED CLASS, and treating it as an authored type was the dual-truth error the engine exists to prevent";
+        :>> createdAt = "2026-08-14";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CORRECTED BY THE HUMAN, 2026-08-14, verbatim: 'how is assumption a genuine loss? any accepted unverified requirement that has downstream non-verification dependencies is an assumption. feels computeable, if it's important at all. I don't see how suspicion doesn't directly solve this as a class of problems.' They are right on every count and my framing in D0142's rationale was wrong. WHAT I GOT WRONG: I accepted requirements.sysml's argument that `Assumption` was first-class — 'when an assumption BREAKS, everything derived from it goes suspect, a high-value input to the suspicion engine' — and concluded that deleting the type lost a capability. But that argument describes a BEHAVIOUR (downstream suspicion), and the behaviour already exists: relationships.sysml:29-31 records that suspicion propagates downstream along satisfy, verify, `:>`, allocate and semantic dependsOn. So 'when this breaks, everything derived from it goes suspect' has been working the entire time the type sat unused. The type would not have added the behaviour; it would have added a LABEL. AND THE LABEL IS COMPUTABLE, which is the decisive point under CLAUDE.md §1.1: 'can it be regenerated from other authored facts? Yes -> it is a view.' An assumption is exactly (a) unverified — no `#Verify` edge targets it, (b) depended upon — something reaches it through a non-verification edge. Both are already authored. Authoring an `Assumption` instance per case would have restated what the edges already say, which is the dual-truth failure this engine is built to prevent, and it would have gone stale the moment a Test was added. DELIVERED INSTEAD: `keel assumptions`, computing the class. It reports 73 today — Decisions, Needs and SystemRequirements that nothing verifies and something depends on. Verification edges are deliberately excluded from the dependency test, because a Test pointing at a requirement DISCHARGES the assumption rather than resting on it; counting it would make every verified requirement look like one. VERIFIED both directions: a verified Need (n01AtomicItems) is correctly ABSENT, and every one of the 73 listed carries at least one dependent. GENERAL LESSON: when a schema comment argues a type is 'first-class because <behaviour>', the question to ask is whether the BEHAVIOUR exists without the type. Here it did, for a year, while the type had zero instances — which is itself the evidence that the type was never what delivered it.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "dcAssumptionsView";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcAssumptionsView to issue105;
 }
