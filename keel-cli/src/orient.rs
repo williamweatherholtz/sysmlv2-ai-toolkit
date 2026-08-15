@@ -539,11 +539,16 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex) -> Output {
     // (D0052), so leaving it ready schedules work a Decision has forbidden. Conservative on error:
     // failing to read the model must not silently make everything ready again.
     let superseded = crate::view::superseded_names(repo).unwrap_or_default();
+    // Nor is a task that `#DependsOn` a still-PROPOSED Decision (issue112). Distinct from superseded,
+    // and the distinction matters: superseded means retired, this means WAITING ON A HUMAN, and the
+    // item returns to the frontier by itself the moment the Decision is accepted or rejected. Same
+    // conservative-on-error stance — a failed model read must not silently make everything ready.
+    let blocked = crate::view::blocked_on_acceptance(repo).unwrap_or_default();
     let mut ready: Vec<String> = Vec::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
         let is_invalid = invalid_evidence.contains(name);
-        if !is_done && !is_invalid && !superseded.contains(name) {
+        if !is_done && !is_invalid && !superseded.contains(name) && !blocked.contains(name) {
             let all_deps_done = all_deps_satisfied(name, data, &done_map);
             if all_deps_done {
                 ready.push(name.clone());

@@ -1304,4 +1304,28 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from d0146 to issue110;
+
+    #ProcessDefect part issue111 : Issue {
+        :>> id = "e1110111-0111-4f11-9111-516273840111";
+        :>> title = "Process definitions require data the schema cannot hold — twice in two sprints (actor role, work claim)";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THE PATTERN, not just the instance. Two consecutive consumer checks (D0144) each found a DECLARED process step whose central data the schema has nowhere to put. (1) `actor-enrollment` step `enrollKindRole` requires ROLE recorded as model data — 'not tribal knowledge' — and `part def Actor` has only name, email and kind (issue110, D0146 proposed). (2) `distributed-collaboration` step `dcClaim` requires 'the claim as an authored fact (claiming actor, item, time, and the commit claimed against)' and states 'the only things authored are irreducible facts, including the claim' — and `schema/core` has no `Claim` type at all (D0147 proposed). WHY THIS IS ONE FINDING RATHER THAN TWO: the process definitions and the schema were authored at different times, each against the other's intended future, and were never reconciled. A process step that cannot be satisfied is worse than an absent one, because it is cited as if enforced — the same argument the panel's finding (b) made about rules.sysml's dead-schema policy, arriving from the opposite direction: there a rule was written and stopped being applied, here a rule was written and could never be applied. NEITHER IS FIXED BY AN AI: both are frozen-core additions needing explicit human sign-off (§1.5), so both are recorded as PROPOSED decisions and surface in `keel orient` -> pendingAcceptances. WHAT WOULD MAKE THIS A CONTROL rather than two findings: a check that every process step's named artifact is representable in the schema. That is not obviously computable — `producedArtifact` is prose — so it is NOT proposed here as a guard, and saying so is more honest than proposing a heuristic that would fire on ambiguity. What IS actionable now: whichever way D0146 and D0147 are decided, the losing side must amend the process step rather than leaving it unsatisfiable, and that obligation is recorded in both decisions' consequences.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcWorkClaim";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0147 to issue111;
+
+    #ProcessDefect part issue112 : Issue {
+        :>> id = "e1120112-0112-4f12-9112-516273840112";
+        :>> title = "The ready frontier ranked an item that provably could not be started — blocked on a human acceptance";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND by walking into it. `dcWorkClaim` needs a `Claim` type that only a human can sign into frozen core (D0147, proposed), so it cannot be executed — and it ranked FIRST on the ready frontier. The frontier is AUTO-FOLLOWED (D0052), so the next contributor would have selected it, rediscovered the same wall, and been told by a COMPUTED VIEW that the work was ready when it provably was not. That is the engine's own central claim failing: state is computed so it cannot lie, and here it did. MEASURED FIRST, not assumed: authoring `#DependsOn dependency from dcWorkClaim to d0147` and re-reading `orient` showed the item STILL ready, so the edge alone was not the fix and `ready` genuinely ignored it. THIS IS issue100's DEFECT WITH A DIFFERENT CAUSE, and it needed its own predicate rather than a widened one: superseded means RETIRED, blocked-on-acceptance means WAITING, and conflating them would either retire work that resumes the instant a human answers, or leave it scheduled. FIXED: `ready` now excludes any task with a `#DependsOn` edge to a Decision whose status is `proposed`. Exact rather than heuristic, and nothing is stored — accepting OR rejecting the Decision returns the item to the frontier with no further edit, which the unit test asserts directly. VERIFIED by read-back: ready 13 -> 12 with dcWorkClaim gone, `outstanding` unchanged at 16 because blocked work is NOT done and reporting it as done would be the same lie in the other direction. NOTE the shape of the near-miss: I authored the edge expecting it to work, and only checked because the response contract requires reading state back from the computed view rather than from the transform's own report. Had I trusted the edge, the model would have carried an authored fact that looked like a fix and changed nothing.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcWorkClaim";
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcBlockedFrontier to issue112;
 }

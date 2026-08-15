@@ -2055,6 +2055,45 @@ fn proposed_decisions(model: &Model) -> Vec<String> {
     pending
 }
 
+/// Task names blocked on a human acceptance: they `#DependsOn` a Decision that is still `proposed`
+/// (issue112).
+///
+/// The frontier is AUTO-FOLLOWED (D0052), so an item it ranks is an item the next contributor will
+/// start. `dcWorkClaim` needs a `Claim` type that only a human can sign into frozen core, and it
+/// nonetheless ranked FIRST — so a successor would rediscover the wall this sprint just hit, and the
+/// computed view would have told them the work was ready when it provably was not.
+///
+/// This is the same defect as issue100 (a superseded task staying ready) with a different cause, and
+/// it needs its own predicate: superseded means RETIRED, blocked-on-acceptance means WAITING, and
+/// conflating them would either hide work that resumes the moment a human answers, or retire it.
+///
+/// Exact, not heuristic: a `#DependsOn` edge to a Decision whose `status` is `proposed`. An accepted
+/// or rejected Decision unblocks the item with no further edit, because nothing here is stored.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn blocked_on_acceptance(root: &Path) -> Result<HashSet<String>, ViewError> {
+    Ok(blocked_by(&Model::build(root)?))
+}
+
+/// Pure core of [`blocked_on_acceptance`], for self-test.
+fn blocked_by(model: &Model) -> HashSet<String> {
+    let pending: HashSet<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision")
+        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
+        .map(|(n, _)| n)
+        .collect();
+    model
+        .edges
+        .iter()
+        .filter(|e| e.kind == "dependson" || e.kind == "dependency")
+        .filter(|e| pending.contains(&e.to))
+        .map(|e| e.from.clone())
+        .collect()
+}
+
 /// `(total_issues, untriaged)` — issues with NO `#Resolves` edge at all (D0077). Pure structure
 /// (no done-set needed); the `issues` guard fails on a non-empty untriaged list.
 ///
@@ -6786,5 +6825,33 @@ mod tests {
         let mut only_accepted = HashMap::new();
         only_accepted.insert("d0001".to_string(), with_status("Decision", "DecisionStatus::accepted"));
         assert!(proposed_decisions(&Model { items: only_accepted, edges: Vec::new() }).is_empty());
+    }
+
+    #[test]
+    fn a_task_depending_on_a_proposed_decision_is_blocked_and_unblocks_by_itself() {
+        // issue112: the frontier is auto-followed (D0052), so ranking an item that cannot be started
+        // points the next contributor at a wall. Distinct from superseded — this is WAITING, not
+        // retired, and it must clear with no edit once the human answers.
+        let with_status = |ty: &str, status: &str| {
+            let mut a = HashMap::new();
+            a.insert("status".to_string(), status.to_string());
+            ItemInfo { type_name: ty.to_string(), attrs: a, marker: None, file: String::new() }
+        };
+        let mut items = HashMap::new();
+        items.insert("dPending".to_string(), with_status("Decision", "DecisionStatus::proposed"));
+        items.insert("dSettled".to_string(), with_status("Decision", "DecisionStatus::accepted"));
+        let edges = vec![
+            Edge { kind: "dependson".to_string(), from: "blockedTask".to_string(), to: "dPending".to_string() },
+            Edge { kind: "dependson".to_string(), from: "freeTask".to_string(), to: "dSettled".to_string() },
+        ];
+        let model = Model { items: items.clone(), edges: edges.clone() };
+        let blocked = blocked_by(&model);
+        assert!(blocked.contains("blockedTask"), "{blocked:?}");
+        assert!(!blocked.contains("freeTask"), "an ACCEPTED decision blocks nothing: {blocked:?}");
+
+        // Accepting the decision unblocks the task with no other edit — nothing is stored.
+        let mut accepted = items;
+        accepted.insert("dPending".to_string(), with_status("Decision", "DecisionStatus::accepted"));
+        assert!(blocked_by(&Model { items: accepted, edges }).is_empty());
     }
 }
