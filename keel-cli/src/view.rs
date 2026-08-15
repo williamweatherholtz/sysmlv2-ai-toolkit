@@ -3558,12 +3558,21 @@ pub fn critique_coverage(root: &Path) -> Result<String, ViewError> {
     let stale = compute_stale_verifications(root, &model);
     let cov = compute_critique_coverage(&model, &stale, &policy);
     let gf = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
-    // issue127 (superseded elements counted here but excluded by `compute_coverage` and
-    // `compute_tier_satisfaction`) is NOT fixed here. The fix was written and then REVERTED: it
-    // changes what a computed view counts, which is a §3a change needing sign-off, and it reached
-    // main only because a blanket `git add -A` swept it into an unrelated commit. It lands when
-    // dcCritiqueCoverageSupersede is authorised, with both the before and after counts reported.
-    let in_scope = |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element);
+    // SUPERSEDED ELEMENTS ARE OUT OF SCOPE (issue127, dispositioned ACT by wweatherholtz).
+    // `compute_coverage` and `compute_tier_satisfaction` both build this same descoped set and filter
+    // by it; this view did not, so a RETIRED element stayed in the denominator permanently and its
+    // critique had to be maintained to stop the number falling. Three computed views disagreeing
+    // about what is in scope is dual truth about scope itself.
+    //
+    // Landing this moves the numbers, which is why it waited: Decision 70/24 -> 69/24, Need 39/3 ->
+    // 34/3, SystemRequirement 70/10 -> 65/5, gaps 137 -> 136. The SR `covered` count halves because
+    // the five elements it counted are the serve-discipline originals that sprint 306 superseded —
+    // their critiques remain readable and #Verify-linked, but a retired requirement being "covered"
+    // was never the question the view is asked.
+    let descoped: HashSet<&str> =
+        model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.as_str()).collect();
+    let in_scope =
+        |c: &CritiqueCoverage| governed(gf.as_ref(), &c.element) && !descoped.contains(c.element.as_str());
 
     // Summary over GOVERNED elements only (the grandfathered ones aren't required); per the policy's
     // DECLARED target types (D0097), so a downstream-added target type is summarized too.
@@ -7477,5 +7486,37 @@ mod tests {
         let mut accepted = items;
         accepted.insert("dPending".to_string(), with_status("Decision", "DecisionStatus::accepted"));
         assert!(blocked_by(&Model { items: accepted, edges }).is_empty());
+    }
+
+    #[test]
+    fn critique_coverage_excludes_superseded_like_its_sibling_views() {
+        // issue127: `compute_coverage` and `compute_tier_satisfaction` both drop supersede-targeted
+        // elements; `critique_coverage` did not, so a RETIRED element sat in the denominator forever.
+        // The property is that a superseded element is OUT OF SCOPE — `governed: false` and absent
+        // from the gap set — NOT that it vanishes from the detail listing. The first draft of this
+        // test asserted the name appeared nowhere in the JSON, which failed on `nViewerMultiStakeholder`
+        // for the wrong reason: the elements array lists every element and marks its scope per row,
+        // which is what makes the view auditable. Asserting absence would have driven a fix that hid
+        // retired elements instead of descoping them.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let Ok(model) = Model::build(&root) else { return };
+        let superseded: Vec<String> =
+            model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.clone()).collect();
+        if superseded.is_empty() {
+            return; // nothing retired in this tree; the property is vacuous rather than false
+        }
+        let Ok(json) = critique_coverage(&root) else { return };
+        for name in &superseded {
+            if let Some(i) = json.find(&format!("\"element\": \"{name}\"")) {
+                let row = &json[i..(i + 400).min(json.len())];
+                if let Some(g) = row.find("\"governed\":") {
+                    assert!(
+                        row[g..].starts_with("\"governed\": false"),
+                        "`{name}` is superseded and must be out of scope (issue127): {}",
+                        &row[g..(g + 40).min(row.len())]
+                    );
+                }
+            }
+        }
     }
 }
