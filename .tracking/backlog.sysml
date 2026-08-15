@@ -1452,4 +1452,9 @@ package EngineBacklog {
     // that provably cannot be done. The edge is the authored fact; `ready` computes the rest, and the
     // item returns by itself when the Decision is accepted or rejected (issue112).
     #DependsOn dependency from dcWorkClaim to d0147;
+
+    // keelArchViews cannot start until D0148 ships a `CodeElement` type for `keel arch` to read.
+    // The frontier is AUTO-FOLLOWED (D0052), so without this edge the next contributor is pointed at
+    // work whose own DoD opens with an unmeetable prerequisite (issue112's machinery, issue114).
+    #DependsOn dependency from keelArchViews to d0148;
 }

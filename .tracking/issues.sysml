@@ -1339,4 +1339,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRepairDuplicateIds to issue113;
+
+    #ProcessDefect part issue114 : Issue {
+        :>> id = "6ee02855-96c0-4f8f-b948-4aeda81ed567";
+        :>> title = "keelArchViews is blocked on a frozen-core prereq its own DoD names, and on data this repo does not hold";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND by the consumer check while scoping the last item on the ready frontier. keelArchViews asks for a 'keel arch' command group computed over an authored CodeElement registry, and its DoD's FIRST LINE names the prerequisite: promote the EngineCodeAudit schema module into the engine's shipped schema. MEASURED: CodeElement exists nowhere here — '.engine/schema/' holds only 'core' and 'safety', and every occurrence of the name in this repo is prose describing this item. (This description was first recorded through a shell that expanded its backticks and ate three path fragments; corrected in place by its own author, which ownership permits. The lesson is the one already recorded for heredocs: prose destined for a file should not travel through a shell.) TWO BLOCKERS, not one. (1) The schema promotion is a frozen-core change needing explicit human sign-off (D0148 proposed). (2) The item's own VERIFY requires testing 'on SelfSync's authored registry' — a DIFFERENT project's data that this repo does not hold — so even with the schema shipped, the acceptance criterion is unreachable from here. Building the commands now would ship a producer for a type the engine does not define, verified against data that does not exist, which is exactly what D0144 prevents — and the sprint would have had to cite D0144 as its charter while violating it. WHAT EITHER VERDICT UNBLOCKS: if D0148 is accepted, keelArchViews becomes executable but should be re-scoped to name WHERE it will be verified, since this repo cannot verify it. If rejected, the item must be re-scoped or superseded, because an item whose first line is an unmeetable prerequisite is not ready work. The current state is the only one that leaves the frontier stuck.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0148 to issue114;
 }

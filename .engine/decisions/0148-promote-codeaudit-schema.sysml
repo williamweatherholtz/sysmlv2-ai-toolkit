@@ -1,0 +1,21 @@
+// D0148 — PROPOSED: promote the EngineCodeAudit schema module into the engine's shipped schema, so
+// `keel arch` has a type to read. FROZEN CORE (§1.5): awaiting human sign-off, NOT applied.
+// #ProspectiveChange (D0070): this adds a module; nothing existing changes meaning.
+package Decision0148 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #ProspectiveChange part d0148 : Decision {
+        :>> id = "c7e05a41-9b38-4d72-8e16-0f4b9a2d5c83";
+        :>> title = "D0148: ship the EngineCodeAudit schema module (PROPOSED — frozen core)";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "FOUND by the consumer check while scoping keelArchViews, which is the last item on the ready frontier. That item asks for a `keel arch` command group — elements, criticality, coupling, drift, stpa-inputs, coverage — all computed over an authored `CodeElement` registry. ITS OWN DoD NAMES THE PREREQ IN ITS FIRST LINE: promote the EngineCodeAudit schema module (CodeElement + RiskClass/InvariantSafety/StpaRole/DesignPattern + the #Controls/#Feedback/#Restructure markers) into the engine's shipped schema, so `keel init` gives every downstream project the type. MEASURED: `CodeElement` exists nowhere in this engine — `.engine/schema/` holds `core` and `safety` and nothing else, and the only occurrences of the name in this repo are prose in the backlog and issues describing this very item. A downstream project (SelfSync) authored a local copy at `.engine/schema/codeaudit/` to prove the model, which sprint 298 confirms works: project-declared types resolve and their instances participate in declared views. So the model is proven; what is missing is SHIPPING it.";
+        :>> decision = "PROPOSED, pending human sign-off under §1.5: add `.engine/schema/codeaudit/` as a third schema module alongside `core` and `safety`, carrying `CodeElement` and its enums, so `keel init` ships it to every downstream project. A MODULE rather than an addition to `core`, deliberately and by the precedent `safety` already sets: code-audit types are a coherent optional concern, not part of the vocabulary every project needs, and putting them in frozen `core` would make every project carry them to serve the projects that want them.";
+        :>> rationale = "WHY THE COMMANDS ARE NOT BUILT FIRST. `keel arch` reads authored `CodeElement` instances; with no such type in the engine, building the command group now would ship a producer for a type the engine does not define, verified against data that does not exist here — a producer with no consumer, which is precisely what D0144 exists to prevent, committed in a sprint that would have to cite D0144 as its charter. The item's own VERIFY compounds it: it requires testing 'on SelfSync's authored registry', which is a different project's data this repo does not hold, so the acceptance criterion is unreachable from here even with the schema in place. ALTERNATIVES: (i) build the commands against a synthetic probe registry — REJECTED, it would demonstrate the commands run, not that they compute anything true, and the item asks for a specific ranked result on real data; (ii) leave the type project-local forever and let each project declare its own — a legitimate option the human may prefer, and it costs nothing today since sprint 298 proved project types work; the price is that every project reinvents the same registry and no two are comparable; (iii) CHOSEN for proposal.";
+        :>> consequences = "If ACCEPTED: one new schema module shipped by `keel init`, after which keelArchViews becomes executable — though its verification still needs a project with an authored registry, which this repo is not, so the item should be re-scoped to name where it will be verified. If REJECTED: keelArchViews must be re-scoped or superseded, because its stated prereq will not happen and an item whose first line is an unmeetable prerequisite is not ready work. Either verdict unblocks the frontier; the current state is the only one that leaves it stuck. Tracked as issue114.";
+    }
+}
