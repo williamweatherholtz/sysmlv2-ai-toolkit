@@ -1544,4 +1544,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcArchRegistryPortability to issue130;
+
+    part issue131 : Issue {
+        :>> id = "8256f2d3-39e1-4e6c-bd2b-2c7d60aae805";
+        :>> title = "A blanket git add -A landed an unauthorised section 3a change on main";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "While working sprint 308 I had an uncommitted fix to critique-coverage sitting in the tree - the supersede-exclusion for issue127 - which I had explicitly recorded as needing section 3a sign-off before landing, because it changes what a computed view counts. A blanket git add -A in the sprint 308 commit swept it onto main. The commit message does not mention it, so a reader of that commit would have no way to know a metric's definition changed. Two controls that exist for exactly this both failed to help: my own recorded DoD said sign-off was required, and my standing guidance says not to blanket-add over changes I have not reviewed. Neither is a control - both are reminders (D0047). REVERTED in a forward commit; never amended or rebased, since rewriting a pushed commit is what D0129 forbids and would orphan evidence. THE RECURRABLE GAP: nothing detects that a commit touches code implementing a computed view while carrying no corresponding authorisation, and nothing forces a diff review before staging. The honest control is probably narrower than that: stage deliberately when the tree holds work that is deliberately being HELD, and notice that a held change is a reason not to use add -A at all.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCritiqueCoverageSupersede to issue131;
 }
