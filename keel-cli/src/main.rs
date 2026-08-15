@@ -1850,8 +1850,8 @@ fn cmd_version(args: &[String]) -> i32 {
 /// The warning-only members of `GUARD_NAMES` — they RUN on every commit and are visible, but never
 /// block (the D0102 promote-once-low-noise pattern). Named here so `keel version` can report the
 /// hard-vs-warning split without a hand-maintained count.
-const WARNING_ONLY_GUARDS: [&str; 8] =
-    ["decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "doc-sync", "hook-config-integrity", "sequence-multiplicity", "parser-coverage"];
+const WARNING_ONLY_GUARDS: [&str; 9] =
+    ["decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "doc-sync", "hook-config-integrity", "sequence-multiplicity", "parser-coverage", "base-first-justification"];
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

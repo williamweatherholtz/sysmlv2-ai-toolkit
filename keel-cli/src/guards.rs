@@ -1468,8 +1468,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 27] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage"];
+pub const GUARD_NAMES: [&str; 28] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification"];
 
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
@@ -1566,6 +1566,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "verification-trace" => Some(verification_trace(root)), // warning-only (D0130/issue082) — delivered work whose requirement is untraced
         "priority-inversion" => Some(priority_inversion(root)), // warning-only (D0130/issue084) — recorded order vs recorded severity
         "retro-backlog" => Some(retro_backlog(root)), // warning-only (D0130/issue085) — a retro finding must not terminate in prose
+        "base-first-justification" => Some(base_first_justification(root)), // warning-only (D0139(B))
         "parser-coverage" => Some(parser_coverage(root)), // warning-only (issue102) — what the engine cannot read
         "sequence-multiplicity" => Some(sequence_multiplicity(root)), // warning-only (issue101) — sequences are newly enabled
         "activation-manifest" => Some(activation_manifest(root)), // hard (D0138) — a typo silently disables a control
@@ -1625,6 +1626,70 @@ fn named_attr_bearers(pkg: &keel_parser::ast::Package) -> Vec<(&str, &[keel_pars
         }
     }
     out
+}
+
+/// WARNING-level: a PROJECT-declared marker with no recorded justification (D0139(B)).
+///
+/// D0139 requires that a custom `metadata def` edge be a last resort carrying a recorded justification
+/// naming the base constructs considered and why each fails. That rule exists because a documented
+/// PREFERENCE demonstrably does not work here: `sysmlv2-syntax-notes.md:16` already recorded `:>` as the
+/// idiomatic derivation form, and `#DerivedFrom` was used 37 times anyway. D0047 is explicit that manual
+/// vigilance is not a control.
+///
+/// Scope is deliberately narrow. The engine's own 17 markers are GRANDFATHERED — forward-only, the
+/// issue068 rule — and D0140 has since supplied kernel-verified justifications for the two that needed
+/// them. So this fires only on markers a PROJECT declares from here on, of which there are currently
+/// zero. A guard that reports nothing today and blocks a bad habit tomorrow is the intended shape.
+///
+/// TEXT-BASED, and the reason is worth stating rather than hiding: the AST does not capture `doc`
+/// clauses or comments, so there is nothing structural to inspect. Capturing doc text is a separate
+/// parser increment; until it lands, a text scan is the honest option, and it is scoped to the lines
+/// immediately around the declaration rather than the whole file.
+fn base_first_justification(root: &Path) -> GuardReport {
+    let engine: HashSet<&str> = ENGINE_MARKERS.iter().copied().collect();
+    let mut warnings = Vec::new();
+    let mut scanned = 0usize;
+    for dir in [root.join(".tracking"), root.join(".engine")] {
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in crate::collect_sysml(&dir) {
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            let lines: Vec<&str> = text.lines().collect();
+            for (i, line) in lines.iter().enumerate() {
+                let Some(rest) = line.trim_start().strip_prefix("metadata def ") else { continue };
+                // Strip a trailing `// comment` BEFORE taking the name. Without this,
+                // `metadata def View;   // marks a computed artifact` yields a name containing the whole
+                // comment, so an ENGINE marker fails the grandfather check and is reported as a project
+                // marker — which is exactly what happened on the first run.
+                let decl = rest.split("//").next().unwrap_or(rest);
+                let name = decl.trim_end_matches([';', ' ', '{']).trim();
+                if name.is_empty() || engine.contains(name) {
+                    continue; // engine markers are grandfathered (issue068)
+                }
+                scanned += 1;
+                // A justification is a `doc` clause on the declaration, or comment lines directly above
+                // it. Both are how this repo actually documents its markers today.
+                let has_doc = line.contains("doc ")
+                    || lines
+                        .get(i.saturating_sub(3)..i)
+                        .unwrap_or_default()
+                        .iter()
+                        .any(|l| {
+                            let t = l.trim_start();
+                            t.starts_with("//") && t.len() > 8
+                        });
+                if !has_doc {
+                    warnings.push(format!(
+                        "{rel}:{}: project marker `#{name}` has no recorded justification — D0139(B) requires naming the base SysML v2 constructs considered and why each fails, because a custom edge is a last resort and an undocumented one is dialect nobody can audit",
+                        i + 1
+                    ));
+                }
+            }
+        }
+    }
+    GuardReport { name: "base-first-justification", scanned, warnings, violations: Vec::new() }
 }
 
 /// WARNING-level: statements the parser could not read, grouped by leading token (issue102).
