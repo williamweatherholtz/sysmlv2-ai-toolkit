@@ -6020,6 +6020,55 @@ pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDi
     Ok((scanned, bad))
 }
 
+/// One claim as authored: `(name, item, by, at, against)`. Liveness is NOT here — it is computed.
+pub type ClaimRow = (String, String, String, String, String);
+
+/// Raw claim tuples from the model, for `claim::claims`.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking file fails to parse.
+pub fn claim_rows(root: &Path) -> Result<Vec<ClaimRow>, ViewError> {
+    let model = Model::build(root)?;
+    let mut out: Vec<ClaimRow> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Claim")
+        .map(|(n, i)| {
+            let g = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
+            (n.clone(), g("claimedItem"), g("claimedBy"), g("claimedAt"), g("claimedAgainst"))
+        })
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// Claim name -> its element id (a UUID), for the claim holder tie-break.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking file fails to parse.
+pub fn claim_ids(root: &Path) -> Result<HashMap<String, String>, ViewError> {
+    let model = Model::build(root)?;
+    Ok(model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Claim")
+        .map(|(n, i)| (n.clone(), i.attrs.get("id").cloned().unwrap_or_default()))
+        .collect())
+}
+
+/// The HEAD commit date, exposed for the claim expiry computation (D0013 — git-derived, so two
+/// contributors computing liveness against the same commit agree).
+#[must_use]
+pub fn repo_today_pub(root: &Path) -> String {
+    repo_today(root)
+}
+
+/// Whole days between two ISO dates, exposed for the claim expiry computation.
+#[must_use]
+pub fn days_between_pub(from: &str, to: &str) -> i64 {
+    days_between(from, to)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

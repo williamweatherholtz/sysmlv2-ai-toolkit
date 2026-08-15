@@ -1242,3 +1242,95 @@ mod issue_tests {
         assert_eq!(next_issue_number("description = \"see issue900 for context\""), 1);
     }
 }
+
+// ── record claim (D0147 / D0129 srDcWorkClaim) ───────────────────────────────
+
+/// Author a `Claim` — one contributor's intent to work one item.
+///
+/// PER-ACTOR FILE, deliberately: claims land in `.tracking/claims/<actor>.sysml` rather than a shared
+/// file. That is `srDcPerActorWriteTargets` applied where it matters most — claims are the highest-
+/// frequency concurrent write in the system, and routing every contributor's to the same anchor in
+/// one file would make a textual conflict the NORMAL outcome of two people working at once. Distinct
+/// files mean concurrent claims merge cleanly and the only contention left is the intended one: the
+/// git ref update that decides who got the item.
+///
+/// `claimedAgainst` records the commit the claim was made against, so a reader can tell a claim made
+/// against current work from one made against a tree forty commits stale.
+///
+/// # Errors
+/// `WriteError::Io` on filesystem errors.
+pub fn record_claim(root: &Path, item: &str, actor: &str) -> Result<(String, String), WriteError> {
+    let dir = root.join(".tracking").join("claims");
+    std::fs::create_dir_all(&dir)?;
+    let file = dir.join(format!("{}.sysml", sanitize_name(actor)));
+    let sha = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .unwrap_or_default();
+    let at = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["log", "-1", "--format=%cs"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| s.len() == 10)
+        .unwrap_or_default();
+    let existing = std::fs::read_to_string(&file).unwrap_or_default();
+    let n = existing.matches("part claim").count() + 1;
+    let name = format!("claim{}{n:03}", sanitize_name(actor));
+    let uuid = gen_uuid();
+    let s = sanitize_field;
+    let entry = format!(
+        "    part {name} : Claim {{\n\
+         \x20       :>> id = \"{uuid}\";\n\
+         \x20       :>> title = \"claim on {item_c}\";\n\
+         \x20       :>> createdAt = \"{at}\";\n\
+         \x20       :>> createdBy = \"{actor_c}\";\n\
+         \x20       :>> claimedItem = \"{item_c}\";\n\
+         \x20       :>> claimedBy = \"{actor_c}\";\n\
+         \x20       :>> claimedAt = \"{at}\";\n\
+         \x20       :>> claimedAgainst = \"{sha}\";\n\
+         \x20   }}\n",
+        item_c = s(item),
+        actor_c = s(actor),
+    );
+    let text = if existing.trim().is_empty() {
+        format!(
+            "// Claims authored by {actor_c} (D0147). PER-ACTOR FILE so concurrent claims by different\n\
+             // contributors merge cleanly (srDcPerActorWriteTargets) — which also means BOTH claims on a\n\
+             // contested item land, so who holds it is COMPUTED, never decided by the push.\n\
+             //\n\
+             // Liveness is NOT stored here. A claim is live if it is the earliest un-expired claim on its\n\
+             // item; `keel claim --list` computes that. Nothing needs to be released.\n\
+             package ProjectClaims{pkg} {{\n\
+             \x20   private import EngineElement::*;\n\
+             \x20   private import EngineWork::*;\n\n\
+             {entry}}}\n",
+            actor_c = s(actor),
+            pkg = sanitize_name(actor),
+        )
+    } else {
+        let close = existing
+            .rfind('}')
+            .ok_or_else(|| WriteError::TaskNotFound(format!("{} (no package close)", file.display())))?;
+        format!("{}\n\n{entry}{}", existing[..close].trim_end(), &existing[close..])
+    };
+    std::fs::write(&file, text)?;
+    Ok((name, format!(".tracking/claims/{}.sysml", sanitize_name(actor))))
+}
+
+/// An actor id reduced to an identifier safe for a filename and a package name.
+fn sanitize_name(v: &str) -> String {
+    let mut out: String = v.chars().filter(char::is_ascii_alphanumeric).collect();
+    if out.is_empty() {
+        out.push_str("actor");
+    }
+    out
+}

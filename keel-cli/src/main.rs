@@ -61,6 +61,22 @@ const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry
 /// Degrades to a skip (never blocks) if `keel` isn't on PATH. POSIX sh.
 const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: '$KEEL' not on PATH — keel gate skipped (install keel to enforce)\"; exit 0; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\n";
 
+/// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
+/// project, it is state that is TRUE OF ONE CLONE and false of every other.
+const GITIGNORE: &str = "# keel machine-local state — never commit these.
+#
+# .keel/actor is THIS MACHINE's identity binding (D0129). Committing it hands your identity to every
+# other clone: two contributors who both commit one end up conflicting over who they are, and a
+# merge that picks a side silently makes one of them write as the other.
+.keel/
+
+# `keel serve` per-clone preferences.
+.keel-serve.json
+
+# Generated views/reports — regenerable from the model, so they are outputs, not facts.
+*.keel.html
+";
+
 // ── repo-root discovery ───────────────────────────────────────────────────────
 
 fn find_repo_root() -> Option<PathBuf> {
@@ -1683,6 +1699,16 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error writing CLAUDE.md: {e}");
         return 1;
     }
+    // A .gitignore, because the MACHINE-LOCAL files must never be committed and nothing was
+    // stopping them. Found by a two-clone test (sprint 300): both contributors' `.keel/actor`
+    // bindings landed in git and then CONFLICTED on merge — each clone claiming to be the other's
+    // identity. `actor.rs` has always said the binding is per-machine and "committing it would
+    // re-create the shared-default defect it exists to remove"; nothing enforced it downstream,
+    // because `keel init` scaffolded no ignore file at all.
+    if let Err(e) = std::fs::write(dir.join(".gitignore"), GITIGNORE) {
+        eprintln!("error writing .gitignore: {e}");
+        return 1;
+    }
     let tracking = dir.join(".tracking");
     if let Err(e) = std::fs::create_dir_all(&tracking) {
         eprintln!("error creating .tracking: {e}");
@@ -2012,7 +2038,8 @@ fn print_usage() -> i32 {
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
             eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
             eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
-            eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
+            eprintln!("  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)");
+    eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
             eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
             eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
             eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
@@ -2144,6 +2171,7 @@ fn main() {
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),

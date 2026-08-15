@@ -605,11 +605,22 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     // item returns to the frontier by itself the moment the Decision is accepted or rejected. Same
     // conservative-on-error stance — a failed model read must not silently make everything ready.
     let blocked = crate::view::blocked_on_acceptance(repo).unwrap_or_default();
+    // Nor is an item another contributor holds a LIVE claim on (D0147/srDcWorkClaim). The frontier
+    // is one global list and is auto-followed, so without this two contributors rationally select
+    // the same top item and the duplication surfaces only at integration. Conservative on error and
+    // on an UNRESOLVED ACTOR: if this machine has no bound identity, `held` is empty and nothing is
+    // hidden — a claim must never make work invisible to someone who cannot be told it is theirs.
+    let me = crate::actor::resolve(repo, None).unwrap_or_default();
+    let claimed_by_others: HashSet<String> = if me.is_empty() {
+        HashSet::new()
+    } else {
+        crate::claim::held_by_others(repo, &me).unwrap_or_default().into_iter().map(|(item, _)| item).collect()
+    };
     let mut ready: Vec<String> = Vec::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
         let is_invalid = invalid_evidence.contains(name);
-        if !is_done && !is_invalid && !superseded.contains(name) && !blocked.contains(name) {
+        if !is_done && !is_invalid && !superseded.contains(name) && !blocked.contains(name) && !claimed_by_others.contains(name) {
             let all_deps_done = all_deps_satisfied(name, data, &done_map);
             if all_deps_done {
                 ready.push(name.clone());
