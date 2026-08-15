@@ -10,12 +10,14 @@
 package EngineIssueResolution {
     private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
 
     part issueResolution : Process {
         :>> id = "63940516-2c7d-4e8f-c078-516273849700";
         :>> title = "Issue Resolution";
         :>> purpose = "Link every Issue to the work or Decision that resolves it (#Resolves), compute its open/resolved state, and record decision-moots-item as a typed edge — never prose.";
         :>> cadence = Cadence::perItem;
+        assert constraint enforcesIssues : issues;
     }
 
     part irRecord : ProcessStep {

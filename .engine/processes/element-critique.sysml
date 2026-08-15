@@ -13,12 +13,14 @@
 package EngineElementCritique {
     private import EngineElement::*;     // Cadence / Owner / CritiqueLens / Severity / CriticKind
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
 
     part elementCritique : Process {
         :>> id = "63940516-2c7d-4e8f-c080-516273849800";
         :>> title = "Antagonistic Element Critique";
         :>> purpose = "Adversarially verify each tracked Need / SystemRequirement / Decision / Architecture element through required adversarial lenses, by an independent critic, recording each critique as a method=critique verification + result (#Verify-linked to the target); raise findings as severity-carrying Issues (#Resolves loop); let critique coverage + staleness COMPUTE from the assurance substrate.";
         :>> cadence = Cadence::perItem;
+        assert constraint enforcesCriticIndependence : criticIndependence;
     }
 
     part ecScope : ProcessStep {

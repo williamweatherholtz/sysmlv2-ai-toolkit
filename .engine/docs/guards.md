@@ -95,7 +95,8 @@ keel activate <process>         # adopt a process as a UNIT: skill + declared ru
 keel deactivate <process>
 ```
 
-`.engine/contracts/process-units.toml` (engine fact) says what each process brings.
+What each process BRINGS is read from the MODEL: `assert constraint` members on the parts in its
+`.engine/processes/` file (D0139(D)). The constraint def is the camelCase form of the guard name.
 `.engine/contracts/activation.toml` (project choice) says which are active. **No file means everything
 is active**, so an existing project is unaffected by upgrading.
 

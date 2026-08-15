@@ -61,6 +61,10 @@ pub struct Part {
     pub type_name: Option<String>,
     /// Attribute assignments in the body.
     pub attributes: Vec<Attribute>,
+    /// Member features declared in the body — `assert constraint`, `ref`, `port` (issue102).
+    /// Stored on every usage kind rather than only where currently needed: dropping them on the other
+    /// two would make those members silently unread again, which is the defect this whole sequence fixes.
+    pub members: Vec<MemberFeature>,
     /// Metadata marker applied as a `#Marker` prefix on the part (D0070, e.g. a process-change
     /// Decision's `ProspectiveChange`). `None` if unmarked. Retained for views (M2.0).
     pub marker: Option<String>,
@@ -78,6 +82,10 @@ pub struct Verification {
     pub type_name: Option<String>,
     /// Attribute assignments in the body.
     pub attributes: Vec<Attribute>,
+    /// Member features declared in the body — `assert constraint`, `ref`, `port` (issue102).
+    /// Stored on every usage kind rather than only where currently needed: dropping them on the other
+    /// two would make those members silently unread again, which is the defect this whole sequence fixes.
+    pub members: Vec<MemberFeature>,
     pub span: Span,
     /// 1-indexed source line of the `verification` keyword.
     pub line: u32,
@@ -98,6 +106,10 @@ pub struct UseCaseUsage {
     pub type_name: Option<String>,
     /// Attribute assignments in the body.
     pub attributes: Vec<Attribute>,
+    /// Member features declared in the body — `assert constraint`, `ref`, `port` (issue102).
+    /// Stored on every usage kind rather than only where currently needed: dropping them on the other
+    /// two would make those members silently unread again, which is the defect this whole sequence fixes.
+    pub members: Vec<MemberFeature>,
     pub span: Span,
     /// 1-indexed source line of the `use` keyword.
     pub line: u32,

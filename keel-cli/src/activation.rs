@@ -7,7 +7,9 @@
 //! when a file moved. Both fixes were correct and neither addressed that.
 //!
 //! Here adoption is a DECLARED fact. `.engine/contracts/activation.toml` names the active processes;
-//! `.engine/contracts/process-units.toml` (an engine fact) says what each process brings. A
+//! what each process BRINGS is read from the MODEL — `assert constraint` members on the parts in its
+//! `.engine/processes/` file (D0139(D)). That mapping used to live in `process-units.toml`, which no
+//! `keel trace`, declared view or viewpoint could reach, so an engine fact sat outside the model. A
 //! process-bound guard runs only while its process is active, and when it does not run it is REPORTED
 //! as not-adopted rather than silently skipped — because "this control is off" is exactly the thing a
 //! project must be able to see.
@@ -51,6 +53,59 @@ pub struct Activation {
     pub errors: Vec<String>,
 }
 
+/// Read each process unit's guards FROM THE MODEL (D0139(D), replacing `process-units.toml`).
+///
+/// A unit is a FILE in `.engine/processes/`; its guards are the union of `assert constraint <m> : <C>;`
+/// across every part in that file. Asserting on the specific step that enforces a control — ceremony on
+/// the standup gate, retro-backlog on `retroTrack` — is strictly more informative than the flat
+/// file-level list the TOML held, and unlike the TOML it is reachable by `keel trace` and every declared
+/// view, which is the whole argument of D0139: an engine fact belongs in the model.
+///
+/// The constraint def name is the camelCase form of the guard name, so `sprintCoverage` recovers
+/// `sprint-coverage` by one mechanical rule with no lookup table to drift.
+fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
+    let dir = root.join(".engine/processes");
+    let mut units = BTreeMap::new();
+    for path in crate::collect_sysml(&dir) {
+        let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().to_string()) else { continue };
+        let Ok(pkg) = crate::parse_pkg(&path) else { continue };
+        let mut guards: Vec<String> = Vec::new();
+        for item in &pkg.items {
+            if let keel_parser::ast::Item::Part(p) = item {
+                for m in &p.members {
+                    if m.kind == "assert" {
+                        if let Some(t) = &m.type_name {
+                            guards.push(camel_to_kebab(t));
+                        }
+                    }
+                }
+            }
+        }
+        if !guards.is_empty() {
+            guards.sort();
+            guards.dedup();
+            units.insert(stem, Unit { skills: Vec::new(), rules: Vec::new(), guards });
+        }
+    }
+    units
+}
+
+/// `sprintCoverage` -> `sprint-coverage`. ASCII-only by construction: every guard name is ASCII.
+fn camel_to_kebab(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('-');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn str_list(v: Option<&toml::Value>) -> Vec<String> {
     v.and_then(toml::Value::as_array)
         .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
@@ -62,30 +117,7 @@ impl Activation {
     /// means "everything present is active" (invariant 1), never a violation (the issue090 lesson).
     #[must_use]
     pub fn load(root: &Path) -> Self {
-        let mut out = Self::default();
-
-        let units_path = root.join(".engine/contracts/process-units.toml");
-        if let Ok(text) = std::fs::read_to_string(&units_path) {
-            match text.parse::<toml::Value>() {
-                Ok(v) => {
-                    if let Some(units) = v.get("units").and_then(toml::Value::as_table) {
-                        for (name, body) in units {
-                            out.units.insert(
-                                name.clone(),
-                                Unit {
-                                    skills: str_list(body.get("skills")),
-                                    rules: str_list(body.get("rules")),
-                                    guards: str_list(body.get("guards")),
-                                },
-                            );
-                        }
-                    }
-                }
-                Err(e) => out.errors.push(format!(
-                    ".engine/contracts/process-units.toml: unparseable TOML ({e}) — every process unit it declares is inert"
-                )),
-            }
-        }
+        let mut out = Self { units: units_from_model(root), ..Self::default() };
 
         let act_path = root.join(".engine/contracts/activation.toml");
         if let Ok(text) = std::fs::read_to_string(&act_path) {
@@ -117,7 +149,7 @@ impl Activation {
             for g in &unit.guards {
                 if !crate::guards::GUARD_NAMES.contains(&g.as_str()) {
                     out.errors.push(format!(
-                        ".engine/contracts/process-units.toml: unit `{proc_name}` names guard `{g}`, which is not an enforced guard — nothing would check it"
+                        ".engine/processes/{proc_name}.sysml: asserts constraint `{g}`, which is not an enforced guard — nothing would check it"
                     ));
                 }
             }
@@ -196,18 +228,27 @@ mod tests {
         d
     }
 
-    const UNITS: &str = r#"
-[units.issue-resolution]
-skills = ["issue-resolution"]
-rules = ["issuesTriagedRule"]
-guards = ["issues"]
-"#;
+    /// A process unit expressed the way units are now declared (D0139(D)): a process file whose parts
+    /// ASSERT the constraints they enforce. Replaces the `process-units.toml` fixture these tests used
+    /// before the mapping moved into the model.
+    const PROCESS_FILE: &str = r"
+package ProbeIssueResolution {
+    part issueResolution : Process {
+        assert constraint enforcesIssues : issues;
+    }
+}
+";
+
+    fn with_unit(tag: &str) -> std::path::PathBuf {
+        let d = tmp(tag);
+        write(&d, ".engine/processes/issue-resolution.sysml", PROCESS_FILE);
+        d
+    }
 
     #[test]
     fn absent_manifest_activates_everything() {
         // Invariant 1: upgrading must not change an existing project's behaviour.
-        let d = tmp("absent");
-        write(&d, ".engine/contracts/process-units.toml", UNITS);
+        let d = with_unit("absent");
         let a = Activation::load(&d);
         assert!(!a.is_declared());
         assert!(a.is_process_active("issue-resolution"));
@@ -216,10 +257,31 @@ guards = ["issues"]
     }
 
     #[test]
+    fn unit_guards_come_from_the_model() {
+        // The mapping is read from `assert constraint` in the process file, and the constraint def name
+        // is the camelCase form of the guard name. Asserts that the camel->kebab rule actually runs.
+        let d = tmp("camel");
+        write(
+            &d,
+            ".engine/processes/agile-workflow.sysml",
+            r"
+package ProbeAgile {
+    part standupGate : ProcessStep {
+        assert constraint enforcesSprintCoverage : sprintCoverage;
+    }
+}
+",
+        );
+        let a = Activation::load(&d);
+        assert_eq!(a.guard_state("sprint-coverage"), GuardState::Active("agile-workflow".into()));
+    }
+
+    #[test]
     fn a_deactivated_process_disables_only_its_own_guards() {
-        let d = tmp("subset");
-        write(&d, ".engine/contracts/process-units.toml", UNITS);
-        write(&d, ".engine/contracts/activation.toml", "[processes]\nactive = []\n");
+        let d = with_unit("subset");
+        write(&d, ".engine/contracts/activation.toml", "[processes]
+active = []
+");
         let a = Activation::load(&d);
         assert!(a.is_declared());
         assert_eq!(a.guard_state("issues"), GuardState::Inactive("issue-resolution".into()));
@@ -229,9 +291,10 @@ guards = ["issues"]
     #[test]
     fn core_guards_are_never_deactivatable() {
         // Invariant 2: activation must not become a switch that makes truthfulness optional.
-        let d = tmp("core");
-        write(&d, ".engine/contracts/process-units.toml", UNITS);
-        write(&d, ".engine/contracts/activation.toml", "[processes]\nactive = []\n");
+        let d = with_unit("core");
+        write(&d, ".engine/contracts/activation.toml", "[processes]
+active = []
+");
         let a = Activation::load(&d);
         for core in ["duplicate-identity", "marker-vocabulary", "actors", "engine-lint"] {
             assert_eq!(a.guard_state(core), GuardState::Core, "{core} must stay enforced");
@@ -239,17 +302,17 @@ guards = ["issues"]
     }
 
     #[test]
-    fn a_typo_in_either_file_fails_loud() {
-        let d = tmp("typo");
-        write(
-            &d,
-            ".engine/contracts/process-units.toml",
-            "[units.issue-resolution]\nguards = [\"isues\"]\n",
-        );
-        write(&d, ".engine/contracts/activation.toml", "[processes]\nactive = [\"isue-resolution\"]\n");
+    fn a_typo_in_the_activation_manifest_fails_loud() {
+        // A misspelled PROCESS name still fails loud. The other half of the old test — a misspelled
+        // GUARD name in the units file — is now caught upstream as an unresolved constraint TYPE by
+        // `keel validate`, which is strictly stronger than a name-list check, so it is verified there
+        // rather than duplicated here.
+        let d = with_unit("typo");
+        write(&d, ".engine/contracts/activation.toml", "[processes]
+active = [\"isue-resolution\"]
+");
         let a = Activation::load(&d);
-        assert_eq!(a.errors.len(), 2, "both a bad guard name and a bad process name must be reported");
-        assert!(a.errors.iter().any(|e| e.contains("isues")));
-        assert!(a.errors.iter().any(|e| e.contains("isue-resolution")));
+        assert_eq!(a.errors.len(), 1, "an unknown process name must be reported");
+        assert!(a.errors[0].contains("isue-resolution"));
     }
 }

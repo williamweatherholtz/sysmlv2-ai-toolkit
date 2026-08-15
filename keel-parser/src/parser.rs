@@ -240,9 +240,10 @@ fn parse_attribute_body(
     p: &mut Parser,
     filename: &str,
     start: Span,
-) -> Result<(Vec<Attribute>, Span), ParseError> {
+) -> Result<(Vec<Attribute>, Vec<MemberFeature>, Span), ParseError> {
     p.expect(&TokenKind::LBrace, filename)?;
     let mut attrs = Vec::new();
+    let mut members = Vec::new();
     loop {
         match p.peek() {
             TokenKind::RBrace => { p.advance(); break; }
@@ -270,18 +271,31 @@ fn parse_attribute_body(
                     line: attr_line,
                 });
             }
-            _ => { skip_item(p); }
+            // `assert constraint c : Ok;` and friends inside an INSTANCE body (issue102). Needed for
+            // D0139(D): a Process instance asserts the constraints it enforces.
+            _ => {
+                if let Some(m) = parse_member_feature(p) {
+                    members.push(m);
+                } else {
+                    skip_item(p);
+                }
+            }
         }
     }
     let end_span = p.current_span();
-    Ok((attrs, Span { start: start.start, end: end_span.start }))
+    Ok((attrs, members, Span { start: start.start, end: end_span.start }))
 }
+
+/// What a typed usage body yields: name, optional `: Type`, attribute assignments, member features
+/// (issue102), and the item's span. Named because the tuple grew past readability once members were
+/// captured alongside attributes.
+type TypedItemBody = (String, Option<String>, Vec<Attribute>, Vec<MemberFeature>, Span);
 
 fn parse_typed_item_body(
     p: &mut Parser,
     filename: &str,
     item_start: Span,
-) -> Result<(String, Option<String>, Vec<Attribute>, Span), ParseError> {
+) -> Result<TypedItemBody, ParseError> {
     let (name, _) = p.expect_ident(filename)?;
     let type_name = if p.eat(&TokenKind::Colon) {
         let (tn, _) = p.expect_ident(filename)?;
@@ -292,8 +306,8 @@ fn parse_typed_item_body(
     } else {
         None
     };
-    let (attrs, span) = parse_attribute_body(p, filename, item_start)?;
-    Ok((name, type_name, attrs, span))
+    let (attrs, members, span) = parse_attribute_body(p, filename, item_start)?;
+    Ok((name, type_name, attrs, members, span))
 }
 
 // ── action def body ───────────────────────────────────────────────────────
@@ -332,14 +346,14 @@ fn parse_action_def_body(
             TokenKind::Part => {
                 let item_line = p.peek_token().line;
                 let s = p.current_span(); p.advance();
-                let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-                parts.push(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: item_line });
+                let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, s)?;
+                parts.push(Part { name: n, type_name: tn, attributes: attrs_v, members: mem, marker: None, span: sp, line: item_line });
             }
             TokenKind::Verification => {
                 let item_line = p.peek_token().line;
                 let s = p.current_span(); p.advance();
-                let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-                verifications.push(Verification { name: n, type_name: tn, attributes: a, span: sp, line: item_line });
+                let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, s)?;
+                verifications.push(Verification { name: n, type_name: tn, attributes: attrs_v, members: mem, span: sp, line: item_line });
             }
             TokenKind::First => {
                 if let Some(s) = parse_succession(p, filename, false)? { successions.push(s); }
@@ -781,8 +795,8 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             }
             if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
-            let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: start_line })))
+            let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, s)?;
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: attrs_v, members: mem, marker: None, span: sp, line: start_line })))
         }
 
         // `verification def Name ...` → TypeDef; `verification Name ...` → Verification instance
@@ -793,8 +807,8 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             }
             if had_abstract { skip_item(p); return Ok(None); }
             let s = p.current_span(); p.advance();
-            let (n, tn, a, sp) = parse_typed_item_body(p, filename, s)?;
-            Ok(Some(Item::Verification(Verification { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
+            let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, s)?;
+            Ok(Some(Item::Verification(Verification { name: n, type_name: tn, attributes: attrs_v, members: mem, span: sp, line: start_line })))
         }
 
         // `attribute def Name ...` → TypeDef
@@ -818,8 +832,8 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
                 return Ok(type_def_tail(p, start, start_line));
             }
             if had_abstract { skip_item(p); return Ok(None); }
-            let (n, tn, a, sp) = parse_typed_item_body(p, filename, start)?;
-            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: a, marker: None, span: sp, line: start_line })))
+            let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, start)?;
+            Ok(Some(Item::Part(Part { name: n, type_name: tn, attributes: attrs_v, members: mem, marker: None, span: sp, line: start_line })))
         }
 
         // `use case def Name ...` → TypeDef; `use case name : Type { ... }` → UseCase USAGE.
@@ -835,8 +849,8 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             if had_abstract { skip_item(p); return Ok(None); }
             // `use` and `case` are consumed, so the parser sits on the NAME — exactly where
             // `parse_typed_item_body` expects to start.
-            let (n, tn, a, sp) = parse_typed_item_body(p, filename, start)?;
-            Ok(Some(Item::UseCase(UseCaseUsage { name: n, type_name: tn, attributes: a, span: sp, line: start_line })))
+            let (n, tn, attrs_v, mem, sp) = parse_typed_item_body(p, filename, start)?;
+            Ok(Some(Item::UseCase(UseCaseUsage { name: n, type_name: tn, attributes: attrs_v, members: mem, span: sp, line: start_line })))
         }
 
         // Generic `<classifier-kind> def Name ...` where the kind word lexes as an

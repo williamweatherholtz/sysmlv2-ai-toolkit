@@ -11,12 +11,14 @@
 package EngineDocSync {
     private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
 
     part docSync : Process {
         :>> id = "77891011-63dd-4792-80f4-1516a414d5a9";
         :>> title = "Documentation Sync";
         :>> purpose = "On every model/tool change, sweep the documentation set for claims the change invalidates; fix them in the same commit.";
         :>> cadence = Cadence::perItem;
+        assert constraint enforcesDocSync : docSync;
     }
 
     part dsTrigger : ProcessStep {

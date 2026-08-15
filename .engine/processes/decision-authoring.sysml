@@ -10,12 +10,18 @@
 package EngineDecisionAuthoring {
     private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
 
     part decisionAuthoring : Process {
         :>> id = "63940516-2c7d-4e8f-c108-516273849700";
         :>> title = "Decision Authoring (one source of truth)";
         :>> purpose = "Author every Decision so each fact has ONE canonical home — the why in its own fields, the verdict/acceptance in a discrete TestResult, status/state COMPUTED — never restated as prose in another field or a comment.";
         :>> cadence = Cadence::perItem;
+        assert constraint enforcesDecisionRationale : decisionRationale;
+        assert constraint enforcesAcceptanceEvents : acceptanceEvents;
+        assert constraint enforcesDecisionRequirementLink : decisionRequirementLink;
+        assert constraint enforcesAttestationSubstance : attestationSubstance;
+        assert constraint enforcesConfirmationAuthenticity : confirmationAuthenticity;
     }
 
     part daFields : ProcessStep {

@@ -8,6 +8,7 @@
 package EngineAgileProcess {
     private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
     private import EngineState::*;
     private import ScalarValues::*;
 
@@ -75,6 +76,8 @@ package EngineAgileProcess {
                   + "semantic). Readiness is the COMPUTED view - never authored.";
         :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
         :>> owner = Owner::either;
+        assert constraint enforcesPriorityInversion : priorityInversion;
+        assert constraint enforcesVerificationTrace : verificationTrace;
     }
 
     // ---- Planning (per-sprint, event-driven) ------------------------
@@ -127,6 +130,8 @@ package EngineAgileProcess {
                   + "Pass -> go. Fail -> resolve or invoke grill-me skill.";
         :>> producedArtifact = "Batch cleared to start, or gaps logged/resolved.";
         :>> owner = Owner::either;
+        assert constraint enforcesCeremony : ceremony;
+        assert constraint enforcesSprintCoverage : sprintCoverage;
     }
 
     // ---- Implementation (per-story) ---------------------------------
@@ -203,6 +208,7 @@ package EngineAgileProcess {
         :>> actionText = "For EACH avoidable issue, either (a) record a tracked `Issue` (with severity) plus the resolving backlog action, placed at its correct PRIORITY — declaration order IS priority (D0052), so ranking it means putting it in the right place in the file, never describing it as important; or (b) state explicitly in the retro why no item is needed (a control already exists, or it is a one-off with no recurrable class). What is FORBIDDEN is the third path taken in sprint 247: writing the lesson into prose — a doc, a commit message, or agent memory — where it carries no severity, no priority, no resolver and no id, is invisible to orient and the burndown, and is not project truth at all. A lesson that terminates in prose has not been retained (D0018, issue085). Per D0047 an avoidable issue with a recurrable class ALSO needs a permanent automated control, not a reminder.";
         :>> producedArtifact = "A tracked Issue + prioritized backlog action per avoidable issue, or a recorded justification for none.";
         :>> owner = Owner::ai;
+        assert constraint enforcesRetroBacklog : retroBacklog;
     }
     part retroPromote : ProcessStep {
         :>> id = "5d66f22d-22db-4532-936d-8fc00b2b3a8e";

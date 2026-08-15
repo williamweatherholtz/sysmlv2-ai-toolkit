@@ -122,6 +122,10 @@ impl PackageRegistry {
                     for attr in &p_item.attributes {
                         Self::check_attr(attr, file, &available_enums, &mut diags);
                     }
+                    // `assert constraint c : Ok;` inside an instance body (issue102/D0139(D)) —
+                    // resolved like any other member type reference, so a Process asserting a
+                    // constraint that does not exist fails loudly instead of asserting nothing.
+                    Self::check_members(&p_item.members, file, &available_types, &mut diags);
                 }
                 Item::Verification(v) => {
                     Self::check_type_ref(v.type_name.as_deref(), v.line, file, &available_types, &mut diags);
@@ -137,6 +141,7 @@ impl PackageRegistry {
                     for attr in &u.attributes {
                         Self::check_attr(attr, file, &available_enums, &mut diags);
                     }
+                    Self::check_members(&u.members, file, &available_types, &mut diags);
                 }
                 Item::ActionDef(adef) => {
                     for p_item in &adef.parts {
@@ -165,17 +170,31 @@ impl PackageRegistry {
                     // would report all 108 as unresolved — a guard that fires on correct input trains
                     // its author to disable it (issue081). `ref`/`port`/`assert`/`require` reference
                     // MODEL types, which is exactly the set the base-first conversions depend on.
-                    for m in &td.members {
-                        if matches!(m.kind.as_str(), "ref" | "port" | "assert" | "require") {
-                            Self::check_type_ref(m.type_name.as_deref(), m.line, file, &available_types, &mut diags);
-                        }
-                    }
+                    Self::check_members(&td.members, file, &available_types, &mut diags);
                 }
                 _ => {}
             }
         }
 
         diags
+    }
+
+    /// Resolve the types of member features that reference MODEL types.
+    ///
+    /// `attribute` members are excluded: they are typed by `ScalarValues` primitives, which is treated
+    /// as system-provided and is not a registered package, so checking them would report every one as
+    /// unresolved. Same rule as the `TypeDef` member check — kept in one place so the two cannot drift.
+    fn check_members(
+        members: &[crate::ast::MemberFeature],
+        file: &str,
+        available_types: &HashSet<&str>,
+        diags: &mut Vec<Diagnostic>,
+    ) {
+        for m in members {
+            if matches!(m.kind.as_str(), "ref" | "port" | "assert" | "require") {
+                Self::check_type_ref(m.type_name.as_deref(), m.line, file, available_types, diags);
+            }
+        }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

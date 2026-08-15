@@ -7,12 +7,14 @@
 package EngineRenderView {
     private import EngineElement::*;     // Cadence / Owner
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0139(D): the guards this process brings
 
     part renderView : Process {
         :>> id = "63940516-2c7d-4e8f-c086-516273849860";
         :>> title = "Modular Render + Review Round-trip (computed view)";
         :>> purpose = "Render any declared view (D0056/D0057) as a self-contained interactive artifact — graph, table, or review — regenerated on demand from authored facts; and round-trip a human review (an independent critique, D0080) back into the model as new linked critique items that attest state and induce suspicion. Never author or commit a rendered artifact.";
         :>> cadence = Cadence::adHoc;
+        assert constraint enforcesViewpointRenderer : viewpointRenderer;
     }
 
     part rvChoose : ProcessStep {
