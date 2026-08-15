@@ -20,5 +20,5 @@ package Decision0143 {
     }
 
     verification d0143Accept : Test { :>> id = "8c15b3e7-0d42-4a96-97fb-2e58061cd4a3"; :>> title = "Human acceptance of d0143 (frozen schema/core, §2.5)"; :>> createdAt = "2026-08-14"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-08-14, verbatim: '#3 is important. required to consider this work finished. fix and proceed please.' Item #3 as presented named exactly this change and its sibling: 'retyping Process/ProcessStep to action def, and converting ~3000 provenance strings to ref Actor … both are migrations over instance data needing D0067 gated expand/migrate/contract', explicitly listed as the work I had EXCLUDED from the leanness sweep and offered for their review. They read that summary and directed both to be done. This attestation covers the Process-as-behaviour half; the provenance migration carries its own record."; }
-    part d0143AcceptR1 : TestResult { :>> id = "d94e0f68-71ba-4c25-8039-5a1e72cb60df"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "dbf486f"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "wweatherholtz"; }
+    part d0143AcceptR1 : TestResult { :>> id = "d94e0f68-71ba-4c25-8039-5a1e72cb60df"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "06e9154"; :>> judgedAt = "2026-08-14"; :>> judgedBy = "wweatherholtz"; }
 }
