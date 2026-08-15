@@ -1292,4 +1292,16 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcKernelConformanceGate to issue109;
+
+    #ProcessDefect part issue110 : Issue {
+        :>> id = "e1100110-0110-4f10-9110-516273840110";
+        :>> title = "The actor-enrollment process requires ROLE to be recorded, and the schema has nowhere to record it";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND by the dorConsumer check (D0144) while building `keel enroll`, BEFORE writing the command rather than after. The enrollment process step `enrollKindRole` requires two fields to be asked and recorded and never inferred: KIND and ROLE. It states that 'role is model data, not tribal knowledge' and that neither may be defaulted. KIND exists as `Actor.kind : ActorKind` and enrollment records it. ROLE HAS NOWHERE TO GO — `part def Actor` carries name, email[0..1] and kind, and nothing else — so a process step this engine's own workflow declares mandatory is currently unsatisfiable. The `part def Role` that might have served was deleted by D0142 as dead schema, correctly, since it had zero declarations; the process was written expecting role to be recordable and the schema never grew the field. WHY THE TIMING MATTERS: had the schema been checked AFTER building the command, `keel enroll --role` would exist and would be writing role into a display-name string or a comment — model data in a place no view can query, which is the dual-truth defect this engine exists to prevent, introduced while implementing the process that forbids it. INTERIM STATE, shipped in sprint 287 and honest rather than silent: enrollment records identity, kind and binding, and REPORTS at the end that role is unrecorded and why, pointing at the proposal. RESOLUTION: D0146 proposes `attribute role : String[0..1]` on Actor — a free String and not an enum, since the process explicitly permits a project-declared role and a closed enum in frozen core would force every downstream project with its own role vocabulary through a frozen-schema sign-off (the issue089 dynamic). It is PROPOSED and not applied because frozen core needs explicit human sign-off and an AI cannot supply it. NOTE that either verdict resolves this: if rejected, the process step must be amended to stop requiring role, because a declared step that cannot be satisfied is cited as if enforced. The one outcome that must not persist is the current one.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dcEnrollment";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0146 to issue110;
 }

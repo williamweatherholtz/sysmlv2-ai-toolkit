@@ -1927,6 +1927,11 @@ fn main() {
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some("enroll") => {
+            let root = rest.iter().rev().find(|a| !a.starts_with("--")).filter(|a| Path::new(a.as_str()).join(".tracking").is_dir());
+            let root = root.map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
+            keel_cli::enroll::cmd(rest, &root)
+        }
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
@@ -1949,6 +1954,7 @@ fn main() {
             eprintln!("keel <subcommand> [args]");
             eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
             eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
+            eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
             eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
             eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
             eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
