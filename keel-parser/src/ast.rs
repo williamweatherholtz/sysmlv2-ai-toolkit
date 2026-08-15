@@ -115,6 +115,28 @@ pub struct UseCaseUsage {
     pub line: u32,
 }
 
+/// An `action name : Type { ... }` typed action USAGE (D0143).
+///
+/// Its own variant rather than reusing [`Part`]: the whole point of retyping `Process`/`ProcessStep`
+/// from `part def` to `action def` is that a procedure is BEHAVIOUR, and modelling the usage as a part
+/// internally would reintroduce the confusion the retype removes. Kernel-verified shape:
+/// `action deploy : Proc { :>> title = "x"; assert constraint c : Ok; }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionUsage {
+    /// Declared name.
+    pub name: String,
+    /// Optional `: Type` annotation.
+    pub type_name: Option<String>,
+    /// Attribute assignments in the body.
+    pub attributes: Vec<Attribute>,
+    /// Member features — notably `assert constraint`, which D0141 attaches to process parts and which
+    /// must survive the retype.
+    pub members: Vec<MemberFeature>,
+    pub span: Span,
+    /// 1-indexed source line of the `action` keyword.
+    pub line: u32,
+}
+
 /// An `action name;` bare declaration (no body).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDecl {
@@ -191,12 +213,21 @@ pub struct Import {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDef {
     pub name: String,
+    /// The `:>` specialization target, if declared (D0143). An `action def` may specialize an abstract
+    /// action base exactly as a `part def` may — needed once `Process :> TrackedAction` exists, and
+    /// captured rather than discarded for the same reason as [`TypeDef::specializes`]: an unread
+    /// hierarchy is an unchecked one.
+    pub specializes: Option<String>,
     pub actions: Vec<ActionDecl>,
     pub parts: Vec<Part>,
     pub verifications: Vec<Verification>,
     pub successions: Vec<Succession>,
     /// `flow from A.x to B.y;` edges declared in the body (issue102).
     pub flows: Vec<FlowEdge>,
+    /// Member features declared in the body — `attribute`, `ref`, `assert constraint` (D0143). An
+    /// `action def` carries these exactly as a `part def` does, and retyping Process/ProcessStep made
+    /// that immediately load-bearing: without this their attributes would be unread.
+    pub members: Vec<MemberFeature>,
     pub span: Span,
 }
 
@@ -263,6 +294,8 @@ pub enum Item {
     Verification(Verification),
     /// `use case name : Type { ... }` usage.
     UseCase(UseCaseUsage),
+    /// `action name : Type { ... }` typed usage (D0143).
+    ActionUsage(ActionUsage),
     ActionDecl(ActionDecl),
     Succession(Succession),
     Satisfy(SatisfyEdge),

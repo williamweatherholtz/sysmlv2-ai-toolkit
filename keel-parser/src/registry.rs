@@ -136,6 +136,15 @@ impl PackageRegistry {
                 // Use case usages resolve their type and validate their attributes like any other typed
                 // item (issue102). Until the parser captured them, 56 usages carried unchecked type
                 // references and unchecked enum literals.
+                // D0143: typed action usages resolve like any other typed item, so a retyped Process
+                // asserting a constraint that does not exist still fails loudly.
+                Item::ActionUsage(a) => {
+                    Self::check_type_ref(a.type_name.as_deref(), a.line, file, &available_types, &mut diags);
+                    for attr in &a.attributes {
+                        Self::check_attr(attr, file, &available_enums, &mut diags);
+                    }
+                    Self::check_members(&a.members, file, &available_types, &mut diags);
+                }
                 Item::UseCase(u) => {
                     Self::check_type_ref(u.type_name.as_deref(), u.line, file, &available_types, &mut diags);
                     for attr in &u.attributes {
@@ -144,6 +153,9 @@ impl PackageRegistry {
                     Self::check_members(&u.members, file, &available_types, &mut diags);
                 }
                 Item::ActionDef(adef) => {
+                    // D0143: an action def may specialize an abstract action base; resolve it.
+                    Self::check_type_ref(adef.specializes.as_deref(), 0, file, &available_types, &mut diags);
+                    Self::check_members(&adef.members, file, &available_types, &mut diags);
                     for p_item in &adef.parts {
                         Self::check_type_ref(p_item.type_name.as_deref(), p_item.line, file, &available_types, &mut diags);
                         for attr in &p_item.attributes {

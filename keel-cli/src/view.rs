@@ -313,6 +313,9 @@ impl Model {
                 // exactly like any other typed item; the model keys on `type_name`, so they surface as
                 // `UseCase` rather than as parts.
                 Item::UseCase(u) => add_item(items, &u.name, u.type_name.as_deref(), &u.attributes, None, file),
+                // D0143: a typed action usage is ingested like any other typed item. The Model keys on
+                // `type_name`, so a retyped Process still surfaces as `Process`.
+                Item::ActionUsage(a) => add_item(items, &a.name, a.type_name.as_deref(), &a.attributes, None, file),
                 Item::ActionDecl(a) => add_item_typed(items, &a.name, "action", file),
                 Item::ActionDef(ad) => {
                     add_item_typed(items, &ad.name, "ActionDef", file);

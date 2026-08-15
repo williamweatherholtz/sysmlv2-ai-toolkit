@@ -71,12 +71,18 @@ fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
         let Ok(pkg) = crate::parse_pkg(&path) else { continue };
         let mut guards: Vec<String> = Vec::new();
         for item in &pkg.items {
-            if let keel_parser::ast::Item::Part(p) = item {
-                for m in &p.members {
-                    if m.kind == "assert" {
-                        if let Some(t) = &m.type_name {
-                            guards.push(camel_to_kebab(t));
-                        }
+            // A process part may be a `part` or — after the D0143 retype — a typed `action` usage.
+            // Both carry the asserts, so both are read; keying on the member rather than the metaclass
+            // means the retype cannot silently drop a control.
+            let members: &[keel_parser::ast::MemberFeature] = match item {
+                keel_parser::ast::Item::Part(p) => &p.members,
+                keel_parser::ast::Item::ActionUsage(a) => &a.members,
+                _ => continue,
+            };
+            for m in members {
+                if m.kind == "assert" {
+                    if let Some(t) = &m.type_name {
+                        guards.push(camel_to_kebab(t));
                     }
                 }
             }

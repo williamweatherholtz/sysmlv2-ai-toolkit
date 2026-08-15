@@ -63,6 +63,17 @@ package EngineElement {
         attribute createdAt : Timestamp;
         attribute createdBy : String[0..1];  // actor id of the creator (a ProjectActors part name)
     }
+    // A PROCEDURE IS BEHAVIOUR (D0143). `Process`/`ProcessStep` were `part def` with their behaviour in
+    // strings and their sequence in an `order : Integer`, because `action` and `output` are RESERVED
+    // WORDS and the fields were renamed around them (process.sysml:5-6) rather than the constructs those
+    // words belong to being used. Retyping them to `action def` needs this fourth base for the same
+    // cross-metaclass reason as the three above.
+    abstract action def TrackedAction {
+        attribute id : Uuid;
+        attribute title : String;
+        attribute createdAt : Timestamp;
+        attribute createdBy : String[0..1];  // actor id of the creator (a ProjectActors part name)
+    }
     abstract verification def TrackedVerification {
         attribute id : Uuid;
         attribute title : String;

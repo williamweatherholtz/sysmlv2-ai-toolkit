@@ -1,5 +1,6 @@
 use crate::ast::{
-    ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, EnumDef, Import, Item,
+    ActionDecl, ActionDef, ActionUsage, AllocateEdge, Attribute, DependencyAnnotation, EnumDef,
+    Import, Item,
     FlowEdge, MemberFeature, Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef,
     UseCaseUsage,
     Value,
@@ -324,6 +325,7 @@ fn parse_action_def_body(
     let mut verifications = Vec::new();
     let mut successions = Vec::new();
     let mut flows = Vec::new();
+    let mut members = Vec::new();
     loop {
         match p.peek().clone() {
             TokenKind::RBrace => { p.advance(); break; }
@@ -371,11 +373,19 @@ fn parse_action_def_body(
                     skip_item(p);
                 }
             }
-            _ => skip_item(p),
+            // `attribute` / `ref` / `assert constraint` members (D0143) — an action def carries them
+            // exactly as a part def does.
+            _ => {
+                if let Some(m) = parse_member_feature(p) {
+                    members.push(m);
+                } else {
+                    skip_item(p);
+                }
+            }
         }
     }
     let end = p.current_span();
-    Ok(ActionDef { name, actions, parts, verifications, successions, flows,
+    Ok(ActionDef { name, specializes: None, actions, parts, verifications, successions, flows, members,
         span: Span { start: start.start, end: end.start } })
 }
 
@@ -592,7 +602,7 @@ fn parse_member_feature(p: &mut Parser) -> Option<MemberFeature> {
         "attribute".clone_into(&mut kind);
         p.advance();
     } else if let TokenKind::Ident(w) = p.peek().clone() {
-        if matches!(w.as_str(), "ref" | "port" | "assert" | "require") {
+        if matches!(w.as_str(), "ref" | "port" | "assert" | "require" | "in" | "out") {
             kind = w;
             p.advance();
             // `assert constraint c : Ok;` / `require constraint c : Ok;` — consume the middle word.
@@ -728,10 +738,32 @@ fn parse_action_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, Par
     let s = p.current_span(); p.advance(); // consume 'action'
     if p.eat(&TokenKind::Def) {
         let (n, _) = p.expect_ident(filename)?;
-        let adef = parse_action_def_body(p, filename, n, s)?;
+        // `action def Process :> TrackedAction { ... }` — the specialization clause sits between the
+        // name and the body, exactly as it does for a `part def` (D0143).
+        let specializes = parse_specializes(p);
+        let mut adef = parse_action_def_body(p, filename, n, s)?;
+        adef.specializes = specializes;
         Ok(Some(Item::ActionDef(adef)))
     } else {
         let (n, _) = p.expect_ident(filename)?;
+        // `action name : Type { ... }` — a typed action USAGE (D0143). Everything after the name is the
+        // same shape every other typed usage has, so it reuses the same body parser rather than growing
+        // a parallel one that could drift.
+        if matches!(p.peek(), TokenKind::Colon | TokenKind::LBrace) {
+            let type_name = if p.eat(&TokenKind::Colon) {
+                let (tn, _) = p.expect_ident(filename)?;
+                if matches!(p.peek(), TokenKind::LBracket) {
+                    skip_bracket_block(p);
+                }
+                Some(tn)
+            } else {
+                None // `action name { out x : T; }` — untyped usage carrying parameters
+            };
+            let (attrs, members, sp) = parse_attribute_body(p, filename, s)?;
+            return Ok(Some(Item::ActionUsage(ActionUsage {
+                name: n, type_name, attributes: attrs, members, span: sp, line: p.peek_token().line,
+            })));
+        }
         p.expect(&TokenKind::Semicolon, filename)?;
         Ok(Some(Item::ActionDecl(ActionDecl { name: n, span: s })))
     }
