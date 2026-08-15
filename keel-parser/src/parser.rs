@@ -1,6 +1,7 @@
 use crate::ast::{
     ActionDecl, ActionDef, AllocateEdge, Attribute, DependencyAnnotation, EnumDef, Import, Item,
-    FlowEdge, Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef, UseCaseUsage,
+    FlowEdge, MemberFeature, Package, Part, SatisfyEdge, SkippedStatement, Succession, TypeDef,
+    UseCaseUsage,
     Value,
     Verification,
 };
@@ -378,6 +379,27 @@ fn parse_succession(p: &mut Parser, filename: &str, is_ordering_only: bool) -> R
 /// Skip one unknown item. Stops (and consumes) on `;`; stops (without extra
 /// consume) when a `{...}` block ends the construct; stops without consuming
 /// on `}` or EOF (the caller's closing delimiter).
+/// Discard the remainder of a construct we DID understand, without recording it as skipped.
+fn skip_tail_silently(p: &mut Parser) {
+    loop {
+        match p.peek() {
+            TokenKind::Semicolon => {
+                p.advance();
+                break;
+            }
+            TokenKind::RBrace | TokenKind::Eof => break,
+            TokenKind::LBrace => {
+                skip_brace_block(p);
+                break;
+            }
+            TokenKind::LBracket => skip_bracket_block(p),
+            _ => {
+                p.advance();
+            }
+        }
+    }
+}
+
 fn skip_item(p: &mut Parser) {
     // Record BEFORE consuming: once the loop runs, the leading token is gone and with it the only
     // evidence of what was dropped.
@@ -495,8 +517,89 @@ fn parse_specializes(p: &mut Parser) -> Option<String> {
 fn type_def_tail(p: &mut Parser, start: Span, start_line: u32) -> Option<Item> {
     let name = extract_ident_name(p);
     let specializes = parse_specializes(p);
-    skip_item(p);
-    name.map(|n| Item::TypeDef(TypeDef { name: n, specializes, span: start, line: start_line }))
+    let members = parse_type_def_body(p);
+    name.map(|n| Item::TypeDef(TypeDef { name: n, specializes, members, span: start, line: start_line }))
+}
+
+/// Parse a type-definition body, capturing its member features (issue102 constructs 3-5).
+///
+/// The body was previously discarded wholesale, so 149 member declarations in the engine's own schema
+/// carried type references nothing resolved. Two of the forms are load-bearing for the base-first
+/// programme: `ref` is what replaces a marker for a one-to-many edge, and `assert constraint` is where
+/// D0139(D) puts process-to-controls.
+///
+/// Deliberately TOLERANT: an unrecognised member is skipped and recorded by `skip_item`, exactly as
+/// before, so this can never turn a previously-parsing file into a parse error. It widens what is READ
+/// without narrowing what is ACCEPTED.
+fn parse_type_def_body(p: &mut Parser) -> Vec<MemberFeature> {
+    let mut members = Vec::new();
+    if !p.eat(&TokenKind::LBrace) {
+        // No body: `part def X;` or `part def X :> Y;`. The terminator is a tail, not a statement.
+        skip_tail_silently(p);
+        return members;
+    }
+    loop {
+        match p.peek().clone() {
+            TokenKind::RBrace | TokenKind::Eof => break,
+            TokenKind::Doc => {
+                p.advance();
+                skip_item(p);
+            }
+            _ => {
+                if let Some(m) = parse_member_feature(p) {
+                    members.push(m);
+                } else {
+                    skip_item(p);
+                }
+            }
+        }
+    }
+    p.eat(&TokenKind::RBrace);
+    members
+}
+
+/// One `<kind> name : Type[mult];` member. Returns `None` when the shape does not match, leaving the
+/// cursor untouched so the caller can skip it and have it recorded.
+fn parse_member_feature(p: &mut Parser) -> Option<MemberFeature> {
+    let line = p.peek_token().line;
+    let mark = p.pos;
+    let mut kind = String::new();
+    // `:>> feature = default;` — a definition REDEFINING an inherited feature to fix its value, e.g.
+    // `part def Person :> Actor { :>> kind = ActorKind::human; }`. The redefinition is the fact worth
+    // reading; the default value is not modelled, so it is discarded silently rather than reported as
+    // an unread statement.
+    if p.eat(&TokenKind::ColonGtGt) {
+        let name = extract_ident_name(p)?;
+        skip_tail_silently(p);
+        return Some(MemberFeature { kind: "redefine".to_owned(), name, type_name: None, line });
+    }
+    // `attribute` is a keyword; `ref`/`port`/`assert`/`require` lex as identifiers.
+    if matches!(p.peek(), TokenKind::Attribute) {
+        "attribute".clone_into(&mut kind);
+        p.advance();
+    } else if let TokenKind::Ident(w) = p.peek().clone() {
+        if matches!(w.as_str(), "ref" | "port" | "assert" | "require") {
+            kind = w;
+            p.advance();
+            // `assert constraint c : Ok;` / `require constraint c : Ok;` — consume the middle word.
+            if let TokenKind::Ident(w2) = p.peek().clone() {
+                if w2 == "constraint" {
+                    p.advance();
+                }
+            }
+        }
+    }
+    let Some(name) = extract_ident_name(p) else {
+        p.pos = mark;
+        return None;
+    };
+    let type_name = if p.eat(&TokenKind::Colon) { extract_ident_name(p) } else { None };
+    // Multiplicity `[0..1]`, `ordered`, defaults — the TAIL of a member we have already understood,
+    // not an unread statement, so discard it WITHOUT recording. Recording it would report 42 phantom
+    // "skipped statements" that are really the multiplicity of members this function just parsed —
+    // the same category error that made the metric count `{` and `;` before it was corrected.
+    skip_tail_silently(p);
+    Some(MemberFeature { kind, name, type_name, line })
 }
 
 fn extract_ident_name(p: &mut Parser) -> Option<String> {

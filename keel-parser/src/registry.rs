@@ -159,6 +159,17 @@ impl PackageRegistry {
                 // migration depends on was the one edge nothing checked.
                 Item::TypeDef(td) => {
                     Self::check_type_ref(td.specializes.as_deref(), td.line, file, &available_types, &mut diags);
+                    // Member feature types (issue102). `attribute` members are EXCLUDED on purpose:
+                    // they are typed by primitives from `ScalarValues`, which is treated as
+                    // system-provided and is deliberately not a registered package, so checking them
+                    // would report all 108 as unresolved — a guard that fires on correct input trains
+                    // its author to disable it (issue081). `ref`/`port`/`assert`/`require` reference
+                    // MODEL types, which is exactly the set the base-first conversions depend on.
+                    for m in &td.members {
+                        if matches!(m.kind.as_str(), "ref" | "port" | "assert" | "require") {
+                            Self::check_type_ref(m.type_name.as_deref(), m.line, file, &available_types, &mut diags);
+                        }
+                    }
                 }
                 _ => {}
             }

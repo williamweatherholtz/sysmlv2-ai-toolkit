@@ -198,11 +198,34 @@ pub struct EnumDef {
     pub line: u32,
 }
 
+/// A member feature declared inside a type definition body (issue102 constructs 3-5).
+///
+/// `attribute id : String;` · `ref states : WorkflowState[*];` · `port p : Pt;` ·
+/// `assert constraint c : Ok;` · `require constraint c : Ok;`
+///
+/// The body used to be discarded wholesale, so 149 member declarations in the engine's own schema
+/// carried type references that nothing resolved. `ref` and `assert constraint` are the two the
+/// base-first programme depends on: `ref` is the base construct that replaces a marker for a
+/// one-to-many edge, and `assert constraint` is where D0139(D) puts process-to-controls.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemberFeature {
+    /// Declaring keyword as written: `attribute`, `ref`, `port`, `assert`, `require`, or empty when
+    /// the member is an untyped usage.
+    pub kind: String,
+    /// Member name.
+    pub name: String,
+    /// The `: Type` annotation, if present.
+    pub type_name: Option<String>,
+    /// 1-indexed source line.
+    pub line: u32,
+}
+
 /// A named type definition (`part def`, `verification def`, `attribute def`, etc.).
-/// Only the name is captured; the body is skipped for tolerant parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeDef {
     pub name: String,
+    /// Member features declared in the body (issue102). Empty when the definition has no body.
+    pub members: Vec<MemberFeature>,
     /// The `:>` specialization target, if declared (issue102/D0140).
     ///
     /// Previously skipped along with the rest of the body, so the TYPE HIERARCHY was unread: 52 such
