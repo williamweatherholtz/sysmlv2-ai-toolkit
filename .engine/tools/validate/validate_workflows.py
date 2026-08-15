@@ -22,7 +22,7 @@ SCHEMA_PRELOAD = [os.path.join(ENGINE, *rel.split("/")) for rel in (
     "schema/core/element.sysml", "schema/core/needs.sysml", "schema/core/requirements.sysml",
     "schema/core/verification.sysml", "schema/core/work.sysml", "schema/core/architecture.sysml",
     "schema/core/computed.sysml", "schema/core/relationships.sysml", "schema/core/workflow.sysml",
-    "schema/core/process.sysml", "schema/core/skills.sysml", "schema/core/risk.sysml",
+    "schema/core/process.sysml", "schema/core/skills.sysml",
     # baseline carries `occurrence def Release`, which the Deploy workflow threads through four action
     # signatures. It was absent here while present in _schema_files.py, so the two lists disagreed and
     # deploy.sysml could not resolve Release once the 0-instance duplicate was removed (D0142).

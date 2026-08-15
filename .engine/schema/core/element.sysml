@@ -33,7 +33,6 @@ package EngineElement {
     enum def DispositionKind { act; acceptRisk; dismiss; }                      // D0092: a human's recorded verdict on a >= Medium finding (act=resolve / acceptRisk=knowingly accept / dismiss=moot)
     enum def Priority { must; should; could; wont; }                            // MoSCoW
     enum def RequirementKind { functional; nonFunctional; safety; security; interfaceReq; }
-    enum def RiskLevel { high; medium; low; }
     enum def Owner { human; ai; either; }
     enum def Cadence { continuous; eventDriven; perItem; perSprint; perStory; adHoc; }
     enum def WritePolicy { readOnly; prOnly; direct; }

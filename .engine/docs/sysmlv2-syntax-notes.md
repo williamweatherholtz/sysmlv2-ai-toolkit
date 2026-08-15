@@ -135,7 +135,7 @@ require a **requirement-typed** target.
 Because qualified names fail and cross-file reopening doesn't share scope, the
 schema is restructured as **one distinct top-level package per file**, named
 `Engine<Concern>` (e.g. `EngineElement`, `EngineRequirements`, `EngineWork`,
-`EngineVerification`, `EngineWorkflow`, `EngineProcess`, `EngineRisk`,
+`EngineVerification`, `EngineWorkflow`, `EngineProcess`,
 `EngineSkills`, `EngineSafety`). Each file:
 - starts with `private import ScalarValues::*;` if it uses primitives, and
 - `private import EngineElement::*;` (etc.) for any sibling types it references.

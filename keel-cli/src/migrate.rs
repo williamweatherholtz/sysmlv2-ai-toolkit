@@ -144,6 +144,22 @@ const REMOVED_TYPES: &[(&str, &str)] = &[
     ("ICD", "an ICD is a computed VIEW, never an authored type (`.engine/schema/core/architecture.sysml`)."),
 ];
 
+/// Enum types the engine REMOVED. Detected by their `Name::` value form rather than by `: Name`,
+/// because an enum is referenced where a VALUE is assigned, not where a type is declared.
+///
+/// This step exists because of who the removal's consumer is (D0144). `RiskLevel` lived in
+/// `element.sysml`, which the engine SHIPS and `engine-resync` overwrites — so a downstream project
+/// assigning `RiskLevel::high` would break the moment it migrated. `RiskStatus` is deliberately
+/// absent from this list for the opposite reason: it lived in `risk.sysml`, which the engine no
+/// longer ships at all, and resync never deletes a file it does not ship — so a project that has it
+/// simply keeps it, and blocking on it would refuse a migration over a type the project still owns.
+///
+/// The distinction is the whole point of the rule that a conversion sprint writes its own migration
+/// step while it still knows what it changed: from the outside, both look like "an enum was deleted".
+const REMOVED_ENUMS: &[(&str, &str)] = &[
+    ("RiskLevel", "removed as dead schema (D0145) — its only consumers were the deleted `Risk`'s likelihood/impact/residual attributes. It lived in `element.sysml`, which this binary OVERWRITES on resync, so re-declare it in your own `.engine/schema/` if you use it."),
+];
+
 // ── line-level transforms ────────────────────────────────────────────────────
 
 fn is_ident_char(c: char) -> bool {
@@ -473,6 +489,16 @@ fn step_removed_types(root: &Path, w: &Working) -> StepPlan {
                     });
                 }
             }
+            for (en, advice) in REMOVED_ENUMS {
+                if line.contains(&format!("{en}::")) {
+                    plan.blockers.push(Blocker {
+                        path: path.clone(),
+                        line: i + 1,
+                        reason: format!("`{en}` no longer exists in the engine schema: {}", clip(line, 72)),
+                        advice: (*advice).to_string(),
+                    });
+                }
+            }
         }
     }
     plan
@@ -754,6 +780,26 @@ mod tests {
         let removed = step_removed_types(&dir, &w);
         assert_eq!(removed.blockers.len(), 1, "`Task` was removed and has no mechanical target");
         assert!(removed.blockers[0].advice.contains("Story"));
+
+        // A removed ENUM is referenced by value (`RiskLevel::high`), never by `: RiskLevel`, so the
+        // type detector cannot see it. It lived in a file the engine ships and resync OVERWRITES.
+        std::fs::write(tracking.join("e.sysml"), "package E {\n    part r : Story { :>> level = RiskLevel::high; }\n}\n").unwrap();
+        let mut w2 = Working::new();
+        let enums = step_removed_types(&dir, &w2);
+        assert!(
+            enums.blockers.iter().any(|b| b.reason.contains("RiskLevel")),
+            "a removed enum's VALUE form must block: {:?}",
+            enums.blockers.iter().map(|b| &b.reason).collect::<Vec<_>>()
+        );
+        // `RiskStatus` must NOT block: its file is no longer shipped, and resync never deletes a
+        // file it does not ship, so the project keeps its own copy and the reference still resolves.
+        std::fs::write(tracking.join("e.sysml"), "package E {\n    part r : Story { :>> s = RiskStatus::open; }\n}\n").unwrap();
+        w2 = Working::new();
+        assert!(
+            !step_removed_types(&dir, &w2).blockers.iter().any(|b| b.reason.contains("RiskStatus")),
+            "RiskStatus lives in a file the engine stopped shipping — the project keeps it"
+        );
+        std::fs::remove_file(tracking.join("e.sysml")).ok();
 
         // Apply in plan order, exactly as `cmd` does.
         for s in [&retype, &order, &release] {
