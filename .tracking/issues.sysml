@@ -1555,4 +1555,26 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcCritiqueCoverageSupersede to issue131;
+
+    part issue132 : Issue {
+        :>> id = "c35dd2d7-f699-40cd-b60f-02c8474ec61b";
+        :>> title = "N-8's statement still asserts multi-user scope that D0115 removed";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "nViewerPersistedViewpoints (N-8) states that viewpoints and view state must be 'shareable across users' with 'per-user view state'. D0115 revised the viewer scope to single-user and unauthenticated, explicitly routing N-7's saveable-viewpoint concern into N-8 while dropping auth, multi-user and per-user. So part of N-8's own statement describes scope an accepted Decision removed, and a reader decomposing N-8 today would derive requirements for work that was cut - the exact trap sprint 294 warned about when it excluded superseded Needs from the gap set. The Need is owned by wweatherholtz and D0108 forbids a non-owner editing its fields, so this is recorded rather than corrected: either N-8's statement is narrowed by its owner, or a superseding Need replaces it. srViewerPersistedViewState decomposes only the surviving half in the meantime, and says so in its own rationale.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from srViewerPersistedViewState to issue132;
+
+    part issue133 : Issue {
+        :>> id = "6960b071-6670-45d1-a92b-5a5b954b5b04";
+        :>> title = "reverify swallowed an unknown flag as a ROOT path and then blamed provenance";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Hit while clearing drift. The actor-resolution error message names three equivalent flags - pass it explicitly: --judged-by ACTOR (or --author / --by) - but cmd_reverify accepted only --by. Passing --judged-by claudeOpus5 fell through to the ROOT arm, so the root became the literal string claudeOpus5, the .keel/actor binding was looked for in a directory that does not exist, and the command refused with 'no acting actor' while pointing at the very fix that could not work. Two defects in one: an error message advertising a flag the command does not accept, and an unrecognised FLAG being treated as a positional path rather than as a mistake. The second is the shape this whole session kept finding - a wrong input producing a confident wrong answer somewhere downstream instead of an error at the point of the mistake. FIXED: all three spellings accepted, and any unrecognised --flag now errors with the usage line instead of becoming a path. WORTH A SWEEP LATER: the same catch-all-as-root arm exists in other subcommand parsers, so the class is probably not confined to reverify.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from srViewerPersistedViewState to issue133;
 }

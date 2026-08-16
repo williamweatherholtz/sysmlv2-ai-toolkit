@@ -184,4 +184,23 @@ package ProjectRequirementsKeelViewer {
     satisfy nViewerEncodingViewpoints by srEncodingRender;
     satisfy nViewerEncodingViewpoints by srEncodingOverride;
     satisfy nViewerEncodingViewpoints by srEncodingModular;
+
+    // Decomposes N-8 (nViewerPersistedViewpoints), the one viewer Need D0115 KEPT — it routes N-7's
+    // saveable-viewpoint concern here explicitly ("saveable viewpoints are covered by N-8") while
+    // dropping auth/multi-user/per-user, because the viewer is single-user and unauthenticated.
+    // Authored by claudeOpus5, who does not own N-8; a non-owner ADDS (D0108) and never edits.
+    // N-8's own statement still says "shareable across users" and "per-user view state" — scope
+    // D0115 removed — so this SR decomposes only the SURVIVING half and issue132 records the residual.
+    requirement srViewerPersistedViewState : SystemRequirement {
+        :>> id = "d3103651-b3fc-44d8-89e9-52e903a74f00";
+        :>> title = "Viewpoints, filters and view state persist as declared artifacts and reload";
+        :>> createdAt = "2026-08-15"; :>> createdBy = "claudeOpus5";
+        :>> statement = "The system shall persist a viewer session's viewpoint selection, filters and view state as a DECLARED artifact in the repository — the same form `.engine/views` already uses for viewpoints — and shall restore that state when the artifact is reopened. Sharing is by the artifact travelling in git, requiring no account, no server-side per-user state and no authentication.";
+        :>> rationale = "N-8, decomposed to the scope D0115 left standing. Sharing by ARTIFACT rather than by account is what makes this consistent with a single-user unauthenticated viewer and with the engine's own premise that truth is text in git: a saved viewpoint that lives in a database would be state the model cannot see, which is the dual-truth §2.1 forbids. It also means a shared viewpoint is reviewable and diffable like any other authored fact.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::should;
+        :>> verificationMethod = VerificationMethod::demo;
+    }
+
+    satisfy nViewerPersistedViewpoints by srViewerPersistedViewState;
 }

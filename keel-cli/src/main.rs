@@ -734,9 +734,22 @@ fn cmd_reverify(args: &[String]) -> i32 {
                 i += 1;
                 task = args.get(i).cloned();
             }
-            "--by" => {
+            // The actor error names `--judged-by`, `--author` and `--by` as equivalents, so all three
+            // are accepted here. They were not: `--judged-by claudeOpus5` fell through to the ROOT
+            // arm, made the root `claudeOpus5`, and the command then refused with "no acting actor"
+            // — an error about provenance for what was really an unknown flag, pointing at the one
+            // fix that could not work.
+            "--by" | "--judged-by" | "--author" => {
                 i += 1;
                 by = args.get(i).cloned();
+            }
+            // An unrecognised FLAG is a mistake, not a path. Swallowing it as a root turned a typo
+            // into a confident wrong answer somewhere further downstream, which is this session's
+            // most-repeated defect shape.
+            other if other.starts_with("--") => {
+                eprintln!("error: unknown flag `{other}`");
+                eprintln!("usage: keel reverify [--all-drift | --task NAME] [--by ACTOR] [ROOT]");
+                return 2;
             }
             other => root = Some(PathBuf::from(other)),
         }
