@@ -1577,4 +1577,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from srViewerPersistedViewState to issue133;
+
+    part issue134 : Issue {
+        :>> id = "c67ae311-ecf9-480b-a2c5-e91ca831f4e0";
+        :>> title = "Unverified suspicions are reported to the human as defects; the gates cover the model, not prose";
+        :>> createdAt = "2026-08-15";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Raised by the human: 'why is all the reporting seemingly so unsettled? every other chat I see oops I thought it was a problem but it wasn't.' MEASURED, and they are right. Of 20 Issues recorded on 2026-08-15, ZERO were later dismissed or superseded - the model contains no false findings, because recording one requires passing validate and 33 guards. But roughly six false claims were made to the human in conversation and then retracted: two schema mismatches that were artifacts of a throwaway extractor knowing five of seven def kinds and keying enum bodies by first-line match; verifiedByMethod reported as returning None when it is emitted at the top level; the claim that keel serve must exist before its requirements could be verified, when 72 of this repo's SR verifications are method=critique and need no implementation; the orphan story offered as fixable when two prior sprints had deliberately refused to fix it; pendingAcceptances read as empty from a wrong key. THE ASYMMETRY IS THE DEFECT: every one of those was caught by verification, which is the control working - but the human watched the catching, because the claim was published before the check. TWO DISTINCT CAUSES, only the first two of which are faults. (1) Suspicions are stated in a conclusion's grammar - 'X is broken' where 'X looks broken, checking' is meant. (2) The measuring instruments are themselves unverified: throwaway scripts written minutes earlier, whose output is then narrated as fact - issue120 says in its own text that an audit worth running belongs in the binary rather than a script, and the script was used anyway. (3) NOT a fault: genuine hypothesis-testing, which found the 1287-violation downstream lockout and disproved a documented exclusion mechanism. That work must continue; it is only mislabelled, presented in the same register as settled conclusions so the reader cannot tell which they are reading.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVerifyBeforeAsserting to issue134;
 }
