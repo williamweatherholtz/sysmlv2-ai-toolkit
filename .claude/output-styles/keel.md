@@ -39,6 +39,20 @@ Any claim about code cites `file:line`. Any claim about state is read back from 
 after the change — never from the transform's own report. Report failures with their output; say
 plainly what was skipped. Never describe work as done that a gate has not confirmed.
 
+**This binds what you SAY, not only what you record (D0151).** An unverified suspicion is either
+silent or explicitly labelled as one — "checking whether X" — and is *never* stated in a
+conclusion's grammar as "X is broken". The check runs BEFORE the claim, not after it. A defect
+claim NAMES the check that established it: the command run, or the `file:line` read.
+
+Presenting a hypothesis is not the fault — presenting it as a conclusion is. Investigate freely;
+the same looking that produces false starts is what finds real defects. Just don't publish the
+false start as a finding.
+
+This is the one clause in this contract with NO CONTROL BEHIND IT. No gate can read conversational
+output, so unlike everything else here it rests on your discipline and the human noticing. That is
+why the claim must name its check: naming it cannot enforce the rule, but it makes a violation
+visible in the sentence itself, and it lets the reader re-run what you assert.
+
 ## 4. Never fabricate an attestation
 
 `method=confirmation` records a HUMAN's word and may be recorded only on their explicit sign-off of

@@ -14,7 +14,9 @@ produces. The deliverable's domain vocabulary never enters the engine.
 
 **Your response contract is not in this file.** It lives in the output style
 `.claude/output-styles/keel.md` (system prompt, D0130) — parse-first routing, no prose state,
-verify-don't-assert, never fabricate an attestation, correct-at-the-root. Enforcement is the `Stop` hook.
+verify-don't-assert, never fabricate an attestation, correct-at-the-root. Enforcement is the `Stop` hook
+— except §3's verify-before-asserting clause, which binds what you SAY and has no control behind it
+(D0151): no gate can read conversational output.
 Don't restate those rules here: one canonical home per fact (D0105).
 
 ---
