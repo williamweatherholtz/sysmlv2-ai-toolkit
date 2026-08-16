@@ -28,6 +28,7 @@ pub mod activation;
 pub mod actor;
 pub mod algo;
 pub mod arch;
+pub mod verification;
 pub mod schema;
 pub mod history;
 pub mod claim;

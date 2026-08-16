@@ -69,8 +69,11 @@ detection) block. Heuristics over prose warn. A guard that fires on ambiguity tr
 it — which is how `issue081` cost eight bypassed commits.
 
 **`sr_verified_pct` is not test coverage.** An SR counts as verified when *any* Test `#Verify`-links it,
-and in this repo that set is ~70% `method=critique`. Always read `keel tier-satisfaction`'s
-`verifiedByMethod` alongside the percentage.
+so the number is the UNION of two unrelated claims — someone examined the requirement, and the system
+was run against it. Use **`keel verification`**, which reports them separately and never as one
+number, and `keel verification --pending` for exactly what is outstanding in each. (`keel
+tier-satisfaction`'s `verifiedByMethod` counts EDGES; `keel verification` counts distinct
+requirements, so a Core-3 critique is 3 there and 1 here.)
 
 ## Marker vocabulary
 

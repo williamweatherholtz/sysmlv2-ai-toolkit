@@ -627,7 +627,7 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
     "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
     "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
-    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness", "tier-satisfaction", "recent",
+    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness", "tier-satisfaction", "recent", "verification",
     "arch", // D0148 — the six `arch` views register as viewpoints; the group name is what `keel <cmd>` matches
 ];
 

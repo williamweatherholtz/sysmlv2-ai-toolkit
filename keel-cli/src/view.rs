@@ -6033,6 +6033,47 @@ pub fn ai_judged_high_dispositions(root: &Path) -> Result<(usize, Vec<AiJudgedDi
     Ok((scanned, bad))
 }
 
+/// Live requirement names paired with the verification methods reaching each.
+pub type SrMethods = (Vec<String>, HashMap<String, std::collections::BTreeSet<String>>);
+
+/// Live `SystemRequirement` names, and the verification METHODS that `#Verify`-reach each.
+///
+/// Superseded requirements are excluded, the same scope rule `coverage`, `tier-satisfaction` and
+/// (since issue127) `critique-coverage` use — a retired requirement is not pending anything.
+///
+/// Returns methods rather than a boolean because the caller's whole purpose is to STOP collapsing
+/// them: `critique` and `test` are both "verified" under `sr_verified_pct` and answer entirely
+/// different questions.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking file fails to parse.
+pub fn sr_verification_methods(
+    root: &Path,
+) -> Result<SrMethods, ViewError> {
+    let model = Model::build(root)?;
+    let retired: HashSet<&str> =
+        model.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.as_str()).collect();
+    let live: Vec<String> = model
+        .items
+        .iter()
+        .filter(|(n, i)| i.type_name == "SystemRequirement" && !retired.contains(n.as_str()))
+        .map(|(n, _)| n.clone())
+        .collect();
+    let live_set: HashSet<&str> = live.iter().map(String::as_str).collect();
+    let mut out: HashMap<String, std::collections::BTreeSet<String>> = HashMap::new();
+    for e in model.edges.iter().filter(|e| e.kind == "verify") {
+        if !live_set.contains(e.to.as_str()) {
+            continue;
+        }
+        if let Some(t) = model.items.get(&e.from) {
+            if let Some(m) = t.attrs.get("method") {
+                out.entry(e.to.clone()).or_default().insert(m.clone());
+            }
+        }
+    }
+    Ok((live, out))
+}
+
 /// One authored `CodeElement`, flattened for the `arch` views (D0148/`EngineCodeAudit`).
 pub struct CodeElementRow {
     pub name: String,

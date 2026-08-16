@@ -249,4 +249,22 @@ package EngineViewpoints {
         :>> sources = "catalogued elements vs a HEURISTIC top-level-def scan of the files they name; non-blocking indicator, never a gate";
         :>> renderer = "keel arch coverage";
     }
+    part verificationExaminedVP : Viewpoint {
+        :>> id = "8f453b6b-81d9-4fd5-b577-c684480115f2";
+        :>> title = "verification-examined";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which requirements has anyone formed a judgment ABOUT — adversarially critiqued, inspected or analysed — regardless of whether any code exists?";
+        :>> audience = "reviewer / assurance lead";
+        :>> sources = "#Verify edges into live SystemRequirements whose Test method is critique/inspect/analyze/confirmation; superseded requirements excluded";
+        :>> renderer = "keel verification [--pending]";
+    }
+    part verificationExercisedVP : Viewpoint {
+        :>> id = "3f24d8fc-d775-43df-9059-1e9f7a3c1a3f";
+        :>> title = "verification-exercised";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which requirements has the SYSTEM actually been run against — test or demo — regardless of whether the requirement was ever adversarially read?";
+        :>> audience = "maintainer / release gate";
+        :>> sources = "#Verify edges into live SystemRequirements whose Test method is test/demo; superseded requirements excluded";
+        :>> renderer = "keel verification [--pending]";
+    }
 }

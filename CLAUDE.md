@@ -56,7 +56,8 @@ keel whats-next [ROOT]    # the ready list, in PRIORITY order (declaration order
 The AI **auto-follows** the ranked frontier (D0052). Do not ask which ready item to work. Pause only for
 a content gate (frozen schema, a direction Decision) or an empty frontier.
 
-Other computed lenses: `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
+Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
+gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
 `governing-version`, `open-issues`, `indicators`. Human-facing scorecards: `keel report
 <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any declared view
