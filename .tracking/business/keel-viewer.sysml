@@ -165,9 +165,9 @@ package ProjectBusinessKeelViewer {
     part keelViewerNeedsAcceptR1 : TestResult { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000000b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5f82eec"; :>> judgedAt = "2026-07-14"; :>> judgedBy = "wweatherholtz"; }
 
     // =====================================================================
-    // EXPANSION (Sprint 210) — additional Personas + UseCases (scenarios) + Needs. The new Needs
-    // (N-9..N-14) are PENDING a SECOND acceptance gate — do NOT derive architecture for them until the
-    // human accepts (needs-before-architecture). Personas + UseCases inform; the Needs gate is the bar.
+    // EXPANSION (Sprint 210) — additional Personas + UseCases (scenarios) + Needs. N-9..N-14 were
+    // accepted at Business gate 2 (keelViewerNeedsAccept2, 2026-07-14), so architecture derived from them
+    // is in order. Personas + UseCases inform; the Needs gate was the bar.
     // =====================================================================
 
     // ── New Personas. ──
@@ -193,7 +193,7 @@ package ProjectBusinessKeelViewer {
         :>> goals = "Prove coverage + provenance for an audit and export a defensible snapshot for records.";
     }
 
-    // ── New Needs (N-9..N-14). PENDING acceptance — no architecture until accepted. ──
+    // ── Needs N-9..N-14, accepted at Business gate 2 below. ──
     requirement nViewerCoverageGap : Need {
         :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000d9";
         :>> title = "N-9: coverage / gap views over a scope";
@@ -301,7 +301,7 @@ package ProjectBusinessKeelViewer {
 
     // =====================================================================
     // SCOPE REVISION (Sprint 212, D0115) — human feedback 2026-07-14. Four Needs superseded (out of
-    // current scope); two new Needs added (PENDING a third acceptance gate). See D0115 for the why.
+    // current scope); two new Needs added and accepted at Business gate 3. See D0115 for the why.
     // =====================================================================
 
     // N-7 dropped (single-user, unauthenticated; saveable viewpoints = N-8); N-11 + N-14 deferred;
@@ -323,8 +323,8 @@ package ProjectBusinessKeelViewer {
     // one-click to the item under review (issue068 linkify; keeps context easy to find).
     #DependsOn dependency from keelViewerNeedsAccept5 to nViewerEncodingViewpoints;
 
-    // ── New Needs (N-15, N-16) — the human's actual goal: AI-assisted critique of constrained systems.
-    //    PENDING acceptance (third gate); no architecture until accepted. ──
+    // ── Needs N-15, N-16 — the human's actual goal: AI-assisted critique of constrained systems.
+    //    Accepted at Business gate 3 below. ──
     requirement nViewerIterativeCritique : Need {
         :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000f5";
         :>> title = "N-15: iterative AI critique over a constrained query (axis-iterated)";
@@ -392,10 +392,9 @@ package ProjectBusinessKeelViewer {
         :>> priority = Priority::must;
     }
 
-    // ── Business gate 5: PENDING human acceptance of N-18 (needs-before-architecture — NOT yet accepted). ──
+    // ── Business gate 5: human acceptance of N-18 (needs-before-architecture). SIGNED — see the result below. ──
     verification keelViewerNeedsAccept5 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003c"; :>> title = "keel-viewer encoding-viewpoints Need N-18 accepted (Business gate 5)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AWAITING wweatherholtz's explicit acceptance of N-18 (axis->visual-encoding viewpoints: colour/position/swimlanes/nesting, auto-generated + overridable). Directed 2026-07-15 as a 'HUGE feature'; captured as a Need before architecture. Design direction is D0120 (PROPOSED). No downstream build until this gate passes."; }
     part keelViewerNeedsAccept5R1 : TestResult { :>> id = "12a80483-5bbe-4b02-b448-7283b10e2f16"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e40db8b"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "wweatherholtz"; :>> notes = "N-18 approved by wweatherholtz (2026-07-15, 'yes this is a huge need. approved') — axis-encoding viewpoints; unblocks D0120."; }
-    // (no TestResult yet — N-18 is proposed/unaccepted; the human signs off at the sitting review.)
 
     // =====================================================================
     // SCOPE CORRECTION (Sprint 320, D0156) — N-8 superseded. Its statement asserted "per-user view

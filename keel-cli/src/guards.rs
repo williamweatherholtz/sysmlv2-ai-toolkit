@@ -604,6 +604,59 @@ pub fn edge_endpoints(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard: no comment may claim a gate is PENDING when its acceptance result PASSES (issue140).
+///
+/// Prose frozen at authoring time contradicting the record beside it is the D0018 defect inside the model
+/// files, and it is not harmless: `keel-viewer.sysml` carried `PENDING human acceptance of N-18 — NOT yet
+/// accepted` on the line ABOVE N-18's passing acceptance result, and I believed the comment over the
+/// record and published a false claim in a critique. A reader has no reason to distrust a comment sitting
+/// next to the thing it describes.
+///
+/// PRECISE, not heuristic: fires only when a comment within three lines of a PASSING `*Accept*R*`
+/// `TestResult` claims the opposite. A comment saying PENDING beside a gate that has NOT been signed is
+/// correct and is left alone, which is what keeps this from firing on honest work-in-progress.
+#[must_use]
+pub fn stale_gate_prose(root: &Path) -> GuardReport {
+    const CLAIMS: [&str; 3] = ["PENDING", "NOT yet accepted", "proposed/unaccepted"];
+    let mut violations = Vec::new();
+    let mut scanned = 0;
+    for dir in [".tracking", ".engine"] {
+        for f in crate::collect_sysml(&root.join(dir)) {
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            let lines: Vec<&str> = text.lines().collect();
+            for (i, line) in lines.iter().enumerate() {
+                // A passing acceptance RESULT: the record a nearby comment must not contradict.
+                let is_pass_result = line.contains(": TestResult") && line.contains("VerdictKind::pass") && line.contains("Accept");
+                if !is_pass_result {
+                    continue;
+                }
+                scanned += 1;
+                let lo = i.saturating_sub(3);
+                let hi = (i + 4).min(lines.len());
+                // `.get` rather than a slice: a panic inside a GUARD would take the whole gate down and
+                // report nothing, which is the worst possible failure mode for a control.
+                for probe in lines.get(lo..hi).unwrap_or(&[]) {
+                    let t = probe.trim_start();
+                    if !t.starts_with("//") {
+                        continue;
+                    }
+                    if let Some(claim) = CLAIMS.iter().find(|c| t.contains(**c)) {
+                        violations.push(format!(
+                            "{}:{}: a comment says `{claim}` within three lines of a PASSING acceptance result — the prose contradicts the record it sits beside, and a reader has no reason to distrust it (issue140). State what IS; delete the stale note rather than annotating it",
+                            relpath(root, &f),
+                            i + 1
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    violations.sort();
+    violations.dedup();
+    GuardReport { name: "stale-gate-prose", scanned, warnings: Vec::new(), violations }
+}
+
 /// Guard: a `#Resolves` resolver must be WORK or a mooting `Decision` (D0077/issue136).
 ///
 /// `guard issues` checks only that an Issue HAS a resolving edge, and its own message already says the
@@ -1495,8 +1548,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 34] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind"];
+pub const GUARD_NAMES: [&str; 35] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1819,6 +1872,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "process-change" => Some(process_change(root)),
         "issues" => Some(issues(root)),
         "resolver-kind" => Some(resolver_kind(root)),
+        "stale-gate-prose" => Some(stale_gate_prose(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),

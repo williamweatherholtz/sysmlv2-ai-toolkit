@@ -1643,4 +1643,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcViewpointEnumeration to issue139;
+
+    part issue140 : Issue {
+        :>> id = "c07f4e18-5b93-4a26-8d01-6fa2b39e57cd";
+        :>> title = "stale prose comments claimed gates were PENDING beside their own passing acceptance results";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY BEING MISLED BY IT. While selecting critique targets I read a comment in .tracking/business/keel-viewer.sysml reading 'Business gate 5: PENDING human acceptance of N-18 - NOT yet accepted', concluded N-18 was unaccepted, and published that claim inside a landed critique (sprint 326, nViewerEncodingViewpoints testability). It is FALSE: keelViewerNeedsAccept5R1 sits on the line directly BELOW that comment with outcome pass, judgedBy wweatherholtz, judgedAt 2026-07-15, and a notes field reading N-18 approved. A second comment immediately after the result asserted 'no TestResult yet - N-18 is proposed/unaccepted'. SIX such comments existed in that one file, covering Business gates 2, 3 and 5, every one of which carries a passing result - each comment was true when written and none was revised when its gate was signed. THIS IS THE D0018 DEFECT INSIDE THE MODEL FILES: prose asserting state that the model records. It is worse than a stale doc because the comment sits beside the record it contradicts, so a reader has no reason to distrust it, and it mattered - five SystemRequirements are derived from N-18, and believing the comment would mean believing that architecture was derived from an unaccepted Need, which is a process violation that did not happen. FIXED: all six comments now state what IS, and guard stale-gate-prose (the 35th) fails on a PENDING-style claim within three lines of a passing acceptance result. The false clause in the landed critique is corrected in place with the correction left visible.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcStaleGateProse to issue140;
 }
