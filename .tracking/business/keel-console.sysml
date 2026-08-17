@@ -31,6 +31,7 @@ package ProjectConsoleBusiness {
     private import EngineElement::*;
     private import EngineNeeds::*;
     private import EngineRelationships::*;
+    private import EngineVerification::*;
 
     part consoleBrief : Brief {
         :>> id = "3c7f1a92-6b04-4e58-9d31-8a2c05e7f4b6";
@@ -165,4 +166,8 @@ package ProjectConsoleBusiness {
     #DerivedFrom dependency from nConsoleContextCertain to consoleBrief;
     #DerivedFrom dependency from nConsoleMultiProject to consoleBrief;
     #DerivedFrom dependency from nConsoleFitsIntermittentAttention to consoleBrief;
+
+    // ── Business gate: human acceptance of the Needs (needs-before-architecture). ──
+    verification consoleNeedsAccept : Test { :>> id = "8516bcb2-8c60-400e-b2d3-5d8c37287cbf"; :>> title = "keel-console Needs accepted (Business gate)"; :>> createdAt = "2026-08-16"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-08-16, verbatim: 'looks great, proceed'. Accepts the five console Needs AS REVISED — N-C1 nConsoleObligationDiscoverable, N-C2 nConsoleNeverMisleads, N-C3 nConsoleContextCertain, N-C5 nConsoleFitsIntermittentAttention [must], N-C4 nConsoleMultiProject [should]. This is the gate re-put on the REVISED set: the human had said 'accepted' one message earlier, in the same message that directed the rewrite, and that word was deliberately NOT recorded because it could not honestly attach to text authored after they said it (section 4, D0151). The revision they directed produced the split of the original N-C1 into discoverability and non-misleading, and added the human-factors Need from their steer that 'fewer tabs is not a need, but UX and good human factors design is'. Architecture — SystemRequirements and the D0114-superseding shape Decision — may now be derived from these accepted Needs."; }
+    part consoleNeedsAcceptR1 : TestResult { :>> id = "c693de24-bd70-46ab-ba38-b90516495777"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "15e33f0"; :>> judgedAt = "2026-08-16"; :>> judgedBy = "wweatherholtz"; }
 }
