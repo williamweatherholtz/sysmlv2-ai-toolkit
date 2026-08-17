@@ -74,7 +74,11 @@ const AGENT_MAX_CONCURRENT: usize = 2;
 
 #[derive(Clone)]
 struct AppState {
-    root: Arc<PathBuf>,
+    /// The ACTIVE project root. Switchable at runtime (srConsoleProjectRebind / N-C4): a supervisor
+    /// overseeing several projects reaches all of them through one surface rather than running one
+    /// server per project and holding the port-to-project mapping in their head — unrecorded state of
+    /// exactly the kind this engine forbids everywhere else, and the first thing lost after a break.
+    root: Arc<Mutex<PathBuf>>,
     /// In-flight agent-bridge runs (concurrency guardrail, D0094).
     agents: Arc<AtomicUsize>,
     /// Per-view JSON cache keyed `view -> (fingerprint, json)` (D0094 serveLiveCache): recompute a view
@@ -98,8 +102,42 @@ pub fn run(root: PathBuf, port: u16) -> i32 {
     rt.block_on(async move { serve_async(root, port).await })
 }
 
+impl AppState {
+    /// The active project root. Cloned out under the lock so no caller holds it across a compute.
+    fn rootpath(&self) -> PathBuf {
+        self.root.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
+    }
+
+    /// Point the surface at another project. REFUSES rather than falling back (srConsoleProjectRebind):
+    /// a silent fallback leaves the reader believing they are looking at project B while seeing project
+    /// A, which is the same class of defect as a defaulted model scope — a confident wrong answer.
+    fn rebind(&self, candidate: &Path) -> Result<PathBuf, String> {
+        if !candidate.join(".tracking").is_dir() || !candidate.join(".engine").is_dir() {
+            return Err(format!(
+                "{} is not a keel project (needs .engine/ and .tracking/) — the active project is UNCHANGED",
+                candidate.display()
+            ));
+        }
+        let canon = candidate.canonicalize().unwrap_or_else(|_| candidate.to_path_buf());
+        {
+            let mut g = self.root.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            (*g).clone_from(&canon);
+        }
+        // Every view is computed against the root, so a rebind must invalidate the whole cache or the
+        // new project would be shown last project's numbers.
+        if let Ok(mut c) = self.cache.lock() {
+            c.clear();
+        }
+        Ok(canon)
+    }
+}
+
 async fn serve_async(root: PathBuf, port: u16) -> i32 {
-    let state = AppState { root: Arc::new(root), agents: Arc::new(AtomicUsize::new(0)), cache: Arc::new(Mutex::new(HashMap::new())) };
+    // CANONICALISE at startup. Served as given, a root of "." has no name and no parent, so the
+    // surface could not say which project was active (N-C4 requires it always be named) and sibling
+    // discovery found nothing. "." is a path, not an identity.
+    let root = root.canonicalize().unwrap_or(root);
+    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), cache: Arc::new(Mutex::new(HashMap::new())) };
     let app = Router::new()
         .route("/", get(index))
         // viewerKeelApi (D0114 shape B / N-6): the COMMITTED, VERSIONED read API contract. A separate
@@ -113,6 +151,11 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // srConsoleObligationsOnArrival (N-C1): what is waiting on the HUMAN, classes derived
         // from the act-surface viewpoints rather than enumerated here.
         .route("/api/obligations", get(api_obligations))
+        // srConsoleProjectRebind (N-C4): several projects, one surface.
+        .route("/api/projects", get(api_projects))
+        .route("/api/project", post(api_project_switch))
+        // srConsoleModelScopeResolved (N-C3): which model am I looking at.
+        .route("/api/scope", get(api_scope))
         // review queue (D0121) — user-gated items awaiting human judgment (read side of the loop)
         .route("/api/review-queue", get(api_review_queue))
         .route("/api/orient", get(api_orient))
@@ -306,14 +349,14 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         "dismiss" => "dismiss",
         other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}'\"}}")).into_response(),
     };
-    let sha = git_head(&s.root);
-    let judged_by = match crate::actor::resolve(&s.root, body.judged_by.as_deref()) {
+    let sha = git_head(&s.rootpath());
+    let judged_by = match crate::actor::resolve(&s.rootpath(), body.judged_by.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let critiques = s.root.join(".tracking").join("critiques.sysml");
+    let critiques = s.rootpath().join(".tracking").join("critiques.sysml");
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
@@ -339,7 +382,7 @@ struct DecisionReq {
 /// acceptance event, and never auto-commits (the human reviews + commits). The generated UI proposes
 /// changes THROUGH the process, not by editing facts directly ("not going rogue").
 async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionReq>) -> Response {
-    let author = match crate::actor::resolve(&s.root, b.author.as_deref()) {
+    let author = match crate::actor::resolve(&s.rootpath(), b.author.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
@@ -348,7 +391,7 @@ async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<Decis
     if b.slug.is_empty() || b.title.is_empty() || b.decision.is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"slug, title, and decision are required\"}".to_string()).into_response();
     }
-    match crate::write::record_decision(&s.root, &b.slug, &b.title, &b.date, &author, &b.context, &b.decision, &b.rationale, &b.consequences) {
+    match crate::write::record_decision(&s.rootpath(), &b.slug, &b.title, &b.date, &author, &b.context, &b.decision, &b.rationale, &b.consequences) {
         Ok((nnnn, path)) => ok_json(format!("{{\"ok\":true,\"decision\":\"D{nnnn}\",\"path\":\"{path}\",\"status\":\"proposed\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -367,16 +410,16 @@ struct DecisionAcceptReq {
 /// the `{decision}Accept` event via `write::accept_decision`. The human's note IS the attestation
 /// (D0106 — `judged_by` is a Person, never AI-fabricated); never auto-commits.
 async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionAcceptReq>) -> Response {
-    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+    let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let sha = git_head(&s.root);
+    let sha = git_head(&s.rootpath());
     match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
@@ -396,19 +439,19 @@ struct DecisionRejectReq {
 /// `rejected` + append the `{decision}Reject` judgment (rationale) via `write::reject_decision`. The
 /// human's rationale IS the attestation (D0106); never auto-commits.
 async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionRejectReq>) -> Response {
-    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+    let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
     if b.rationale.trim().is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"a rejection rationale is required\"}".to_string()).into_response();
     }
-    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let sha = git_head(&s.root);
+    let sha = git_head(&s.rootpath());
     match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
@@ -429,16 +472,16 @@ struct GateResultReq {
 /// `{gate}R{n}` `TestResult` via `write::append_gate_result` (the human's action = the sign-off, D0106;
 /// optional note recorded as `notes`). Never auto-commits.
 async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<GateResultReq>) -> Response {
-    let Some(path) = safe_repo_path(&s.root, &b.file) else {
+    let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let sha = git_head(&s.root);
+    let sha = git_head(&s.rootpath());
     let note = b.note.as_deref().filter(|t| !t.is_empty());
     let verdict = match b.verdict.as_deref() {
         Some("fail") => "fail",
@@ -476,10 +519,10 @@ async fn api_edge(State(s): State<AppState>, axum::Json(b): axum::Json<EdgeReq>)
         return (StatusCode::BAD_REQUEST, "{\"error\":\"from and to must be bare SysML identifiers\"}".to_string()).into_response();
     }
     let file_rel = b.file.filter(|f| !f.is_empty()).unwrap_or_else(|| ".tracking/authored.sysml".to_string());
-    if safe_repo_path(&s.root, &file_rel).is_none() {
+    if safe_repo_path(&s.rootpath(), &file_rel).is_none() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     }
-    match crate::write::author_edge(&s.root, &file_rel, &kind, &b.from, &b.to) {
+    match crate::write::author_edge(&s.rootpath(), &file_rel, &kind, &b.from, &b.to) {
         Ok(()) => ok_json(format!("{{\"ok\":true,\"edge\":\"{kind} {} -> {}\"}}", b.from, b.to)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -511,7 +554,7 @@ async fn api_create_item(State(s): State<AppState>, axum::Json(b): axum::Json<Cr
     if ty.is_empty() || !ty.chars().all(|c| c.is_ascii_alphanumeric()) {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"type must be a declared type name\"}".to_string()).into_response();
     }
-    let author = match crate::actor::resolve(&s.root, b.author.as_deref()) {
+    let author = match crate::actor::resolve(&s.rootpath(), b.author.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
@@ -523,7 +566,7 @@ async fn api_create_item(State(s): State<AppState>, axum::Json(b): axum::Json<Cr
         keyword: item_keyword(ty), type_name: ty, name_hint: b.name.as_deref().unwrap_or(""),
         string_attrs: &strs, enum_attrs: &enums, author: &author, created_at: &b.date,
     };
-    match crate::write::create_item(&s.root, &new_item) {
+    match crate::write::create_item(&s.rootpath(), &new_item) {
         Ok((name, path)) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"type\":\"{ty}\",\"path\":\"{path}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -562,7 +605,7 @@ async fn api_set_attr(State(s): State<AppState>, axum::Json(b): axum::Json<SetAt
         Some(ty) if ty.chars().all(|c| c.is_ascii_alphanumeric()) && b.value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') => format!("{ty}::{}", b.value),
         _ => format!("\"{}\"", b.value.replace('"', "'").replace(['\n', '\r', '\t'], " ")),
     };
-    match crate::write::set_attr(&s.root, &b.item, &b.attr, &literal) {
+    match crate::write::set_attr(&s.rootpath(), &b.item, &b.attr, &literal) {
         Ok(path) => ok_json(format!("{{\"ok\":true,\"item\":\"{}\",\"attr\":\"{}\",\"path\":\"{path}\"}}", b.item, b.attr)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -576,7 +619,8 @@ async fn api_set_attr(State(s): State<AppState>, axum::Json(b): axum::Json<SetAt
 /// don't starve the runtime.
 async fn api_check(State(s): State<AppState>) -> Response {
     let json = tokio::task::block_in_place(|| {
-        let root = s.root.as_path();
+        let root = s.rootpath();
+        let root = root.as_path();
         let report = crate::validate_root(root);
         let mut parse_errors: Vec<Json> = report.errors.iter()
             .map(|e| Json::s(format!("{}: {}", e.file.display(), e.message)))
@@ -616,7 +660,7 @@ async fn api_check(State(s): State<AppState>) -> Response {
 /// model moved underneath (a possible concurrent edit, D0108) — the viewer flags a conflict rather than
 /// silently overwriting. Cheap (stat-only), never cached.
 async fn api_fingerprint(State(s): State<AppState>) -> Response {
-    ok_json(format!("{{\"fingerprint\":\"{}\"}}", fingerprint(&s.root)))
+    ok_json(format!("{{\"fingerprint\":\"{}\"}}", fingerprint(&s.rootpath())))
 }
 
 /// Resolve a repo-relative `.sysml` path safely (no absolute paths, no `..` traversal, stays under root).
@@ -641,12 +685,12 @@ fn view_html(r: Result<String, crate::view::ViewError>) -> Response {
 
 /// GET /view/report/:name (D0094 m2) — the full computed HTML report (instantiate/render action).
 async fn view_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
-    view_html(crate::view::report_html(&s.root, &name, false))
+    view_html(crate::view::report_html(&s.rootpath(), &name, false))
 }
 
 /// GET /view/diagram (D0094 m2) — the whole-model interactive diagram HTML (render action).
 async fn view_diagram(State(s): State<AppState>) -> Response {
-    view_html(crate::view::diagram_html(&s.root))
+    view_html(crate::view::diagram_html(&s.rootpath()))
 }
 
 // ── m3 agent-bridge — drive the LOCALLY-AUTHENTICATED `claude` CLI, stream its work over SSE ───────
@@ -796,7 +840,7 @@ fn agent_bridge_enabled(root: &Path) -> bool {
 
 /// GET /api/settings — the persisted serve settings (defaults applied).
 async fn api_settings_get(State(s): State<AppState>) -> Response {
-    ok_json(format!("{{\"agentBridge\":{}}}", agent_bridge_enabled(&s.root)))
+    ok_json(format!("{{\"agentBridge\":{}}}", agent_bridge_enabled(&s.rootpath())))
 }
 
 #[derive(serde::Deserialize)]
@@ -808,7 +852,7 @@ struct SettingsReq {
 /// POST /api/settings — persist serve settings (currently the agent-bridge toggle) to `.keel-serve.json`.
 async fn api_settings_post(State(s): State<AppState>, axum::Json(b): axum::Json<SettingsReq>) -> Response {
     let body = format!("{{\"agentBridge\": {}}}\n", b.agent_bridge);
-    match std::fs::write(settings_path(&s.root), body) {
+    match std::fs::write(settings_path(&s.rootpath()), body) {
         Ok(()) => ok_json(format!("{{\"ok\":true,\"agentBridge\":{}}}", b.agent_bridge)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -853,7 +897,7 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 /// run (parsed action, target, validity, exact prompt) WITHOUT spawning, so the human can review before
 /// approving. The console shows this, then calls /api/agent/stream with approved=1 on approval.
 async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Response {
-    let (action_ok, launch_undefined, prompt) = request_plan(&s.root, &q);
+    let (action_ok, launch_undefined, prompt) = request_plan(&s.rootpath(), &q);
     let json = crate::json::Json::Obj(vec![
         ("plan".to_string(), crate::json::Json::s("agent-request plan (srServeApproveGate) — review, then execute with approved=1")),
         ("action".to_string(), crate::json::Json::s(q.action)),
@@ -869,7 +913,7 @@ async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) ->
 }
 
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let root = (*s.root).clone();
+    let root = s.rootpath();
     // sr17 critique + D0109 launch (model-driven launcher; non-freeform: a launch target must be is_launchable).
     let (action_ok, launch_undefined, prompt) = request_plan(&root, &q);
     // srServeApproveGate (Tier 2b): the execute path refuses to run without an EXPLICIT approval — the human
@@ -983,8 +1027,8 @@ async fn api_resolver(State(s): State<AppState>, axum::Json(b): axum::Json<Resol
     }
     let resolver = format!("{base}Fix");
     let title = b.title.replace('\\', "/").replace('"', "'").replace(['\n', '\r', '\t'], " ");
-    let backlog = s.root.join(".tracking").join("backlog.sysml");
-    let issues = s.root.join(".tracking").join("issues.sysml");
+    let backlog = s.rootpath().join(".tracking").join("backlog.sysml");
+    let issues = s.rootpath().join(".tracking").join("issues.sysml");
     match crate::write::add_task(&backlog, "NextWork", &resolver, &title, "inspect") {
         // Ok = created; TaskAlreadyExists = re-click (resolver exists) — both proceed to ensure the edge.
         Ok(_) | Err(crate::write::WriteError::TaskAlreadyExists(_)) => {}
@@ -1037,13 +1081,22 @@ fn with_status(body: &str, status: &str, extra: &str) -> String {
     b.strip_prefix('{').map_or_else(
         // A non-object body (an array) is WRAPPED rather than left unstamped.
         || format!("{{\"viewStatus\":\"{status}\"{extra},\"data\":{b}}}"),
-        // Splice into the existing object so no consumer's existing field moves.
-        |rest| format!("{{\"viewStatus\":\"{status}\"{extra},{rest}"),
+        |rest| {
+            // An EMPTY object leaves nothing after the stamp, so the separating comma would be
+            // trailing and the whole body invalid JSON. Found on the FAILED path — the one N-C2 leans
+            // on hardest: a refusal that cannot be parsed is a refusal whose reason never reaches the
+            // reader, which is worse than the failure it was reporting.
+            if rest.trim() == "}" {
+                format!("{{\"viewStatus\":\"{status}\"{extra}}}")
+            } else {
+                format!("{{\"viewStatus\":\"{status}\"{extra},{rest}")
+            }
+        },
     )
 }
 
 fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>) -> Response {
-    let fp = fingerprint(&state.root);
+    let fp = fingerprint(&state.rootpath());
     let previous = {
         let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         guard.get(key).cloned()
@@ -1057,7 +1110,7 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
     // hit; run it via block_in_place so it never STARVES the multi-thread runtime's worker — other
     // requests + the SSE change-push keep flowing while this view computes. (No async refactor needed:
     // block_in_place offloads the current worker's other tasks; the serve runtime is new_multi_thread.)
-    match tokio::task::block_in_place(|| compute(&state.root)) {
+    match tokio::task::block_in_place(|| compute(&state.rootpath())) {
         Ok(json) => {
             {
                 let mut guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -1105,6 +1158,121 @@ async fn api_schema(State(s): State<AppState>) -> Response {
 /// GET /api/review-queue (D0121) — the human review queue: user-gated items awaiting judgment
 /// (proposed Decisions + pending confirmation gates). The read side of the human-oversight loop;
 /// the "Review" console tab renders it and records acceptance via the write endpoints.
+/// GET /api/projects — the projects this surface can reach, and which is ACTIVE (N-C4).
+///
+/// Discovered rather than configured: the active root plus any sibling directory that is itself a keel
+/// project. A config file would be a second place to keep the list true, and the filesystem already
+/// knows. The active project is always named, which is the half of N-C4 that stops a supervisor
+/// wondering which project they are looking at.
+async fn api_projects(State(s): State<AppState>) -> Response {
+    let active = s.rootpath();
+    let mut found: Vec<PathBuf> = vec![active.clone()];
+    if let Some(parent) = active.parent() {
+        if let Ok(rd) = std::fs::read_dir(parent) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p != active && p.join(".engine").is_dir() && p.join(".tracking").is_dir() {
+                    found.push(p);
+                }
+            }
+        }
+    }
+    found.sort();
+    found.dedup();
+    let rows: Vec<crate::json::Json> = found
+        .iter()
+        .map(|p| {
+            crate::json::Json::Obj(vec![
+                ("root".to_string(), crate::json::Json::s(p.display().to_string())),
+                (
+                    "name".to_string(),
+                    crate::json::Json::s(
+                        p.file_name().map_or_else(String::new, |n| n.to_string_lossy().to_string()),
+                    ),
+                ),
+                ("active".to_string(), crate::json::Json::Bool(*p == active)),
+            ])
+        })
+        .collect();
+    ok_json(with_status(
+        &crate::json::Json::Obj(vec![
+            ("activeProject".to_string(), crate::json::Json::s(active.display().to_string())),
+            ("projects".to_string(), crate::json::Json::Arr(rows)),
+        ])
+        .dump(),
+        "computed",
+        "",
+    ))
+}
+
+/// POST /api/project — rebind the surface to another project, or REFUSE and change nothing.
+async fn api_project_switch(State(s): State<AppState>, body: String) -> Response {
+    let target = serde_json::from_str::<serde_json::Value>(&body)
+        .ok()
+        .and_then(|v| v.get("root").and_then(|r| r.as_str().map(str::to_owned)))
+        .unwrap_or_default();
+    if target.is_empty() {
+        return (StatusCode::BAD_REQUEST, with_status("{}", "failed", ",\"reason\":\"no root given\"")).into_response();
+    }
+    match s.rebind(Path::new(&target)) {
+        Ok(p) => ok_json(with_status(
+            &format!("{{\"activeProject\":\"{}\"}}", p.display().to_string().replace('\\', "/")),
+            "computed",
+            "",
+        )),
+        Err(e) => (StatusCode::BAD_REQUEST, with_status("{}", "failed", &format!(",\"reason\":\"{}\"", e.replace('"', "'").replace('\\', "/")))).into_response(),
+    }
+}
+
+/// GET /api/scope — which MODEL is in view, and every item's resolved scope (N-C3).
+///
+/// The repo-level question comes first and is the one that actually confuses a reader: where the engine
+/// builds ITSELF, its own tracked work and its deliverable's work are the same programme, and the
+/// surface must say so rather than leaving the reader to infer it. Per item the scope follows the file
+/// the item was authored in — `.engine/` is the engine's own definitions, `.tracking/` is the work
+/// being tracked — and anything else is UNSCOPED, never defaulted.
+async fn api_scope(State(s): State<AppState>) -> Response {
+    cached(&s, "scope", |root| {
+        let coincident = root.join("keel-cli").join("Cargo.toml").is_file();
+        let (mut engine, mut deliverable, mut unscoped) = (0i64, 0i64, 0i64);
+        let mut unscoped_names: Vec<crate::json::Json> = Vec::new();
+        for (name, file) in crate::view::item_files(root)? {
+            let f = file.replace('\\', "/");
+            if f.starts_with(".engine/") {
+                engine += 1;
+            } else if f.starts_with(".tracking/") {
+                deliverable += 1;
+            } else {
+                unscoped += 1;
+                if unscoped_names.len() < 25 {
+                    unscoped_names.push(crate::json::Json::s(format!("{name} ({f})")));
+                }
+            }
+        }
+        Ok(crate::json::Json::Obj(vec![
+            (
+                "scope_note".to_string(),
+                crate::json::Json::s(
+                    "which MODEL is in view. `coincident` means this repository builds the engine                      itself, so the engine's tracked work and the deliverable's are the same programme                      — stated rather than left to be inferred. Per-item scope follows the authoring                      file; anything outside .engine/ or .tracking/ is UNSCOPED and never defaulted.",
+                ),
+            ),
+            (
+                "modelsCoincide".to_string(),
+                crate::json::Json::Bool(coincident),
+            ),
+            (
+                "activeScope".to_string(),
+                crate::json::Json::s(if coincident { "coincident" } else { "distinct" }),
+            ),
+            ("engineItems".to_string(), crate::json::Json::Int(engine)),
+            ("deliverableItems".to_string(), crate::json::Json::Int(deliverable)),
+            ("unscopedItems".to_string(), crate::json::Json::Int(unscoped)),
+            ("unscopedSample".to_string(), crate::json::Json::Arr(unscoped_names)),
+        ])
+        .dump())
+    })
+}
+
 /// GET /api/surfaces — navigation computed from the declared Viewpoint registry, never enumerated.
 async fn api_surfaces(State(s): State<AppState>) -> Response {
     cached(&s, "surfaces", crate::view::surfaces_json)
@@ -1242,13 +1410,13 @@ async fn api_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> 
 
 /// History reads ~/.claude transcripts (outside the fingerprint), so it is computed fresh (uncached).
 async fn api_history(State(s): State<AppState>) -> Response {
-    ok_json(interaction_history(&s.root))
+    ok_json(interaction_history(&s.rootpath()))
 }
 
 /// GET /api/recent (sr15) — the git-derived recent-activity timeline. Reads git history (outside the
 /// model fingerprint), so it is computed fresh (uncached); a git failure yields an empty timeline.
 async fn api_recent(State(s): State<AppState>) -> Response {
-    match crate::view::recent(&s.root) {
+    match crate::view::recent(&s.rootpath()) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("recent error: {e}")).into_response(),
     }
@@ -1270,7 +1438,7 @@ struct SectionReq {
 /// GET /api/section?view=NAME | ?element=NAME (sr18) — render a bounded section as JSON
 /// (`{seed, kind, count, items[], edges[]}`) for local, section-scoped critique. A computed `#View`.
 async fn api_section(State(s): State<AppState>, Query(q): Query<SectionReq>) -> Response {
-    match crate::view::section_json(&s.root, q.view.as_deref(), q.element.as_deref()) {
+    match crate::view::section_json(&s.rootpath(), q.view.as_deref(), q.element.as_deref()) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1309,7 +1477,7 @@ async fn api_slice(State(s): State<AppState>, Query(q): Query<SliceReq>) -> Resp
         since: q.since.as_deref().filter(|d| !d.is_empty()),
         until: q.until.as_deref().filter(|d| !d.is_empty()),
     };
-    match crate::view::slice_json(&s.root, &q.seed, depth, &edges, dir, df) {
+    match crate::view::slice_json(&s.rootpath(), &q.seed, depth, &edges, dir, df) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1358,7 +1526,7 @@ struct ChangeImpactReq {
 async fn api_change_impact(State(s): State<AppState>, Query(q): Query<ChangeImpactReq>) -> Response {
     let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("up"));
-    match crate::view::change_impact_json(&s.root, &q.seed, &edges, dir) {
+    match crate::view::change_impact_json(&s.rootpath(), &q.seed, &edges, dir) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1370,9 +1538,9 @@ async fn api_snapshot(State(s): State<AppState>, Query(q): Query<SliceReq>) -> R
     let depth = q.depth.unwrap_or(2);
     let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
-    let commit = git_head(&s.root);
-    let as_of = git_head_date(&s.root);
-    match crate::view::snapshot_json(&s.root, &q.seed, depth, &edges, dir, &commit, &as_of) {
+    let commit = git_head(&s.rootpath());
+    let as_of = git_head_date(&s.rootpath());
+    match crate::view::snapshot_json(&s.rootpath(), &q.seed, depth, &edges, dir, &commit, &as_of) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1395,7 +1563,7 @@ async fn api_baseline_compare(State(s): State<AppState>, Query(q): Query<Baselin
     let depth = q.depth.unwrap_or(2);
     let edges: std::collections::HashSet<String> = q.edges.as_deref().unwrap_or("").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
-    match crate::view::baseline_compare_json(&s.root, &q.seed, &q.from, &q.to, depth, &edges, dir) {
+    match crate::view::baseline_compare_json(&s.rootpath(), &q.seed, &q.from, &q.to, depth, &edges, dir) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1426,7 +1594,7 @@ async fn api_critique_plan(State(s): State<AppState>, Query(q): Query<CritiquePl
         .collect();
     let dir = crate::view::SliceDir::parse(q.dir.as_deref().unwrap_or("both"));
     let lens = q.lens.as_deref().unwrap_or("best-practice");
-    match crate::view::critique_plan_json(&s.root, &q.seed, depth, &edges, dir, lens) {
+    match crate::view::critique_plan_json(&s.rootpath(), &q.seed, depth, &edges, dir, lens) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1441,7 +1609,7 @@ struct BoundaryReq {
 /// GET /api/boundary?need=NAME (sr19) — a Need-slice boundary: white-box internal elements + black-box
 /// interface cut edges + coupling count, as JSON. A computed `#View`.
 async fn api_boundary(State(s): State<AppState>, Query(q): Query<BoundaryReq>) -> Response {
-    match crate::view::boundary_json(&s.root, &q.need) {
+    match crate::view::boundary_json(&s.rootpath(), &q.need) {
         Ok(json) => ok_json(json),
         Err(e) => (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -1475,16 +1643,16 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
     if verdict != "pass" && verdict != "fail" {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"verdict must be pass or fail\"}".to_string()).into_response();
     }
-    let Some(file) = find_task_file(&s.root, &b.task) else {
+    let Some(file) = find_task_file(&s.rootpath(), &b.task) else {
         return (StatusCode::NOT_FOUND, format!("{{\"error\":\"no `action {}` found in .tracking\"}}", b.task.replace('"', "'"))).into_response();
     };
-    let by = match crate::actor::resolve(&s.root, b.judged_by.as_deref()) {
+    let by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
         Ok(a) => a,
         // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let sha = git_head(&s.root);
+    let sha = git_head(&s.rootpath());
     match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
@@ -1495,7 +1663,7 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
 /// (~1.5s) and emit a `changed` event only when it flips, so the UI refetches event-driven (not blind
 /// polling). `ping` keepalives in between; `hello` carries the initial fingerprint.
 async fn api_events(State(s): State<AppState>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let root = (*s.root).clone();
+    let root = s.rootpath();
     let stream = async_stream::stream! {
         let mut last = fingerprint(&root);
         yield Ok(Event::default().event("hello").data(last.to_string()));
@@ -1803,6 +1971,15 @@ mod view_status_tests {
         let s = with_status(r#"{"items":[]}"#, "computed", "");
         assert!(s.contains(r#""items":[]"#), "the payload survives the stamp");
         assert!(s.starts_with(r#"{"viewStatus":"computed","#));
+    }
+
+    #[test]
+    fn an_empty_object_body_stays_valid_json() {
+        // Regression: the FAILED path stamps an empty {} body, and the separating comma made it
+        // `{"viewStatus":"failed","reason":"...",}` — invalid, so the reason never reached the reader.
+        let s = with_status("{}", "failed", ",\"reason\":\"nope\"");
+        assert!(!s.contains(",}"), "trailing comma makes the refusal unparseable: {s}");
+        assert_eq!(s, r#"{"viewStatus":"failed","reason":"nope"}"#);
     }
 
     #[test]

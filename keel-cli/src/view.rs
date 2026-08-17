@@ -7634,3 +7634,19 @@ pub(crate) fn surfaces_json(root: &Path) -> Result<String, ViewError> {
     ])
     .dump())
 }
+
+/// Every item name paired with the repo-relative file it was authored in (N-C3 model scope).
+///
+/// The authoring file is the only honest basis for an item's model scope: `.engine/` holds the
+/// engine's own definitions and `.tracking/` holds the work being tracked. Anything else is UNSCOPED,
+/// which the caller must report rather than default — a wrong scope is worse than an admitted unknown.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking file fails to parse.
+pub fn item_files(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let mut out: Vec<(String, String)> =
+        model.items.iter().map(|(n, i)| (n.clone(), i.file.clone())).collect();
+    out.sort();
+    Ok(out)
+}
