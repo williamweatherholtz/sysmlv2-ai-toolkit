@@ -33,6 +33,6 @@ package Decision0159 {
         :>> method = VerificationMethod::analyze;
         :>> disposition = DispositionKind::acceptRisk;
         :>> procedureText = "acceptRisk, not dismiss: the finding is REAL — a viewpoint is the same portable unit shape as a process and only processes can be exported — and it is knowingly not acted on. The measurement that decides it: all 32 viewpoints are engine-authored, `keel init` ships the whole set to every downstream project, and no project has ever authored one, so the unserved case (a project-authored viewpoint handed to another project) has never occurred. Dismissing it would assert the gap is not real, which would be false and would lose the analysis. The residual risk is bounded and named in D0159's consequences, and it is smaller than it was yesterday: a receiving project's viewpoint-renderer guard would catch an unrenderable imported lens, which became true only when sprint 322 made that guard see every viewpoint instead of one file's worth."; }
-    part issue138Disp1R1 : TestResult { :>> id = "83b1e5c7-4a06-4d29-9f13-6b027ae1cd85"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDING"; :>> judgedAt = "2026-08-17"; :>> judgedBy = "claudeOpus5"; }
+    part issue138Disp1R1 : TestResult { :>> id = "83b1e5c7-4a06-4d29-9f13-6b027ae1cd85"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7f09bc8"; :>> judgedAt = "2026-08-17"; :>> judgedBy = "claudeOpus5"; }
     #Dispositions dependency from issue138Disp1 to issue138;
 }
