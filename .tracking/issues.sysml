@@ -1610,4 +1610,26 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcResolverKindGuard to issue136;
+
+    part issue137 : Issue {
+        :>> id = "d5c81f24-3a97-4e60-b1d8-6f02a94c7e35";
+        :>> title = "D0115 says the viewer is single-user, but distributed collaboration shipped and contradicts it";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Surfaced by the human on 2026-08-17 while resolving issue132: 'it's not single user altogether, it's a single user per machine - this service app is local only at the moment.' D0115 clause 1 reads 'the viewer is single-user + unauthenticated', and that phrase is now inconsistent with shipped behaviour: D0108/D0129 gave keel one BOUND ACTOR PER MACHINE with per-actor claim files to remove contention, merge-only integration, and contention recorded as an Issue for human adjudication - so several humans on several machines already collaborate through git. What is single-user is the SERVE CONSOLE, which is local-only and unauthenticated. D0115 conflated the identity model with the service deployment model, and issue132 sits directly downstream of that conflation: N-8's statement was judged against 'single-user' when the accurate boundary was 'no accounts, no server-side session'. NOT CORRECTED HERE because D0115 is an accepted Decision and its wording is a scope statement, so restating it needs a superseding Decision with human acceptance rather than an edit. DO: author that Decision, restating the boundary as 'one bound actor per machine; collaboration by git; the console is local-only and unauthenticated' and checking every claim derived from the old phrase.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcMachineScopeRestatement to issue137;
+
+    part issue138 : Issue {
+        :>> id = "0b6e39a1-8d47-4c25-9f03-e178a5db2c60";
+        :>> title = "a viewpoint is the same portable UNIT as a process, but only processes can be exported";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found answering the human's question 'can viewpoint sharing not use the same mechanisms as process sharing? what's the issue here?' - and the answer is that it can, so the gap is that nothing does it. MEASURED: `keel process export` writes a bundle of .engine-relative files plus a unit.toml naming the skills, rules and guards a receiving project must have and activate. A VIEWPOINT HAS THE SAME SHAPE: 0..1 .view.toml to copy (7 of 32 viewpoints have one), one declaration in the shared .engine/views/viewpoint-registry.sysml, and one renderer naming a keel subcommand (21 of 32) that the receiving binary must possess. Both apparent obstacles already have answers IN THE PROCESS MECHANISM: a declaration in a shared file is carried by NAME in the manifest, exactly as process_cmd.rs already does for rules ('Rules live in shared files, so a rule is carried by NAME rather than by copying a file that also holds other processes rules'); and a dependency on binary capability is carried by name with the import reporting it, exactly as unit.toml already does for guards ('a receiving project must have them in its binary... importing the files alone lands the skill and leaves the teeth behind'). So unit.toml is not process-shaped, it is UNIT-shaped, and the machinery is merely NAMED after processes. Three distinct things had been hiding under the one word shareable: viewpoint DEFINITION portability (no requirement, no command - this issue), viewpoint RESULT snapshot export (srViewerExportShare, verified), and view STATE persistence (srViewerPersistedViewState, now satisfying N-19). DO: decide whether the unit machinery generalizes from processes to units with viewpoints as a second kind, or whether a viewpoint bundle is its own command - a design decision, not an implementation detail.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcUnitPortabilityScope to issue138;
 }

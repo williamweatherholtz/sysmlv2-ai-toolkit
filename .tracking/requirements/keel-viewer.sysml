@@ -202,5 +202,9 @@ package ProjectRequirementsKeelViewer {
         :>> verificationMethod = VerificationMethod::demo;
     }
 
-    satisfy nViewerPersistedViewpoints by srViewerPersistedViewState;
+    // Satisfies N-19, not the superseded N-8 (D0156). The SR itself needed no change: it already said
+    // "sharing is by the artifact travelling in git, requiring no account, no server-side per-user state
+    // and no authentication" — it was decomposing the surviving half all along, which is why the residual
+    // was recordable as issue132 rather than as a defect in this requirement.
+    satisfy nViewerViewStateTravels by srViewerPersistedViewState;
 }

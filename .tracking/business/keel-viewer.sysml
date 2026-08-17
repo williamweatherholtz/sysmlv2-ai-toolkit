@@ -396,4 +396,23 @@ package ProjectBusinessKeelViewer {
     verification keelViewerNeedsAccept5 : Test { :>> id = "6e50d1c0-0113-4c8b-9d2e-00000000003c"; :>> title = "keel-viewer encoding-viewpoints Need N-18 accepted (Business gate 5)"; :>> createdAt = "2026-07-15"; :>> createdBy = "claudeOpus"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AWAITING wweatherholtz's explicit acceptance of N-18 (axis->visual-encoding viewpoints: colour/position/swimlanes/nesting, auto-generated + overridable). Directed 2026-07-15 as a 'HUGE feature'; captured as a Need before architecture. Design direction is D0120 (PROPOSED). No downstream build until this gate passes."; }
     part keelViewerNeedsAccept5R1 : TestResult { :>> id = "12a80483-5bbe-4b02-b448-7283b10e2f16"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e40db8b"; :>> judgedAt = "2026-07-15"; :>> judgedBy = "wweatherholtz"; :>> notes = "N-18 approved by wweatherholtz (2026-07-15, 'yes this is a huge need. approved') — axis-encoding viewpoints; unblocks D0120."; }
     // (no TestResult yet — N-18 is proposed/unaccepted; the human signs off at the sitting review.)
+
+    // =====================================================================
+    // SCOPE CORRECTION (Sprint 320, D0156) — N-8 superseded. Its statement asserted "per-user view
+    // state" and "shareable across users", scope D0115 explicitly dropped, so a reader decomposing it
+    // would derive auth work that was cut. N-19 states the concern that SURVIVES, in the human's own
+    // framing of it: the real need is that a saved view TRAVELS to another machine, not that a server
+    // knows who you are. Authored by claudeOpus5 under the human's explicit authorization (D0156's
+    // acceptance event) because N-8 is theirs and D0108 forbids a non-owner narrowing it unbidden.
+    // =====================================================================
+    #Supersede dependency from d0156 to nViewerPersistedViewpoints;
+
+    requirement nViewerViewStateTravels : Need {
+        :>> id = "6e50d1c0-0113-4c8b-9d2e-0000000000g1";
+        :>> title = "N-19: a saved view persists as an artifact and travels to another machine";
+        :>> createdAt = "2026-08-17"; :>> createdBy = "claudeOpus5"; :>> source = NeedSource::operator;
+        :>> statement = "A stakeholder's saved viewpoint selection, filters and layout must persist as an artifact in the repository and travel with it, so the same view opens on another machine and in another person's clone without an account, a server-side session, or anything the model cannot see. Nothing persists a saved query, scope or layout today.";
+        :>> priority = Priority::should;
+    }
+    satisfy nViewerViewStateTravels by srViewerPersistedViewState;
 }
