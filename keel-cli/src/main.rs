@@ -91,16 +91,49 @@ fn find_repo_root() -> Option<PathBuf> {
     }
 }
 
+/// Resolve a subcommand's optional `[ROOT]` positional, REFUSING an unrecognised flag (issue133).
+///
+/// `positionals` is how many leading positional arguments the subcommand takes before ROOT (`keel view
+/// <name> [ROOT]` passes 1). `known` lists the flag names the subcommand accepts, without `--`.
+///
+/// THE DEFECT THIS EXISTS TO END: every parser used to take its first argument as ROOT, so `keel audit
+/// --explan` made the root the literal string `--explan`, and the command then failed somewhere
+/// downstream about a missing directory — or worse, succeeded against the wrong tree. The other half of
+/// the class SKIPPED anything starting with `--`, so an unknown flag was silently ignored and the command
+/// ran with the wrong behaviour and said nothing. Both turn a typo into a confident wrong answer instead
+/// of an error at the point of the mistake, which is the shape this whole class keeps taking.
+///
+/// `Err(2)` after printing the usage line; the caller returns that code unchanged.
+fn root_arg(args: &[String], usage: &str, known: &[&str], positionals: usize) -> Result<PathBuf, i32> {
+    let mut positional: Vec<&String> = Vec::new();
+    for a in args {
+        if let Some(name) = a.strip_prefix("--") {
+            // A flag's VALUE is consumed by the caller's own parse; only the flag NAME is judged here.
+            if !known.contains(&name) {
+                eprintln!("error: unknown flag `{a}`");
+                eprintln!("usage: {usage}");
+                return Err(2);
+            }
+        } else {
+            positional.push(a);
+        }
+    }
+    if let Some(p) = positional.get(positionals) {
+        return Ok(PathBuf::from(p.as_str()));
+    }
+    find_repo_root().ok_or_else(|| {
+        eprintln!("error: no .engine/ directory found from the current directory upward.");
+        eprintln!("usage: {usage}");
+        2
+    })
+}
+
 // ── subcommands ───────────────────────────────────────────────────────────────
 
 fn cmd_validate(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => if let Some(r) = find_repo_root() { r } else {
-            eprintln!("error: no .engine/ directory found from the current directory upward.");
-            eprintln!("usage: keel validate [ROOT]");
-            return 2;
-        },
+    let root = match root_arg(args, "keel validate [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
 
     let report = validate_root(&root);
@@ -403,13 +436,9 @@ fn cmd_gate(args: &[String]) -> i32 {
 }
 
 fn cmd_check_engine(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => if let Some(r) = find_repo_root() { r } else {
-            eprintln!("error: no .engine/ directory found from the current directory upward.");
-            eprintln!("usage: keel check-engine [ROOT]");
-            return 2;
-        },
+    let root = match root_arg(args, "keel check-engine [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     let diags = keel_cli::validate_engine_instances(&root);
     for (path, d) in &diags {
@@ -520,17 +549,9 @@ fn cmd_serve(args: &[String]) -> i32 {
 
 fn cmd_orient(args: &[String]) -> i32 {
     let html = args.iter().any(|a| a == "--html");
-    let root = match args.iter().find(|a| !a.starts_with("--")) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: keel orient [ROOT] [--html]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel orient [ROOT] [--html]", &["html"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     if html {
         return match keel_cli::view::orient_html(&root) {
@@ -549,16 +570,9 @@ fn cmd_orient(args: &[String]) -> i32 {
 }
 
 fn cmd_attestation_coverage(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel attestation-coverage [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel attestation-coverage [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::attestation_coverage(&root) {
         Ok(json) => {
@@ -573,16 +587,9 @@ fn cmd_attestation_coverage(args: &[String]) -> i32 {
 }
 
 fn cmd_orphans(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel orphans [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel orphans [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::algo::orphans(&root) {
         Ok(json) => {
@@ -597,16 +604,9 @@ fn cmd_orphans(args: &[String]) -> i32 {
 }
 
 fn cmd_audit(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel audit [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel audit [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::algo::audit(&root) {
         Ok(json) => {
@@ -684,16 +684,9 @@ fn cmd_guard(args: &[String]) -> i32 {
 
 // Root-only query: `keel <name> [ROOT]`.
 fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel {usage} [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, &format!("keel {usage} [ROOT]"), &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     println!("{}", f(&root));
     0
@@ -705,16 +698,9 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
         eprintln!("usage: keel {usage} <name> [ROOT]");
         return 2;
     };
-    let root = match args.get(1) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel {usage} <name> [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, &format!("keel {usage} <name> [ROOT]"), &[], 1) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     println!("{}", f(&root, arg));
     0
@@ -768,16 +754,9 @@ fn cmd_reverify(args: &[String]) -> i32 {
 }
 
 fn cmd_open_issues(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel open-issues [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel open-issues [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::open_issues(&root) {
         Ok(json) => {
@@ -792,16 +771,9 @@ fn cmd_open_issues(args: &[String]) -> i32 {
 }
 
 fn cmd_dispositions(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel dispositions [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel dispositions [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::dispositions(&root) {
         Ok(json) => {
@@ -816,16 +788,9 @@ fn cmd_dispositions(args: &[String]) -> i32 {
 }
 
 fn cmd_sitting_coverage(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel sitting-coverage [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel sitting-coverage [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::sitting_coverage(&root) {
         Ok(json) => {
@@ -840,16 +805,9 @@ fn cmd_sitting_coverage(args: &[String]) -> i32 {
 }
 
 fn cmd_concern_coverage(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel concern-coverage [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel concern-coverage [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::concern_coverage(&root) {
         Ok(json) => {
@@ -867,16 +825,9 @@ fn cmd_concern_coverage(args: &[String]) -> i32 {
 // spec-compat file checker; the D0105 name reconciliation is a tracked follow-up). Runs ALONGSIDE
 // `keel guard` until parity retires each guard (guardsToRulesMigration).
 fn cmd_rules(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel rules [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel rules [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::check(&root) {
         Ok(json) => {
@@ -892,16 +843,9 @@ fn cmd_rules(args: &[String]) -> i32 {
 
 // `keel launchables [ROOT]` (srServeModelDrivenRegistry, Tier 1a): the model-declared launchable set.
 fn cmd_launchables(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel launchables [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel launchables [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::launchables(&root) {
         Ok(json) => {
@@ -917,16 +861,9 @@ fn cmd_launchables(args: &[String]) -> i32 {
 
 // `keel business [ROOT]` (serveBusinessNeedsView): the Business layer (Brief/Personas/Needs/UseCases).
 fn cmd_business(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel business [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel business [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::business(&root) {
         Ok(json) => {
@@ -941,16 +878,9 @@ fn cmd_business(args: &[String]) -> i32 {
 }
 
 fn cmd_coverage(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel coverage [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel coverage [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::coverage(&root) {
         Ok(json) => {
@@ -965,16 +895,9 @@ fn cmd_coverage(args: &[String]) -> i32 {
 }
 
 fn cmd_diagram(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel diagram [ROOT]  (redirect to a .html file)");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel diagram [ROOT]  (redirect to a .html file)", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::diagram_html(&root) {
         Ok(html) => {
@@ -989,16 +912,9 @@ fn cmd_diagram(args: &[String]) -> i32 {
 }
 
 fn cmd_decisions(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel decisions [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel decisions [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::decisions_report(&root) {
         Ok(json) => {
@@ -1013,16 +929,9 @@ fn cmd_decisions(args: &[String]) -> i32 {
 }
 
 fn cmd_assured(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel assured [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel assured [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::assured(&root) {
         Ok(json) => {
@@ -1037,16 +946,9 @@ fn cmd_assured(args: &[String]) -> i32 {
 }
 
 fn cmd_critique_coverage(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel critique-coverage [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel critique-coverage [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::critique_coverage(&root) {
         Ok(json) => {
@@ -1061,16 +963,9 @@ fn cmd_critique_coverage(args: &[String]) -> i32 {
 }
 
 fn cmd_critique_policy(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel critique-policy [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel critique-policy [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::critique_policy(&root) {
         Ok(json) => {
@@ -1089,32 +984,18 @@ fn cmd_governing_version(args: &[String]) -> i32 {
         eprintln!("usage: keel governing-version <delivery Story name> [ROOT]");
         return 2;
     };
-    let root = match args.get(1) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel governing-version <delivery Story name> [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel governing-version <delivery Story name> [ROOT]", &[], 1) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     println!("{}", keel_cli::govern::governing_version(&root, item));
     0
 }
 
 fn cmd_reprocess_candidates(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel reprocess-candidates [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel reprocess-candidates [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     println!("{}", keel_cli::govern::reprocess_candidates(&root));
     0
@@ -1122,16 +1003,9 @@ fn cmd_reprocess_candidates(args: &[String]) -> i32 {
 
 fn cmd_suspect(args: &[String]) -> i32 {
     let explain = args.iter().any(|a| a == "--explain");
-    let root = match args.iter().find(|a| !a.starts_with("--")) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("usage: keel suspect [--explain] [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel suspect [--explain] [ROOT]", &["explain"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     println!("{}", keel_cli::govern::suspect(&root, explain));
     0
@@ -1142,17 +1016,9 @@ fn cmd_view(args: &[String]) -> i32 {
         eprintln!("usage: keel view <name> [ROOT]");
         return 2;
     };
-    let root = match args.get(1) {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: keel view <name> [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel view <name> [ROOT]", &[], 1) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     match keel_cli::view::run(&root, name) {
         Ok(json) => {
@@ -1167,17 +1033,9 @@ fn cmd_view(args: &[String]) -> i32 {
 }
 
 fn cmd_whats_next(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("error: no .engine/ directory found from the current directory upward.");
-                eprintln!("usage: keel whats-next [ROOT]");
-                return 2;
-            }
-        }
+    let root = match root_arg(args, "keel whats-next [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     for task in orient::compute(&root).ready {
         println!("{task}");
@@ -1186,12 +1044,9 @@ fn cmd_whats_next(args: &[String]) -> i32 {
 }
 
 fn cmd_ls(args: &[String]) -> i32 {
-    let root = match args.first() {
-        Some(p) => PathBuf::from(p),
-        None => if let Some(r) = find_repo_root() { r } else {
-            eprintln!("error: no .engine/ directory found.");
-            return 2;
-        },
+    let root = match root_arg(args, "keel ls [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
     };
     let dir = root.join(".tracking");
     for p in collect_sysml(&dir) {
@@ -1886,7 +1741,10 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
 /// anyway, but a command that rewrites authored facts should take its target explicitly.
 fn cmd_migrate(args: &[String]) -> i32 {
     let dry_run = args.iter().any(|a| a == "--dry-run");
-    let root = args.iter().find(|a| !a.starts_with("--")).map_or_else(|| PathBuf::from("."), PathBuf::from);
+    let root = match root_arg(args, "keel migrate [--dry-run] [ROOT]", &["dry-run"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
     keel_cli::migrate::cmd(&root, &ENGINE_DIR, dry_run)
 }
 
@@ -2221,7 +2079,24 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_guard_args, remap_engine_path, Path};
+    use super::{classify_guard_args, remap_engine_path, root_arg, Path};
+
+    #[test]
+    fn an_unknown_flag_is_a_mistake_and_never_a_root() {
+        // issue133: the whole class. A mistyped flag used to BECOME the root path (or, in the
+        // skip-flags variant, be silently ignored), so a typo produced a confident wrong answer
+        // somewhere downstream instead of an error where the mistake was made.
+        let a = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        assert_eq!(root_arg(&a(&["--explan"]), "u", &[], 0), Err(2));
+        assert_eq!(root_arg(&a(&["--explan"]), "u", &["explain"], 0), Err(2), "a NEAR-MISS of a known flag is still unknown");
+        // a declared flag passes through, and the positional is still found around it
+        assert_eq!(root_arg(&a(&["--explain", "/r"]), "u", &["explain"], 0).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
+        assert_eq!(root_arg(&a(&["/r", "--explain"]), "u", &["explain"], 0).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
+        // `positionals` skips the subcommand's own leading argument (`keel view <name> [ROOT]`)
+        assert_eq!(root_arg(&a(&["decisions", "/r"]), "u", &[], 1).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
+        // and a leading positional alone leaves ROOT to repo discovery, not to the positional
+        assert_ne!(root_arg(&a(&["decisions"]), "u", &[], 1).map(|p| p.to_string_lossy().to_string()), Ok("decisions".to_string()));
+    }
 
     #[test]
     fn guard_args_distinguish_name_from_root() {

@@ -2106,6 +2106,28 @@ fn blocked_by(model: &Model) -> HashSet<String> {
         .collect()
 }
 
+/// Every `#Resolves` edge as `(resolver, issue, resolver_type)`.
+///
+/// `resolver_type` is the declared item type, or `""` when the resolver is not a typed item — which is
+/// the normal case, since most resolvers are `action` names.
+///
+/// Feeds `guard resolver-kind`. Separate from [`untriaged_issues`] on purpose: that answers whether an
+/// edge EXISTS, and this answers whether the thing on the other end could resolve anything.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn resolves_edges(root: &Path) -> Result<Vec<(String, String, String)>, ViewError> {
+    let model = Model::build(root)?;
+    let mut out: Vec<(String, String, String)> = model
+        .edges
+        .iter()
+        .filter(|e| e.kind == "resolves")
+        .map(|e| (e.from.clone(), e.to.clone(), model.items.get(&e.from).map(|i| i.type_name.clone()).unwrap_or_default()))
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
 /// `(total_issues, untriaged)` — issues with NO `#Resolves` edge at all (D0077). Pure structure
 /// (no done-set needed); the `issues` guard fails on a non-empty untriaged list.
 ///

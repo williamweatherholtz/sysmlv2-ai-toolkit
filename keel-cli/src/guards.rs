@@ -604,6 +604,45 @@ pub fn edge_endpoints(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard: a `#Resolves` resolver must be WORK or a mooting `Decision` (D0077/issue136).
+///
+/// `guard issues` checks only that an Issue HAS a resolving edge, and its own message already says the
+/// resolver should be "a resolving action or Decision" — unchecked, so triage passed on an edge pasted
+/// from the line above it, pointing an unrelated `SystemRequirement` at an Issue about a flag parser.
+/// A nominally-triaged Issue is worse than an untriaged one: it reports as handled.
+///
+/// Valid resolvers: a declared `action` (work that will close it), or a `Decision` (which moots it —
+/// "we won't do X" is a first-class resolution, §1.4). A requirement, Need, Test or Story cannot resolve
+/// anything: none of them is an act, so none can ever compute as complete against the Issue.
+///
+/// A BESPOKE PREDICATE, and D0107 is the precedent that makes that the right call rather than a
+/// shortcut: this cannot be an `EdgeRule`, because `objectType` filters by declared item TYPE and an
+/// `action` is not a typed element — the 127 legitimate action resolvers would all fail. Extending the
+/// rule language to express "action OR Decision" is the larger change; the constraint is checked here
+/// meanwhile, and the rule keeps `objectType = "*"` because that is honestly all it can say.
+#[must_use]
+pub fn resolver_kind(root: &Path) -> GuardReport {
+    let actions = declared_task_names(root);
+    match crate::view::resolves_edges(root) {
+        Ok(edges) => {
+            let scanned = edges.len();
+            let violations = edges
+                .into_iter()
+                .filter(|(from, _, ty)| !actions.contains(from) && ty != "Decision")
+                .map(|(from, to, ty)| {
+                    let what = if ty.is_empty() { "not a declared action and not a typed item".to_string() } else { format!("a {ty}") };
+                    format!(
+                        "{to}: #Resolves comes from {from}, which is {what} — a resolver must be a declared action (work that closes it) or a Decision (which moots it); \
+                         until it is, the Issue reports as TRIAGED while nothing is on the hook for it (issue136)"
+                    )
+                })
+                .collect();
+            GuardReport { name: "resolver-kind", scanned, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport { name: "resolver-kind", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading #Resolves edges: {e}")] },
+    }
+}
+
 /// Guard: the composite assurance-readiness gate (D0079 c).
 ///
 /// Reports the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
@@ -1457,8 +1496,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 33] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary"];
+pub const GUARD_NAMES: [&str; 34] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1780,6 +1819,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
         "issues" => Some(issues(root)),
+        "resolver-kind" => Some(resolver_kind(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),

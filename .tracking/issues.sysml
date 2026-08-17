@@ -1565,7 +1565,7 @@ package ProjectIssues {
         :>> discoveredInField = false;
         :>> severity = Severity::Medium;
     }
-    #Resolves dependency from srViewerPersistedViewState to issue132;
+    #Resolves dependency from dcNeed8ScopeNarrowing to issue132;
 
     part issue133 : Issue {
         :>> id = "6960b071-6670-45d1-a92b-5a5b954b5b04";
@@ -1576,7 +1576,7 @@ package ProjectIssues {
         :>> discoveredInField = false;
         :>> severity = Severity::Medium;
     }
-    #Resolves dependency from srViewerPersistedViewState to issue133;
+    #Resolves dependency from dcRootArmSweep to issue133;
 
     part issue134 : Issue {
         :>> id = "c67ae311-ecf9-480b-a2c5-e91ca831f4e0";
@@ -1599,4 +1599,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSittingObligationScope to issue135;
+
+    part issue136 : Issue {
+        :>> id = "e2a7c50d-9b18-4e6f-a374-6d51b90fc82a";
+        :>> title = "triage passed on a #Resolves edge whose resolver cannot resolve anything";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found while checking whether the two remaining open issues were genuinely triaged, after the ready frontier emptied. issue133 is about a subcommand parser swallowing an unknown flag as a ROOT path; its #Resolves edge pointed at srViewerPersistedViewState, a viewer SystemRequirement, copy-pasted from issue132's edge on the line directly above it. keel open-issues reported untriaged=false for both, because the triage control (view::untriaged_issues, D0077) checks that an incoming #Resolves edge EXISTS and never what is on the other end - and guard:issues own violation message already tells authors to link a resolving action or Decision, so the intended rule was written down and simply not enforced. A nominally-triaged Issue is WORSE than an untriaged one: an untriaged issue is reported as a gap, while this one reported as handled with nothing on the hook for it, and it survived every guard, validate, check-engine and the fast gate. MEASURED before fixing: of 134 #Resolves edges, 127 come from actions and 5 from Decisions - both legitimate - and exactly 2 from a requirement, which are this defect. Same shape as issue109 (an edge whose endpoint resolved to nothing) one level up: there the endpoint did not exist, here it exists and is the wrong KIND of thing.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcResolverKindGuard to issue136;
 }
