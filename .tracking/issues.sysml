@@ -1588,4 +1588,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcVerifyBeforeAsserting to issue134;
+
+    part issue135 : Issue {
+        :>> id = "b05dc7df-bd28-4648-8982-e9dcd15a9df7";
+        :>> title = "sitting-review-due reports 311 obligations, which is true and useless as a queue";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found while building the obligation surface (srConsoleObligationsOnArrival). Of four declared act-surface obligation classes, three report small actionable numbers - acceptances-pending 0, authority-queue 4, findings-awaiting-disposition 3 - and sitting-review-due reports 311 of 315 sprints. The count is correct: keel sitting-coverage reports 311 uncovered sittings, because the per-sitting human review gate post-dates nearly all of this repository's history and nothing in the model distinguishes a sitting AWAITING review from one that predates the convention. N-C1 requires the surface to show every obligation requiring the human's own judgment and NOTHING ELSE, and a queue whose largest entry is 311 items nobody will ever clear defeats the purpose - the three real obligations are lost beside it. Reported with an explicit caveat rather than filtered, because choosing a recency window or a cutoff silently would invent an actionable definition nobody has agreed, and dropping the class would hide a real gap. The fix is a scope decision about what makes a sitting review actionable, which belongs to the human.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSittingObligationScope to issue135;
 }

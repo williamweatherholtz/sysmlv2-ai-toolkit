@@ -110,6 +110,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // srConsoleNavigationDerived (D0152/D0154): the console asks the MODEL what its
         // navigation is. There is no list of surfaces in the console, here, or anywhere else.
         .route("/api/surfaces", get(api_surfaces))
+        // srConsoleObligationsOnArrival (N-C1): what is waiting on the HUMAN, classes derived
+        // from the act-surface viewpoints rather than enumerated here.
+        .route("/api/obligations", get(api_obligations))
         // review queue (D0121) — user-gated items awaiting human judgment (read side of the loop)
         .route("/api/review-queue", get(api_review_queue))
         .route("/api/orient", get(api_orient))
@@ -1023,14 +1026,32 @@ fn fingerprint(root: &Path) -> u64 {
 
 /// Serve a view's JSON from the per-fingerprint cache, recomputing ONLY when the model changed
 /// (D0094 serveLiveCache) — this is what kills the per-request 2s recompute on unchanged data.
+/// Stamp an explicit view status into a computed JSON body (srConsoleViewStatusExplicit / N-C2).
+///
+/// EVERY cached response passes through here, and that is the point: the requirement says no render
+/// path may emit content without a status, and a choke point is the only way to mean it. Without it,
+/// an empty list and a failed computation are the same absence of rows, and the surface cannot help
+/// misleading its reader — the exact failure this engine's own tooling produced repeatedly.
+fn with_status(body: &str, status: &str, extra: &str) -> String {
+    let b = body.trim_start();
+    b.strip_prefix('{').map_or_else(
+        // A non-object body (an array) is WRAPPED rather than left unstamped.
+        || format!("{{\"viewStatus\":\"{status}\"{extra},\"data\":{b}}}"),
+        // Splice into the existing object so no consumer's existing field moves.
+        |rest| format!("{{\"viewStatus\":\"{status}\"{extra},{rest}"),
+    )
+}
+
 fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>) -> Response {
     let fp = fingerprint(&state.root);
-    let hit = {
+    let previous = {
         let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        guard.get(key).and_then(|(cfp, json)| (*cfp == fp).then(|| json.clone()))
+        guard.get(key).cloned()
     };
-    if let Some(json) = hit {
-        return ok_json(json);
+    if let Some((cfp, json)) = previous.clone() {
+        if cfp == fp {
+            return ok_json(with_status(&json, "computed", ""));
+        }
     }
     // issue063: the compute can shell out to git (orient suspect/drift) for up to a second-plus on a cold
     // hit; run it via block_in_place so it never STARVES the multi-thread runtime's worker — other
@@ -1042,9 +1063,22 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
                 let mut guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 guard.insert(key.to_string(), (fp, json.clone()));
             }
-            ok_json(json)
+            ok_json(with_status(&json, "computed", ""))
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+        Err(e) => {
+            let reason = e.to_string().replace('"', "'");
+            // STALE rather than FAILED when a previous good answer exists. Showing the last true
+            // value LABELLED as un-recomputable beats an error page, and stays honest only because
+            // the label travels with it; serving it as current is precisely what N-C2 forbids.
+            if let Some((_, json)) = previous {
+                return ok_json(with_status(&json, "stale", &format!(",\"staleReason\":\"{reason}\"")));
+            }
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                with_status("{}", "failed", &format!(",\"reason\":\"{reason}\"")),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -1074,6 +1108,102 @@ async fn api_schema(State(s): State<AppState>) -> Response {
 /// GET /api/surfaces — navigation computed from the declared Viewpoint registry, never enumerated.
 async fn api_surfaces(State(s): State<AppState>) -> Response {
     cached(&s, "surfaces", crate::view::surfaces_json)
+}
+
+/// The obligation count for one declared act-surface viewpoint, read from the view its `renderer`
+/// names — so the AUTHORITY stays the existing computed view and nothing is re-implemented here.
+///
+/// Returns `None` when no counter is bound to that command. That is reported as NOT COMPUTABLE, never
+/// as zero: a class the console cannot count must not look like a class with nothing in it (N-C2).
+fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
+    let num = |json: &str, key: &str| -> Option<i64> {
+        serde_json::from_str::<serde_json::Value>(json).ok()?.get(key).and_then(|v| match v {
+            serde_json::Value::Array(a) => i64::try_from(a.len()).ok(),
+            other => other.as_i64(),
+        })
+    };
+    match cmd {
+        "orient" => num(&crate::orient::compute(root).to_json(), "pendingAcceptances").map(|n| (n, None)),
+        "dispositions" => num(&crate::view::dispositions(root).ok()?, "undispositioned").map(|n| (n, None)),
+        "authority-queue" => num(&crate::view::authority_queue(root).ok()?, "awaiting").map(|n| (n, None)),
+        // The raw number here is 311 of 315 sprints, because per-sitting review post-dates almost all
+        // of this repo's history. It is reported WITH that caveat rather than filtered: silently
+        // scoping it to "recent" would be inventing an actionable definition nobody has agreed
+        // (issue135), and dropping it would hide a real gap.
+        "sitting-coverage" => num(&crate::view::sitting_coverage(root).ok()?, "uncovered").map(|n| {
+            (n, Some("counts EVERY uncovered sitting, including pre-D0049 history — see issue135 before treating as a live queue".to_string()))
+        }),
+        _ => None,
+    }
+}
+
+/// GET /api/obligations — what is waiting on the human, with the CLASSES derived from the declared
+/// act-surface viewpoints (srConsoleObligationsOnArrival / N-C1).
+///
+/// The classes are not enumerated here. Declaring a viewpoint with `surface = "act"` adds one, which
+/// is what makes N-C1's "without having been told a new class exists" achievable at all.
+async fn api_obligations(State(s): State<AppState>) -> Response {
+    cached(&s, "obligations", |root| {
+        let surfaces = crate::view::surfaces_json(root)?;
+        let parsed: serde_json::Value = serde_json::from_str(&surfaces).unwrap_or(serde_json::Value::Null);
+        let act = parsed
+            .get("surfaces")
+            .and_then(|v| v.as_array())
+            .and_then(|a| a.iter().find(|s| s.get("surface").and_then(|x| x.as_str()) == Some("act")))
+            .and_then(|s| s.get("viewpoints"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let mut classes: Vec<crate::json::Json> = Vec::new();
+        let mut total = 0i64;
+        let mut uncountable = 0i64;
+        for vp in &act {
+            let get = |k: &str| vp.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
+            let renderer = get("renderer");
+            let cmd = renderer.trim_start_matches("keel ").split([' ', '(']).next().unwrap_or("").to_string();
+            let mut row = vec![
+                ("title".to_string(), crate::json::Json::s(get("title"))),
+                ("concern".to_string(), crate::json::Json::s(get("concern"))),
+                ("renderer".to_string(), crate::json::Json::s(renderer.clone())),
+            ];
+            if let Some((n, caveat)) = obligation_count(root, &cmd) {
+                {
+                    total += n;
+                    row.push(("count".to_string(), crate::json::Json::Int(n)));
+                    row.push(("countable".to_string(), crate::json::Json::Bool(true)));
+                    if let Some(c) = caveat {
+                        row.push(("caveat".to_string(), crate::json::Json::s(c)));
+                    }
+                }
+            } else {
+                {
+                    uncountable += 1;
+                    row.push(("countable".to_string(), crate::json::Json::Bool(false)));
+                    row.push((
+                        "why".to_string(),
+                        crate::json::Json::s(format!(
+                            "no counter bound to `{cmd}` — reported as NOT COUNTABLE rather than as zero (N-C2)"
+                        )),
+                    ));
+                }
+            }
+            classes.push(crate::json::Json::Obj(row));
+        }
+        Ok(crate::json::Json::Obj(vec![
+            (
+                "obligations_note".to_string(),
+                crate::json::Json::s(
+                    "what is waiting on a HUMAN. Classes are derived from viewpoints declaring \
+                     surface=\"act\" — declaring one adds a class with no console change. A class with no \
+                     bound counter is reported NOT COUNTABLE, never as zero.",
+                ),
+            ),
+            ("total".to_string(), crate::json::Json::Int(total)),
+            ("classes".to_string(), crate::json::Json::Arr(classes)),
+            ("uncountableClasses".to_string(), crate::json::Json::Int(uncountable)),
+        ])
+        .dump())
+    })
 }
 
 async fn api_review_queue(State(s): State<AppState>) -> Response {
@@ -1643,5 +1773,42 @@ mod tests {
 
         let none = build_blackbox_prompt("n17", &[]);
         assert!(none.contains("self-contained"));
+    }
+}
+
+#[cfg(test)]
+mod view_status_tests {
+    use super::with_status;
+
+    /// srConsoleViewStatusExplicit: the four states must be DISTINGUISHABLE in the payload, because
+    /// an empty list and a failed computation are otherwise the same absence of rows (N-C2).
+    #[test]
+    fn the_four_states_are_distinguishable() {
+        let computed = with_status(r#"{"ready":[]}"#, "computed", "");
+        let failed = with_status("{}", "failed", ",\"reason\":\"parse error\"");
+        let stale = with_status(r#"{"ready":["x"]}"#, "stale", ",\"staleReason\":\"parse error\"");
+        assert!(computed.contains(r#""viewStatus":"computed""#));
+        assert!(failed.contains(r#""viewStatus":"failed""#) && failed.contains("parse error"));
+        assert!(stale.contains(r#""viewStatus":"stale""#) && stale.contains("staleReason"));
+        // The load-bearing assertion: a COMPUTED-EMPTY body must not look like a FAILED one.
+        assert_ne!(
+            computed.replace("computed", "X"),
+            failed.replace("failed", "X"),
+            "an empty computed view and a failed view must not be interchangeable"
+        );
+    }
+
+    #[test]
+    fn an_empty_result_keeps_its_content_and_is_still_stamped() {
+        let s = with_status(r#"{"items":[]}"#, "computed", "");
+        assert!(s.contains(r#""items":[]"#), "the payload survives the stamp");
+        assert!(s.starts_with(r#"{"viewStatus":"computed","#));
+    }
+
+    #[test]
+    fn a_non_object_body_is_wrapped_rather_than_left_unstamped() {
+        // No render path may emit content without a status — including an array body.
+        let s = with_status("[1,2]", "computed", "");
+        assert!(s.contains(r#""viewStatus":"computed""#) && s.contains(r#""data":[1,2]"#));
     }
 }

@@ -82,7 +82,17 @@ async function buildNav(){
 function draw(){const k=activeSurface||active;[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===k))}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${d||''}</div></div>`}
-async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
+async function get(u){const r=await fetch(u);let j=null;try{j=await r.json()}catch(_){}
+ if(!r.ok){const e=new Error((j&&(j.reason||j.viewStatus))||('HTTP '+r.status));e.viewStatus=(j&&j.viewStatus)||'failed';throw e}
+ return j}
+// A view's own status decides how it is drawn. An empty COMPUTED view says so; a STALE one says
+// when it was last true; a FAILED one says why. None of them renders as the others (N-C2).
+function statusBanner(d){
+ const s=d&&d.viewStatus;
+ if(s==='stale')return '<p class=muted style="border-left:3px solid #b58900;padding-left:8px">STALE — this could not be recomputed and is the last value known to be true. Reason: '+esc(d.staleReason||'unknown')+'</p>';
+ if(s==='failed')return '<p class=muted style="border-left:3px solid #c33;padding-left:8px">FAILED to compute: '+esc(d.reason||'unknown')+' — this is NOT an empty result.</p>';
+ return ''}
+
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
 function itemLink(name){return name?`<span class=il data-i="${esc(name)}">${esc(name)}</span>`:'<span class=muted>—</span>'}
 function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';n=n||12;const sh=arr.slice(0,n).map(itemLink).join(' · ');return sh+(arr.length>n?` <span class=muted>…+${arr.length-n} more</span>`:'')}
@@ -242,14 +252,36 @@ function vpCard(vp){
   '<div class=d>'+esc(vp.concern)+'</div>'+
   '<div class=d style="margin-top:6px"><code>'+esc(vp.renderer)+'</code></div></div>'
 }
+// What is owed by the human, drawn on arrival regardless of which surface is active. Classes come
+// from /api/obligations, which derives them from the act-surface viewpoints — so a class declared
+// later appears here without this file changing (N-C1: discoverable without being told it exists).
+async function obligationBar(){
+ let d;
+ try{d=await get('/api/obligations')}
+ catch(e){return '<p class=muted style="border-left:3px solid #c33;padding-left:8px">obligations could not be computed: '+esc(e.message)+' — this is a FAILURE, not "nothing owed".</p>'}
+ const cs=d.classes||[];
+ const owed=cs.filter(c=>c.countable&&c.count>0);
+ const dead=cs.filter(c=>!c.countable);
+ if(!cs.length)return '<p class=muted>No obligation classes are declared. Declare a viewpoint with <code>surface = "act"</code> to add one.</p>';
+ const head=owed.length
+  ?'<b>'+owed.reduce((a,c)=>a+c.count,0)+'</b> item(s) waiting on you, in '+owed.length+' class(es)'
+  :'<b>Nothing is waiting on you.</b> All '+cs.length+' declared obligation classes computed and are empty.';
+ return '<div class=cards style="margin-bottom:10px">'+
+  cs.map(c=>card(c.title,(c.countable?c.count:'?'),
+    esc(c.concern||'')+(c.caveat?'<br><span style="color:#b58900">caveat: '+esc(c.caveat)+'</span>':'')+
+    (c.countable?'':'<br><span style="color:#c33">NOT COUNTABLE — '+esc(c.why||'')+'</span>'),
+    c.countable?(c.count>0?'warn':'good'):'warn')).join('')+'</div>'+
+  '<p class=muted>'+head+(dead.length?' · '+dead.length+' class(es) could not be counted and are shown as ? rather than 0.':'')+'</p>';
+}
 async function render(){
  status.textContent='refreshing…';
  try{
+  const obl=await obligationBar();
   // A SURFACE is selected and no viewpoint yet: show what this surface offers. This is the
   // arrival view, and it is generated — nothing here enumerates surfaces or their contents.
   if(activeSurface&&!activeVp){
    const vps=activeSurface==='__unsurfaced'?UNSURFACED:((SURFACES.find(s=>s.surface===activeSurface)||{}).viewpoints||[]);
-   main.innerHTML=(activeSurface==='__unsurfaced'
+   main.innerHTML=obl+(activeSurface==='__unsurfaced'
      ?'<p class=muted>These viewpoints declare no <code>surface</code>. They are shown rather than filed under a default — an absent grouping is a gap you should see, not one the console guesses at.</p>':'')+
     '<div class=cards>'+vps.map(vpCard).join('')+'</div>'+
     (vps.length?'<p class=muted>Pick a viewpoint to render it, where a panel exists.</p>'
@@ -259,7 +291,7 @@ async function render(){
    status.textContent=activeSurface+' — '+vps.length+' viewpoint(s)';return;
   }
   if(active==='orient'){const o=await get('/api/orient');
-   main.innerHTML='<div class=cards>'+
+   main.innerHTML=obl+statusBanner(o)+'<div class=cards>'+
     card('Progress',`${o.counts.done} / ${o.counts.outstanding}`,'done / outstanding tasks','good')+
     card('Ready to start',(o.ready||[]).length,linkList(o.ready,6),(o.ready||[]).length?'good':'warn')+
     card('Sprints in progress',(o.in_progress_sprints||[]).length,(o.in_progress_sprints||[]).map(s=>itemLink(s.sprint)+' (pending '+(s.pending||'—')+')').join('; ')||'none',(o.in_progress_sprints||[]).length<=2?'good':'warn')+
