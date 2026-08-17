@@ -2186,6 +2186,47 @@ pub fn open_issues(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+/// One declared `Viewpoint`, as every consumer of the registry needs it.
+pub struct ViewpointRow {
+    /// The declaration's element name.
+    pub name: String,
+    /// Human title (what the guard and the views label it by).
+    pub title: String,
+    /// The `renderer` string — a `keel` command, or `(planned ...)`.
+    pub renderer: String,
+    /// `concernText` — the question the lens answers.
+    pub concern: String,
+    /// The declared top-level surface, empty when undeclared (D0154).
+    pub surface: String,
+}
+
+/// EVERY declared `Viewpoint`, from the MODEL — the single answer to "what viewpoints exist" (issue139).
+///
+/// Sourced from the model rather than from `.engine/views/viewpoint-registry.sysml` by name, because
+/// reading one hardcoded file gave the engine TWO answers: the model-driven paths saw every Viewpoint
+/// while the `viewpoint-renderer` HARD GUARD and `concern-coverage` saw only the registry file's. Proven,
+/// not suspected — a probe viewpoint in another views file, with the renderer `keel
+/// definitely-not-a-real-command`, passed the guard while it reported "32 scanned, 0 violations".
+///
+/// It also unblocks per-viewpoint files (issue138): splitting the registry would have silently disabled
+/// the guard for all 32, because none of them would have been in the file it read.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn declared_viewpoints(root: &Path) -> Result<Vec<ViewpointRow>, ViewError> {
+    let model = Model::build(root)?;
+    let mut names: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Viewpoint").map(|(n, _)| n).collect();
+    names.sort();
+    Ok(names
+        .into_iter()
+        .filter_map(|n| {
+            let i = model.items.get(n)?;
+            let g = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
+            Some(ViewpointRow { name: n.clone(), title: g("title"), renderer: g("renderer"), concern: g("concernText"), surface: g("surface") })
+        })
+        .collect())
+}
+
 /// Concern-coverage view (D0057/issue035): which declared stakeholder concerns (Viewpoints) are
 /// SERVED by a real computed renderer, and which are still unserved (renderer `(planned ...)`).
 ///
@@ -2195,30 +2236,16 @@ pub fn open_issues(root: &Path) -> Result<String, ViewError> {
 /// `served` = renderer names a `keel` command; `unserved` = renderer is `(planned ...)`.
 ///
 /// # Errors
-/// Returns `ViewError::Io` if the viewpoint registry cannot be read.
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn concern_coverage(root: &Path) -> Result<String, ViewError> {
-    let path = root.join(".engine").join("views").join("viewpoint-registry.sysml");
-    let text = std::fs::read_to_string(&path).map_err(|e| ViewError::Io(path.display().to_string(), e))?;
-    let quoted = |line: &str, key: &str| -> Option<String> {
-        let needle = format!(":>> {key} = \"");
-        line.split(needle.as_str()).nth(1)?.split('"').next().map(str::to_string)
-    };
-    let (mut title, mut concern) = (String::new(), String::new());
     let mut served: Vec<(String, String, String)> = Vec::new();
     let mut unserved: Vec<(String, String, String)> = Vec::new();
-    for line in text.lines() {
-        let t = line.trim_start();
-        if let Some(v) = quoted(t, "title") {
-            title = v;
-        } else if let Some(v) = quoted(t, "concernText") {
-            concern = v;
-        } else if let Some(r) = quoted(t, "renderer") {
-            let row = (title.clone(), concern.clone(), r.clone());
-            if r.starts_with("(planned") {
-                unserved.push(row);
-            } else {
-                served.push(row);
-            }
+    for vp in declared_viewpoints(root)? {
+        let row = (vp.title.clone(), vp.concern.clone(), vp.renderer.clone());
+        if vp.renderer.starts_with("(planned") {
+            unserved.push(row);
+        } else {
+            served.push(row);
         }
     }
     let total = served.len() + unserved.len();

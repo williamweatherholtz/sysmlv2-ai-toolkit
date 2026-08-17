@@ -671,12 +671,6 @@ const VIEW_SUBCOMMANDS: &[&str] = &[
     "arch", // D0148 — the six `arch` views register as viewpoints; the group name is what `keel <cmd>` matches
 ];
 
-/// The quoted value of `:>> {key} = "..."` on a line.
-fn quoted_attr(line: &str, key: &str) -> Option<String> {
-    let needle = format!(":>> {key} = \"");
-    line.split(needle.as_str()).nth(1)?.split('"').next().map(str::to_string)
-}
-
 /// Classify a viewpoint renderer string: `"retired"` (query.py/report.py, a violation), `"planned"`
 /// (a tolerated warning), `"ok"` (names a real `keel` subcommand), or `"unknown"` (a violation).
 fn classify_renderer(r: &str) -> &'static str {
@@ -699,26 +693,31 @@ fn classify_renderer(r: &str) -> &'static str {
 /// A `(planned ...)` renderer is a tolerated WARNING (a declared-but-unbuilt concern).
 #[must_use]
 pub fn viewpoint_renderer(root: &Path) -> GuardReport {
-    let path = root.join(".engine").join("views").join("viewpoint-registry.sysml");
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        return GuardReport { name: "viewpoint-renderer", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &path))] };
+    // EVERY declared Viewpoint, not just the registry file's (issue139). This guard read one hardcoded
+    // filename while the model saw them all, so a viewpoint declared elsewhere never had its renderer
+    // checked — proven with a probe whose renderer named no command and which the guard did not see.
+    let vps = match crate::view::declared_viewpoints(root) {
+        Ok(v) => v,
+        Err(e) => return GuardReport { name: "viewpoint-renderer", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot enumerate viewpoints: {e}")] },
     };
     let mut scanned = 0;
     let mut warnings = Vec::new();
     let mut violations = Vec::new();
-    let mut title = String::new();
-    for line in text.lines() {
-        let t = line.trim_start();
-        if let Some(v) = quoted_attr(t, "title") {
-            title = v;
-        } else if let Some(r) = quoted_attr(t, "renderer") {
-            scanned += 1;
-            match classify_renderer(&r) {
-                "retired" => violations.push(format!("{title}: renderer references a RETIRED tool (query.py/report.py, D0074) — '{r}'")),
-                "unknown" => violations.push(format!("{title}: renderer names no known keel command — '{r}'")),
-                "planned" => warnings.push(format!("{title}: viewpoint declared but renderer is planned/unbuilt — '{r}'")),
-                _ => {}
-            }
+    for vp in vps {
+        // A Viewpoint with NO renderer is a declared lens nothing can render, so it is judged rather
+        // than skipped — the previous text scan only ever saw viewpoints that had the line at all.
+        let r = vp.renderer;
+        let label = if vp.title.is_empty() { vp.name } else { vp.title };
+        scanned += 1;
+        if r.trim().is_empty() {
+            violations.push(format!("{label}: viewpoint declares NO renderer — a lens nothing can render is a concern claimed and not served"));
+            continue;
+        }
+        match classify_renderer(&r) {
+            "retired" => violations.push(format!("{label}: renderer references a RETIRED tool (query.py/report.py, D0074) — '{r}'")),
+            "unknown" => violations.push(format!("{label}: renderer names no known keel command — '{r}'")),
+            "planned" => warnings.push(format!("{label}: viewpoint declared but renderer is planned/unbuilt — '{r}'")),
+            _ => {}
         }
     }
     GuardReport { name: "viewpoint-renderer", scanned, warnings, violations }
@@ -2192,7 +2191,6 @@ mod tests {
         assert_eq!(classify_renderer("keel report <assurance|...> [--html]"), "ok");
         assert_eq!(classify_renderer("keel frobnicate"), "unknown");
         assert_eq!(classify_renderer("some hand-wave"), "unknown");
-        assert_eq!(quoted_attr("    :>> renderer = \"keel orient\";", "renderer").as_deref(), Some("keel orient"));
     }
 
     #[test]
@@ -2570,5 +2568,48 @@ mod attribute_vocabulary_tests {
     fn prose_naming_an_attribute_is_not_an_assignment() {
         let r = probe("// :>> notReal = \"in a comment\";\npart p : Claim { :>> id = \"x\"; }\n");
         assert!(r.violations.is_empty(), "{:?}", r.violations);
+    }
+}
+
+#[cfg(test)]
+mod viewpoint_enumeration_tests {
+    use super::*;
+
+    /// issue139: the guard must judge EVERY declared Viewpoint, not the ones in one hardcoded filename.
+    /// Before the fix a viewpoint in any other `.engine/views` file was invisible — the guard reported
+    /// "32 scanned, 0 violations" with a probe in the tree whose renderer named no command at all. This
+    /// asserts the FAILING direction, because a guard only ever tested green is a guard nobody tested.
+    #[test]
+    fn a_viewpoint_outside_the_registry_file_is_still_judged() {
+        let dir = std::env::temp_dir().join("keel_vp_enum_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".engine/views")).unwrap();
+        std::fs::create_dir_all(dir.join(".tracking")).unwrap();
+        let vp = |name: &str, id: &str, title: &str, renderer: &str| {
+            format!(
+                "package P{name} {{
+    part {name} : Viewpoint {{
+        :>> id = \"{id}\";
+        :>> title = \"{title}\";
+        :>> renderer = \"{renderer}\";
+    }}
+}}
+"
+            )
+        };
+        // one in the registry file with a real renderer, one in ANOTHER file with a command that does
+        // not exist — the exact shape that used to pass.
+        std::fs::write(dir.join(".engine/views/viewpoint-registry.sysml"), vp("goodVP", "aaaaaaaa-1111-4111-8111-111111111111", "good", "keel orient")).unwrap();
+        std::fs::write(dir.join(".engine/views/other.sysml"), vp("strayVP", "bbbbbbbb-2222-4222-8222-222222222222", "stray", "keel no-such-command")).unwrap();
+
+        let r = viewpoint_renderer(&dir);
+        assert_eq!(r.scanned, 2, "both viewpoints must be scanned, wherever they are declared");
+        assert_eq!(r.violations.len(), 1, "the stray viewpoint's unknown renderer must be a violation; got {:?}", r.violations);
+        assert!(r.violations[0].contains("stray"), "the violation must name the stray viewpoint; got {:?}", r.violations);
+
+        // and the enumeration both readers share agrees
+        let rows = crate::view::declared_viewpoints(&dir).unwrap();
+        assert_eq!(rows.len(), 2, "one answer to what viewpoints exist");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
