@@ -187,7 +187,10 @@ package ProjectRequirementsKeelViewer {
 
     // Decomposes N-8 (nViewerPersistedViewpoints), the one viewer Need D0115 KEPT — it routes N-7's
     // saveable-viewpoint concern here explicitly ("saveable viewpoints are covered by N-8") while
-    // dropping auth/multi-user/per-user, because the viewer is single-user and unauthenticated.
+    // dropping auth/multi-user/per-user, because the CONSOLE is local-only and unauthenticated (D0158
+    // restates D0115's "single-user" here: the ENGINE has one bound actor per machine and collaborates
+    // by git, so multiple contributors are in scope — it is accounts and server-side session state that
+    // are not).
     // Authored by claudeOpus5, who does not own N-8; a non-owner ADDS (D0108) and never edits.
     // N-8's own statement still says "shareable across users" and "per-user view state" — scope
     // D0115 removed — so this SR decomposes only the SURVIVING half and issue132 records the residual.

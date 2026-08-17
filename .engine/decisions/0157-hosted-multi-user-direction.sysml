@@ -23,4 +23,16 @@ package Decision0157 {
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0157Accept : Test { :>> id = "9a3c6e40-5d18-4b72-a06f-c47e9b2d1503"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-08-17, verbatim: 'yes implement as indicated' — in direct reply to a message whose second named record was 'Record a Decision for the hosted/multi-user/marketplace direction: what it is, why not now, what would trigger it, and explicitly that no requirement is derived from it yet.' The DIRECTION recorded here is quoted from their own words in the message before that one, and the same message contained my argument against making it a Need, which they did not contest. This attests the decision to RECORD the direction without deriving work from it. It is not an attestation that the hosted service will be built, nor that any date applies — no trigger date was given, and the Decision says so."; }
     part d0157AcceptR1 : TestResult { :>> id = "5f81b3d6-4c09-4e27-b8a5-13d70fe4c982"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7493b12"; :>> judgedAt = "2026-08-17"; :>> judgedBy = "wweatherholtz"; }
+
+    // ── The trigger this Decision said it lacked. ADDED rather than folded into the text above, because
+    // that text carries an attestation and rewriting it would leave the attestation naming words the
+    // human never saw (the same reason N-8 was superseded instead of edited, D0156).
+    verification d0157Defer : Test {
+        :>> id = "7e14ba62-8c05-4d93-a6f1-20fb85c37e49";
+        :>> title = "D0157 deferred indefinitely — the trigger is the human reraising it";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz, 2026-08-17, verbatim: 'defer the hosted service for now. If we get close to needing it, I'll reraise. Otherwise, keep pursuing.' This CLOSES the weakness D0157's own rationale named: it recorded a direction with no trigger, and said plainly that a direction with no trigger is indistinguishable from one nobody will act on. The trigger is now explicit and it is a PERSON rather than a date — the owner of the intent reraises it. That is a stronger trigger than a date for an intent whose demand they described as 'weak atm': a date would come due while the demand had not, and the honest answer at that point would be to defer again. NO WORK IS SCHEDULED BY THIS and none may be derived from it: the deferral is not a plan to build later, it is a decision not to build now, held open by the one person who can tell when that changes."; }
+    part d0157DeferR1 : TestResult { :>> id = "b0d7c391-5a28-4e64-8f19-c3e40a7b1d52"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "PENDING"; :>> judgedAt = "2026-08-17"; :>> judgedBy = "wweatherholtz"; }
 }

@@ -1632,4 +1632,15 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcUnitPortabilityScope to issue138;
+
+    part issue139 : Issue {
+        :>> id = "3f8a02c5-6b71-4d94-8e05-a2c9147b6de3";
+        :>> title = "the viewpoint-renderer guard reads one hardcoded file while the model sees every Viewpoint";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found while scoping issue138. PROVEN WITH A PROBE, not inferred from reading: a Viewpoint declared in .engine/views/zz-probe.sysml with the deliberately-bogus renderer 'keel definitely-not-a-real-command' passed the HARD viewpoint-renderer guard, which reported '32 scanned, 0 violations' while 33 viewpoints existed - and concern-coverage did not mention it at all. `keel view viewpoints`, which is model-driven, DID see it. The cause: guards.rs viewpoint_renderer and view.rs concern_coverage both read root/.engine/views/viewpoint-registry.sysml by HARDCODED FILENAME and text-scan its lines, while the Model globs the whole .engine/views directory. So the engine holds two different answers to 'what viewpoints exist' and the HARD GUARD holds the smaller one. Consequences: a viewpoint declared in any other engine file can name a dead renderer forever, and its concern is reported as if the viewpoint did not exist - a viewpoint invisible to the audit that exists to stop viewpoints drifting to dead renderers. This is the session's recurring shape once more, a partial view reported as a complete one, and the same family as issue109 (an edge endpoint resolving to nothing) and issue136 (a resolver of the wrong kind). IT ALSO BLOCKS issue138: splitting the registry into one file per viewpoint - the change that would make viewpoints portable the way processes are - would today SILENTLY disable the guard for all of them. DO: source both readers from the model (or the directory) so there is one answer, and cover it with a test that declares a viewpoint outside the registry file and asserts the guard still judges it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcViewpointEnumeration to issue139;
 }
