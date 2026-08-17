@@ -1294,13 +1294,12 @@ fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
         "orient" => num(&crate::orient::compute(root).to_json(), "pendingAcceptances").map(|n| (n, None)),
         "dispositions" => num(&crate::view::dispositions(root).ok()?, "undispositioned").map(|n| (n, None)),
         "authority-queue" => num(&crate::view::authority_queue(root).ok()?, "awaiting").map(|n| (n, None)),
-        // The raw number here is 311 of 315 sprints, because per-sitting review post-dates almost all
-        // of this repo's history. It is reported WITH that caveat rather than filtered: silently
-        // scoping it to "recent" would be inventing an actionable definition nobody has agreed
-        // (issue135), and dropping it would hide a real gap.
-        "sitting-coverage" => num(&crate::view::sitting_coverage(root).ok()?, "uncovered").map(|n| {
-            (n, Some("counts EVERY uncovered sitting, including pre-D0049 history — see issue135 before treating as a live queue".to_string()))
-        }),
+        // `due`, not `uncovered`: the live obligation is what postdates D0155's grandfather line. The
+        // 313 sittings uncovered when that line landed are accepted-unreviewed by human attestation and
+        // stay visible in the view's own `grandfathered_unreviewed` — they are not a thing to act on, so
+        // they do not belong on the act surface (N-C1: obligations requiring judgment AND NOTHING ELSE).
+        // No caveat: the number is defensible now, and a caveat on a defensible number is noise.
+        "sitting-coverage" => num(&crate::view::sitting_coverage(root).ok()?, "due").map(|n| (n, None)),
         _ => None,
     }
 }

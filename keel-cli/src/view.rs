@@ -2276,6 +2276,16 @@ fn covered_sprints(model: &Model) -> HashSet<&str> {
 /// computable (the human gate's coverage). A VIEW, not a gate — the human reviews per sitting at their
 /// own cadence (batchable, D0019); an uncovered sprint is surfaced, not blocked.
 ///
+/// `uncovered` is every sitting with no review, unchanged. `due` is the LIVE obligation: uncovered and
+/// created after D0155's grandfather line, drawn at that Decision's introduction commit. The 313
+/// sittings uncovered when it landed are accepted-unreviewed by human attestation and reported as
+/// `grandfathered_unreviewed` — a waived obligation stays on screen, or the waiver is unfalsifiable.
+///
+/// If the line can't be resolved, NOTHING is grandfathered and every uncovered sitting is due. That is
+/// the opposite of the gate stance (D0050 grandfathers everything on git failure so a gate never
+/// spuriously blocks): a gate failing open is cautious, but an obligation surface reporting nothing owed
+/// when it doesn't know is the one thing N-C2 forbids.
+///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
@@ -2283,7 +2293,16 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
     let mut sprints: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
     sprints.sort();
     let covered: HashSet<&str> = covered_sprints(&model);
-    let uncovered: Vec<Json> = sprints.iter().filter(|s| !covered.contains(s.as_str())).map(|s| Json::s((*s).clone())).collect();
+    let gf = crate::govern::grandfathered_under(root, SITTING_DECISION);
+    let uncovered_names: Vec<&String> = sprints.iter().filter(|s| !covered.contains(s.as_str())).copied().collect();
+    let is_gf = |s: &str| gf.as_ref().is_some_and(|g| g.contains(s));
+    let due: Vec<Json> = uncovered_names.iter().filter(|s| !is_gf(s)).map(|s| Json::s((*s).clone())).collect();
+    let gf_n = uncovered_names.len() - due.len();
+    let basis = match gf.as_ref() {
+        None => "GRANDFATHER LINE UNRESOLVED (D0155 not yet committed, or git unavailable) — nothing is grandfathered and every uncovered sitting is reported as due, because a surface that cannot resolve its boundary must overstate the obligation rather than understate it".to_string(),
+        Some(_) => format!("due = uncovered AND not present at D0155's introduction commit; {gf_n} sitting(s) accepted-unreviewed by human attestation (D0155), reported and not deleted"),
+    };
+    let uncovered: Vec<Json> = uncovered_names.iter().map(|s| Json::s((*s).clone())).collect();
     // Each per-sitting review (a source of #Covers edges) + the sprints it attests.
     let mut review_names: Vec<&String> = model.edges.iter().filter(|e| e.kind == "covers").map(|e| &e.from).collect();
     review_names.sort_unstable();
@@ -2298,11 +2317,16 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
         .collect();
     let total = sprints.len();
     let uncovered_n = uncovered.len();
+    let due_n = due.len();
     let out = Json::Obj(vec![
         ("sprints".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
         ("covered".to_string(), Json::Int(i64::try_from(total - uncovered_n).unwrap_or(i64::MAX))),
         ("uncovered".to_string(), Json::Int(i64::try_from(uncovered_n).unwrap_or(i64::MAX))),
+        ("due".to_string(), Json::Int(i64::try_from(due_n).unwrap_or(i64::MAX))),
+        ("grandfathered_unreviewed".to_string(), Json::Int(i64::try_from(gf_n).unwrap_or(i64::MAX))),
+        ("grandfatherBasis".to_string(), Json::s(basis)),
         ("sitting_reviews".to_string(), Json::Arr(reviews)),
+        ("due_sprints".to_string(), Json::Arr(due)),
         ("uncovered_sprints".to_string(), Json::Arr(uncovered)),
     ]);
     Ok(out.dump())
@@ -3094,6 +3118,9 @@ fn compute_critique_coverage<S: std::hash::BuildHasher>(
 // though still shown in the VIEW with `governed=false` for transparency).
 const COVERAGE_DECISION: &str = "d0079";
 const CRITIQUE_DECISION: &str = "d0080";
+/// The sitting-review grandfather line (D0155): sittings present at this Decision's introduction commit
+/// are accepted-unreviewed; everything after it is a live obligation.
+const SITTING_DECISION: &str = "d0155";
 
 /// Whether `name` is GOVERNED (in scope) given a grandfather set: in scope iff present and not
 /// grandfathered. A `None` set (git unavailable) yields `false` — conservative: the gate never
@@ -6736,6 +6763,28 @@ mod tests {
         assert!(covered.contains("s1"), "s1 is covered by the sitting review");
         assert!(!covered.contains("s2"), "s2 has no covering review");
         assert_eq!(covered.len(), 1);
+    }
+
+    #[test]
+    fn an_unresolved_grandfather_line_reports_every_sitting_as_due() {
+        // D0155: the obligation surface must OVERSTATE rather than understate when it cannot resolve its
+        // own boundary. A non-repo root has no D0155 introduction commit, so nothing may be grandfathered
+        // — the opposite of the gate stance (D0050), because "nothing owed" must never be a guess.
+        let dir = std::env::temp_dir().join("keel_sitting_gf_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".tracking/delivery")).unwrap();
+        std::fs::create_dir_all(dir.join(".engine")).unwrap();
+        std::fs::write(
+            dir.join(".tracking/delivery/s.sysml"),
+            "package P {\n    part s1 : Story { :>> id = \"11111111-1111-4111-8111-111111111111\"; :>> title = \"t\"; }\n}\n",
+        )
+        .unwrap();
+        let out = sitting_coverage(&dir).unwrap();
+        assert!(out.contains("\"uncovered\": 1"), "one uncovered sitting: {out}");
+        assert!(out.contains("\"due\": 1"), "an unresolved line grandfathers NOTHING: {out}");
+        assert!(out.contains("\"grandfathered_unreviewed\": 0"), "{out}");
+        assert!(out.contains("GRANDFATHER LINE UNRESOLVED"), "the basis must SAY why it could not scope: {out}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
