@@ -39,7 +39,7 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/version", "/api/schema", "/api/review-queue", "/api/orient", "/api/business", "/api/decisions",
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/baseline-compare",
-    "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations", "/api/grammar",
+    "/api/computed/:cmd", "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations", "/api/grammar",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -166,6 +166,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/dispositions", get(api_dispositions))
         .route("/api/processes", get(api_processes))
         .route("/api/report/:name", get(api_report))
+        .route("/api/computed/:cmd", get(api_computed))
         .route("/api/history", get(api_history))
         // m2 — deterministic actions
         .route("/api/disposition", post(api_disposition))
@@ -1278,6 +1279,48 @@ async fn api_surfaces(State(s): State<AppState>) -> Response {
     cached(&s, "surfaces", crate::view::surfaces_json)
 }
 
+/// The full computed JSON for a declared viewpoint's `renderer` command — ONE dispatch table, shared by
+/// the obligation counter and by `/api/computed/:cmd`.
+///
+/// Why it exists (srConsoleObligationActionable): an obligation card must take the reader to the place the
+/// work is done, and two of the four act viewpoints named views with no endpoint at all — a click would
+/// have silently changed nothing. Serving the command's own JSON generically means a NEWLY DECLARED act
+/// viewpoint is both countable and reachable with no route and no console change.
+///
+/// `None` for a command with no binding, reported as NOT AVAILABLE naming the command — never as an empty
+/// result, which is the same rule the counter follows.
+fn computed_view(root: &Path, cmd: &str) -> Option<Result<String, crate::view::ViewError>> {
+    Some(match cmd {
+        "orient" => Ok(crate::orient::compute(root).to_json()),
+        "dispositions" => crate::view::dispositions(root),
+        "authority-queue" => crate::view::authority_queue(root),
+        "sitting-coverage" => crate::view::sitting_coverage(root),
+        "open-issues" => crate::view::open_issues(root),
+        "suspect" => Ok(crate::govern::suspect(root, false)),
+        "critique-coverage" => crate::view::critique_coverage(root),
+        "concern-coverage" => crate::view::concern_coverage(root),
+        "coverage" => crate::view::coverage(root),
+        "rootedness" => crate::view::rootedness(root),
+        "tier-satisfaction" => crate::view::tier_satisfaction(root),
+        "indicators" => crate::view::indicators(root, false),
+        "orphans" => crate::algo::orphans(root).map_err(|e| crate::view::ViewError::Track(String::from("orphans"), e.to_string())),
+        _ => return None,
+    })
+}
+
+/// GET /api/computed/:cmd — any declared viewpoint's computed JSON, so a card can land on the view its
+/// renderer names. Cached per command like every other view.
+async fn api_computed(State(s): State<AppState>, axum::extract::Path(cmd): axum::extract::Path<String>) -> Response {
+    let key = format!("computed:{cmd}");
+    let c = cmd.clone();
+    match computed_view(&s.rootpath(), &c) {
+        Some(_) => cached(&s, &key, move |root| computed_view(root, &c).unwrap_or_else(|| Ok(String::from("{}")))),
+        // Not an empty body and not a 200: a command with no binding is a stated gap, so the reader learns
+        // the view exists in the model and has no server-side computation rather than seeing a blank panel.
+        None => (StatusCode::NOT_FOUND, format!("{{\"viewStatus\":\"failed\",\"reason\":\"no computed view is bound to the command '{cmd}' - the viewpoint declares a renderer the server cannot compute; run it on the CLI as: keel {cmd}\"}}")).into_response(),
+    }
+}
+
 /// The obligation count for one declared act-surface viewpoint, read from the view its `renderer`
 /// names — so the AUTHORITY stays the existing computed view and nothing is re-implemented here.
 ///
@@ -1290,16 +1333,19 @@ fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
             other => other.as_i64(),
         })
     };
+    // The COUNT key per command; the JSON itself comes from computed_view, so the counter and the panel
+    // can never disagree about which view a renderer names (one dispatch table, not two).
+    let json = computed_view(root, cmd)?.ok()?;
     match cmd {
-        "orient" => num(&crate::orient::compute(root).to_json(), "pendingAcceptances").map(|n| (n, None)),
-        "dispositions" => num(&crate::view::dispositions(root).ok()?, "undispositioned").map(|n| (n, None)),
-        "authority-queue" => num(&crate::view::authority_queue(root).ok()?, "awaiting").map(|n| (n, None)),
+        "orient" => num(&json, "pendingAcceptances").map(|n| (n, None)),
+        "dispositions" => num(&json, "undispositioned").map(|n| (n, None)),
+        "authority-queue" => num(&json, "awaiting").map(|n| (n, None)),
         // `due`, not `uncovered`: the live obligation is what postdates D0155's grandfather line. The
         // 313 sittings uncovered when that line landed are accepted-unreviewed by human attestation and
         // stay visible in the view's own `grandfathered_unreviewed` — they are not a thing to act on, so
         // they do not belong on the act surface (N-C1: obligations requiring judgment AND NOTHING ELSE).
         // No caveat: the number is defensible now, and a caveat on a defensible number is noise.
-        "sitting-coverage" => num(&crate::view::sitting_coverage(root).ok()?, "due").map(|n| (n, None)),
+        "sitting-coverage" => num(&json, "due").map(|n| (n, None)),
         _ => None,
     }
 }
@@ -1329,6 +1375,9 @@ async fn api_obligations(State(s): State<AppState>) -> Response {
             let renderer = get("renderer");
             let cmd = renderer.trim_start_matches("keel ").split([' ', '(']).next().unwrap_or("").to_string();
             let mut row = vec![
+                // The viewpoint's ELEMENT NAME, so a console can link the card to the place the work is
+                // done by identity rather than by matching a title (srConsoleObligationActionable).
+                ("viewpoint".to_string(), crate::json::Json::s(get("viewpoint"))),
                 ("title".to_string(), crate::json::Json::s(get("title"))),
                 ("concern".to_string(), crate::json::Json::s(get("concern"))),
                 ("renderer".to_string(), crate::json::Json::s(renderer.clone())),

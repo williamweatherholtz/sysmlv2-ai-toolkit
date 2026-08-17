@@ -1654,4 +1654,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcStaleGateProse to issue140;
+
+    part issue141 : Issue {
+        :>> id = "5a9d02e7-c418-4b36-8f70-1e6b3a95cd24";
+        :>> title = "console bound card clicks by DOM position, so every viewpoint card was off by four";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY THE HUMAN using the live console: clicking a card, especially on the act surface, did not take them where the work is done. The cause is a defect I introduced in sprint 316. The surface arrival view bound clicks positionally - main.querySelectorAll('.c') indexed against the viewpoint array - and sprint 316 then PREPENDED the obligation bar into the same container, where each obligation class is rendered by the same card() helper and so carries the same `.c` class. From that commit on, the four obligation cards occupied indices 0..3: clicking an obligation card selected an arbitrary viewpoint, and every viewpoint card was off by four, with the last four selecting undefined and rendering nothing. Nothing detected it: no gate reads the DOM, the console has no tests, and both card kinds are correct in isolation - the defect is only in their COMBINATION, which is the same check-narrower-than-its-subject shape as issue109, issue136 and issue139. THE CONTROL IS STRUCTURAL RATHER THAN A GUARD, and that is stated plainly because no automated check in this engine can read a browser: the target is now carried ON the element as a data attribute and resolved by identity, so there is no index to be off by, and the handler is bound ONCE by delegation on the container so a render path added later inherits it rather than silently producing dead cards. Fixed with srConsoleObligationActionable, which makes identity-binding a requirement rather than a habit.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcObligationActionable to issue141;
 }

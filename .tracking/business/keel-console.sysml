@@ -143,6 +143,19 @@ package ProjectConsoleBusiness {
         :>> extensions = "UNREADABLE: a project whose model fails to parse reports that plainly and never silently falls back to the previous one. STALE: a project changed on disk since last read is recomputed rather than served from cache.";
     }
 
+    // Requested by wweatherholtz on 2026-08-17, browsing the live console: "when i click on the cards,
+    // especially those in act, i expect to be taken to the right place to act." UC-C2 covers DISCHARGING
+    // an obligation once you are on it; nothing covered GETTING there from the count, which is the step
+    // the reader actually performs first.
+    use case ucConsoleActFromCount : UseCase {
+        :>> id = "3c7f1a92-6b04-4e58-9d31-000000000u07";
+        :>> title = "UC-C7: Go from a count to the work it counts";
+        :>> createdAt = "2026-08-17"; :>> createdBy = "claudeOpus5";
+        :>> description = "As an asynchronous supervisor, I want a number that says something is owed to take me to the thing it counted, so that reading my obligations and acting on them are one motion rather than two - the second being a translation from a count into a command I have to know. (Serves N-C1; precondition of UC-C2.)";
+        :>> mainSuccess = "An obligation card shows a count and an affordance that it acts; selecting it opens the view whose renderer produced that count, with the surface selection following so the navigation agrees with what is rendered; where a purpose-built panel exists the reader gets its controls, and otherwise the computed view itself is rendered rather than nothing.";
+        :>> extensions = "NO TARGET: a card with nothing to open carries no affordance, so the surface never promises a click that does nothing. UNCOMPUTABLE DESTINATION: a viewpoint whose renderer names a view the server cannot compute reports that, with the CLI command to run, rather than rendering an empty panel. NEW CLASS: an act viewpoint declared later is clickable and lands correctly with no console change, because both the count and the destination are read from the same declaration.";
+    }
+
     use case ucConsoleAddCapabilityByDeclaration : UseCase {
         :>> id = "3c7f1a92-6b04-4e58-9d31-000000000u05";
         :>> title = "UC-C6: Add a surface by declaring a viewpoint, not by editing the console";
@@ -155,6 +168,7 @@ package ProjectConsoleBusiness {
     // ---- traces: UseCase -> Need --------------------------------------------------------------
     #DerivedFrom dependency from ucConsoleCheckObligations to nConsoleObligationDiscoverable;
     #DerivedFrom dependency from ucConsoleDischargeObligation to nConsoleObligationDiscoverable;
+    #DerivedFrom dependency from ucConsoleActFromCount to nConsoleObligationDiscoverable;
     #DerivedFrom dependency from ucConsoleTrustAQuietSurface to nConsoleNeverMisleads;
     #DerivedFrom dependency from ucConsoleScopeToModel to nConsoleContextCertain;
     #DerivedFrom dependency from ucConsoleSwitchProject to nConsoleMultiProject;

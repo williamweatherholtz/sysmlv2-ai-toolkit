@@ -103,7 +103,23 @@ package ProjectConsoleRequirements {
     #DependsOn dependency from srConsoleArrivalBounded to srConsoleNavigationDerived;
     #DependsOn dependency from srConsoleModelScopeResolved to srConsoleProjectRebind;
 
+    // UC-C7. The DESTINATION is derived from the same declaration as the COUNT, so this cannot drift into
+    // a hardcoded map of class-to-page - the failure nServeReuseModel forbids and VIEW_SUBCOMMANDS already
+    // demonstrates in a neighbouring control.
+    requirement srConsoleObligationActionable : SystemRequirement {
+        :>> id = "d3103651-b3fc-44d8-89e9-52e903a74c07";
+        :>> title = "An obligation count is a link to the view that produced it";
+        :>> createdAt = "2026-08-17"; :>> createdBy = "claudeOpus5";
+        :>> statement = "Every obligation class the surface reports shall carry the IDENTITY of the viewpoint whose renderer computed its count, and selecting the class shall open that viewpoint - selecting its surface as well, so the navigation agrees with what is rendered. A class with no resolvable destination shall carry no affordance rather than an inert one. A destination whose renderer names a view the server cannot compute shall report that, naming the command to run, and shall not render as an empty result. The binding shall be by identity carried on the element, never by the position of a card in a rendered list.";
+        :>> rationale = "Two things forced the last clause. The count and the destination must come from ONE declaration or they drift: the count is already read from the view the renderer names, so the destination is free. And the previous arrival view bound clicks by DOM index over every element of class `.c`, while the obligation bar prepends four such cards into the same container - so every viewpoint card was off by four and an obligation card selected an arbitrary viewpoint (issue141). Identity binding cannot go off-by-N, and delegation means a render path added later inherits the behaviour instead of silently producing dead cards.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::demo;
+    }
+    satisfy nConsoleObligationDiscoverable by srConsoleObligationActionable;
+
     // ── #DerivedFrom: the shape Decision these requirements sit inside ─────────────────────────
     #DerivedFrom dependency from srConsoleNavigationDerived to d0152;
     #DerivedFrom dependency from srConsoleObligationsOnArrival to d0152;
+    #DerivedFrom dependency from srConsoleObligationActionable to d0152;
 }
