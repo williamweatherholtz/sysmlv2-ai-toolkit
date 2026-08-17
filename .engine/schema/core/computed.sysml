@@ -30,6 +30,15 @@ package EngineComputed {
         attribute audience : String;   // stakeholder/role served (e.g. "safety engineer")
         attribute sources : String;    // model elements/edges it draws from (what it exposes)
         attribute renderer : String;   // tooling binding that computes/renders it (e.g. "report.py:tab_traceability")
+        // WHICH top-level surface this lens appears on (D0154). The console derives its navigation
+        // from the DISTINCT set of declared surfaces, so the number of top-level choices is a
+        // function of declared grouping rather than of viewpoint count — without this, generating
+        // navigation from 28 viewpoints yields 28 entries, which is worse than the hardcoded tabs the
+        // redesign replaces. Deliberately NOT `audience`: that is free prose, inconsistently ordered,
+        // and answers who a lens is FOR rather than where it APPEARS. Optional so every viewpoint
+        // predating it stays valid (issue068, forward-only); an absent surface is REPORTED as a gap,
+        // never defaulted onto a surface the viewpoint never claimed.
+        attribute surface : String[0..1];
     }
 
     // ---- derivations as native calc / analysis defs (analysisCalc) ----

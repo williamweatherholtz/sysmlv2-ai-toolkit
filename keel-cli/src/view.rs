@@ -7561,3 +7561,76 @@ mod tests {
         }
     }
 }
+
+/// GET /api/surfaces — the console's navigation, COMPUTED from the declared Viewpoint registry
+/// (D0152/D0154, srConsoleNavigationDerived).
+///
+/// # Why this exists rather than a list in the console
+///
+/// The console's navigation was a literal array of twelve entries organised by data type, grown one
+/// per API endpoint. N-17 forbids exactly that — the surface must generate itself from the declared
+/// model — and srConsoleArrivalBounded requires that adding a viewpoint NOT add a top-level choice.
+/// Both hold here because the top level is the DISTINCT SET OF DECLARED SURFACES: 32 viewpoints
+/// currently resolve to 6 surfaces, and declaring a 33rd changes the count only if it names a
+/// surface no other viewpoint claims.
+///
+/// A viewpoint with NO declared surface is returned under `unsurfaced` rather than dropped or
+/// defaulted — an absent grouping is a gap the reader must see (N-C2), and silently filing it under
+/// some default would be the confident-wrong-answer failure this engine keeps producing.
+///
+/// # Errors
+/// Returns [`ViewError`] if the registry cannot be read.
+pub(crate) fn surfaces_json(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let mut by_surface: BTreeMap<String, Vec<Json>> = BTreeMap::new();
+    let mut unsurfaced: Vec<Json> = Vec::new();
+    let mut names: Vec<&String> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Viewpoint")
+        .map(|(n, _)| n)
+        .collect();
+    names.sort();
+    for n in names {
+        let Some(i) = model.items.get(n) else { continue };
+        let g = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
+        let entry = Json::Obj(vec![
+            ("viewpoint".to_string(), Json::s(n.clone())),
+            ("title".to_string(), Json::s(g("title"))),
+            ("concern".to_string(), Json::s(g("concernText"))),
+            ("audience".to_string(), Json::s(g("audience"))),
+            ("renderer".to_string(), Json::s(g("renderer"))),
+        ]);
+        let s = g("surface");
+        if s.trim().is_empty() {
+            unsurfaced.push(entry);
+        } else {
+            by_surface.entry(s).or_default().push(entry);
+        }
+    }
+    let surfaces: Vec<Json> = by_surface
+        .into_iter()
+        .map(|(name, vps)| {
+            Json::Obj(vec![
+                ("surface".to_string(), Json::s(name)),
+                ("count".to_string(), Json::Int(i64::try_from(vps.len()).unwrap_or(i64::MAX))),
+                ("viewpoints".to_string(), Json::Arr(vps)),
+            ])
+        })
+        .collect();
+    Ok(Json::Obj(vec![
+        (
+            "surfaces_note".to_string(),
+            Json::s(
+                "console navigation, COMPUTED from the declared Viewpoint registry (D0154). Top-level \
+                 choices are the DISTINCT declared surfaces, so declaring a viewpoint does not add one \
+                 unless it names a new surface. A viewpoint with no declared surface appears under \
+                 `unsurfaced` — never defaulted onto a surface it did not claim.",
+            ),
+        ),
+        ("status".to_string(), Json::s("computed")),
+        ("surfaces".to_string(), Json::Arr(surfaces)),
+        ("unsurfaced".to_string(), Json::Arr(unsurfaced)),
+    ])
+    .dump())
+}

@@ -107,6 +107,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/version", get(api_version))
         // viewerSchemaApi (N-17/D0117) — declared types + attributes, the generative-UI substrate
         .route("/api/schema", get(api_schema))
+        // srConsoleNavigationDerived (D0152/D0154): the console asks the MODEL what its
+        // navigation is. There is no list of surfaces in the console, here, or anywhere else.
+        .route("/api/surfaces", get(api_surfaces))
         // review queue (D0121) — user-gated items awaiting human judgment (read side of the loop)
         .route("/api/review-queue", get(api_review_queue))
         .route("/api/orient", get(api_orient))
@@ -1068,6 +1071,11 @@ async fn api_schema(State(s): State<AppState>) -> Response {
 /// GET /api/review-queue (D0121) — the human review queue: user-gated items awaiting judgment
 /// (proposed Decisions + pending confirmation gates). The read side of the human-oversight loop;
 /// the "Review" console tab renders it and records acceptance via the write endpoints.
+/// GET /api/surfaces — navigation computed from the declared Viewpoint registry, never enumerated.
+async fn api_surfaces(State(s): State<AppState>) -> Response {
+    cached(&s, "surfaces", crate::view::surfaces_json)
+}
+
 async fn api_review_queue(State(s): State<AppState>) -> Response {
     cached(&s, "review-queue", crate::view::review_queue_json)
 }

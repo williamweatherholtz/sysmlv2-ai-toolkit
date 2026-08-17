@@ -38,7 +38,11 @@
 <script>
 // Directed-only (sr17/D0098): NO free-form Agent tab. Every AI action is directed at a named element
 // (the modal's Critique ▶) and produces a recorded artifact (Issues). For free-form AI, open a terminal.
-const TABS=[["orient","Orient"],["review","Review"],["recent","Recent"],["business","Business"],["decisions","Decisions"],["processes","Processes"],["section","Section"],["boundary","Boundary"],["dispositions","Findings"],["reports","Reports"],["history","Interaction history"],["settings","Settings"]];
+// NO LITERAL LIST OF SURFACES, TABS OR SECTIONS EXISTS HERE (srConsoleNavigationDerived, N-17).
+// Navigation is fetched from /api/surfaces, which computes it from the declared Viewpoint registry.
+// Adding a viewpoint changes this nav ONLY if it names a surface no other viewpoint claims
+// (srConsoleArrivalBounded) — twelve hardcoded tabs were the integral of one tab per endpoint.
+let SURFACES=[], UNSURFACED=[], activeVp=null;
 let aiBridge=true; // serveSettings: whether the claude -p agent bridge is enabled (fetched from /api/settings)
 function renderAgentEvent(data){
  try{const o=JSON.parse(data);
@@ -48,10 +52,34 @@ function renderAgentEvent(data){
   return '';
  }catch(_){return ''}
 }
-let active=TABS.some(([k])=>k===location.hash.slice(1))?location.hash.slice(1):"orient", reportName="assurance", showAllReview=false;
+let active=null, activeSurface=null, reportName="assurance", showAllReview=false;
 const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
-TABS.forEach(([k,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.k=k;b.onclick=()=>{active=k;location.hash=k;draw();render()};nav.appendChild(b)});
-function draw(){[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===active))}
+// The command a viewpoint's DECLARED renderer names — the binding comes from the model, so a
+// viewpoint pointing at an existing panel gets it, and one that does not says what to run instead.
+function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+/,'').split(/[\s(]/)[0]}
+async function buildNav(){
+ const d=await get('/api/surfaces');
+ SURFACES=d.surfaces||[]; UNSURFACED=d.unsurfaced||[];
+ nav.innerHTML='';
+ SURFACES.forEach(s=>{const b=document.createElement('button');
+  b.textContent=s.surface+' ('+s.count+')';b.dataset.k=s.surface;
+  b.onclick=()=>{activeSurface=s.surface;activeVp=null;active=null;location.hash=s.surface;draw();render()};
+  nav.appendChild(b)});
+ if(UNSURFACED.length){const b=document.createElement('button');
+  b.textContent='unsurfaced ('+UNSURFACED.length+')';b.dataset.k='__unsurfaced';
+  b.title='viewpoints declaring no surface — shown, never silently filed under a default';
+  b.onclick=()=>{activeSurface='__unsurfaced';activeVp=null;active=null;draw();render()};
+  nav.appendChild(b)}
+ const g=document.createElement('button');g.textContent='⚙';g.dataset.k='settings';
+ g.title='console settings — app configuration, not a lens on the model, so not a surface';
+ g.onclick=()=>{activeSurface=null;activeVp=null;active='settings';location.hash='settings';draw();render()};
+ nav.appendChild(g);
+ const h=location.hash.slice(1);
+ activeSurface=SURFACES.some(s=>s.surface===h)?h:(SURFACES[0]&&SURFACES[0].surface)||null;
+ if(h==='settings'){active='settings';activeSurface=null}
+ draw();
+}
+function draw(){const k=activeSurface||active;[...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.k===k))}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function card(l,v,d,tone){return `<div class="c ${tone||''}"><div class=l>${esc(l)}</div><div class=v>${esc(v)}</div><div class=d>${d||''}</div></div>`}
 async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
@@ -209,9 +237,27 @@ async function rejectGate(name,file){
   status.textContent='rejected gate '+name+' ✓ (recorded)';render();
  }catch(e){status.textContent='reject error: '+e.message}
 }
+function vpCard(vp){
+ return '<div class="c"><div class=l>'+esc(vp.title)+'</div>'+
+  '<div class=d>'+esc(vp.concern)+'</div>'+
+  '<div class=d style="margin-top:6px"><code>'+esc(vp.renderer)+'</code></div></div>'
+}
 async function render(){
  status.textContent='refreshing…';
  try{
+  // A SURFACE is selected and no viewpoint yet: show what this surface offers. This is the
+  // arrival view, and it is generated — nothing here enumerates surfaces or their contents.
+  if(activeSurface&&!activeVp){
+   const vps=activeSurface==='__unsurfaced'?UNSURFACED:((SURFACES.find(s=>s.surface===activeSurface)||{}).viewpoints||[]);
+   main.innerHTML=(activeSurface==='__unsurfaced'
+     ?'<p class=muted>These viewpoints declare no <code>surface</code>. They are shown rather than filed under a default — an absent grouping is a gap you should see, not one the console guesses at.</p>':'')+
+    '<div class=cards>'+vps.map(vpCard).join('')+'</div>'+
+    (vps.length?'<p class=muted>Pick a viewpoint to render it, where a panel exists.</p>'
+               :'<p class=muted>This surface computed successfully and contains no viewpoints.</p>');
+   [...main.querySelectorAll('.c')].forEach((el,i)=>{el.style.cursor='pointer';
+     el.onclick=()=>{activeVp=vps[i];active=vpCmd(vps[i]);render()}});
+   status.textContent=activeSurface+' — '+vps.length+' viewpoint(s)';return;
+  }
   if(active==='orient'){const o=await get('/api/orient');
    main.innerHTML='<div class=cards>'+
     card('Progress',`${o.counts.done} / ${o.counts.outstanding}`,'done / outstanding tasks','good')+
@@ -322,7 +368,13 @@ async function render(){
  }catch(e){status.textContent='error: '+e.message}
 }
 // load the agent-bridge setting up front so Critique buttons reflect it (serveSettings), then draw
-fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).catch(()=>{}).finally(()=>{draw();render()});
+// buildNav() MUST resolve before the first render: navigation comes from the model now, so there is
+// nothing to draw until /api/surfaces answers. A failure here is reported rather than rendered as an
+// empty nav, because an empty surface list and a failed fetch must not look alike (N-C2).
+fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).catch(()=>{})
+ .then(()=>buildNav())
+ .then(()=>render())
+ .catch(e=>{status.textContent='navigation could not be computed: '+e.message+' — this is a FAILURE, not an empty console';});
 // pre-load the light views to warm the server-side cache so tab-switches are instant
 ['orient','decisions','dispositions','processes'].forEach(k=>fetch('/api/'+k).catch(()=>{}));
 // event-driven refresh: the server pushes `changed` only when the model's content fingerprint flips

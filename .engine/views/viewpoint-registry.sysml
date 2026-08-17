@@ -19,6 +19,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / lead";
         :>> sources = "backlog action defs + latest TestResults + succession DAG + delivery-file ceremony gates";
         :>> renderer = "keel orient [--html] (JSON authority; --html = the human dashboard #View, D0093)";
+        :>> surface = "work";
     }
     part whatsNextVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-2619-405162738411";
@@ -28,6 +29,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / AI executor";
         :>> sources = "ready frontier (outstanding tasks with all deps done), ranked by backlog declaration order (D0052)";
         :>> renderer = "keel whats-next";
+        :>> surface = "work";
     }
     part traceabilityVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-3619-405162738412";
@@ -37,6 +39,7 @@ package EngineViewpoints {
         :>> audience = "reviewer / auditor";
         :>> sources = "satisfy + verify edges; sprint ceremony gate coverage; issue->decision links; process-evolution timeline";
         :>> renderer = "keel diagram";
+        :>> surface = "assurance";
     }
     part diagramVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-c085-405162738485";
@@ -46,6 +49,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "all elements + all typed edges + authored metadata (the full Model)";
         :>> renderer = "keel diagram (interactive HTML #View, D0085; regenerate-don't-commit)";
+        :>> surface = "explore";
     }
     part renderVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-c086-405162738486";
@@ -55,6 +59,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "any declared view (D0056/D0057) over the Model — graph (elements + typed edges), table/review (selected rows + projected fields); review dispositions round-trip via apply-review into .tracking/critiques.sysml";
         :>> renderer = "keel render <view> --mode graph|table|review (interactive HTML #View, D0086; regenerate-don't-commit) + keel apply-review";
+        :>> surface = "explore";
     }
     part reportVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-c087-405162738487";
@@ -64,6 +69,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / program lead";
         :>> sources = "aggregation of the per-element computed views (coverage 3-tier, critique-coverage, attestation, assured/readiness, decisions, orphans, open-issues, suspect) + delivery Stories (velocity) + git history (trends); grounded in the INCOSE DE Measurement Framework + SE Leading Indicators";
         :>> renderer = "keel report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] (computed scorecard #View, D0087; regenerate-don't-commit)";
+        :>> surface = "explore";
     }
     part indicatorsVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-c089-405162738489";
@@ -73,6 +79,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / lead / program";
         :>> sources = "Indicator items + their measurement method (computed series via the report/trend engine; pulled/manual series from recorded Measurement datapoints, #Measures edges); direction-aware status by goal (D0088 measure spectrum)";
         :>> renderer = "keel indicators [--trend] (+ keel record-measurement for pulled/manual datapoints, D0089)";
+        :>> surface = "explore";
     }
     part safetyVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-4619-405162738413";
@@ -82,6 +89,7 @@ package EngineViewpoints {
         :>> audience = "safety engineer";
         :>> sources = "STPA losses/hazards/UCAs/constraints (EngineSafety); safety-kind requirements; verify edges to their Tests";
         :>> renderer = "(planned) STPA safety view (losses/hazards/UCAs/constraints + verify coverage) — not yet rendered";
+        :>> surface = "assurance";
     }
     part requirementsVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-5619-405162738414";
@@ -91,6 +99,7 @@ package EngineViewpoints {
         :>> audience = "systems engineer / requirements owner";
         :>> sources = "Need / Requirement items; satisfy edges (to components) + verify edges (to Tests); requirement-quality (INCOSE/EARS)";
         :>> renderer = "(planned) dedicated requirements view — partially served today by keel coverage + keel critique-coverage";
+        :>> surface = "assurance";
     }
     part decisionsVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-6619-405162738415";
@@ -100,6 +109,7 @@ package EngineViewpoints {
         :>> audience = "lead / auditor / future maintainer";
         :>> sources = ".engine/decisions/*.sysml Decision items (context/decisionText/consequences; alternatives via decisionAnalysis/issue016)";
         :>> renderer = "keel decisions (+ the decisions TOML view: keel view decisions)";
+        :>> surface = "record";
     }
     part baselinesVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-7619-405162738416";
@@ -109,6 +119,7 @@ package EngineViewpoints {
         :>> audience = "release manager / auditor";
         :>> sources = "Release (commit SHA + member refs); baseline view computed from git + authored facts";
         :>> renderer = "(planned) baselines view computed from git + authored facts — not yet rendered";
+        :>> surface = "record";
     }
     part suspectVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-8619-405162738417";
@@ -118,6 +129,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / QA";
         :>> sources = "git-ancestry of judgedAgainst vs upstream change over satisfy/:> edges; deliverable-manifest source drift (D0050); unresolved failing critiques (D0086)";
         :>> renderer = "keel suspect";
+        :>> surface = "work";
     }
     part orphansVP : Viewpoint {
         :>> id = "61728394-0a5b-4c6d-9619-405162738418";
@@ -127,6 +139,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "all items + typed edges; flag any element missing a REQUIRED incoming/outgoing edge for its kind (Need->Requirement satisfy; Requirement->Test verify; task->DoD; Issue->relatedTask)";
         :>> renderer = "keel orphans";
+        :>> surface = "assurance";
     }
 
     part attestationCoverageVP : Viewpoint {
@@ -137,6 +150,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "all decisions; flag any status=accepted Decision with no passing dNNNNAcceptR1 TestResult (extensible to other process-required attestations)";
         :>> renderer = "keel attestation-coverage";
+        :>> surface = "assurance";
     }
 
     part governingVersionVP : Viewpoint {
@@ -147,6 +161,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "git ancestry (D0013): the process-def state at the latest change-commit that is an ancestor of the item's introduction commit; correlated with process-change Decisions (#ProspectiveChange/#SafetyChange markers, D0070) in force at vs. after the charter; work->process by convention (D0069)";
         :>> renderer = "keel governing-version <item>";
+        :>> surface = "record";
     }
 
     part reprocessVP : Viewpoint {
@@ -157,6 +172,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / safety reviewer";
         :>> sources = "governing-version per item x process-change Decisions whose retroactivity=safety and whose effective commit post-dates the item's charter (git ancestry, D0070)";
         :>> renderer = "keel reprocess-candidates";
+        :>> surface = "work";
     }
 
     part rootednessVP : Viewpoint {
@@ -167,6 +183,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "delivery Story #CharteredBy chains -> Need (direct / via satisfy'd SystemRequirement / via a Decision #DerivedFrom a Need); the #Capability marker + its #DerivedFrom->Need link (the hard-gate set)";
         :>> renderer = "keel rootedness (+ the requirement-rootedness guard for the #Capability hard gate)";
+        :>> surface = "assurance";
     }
     part tierSatisfactionVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a098-516273849698";
@@ -176,6 +193,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / systems engineer";
         :>> sources = "satisfy edges (Need->SystemRequirement) + verify edges (Test->SystemRequirement); per-tier structural-satisfaction fraction + the gap set";
         :>> renderer = "keel tier-satisfaction (+ the orient burndown block)";
+        :>> surface = "assurance";
     }
     part critiquePolicyVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a097-516273849697";
@@ -185,6 +203,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "the declared .engine/contracts/critique-policy.toml ([lenses] type -> required CritiqueLens list); the built-in Core-3 default when the file is absent; the CritiqueLens canon (schema/core)";
         :>> renderer = "keel critique-policy";
+        :>> surface = "assurance";
     }
     part concernCoverageVP : Viewpoint {
         :>> id = "63940516-2c7d-4e8f-a071-516273849632";
@@ -194,6 +213,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "this viewpoint registry: each Viewpoint's renderer classified served (names a keel command) vs unserved (planned), with a coverage %";
         :>> renderer = "keel concern-coverage";
+        :>> surface = "assurance";
     }
     part archElementsVP : Viewpoint {
         :>> id = "c58f7043-8c0c-4853-8730-5082bae8d7e6";
@@ -203,6 +223,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / auditor";
         :>> sources = "authored CodeElement instances (EngineCodeAudit, D0148)";
         :>> renderer = "keel arch elements [--kind K] [--file F]";
+        :>> surface = "architecture";
     }
     part archCriticalityVP : Viewpoint {
         :>> id = "17a5aae3-5eb6-4073-addb-9338f95a8af3";
@@ -212,6 +233,7 @@ package EngineViewpoints {
         :>> audience = "maintainer / safety reviewer";
         :>> sources = "CodeElement.riskClass, ranked worst-first, bumped one tier where the element traces to a `must` Need";
         :>> renderer = "keel arch criticality";
+        :>> surface = "architecture";
     }
     part archCouplingVP : Viewpoint {
         :>> id = "a32cbe7c-51c5-4812-9b48-d77dde78f330";
@@ -221,6 +243,7 @@ package EngineViewpoints {
         :>> audience = "architect";
         :>> sources = "#DependsOn edges among catalogued elements; authored abstractness where present";
         :>> renderer = "keel arch coupling";
+        :>> surface = "architecture";
     }
     part archDriftVP : Viewpoint {
         :>> id = "625ba256-1c94-4514-8fa6-0e03e01d8b4a";
@@ -230,6 +253,7 @@ package EngineViewpoints {
         :>> audience = "maintainer";
         :>> sources = "CodeElement.codeHash vs a re-hash of the block under the live // @audit-hash marker";
         :>> renderer = "keel arch drift";
+        :>> surface = "architecture";
     }
     part archStpaInputsVP : Viewpoint {
         :>> id = "01edfc83-4aac-41f2-bda7-aba3b60a415d";
@@ -239,6 +263,7 @@ package EngineViewpoints {
         :>> audience = "safety analyst";
         :>> sources = "CodeElement.stpaRole + controlActions + #Controls/#Feedback edges. A HAND-OFF, not an analysis";
         :>> renderer = "keel arch stpa-inputs";
+        :>> surface = "architecture";
     }
     part archCoverageVP : Viewpoint {
         :>> id = "6a6879b9-bab4-450d-b561-bd622783acbf";
@@ -248,6 +273,7 @@ package EngineViewpoints {
         :>> audience = "maintainer";
         :>> sources = "catalogued elements vs a HEURISTIC top-level-def scan of the files they name; non-blocking indicator, never a gate";
         :>> renderer = "keel arch coverage";
+        :>> surface = "architecture";
     }
     part verificationExaminedVP : Viewpoint {
         :>> id = "8f453b6b-81d9-4fd5-b577-c684480115f2";
@@ -257,6 +283,7 @@ package EngineViewpoints {
         :>> audience = "reviewer / assurance lead";
         :>> sources = "#Verify edges into live SystemRequirements whose Test method is critique/inspect/analyze/confirmation; superseded requirements excluded";
         :>> renderer = "keel verification [--pending]";
+        :>> surface = "assurance";
     }
     part verificationExercisedVP : Viewpoint {
         :>> id = "3f24d8fc-d775-43df-9059-1e9f7a3c1a3f";
@@ -266,5 +293,46 @@ package EngineViewpoints {
         :>> audience = "maintainer / release gate";
         :>> sources = "#Verify edges into live SystemRequirements whose Test method is test/demo; superseded requirements excluded";
         :>> renderer = "keel verification [--pending]";
+        :>> surface = "assurance";
+    }
+    part acceptancesPendingVP : Viewpoint {
+        :>> id = "74316d68-38c4-4f01-8f25-f200b0a92c19";
+        :>> title = "acceptances-pending";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which proposed Decisions are waiting on MY acceptance before work can continue?";
+        :>> audience = "asynchronous supervisor";
+        :>> sources = "Decisions with status=proposed and no acceptance event; the items #DependsOn-blocked behind them";
+        :>> renderer = "keel orient (pendingAcceptances)";
+        :>> surface = "act";
+    }
+    part findingsAwaitingDispositionVP : Viewpoint {
+        :>> id = "c9926f37-525b-4649-80be-1c9e91b9a069";
+        :>> title = "findings-awaiting-disposition";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which critique findings at or above Medium are waiting on MY typed verdict?";
+        :>> audience = "asynchronous supervisor";
+        :>> sources = "Issues carrying severity >= Medium with no #Dispositions-linked confirmation (D0092)";
+        :>> renderer = "keel dispositions";
+        :>> surface = "act";
+    }
+    part authorityQueueVP : Viewpoint {
+        :>> id = "8b58e787-bc4d-40cf-8c9b-551c6b23e92d";
+        :>> title = "authority-queue";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "What is waiting on a human authority I hold, and how long has it waited?";
+        :>> audience = "asynchronous supervisor";
+        :>> sources = "obligations whose attestation class permits only a human (attestation-policy.toml), with age";
+        :>> renderer = "keel authority-queue";
+        :>> surface = "act";
+    }
+    part sittingReviewVP : Viewpoint {
+        :>> id = "1e524f74-fc98-44d2-b6f1-8d4e0b4b8938";
+        :>> title = "sitting-review-due";
+        :>> createdBy = "claudeOpus5";
+        :>> concernText = "Which sittings have not yet had their per-sitting human review (D0049's single gate)?";
+        :>> audience = "asynchronous supervisor";
+        :>> sources = "sprints and their #Covers-linked review records; sittings with no covering review";
+        :>> renderer = "keel sitting-coverage";
+        :>> surface = "act";
     }
 }
