@@ -154,6 +154,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Any CHANGE (§3a) or schema/process/skill/tool edit; before committing such a change.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part knowledgeGraphMemory : AISkill {
+        :>> id = "ec6f83bf-1a8e-438a-9f5c-79655c18bb49";
+        :>> title = "knowledge-graph-memory";
+        :>> purpose = "Deploy the Knowledge-Graph Memory process (D0153): derive a small closed ontology from the QUESTIONS a corpus must answer, extract a typed graph with computed identity, and INJECT the recalled facts before the model thinks — so retrieval is code rather than conversation and the model never does the traversal. The deploying skill for .engine/processes/knowledge-graph-memory.sysml.";
+        :>> location = ".engine/skills/knowledge-graph-memory/SKILL.md";
+        :>> triggerCondition = "An assistant must answer questions spanning documents that share no vocabulary; search returns wrong answers or right ones slowly; a request for memory / RAG / a knowledge graph over docs.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part statusReport : AISkill {
         :>> id = "c820fk6f-3b78-4e0c-de13-3b60b7k6j333";
         :>> title = "status-report";
