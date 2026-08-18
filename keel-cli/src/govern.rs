@@ -135,6 +135,15 @@ fn acceptance_judged_against(text: &str, dec: &str) -> Option<String> {
 
 // ── charter-time scoping for the assurance gates (D0068 freeze, D0081) ─────────────────────────
 
+/// The author date (YYYY-MM-DD) of `sha`, or `None` if it does not resolve.
+///
+/// Author date rather than commit date: a merge or a re-application should not move when a judgment
+/// was possible, and D0129 forbids the history rewriting that would make the two diverge anyway.
+#[must_use]
+pub fn commit_date(repo: &Path, sha: &str) -> Option<String> {
+    git_lines(repo, &["show", "-s", "--format=%ad", "--date=short", sha]).into_iter().next()
+}
+
 /// The INTRODUCTION commit of a Decision — the first commit that added `part <decision> :` under
 /// `.engine/decisions` (when the rule landed). `None` if not yet committed (e.g. staged-only).
 #[must_use]

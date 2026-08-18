@@ -2668,6 +2668,73 @@ fn semantic_field(type_name: &str) -> Option<&'static str> {
     }
 }
 
+/// The forward-only line for `impossible_evidence_dates` (D0162): a result whose cited COMMIT predates
+/// this date is exempt. Keyed on the commit rather than on `judgedAt` so that no future stamp can escape
+/// by being attached to an old judgment - which is exactly the defect that motivated the guard.
+const GRANDFATHER_BEFORE: &str = "2026-08-18";
+
+/// `TestResult`s whose `judgedAgainst` commit POSTDATES their `judgedAt` (issue144).
+///
+/// A judgment cannot have been made against a commit that did not yet exist. This is not a pedantic
+/// date check — it catches the one mechanical way a recorded attestation becomes a lie without anyone
+/// intending it: a bulk stamp that rewrites every `PENDING` SHA in a file, including results whose judge
+/// was a HUMAN who never saw that commit. That happened, to a `method=confirmation` result from the day
+/// before, and no existing guard could see it because every field was individually well-formed.
+///
+/// Day granularity, and the commit's own date must be strictly LATER than `judgedAt` to violate: a
+/// same-day stamp is the normal case, and clock skew within a day is not evidence of anything.
+///
+/// Returns `(scanned, violations)`. Unresolvable SHAs are SKIPPED, not flagged — `evidence-resolves`
+/// owns that, and a guard that reports two different failures for one field teaches nothing.
+///
+/// # Errors
+/// If the model cannot be built from `root`.
+pub fn impossible_evidence_dates(root: &Path) -> Result<(usize, Vec<String>), String> {
+    let model = Model::build(root).map_err(|e| e.to_string())?;
+    let mut scanned = 0usize;
+    let mut out = Vec::new();
+    let mut dates: HashMap<String, String> = HashMap::new();
+    for (name, info) in &model.items {
+        let (Some(sha), Some(at)) = (info.attrs.get("judgedAgainst"), info.attrs.get("judgedAt")) else {
+            continue;
+        };
+        if sha.is_empty() || sha == "PENDING" || at.is_empty() {
+            continue;
+        }
+        scanned += 1;
+        // Memoised per DISTINCT sha: 3799 results cite far fewer commits, and each miss is a subprocess.
+        let commit_date = dates
+            .entry(sha.clone())
+            .or_insert_with(|| crate::govern::commit_date(root, sha).unwrap_or_default())
+            .clone();
+        if commit_date.is_empty() {
+            continue; // unresolvable — evidence-resolves owns that failure
+        }
+        // FORWARD-ONLY (D0162, and issue068's rule that correct-when-written work is never retro-failed).
+        // The corpus holds thirteen pre-existing violations, all in two commits and all exactly one day:
+        // sessions that crossed midnight, where the judgment was recorded before 00:00 and the commit
+        // landed after. Those are benign, and five of them are the human's own attestations, which D0108
+        // ownership forbids me from editing. So the line is drawn at this guard's introduction rather than
+        // by rewriting anyone's dates.
+        // The line is drawn on WHEN THE CITED COMMIT WAS MADE, not on when the judgment claims to be
+        // from. Drawing it on `judgedAt` was my first attempt and it exempted the very defect this guard
+        // exists for: a result dated YESTERDAY that a bulk stamp pointed at TODAY's commit is old by
+        // judgedAt and brand new by evidence. Keying on the commit means every stamp from here on is in
+        // scope no matter how old the judgment it is attached to.
+        if commit_date.as_str() < GRANDFATHER_BEFORE {
+            continue;
+        }
+        if commit_date.as_str() > at.as_str() {
+            let by = info.attrs.get("judgedBy").cloned().unwrap_or_default();
+            out.push(format!(
+                "{name}: judgedAt {at} but judgedAgainst {sha} was committed {commit_date} - a judgment cannot be made against a commit that did not exist yet (judgedBy {by})"
+            ));
+        }
+    }
+    out.sort();
+    Ok((scanned, out))
+}
+
 /// `(outcome, judgedAgainst)` of the HIGHEST-numbered `<v>R<n>` result for verification `v`.
 fn latest_result(model: &Model, v: &str) -> Option<(String, String)> {
     let mut best: Option<(u32, String, String)> = None;

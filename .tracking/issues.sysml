@@ -1678,6 +1678,17 @@ package ProjectIssues {
 
     #Resolves dependency from dcConsoleLoudFailure to issue143;
 
+    part issue144 : Issue {
+        :>> id = "6b21e07f-9d3a-4c58-b204-7fe1c9a3086d";
+        :>> title = "a bulk SHA stamp pointed a human's day-old confirmation at a commit they never saw, and every attestation guard stayed green";
+        :>> createdAt = "2026-08-18";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "SELF-REPORTED, and it is the mechanical form of the one thing the response contract forbids outright. Stamping the evidence SHAs for sprint 343 I ran a blanket replace of judgedAgainst = PENDING across three files. One of the results it rewrote was srConsoleObligationActionableConfirmR1 - a method=confirmation result recorded the DAY BEFORE, judged by wweatherholtz - which then asserted that the human had attested something at cb53ba0, a commit created today that they had never seen. It also rewrote the retraction R2 to cite the commit that CONTAINS THE FIX as the build against which they observed the failure, and rewrote a prose sentence whose whole point was that R1 was unstamped. WHY NOTHING CAUGHT IT: every field stayed individually well-formed, so validate, attestation-substance, attestation-authority and confirmation-authenticity all passed. Those guards check whether an attestation is SUBSTANTIVE and AUTHORISED; none checked whether it was POSSIBLE. THE CLASS IS BROADER THAN THE INSTANCE: any bulk transform over provenance fields can silently relocate someone else's judgment, and D0108 ownership - only the owner edits its fields - is stated as a rule with no mechanical control behind it for the specific case of a batch rewrite. Corrected by hand: R1 is back to PENDING, R2 cites 8608a9b (the last commit carrying the pre-fix console, which is what they were running), and the prose is restored. THE CONTROL IS impossible-evidence-date, guard 36, hard-blocking.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcImpossibleEvidenceDate to issue144;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

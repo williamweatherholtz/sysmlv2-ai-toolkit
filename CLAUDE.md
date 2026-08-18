@@ -147,7 +147,7 @@ frozen (modify it only by out-of-band Decision).
 ```
 keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
-keel guard             # all 35 forward guards — see .engine/docs/guards.md
+keel guard             # all 36 forward guards — see .engine/docs/guards.md
 keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary (~0.35s)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```

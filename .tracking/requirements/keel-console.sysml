@@ -144,7 +144,7 @@ package ProjectConsoleRequirements {
     part srConsoleObligationActionableConfirmR2 : TestResult {
         :>> id = "3f0c95a8-71b4-4e26-8d19-0a6b47c3e502";
         :>> outcome = VerdictKind::fail;
-        :>> judgedAgainst = "PENDING";
+        :>> judgedAgainst = "8608a9b";
         :>> judgedAt = "2026-08-18";
         :>> judgedBy = "wweatherholtz";
         :>> notes = "wweatherholtz, 2026-08-18, verbatim: 'i click to act in keel serve and it doesnt actually show anything or take me anywhere new. why?' - and, when the first diagnosis changed nothing, 'try again'. This DIRECTLY CONTRADICTS R1, and the contradiction is recorded rather than resolved in my favour. It also puts R1's own reading in doubt: their earlier words were 'confirmed otherwise' in a message whose first half was a challenge, and I read the second half as attesting the click-through. If they never exercised it, R1 was an over-reading of an ambiguous phrase and should never have been recorded as a confirmation - which is the lesson for the NEXT one, since a confirmation must rest on words that are unambiguous about the specific claim.";

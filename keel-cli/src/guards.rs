@@ -1548,8 +1548,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 35] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose"];
+pub const GUARD_NAMES: [&str; 36] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1791,6 +1791,30 @@ pub fn attestation_authority(root: &Path) -> GuardReport {
 }
 
 
+/// Guard (issue144): a judgment may not cite a commit that postdates it.
+///
+/// HARD, and it is squarely an honest-state gate (D0098): it does not ask whether work is finished, it
+/// asks whether a recorded judgment is POSSIBLE. It exists because I stamped a human's
+/// `method=confirmation` result — given the day before — against a commit created today, by running a
+/// blanket replace of every `PENDING` SHA in a file. Every field remained well-formed, `attestation-*`
+/// and `confirmation-authenticity` both passed, and the record silently claimed the human had attested
+/// something at a commit they had never seen. §4 forbids fabricating an attestation; this is the control
+/// for fabricating one MECHANICALLY, which no amount of care about the original recording prevents.
+#[must_use]
+pub fn impossible_evidence_dates(root: &Path) -> GuardReport {
+    match crate::view::impossible_evidence_dates(root) {
+        Ok((scanned, violations)) => {
+            GuardReport { name: "impossible-evidence-date", scanned, warnings: Vec::new(), violations }
+        }
+        Err(e) => GuardReport {
+            name: "impossible-evidence-date",
+            scanned: 0,
+            warnings: Vec::new(),
+            violations: vec![format!("error reading results: {e}")],
+        },
+    }
+}
+
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
 /// commands already probe for, whereas a script is committed source that must exist to be referenced.
@@ -1873,6 +1897,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "issues" => Some(issues(root)),
         "resolver-kind" => Some(resolver_kind(root)),
         "stale-gate-prose" => Some(stale_gate_prose(root)),
+        "impossible-evidence-date" => Some(impossible_evidence_dates(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
@@ -2209,6 +2234,26 @@ pub fn engine_lint(root: &Path) -> GuardReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every enforced guard must actually DISPATCH. `run_one` is a hand-written match, so a name can sit
+    /// in `GUARD_NAMES` -- counted in the control inventory, listed in `--help`, documented in guards.md --
+    /// while `run_one` returns `None` for it and `run_all` silently runs 35 of 36. Text-level against this
+    /// file's own source, so it costs no model build and cannot drift from the match it checks.
+    #[test]
+    fn every_enforced_guard_dispatches() {
+        const GUARDS_RS: &str = include_str!("guards.rs");
+        let dispatch = GUARDS_RS
+            .split_once("pub fn run_one(")
+            .expect("run_one must exist")
+            .1;
+        for name in GUARD_NAMES {
+            let arm = format!("\"{name}\" =>");
+            assert!(
+                dispatch.contains(&arm),
+                "guard `{name}` is in GUARD_NAMES but has no arm in run_one -- it would be counted in the                  control inventory and never actually run"
+            );
+        }
+    }
 
     #[test]
     fn actor_refs_extracted() {
