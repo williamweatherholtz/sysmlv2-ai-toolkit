@@ -1879,8 +1879,30 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-    use super::{build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
+    use super::{CONSOLE_HTML, build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
 
+    /// issue141: the console must bind a card's target BY IDENTITY, never by its position in a rendered
+    /// list. `CONSOLE_HTML` is `include_str!`-embedded, so this costs no toolchain and fails at
+    /// `cargo test` the moment the anti-pattern returns.
+    ///
+    /// HONEST CEILING, stated because I previously overclaimed the opposite: this is a TEXT assertion over
+    /// the asset. It catches the specific anti-pattern that produced issue141 -- indexing every `.c` card
+    /// against an array while a second card kind renders into the same container -- and it does NOT verify
+    /// BEHAVIOUR. A wrong destination that is bound by identity would pass this and needs a DOM-level or
+    /// browser-level test (D0160).
+    #[test]
+    fn console_binds_card_targets_by_identity_not_position() {
+        // The anti-pattern: selecting every card in the container and using the loop INDEX as the key.
+        // The obligation bar renders `.c` cards into that same container, so this was off by four.
+        assert!(
+            !CONSOLE_HTML.contains("querySelectorAll('.c')"),
+            "the console selects every .c card as a group -- if it indexes them against a list, adding              another card kind to the container silently shifts every target (issue141). Bind by a data-*              attribute carried on the element instead."
+        );
+        // and the identity bindings that replaced it must be present
+        for needle in ["data-oblig", "data-vp", "[data-oblig],[data-vp]"] {
+            assert!(CONSOLE_HTML.contains(needle), "console is missing the identity binding `{needle}`");
+        }
+    }
     #[test]
     fn cors_reflects_localhost_origins_only() {
         // viewerKeelApi (D0114 shape B): a separate local viewer (any port) is allowed; remote is not.

@@ -15,6 +15,7 @@ package ProjectConsoleRequirements {
     private import EngineRequirements::*;
     private import EngineNeeds::*;
     private import EngineRelationships::*;
+    private import EngineVerification::*;   // Test / TestResult: the human confirmation below
 
     // ── N-C1: what is owed is discoverable without knowing to look for it ──────────────────────
     requirement srConsoleObligationsOnArrival : SystemRequirement {
@@ -117,6 +118,26 @@ package ProjectConsoleRequirements {
         :>> verificationMethod = VerificationMethod::demo;
     }
     satisfy nConsoleObligationDiscoverable by srConsoleObligationActionable;
+
+    // ── Human confirmation that the click-through lands where the work is (D0016/D0066: a
+    //    method=confirmation result records a HUMAN's word and is never inferred). This one is
+    //    NARROW on purpose: it attests the behaviour they exercised, not the requirement's every clause.
+    verification srConsoleObligationActionableConfirm : Test {
+        :>> id = "e4b8207c-93a1-4d56-8f02-71cae35b9d68";
+        :>> title = "Obligation cards take the reader to the work - confirmed in the live console";
+        :>> createdAt = "2026-08-17";
+        :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz, 2026-08-17, verbatim: 'confirmed otherwise'. Given in a message whose first half challenged a separate claim of mine (that no automated check could read a browser - it could, and that is corrected in issue141 and sprint 339), with 'otherwise' confirming the rest: that clicking the cards now takes them to the right place to act. Exercised against the running console at 127.0.0.1:7777 on the build landed at 844b4ca, where all four act cards carry a resolvable viewpoint identity and their views compute. SCOPE OF THE ATTESTATION, stated so it is not read wider than it is: it confirms the OBSERVED behaviour - a card click lands on the view its renderer names. It does NOT attest the requirement's every clause; specifically the no-affordance-without-a-target case and the uncomputable-destination case were verified by me by construction and API probe, not by them, and the generic panel remains READ-ONLY for authority-queue and sitting-coverage, so for those two classes they can see the work and still discharge it elsewhere.";
+    }
+    part srConsoleObligationActionableConfirmR1 : TestResult {
+        :>> id = "b1f79d3a-6c84-4e07-95d2-380ae6c14b7f";
+        :>> outcome = VerdictKind::pass;
+        :>> judgedAgainst = "PENDING";
+        :>> judgedAt = "2026-08-17";
+        :>> judgedBy = "wweatherholtz";
+    }
+    #Verify dependency from srConsoleObligationActionableConfirm to srConsoleObligationActionable;
 
     // ── #DerivedFrom: the shape Decision these requirements sit inside ─────────────────────────
     #DerivedFrom dependency from srConsoleNavigationDerived to d0152;
