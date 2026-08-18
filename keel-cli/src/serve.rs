@@ -240,8 +240,23 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     0
 }
 
-async fn index() -> Html<&'static str> {
-    Html(CONSOLE_HTML)
+/// The console, served NO-STORE (issue143).
+///
+/// The console is a client-side app whose behaviour lives entirely in embedded JavaScript, so a browser
+/// holding an older copy runs older LOGIC against a newer API and the mismatch is invisible from the
+/// server side - every endpoint answers correctly while the page misbehaves. There is no build hash to
+/// bust a cache with, so the only reliable answer is to never let it cache: the page is a few tens of KB
+/// from localhost, and correctness is worth more than that request. The API responses keep their own
+/// per-fingerprint caching, which is unaffected.
+async fn index() -> Response {
+    (
+        [
+            (axum::http::header::CACHE_CONTROL, "no-store, must-revalidate"),
+            (axum::http::header::PRAGMA, "no-cache"),
+        ],
+        Html(CONSOLE_HTML),
+    )
+        .into_response()
 }
 
 /// Request-logging middleware (D0094 m2 observability): logs method, path, status, and elapsed ms to
@@ -1879,6 +1894,7 @@ pub fn interaction_history(root: &Path) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
+    const SERVE_RS: &str = include_str!("serve.rs");
     use super::{CONSOLE_HTML, build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
 
     /// issue141: the console must bind a card's target BY IDENTITY, never by its position in a rendered
@@ -1903,6 +1919,46 @@ mod tests {
             assert!(CONSOLE_HTML.contains(needle), "console is missing the identity binding `{needle}`");
         }
     }
+    /// issue143: a console failure must not be able to impersonate a console no-op. Three controls, all
+    /// text-level because D0160 records that we cannot execute the page - which is exactly why the page
+    /// has to be built so that a failure is loud without a test needing to see it.
+    #[test]
+    fn a_console_failure_can_never_look_like_nothing_happened() {
+        // (1) The page must be served no-store. A cached console runs OLD LOGIC against a NEW API and no
+        //     server-side check can see the mismatch, which is what made issue143 undiagnosable.
+        assert!(
+            SERVE_RS.contains("no-store"),
+            "the console must be served no-store: a browser holding an older copy runs older logic              against a newer API and the mismatch is invisible from here"
+        );
+        // (2) A thrown render must write the failure INTO the panel. Writing only to the status line
+        //     leaves the previous view on screen, which is the exact reported symptom.
+        assert!(
+            CONSOLE_HTML.contains("this view FAILED to render"),
+            "a thrown render must say so in the panel -- leaving the previous panel up and whispering              into the status line is how a failure disguises itself as a no-op"
+        );
+        // (3) A click must announce its target BEFORE its first await, so 'fired and failed' and 'never
+        //     fired' are distinguishable observations.
+        // Scan CODE lines only: the first draft of this assertion matched the word `await` inside the
+        // comment explaining the rule, and failed the very code that follows it.
+        let go = CONSOLE_HTML.find("function goToVp").expect("goToVp must exist");
+        let body: Vec<&str> = CONSOLE_HTML[go..]
+            .lines()
+            .take_while(|l| !l.starts_with("main.addEventListener"))
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .collect();
+        let announce = body.iter().position(|l| l.contains("status.textContent="));
+        let first_await = body.iter().position(|l| l.contains("await"));
+        assert!(
+            announce.is_some() && announce < first_await.or(Some(usize::MAX)),
+            "goToVp must set the status line before anything that can await and throw"
+        );
+        // (4) The page must be able to say WHICH build it is, or 'is your browser stale?' stays unanswerable.
+        assert!(
+            CONSOLE_HTML.contains("v.apiVersion"),
+            "the console must stamp the API version it loaded against"
+        );
+    }
+
     #[test]
     fn cors_reflects_localhost_origins_only() {
         // viewerKeelApi (D0114 shape B): a separate local viewer (any port) is allowed; remote is not.

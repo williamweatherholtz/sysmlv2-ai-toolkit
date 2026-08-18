@@ -38,7 +38,7 @@
  #status{font-size:11px;color:var(--mut);padding:4px 16px}
 </style></head><body>
 <header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
- <div class="sub">Technical smooth sailing</div></header>
+ <div class="sub">Technical smooth sailing <span id="build" class="muted" style="color:#7d8a97"></span></div></header>
 <nav id="nav"></nav>
 <div id="status">loading…</div>
 <main id="main"></main>
@@ -426,7 +426,15 @@ async function render(){
    status.textContent=(activeVp.title||cmd)+(failed?' — failed':'');return;
   }
   status.textContent='live · updated '+new Date().toLocaleTimeString();
- }catch(e){status.textContent='error: '+e.message}
+ }catch(e){
+  // issue143: a thrown render used to leave the PREVIOUS panel on screen and change only the status line,
+  // which is exactly how a failure disguises itself as "nothing happened". The panel now says so.
+  status.textContent='error: '+e.message;
+  main.innerHTML='<p class=muted style="border-left:3px solid #c33;padding-left:8px">this view FAILED to render: '
+   +esc(e.message)+' &mdash; the panel below is not stale, there is nothing to show. '
+   +'active=<code>'+esc(String(active))+'</code> surface=<code>'+esc(String(activeSurface))+'</code>'
+   +' viewpoint=<code>'+esc(String(activeVp&&(activeVp.viewpoint||activeVp.title)))+'</code></p>';
+ }
 }
 // Card navigation, bound ONCE by DELEGATION on the container rather than per-render on each element.
 // Two reasons, both learned the hard way: a per-render positional binding was off by the number of
@@ -442,6 +450,9 @@ function findVp(name){
 // highlight agrees with what is rendered — arriving at a view while the nav points elsewhere is its own
 // small lie about where you are.
 function goToVp(name){
+ // Announce the attempt FIRST: everything after this point can await and throw, and a click whose only
+ // evidence is the panel changing cannot be distinguished from a click that never fired (issue143).
+ status.textContent='going to '+name+'…';
  const [surface,vp]=findVp(name);
  if(!vp){status.textContent='no declared viewpoint named '+name+' — the card names a target the model does not declare';return}
  activeSurface=surface;activeVp=vp;active=vpCmd(vp);
@@ -457,6 +468,11 @@ main.addEventListener('click',e=>{
 // buildNav() MUST resolve before the first render: navigation comes from the model now, so there is
 // nothing to draw until /api/surfaces answers. A failure here is reported rather than rendered as an
 // empty nav, because an empty surface list and a failed fetch must not look alike (N-C2).
+// Stamp WHICH build this page is: a console is client-side JavaScript, so a browser holding an older copy
+// runs older logic against a newer API and nothing server-side can see the mismatch (issue143).
+fetch('/api/version').then(r=>r.json()).then(v=>{
+  document.getElementById('build').textContent=' · api '+v.apiVersion+' · page loaded '+new Date().toLocaleTimeString();
+}).catch(()=>{});
 fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).catch(()=>{})
  .then(()=>buildNav())
  .then(()=>render())

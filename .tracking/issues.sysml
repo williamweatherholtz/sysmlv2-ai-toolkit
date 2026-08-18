@@ -1666,6 +1666,18 @@ package ProjectIssues {
     }
     #Resolves dependency from dcObligationActionable to issue141;
 
+    part issue143 : Issue {
+        :>> id = "c7a3f81e-2d95-4b60-9e73-51f802ad64bc";
+        :>> title = "a console failure was indistinguishable from a console no-op: stale JS could not be detected, a thrown render left the old panel on screen, and a click said nothing";
+        :>> createdAt = "2026-08-18";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY THE HUMAN FROM THE FIELD, retracting a confirmation they had given the day before: 'i click to act in keel serve and it doesnt actually show anything or take me anywhere new'. I could not reproduce it and STILL CANNOT NAME THE CAUSE, and that inability is the actual defect being recorded. What I verified from the server side, all green: /api/obligations returns a resolvable viewpoint identity for all four act classes; the served console carries data-oblig, data-vp, the delegated [data-oblig],[data-vp] listener and the generic panel branch verbatim; all four /api/computed/* endpoints answer 200 and the route is advertised; there is no competing handler and nothing calls stopPropagation. THE CONSOLE IS CLIENT-SIDE JAVASCRIPT, so none of that touches the only thing that matters - what the BROWSER did - and D0160 records that we have no way to execute it. THREE STRUCTURAL DEFECTS MADE THE FAILURE UNDIAGNOSABLE, and all three are fixed here rather than the guessed cause. (1) THE CONSOLE WAS SERVED WITH NO CACHE HEADERS AND CARRIES NO BUILD MARKER, so a browser holding an older copy runs older LOGIC against a newer API and neither of us can see the mismatch - across a day of restarts and rebuilds that is a live hypothesis I had no way to test, and after the fix I still cannot test it retroactively. (2) A THROWN RENDER LEFT THE PREVIOUS PANEL ON SCREEN and wrote the error only to the status line, which is precisely how a failure impersonates a no-op: the reported symptom - nothing shows, nowhere new - is exactly what a mid-branch exception looks like. (3) A CLICK ANNOUNCED NOTHING BEFORE ITS FIRST AWAIT, so a click that fired and then failed and a click that never fired were the same observation. THE HONEST STATE: the console is now self-diagnosing, and the cause of their specific failure is still unknown.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+
+    #Resolves dependency from dcConsoleLoudFailure to issue143;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";
