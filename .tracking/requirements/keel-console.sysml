@@ -139,6 +139,13 @@ package ProjectConsoleRequirements {
     }
     #Verify dependency from srConsoleObligationActionableConfirm to srConsoleObligationActionable;
 
+    // ── THE CONSOLE HAS NO BEHAVIOURAL COVERAGE, and D0160 obliges saying so here rather than leaving it
+    //    implicit. This is a stated LIMIT on every console requirement above, not a requirement itself.
+    //    One structural test guards the card binding (console_binds_card_targets_by_identity_not_position,
+    //    a TEXT assertion over the embedded asset); nothing exercises the console's behaviour. So a wrong
+    //    destination, a dead control or a broken render reaches the human before it reaches a gate — which
+    //    is how both of this week's console defects were found. Accepted risk, trigger named in D0160:
+    //    a third such defect, or a DOM-capable option that needs no Node toolchain.
     // ── #DerivedFrom: the shape Decision these requirements sit inside ─────────────────────────
     #DerivedFrom dependency from srConsoleNavigationDerived to d0152;
     #DerivedFrom dependency from srConsoleObligationsOnArrival to d0152;
