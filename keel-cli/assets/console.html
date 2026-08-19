@@ -329,12 +329,18 @@ async function obligationBar(){
   cs.map(c=>card(c.title,(c.countable?c.count:'?'),
     esc(c.concern||'')+(c.caveat?'<br><span style="color:#b58900">caveat: '+esc(c.caveat)+'</span>':'')+
     (c.countable?'':'<br><span style="color:#c33">NOT COUNTABLE — '+esc(c.why||'')+'</span>')+
-    (c.viewpoint?'<br><span class=go>click to act &rarr;</span>':''),
+    (c.dischargePanel?'<br><span class=go>click to act &rarr;</span>'
+      :(c.viewpoint?'<br><span class=go>click to view (read-only) &rarr;</span>':'')),
     c.countable?(c.count>0?'warn':'good'):'warn',
     // The card's target is the viewpoint whose renderer COMPUTED this count, carried by identity. So the
     // place to act is derived from the same declaration the number came from, and a class declared later
     // is clickable with no console change (srConsoleObligationActionable).
-    c.viewpoint?' data-oblig="'+esc(c.viewpoint)+'"':'')).join('')+'</div>'+
+    // ONE CLICK, NOT TWO (issue155). When the server names a panel that can DISCHARGE this class, the
+    // card lands there directly; the bridge that used to sit in between was a second click to reach the
+    // same place. Without a discharge panel the card still opens the read-only rendering by identity,
+    // which is the honest destination for work the console cannot act on.
+    c.dischargePanel?' data-panel="'+esc(c.dischargePanel)+'"'
+      :(c.viewpoint?' data-oblig="'+esc(c.viewpoint)+'"':''))).join('')+'</div>'+
   '<p class=muted>'+head+(dead.length?' · '+dead.length+' class(es) could not be counted and are shown as ? rather than 0.':'')+'</p>';
 }
 async function render(){

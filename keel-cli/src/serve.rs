@@ -1367,6 +1367,31 @@ async fn api_computed(State(s): State<AppState>, axum::extract::Path(cmd): axum:
 ///
 /// Returns `None` when no counter is bound to that command. That is reported as NOT COMPUTABLE, never
 /// as zero: a class the console cannot count must not look like a class with nothing in it (N-C2).
+/// The console panel that can DISCHARGE this obligation class, or `None` when none can (issue155).
+///
+/// Two clicks were needed to reach the work: one to open the class, one to cross a bridge to a panel that
+/// had controls. The bridge existed because the console decided AFTER landing whether the destination
+/// could act. The server already computes each class's view to produce its count, so it can say where the
+/// work is done and the card can go straight there.
+///
+/// STATED PER COMMAND WITH A REASON, not inferred from the payload's shape. A regex over item `kind`
+/// strings would be a guess, and a wrong guess sends the human to a panel that cannot act - the exact
+/// defect being fixed. `None` is a first-class answer and degrades gracefully: a newly declared act
+/// viewpoint still needs no console change, it lands on the read-only rendering with the note saying so,
+/// which is the honest destination for work the console genuinely cannot discharge.
+const fn discharge_panel(cmd: &str) -> Option<&'static str> {
+    match cmd.as_bytes() {
+        // Proposed Decisions and pending confirmation gates: the review panel holds accept and reject for
+        // both, and `pendingAcceptances` and `awaiting` are largely the same items counted twice.
+        b"orient" | b"authority-queue" => Some("review"),
+        // The dispositions panel carries the per-finding disposition controls.
+        b"dispositions" => Some("dispositions"),
+        // A sitting review is a human reading a sitting and recording a judgment. NO console control does
+        // that today, so this is None rather than a panel that would only display the work again.
+        _ => None,
+    }
+}
+
 fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
     let num = |json: &str, key: &str| -> Option<i64> {
         serde_json::from_str::<serde_json::Value>(json).ok()?.get(key).and_then(|v| match v {
@@ -1431,6 +1456,10 @@ pub fn obligations_json(root: &Path) -> Result<String, crate::view::ViewError> {
             ("concern".to_string(), crate::json::Json::s(get("concern"))),
             ("renderer".to_string(), crate::json::Json::s(renderer.clone())),
         ];
+        if let Some(panel) = discharge_panel(&cmd) {
+            // WHERE THE WORK IS DONE, so the card lands there in one click instead of via a bridge.
+            row.push(("dischargePanel".to_string(), crate::json::Json::s(panel.to_string())));
+        }
         if let Some((n, caveat)) = obligation_count(root, &cmd) {
             {
                 total += n;

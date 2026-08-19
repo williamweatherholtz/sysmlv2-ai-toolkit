@@ -1788,6 +1788,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcActionableDestination to issue154;
 
+    part issue155 : Issue {
+        :>> id = "3c81b7e0-6d49-4a52-b937-e05fa14c82d6";
+        :>> title = "acting took two clicks: one to open the obligation, one to cross a bridge to the panel that had the controls";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY THE HUMAN immediately after issue154 shipped: 'ok act works now, but it just provides me another button to click. why 2 clicks for a single request?' Correct, and the cause was my fix rather than the original design. issue154 made the console decide AFTER LANDING whether the destination could act - so a card opened a read-only view which then offered a bridge to a panel with controls. Two clicks to reach one piece of work, and the second click carried no information the first did not already imply. WHY IT WAS BUILT THAT WAY, since the reasoning was not wrong so much as incomplete: I derived the discharge target from the PAYLOAD's shape to avoid hardcoding a viewpoint-to-panel map, because the console's design principle is that declaring a new act viewpoint requires no console change. Deriving it client-side meant it could only be known after fetching, hence the bridge. THE SERVER ALREADY COMPUTES EACH CLASS'S VIEW TO PRODUCE ITS COUNT, so it can name the discharging panel in the same pass and the card can go straight there. Now `discharge_panel(cmd)` states it per command WITH A REASON - orient and authority-queue discharge in `review` because that panel holds accept and reject for both proposed Decisions and pending gates; dispositions discharges in the dispositions panel which carries the per-finding controls; sitting-coverage returns None because a sitting review is a human reading a sitting and recording a judgment, and NO console control does that today. STATED RATHER THAN INFERRED ON PURPOSE: a regex over item `kind` strings would be a guess, and a wrong guess sends the human to a panel that cannot act, which is precisely the defect issue154 was about. THE PRINCIPLE SURVIVES because None is a first-class answer: a newly declared act viewpoint still needs no console change, it lands on the read-only rendering and its card now says `click to view (read-only)` instead of `click to act`. Measured live: acceptances-pending and authority-queue report dischargePanel `review`, findings-awaiting-disposition reports `dispositions`, sitting-review-due reports none.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcOneClickToAct to issue155;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";
