@@ -1744,6 +1744,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcActivationSurface to issue149;
 
+    part issue150 : Issue {
+        :>> id = "5e93b1c7-2f48-4a06-b85d-9c71e4f30a26";
+        :>> title = "70 items were waiting on the human with the console down, and nothing noticed but the human";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY THE HUMAN: 'not seeing a keel serve. if there are outstanding items for me to act on, keel serve should be running so i can do so more comprehensively.' They were right and the number was 70 - 4 pending acceptances, 21 authority-queue, 16 findings awaiting disposition, 29 sitting reviews due. THE MECHANICAL CAUSE IS WORTH MORE THAN THE OVERSIGHT: `keel serve` holds `target/release/keel.exe`, so every rebuild fails with `Access is denied` until the console is killed. Across this session I killed it for each build - eight or more times - and each time left it down, because nothing in the loop asked whether the human could still see their queue. The console is their oversight lens (D0093) and I was treating it as my debugging tool. TWO FIXES. (1) SERVE A COPY: `cp target/release/keel.exe target/release/keel-serve.exe` and run that, so builds and the console stop competing - verified by rebuilding with the console still answering. Recorded in CLAUDE.md §6 next to the other host-friction traps. (2) A CONTROL, because 'remember to restart serve' is exactly the manual vigilance D0047 refuses: when the model is GREEN, `keel hook stop` now checks whether anything is waiting on the human and whether a console answers, and advises if not. ADVISORY, NEVER BLOCKING - the human's console being down is not dishonest state, and a turn boundary that blocked on it would be the over-strict gate that trains its actor to disable it, taking the honest-state checks in the same hook with it (issue076/issue081, and D0132 in the large). THE CHECK ASKS `/api/version` AND LOOKS FOR `apiVersion` rather than merely opening a socket, so it cannot report an unrelated process on port 7777 as a running console - that would be the same overstatement as issue140 and issue149, and here it would tell the human their queue is reachable when it is not. Its count is read from `serve::obligations_json`, extracted to one home, so the hook advises about exactly the set the console displays rather than a second derivation that could drift. Scope stated in the message itself: only port 7777 is probed.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcOversightAdvisory to issue150;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

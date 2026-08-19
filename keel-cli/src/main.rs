@@ -337,6 +337,40 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
     }))
 }
 
+/// The default console port. One constant, because the hook advisory names it to the reader and a
+/// wrong number in an advisory is worse than no advisory.
+const CONSOLE_PORT: u16 = 7777;
+
+/// Is a KEEL console answering on `127.0.0.1:<port>`?
+///
+/// It asks `/api/version` and looks for `apiVersion` rather than merely opening a socket, because
+/// "something is listening on 7777" is not the claim being made. Reporting an unrelated process as a
+/// running console would be the same class of defect as issue140 and issue149 - a tool asserting more
+/// than it checked - and here it would tell the human their work is reachable when it is not.
+///
+/// Raw TCP with std, no HTTP client dependency, and short timeouts so a turn boundary can never hang on
+/// it. Any failure at all answers `false`: the advisory that follows is non-blocking, so a false negative
+/// costs one redundant line and a false positive costs the human their queue.
+fn console_is_up(port: u16) -> bool {
+    use std::io::{Read as _, Write as _};
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut s) = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(300)) else {
+        return false;
+    };
+    let _ = s.set_read_timeout(Some(std::time::Duration::from_millis(400)));
+    let req = format!("GET /api/version HTTP/1.1
+Host: 127.0.0.1:{port}
+Connection: close
+
+");
+    if s.write_all(req.as_bytes()).is_err() {
+        return false;
+    }
+    let mut buf = Vec::new();
+    let _ = s.take(4096).read_to_end(&mut buf);
+    String::from_utf8_lossy(&buf).contains("apiVersion")
+}
+
 /// Turn-boundary gate: refuse to end the turn while the model is dishonest. Loop-safe.
 fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     let already = payload.get("stop_hook_active").and_then(serde_json::Value::as_bool).unwrap_or(false);
@@ -367,7 +401,22 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
 
     if problems.is_empty() {
-        return 0; // green -> allow the stop
+        // GREEN, but the human may still be blocked. The console is their oversight lens (D0093), and
+        // this session repeatedly killed it to rebuild and then left it down while 70 items waited on
+        // them - which they had to notice and ask about. "Remember to restart serve" is the manual
+        // vigilance D0047 refuses, so the turn boundary checks it instead. ADVISORY, NEVER BLOCKING:
+        // whether the console should be up is the human's call, and a gate that blocked on it would be
+        // the over-strict control that trains its actor to disable it (issue076/issue081).
+        if let Some(total) = keel_cli::serve::obligations_total(root) {
+            if total > 0 && !console_is_up(CONSOLE_PORT) {
+                return hook_emit(&serde_json::json!({
+                    "systemMessage": format!(
+                        "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. Note it holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Checked only port {CONSOLE_PORT}; a console on another port is not detected."
+                    )
+                }));
+            }
+        }
+        return 0; // green, and the human is not blocked -> silent
     }
     if already {
         // Second consecutive red: allow the stop with a loud warning rather than trapping the agent.
@@ -2097,6 +2146,41 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{classify_guard_args, remap_engine_path, root_arg, Path};
+
+    /// issue150: the oversight advisory must be ADVISORY. A turn boundary that blocked because a server
+    /// was not running would be the over-strict gate that trains its actor to disable it, taking the
+    /// honest-state checks in the same hook down with it (issue076/issue081, and D0132 in the large).
+    #[test]
+    fn the_oversight_advisory_never_blocks() {
+        const MAIN_RS: &str = include_str!("main.rs");
+        // Index arithmetic rather than expect/panic: this crate denies both, and a test that trips a
+        // lint is a test someone deletes.
+        let hook_at = MAIN_RS.find("fn hook_stop(").unwrap_or(0);
+        assert!(hook_at > 0, "hook_stop must exist");
+        let hook = &MAIN_RS[hook_at..];
+        let adv_at = hook.find("[oversight]").unwrap_or(0);
+        assert!(adv_at > 0, "the oversight advisory must exist");
+        // Everything from the start of the GREEN branch up to the advisory must carry no block decision.
+        let green_at = hook[..adv_at].rfind("if problems.is_empty()").unwrap_or(0);
+        assert!(green_at > 0, "the green branch must exist");
+        let green = &hook[green_at..adv_at];
+        assert!(
+            !green.contains("\"decision\": \"block\""),
+            "the green branch of hook_stop must never block -- the human's console being down is not              dishonest state"
+        );
+        assert!(green.contains("systemMessage"), "the advisory must emit a systemMessage");
+    }
+
+    /// The advisory's count must come from the console's own obligation computation, not a second one.
+    #[test]
+    fn the_advisory_counts_what_the_console_shows() {
+        let total = keel_cli::serve::obligations_total(std::path::Path::new(".."));
+        assert!(total.is_some(), "obligations_total must be computable for this repository");
+        assert!(
+            total.unwrap_or(0) > 0,
+            "this repository has outstanding human obligations, so the reused count must be non-zero --              a zero here would mean the hook silently advises nothing while work waits"
+        );
+    }
 
     #[test]
     fn an_unknown_flag_is_a_mistake_and_never_a_root() {

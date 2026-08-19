@@ -1377,71 +1377,95 @@ fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
 ///
 /// The classes are not enumerated here. Declaring a viewpoint with `surface = "act"` adds one, which
 /// is what makes N-C1's "without having been told a new class exists" achievable at all.
-async fn api_obligations(State(s): State<AppState>) -> Response {
-    cached(&s, "obligations", |root| {
-        let surfaces = crate::view::surfaces_json(root)?;
-        let parsed: serde_json::Value = serde_json::from_str(&surfaces).unwrap_or(serde_json::Value::Null);
-        let act = parsed
-            .get("surfaces")
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.iter().find(|s| s.get("surface").and_then(|x| x.as_str()) == Some("act")))
-            .and_then(|s| s.get("viewpoints"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        let mut classes: Vec<crate::json::Json> = Vec::new();
-        let mut total = 0i64;
-        let mut uncountable = 0i64;
-        for vp in &act {
-            let get = |k: &str| vp.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
-            let renderer = get("renderer");
-            let cmd = renderer.trim_start_matches("keel ").split([' ', '(']).next().unwrap_or("").to_string();
-            let mut row = vec![
-                // The viewpoint's ELEMENT NAME, so a console can link the card to the place the work is
-                // done by identity rather than by matching a title (srConsoleObligationActionable).
-                ("viewpoint".to_string(), crate::json::Json::s(get("viewpoint"))),
-                ("title".to_string(), crate::json::Json::s(get("title"))),
-                ("concern".to_string(), crate::json::Json::s(get("concern"))),
-                ("renderer".to_string(), crate::json::Json::s(renderer.clone())),
-            ];
-            if let Some((n, caveat)) = obligation_count(root, &cmd) {
-                {
-                    total += n;
-                    row.push(("count".to_string(), crate::json::Json::Int(n)));
-                    row.push(("countable".to_string(), crate::json::Json::Bool(true)));
-                    if let Some(c) = caveat {
-                        row.push(("caveat".to_string(), crate::json::Json::s(c)));
-                    }
-                }
-            } else {
-                {
-                    uncountable += 1;
-                    row.push(("countable".to_string(), crate::json::Json::Bool(false)));
-                    row.push((
-                        "why".to_string(),
-                        crate::json::Json::s(format!(
-                            "no counter bound to `{cmd}` — reported as NOT COUNTABLE rather than as zero (N-C2)"
-                        )),
-                    ));
+/// The obligation set — WHAT IS WAITING ON A HUMAN — as JSON (issue150).
+///
+/// Extracted from `api_obligations` so it has exactly one home. The turn-boundary hook needs the TOTAL
+/// to decide whether the human has anything to act on, and re-deriving "which viewpoints are act-surface
+/// and what do they count" in a second place is the dual truth §1 forbids: the two copies would drift and
+/// the hook would advise about a different set than the console displays.
+///
+/// # Errors
+/// Returns [`crate::view::ViewError`] if the surfaces view cannot be computed.
+pub fn obligations_json(root: &Path) -> Result<String, crate::view::ViewError> {
+    let surfaces = crate::view::surfaces_json(root)?;
+    let parsed: serde_json::Value = serde_json::from_str(&surfaces).unwrap_or(serde_json::Value::Null);
+    let act = parsed
+        .get("surfaces")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.iter().find(|s| s.get("surface").and_then(|x| x.as_str()) == Some("act")))
+        .and_then(|s| s.get("viewpoints"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut classes: Vec<crate::json::Json> = Vec::new();
+    let mut total = 0i64;
+    let mut uncountable = 0i64;
+    for vp in &act {
+        let get = |k: &str| vp.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        let renderer = get("renderer");
+        let cmd = renderer.trim_start_matches("keel ").split([' ', '(']).next().unwrap_or("").to_string();
+        let mut row = vec![
+            // The viewpoint's ELEMENT NAME, so a console can link the card to the place the work is
+            // done by identity rather than by matching a title (srConsoleObligationActionable).
+            ("viewpoint".to_string(), crate::json::Json::s(get("viewpoint"))),
+            ("title".to_string(), crate::json::Json::s(get("title"))),
+            ("concern".to_string(), crate::json::Json::s(get("concern"))),
+            ("renderer".to_string(), crate::json::Json::s(renderer.clone())),
+        ];
+        if let Some((n, caveat)) = obligation_count(root, &cmd) {
+            {
+                total += n;
+                row.push(("count".to_string(), crate::json::Json::Int(n)));
+                row.push(("countable".to_string(), crate::json::Json::Bool(true)));
+                if let Some(c) = caveat {
+                    row.push(("caveat".to_string(), crate::json::Json::s(c)));
                 }
             }
-            classes.push(crate::json::Json::Obj(row));
+        } else {
+            {
+                uncountable += 1;
+                row.push(("countable".to_string(), crate::json::Json::Bool(false)));
+                row.push((
+                    "why".to_string(),
+                    crate::json::Json::s(format!(
+                        "no counter bound to `{cmd}` — reported as NOT COUNTABLE rather than as zero (N-C2)"
+                    )),
+                ));
+            }
         }
-        Ok(crate::json::Json::Obj(vec![
-            (
-                "obligations_note".to_string(),
-                crate::json::Json::s(
-                    "what is waiting on a HUMAN. Classes are derived from viewpoints declaring \
-                     surface=\"act\" — declaring one adds a class with no console change. A class with no \
-                     bound counter is reported NOT COUNTABLE, never as zero.",
-                ),
+        classes.push(crate::json::Json::Obj(row));
+    }
+    Ok(crate::json::Json::Obj(vec![
+        (
+            "obligations_note".to_string(),
+            crate::json::Json::s(
+                "what is waiting on a HUMAN. Classes are derived from viewpoints declaring \
+                 surface=\"act\" — declaring one adds a class with no console change. A class with no \
+                 bound counter is reported NOT COUNTABLE, never as zero.",
             ),
-            ("total".to_string(), crate::json::Json::Int(total)),
-            ("classes".to_string(), crate::json::Json::Arr(classes)),
-            ("uncountableClasses".to_string(), crate::json::Json::Int(uncountable)),
-        ])
-        .dump())
-    })
+        ),
+        ("total".to_string(), crate::json::Json::Int(total)),
+        ("classes".to_string(), crate::json::Json::Arr(classes)),
+        ("uncountableClasses".to_string(), crate::json::Json::Int(uncountable)),
+    ])
+    .dump())
+}
+
+/// How many items are waiting on a human, or `None` when that cannot be computed.
+///
+/// Reads the TOTAL out of [`obligations_json`] rather than counting anything itself, so the number the
+/// hook advises on is the number the console shows. `None` is distinct from `Some(0)` and must stay so:
+/// "nothing is waiting" and "I could not tell what is waiting" are different answers, and reporting the
+/// second as the first is how a quiet failure becomes a false all-clear (N-C2).
+#[must_use]
+pub fn obligations_total(root: &Path) -> Option<i64> {
+    let json = obligations_json(root).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&json).ok()?;
+    v.get("total").and_then(serde_json::Value::as_i64)
+}
+
+async fn api_obligations(State(s): State<AppState>) -> Response {
+    cached(&s, "obligations", obligations_json)
 }
 
 async fn api_review_queue(State(s): State<AppState>) -> Response {

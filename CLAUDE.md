@@ -175,7 +175,10 @@ ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 In-loop gating (D0128/D0130/D0134): `keel hook post-edit` runs the fast tier after each `.sysml` edit;
 `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest;
 `keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) — **advisory, never
-blocking**, and silent unless it has something to say. All live in the binary — no extra runtime.
+blocking**, and silent unless it has something to say. When the model is GREEN, `hook stop` also advises
+(never blocks) if items are waiting on the human and no console answers on 127.0.0.1:7777 — the human's
+oversight lens being down is not dishonest state, but leaving it down while their queue fills is a
+failure the turn boundary can see and I cannot be trusted to remember (issue150). All live in the binary — no extra runtime.
 
 The JVM **kernel** validators are the deeper SysML oracle for the type-conformance residual, and are
 **opt-in** (`KEEL_KERNEL_VALIDATE=1`, D0132/issue081) — the per-file instance validator was demoted
@@ -198,6 +201,9 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   switch tools rather than re-issuing the same form. This host: **Windows + PowerShell + git-bash**.
 - **`conda` is not on `PATH`** in Claude Code shells. Use the full miniforge3 path (above). Installation
   root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, not miniconda3).
+- **`keel serve` holds `target/release/keel.exe`, so it blocks every rebuild (issue150).** Serve a COPY
+  (`cp target/release/keel.exe target/release/keel-serve.exe`) when you will keep building — otherwise the
+  console gets killed for each build and stays down, which is how the human's queue went unwatched.
 - **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
   invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
   file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with
