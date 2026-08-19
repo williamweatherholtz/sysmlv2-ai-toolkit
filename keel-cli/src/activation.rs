@@ -242,6 +242,24 @@ impl Activation {
     }
 }
 
+/// Every process declared on disk, sorted — INCLUDING those that assert no constraint (issue149).
+///
+/// A "unit" exists only for a process that asserts at least one guard, because activation switches
+/// GUARDS. That is coherent, and it made `keel activation` report 6 of this repository's 18 processes
+/// with nothing to indicate the other 12 existed, while `keel deactivate` refused them as "not a
+/// declared process unit" — which reads as "no such process" rather than "that process carries no
+/// deactivatable guards". The mechanism was right and its surface was misleading, so the surface now
+/// reports the whole set and says which part of it is switchable.
+#[must_use]
+pub fn declared_processes(root: &Path) -> Vec<String> {
+    let mut out: Vec<String> = crate::collect_sysml(&root.join(".engine").join("processes"))
+        .iter()
+        .filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_string))
+        .collect();
+    out.sort();
+    out
+}
+
 /// True when `.engine/processes/<name>.sysml` exists — so a project may activate a process it authored
 /// itself, with no unit declared, without that counting as a typo.
 fn process_exists(root: &Path, name: &str) -> bool {
@@ -252,6 +270,32 @@ fn process_exists(root: &Path, name: &str) -> bool {
 mod tests {
     use super::{Activation, GuardState};
     use std::path::Path;
+
+    /// issue149: the reported process set must be the set ON DISK, not the switchable subset. This
+    /// repository has 18 process files and 6 guard-bearing units; reporting 6 told a reader it had 6
+    /// processes, and refusing the other 12 as "not a declared process unit" told them those did not
+    /// exist. The unit set is deliberately narrower - activation switches guards - so the two must be
+    /// separately observable rather than one standing in for the other.
+    #[test]
+    fn declared_processes_is_every_file_not_only_the_guard_bearing_units() {
+        let root = Path::new("..");
+        let all = super::declared_processes(root);
+        let act = Activation::load(root);
+        let units = act.unit_names();
+        assert!(
+            all.len() > units.len(),
+            "this repository has guard-less processes, so the declared set must exceed the unit set              (all={}, units={})",
+            all.len(),
+            units.len()
+        );
+        for u in &units {
+            assert!(all.contains(u), "every guard-bearing unit `{u}` must also be a declared process");
+        }
+        assert!(
+            all.iter().any(|p| p == "knowledge-graph-memory"),
+            "a process with no asserted guard must still be reported as declared"
+        );
+    }
 
     fn write(dir: &Path, rel: &str, body: &str) {
         let p = dir.join(rel);

@@ -1671,13 +1671,17 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
 
     if mode == "activation" {
         println!("declared manifest: {}", if act.is_declared() { "yes" } else { "no — everything present is active" });
-        for p in act.unit_names() {
-            let unit = act.unit(&p);
-            let n_guards = unit.map_or(0, |u| u.guards.len());
-            println!(
-                "  [{}] {p}  ({n_guards} guard(s))",
-                if act.is_process_active(&p) { "active  " } else { "INACTIVE" }
-            );
+        // EVERY declared process, not only the switchable ones (issue149): listing 6 of 18 with no note
+        // that the rest exist reads as "this project has 6 processes".
+        for p in keel_cli::activation::declared_processes(&root) {
+            match act.unit(&p) {
+                Some(unit) => println!(
+                    "  [{}] {p}  ({} guard(s))",
+                    if act.is_process_active(&p) { "active  " } else { "INACTIVE" },
+                    unit.guards.len()
+                ),
+                None => println!("  [always  ] {p}  (asserts no guard — nothing to switch off)"),
+            }
         }
         println!("\ncore guards (never deactivatable):");
         for g in keel_cli::guards::GUARD_NAMES {
@@ -1693,10 +1697,18 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
         return 2;
     };
     if act.unit(target).is_none() {
-        eprintln!(
-            "error: `{target}` is not a declared process unit. Declared: {}",
-            act.unit_names().join(", ")
-        );
+        // Say WHICH of the two cases this is (issue149). "Not a declared process unit" was true and
+        // read as "no such process", which is a different and wrong answer.
+        if keel_cli::activation::declared_processes(&root).iter().any(|p| p == target) {
+            eprintln!(
+                "error: `{target}` is a declared process but asserts no guard, so there is nothing for {mode} to switch. Activation governs GUARDS (D0138). To stop running this process, remove the facts it authors -- a process whose inputs are absent produces nothing -- or give it an `assert constraint` so it becomes switchable."
+            );
+        } else {
+            eprintln!(
+                "error: `{target}` is not a declared process. Declared: {}",
+                keel_cli::activation::declared_processes(&root).join(", ")
+            );
+        }
         return 2;
     }
 

@@ -1733,6 +1733,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcBatchGitReads to issue148;
 
+    part issue149 : Issue {
+        :>> id = "7b3e08d1-4a26-4f95-8c07-1d59ea62b834";
+        :>> title = "`keel activation` reported 6 of 18 declared processes, and `keel deactivate` refused the other 12 as if they did not exist";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY THE HUMAN ASKING WHETHER A FEATURE CAN BE UNPLUGGED AFTER IT IS IMPLEMENTED. Activation switches GUARDS (D0138), so a process UNIT exists only for a process file asserting at least one `assert constraint`. That is coherent and it is not a regression - the retired `process-units.toml` listed the same six. THE DEFECT IS THE SURFACE, NOT THE MECHANISM. `keel activation` listed 6 entries with nothing to indicate that 12 more process files existed, so a reader concluded this project has six processes; and `keel deactivate knowledge-graph-memory` answered `not a declared process unit`, which reads as NO SUCH PROCESS rather than THAT PROCESS CARRIES NO DEACTIVATABLE GUARDS. Those are different answers and only the second is true. A misreported control inventory is the same class of defect as issue140 and the `resolver-kind` finding: the tool stating a narrower truth than it means, in a place a human uses to make a decision. FIXED: `activation::declared_processes` reports every process file; `keel activation` marks the guard-less ones `[always]  asserts no guard - nothing to switch off`; and the refusal now distinguishes an unknown name from a declared-but-unswitchable one and says what to do instead. Controlled by declared_processes_is_every_file_not_only_the_guard_bearing_units, which asserts the declared set strictly exceeds the unit set and that every unit is also a declared process - so the two can never silently collapse into one number again. THE SECOND HALF OF THEIR QUESTION IS A DESIGN GAP, NOT A DEFECT, and is answered in D0161 rather than here: nothing in the engine describes how to remove a FEATURE - a command plus a directory - once shipped, and D0161 proposed exactly that shape without saying how to undo it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcActivationSurface to issue149;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";
