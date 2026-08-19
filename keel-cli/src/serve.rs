@@ -28,6 +28,22 @@ use crate::json::Json;
 /// The embedded single-page console frontend (self-contained, no CDN — the cytoscape precedent).
 const CONSOLE_HTML: &str = include_str!("../assets/console.html");
 
+/// A short id for the console BUILD — a hash of the page's own bytes (issue153).
+///
+/// It changes exactly when the page changes, and is substituted into the served HTML so the marker is
+/// present WITHOUT JavaScript. That matters because the case we could not distinguish for three rounds
+/// was "the page's script is dead" from "the page is old" from "you are looking at something else" — and
+/// a JS-rendered marker is absent in the first two, telling the reader nothing about which.
+fn console_build() -> &'static str {
+    static B: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    B.get_or_init(|| {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        CONSOLE_HTML.hash(&mut h);
+        format!("{:x}", h.finish())[..8].to_string()
+    })
+}
+
 /// The committed keel read-API version (`viewerKeelApi`, D0114 shape B).
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
@@ -254,7 +270,7 @@ async fn index() -> Response {
             (axum::http::header::CACHE_CONTROL, "no-store, must-revalidate"),
             (axum::http::header::PRAGMA, "no-cache"),
         ],
-        Html(CONSOLE_HTML),
+        Html(CONSOLE_HTML.replace("__KEEL_BUILD__", console_build())),
     )
         .into_response()
 }
@@ -1141,6 +1157,9 @@ async fn api_version() -> Response {
     let weps = KEEL_API_WRITE_ENDPOINTS.iter().map(|e| Json::s((*e).to_string())).collect();
     ok_json(Json::Obj(vec![
         ("apiVersion".to_string(), Json::s(KEEL_API_VERSION.to_string())),
+        // The CONSOLE build, distinct from the API version (issue153): the API contract can hold steady
+        // across many page changes, so a page cannot tell whether it is current by reading apiVersion.
+        ("consoleBuild".to_string(), Json::s(console_build().to_string())),
         ("viewerKeelApi".to_string(), Json::s("committed read+write API for a viewpoint explorer (D0114 shape B); breaking read-contract changes bump the major version".to_string())),
         ("readEndpoints".to_string(), Json::Arr(eps)),
         ("writeEndpoints".to_string(), Json::Arr(weps)),

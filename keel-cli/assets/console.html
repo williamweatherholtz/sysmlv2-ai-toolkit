@@ -38,7 +38,7 @@
  #status{font-size:11px;color:var(--mut);padding:4px 16px}
 </style></head><body>
 <header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
- <div class="sub">Technical smooth sailing <span id="build" class="muted" style="color:#7d8a97"></span></div></header>
+ <div class="sub">Technical smooth sailing · <b>build __KEEL_BUILD__</b><span id="build" class="muted" style="color:#7d8a97"></span></div></header>
 <nav id="nav"></nav>
 <div id="status">loading…</div>
 <main id="main"></main>
@@ -71,6 +71,10 @@ const main=document.getElementById('main'), nav=document.getElementById('nav'), 
 // whether the handler was firing, whether the attribute was in the DOM, or whether the navigation ran.
 // A page the reader can interrogate beats a page I have to reason about.
 document.addEventListener('click',e=>{
+ // A panel switch travels the same way a card target does, so a bridge rendered anywhere works with no
+ // per-render wiring and cannot be orphaned by a re-render (issue154).
+ const p=e.target&&e.target.closest?e.target.closest('[data-panel]'):null;
+ if(p){activeSurface=null;activeVp=null;active=p.dataset.panel;location.hash=p.dataset.panel;draw();render();return}
  const t=e.target&&e.target.closest?e.target.closest('[data-oblig],[data-vp]'):null;
  if(!t){
   // Only speak up when the click looks like an attempt to act, so ordinary clicks stay quiet.
@@ -86,6 +90,28 @@ document.addEventListener('click',e=>{
 });
 // The command a viewpoint's DECLARED renderer names — the binding comes from the model, so a
 // viewpoint pointing at an existing panel gets it, and one that does not says what to run instead.
+// ACT BRIDGE (issue154). "Click to act" navigated correctly for three reports and landed on views where
+// nothing could be done: acceptances went to the orient panel (counts), authority-queue and
+// sitting-coverage to a read-only JSON rendering. Navigation was never the defect - the DESTINATION was.
+// So a panel holding work it cannot discharge now says so and offers the panel that can.
+//
+// Keyed on the PAYLOAD's shape, not on a list of viewpoint names: any computed view returning items that
+// await a human acceptance gets the bridge, including one declared after this was written.
+function acceptanceItems(d){
+ if(!d||typeof d!=='object')return 0;
+ const aw=Array.isArray(d.awaiting)?d.awaiting:[];
+ const pa=Array.isArray(d.pendingAcceptances)?d.pendingAcceptances:[];
+ return aw.filter(x=>/accept|confirm/i.test(String(x&&x.kind||''))).length+pa.length;
+}
+function actBridge(n){
+ return n?'<p style="margin:8px 0"><button class=rb data-panel="review" style="font-weight:600">Act on '
+  +n+' item(s) in the review queue &rarr;</button></p>':'';
+}
+function readOnlyNote(cmd){
+ return '<p class=muted style="border-left:3px solid #b58900;padding-left:8px">This panel RENDERS the '
+  +'computed view and cannot discharge it. Nothing here is a control. To act: use the review queue where '
+  +'the item is acceptance-bearing, or run <code>keel '+esc(cmd)+'</code> and record the result.</p>';
+}
 function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+/,'').split(/[\s(]/)[0]}
 async function buildNav(){
  const d=await get('/api/surfaces');
@@ -327,12 +353,17 @@ async function render(){
    status.textContent=activeSurface+' — '+vps.length+' viewpoint(s)';return;
   }
   if(active==='orient'){const o=await get('/api/orient');
-   main.innerHTML=obl+statusBanner(o)+'<div class=cards>'+
+   // The acceptances-pending card lands HERE, and orient reports a COUNT. A count is not a control, so a
+   // reader arriving from "click to act" found a number where they expected work (issue154).
+   main.innerHTML=obl+statusBanner(o)+actBridge((o.pendingAcceptances||[]).length)+'<div class=cards>'+
     card('Progress',`${o.counts.done} / ${o.counts.outstanding}`,'done / outstanding tasks','good')+
     card('Ready to start',(o.ready||[]).length,linkList(o.ready,6),(o.ready||[]).length?'good':'warn')+
     card('Sprints in progress',(o.in_progress_sprints||[]).length,(o.in_progress_sprints||[]).map(s=>itemLink(s.sprint)+' (pending '+(s.pending||'—')+')').join('; ')||'none',(o.in_progress_sprints||[]).length<=2?'good':'warn')+
     card('Open issues',(o.open_issues||[]).length,linkList(o.open_issues,8),(o.open_issues||[]).length?'warn':'good')+
     card('Suspect / stale',(o.suspect||[]).length,linkList(o.suspect,10),(o.suspect||[]).length?'warn':'good')+
+    // orient has always returned pendingAcceptances and this panel never rendered it, so the one thing
+    // the human is blocking on was the one thing the orient panel did not show (issue154).
+    card('Awaiting YOUR acceptance',(o.pendingAcceptances||[]).length,linkList(o.pendingAcceptances,8),(o.pendingAcceptances||[]).length?'warn':'good')+
    '</div>';
   } else if(active==='review'){const q=await get('/api/review-queue');
    const items=(q.items||[]).filter(x=>showAllReview||!x.ceremony);
@@ -444,7 +475,8 @@ async function render(){
     '<p class=muted>'+esc(activeVp.concern||'')+'<br>renderer <code>'+esc(activeVp.renderer||'')+'</code></p>'+
     (failed
       ? '<p class=muted style="border-left:3px solid #c33;padding-left:8px">this view could not be computed: '+esc(failed)+' — it is NOT empty. Run <code>keel '+esc(cmd)+'</code> on the CLI.</p>'
-      : statusBanner(d)+'<pre class=j>'+esc(JSON.stringify(d,null,1))+'</pre>');
+      : statusBanner(d)+actBridge(acceptanceItems(d))+readOnlyNote(cmd)
+        +'<pre class=j>'+esc(JSON.stringify(d,null,1))+'</pre>');
    status.textContent=(activeVp.title||cmd)+(failed?' — failed':'');return;
   }
   status.textContent='live · updated '+new Date().toLocaleTimeString();
@@ -498,12 +530,26 @@ fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).cat
 // pre-load the light views to warm the server-side cache so tab-switches are instant
 ['orient','decisions','dispositions','processes'].forEach(k=>fetch('/api/'+k).catch(()=>{}));
 // event-driven refresh: the server pushes `changed` only when the model's content fingerprint flips
+const MY_BUILD='__KEEL_BUILD__';
+// A tab open across a server restart keeps running the build it loaded with, forever, while looking
+// current because the SSE stream and the 30s interval keep repainting it (issue153). Compare builds and
+// reload rather than let the reader debug logic that no longer exists on disk.
+async function reloadIfStale(){
+ try{
+  const v=await (await fetch('/api/version',{cache:'no-store'})).json();
+  if(v.consoleBuild&&v.consoleBuild!==MY_BUILD){
+   status.textContent='this page is build '+MY_BUILD+' and the server now serves '+v.consoleBuild+' — reloading';
+   location.reload();
+  }
+ }catch(e){/* offline: keep what we have rather than reload-loop */}
+}
 let evs=new EventSource('/api/events');
-evs.addEventListener('hello',()=>{status.textContent='live (event-driven)'});
+evs.addEventListener('hello',()=>{status.textContent='live (event-driven)';reloadIfStale()});
 evs.addEventListener('changed',()=>render());
 evs.onerror=()=>{status.textContent='live: reconnecting…'};
 // slow safety-net refresh in case the event stream drops (NOT the primary path)
 setInterval(render,30000);
+setInterval(reloadIfStale,30000);
 // LAST STATEMENT IN THE FILE (issue152): if the header does not say `js ok`, the script threw before
 // here and every listener registered after the throw is missing. That single word tells the reader
 // whether the page is alive, which no amount of reading the source from outside can establish.

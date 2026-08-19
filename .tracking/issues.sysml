@@ -1766,6 +1766,28 @@ package ProjectIssues {
     }
     #Resolves dependency from dcConsoleSelfReport to issue152;
 
+    part issue153 : Issue {
+        :>> id = "6a05e2b9-4d71-4c38-9f26-8b13c07ae5d4";
+        :>> title = "a console tab left open across a restart runs its original build forever, and nothing on the page said which build it was";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "DIAGNOSED FROM THE HUMAN'S REPORT that the header showed no `js ok` marker while the server log showed their browser actively polling. Both facts are true together only if their page PREDATES the build that added the marker - so the tab had been open across restarts, running the JavaScript it originally loaded. issue143 shipped `no-store` to stop the browser CACHING the page, which does nothing for a page ALREADY LOADED: the SSE stream and the 30-second interval keep repainting it, so it looks current while running logic that no longer exists on disk. THE SECOND DEFECT MADE THE FIRST UNDIAGNOSABLE: every marker I had added was rendered BY JAVASCRIPT, so its absence was ambiguous between 'the script is dead', 'the page is old' and 'you are looking at something else' - three very different faults with one symptom, and I burned three rounds on it. FIXED. (1) The build id is a hash of the console's own bytes, substituted into the HTML BY THE SERVER, so `build <id>` renders in the header with no JavaScript at all - the marker is present even when the script is dead, which is exactly when it is needed. (2) It is exposed as `consoleBuild` on /api/version, distinct from `apiVersion` because the API contract holds steady across many page changes and so cannot tell a page whether it is current. (3) The page compares its own embedded id against the server's on every SSE `hello` and every 30 seconds, and reloads itself when they differ. A stale console now removes itself instead of waiting to be noticed. THE ONE THING THIS CANNOT FIX is the page that was already stale when the fix shipped: it has no such check, so it needs one manual reload - stated plainly rather than left as a surprise.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcConsoleBuildStamp to issue153;
+
+    part issue154 : Issue {
+        :>> id = "b70f4a13-8c52-4e69-a381-05fc7e29b641";
+        :>> title = "click to act navigated correctly for three reports and landed where nothing could be acted on - the destination was the defect, not the click";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THE HUMAN REPORTED THIS THREE TIMES AND I CHECKED THE WRONG THING EVERY TIME. Their words were precise - 'i see no items or content to act on' - and I read them as 'the click does nothing', so I spent three rounds verifying that navigation FIRED. It fired. The server log proves it: /api/computed/authority-queue was requested four times, and nothing but a click-to-act navigation requests that path (the page's warm-up list is orient, decisions, dispositions, processes). THE CLICK WORKED AND THE DESTINATION HELD NOTHING TO ACT ON. Mapped explicitly, which is what I should have done first: acceptancesPendingVP lands on the ORIENT panel, which reports a COUNT and did not even render the pendingAcceptances it has always returned; authorityQueueVP and sittingReviewVP land on the GENERIC panel, a read-only JSON rendering with no controls; only findingsAwaitingDispositionVP lands somewhere actionable. Three of four obligation classes took the reader somewhere they could SEE the work and not DO it - while the `review` panel, which has working accept and reject buttons, held 4 actionable items and 12 pending gates the whole time. I EVEN RECORDED THIS LIMIT MYSELF in sprint 343 ('the generic panel remains READ-ONLY for authority-queue and sitting-coverage, so for those two classes they can see the work and still discharge it elsewhere') and then treated the same complaint as a navigation bug three times over. A limitation I have written down is one I am responsible for reading. FIXED: a panel holding work it cannot discharge now says so in a warning-bordered note that states nothing on it is a control, and offers a bridge to the panel that CAN - keyed on the PAYLOAD's shape (items whose kind matches accept/confirm, or a pendingAcceptances array) rather than on a list of viewpoint names, so a class declared later gets the bridge with no console change. The orient panel gained both the bridge and an `Awaiting YOUR acceptance` card, because the one thing the human was blocking on was the one thing that panel never showed. The bridge travels as `data-panel` through the same document-level delegation as card targets, so it needs no per-render wiring and cannot be orphaned by a re-render.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcActionableDestination to issue154;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";
