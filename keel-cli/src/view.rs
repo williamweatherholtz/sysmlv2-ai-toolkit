@@ -4904,6 +4904,7 @@ fn sampled_commits(root: &Path, n: usize) -> Vec<String> {
 /// Run `git -C root <args>` and capture stdout, or `None` on non-zero exit / failure.
 fn git_out(root: &Path, args: &[&str]) -> Option<String> {
     crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    crate::perf::note_git(args);
     let out = crate::perf::timed(&crate::perf::GIT_NANOS, || {
         std::process::Command::new("git").arg("-C").arg(root).args(args).output()
     })

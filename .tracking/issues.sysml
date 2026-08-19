@@ -1722,6 +1722,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcBatchGitReads to issue147;
 
+    part issue148 : Issue {
+        :>> id = "2c74f9a5-6018-4e3b-9d82-5af0b71ce634";
+        :>> title = "the guard I added in sprint 344 spawned one `git show -s` per SHA and tripled the cost of `keel assured`";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MY OWN REGRESSION, INTRODUCED THE DAY BEFORE, AND I MISDIAGNOSED IT TWICE BEFORE MEASURING IT. `keel assured` runs every guard (view.rs:4620 folds GUARD_NAMES into its invariant check), so the `impossible-evidence-date` guard I added in sprint 344 ran inside it, and its `commit_date` helper spawned `git show -s --format=%ad` once per DISTINCT judgedAgainst SHA. Measured with the new per-argv tally: 480 of 484 spawns in `assured` were that one call, costing 15,286ms of a ~21,000ms run. Sprint 342 had recorded `assured` at 9.9s, so the guard roughly TRIPLED it. TWO WRONG DIAGNOSES ON THE WAY, both mine and both made without the measurement that would have settled them. (1) Sprint 346's review gate attributed the 9.9s-to-21s jump to cross-day wall-clock unreliability on this host - the sprint-342 number was in fact real and my own change explains the difference. (2) issue147 asserted the 483 spawns were 'one per element for D0084 staleness, and there are ~250 critiquable elements' - a plausible story that fit the order of magnitude and was wrong; it was a guard, keyed by SHA, not by element. Both claims were made from a TOTAL, and the per-argv breakdown that settled it took five minutes to add. THE FIX: `commit_dates()` reads the whole history in ONE `git log --all --format=%H %ad`, memoized for the process (safe because D0129 forbids rewriting history, so a commit's author date is immutable), and `commit_date` resolves an abbreviated SHA against that map - exact hit first, then a UNIQUE prefix match, returning None on an ambiguous prefix because a date attached to the wrong commit is worse than no date. MEASURED AFTER, five samples on a warmed binary: spawns 484 to 5, git time 15,286ms to 963ms, `assured` ~21s to 6.0-6.6s - now FASTER than the 9.9s baseline the guard had regressed. The guard's behaviour is unchanged and was re-verified both ways: PASS on the clean tree at 3817 results, FAIL naming the right result when the original defect is reintroduced.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcBatchGitReads to issue148;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

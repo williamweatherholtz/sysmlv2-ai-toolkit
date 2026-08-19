@@ -33,11 +33,41 @@ pub static GIT_CALLS: AtomicU64 = AtomicU64::new(0);
 /// Nanoseconds spent waiting on `git`.
 pub static GIT_NANOS: AtomicU64 = AtomicU64::new(0);
 
+/// Per-argv spawn tally, populated only at `KEEL_PERF=2`.
+///
+/// A total tells you spawns are the cost; only the breakdown tells you WHICH call to batch. Guessing the
+/// caller from a total is how the earlier bad attributions happened - including issue147, which named
+/// D0084 staleness when the answer was 480 `git show -s` calls from a guard.
+pub static GIT_ARGV: std::sync::Mutex<Option<std::collections::BTreeMap<String, u64>>> =
+    std::sync::Mutex::new(None);
+
+/// Record one spawn's shape. Cheap and skipped entirely below `KEEL_PERF=2`.
+pub fn note_git(args: &[&str]) {
+    if !verbose() {
+        return;
+    }
+    // Just the subcommand and its first flag-ish token: the full argv would be one line per element,
+    // which is the noise the tally exists to collapse.
+    let shape = args.iter().take(2).copied().collect::<Vec<_>>().join(" ");
+    if let Ok(mut g) = GIT_ARGV.lock() {
+        *g.get_or_insert_with(std::collections::BTreeMap::new).entry(shape).or_insert(0) += 1;
+    }
+}
+
+/// `KEEL_PERF=2` — the per-argv breakdown as well as the totals.
+#[must_use]
+pub fn verbose() -> bool {
+    static ON: std::sync::LazyLock<bool> =
+        std::sync::LazyLock::new(|| std::env::var("KEEL_PERF").is_ok_and(|v| v == "2"));
+    *ON
+}
+
 /// Whether instrumentation is on. Read once; an env lookup per build call would itself be a cost.
 #[must_use]
 pub fn enabled() -> bool {
-    static ON: std::sync::LazyLock<bool> =
-        std::sync::LazyLock::new(|| std::env::var("KEEL_PERF").is_ok_and(|v| v == "1"));
+    static ON: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| {
+        std::env::var("KEEL_PERF").is_ok_and(|v| v == "1" || v == "2")
+    });
     *ON
 }
 
@@ -64,6 +94,21 @@ pub fn timed<T>(counter: &AtomicU64, f: impl FnOnce() -> T) -> T {
 /// Deliberately reports the MISS COUNT rather than a hit RATE: a rate flatters a command that builds
 /// the model fifty times and hits the cache forty-nine, when the honest finding is that it keyed the
 /// cache fifty times to parse once.
+/// The per-argv tally as report lines, or empty when not at `KEEL_PERF=2`. Sorted by count descending,
+/// because the thing to batch is whatever is at the top.
+fn git_breakdown() -> String {
+    use std::fmt::Write as _;
+    let Ok(g) = GIT_ARGV.lock() else { return String::new() };
+    let Some(map) = g.as_ref() else { return String::new() };
+    let mut rows: Vec<(&String, &u64)> = map.iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(a.1));
+    rows.iter().fold(String::new(), |mut s, (shape, n)| {
+        let _ = write!(s, "
+  git {shape} x{n}");
+        s
+    })
+}
+
 /// Nanoseconds as whole milliseconds. Integer division, not a float cast: a report a human reads never
 /// needs sub-millisecond precision, and `u64 as f64` silently loses bits above 2^52.
 const fn ms(nanos: u64) -> u64 {
@@ -91,5 +136,5 @@ pub fn report() -> Option<String> {
         TREES_WALKED.load(Ordering::Relaxed),
         GIT_CALLS.load(Ordering::Relaxed),
         ms(GIT_NANOS.load(Ordering::Relaxed)),
-    ))
+    ) + &git_breakdown())
 }

@@ -22,6 +22,7 @@ const GOVERNING_PROCESS_STORY: &str = ".engine/workflows/delivery.sysml";
 /// Run `git -C <repo> <args>`; return non-empty trimmed stdout lines, or `[]` on failure.
 fn git_lines(repo: &Path, args: &[&str]) -> Vec<String> {
     crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    crate::perf::note_git(args);
     let output = crate::perf::timed(&crate::perf::GIT_NANOS, || {
         Command::new("git").arg("-C").arg(repo).args(args).output()
     });
@@ -138,13 +139,54 @@ fn acceptance_judged_against(text: &str, dec: &str) -> Option<String> {
 
 // ── charter-time scoping for the assurance gates (D0068 freeze, D0081) ─────────────────────────
 
+/// Every commit's author date, keyed by full SHA — ONE spawn for the whole history (issue148).
+///
+/// This replaces a `git show -s` PER SHA. That version cost 480 spawns and ~15 SECONDS inside `keel
+/// assured`, because `assured` runs every guard and `impossible-evidence-date` asks for the date of
+/// every distinct SHA in the corpus. A per-item git call is fine at ten items and catastrophic at five
+/// hundred; the whole history is one `git log`, so there is no reason to ever pay per item.
+///
+/// Memoized for the process. Safe because D0129 forbids rewriting history, so a commit's author date is
+/// immutable — and any commit created DURING a run postdates every judgment a run could be reading,
+/// which is exactly the case the caller treats as a violation rather than a lookup.
+fn commit_dates(repo: &Path) -> &'static std::collections::HashMap<String, String> {
+    static CACHE: std::sync::OnceLock<std::collections::HashMap<String, String>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| {
+        git_lines(repo, &["log", "--all", "--format=%H %ad", "--date=short"])
+            .into_iter()
+            .filter_map(|l| {
+                let (sha, date) = l.split_once(' ')?;
+                Some((sha.to_string(), date.to_string()))
+            })
+            .collect()
+    })
+}
+
 /// The author date (YYYY-MM-DD) of `sha`, or `None` if it does not resolve.
+///
+/// Accepts an ABBREVIATED sha, because that is what `judgedAgainst` records: an exact hit is tried
+/// first, then a unique prefix match. An AMBIGUOUS prefix returns `None` rather than an arbitrary
+/// winner — a date attached to the wrong commit is worse than no date, since callers use it to decide
+/// whether a judgment was possible.
 ///
 /// Author date rather than commit date: a merge or a re-application should not move when a judgment
 /// was possible, and D0129 forbids the history rewriting that would make the two diverge anyway.
 #[must_use]
 pub fn commit_date(repo: &Path, sha: &str) -> Option<String> {
-    git_lines(repo, &["show", "-s", "--format=%ad", "--date=short", sha]).into_iter().next()
+    let map = commit_dates(repo);
+    if let Some(d) = map.get(sha) {
+        return Some(d.clone());
+    }
+    let mut hit = None;
+    for (full, date) in map {
+        if full.starts_with(sha) {
+            if hit.is_some() {
+                return None; // ambiguous prefix
+            }
+            hit = Some(date.clone());
+        }
+    }
+    hit
 }
 
 /// The INTRODUCTION commit of a Decision — the first commit that added `part <decision> :` under
