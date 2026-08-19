@@ -1755,6 +1755,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcOversightAdvisory to issue150;
 
+    part issue152 : Issue {
+        :>> id = "8d47c015-3e92-4b78-a061-5cf29b0e7a43";
+        :>> title = "click-to-act reported broken a THIRD time; three rounds of source-reading could not observe the browser, so the page now reports on itself";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THIRD FIELD REPORT OF THE SAME FAILURE, and the new wording changed the hypothesis: 'click to act -> still does not do anything. i see no items or content to act on.' EVERY LINK IN THE CHAIN IS CORRECT WHEN READ, and I have now verified each one against the SERVED file rather than the source: /api/obligations returns a resolvable `viewpoint` for all four act classes; `card(l,v,d,tone,attrs)` interpolates attrs and obligationBar passes `data-oblig`; the four renderers resolve to `orient`, `authority-queue`, `dispositions`, `sitting-coverage`, and every one of those has a destination branch (orient at 307, dispositions at 392, the other two via the generic `activeVp` branch at 412); the obligation bar IS rendered into `main`; `#main` is never replaced, only its innerHTML assigned; no competing handler and nothing calls stopPropagation. THE DEFECT IS THAT I CANNOT OBSERVE THE BROWSER AND KEPT ANSWERING AS THOUGH I COULD - three times I told them it should work, which is worse than saying I do not know. D0160 records that we have no way to execute the page and I have been reasoning past that limit instead of engineering around it. TWO CHANGES, both aimed at making the next report carry its own evidence rather than at a guessed cause. (1) DELEGATION MOVED TO `document` AND REGISTERED EARLY, immediately after the element handles: bound to `main` and registered near the end of the script, ANY earlier top-level throw would leave no listener at all - which is indistinguishable from 'clicking does nothing' - and a `main` node that was ever replaced would take its listener with it. Neither is proven to have happened; both are now impossible. (2) THE PAGE REPORTS ON ITSELF: a click on a card with no target says so and states how many targeted cards exist in the DOM, which separates 'the handler never fired' from 'the attribute is not in the rendered DOM'; a click with a target says `opening <viewpoint>...` BEFORE anything can await; and the final statement in the file stamps `js ok` plus the clickable-card count into the header, so a script that threw before the end is visible at a glance instead of inferred. STILL UNRESOLVED: the cause is unknown, and this Issue stays OPEN until they report what the page now says.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcConsoleSelfReport to issue152;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

@@ -62,6 +62,28 @@ function renderAgentEvent(data){
 }
 let active=null, activeSurface=null, reportName="assurance", showAllReview=false;
 const main=document.getElementById('main'), nav=document.getElementById('nav'), status=document.getElementById('status');
+// CLICK DELEGATION AND SELF-DIAGNOSIS (issue152). Registered HERE, immediately after the element
+// handles and before anything that can throw, and bound to DOCUMENT rather than to `main`:
+//   - bound late, any earlier top-level error would leave no listener at all, which is indistinguishable
+//     from "clicking does nothing" — the exact report received three times;
+//   - bound to `main`, a captured node that was ever replaced would take its listener with it.
+// It also REPORTS what it saw on every click, because three rounds of source-reading could not tell me
+// whether the handler was firing, whether the attribute was in the DOM, or whether the navigation ran.
+// A page the reader can interrogate beats a page I have to reason about.
+document.addEventListener('click',e=>{
+ const t=e.target&&e.target.closest?e.target.closest('[data-oblig],[data-vp]'):null;
+ if(!t){
+  // Only speak up when the click looks like an attempt to act, so ordinary clicks stay quiet.
+  const card=e.target&&e.target.closest?e.target.closest('.c'):null;
+  if(card){
+   const n=document.querySelectorAll('[data-oblig],[data-vp]').length;
+   status.textContent='that card carries no target ('+n+' targeted card(s) on this page) — click-to-act is bound by identity, so a card without data-oblig/data-vp has nothing to open';
+  }
+  return;
+ }
+ status.textContent='opening '+(t.dataset.oblig||t.dataset.vp)+'…';
+ goToVp(t.dataset.oblig||t.dataset.vp);
+});
 // The command a viewpoint's DECLARED renderer names — the binding comes from the model, so a
 // viewpoint pointing at an existing panel gets it, and one that does not says what to run instead.
 function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+/,'').split(/[\s(]/)[0]}
@@ -459,11 +481,7 @@ function goToVp(name){
  if(surface)location.hash=surface;
  draw();render();
 }
-main.addEventListener('click',e=>{
- const t=e.target.closest('[data-oblig],[data-vp]');
- if(!t||!main.contains(t))return;
- goToVp(t.dataset.oblig||t.dataset.vp);
-});
+
 // load the agent-bridge setting up front so Critique buttons reflect it (serveSettings), then draw
 // buildNav() MUST resolve before the first render: navigation comes from the model now, so there is
 // nothing to draw until /api/surfaces answers. A failure here is reported rather than rendered as an
@@ -486,4 +504,11 @@ evs.addEventListener('changed',()=>render());
 evs.onerror=()=>{status.textContent='live: reconnecting…'};
 // slow safety-net refresh in case the event stream drops (NOT the primary path)
 setInterval(render,30000);
+// LAST STATEMENT IN THE FILE (issue152): if the header does not say `js ok`, the script threw before
+// here and every listener registered after the throw is missing. That single word tells the reader
+// whether the page is alive, which no amount of reading the source from outside can establish.
+(function(){
+ const b=document.getElementById('build');
+ if(b)b.textContent=' · js ok · '+document.querySelectorAll('[data-oblig],[data-vp]').length+' clickable card(s)'+b.textContent;
+})();
 </script></body></html>
