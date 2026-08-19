@@ -21,7 +21,10 @@ const GOVERNING_PROCESS_STORY: &str = ".engine/workflows/delivery.sysml";
 
 /// Run `git -C <repo> <args>`; return non-empty trimmed stdout lines, or `[]` on failure.
 fn git_lines(repo: &Path, args: &[&str]) -> Vec<String> {
-    let output = Command::new("git").arg("-C").arg(repo).args(args).output();
+    crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    let output = crate::perf::timed(&crate::perf::GIT_NANOS, || {
+        Command::new("git").arg("-C").arg(repo).args(args).output()
+    });
     match output {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
             .lines()

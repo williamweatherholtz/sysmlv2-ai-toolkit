@@ -1689,6 +1689,39 @@ package ProjectIssues {
     }
     #Resolves dependency from dcImpossibleEvidenceDate to issue144;
 
+    part issue145 : Issue {
+        :>> id = "4f9c2b78-6e15-4d03-a927-8b0e5c14f7a2";
+        :>> title = "the model cache was keyed by a fingerprint that cost nine times what the cache saved, and the fingerprint function existed twice";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY INSTRUMENTATION, AND IT CORRECTS A FALSE CLAIM I RECORDED IN issue142: 'only the JSON OUTPUT is cached, never the parsed model' IS WRONG. `MODEL_CACHE` and `MODEL_BUILD_LOCK` have memoized `Model::build` by content fingerprint all along, and dcSharedParsedModel's DoD therefore asked for work that was already done. THE ACTUAL DEFECT WAS THE CACHE KEY. `fingerprint()` recursively walks `.tracking` and `.engine` and calls `metadata()` on every file - about 40ms and 582 stats here - and it ran on EVERY `Model::build` call, cache hit included. Measured: `keel assured` built the model 37 times, hit the cache 36 times, and spent 1472ms fingerprinting to avoid a 160ms parse, at 21,534 stats and 74 tree walks. The cache key cost nine times what the cache saved, and the more effective the cache became the more the key dominated. SECOND DEFECT: the function existed TWICE, identical logic in `view::Model::fingerprint` and `serve::fingerprint`, one commented 'same shape as serve's'. Two copies of a predicate is the dual truth §1 forbids, and it meant the server and the view layer could disagree about whether a file had changed. Fixed by one home (`crate::fingerprint`) memoized by an EXPLICIT EPOCH, never a timer: a CLI process is one epoch because it is one-shot and read-only, `serve` bumps the epoch per HTTP request so each request sees one snapshot and the request after any write re-reads, and the SSE change DETECTOR calls the uncached `compute` because it is the thing detecting change. Measured after: `assured` fingerprint 1472ms to 41ms, stats 21,534 to 582, walks 74 to 2. NOTE FOR PRECISION: it folds mtime, so it is a STAT fingerprint, not a content one - a `git checkout` that restores identical bytes changes it. That is conservative in the safe direction and was already intended, but 'content fingerprint' overstates it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcFingerprintEpoch to issue145;
+
+    part issue146 : Issue {
+        :>> id = "d3a86f01-5c94-4e27-b168-70e2fa9c3d85";
+        :>> title = "/api/computed/:cmd computed every view TWICE per request - once to ask whether the command was bound, then again through the cache";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MY OWN DEFECT FROM SPRINT 339, found while measuring the console burst. `api_computed` called `computed_view(root, cmd)` to decide whether to return 404, discarded the result, and then passed a closure to `cached()` that computed the SAME view again. So every request paid a full uncached computation whether the cache hit or not, and the per-fingerprint view cache the endpoint advertised in its own doc comment ('Cached per command like every other view') could never take effect. Measured: a WARM burst of the eight endpoints the console requests took 7197ms, where a cached endpoint set should be a fraction of that. THE ROOT CAUSE IS A CONFLATED SIGNATURE, not a careless call: `computed_view` returned `Option<Result<String, _>>`, folding IS THIS BOUND and WHAT DOES IT COMPUTE into one value, so the only way to ask the cheap question was to answer the expensive one. Fixed by splitting the table: `computed_binding(cmd) -> Option<ComputedFn>` answers boundness from the table alone and hands back the function, and `computed_view` is now that call plus an application. Measured after, same session: warm burst 7197ms to 979-1291ms, cold 12066ms to 5185-5505ms.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcComputedBindingSplit to issue146;
+
+    part issue147 : Issue {
+        :>> id = "9e5b3c02-8a17-4d64-b039-6c7f1e48a5d3";
+        :>> title = "assurance spawns 483 git subprocesses per run - 15 seconds of a 21-second command, one process per element";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED, NOT INFERRED, which matters because three previous wall-clock inferences about this codebase were wrong. With KEEL_PERF=1 counting spawns in the two shared git helpers, `keel assured` makes 483 `git` invocations costing 15,078ms of a ~21,000ms command - about 31ms per spawn, which is process-creation cost on Windows rather than work git does. For comparison the same run parses the whole corpus once in 147ms and fingerprints in 44ms. SO ASSURANCE IS NOT A PARSING PROBLEM OR A CACHING PROBLEM, IT IS A PROCESS-SPAWN PROBLEM, and the shape is one spawn per element: D0084 staleness fetches each element's historical content to decide whether its critique drifted, and there are ~250 critiquable elements. THE FIX IS ALREADY THE SHAPE GIT PROVIDES: `git cat-file --batch` takes (sha, path) pairs on stdin and streams every blob back over ONE process, which collapses 483 spawns into 1. That is plumbing designed for exactly this access pattern. SCOPE OF THE MEASUREMENT, stated so it is not read wider than it is: the counter covers `view::git_out` and `govern::git_lines`, which are two of about 25 spawn sites in the tree - `orient` reports git x0 because orient.rs spawns directly and is not instrumented, so the true total for other commands is higher than reported, never lower. Instrumenting the remaining sites belongs with the fix.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcBatchGitReads to issue147;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

@@ -38,6 +38,8 @@ pub mod guards;
 pub mod indexer;
 pub mod migrate;
 mod json;
+pub mod fingerprint;
+pub mod perf;
 pub mod orient;
 pub mod process_cmd;
 pub mod queries;

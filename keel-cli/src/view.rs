@@ -250,38 +250,21 @@ impl Model {
         MODEL_CACHE.lock().ok().and_then(|g| g.as_ref().filter(|(c, _)| *c == fp).map(|(_, m)| m.clone()))
     }
 
-    /// Content fingerprint of the model files (stat-only: path + len + mtime). Same shape as serve's.
-    fn fingerprint(root: &Path) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        for base in [".tracking", ".engine"] {
-            for f in crate::collect_sysml(&root.join(base)) {
-                if let Ok(m) = std::fs::metadata(&f) {
-                    f.to_string_lossy().hash(&mut h);
-                    m.len().hash(&mut h);
-                    if let Ok(t) = m.modified() {
-                        if let Ok(d) = t.duration_since(std::time::UNIX_EPOCH) {
-                            d.as_nanos().hash(&mut h);
-                        }
-                    }
-                }
-            }
-        }
-        h.finish()
-    }
-
     /// Build the model, MEMOIZED by content fingerprint (see [`MODEL_CACHE`]). A burst of concurrent
     /// callers on an unchanged model shares one parse; the cache invalidates on any file change.
     fn build(root: &Path) -> Result<Self, ViewError> {
-        let fp = Self::fingerprint(root);
+        crate::perf::add(&crate::perf::BUILD_CALLS, 1);
+        let fp = crate::fingerprint::of(root);
         if let Some(m) = Self::cached_model(fp) {
+            crate::perf::add(&crate::perf::CACHE_HITS, 1);
             return Ok(m);
         }
         let _bl = MODEL_BUILD_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(m) = Self::cached_model(fp) {
+            crate::perf::add(&crate::perf::CACHE_HITS, 1);
             return Ok(m); // another thread built it while we waited
         }
-        let model = Self::build_uncached(root)?;
+        let model = crate::perf::timed(&crate::perf::PARSE_NANOS, || Self::build_uncached(root))?;
         if let Ok(mut g) = MODEL_CACHE.lock() {
             *g = Some((fp, model.clone()));
         }
@@ -4920,7 +4903,11 @@ fn sampled_commits(root: &Path, n: usize) -> Vec<String> {
 
 /// Run `git -C root <args>` and capture stdout, or `None` on non-zero exit / failure.
 fn git_out(root: &Path, args: &[&str]) -> Option<String> {
-    let out = std::process::Command::new("git").arg("-C").arg(root).args(args).output().ok()?;
+    crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    let out = crate::perf::timed(&crate::perf::GIT_NANOS, || {
+        std::process::Command::new("git").arg("-C").arg(root).args(args).output()
+    })
+    .ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 

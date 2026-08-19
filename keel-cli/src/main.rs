@@ -2074,6 +2074,11 @@ fn main() {
         Some("record") => cmd_record(rest),
         _ => print_usage(),
     };
+    // STDERR, always, and after the command's own output: a computed view's stdout is JSON that
+    // automation parses, so a perf line on stdout would corrupt every caller that asked for numbers.
+    if let Some(r) = keel_cli::perf::report() {
+        eprintln!("{r}");
+    }
     process::exit(code);
 }
 

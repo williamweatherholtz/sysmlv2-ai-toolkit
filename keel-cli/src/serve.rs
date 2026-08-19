@@ -264,6 +264,11 @@ async fn index() -> Response {
 async fn log_request(req: Request, next: Next) -> Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
+    // A REQUEST IS THE POINT IN TIME (issue145). Bumping the epoch here means every fingerprint asked
+    // for while serving this request reads the tree at most once, and the request AFTER any write
+    // re-reads it -- a write arrives as a request too, so no write path needs to remember to invalidate.
+    // Without this, one page load fingerprinted the tree dozens of times: 37 in `assured` alone.
+    crate::fingerprint::new_epoch();
     let start = std::time::Instant::now();
     let resp = next.run(req).await;
     let line = format!("[keel serve] {method} {path} -> {} ({}ms)", resp.status().as_u16(), start.elapsed().as_millis());
@@ -676,7 +681,7 @@ async fn api_check(State(s): State<AppState>) -> Response {
 /// model moved underneath (a possible concurrent edit, D0108) — the viewer flags a conflict rather than
 /// silently overwriting. Cheap (stat-only), never cached.
 async fn api_fingerprint(State(s): State<AppState>) -> Response {
-    ok_json(format!("{{\"fingerprint\":\"{}\"}}", fingerprint(&s.rootpath())))
+    ok_json(format!("{{\"fingerprint\":\"{}\"}}", crate::fingerprint::of(&s.rootpath())))
 }
 
 /// Resolve a repo-relative `.sysml` path safely (no absolute paths, no `..` traversal, stays under root).
@@ -1061,28 +1066,6 @@ fn ok_json(body: String) -> Response {
     ([("content-type", "application/json")], body).into_response()
 }
 
-/// Cheap content fingerprint of the model files (.tracking + .engine `.sysml`): folds (path, len,
-/// mtime). Drives BOTH the view cache and the change-detection SSE (D0094 serveLiveCache) — "if the
-/// fingerprint is unchanged, the files didn't change". Catches out-of-purview edits (e.g. git checkout
-/// rewrites mtime). ~stat-only, fast enough to poll server-side.
-fn fingerprint(root: &Path) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    for base in [".tracking", ".engine"] {
-        for f in crate::collect_sysml(&root.join(base)) {
-            if let Ok(m) = std::fs::metadata(&f) {
-                f.to_string_lossy().hash(&mut h);
-                m.len().hash(&mut h);
-                if let Ok(t) = m.modified() {
-                    if let Ok(d) = t.duration_since(std::time::UNIX_EPOCH) {
-                        d.as_nanos().hash(&mut h);
-                    }
-                }
-            }
-        }
-    }
-    h.finish()
-}
 
 /// Serve a view's JSON from the per-fingerprint cache, recomputing ONLY when the model changed
 /// (D0094 serveLiveCache) — this is what kills the per-request 2s recompute on unchanged data.
@@ -1112,7 +1095,7 @@ fn with_status(body: &str, status: &str, extra: &str) -> String {
 }
 
 fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>) -> Response {
-    let fp = fingerprint(&state.rootpath());
+    let fp = crate::fingerprint::of(&state.rootpath());
     let previous = {
         let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         guard.get(key).cloned()
@@ -1304,36 +1287,60 @@ async fn api_surfaces(State(s): State<AppState>) -> Response {
 ///
 /// `None` for a command with no binding, reported as NOT AVAILABLE naming the command — never as an empty
 /// result, which is the same rule the counter follows.
-fn computed_view(root: &Path, cmd: &str) -> Option<Result<String, crate::view::ViewError>> {
+type ComputedFn = fn(&Path) -> Result<String, crate::view::ViewError>;
+
+/// The command -> view binding, resolved WITHOUT computing anything (issue146).
+///
+/// Returning the function rather than its result is the whole point. The first version of this table
+/// returned `Option<Result<String, _>>`, which conflated two questions - IS this command bound, and
+/// WHAT does it compute - so the only way to ask the first was to answer the second. `api_computed`
+/// asked whether the command was bound, threw the computed view away, then computed it again through
+/// the cache: EVERY request paid a full uncached computation, cache hit or not. A binding is a fact
+/// about the table and must be answerable without touching the model.
+fn computed_binding(cmd: &str) -> Option<ComputedFn> {
     Some(match cmd {
-        "orient" => Ok(crate::orient::compute(root).to_json()),
-        "dispositions" => crate::view::dispositions(root),
-        "authority-queue" => crate::view::authority_queue(root),
-        "sitting-coverage" => crate::view::sitting_coverage(root),
-        "open-issues" => crate::view::open_issues(root),
-        "suspect" => Ok(crate::govern::suspect(root, false)),
-        "critique-coverage" => crate::view::critique_coverage(root),
-        "concern-coverage" => crate::view::concern_coverage(root),
-        "coverage" => crate::view::coverage(root),
-        "rootedness" => crate::view::rootedness(root),
-        "tier-satisfaction" => crate::view::tier_satisfaction(root),
-        "indicators" => crate::view::indicators(root, false),
-        "orphans" => crate::algo::orphans(root).map_err(|e| crate::view::ViewError::Track(String::from("orphans"), e.to_string())),
+        "orient" => |root: &Path| Ok(crate::orient::compute(root).to_json()),
+        "dispositions" => crate::view::dispositions,
+        "authority-queue" => crate::view::authority_queue,
+        "sitting-coverage" => crate::view::sitting_coverage,
+        "open-issues" => crate::view::open_issues,
+        "suspect" => |root: &Path| Ok(crate::govern::suspect(root, false)),
+        "critique-coverage" => crate::view::critique_coverage,
+        "concern-coverage" => crate::view::concern_coverage,
+        "coverage" => crate::view::coverage,
+        "rootedness" => crate::view::rootedness,
+        "tier-satisfaction" => crate::view::tier_satisfaction,
+        "indicators" => |root: &Path| crate::view::indicators(root, false),
+        "orphans" => |root: &Path| {
+            crate::algo::orphans(root)
+                .map_err(|e| crate::view::ViewError::Track(String::from("orphans"), e.to_string()))
+        },
         _ => return None,
     })
+}
+
+/// Compute the view bound to `cmd`, or `None` when nothing is bound.
+fn computed_view(root: &Path, cmd: &str) -> Option<Result<String, crate::view::ViewError>> {
+    computed_binding(cmd).map(|f| f(root))
 }
 
 /// GET /api/computed/:cmd — any declared viewpoint's computed JSON, so a card can land on the view its
 /// renderer names. Cached per command like every other view.
 async fn api_computed(State(s): State<AppState>, axum::extract::Path(cmd): axum::extract::Path<String>) -> Response {
     let key = format!("computed:{cmd}");
-    let c = cmd.clone();
-    match computed_view(&s.rootpath(), &c) {
-        Some(_) => cached(&s, &key, move |root| computed_view(root, &c).unwrap_or_else(|| Ok(String::from("{}")))),
+    // Ask the TABLE whether the command is bound; never compute a view to find out (issue146).
+    computed_binding(&cmd).map_or_else(
         // Not an empty body and not a 200: a command with no binding is a stated gap, so the reader learns
         // the view exists in the model and has no server-side computation rather than seeing a blank panel.
-        None => (StatusCode::NOT_FOUND, format!("{{\"viewStatus\":\"failed\",\"reason\":\"no computed view is bound to the command '{cmd}' - the viewpoint declares a renderer the server cannot compute; run it on the CLI as: keel {cmd}\"}}")).into_response(),
-    }
+        || {
+            (
+                StatusCode::NOT_FOUND,
+                format!("{{\"viewStatus\":\"failed\",\"reason\":\"no computed view is bound to the command '{cmd}'\"}}"),
+            )
+                .into_response()
+        },
+        |f| cached(&s, &key, f),
+    )
 }
 
 /// The obligation count for one declared act-surface viewpoint, read from the view its `renderer`
@@ -1728,11 +1735,11 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
 async fn api_events(State(s): State<AppState>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = s.rootpath();
     let stream = async_stream::stream! {
-        let mut last = fingerprint(&root);
+        let mut last = crate::fingerprint::compute(&root);
         yield Ok(Event::default().event("hello").data(last.to_string()));
         loop {
             tokio::time::sleep(Duration::from_millis(1500)).await;
-            let now = fingerprint(&root);
+            let now = crate::fingerprint::compute(&root);
             if now == last {
                 yield Ok(Event::default().event("ping").data(""));
             } else {
