@@ -2784,4 +2784,7 @@ package ProjectCritiques {
     verification issue142Disp1 : Test { :>> id = "68dfa123-4e72-4f7d-a026-4347dad03b00"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "building cache isn't the same as authoring duplicate/stale facts.  max cache to improve speed here is just fine, if there's a good mechanism to piece-wise update the cache when changes are detected."; }
     part issue142Disp1R1 : TestResult { :>> id = "777004fa-b0c3-4f12-8b89-cfb76112d59f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e791083"; :>> judgedAt = "2026-08-18"; :>> judgedBy = "wweatherholtz"; }
     #Dispositions dependency from issue142Disp1 to issue142;
+    verification issue142Disp2 : Test { :>> id = "8c3eda7c-c764-459d-925c-4f136464a005"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "i believe this is resolved.  regardless, it's valuable to have good performance"; }
+    part issue142Disp2R1 : TestResult { :>> id = "2b870569-5f84-4ede-ad15-7eb73ade336c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "127017f"; :>> judgedAt = "2026-08-19"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue142Disp2 to issue142;
 }
