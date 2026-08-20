@@ -90,6 +90,95 @@ pub fn gen_uuid() -> String {
     s
 }
 
+/// The ONE lock file guarding model writes, found by walking up to the `.tracking`/`.engine` parent.
+///
+/// Falls back to a sibling lock when neither is found - a caller writing outside a model tree still gets
+/// mutual exclusion against itself, which is the best available answer without inventing a root.
+fn model_lock_path(target: &Path) -> std::path::PathBuf {
+    let mut cur = target;
+    while let Some(parent) = cur.parent() {
+        if matches!(parent.file_name().and_then(|n| n.to_str()), Some(".tracking" | ".engine")) {
+            return parent.with_file_name(".keel-write-lock");
+        }
+        cur = parent;
+    }
+    target.with_extension("keel-lock")
+}
+
+/// Hold an exclusive lock on `path` for the duration of `f` (issue185).
+///
+/// WHY. Every write here is a read-modify-write: read the file, splice an item in, write it all back.
+/// Four concurrent `keel record issue` calls landed TWO issues - all four exited 0, the tree validated
+/// clean, and two recorded facts simply vanished. Whichever writer renamed last won. Making each write
+/// ATOMIC (issue184) guarantees the file is never half-written and says nothing about whether it
+/// contains both writers' work.
+///
+/// The lock is a sibling `.keel-lock` created with `create_new`, which is atomic on every platform this
+/// runs on: exactly one creator succeeds. A writer that cannot acquire it FAILS LOUDLY, because a
+/// refused write is recoverable - the caller retries - whereas a lost write with a success exit code is
+/// undetectable by anything, and the write API is what D0093 makes the automation substrate.
+///
+/// A STALE LOCK IS BREAKABLE. A process that dies holding one would otherwise block every later write
+/// forever, turning a crash into a permanent outage. On the last attempt a lock older than twice the
+/// retry budget is taken over - a live holder finishes far inside that.
+///
+/// # Errors
+/// Returns [`std::io::ErrorKind::WouldBlock`] if the lock cannot be acquired, or whatever `f` returns.
+pub fn with_file_lock<T, E: From<std::io::Error>>(
+    path: &Path,
+    f: impl FnOnce() -> Result<T, E>,
+) -> Result<T, E> {
+    const ATTEMPTS: u32 = 100;
+    const WAIT_MS: u64 = 20;
+    // ONE MODEL-WIDE LOCK, not one per file. Two entry points - `set_attr` and `create_item` - SEARCH
+    // for the file they will modify, so the target is unknown until after the read and a per-file lock
+    // cannot be taken up front. A single lock beside the model root makes every writer mutually
+    // exclusive, which for a text-file model with millisecond writes costs nothing measurable and
+    // removes the whole class rather than most of it.
+    let lock = model_lock_path(path);
+    let mut held = false;
+    for attempt in 0..ATTEMPTS {
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
+            Ok(_) => {
+                held = true;
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                if attempt + 1 == ATTEMPTS {
+                    let stale = std::fs::metadata(&lock)
+                        .and_then(|m| m.modified())
+                        .ok()
+                        .and_then(|m| m.elapsed().ok())
+                        .is_some_and(|age| {
+                            age.as_millis() > u128::from(ATTEMPTS) * u128::from(WAIT_MS) * 2
+                        });
+                    if stale {
+                        let _ = std::fs::remove_file(&lock);
+                        held = std::fs::OpenOptions::new()
+                            .write(true)
+                            .create_new(true)
+                            .open(&lock)
+                            .is_ok();
+                    }
+                }
+                if !held {
+                    std::thread::sleep(std::time::Duration::from_millis(WAIT_MS));
+                }
+            }
+            Err(e) => return Err(E::from(e)),
+        }
+    }
+    if !held {
+        return Err(E::from(std::io::Error::new(
+            std::io::ErrorKind::WouldBlock,
+            format!("another writer holds {} - refusing rather than overwriting their work", lock.display()),
+        )));
+    }
+    let out = f();
+    let _ = std::fs::remove_file(&lock);
+    out
+}
+
 /// Write `content` to `path` ATOMICALLY: a sibling temp file, then a rename over the target (issue184).
 ///
 /// `std::fs::write` truncates and then writes, so the target is momentarily EMPTY and then progressively
@@ -368,6 +457,18 @@ pub fn append_result(
     judged_at: &str,
     judged_by: &str,
 ) -> Result<String, WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_result_locked(path, task_name, sha, verdict, judged_at, judged_by))
+}
+
+fn append_result_locked(
+    path: &Path,
+    task_name: &str,
+    sha: &str,
+    verdict: &str,
+    judged_at: &str,
+    judged_by: &str,
+) -> Result<String, WriteError> {
     if verdict != "pass" && verdict != "fail" {
         return Err(WriteError::InvalidVerdict(verdict.to_owned()));
     }
@@ -447,6 +548,11 @@ pub struct Critique<'a> {
 /// `WriteError::InsertionPointNotFound` if the file has no package-closing brace;
 /// `WriteError::Io` on filesystem errors.
 pub fn append_critique(path: &Path, c: &Critique) -> Result<String, WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_critique_locked(path, c))
+}
+
+fn append_critique_locked(path: &Path, c: &Critique) -> Result<String, WriteError> {
     if c.outcome != "pass" && c.outcome != "fail" {
         return Err(WriteError::InvalidVerdict(c.outcome.to_owned()));
     }
@@ -530,6 +636,11 @@ pub struct Disposition<'a> {
 /// `WriteError::InsertionPointNotFound` if the file has no package-closing brace;
 /// `WriteError::Io` on filesystem errors.
 pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_disposition_locked(path, d))
+}
+
+fn append_disposition_locked(path: &Path, d: &Disposition) -> Result<String, WriteError> {
     if !matches!(d.verdict, "act" | "acceptRisk" | "dismiss") {
         return Err(WriteError::InvalidVerdict(d.verdict.to_owned()));
     }
@@ -579,6 +690,11 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
 /// # Errors
 /// Returns [`WriteError::TaskNotFound`] if the item isn't found, or on I/O / malformed-block failure.
 pub fn set_attr(root: &Path, item: &str, attr: &str, literal: &str) -> Result<String, WriteError> {
+    // issue185: this SEARCHES for its target, so it locks the model rather than a file.
+    with_file_lock(&root.join(".tracking"), || set_attr_locked(root, item, attr, literal))
+}
+
+fn set_attr_locked(root: &Path, item: &str, attr: &str, literal: &str) -> Result<String, WriteError> {
     let decl_kw = ["part ", "requirement ", "use case ", "action ", "verification "];
     for file in crate::collect_sysml(&root.join(".tracking")) {
         let content = std::fs::read_to_string(&file)?;
@@ -620,6 +736,11 @@ const AUTHORED_HEADER: &str = "// ProjectAuthored — items + edges created in-c
 /// # Errors
 /// Returns [`WriteError`] if the file cannot be read/written or has no closing `}` insertion point.
 pub fn append_resolves_edge(path: &Path, from: &str, to: &str) -> Result<(), WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_resolves_edge_locked(path, from, to))
+}
+
+fn append_resolves_edge_locked(path: &Path, from: &str, to: &str) -> Result<(), WriteError> {
     append_marker_edge(path, "Resolves", from, to)
 }
 
@@ -686,6 +807,11 @@ pub fn author_edge(root: &Path, file_rel: &str, kind: &str, from: &str, to: &str
 /// # Errors
 /// Returns [`WriteError`] if the file cannot be read/written, or has no closing `}` insertion point.
 pub fn append_marker_edge(path: &Path, marker: &str, from: &str, to: &str) -> Result<(), WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_marker_edge_locked(path, marker, from, to))
+}
+
+fn append_marker_edge_locked(path: &Path, marker: &str, from: &str, to: &str) -> Result<(), WriteError> {
     append_line_before_close(path, &edge_line(marker, from, to))
 }
 
@@ -700,6 +826,11 @@ pub fn append_marker_edge(path: &Path, marker: &str, from: &str, to: &str) -> Re
 /// # Errors
 /// `WriteError::InsertionPointNotFound` if the file has no package-closing brace; `WriteError::Io`.
 pub fn append_measurement(path: &Path, indicator: &str, value: &str, measured_at: &str, source: &str, by: &str) -> Result<String, WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_measurement_locked(path, indicator, value, measured_at, source, by))
+}
+
+fn append_measurement_locked(path: &Path, indicator: &str, value: &str, measured_at: &str, source: &str, by: &str) -> Result<String, WriteError> {
     let content = std::fs::read_to_string(path)?;
     let prefix = format!("{indicator}M");
     let mut n = 1u32;
@@ -746,6 +877,19 @@ pub fn append_measurement(path: &Path, indicator: &str, value: &str, measured_at
 /// Returns `WriteError::Parse` if the file cannot be lexed or parsed.
 /// Returns `WriteError::Io` on filesystem errors.
 pub fn append_gate_result(
+    path: &Path,
+    gate_name: &str,
+    sha: &str,
+    verdict: &str,
+    judged_at: &str,
+    judged_by: &str,
+    notes: Option<&str>,
+) -> Result<String, WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || append_gate_result_locked(path, gate_name, sha, verdict, judged_at, judged_by, notes))
+}
+
+fn append_gate_result_locked(
     path: &Path,
     gate_name: &str,
     sha: &str,
@@ -814,6 +958,17 @@ pub fn append_gate_result(
 /// Returns `WriteError::Parse` if the file cannot be lexed or parsed.
 /// Returns `WriteError::Io` on filesystem errors.
 pub fn add_task(
+    path: &Path,
+    def_name: &str,
+    task_name: &str,
+    dod_text: &str,
+    method: &str,
+) -> Result<String, WriteError> {
+    // issue185: the whole read-modify-write under one lock.
+    with_file_lock(path, || add_task_locked(path, def_name, task_name, dod_text, method))
+}
+
+fn add_task_locked(
     path: &Path,
     def_name: &str,
     task_name: &str,
@@ -915,6 +1070,11 @@ pub struct NewItem<'a> {
 /// # Errors
 /// Returns [`WriteError`] on I/O failure or a missing insertion point.
 pub fn create_item(root: &Path, it: &NewItem) -> Result<(String, String), WriteError> {
+    // issue185: this SEARCHES for its target, so it locks the model rather than a file.
+    with_file_lock(&root.join(".tracking"), || create_item_locked(root, it))
+}
+
+fn create_item_locked(root: &Path, it: &NewItem) -> Result<(String, String), WriteError> {
     use std::fmt::Write as _;
     let uuid = gen_uuid();
     let ident = |s: &str| -> String { s.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect() };
@@ -1049,6 +1209,18 @@ pub fn accept_decision(
     judged_by: &str,
     note: &str,
 ) -> Result<String, WriteError> {
+    // issue185: the whole read-modify-write under one lock.
+    with_file_lock(path, || accept_decision_locked(path, decision, sha, judged_at, judged_by, note))
+}
+
+fn accept_decision_locked(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    note: &str,
+) -> Result<String, WriteError> {
     let content = std::fs::read_to_string(path)?;
     if !content.contains(&format!("part {decision} : Decision")) {
         return Err(WriteError::TaskNotFound(decision.to_owned()));
@@ -1082,6 +1254,18 @@ pub fn accept_decision(
 /// `WriteError::TaskNotFound` if the decision part or a `proposed` status is not present; `WriteError::Io`
 /// on filesystem errors.
 pub fn reject_decision(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    rationale: &str,
+) -> Result<String, WriteError> {
+    // issue185: the whole read-modify-write under one lock.
+    with_file_lock(path, || reject_decision_locked(path, decision, sha, judged_at, judged_by, rationale))
+}
+
+fn reject_decision_locked(
     path: &Path,
     decision: &str,
     sha: &str,
@@ -1134,6 +1318,43 @@ mod atomic_write_tests {
             .collect();
         assert!(strays.is_empty(), "a temp file survived a successful write");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// THE CONTROL for issue185: no PUBLIC write entry point may read-modify-write outside the lock.
+    ///
+    /// Four concurrent `keel record issue` calls landed two issues, all four exiting 0. A concurrency
+    /// test would be flaky, so what is pinned is the STRUCTURE: a `pub fn` that reads the file it is
+    /// about to rewrite has not taken the lock, because the wrapped ones delegate to a private
+    /// `*_locked` sibling and do no reading themselves.
+    #[test]
+    fn no_public_write_reads_outside_the_lock() {
+        let full = std::fs::read_to_string("src/write.rs").expect("write.rs is readable");
+        let src = &full[..full.find("
+#[cfg(test)]").unwrap_or(full.len())];
+        let mut offenders = Vec::new();
+        let mut current: Option<String> = None;
+        let mut public = false;
+        for line in src.lines() {
+            if line.starts_with("pub fn ") || line.starts_with("fn ") {
+                public = line.starts_with("pub fn ");
+                current = line
+                    .split_whitespace()
+                    .nth(usize::from(public) + 1)
+                    .map(|n| n.split('(').next().unwrap_or(n).to_string());
+            }
+            if !line.contains("read_to_string") || line.trim_start().starts_with("//") {
+                continue;
+            }
+            let name = current.clone().unwrap_or_default();
+            // `with_file_lock` and `write_atomic` are the mechanism, not entry points.
+            if public && !matches!(name.as_str(), "with_file_lock" | "write_atomic") {
+                offenders.push(name);
+            }
+        }
+        assert!(
+            offenders.is_empty(),
+            "public write entry point(s) reading outside the lock - concurrent writers silently lose              facts: {offenders:?}"
+        );
     }
 
     /// No model write in this module may call `std::fs::write` directly. THE CONTROL: the defect was 21
@@ -1272,6 +1493,11 @@ fn next_issue_number(text: &str) -> u32 {
 /// `WriteError::Io` on filesystem errors; `WriteError::TaskNotFound` if the issues file has no
 /// package close to insert before.
 pub fn record_issue(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
+    // issue185: lock the file this will read-modify-write, for its whole duration.
+    with_file_lock(&root.join(".tracking").join("issues.sysml"), || record_issue_locked(root, n))
+}
+
+fn record_issue_locked(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
     let path = root.join(".tracking").join("issues.sysml");
     let text = std::fs::read_to_string(&path)?;
     let num = next_issue_number(&text);
@@ -1349,6 +1575,11 @@ mod issue_tests {
 /// `WriteError::Io` on filesystem errors.
 // @audit-hash ceRecordClaim
 pub fn record_claim(root: &Path, item: &str, actor: &str) -> Result<(String, String), WriteError> {
+    // issue185: lock the file this will read-modify-write, for its whole duration.
+    with_file_lock(&root.join(".tracking").join("claims.sysml"), || record_claim_locked(root, item, actor))
+}
+
+fn record_claim_locked(root: &Path, item: &str, actor: &str) -> Result<(String, String), WriteError> {
     let dir = root.join(".tracking").join("claims");
     std::fs::create_dir_all(&dir)?;
     let file = dir.join(format!("{}.sysml", sanitize_name(actor)));

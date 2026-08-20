@@ -2130,4 +2130,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcAtomicModelWrite to issue184;
+
+    part issue185 : Issue {
+        :>> id = "7ac2ee52-220d-4dfd-bf68-16196ea1e6c0";
+        :>> title = "Concurrent writes silently lose facts and every command reports success";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED ON A COPY: four concurrent 'keel record issue' calls against .tracking/issues.sysml landed TWO issues. All four exited 0. The tree validated clean. No temp file was left behind. Two recorded facts vanished and nothing anywhere said so. Every write in write.rs is a read-modify-write - read_to_string, splice the new item in, write the whole file back - at eight separate sites, with no lock, no conflict detection and no compare-and-swap. Whichever writer renames last wins, and the loser's content is simply gone. WHY THIS IS NOT THEORETICAL: D0108 and D0129 are explicitly about multi-contributor work, and D0108's rule is that a non-owner ADDS items or supersedes rather than overwriting in place. Two contributors both obeying that rule, at the same moment, silently discard one of their contributions. The console's write endpoints make it easier still, since a human clicking accept while a session records an issue is exactly two writers. SILENT IS THE DEFECT, NOT SLOW. A refused write is recoverable - the caller retries. A lost write with rc=0 is undetectable by any automation, and the sanctioned write path is the thing D0093 makes the automation substrate. This also sits directly downstream of issue184: making each individual write atomic guarantees the file is never HALF written, and says nothing about whether it contains both writers' work. PREVENTING CHANGE: serialise writers to a file with an atomically-created lock file and bounded retry; a writer that cannot acquire the lock fails loudly; the four-way probe must land 4 of 4.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcConcurrentWriteSafe to issue185;
 }

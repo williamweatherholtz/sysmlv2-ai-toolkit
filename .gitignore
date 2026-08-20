@@ -72,3 +72,10 @@ architect-sure-*.png
 # Machine-local acting-actor binding (D0129). Per-machine by design: committing it would
 # re-create the shared-default provenance defect it exists to remove (issue072).
 .keel/
+
+# Write-path scratch (issue184/issue185). A crashed writer can leave either behind, and `git add -A`
+# is the standing instruction here - so an un-ignored lock file would get COMMITTED and then block
+# every clone that pulled it.
+.keel-write-lock
+*.keel-lock
+*.keel-tmp

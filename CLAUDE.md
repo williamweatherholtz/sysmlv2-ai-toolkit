@@ -102,6 +102,10 @@ frozen (modify it only by out-of-band Decision).
 
 ## 4. Working rules
 
+- **Model writes are atomic and mutually exclusive (issue184/issue185).** Every write goes through
+  a temp-file-then-rename, and all writers serialise on one `.keel-write-lock` beside the model root:
+  four concurrent `record issue` calls used to land two issues with all four exiting 0. A writer that
+  cannot acquire the lock **fails loudly** — a refused write is recoverable, a lost one is not.
 - **The write API is the sanctioned write path.** `keel append-result`, `append-gate-result`, `add-task`,
   `record decision`, `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
