@@ -1843,6 +1843,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcLiveDoc to issue159;
 
+    part issue160 : Issue {
+        :>> id = "b6f39c05-2a74-4e18-9037-51de4a8c07b3";
+        :>> title = "keel's human-facing output is write-only: 350k words of gate prose nobody reads, identity printed twice, and 52 warnings that never change";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "RAISED BY THE HUMAN asking for a UX and human-factors critique of the output format, and the worst finding is mine. (1) THE PROSE IS WRITE-ONLY. 356 sprints times roughly seven gates, at 200-600 words each, is a third of a million words of procedureText that no reader has ever read - including me, twice in this session: sprint 343 recorded that the generic panel was read-only and I then diagnosed the same complaint as a navigation bug three times, and sprint 353 recorded a reason to ignore the synthetic uid that issue158 later proved wrong. A record nobody reads is not documentation, it is ritual, and it costs real money - it is why the model file is large and why grep is the only way through it. (2) IDENTITY IS PRINTED TWICE, EVERYWHERE. `d0166` beside a title that opens D0166:; `sprint355_liveDocDeck` beside Sprint 355:; `issue159` beside a title restating it. Every human surface stutters. (3) MACHINE NAMES LEAK INTO HUMAN SURFACES: srConsoleObligationActionableConfirmR2 and ldRetroGateR1 are in a queue a person reads. (4) WARNING FATIGUE, and it is D0132's own lesson unlearned one layer up: 52 legacy-actor warnings have printed on every commit for hundreds of commits. A warning that never changes trains its reader to skip the whole block, which is exactly how the kernel validator got disabled. (5) NUMBERS WITHOUT A DENOMINATOR OR AN ACTION: `3893 scanned` of what, and `due 34` meaning what happens if nobody acts. (6) TWO VOCABULARIES: the deck says Accept / Needs work / Reject, the schema says act / acceptRisk / dismiss, and I translate on every round trip while stating the mapping - the need for a translator IS the finding, not a display detail. NONE OF THIS IS A RENDERING PROBLEM. The engine is scrupulous about whether a fact is true and indifferent to whether anyone can read it, and honest-state doctrine has no clause about legibility.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLegibleOutput to issue160;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

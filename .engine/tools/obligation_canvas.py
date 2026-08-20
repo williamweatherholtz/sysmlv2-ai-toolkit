@@ -23,11 +23,11 @@ from pathlib import Path
 # One hue per obligation class (categorical), deliberately distinct from the semantic verdict colors.
 CLASSES = [
     ("acceptance", "Decisions awaiting your acceptance", "#4c5fd7",
-     "An AI actor cannot supply this (D0106). Until you sign, the work each charters stays blocked."),
+     "An AI cannot sign these. Until you do, the work each charters stays blocked."),
     ("authority", "Authority queue", "#0e7c86",
-     "Judgments only a registered person may make, with how long each has waited."),
+     "Judgments only a person may make."),
     ("finding", "Findings awaiting disposition", "#b5651d",
-     "Critique results at or above Medium with no disposition recorded."),
+     "Findings at Medium or above, undispositioned."),
     ("sitting", "Sitting reviews due", "#7d4f9c",
      "Sprints with no sitting review since D0155's grandfather line."),
 ]
@@ -77,6 +77,21 @@ def scan_items(root):
     return out
 
 
+def trim_title(name, title):
+    """Drop a title's leading self-reference, because the card already shows the id.
+
+    `d0166` followed by "D0166: a human statement is a tracked item..." printed the identifier twice in
+    eight characters - what the human meant by duplicate titles and IDs. Only a prefix matching THIS
+    item's own name is removed; a title that mentions some other item keeps it.
+    """
+    low = title.lower()
+    for sep in (": ", " - ", " -- "):
+        head, found, tail = low.partition(sep)
+        if found and head.strip() == name.lower() and tail.strip():
+            return title[len(head) + len(sep):].strip()
+    return title
+
+
 def sig(*parts):
     """Content signature, so a verdict on an item that later CHANGED can be re-surfaced."""
     return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()[:12]
@@ -108,7 +123,7 @@ def collect(root):
         if uid in seen:
             return
         seen.add(uid)
-        shown = title or info.get("title") or name
+        shown = trim_title(name, title or info.get("title") or name)
         items.append({
             "cls": cls, "name": name, "uid": uid, "title": shown,
             "meta": meta, "body": body, "sig": sig(shown, body),
@@ -119,16 +134,16 @@ def collect(root):
     # reclassifies every finding as "authority queue" - which it did on the first attempt, taking the
     # findings count from 22 to 0 while the totals still looked plausible.
     for d in keel(root, "orient").get("pendingAcceptances", []):
-        add("acceptance", d, decl.get(d, {}).get("title", d), "proposed Decision - needs your sign-off")
+        add("acceptance", d, decl.get(d, {}).get("title", d), "proposed")
 
     for f in keel(root, "dispositions").get("findings", []):
         if not f.get("dispositioned"):
             fn = f.get("finding", "?")
             add("finding", fn, decl.get(fn, {}).get("title", fn),
-                "severity %s - no disposition recorded" % f.get("severity", "?"))
+                "severity %s" % f.get("severity", "?"))
 
     for s in keel(root, "sitting-coverage").get("due_sprints", []):
-        add("sitting", s, decl.get(s, {}).get("title", s), "sprint has no sitting review")
+        add("sitting", s, decl.get(s, {}).get("title", s), "unreviewed")
 
     for a in keel(root, "authority-queue").get("awaiting", []):
         item = a.get("item", "?")
@@ -203,9 +218,17 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;text-wrap:balan
 .blurb{margin:12px 0;color:var(--ink3);font-size:13px}
 .card{border:1px solid var(--line);border-left:4px solid var(--h);border-radius:var(--r);
   padding:12px;margin:10px 0;background:var(--card)}
-.card[data-verdict=accept]{border-left-color:var(--accept)}
-.card[data-verdict=maybe]{border-left-color:var(--maybe)}
-.card[data-verdict=reject]{border-left-color:var(--reject)}
+.card[data-verdict=accept]{border-color:var(--accept);border-left-color:var(--accept);background:color-mix(in srgb,var(--accept) 9%,var(--card))}
+.card[data-verdict=maybe]{border-color:var(--maybe);border-left-color:var(--maybe);background:color-mix(in srgb,var(--maybe) 9%,var(--card))}
+.card[data-verdict=reject]{border-color:var(--reject);border-left-color:var(--reject);background:color-mix(in srgb,var(--reject) 9%,var(--card))}
+.vd{display:none;font:700 10px/1 var(--sans);text-transform:uppercase;letter-spacing:.08em;
+  padding:4px 8px;border-radius:99px;color:#fff}
+.card[data-verdict] .vd{display:inline-block}
+.card[data-verdict=""] .vd{display:none}
+.card[data-verdict=accept] .vd{background:var(--accept)}
+.card[data-verdict=maybe] .vd{background:var(--maybe);color:#1a1200}
+.card[data-verdict=reject] .vd{background:var(--reject)}
+.sv{font:11px var(--mono);color:var(--ink3)}
 .card header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .card code{font:600 12px/1 var(--mono);color:var(--ink3)}
 .chg{font:600 10px/1 var(--sans);text-transform:uppercase;letter-spacing:.06em;
@@ -277,6 +300,31 @@ document.addEventListener('claude:sync-lost', function(){
   if (el) el.textContent = 'a change did not reach the document yet - it will go with the next one';
 });
 
+var LABEL = { accept:'accepted', maybe:'needs work', reject:'rejected', '':'' };
+
+// POSITIVE CONFIRMATION, not an assumption. `claude.use('artifact')` resolves null when this view cannot
+// write at all; `sync(fn)` resolves once what fn changed has been appended and REJECTS with a code if it
+// was not. Calling it with a no-op after the gesture asks the runtime the only question that matters:
+// did my change land? Anything other than success says so ON THE CARD, because a verdict the human
+// believes they recorded and which never reached the document is the worst outcome available here.
+var ART = (window.claude && claude.use) ? claude.use('artifact') : Promise.resolve(null);
+function confirmSaved(card){
+  var sv = card.querySelector('.sv');
+  if (!sv) return;
+  sv.textContent = 'saving...';
+  ART.then(function(a){
+    if (!a || !a.sync) { sv.textContent = 'not saved - use Copy for Claude'; return; }
+    return a.sync(function(){}).then(
+      function(){ sv.textContent = 'saved'; },
+      function(err){
+        sv.textContent = 'NOT saved (' + ((err && err.code) || 'unknown') + ') - use Copy for Claude';
+        if (err && (err.code === 'not_writer' || err.code === 'not_granted')) {
+          document.body.dataset.localReadonly = 'true';
+        }
+      });
+  }).catch(function(){ sv.textContent = 'not saved - use Copy for Claude'; });
+}
+
 var cards = [].slice.call(document.querySelectorAll('.card'));
 function judged(){ return cards.filter(function(c){ return c.dataset.verdict; }).length; }
 function count(){
@@ -291,11 +339,16 @@ document.addEventListener('click', function(e){
     h.setAttribute('aria-expanded', open ? 'true' : 'false'); return; }
   var b = e.target.closest('.verdicts button');
   if (b) {
-    // THE GESTURE IS THE WRITE. Setting data-verdict inside this handler is what gets appended to the
-    // document as this viewer - no save call, no export, no copy.
+    // THE GESTURE IS THE WRITE: setting data-verdict inside this handler is what gets appended to the
+    // document as this viewer. But a silent write is indistinguishable from a dead button - which is
+    // exactly what they reported - so the card SAYS its verdict in words and then says whether it saved.
     var c = b.closest('.card');
-    c.dataset.verdict = c.dataset.verdict === b.dataset.v ? '' : b.dataset.v;
-    count(); return;
+    var next = c.dataset.verdict === b.dataset.v ? '' : b.dataset.v;
+    c.dataset.verdict = next;
+    var vd = c.querySelector('.vd'); if (vd) vd.textContent = LABEL[next] || '';
+    count();
+    confirmSaved(c);
+    return;
   }
   if (e.target.id === 'exp') { buildExport(); document.getElementById('dlg').showModal(); copyOut(); return; }
   if (e.target.id === 'close') { document.getElementById('dlg').close(); return; }
@@ -332,8 +385,10 @@ function buildExport(){
     L.push('## ' + names[v] + ' (' + got.length + ')', '');
     got.forEach(function(c){
       var n = c.querySelector('.note'), note = n ? n.value.trim() : '';
-      L.push('- **' + c.querySelector('code').textContent + '** (' + c.dataset.cls + ') - '
-        + c.querySelector('h3').textContent + (note ? '
+      // One line per item: id, title, note. The class is the section heading above, so repeating it
+      // on every line was pure noise (their words: duplicate titles, IDs, etc).
+      L.push('- `' + c.querySelector('code').textContent + '` ' + c.querySelector('h3').textContent
+        + (note ? ' -- ' + note : ''));
   - note: ' + note : ''));
     });
     L.push('');
@@ -371,7 +426,7 @@ def render(items, generated_at, head_sha):
         rows = by_cls[key]
         cards = "".join(
             '<article class=card data-uid="%s" data-sig="%s" data-cls="%s" data-verdict="">'
-            '<header><code>%s</code><span class=chg hidden>changed since you judged it</span></header>'
+            '<header><code>%s</code><span class=vd></span><span class=sv></span></header>'
             '<h3>%s</h3><p class=meta>%s</p>%s'
             '<div class=verdicts role=group aria-label="verdict">'
             '<button data-v=accept>Accept</button>'
