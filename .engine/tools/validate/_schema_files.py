@@ -12,6 +12,7 @@ import glob
 SCHEMA_ORDER = [
     "schema/core/element.sysml",
     "schema/core/rules.sysml",
+    "schema/core/intake.sysml",
     "schema/core/needs.sysml",
     "schema/core/requirements.sysml",
     "schema/core/verification.sysml",

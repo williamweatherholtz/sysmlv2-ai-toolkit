@@ -1323,6 +1323,7 @@ fn computed_binding(cmd: &str) -> Option<ComputedFn> {
         "authority-queue" => crate::view::authority_queue,
         "sitting-coverage" => crate::view::sitting_coverage,
         "open-issues" => crate::view::open_issues,
+        "intake" => crate::view::intake,
         "suspect" => |root: &Path| Ok(crate::govern::suspect(root, false)),
         "critique-coverage" => crate::view::critique_coverage,
         "concern-coverage" => crate::view::concern_coverage,

@@ -1854,6 +1854,62 @@ package ProjectIssues {
     }
     #Resolves dependency from dcLegibleOutput to issue160;
 
+    part issue161 : Issue {
+        :>> id = "cd07f3a1-6b48-4e25-9013-72ae5fc84b60";
+        :>> title = "regenerating the review deck overwrites marks the human has not submitted yet";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A live doc holds their verdicts in the published page, so a republish replaces them. Sprint 355 added an ordering rule (read, act, THEN regenerate) which removes the common case and not the race: they can be marking while I regenerate. Real fix is diff-and-merge - read the live page, merge their marks into the regenerated one - which is not built.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckWorkSurface to issue161;
+
+    part issue162 : Issue {
+        :>> id = "4e81b5d0-27c6-4a93-8f14-06db3e175a29";
+        :>> title = "the deck has no notification, so the human must remember to look";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The console put obligations in front of them; the deck is a URL they must revisit. Every item in it waited because they happened to check. The turn-boundary advisory tells ME the queue is non-empty and has no channel to tell THEM.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckWorkSurface to issue162;
+
+    part issue163 : Issue {
+        :>> id = "9a52c407-8e31-4b76-a0d5-31fc8e2b6047";
+        :>> title = "the deck shows now and cannot answer what was decided before";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "No history: a reader cannot ask what they decided last week or why. The model holds every disposition with its note and its SHA, and the deck links to none of it - so the one surface they actually use is the one that cannot show precedent.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcDeckWorkSurface to issue163;
+
+    part issue164 : Issue {
+        :>> id = "7c30f9b2-5a14-4e68-b129-84ed0c73f5a1";
+        :>> title = "three verdict buttons carry four different meanings, so every round trip needs a translator";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Accept means sign it on a Decision, act on it on a finding, and the record is fine on a sitting review. I map the deck's Accept/Needs work/Reject onto act/acceptRisk/dismiss and state the mapping in every record - and needing to state it IS the defect. The human's vocabulary and the schema's are different, which is a schema-vs-user gap, not a display one.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckWorkSurface to issue164;
+
+    part issue165 : Issue {
+        :>> id = "2b6ea81f-40d7-4c95-8e03-15fb7a92d648";
+        :>> title = "the deck lets the human judge but never act, so every verdict round-trips through the AI";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "It is a queue, not a work surface: they cannot edit a Decision, cannot turn a note into a Need, cannot reorder the backlog. Nothing they do takes effect until I read it and write it. That is acceptable for judgment and wrong for anything they could do themselves.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckWorkSurface to issue165;
+
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

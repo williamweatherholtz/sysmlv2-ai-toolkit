@@ -2718,6 +2718,116 @@ pub fn impossible_evidence_dates(root: &Path) -> Result<(usize, Vec<String>), St
     Ok((scanned, out))
 }
 
+/// The INTAKE view (D0166): what was said, what it became, and what nobody acted on.
+///
+/// Three gaps, none of which was computable before:
+///   UNPARSED  - a `Statement` no `UserStory` cites. Direction they gave that nothing translated.
+///   UNROUTED  - a `UserStory` whose `implication` is not `none` and which reaches no downstream item.
+///               Triaged and then dropped, which is worse than untriaged because it looks handled.
+///   UNSOURCED - a `Need` / `SystemRequirement` / `Issue` / `Decision` that no `UserStory` implicates. Work with
+///               no recorded human statement behind it. Expected to be large and expected to be
+///               uncomfortable: it is the ratio of what was asked for to what I invented.
+///
+/// UNSOURCED IS A FLOOR, NOT A TOTAL, and the view says so: nothing can force a statement to be
+/// recorded, so an item may be genuinely requested and simply have no `Statement` written down. The
+/// number measures the RECORD's completeness, never the human's.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub fn intake(root: &Path) -> Result<String, ViewError> {
+    // The item types a UserStory can implicate. Declared at the top: an item after statements is
+    // confusing because items exist from the start of the scope regardless.
+    const DOWNSTREAM: [&str; 4] = ["Need", "SystemRequirement", "Issue", "Decision"];
+    let model = Model::build(root)?;
+    let is = |n: &str, ty: &str| model.items.get(n).is_some_and(|i| i.type_name == ty);
+
+    let statements: Vec<&String> =
+        model.items.iter().filter(|(_, i)| i.type_name == "Statement").map(|(n, _)| n).collect();
+    let stories: Vec<&String> =
+        model.items.iter().filter(|(_, i)| i.type_name == "UserStory").map(|(n, _)| n).collect();
+
+    // a story cites its statement with #DerivedFrom; it names its outcome with #Implicates
+    let mut cited: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut routed: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut implicated: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for e in &model.edges {
+        if e.kind == "derivedfrom" && is(&e.from, "UserStory") && is(&e.to, "Statement") {
+            cited.insert(e.to.as_str());
+        }
+        if e.kind == "implicates" && is(&e.from, "UserStory") {
+            routed.insert(e.from.as_str());
+            implicated.insert(e.to.as_str());
+        }
+    }
+
+    let mut unparsed: Vec<String> =
+        statements.iter().filter(|s| !cited.contains(s.as_str())).map(|s| (*s).clone()).collect();
+    let mut unrouted: Vec<String> = stories
+        .iter()
+        .filter(|s| {
+            let kind = model.items.get(**s).and_then(|i| i.attrs.get("implication")).cloned().unwrap_or_default();
+            !kind.ends_with("none") && !routed.contains(s.as_str())
+        })
+        .map(|s| (*s).clone())
+        .collect();
+    // A story with NO #DerivedFrom is an invention wearing a story's clothes - reported separately from
+    // unrouted, because the two need different fixes: one needs a source, the other needs an outcome.
+    let mut unsourced_stories: Vec<String> = stories
+        .iter()
+        .filter(|s| !model.edges.iter().any(|e| e.kind == "derivedfrom" && e.from == ***s))
+        .map(|s| (*s).clone())
+        .collect();
+
+    let mut unsourced: Vec<String> = model
+        .items
+        .iter()
+        .filter(|(n, i)| DOWNSTREAM.contains(&i.type_name.as_str()) && !implicated.contains(n.as_str()))
+        .map(|(n, _)| n.clone())
+        .collect();
+    let downstream_total = model
+        .items
+        .values()
+        .filter(|i| DOWNSTREAM.contains(&i.type_name.as_str()))
+        .count();
+
+    for v in [&mut unparsed, &mut unrouted, &mut unsourced_stories, &mut unsourced] {
+        v.sort();
+    }
+    let cap = |v: &[String], n: usize| -> Json {
+        Json::Arr(v.iter().take(n).map(|s| Json::s(s.clone())).collect())
+    };
+
+    // per-implication tally, so the triage distribution is visible rather than inferred
+    let mut by_kind: BTreeMap<String, i64> = BTreeMap::new();
+    for s in &stories {
+        let k = model.items.get(*s).and_then(|i| i.attrs.get("implication")).cloned().unwrap_or_default();
+        *by_kind.entry(k.rsplit("::").next().unwrap_or("unrecorded").to_string()).or_insert(0) += 1;
+    }
+
+    Ok(Json::Obj(vec![
+        ("statements".to_string(), Json::Int(i64::try_from(statements.len()).unwrap_or(0))),
+        ("userStories".to_string(), Json::Int(i64::try_from(stories.len()).unwrap_or(0))),
+        ("unparsed".to_string(), Json::Int(i64::try_from(unparsed.len()).unwrap_or(0))),
+        ("unparsed_statements".to_string(), cap(&unparsed, 20)),
+        ("unrouted".to_string(), Json::Int(i64::try_from(unrouted.len()).unwrap_or(0))),
+        ("unrouted_stories".to_string(), cap(&unrouted, 20)),
+        ("storiesWithNoStatement".to_string(), Json::Int(i64::try_from(unsourced_stories.len()).unwrap_or(0))),
+        ("storiesWithNoStatement_list".to_string(), cap(&unsourced_stories, 20)),
+        ("downstreamItems".to_string(), Json::Int(i64::try_from(downstream_total).unwrap_or(0))),
+        ("unsourced".to_string(), Json::Int(i64::try_from(unsourced.len()).unwrap_or(0))),
+        ("unsourced_sample".to_string(), cap(&unsourced, 20)),
+        ("byImplication".to_string(), Json::Obj(by_kind.into_iter().map(|(k, v)| (k, Json::Int(v))).collect())),
+        (
+            "unsourcedNote".to_string(),
+            Json::s(
+                "unsourced counts downstream items no UserStory implicates. It is a FLOOR on the                  record's completeness, never a claim about the human: nothing can force a statement to                  be written down, so an item may be genuinely requested and simply unrecorded."
+                    .to_string(),
+            ),
+        ),
+    ])
+    .dump())
+}
+
 /// `(outcome, judgedAgainst)` of the HIGHEST-numbered `<v>R<n>` result for verification `v`.
 fn latest_result(model: &Model, v: &str) -> Option<(String, String)> {
     let mut best: Option<(u32, String, String)> = None;

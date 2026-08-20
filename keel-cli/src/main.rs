@@ -825,6 +825,24 @@ fn cmd_reverify(args: &[String]) -> i32 {
     keel_cli::reverify::run(&root, task.as_deref(), &by)
 }
 
+/// `keel intake [ROOT]` (D0166) — what was said, what it became, what nobody acted on.
+fn cmd_intake(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel intake [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::view::intake(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_open_issues(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel open-issues [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -2195,6 +2213,7 @@ fn main() {
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("suspect") => cmd_suspect(rest),
         Some("open-issues") => cmd_open_issues(rest),
+        Some("intake") => cmd_intake(rest),
         Some("dispositions") => cmd_dispositions(rest),
         Some("sitting-coverage") => cmd_sitting_coverage(rest),
         Some("concern-coverage") => cmd_concern_coverage(rest),

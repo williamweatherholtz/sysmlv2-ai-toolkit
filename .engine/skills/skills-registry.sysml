@@ -154,6 +154,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Any CHANGE (§3a) or schema/process/skill/tool edit; before committing such a change.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part intake : AISkill {
+        :>> id = "d5c81e30-4a76-4b29-9f05-63be7a12cd48";
+        :>> title = "intake";
+        :>> purpose = "Deploys .engine/processes/intake.sysml (D0166), the Intake process: record a human's directive statement VERBATIM, translate it into one or more UserStories, triage each by what it implicates from a closed vocabulary, create the downstream item and link it. Keeps their words and the AI's reading as separate auditable facts, because the failure this fixes is a paraphrase that drifted and was the only thing written down.";
+        :>> location = ".engine/skills/intake/SKILL.md";
+        :>> triggerCondition = "The human states direction - a request, correction, constraint, priority, verdict or terminology preference. Applies at the START of the turn, before the work, so what they asked for is recorded before it is acted on.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part obligationReview : AISkill {
         :>> id = "0a5c37e9-64b1-4d28-9f70-e13c8b5407fa";
         :>> title = "obligation-review";

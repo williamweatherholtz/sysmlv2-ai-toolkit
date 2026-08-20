@@ -61,7 +61,8 @@ a content gate (frozen schema, a direction Decision) or an empty frontier.
 Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
 gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
-`governing-version`, `open-issues`, `indicators`. Human-facing scorecards: `keel report
+`governing-version`, `open-issues`, `indicators`, `intake` (D0166: what was said, what it
+became, and what nobody acted on - unparsed / unrouted / unsourced). Human-facing scorecards: `keel report
 <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any declared view
 renders interactively via `keel render <view> --mode graph|table|review`, and a human review round-trips
 back as linked critiques via `keel apply-review`.
