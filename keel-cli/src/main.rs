@@ -409,11 +409,27 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // ADVISORY, NEVER BLOCKING, in both branches: whether the console should be up is their call, and a
     // gate that blocked on it would be the over-strict control that trains its actor to disable it
     // (issue076/issue081), taking the honest-state checks in this same hook down with it.
+    // WHERE THE HUMAN IS CHANGES WHAT TO DO ABOUT IT (their request: on remote control, serve HTML
+    // feedback instead of a localhost console). A BRIDGED session is one driven through claude.ai rather
+    // than this terminal, and for a human on the other end of that bridge a localhost console is not
+    // merely down - it is UNREACHABLE, so telling me to start one is advice that cannot help them.
+    //
+    // THE BASIS IS STATED IN THE MESSAGE rather than asserted: the signal is that
+    // CLAUDE_CODE_BRIDGE_SESSION_ID is set, which is the id a remote client attaches to the session. I
+    // have not verified that it appears ONLY under remote control, so the message says what it observed
+    // instead of claiming to know where they are.
+    let bridged = std::env::var("CLAUDE_CODE_BRIDGE_SESSION_ID").is_ok_and(|v| !v.is_empty());
     let oversight = keel_cli::serve::obligations_total(root)
-        .filter(|total| *total > 0 && !console_is_up(CONSOLE_PORT))
-        .map(|total| format!(
-            "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. It holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Only port {CONSOLE_PORT} is checked; a console elsewhere is not detected."
-        ));
+        .filter(|total| *total > 0 && (bridged || !console_is_up(CONSOLE_PORT)))
+        .map(|total| if bridged {
+            format!(
+                "[oversight] {total} item(s) are waiting on the HUMAN, and this session is BRIDGED (CLAUDE_CODE_BRIDGE_SESSION_ID is set), so a localhost console may not be reachable for them. Publish the review deck instead of starting `keel serve`: run the `obligation-review` skill (`python .engine/tools/obligation_canvas.py . -o <path>` then publish it), and hand them the URL."
+            )
+        } else {
+            format!(
+                "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. It holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Only port {CONSOLE_PORT} is checked; a console elsewhere is not detected."
+            )
+        });
 
     if problems.is_empty() {
         // green, and the human is not blocked -> silent
