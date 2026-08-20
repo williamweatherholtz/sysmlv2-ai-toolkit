@@ -2141,4 +2141,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcConcurrentWriteSafe to issue185;
+
+    part issue186 : Issue {
+        :>> id = "7e3dc2eb-2acc-4f7c-a0c3-c3b86380a995";
+        :>> title = "Three frozen-core attributes are neither written nor read, including the reason a process changed";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CORRECTED TWICE WHILE WRITING IT, and the corrections are the useful part. Of 88 attributes in schema/core, five are never set: actualHours, actualPoints, impact, reasonForChange, safetyLevel. Two are accounted for - actualHours was demoted to an indicator in issue175, safetyLevel belongs to the OPTIONAL safety schema downstream projects use. FIRST CORRECTION: I wrote that impact and reasonForChange sit on the process-change type. They sit on ChangeRequest. SECOND CORRECTION: I was about to argue that 368 sprints recorded no reason for any change, which would have been badly wrong - ChangeRequest has only THREE instances in the entire model, so two unset optional fields on a type used three times is a small fact, not a systemic gap. The CR discipline records its reasoning in Decision rationale and in CR-prefixed commit messages, which is where D0105's one-governance-home rule puts it. WHAT SURVIVES AS A REAL FINDING IS NARROWER AND STILL WORTH FIXING: actualPoints is declared on Story, which has 370 instances, and is set on none of them while estimatedPoints is set on all of them. So the schema asks every sprint to record what it actually cost and no sprint ever has - the same defect as issue175's actualHours, on the sibling field, and I resolved that one without noticing this one three sprints ago. Nothing in the Rust code reads it either. THIS CANNOT BE CLOSED BY ME: schema/core is FROZEN under invariant 5, so retiring a field needs explicit human sign-off, and it cannot be filled retroactively. A Decision is proposed and the issue stays OPEN until accepted, rather than being closed as merely documented.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcDeadCoreFields to issue186;
 }
