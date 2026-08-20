@@ -145,4 +145,48 @@ package ProjectIntake20260820 {
     #DerivedFrom dependency from us007 to st005;
     #Implicates dependency from us006 to issue168;
     #Implicates dependency from us007 to d0167;
+
+    // -- fourth intake, same day: approval, a closed-off scope, and two questions -------------------
+    part st006 : Statement {
+        :>> id = "9c3e18b5-4a72-4d06-8b51-63fa27ce9014";
+        :>> title = "that looks good; cold burst is fine; all implemented; what is in the backlog";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> text = "that looks good.  cold burst is fine.  all implemented?  what's in the backlog";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-20"; :>> channel = StatementChannel::chat;
+    }
+
+    part us008 : UserStory {
+        :>> id = "4b07d2f6-9e35-4c81-a814-70de26bf9153";
+        :>> title = "the sprint 359 result as reported is approved";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the serve performance work as reported to stand";
+        :>> implication = ImplicationKind::attestation;
+        :>> triageNote = "attestation, AND THE SCOPE MATTERS MORE THAN THE VERDICT. `that looks good` approves the reported RESULT of sprint 359. It is NOT read as accepting D0167, which remains proposed and unsigned: D0167 narrows a condition they themselves attached to authorising the fingerprint memo and opens a bounded 1.5s out-of-band staleness window, and a general approval of a sprint cannot carry a signature on a specific mechanism they may not have read. Section 4 forbids inferring an attestation from approval of the work being done - that is exactly the shape of issue144. If they intend it as acceptance of D0167 they can say so and it becomes a confirmation result; until then the Decision stays proposed and the code stays deployed under their `regardless, deploy` instruction (us007).";
+    }
+
+    part us009 : UserStory {
+        :>> id = "e7c05b31-8f46-4a92-b073-15da28ce6f40";
+        :>> title = "the cold-start burst is out of scope for further work";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "no further effort spent on the cold-start cost";
+        :>> soThat = "performance work stays on what I feel repeatedly rather than once per server start";
+        :>> implication = ImplicationKind::scopeConstraint;
+        :>> triageNote = "scopeConstraint, and it CLOSES something rather than requesting it - which is why it is recorded at all. The cold burst is 3.11s, and 2.5s of that is the first /api/obligations parse; it was the obvious next target and they have ruled it out. Recording the closure is what stops a later session rediscovering it as an opportunity. It also narrows us006: performance means the WARM interactive path.";
+    }
+
+    part us010 : UserStory {
+        :>> id = "3a86f04d-2c19-4b57-9e80-64bc17ea5d38";
+        :>> title = "what is implemented and what is in the backlog";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "to know what of this is implemented and what remains in the backlog";
+        :>> implication = ImplicationKind::question;
+        :>> triageNote = "question, and self-terminating: it is answered by computed views (`keel whats-next`, `keel open-issues`, `keel verification --pending`) and produces no downstream item. Recorded rather than dropped because the ANSWER exposed something worth acting on - 9 of the 14 ready items are 5 pieces of work counted twice, each appearing as both a backlog item and its sprint action, and all 5 are blocked on the same human demo confirmation. That is a legibility defect in the frontier, not in the work.";
+    }
+
+    #DerivedFrom dependency from us008 to st006;
+    #DerivedFrom dependency from us009 to st006;
+    #DerivedFrom dependency from us010 to st006;
 }

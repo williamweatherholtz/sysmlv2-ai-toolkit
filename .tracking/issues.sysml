@@ -1965,4 +1965,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from d0167 to issue169;
+
+    part issue170 : Issue {
+        :>> id = "09bb4b3c-7682-4b76-b24c-d31125ac66b6";
+        :>> title = "An id that is not a UUID validates clean: guard 37 checks presence, nothing checks form";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY MY OWN DEFECT. Authoring three UserStories, two of my ids came out mangled - the strings 'a period-placeholder' and '64bc17ea5device' appeared inside them - and the fast gate reported 391 files clean. Tested deliberately afterwards: an id of literally 'not-a-uuid-at-all' passes keel validate AND all 37 guards. Invariant 3 says identity is an immutable UUID; identity-present (guard 37) checks that an id EXISTS and duplicate-identity checks that two items do not SHARE one, so the middle property - that the string is a UUID at all - is enforced by nothing. WHY IT MATTERS BEYOND TIDINESS: a malformed id is still unique, so it collides with nothing and every view resolves it happily; the damage is silent and deferred, because identity is the one field the model's whole traceability rests on and the corruption stays invisible until something external tries to join on it. WHAT CAUGHT IT was reading my own output, not the gate - which is manual vigilance, and D0047 says manual vigilance is not a control.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUuidWellFormed to issue170;
 }

@@ -1555,8 +1555,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 37] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present"];
+pub const GUARD_NAMES: [&str; 38] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1859,6 +1859,104 @@ pub fn identity_present(root: &Path) -> GuardReport {
     GuardReport { name: "identity-present", scanned, warnings: Vec::new(), violations }
 }
 
+#[must_use]
+/// Guard 38: an `id` must be SHAPED like a UUID — 8-4-4-4-12 of `[0-9a-z]` (issue170/D0168).
+///
+/// Guard 37 checks an id is PRESENT and `duplicate-identity` checks two items do not SHARE one. The
+/// middle property — that the string is an identifier at all — was enforced by nothing, and an id of
+/// literally `not-a-uuid-at-all` passed `keel validate` and all 37 guards. A malformed id is still
+/// UNIQUE, so it collides with nothing and every view resolves it happily; the damage is silent and
+/// surfaces only when something outside this repo tries to join on it.
+///
+/// SHAPE, NOT STRICT HEX, and the corpus is why: 78 ids deliberately carry a mnemonic suffix
+/// (`…-000000000i01` for the intake process steps), which is UUID-shaped but not hexadecimal. Those are
+/// intentional and readable, and a guard that failed them would be demanding a migration nobody asked
+/// for. Shape catches every real defect — the two mangled ids that prompted this, and the 15 historical
+/// ones below — while leaving a deliberate convention alone.
+///
+/// THE GRANDFATHER SET IS AN EXPLICIT LIST, not a date. Guard 36's first version keyed its exemption on
+/// a date and thereby exempted the very defect it existed for. Fifteen named strings cannot absorb a
+/// sixteenth: a new malformed id fails, no matter when it is written. They are not REWRITTEN because
+/// section 1.3 makes identity immutable — an id is wrong here, and changing it would be a second wrong.
+pub fn identity_well_formed(root: &Path) -> GuardReport {
+    /// Ids that predate the guard. Malformed (7- and 9-character first groups) and immutable.
+    const GRANDFATHERED: [&str; 15] = [
+        "be4dae8-5f6a-4b7c-def8-9a0b1c2d3e4f",
+        "cf5ebl9-7b8c-4d9e-efa0-1c2d3e4f5a6b",
+        "d0105r001-0001-4001-9001-516273841001",
+        "d0105r002-0002-4002-9002-516273841002",
+        "d0105r003-0003-4003-9003-516273841003",
+        "d0105r004-0004-4004-9004-516273841004",
+        "d0105r005-0005-4005-9005-516273841005",
+        "d0105r006-0006-4006-9006-516273841006",
+        "d0105r007-0007-4007-9007-516273841007",
+        "d0105r008-0008-4008-9008-516273841008",
+        "da6fcm0-8c9d-4e0f-fab1-2d3e4f5a6b7c",
+        "da7gdp2-0e1f-4a2b-bcd3-4f5a6b7c8d9e",
+        "eb5ebf9-6a7b-4c8d-efa9-0b1c2d3e4f5a",
+        "eb8heq3-1f2a-4b3c-cde4-5a6b7c8d9e0f",
+        "fc6fcn1-9d0e-4f1a-abc2-3e4f5a6b7c8d",
+    ];
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let rel = relpath(root, path);
+        for (n, raw) in text.lines().enumerate() {
+            let line = raw.trim_start();
+            if line.starts_with("//") {
+                continue;
+            }
+            for value in id_values(line) {
+                scanned += 1;
+                if uuid_shaped(&value) || GRANDFATHERED.contains(&value.as_str()) {
+                    continue;
+                }
+                violations.push(format!(
+                    "{rel}:{}: id \"{value}\" is not shaped like a UUID (8-4-4-4-12 of [0-9a-z]) - section 1.3 makes identity an immutable UUID, and a malformed id is still UNIQUE, so nothing else in the model will ever notice",
+                    n + 1
+                ));
+            }
+        }
+    }
+    GuardReport { name: "identity-well-formed", scanned, warnings: Vec::new(), violations }
+}
+
+/// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
+/// and its result on one line each, and a per-line regex-free scan must not stop at the first.
+fn id_values(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = line;
+    while let Some(i) = rest.find(":>> id") {
+        rest = &rest[i + ":>> id".len()..];
+        let Some(after_eq) = rest.split_once('=') else { break };
+        let mut chars = after_eq.1.trim_start().chars();
+        if chars.next() != Some('"') {
+            continue;
+        }
+        let tail = chars.as_str();
+        if let Some(end) = tail.find('"') {
+            out.push(tail[..end].to_string());
+            rest = &tail[end..];
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+/// 8-4-4-4-12 groups of `[0-9a-z]`, exactly. Written out rather than regexed because the guard path
+/// stays dependency-light, and because the group lengths ARE the specification.
+fn uuid_shaped(v: &str) -> bool {
+    let groups: Vec<&str> = v.split('-').collect();
+    groups.len() == 5
+        && [8usize, 4, 4, 4, 12].iter().zip(&groups).all(|(want, g)| {
+            g.len() == *want && g.chars().all(|c| c.is_ascii_digit() || c.is_ascii_lowercase())
+        })
+}
+
 /// `(name, type, 1-based line, body-up-to-the-next-declaration)` for each id-bearing declaration.
 ///
 /// The body stops at the NEXT declaration so a member can never borrow its sibling's id — the bug that
@@ -1984,6 +2082,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "stale-gate-prose" => Some(stale_gate_prose(root)),
         "impossible-evidence-date" => Some(impossible_evidence_dates(root)),
         "identity-present" => Some(identity_present(root)),
+        "identity-well-formed" => Some(identity_well_formed(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
@@ -2318,6 +2417,56 @@ pub fn engine_lint(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
+}
+
+#[cfg(test)]
+mod identity_form_tests {
+    use super::{id_values, uuid_shaped};
+
+    /// The shape predicate, on the two ids I actually mangled and the deliberate mnemonic convention it
+    /// must NOT break. Written as a table because the interesting cases are the near-misses.
+    #[test]
+    fn the_shape_predicate_accepts_the_convention_and_rejects_the_real_defects() {
+        for good in [
+            "3a86f04d-2c19-4b57-9e80-64bc17ea5d38",
+            "4b78e0c1-3f52-4d96-a814-000000000i01", // the intake process-step convention: shaped, not hex
+            "0d800620-0814-6620-9b3e-000000300620",
+        ] {
+            assert!(uuid_shaped(good), "{good} is well shaped and must pass");
+        }
+        for bad in [
+            "not-a-uuid-at-all",
+            "3a86f04d-2c19-4b57-9e80-64bc17ea5device", // 15 chars in the last group
+            "4b07d2f6-9e35-4c81-a period-placeholder", // a SPACE, which is how this was found
+            "eb5ebf9-6a7b-4c8d-efa9-0b1c2d3e4f5a",     // 7 in the first group - the historical class
+            "3a86f04d-2c19-4b57-9e80-64BC17EA5D38",    // uppercase: one id, two spellings, is not identity
+            "",
+        ] {
+            assert!(!uuid_shaped(bad), "{bad:?} is malformed and must fail");
+        }
+    }
+
+    /// A line may declare an item AND its result, so the scan must not stop at the first id. Missing
+    /// this would make the guard blind to exactly the sprint records where most ids live.
+    #[test]
+    fn every_id_on_a_line_is_read_not_just_the_first() {
+        let line = r#"part a : X { :>> id = "aaaaaaaa-1111-2222-3333-444444444444"; } part b : Y { :>> id = "bad"; }"#;
+        assert_eq!(id_values(line), vec!["aaaaaaaa-1111-2222-3333-444444444444", "bad"]);
+    }
+
+    /// The grandfather set is an explicit LIST of 15, and its size is asserted so growing it is a
+    /// deliberate edit to a failing test rather than a quiet accommodation. Guard 36's first version
+    /// keyed its exemption on a DATE and thereby exempted the defect it existed to catch.
+    #[test]
+    fn the_grandfather_set_cannot_grow_quietly() {
+        let src = std::fs::read_to_string("src/guards.rs").expect("guards.rs is readable");
+        let body = src
+            .split_once("const GRANDFATHERED: [&str; 15]")
+            .expect("the set is declared with its size, so a 16th entry does not compile")
+            .1;
+        let listed = body[..body.find("];").expect("the list is closed")].matches('"').count() / 2;
+        assert_eq!(listed, 15, "the declared size and the actual entries must agree");
+    }
 }
 
 #[cfg(test)]
