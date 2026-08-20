@@ -1821,6 +1821,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcObligationDeck to issue157;
 
+    part issue158 : Issue {
+        :>> id = "d41f0a76-58b3-4e29-9c05-7b62ea1c8f40";
+        :>> title = "the review deck rendered an aggregate SUMMARY row as a judgeable card, so the human accepted a count twice and nothing happened";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THE HUMAN TAPPED ACCEPT ON THE SAME NON-ITEM TWICE - '307 sprint(s) awaiting a sitting review' and then '274 sprint(s) awaiting a sitting review' - and both times there was nothing to record. The authority queue emits SUMMARY rows whose `item` field is a sentence rather than an item name, and the deck rendered them exactly like items: a card with Accept / Needs work / Reject buttons and a note field. A card with verdict buttons SAYS it can be acted on, and a count cannot be attested against - there is no element, no UUID, and no fact a verdict could become. I SAW THIS AND WAVED PAST IT. Sprint 353's implement gate records that I found one synthetic uid, investigated it, concluded 'synthetic is the correct answer there', and wrote that reasoning into the skill's checklist as a legitimate case. It was not legitimate - it was a summary wearing an item's clothes, and treating the symptom as expected is what let the human spend two taps on it. The correct rule is stronger and simpler: EVERY judgeable card must resolve to a declared item with a minted UUID; a row that does not is a summary, and a summary belongs in the class header. FIXED: `collect` drops any row whose name is not a declared item and REPORTS what it dropped on stderr, because a silent exclusion is how a deck starts under-reporting - the failure mode the checklist already warns about in the other direction. The deck now reads 0 items across all four classes, which is the true state after their review. THE SAME DEFECT FAMILY AS issue141/143/152/154/155/157: an affordance promising more than it delivers. Seventh instance, and the first one where I had already looked straight at the evidence and recorded a reason to ignore it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcObligationDeck to issue158;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

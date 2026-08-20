@@ -40,9 +40,13 @@ awaiting disposition, sitting reviews due.
 
 - **Counts match the computed views.** Compare the printed totals against `keel orient` and
   `/api/obligations` if a console is up. A deck that under-reports is worse than no deck.
-- **Titles resolved.** `data-uid="synthetic:..."` is legitimate ONLY for aggregate rows whose `item`
-  is a sentence rather than an item name. A synthetic uid on a real item means `scan_items` missed its
-  declaration, and that item's saved verdicts will not survive regeneration.
+- **Every card resolves to a declared item.** There is no legitimate synthetic uid (issue158). A row
+  whose name is not a declared item is a SUMMARY - the authority queue emits rows like "274 sprint(s)
+  awaiting a sitting review" - and a summary rendered as a card with verdict buttons invites a judgment
+  that cannot be recorded. The human accepted one such row twice before this was fixed. `collect` drops
+  them and prints what it dropped; read that output, because a silent exclusion is how a deck starts
+  under-reporting. An earlier version of this checklist called synthetic uids legitimate for exactly
+  this case, which is how the defect survived being looked at.
 - **No item appears twice.** `uids = grep -o 'data-uid="[^"]*"'`; unique count must equal card count.
   The authority queue is the AGGREGATE of what awaits a person, so its rows overlap every specific
   class — it is collected LAST for that reason. Collect it first and every finding is silently

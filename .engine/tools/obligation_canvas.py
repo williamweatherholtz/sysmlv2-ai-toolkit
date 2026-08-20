@@ -87,10 +87,20 @@ def collect(root):
     decl = scan_items(root)
 
     seen = set()
+    skipped = []
 
     def add(cls, name, title, meta, body=""):
         info = decl.get(name, {})
-        uid = info.get("id") or ("synthetic:%s:%s" % (cls, name))
+        # AN AGGREGATE ROW IS NOT A JUDGEABLE ITEM (issue158). The authority queue emits summary rows whose
+        # `item` is a SENTENCE rather than an item name ("274 sprint(s) awaiting a sitting review"), and the
+        # deck rendered them as cards with verdict buttons. The human tapped ACCEPT on one twice, because a
+        # card with buttons says it can be acted on - and there is nothing to attest against a count. Every
+        # declared item resolves to a UUID; a row that does not is a summary, and a summary belongs in the
+        # class HEADER, not in a card. I first saw this as a "legitimate synthetic uid" and waved past it.
+        if name not in decl:
+            skipped.append((cls, name))
+            return
+        uid = info["id"]
         # ONE CARD PER ITEM. The authority queue reports the same decisionAcceptance rows that orient
         # reports as pendingAcceptances, so without this every proposed Decision appeared twice and the
         # human had to judge it twice - which they did, and said so. First class wins, and acceptances are
@@ -127,6 +137,10 @@ def collect(root):
             "%s - waiting %sd%s" % (a.get("kind", "?"), a.get("waitingDays", "?"), escalated),
             a.get("note", ""))
 
+    if skipped:
+        print("skipped %d aggregate row(s) that name no declared item:" % len(skipped), file=sys.stderr)
+        for cls, name in skipped:
+            print("  [%s] %s" % (cls, name), file=sys.stderr)
     return items
 
 
