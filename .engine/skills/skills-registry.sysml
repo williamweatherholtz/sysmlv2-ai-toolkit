@@ -154,6 +154,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "Any CHANGE (§3a) or schema/process/skill/tool edit; before committing such a change.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part obligationReview : AISkill {
+        :>> id = "0a5c37e9-64b1-4d28-9f70-e13c8b5407fa";
+        :>> title = "obligation-review";
+        :>> purpose = "Turn what is waiting on the HUMAN into a self-contained static HTML review deck they can operate away from the terminal - on a phone - and hand back. Generates from the computed obligation views via `.engine/tools/obligation_canvas.py` (orient pendingAcceptances, authority-queue, dispositions, sitting-coverage), publishes it as an artifact, and parses their marked-up export back into recorded facts through the write API. The deck is a #View: regenerable, never truth, and it records nothing - only their pasted-back words become a confirmation result.";
+        :>> location = ".engine/skills/obligation-review/SKILL.md";
+        :>> triggerCondition = "The human wants to review or give feedback on outstanding items away from the terminal, or asks for something usable on mobile - `keel serve` needs a server, a localhost browser and a shell, and their obligations do not wait for those conditions.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part knowledgeGraphMemory : AISkill {
         :>> id = "ec6f83bf-1a8e-438a-9f5c-79655c18bb49";
         :>> title = "knowledge-graph-memory";

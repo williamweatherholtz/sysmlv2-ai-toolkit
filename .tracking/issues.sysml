@@ -1810,6 +1810,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcViewpointActivation to issue156;
 
+    part issue157 : Issue {
+        :>> id = "c8e05a41-7b26-4d93-a172-6f40be51c7d8";
+        :>> title = "the review deck's copy button failed silently, and it showed every proposed Decision twice so the human judged all four twice";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "TWO DEFECTS IN THE FIRST PUBLISHED DECK, both reported by the human in one message, and the second is worse than the one they named. (1) COPY BUTTON: `navigator.clipboard.writeText` REJECTS inside a sandboxed artifact frame that lacks clipboard-write permission, and I wrote `.then()` with no rejection handler - so the promise failed silently, the textarea fallback never ran, and the button did not even change its label. They had to select the text by hand, which is how they produced the export they pasted. That is the affordance defect this session keeps producing (issue141/143/152/154/155): a control that appears to do nothing. Fixed by passing the manual path as the REJECTION handler, lifting `readonly` so iOS can select programmatically, and ending every path in either `Copied` or `Text selected - copy it`. (2) DUPLICATED ITEMS, WHICH THEY DID NOT REPORT AND THEIR PASTE PROVED: the export listed d0161, d0162, d0163 and d0164 TWICE each, once as `acceptance` and once as `authority` - 8 ACCEPT lines for 4 Decisions - because the authority queue reports the same decisionAcceptance rows that orient reports as pendingAcceptances. My own D0164 text says as much ('largely the same items counted twice') and I built the deck anyway without deduping. THE FIX HAD A SECOND DEFECT I CAUGHT BY CHECKING COUNTS: deduping with the authority queue collected FIRST silently reclassified every finding as authority and took the findings class from 22 to 0, while the total still looked plausible. The authority queue is the AGGREGATE of what awaits a person, so it must be collected LAST. Final counts cross-checked against the computed views: 4 pendingAcceptances, 22 undispositioned, 34 due, 61 unique cards with zero duplicate uids - 25 cards removed, each one a judgment the human would have made twice.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcObligationDeck to issue157;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";
