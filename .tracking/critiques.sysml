@@ -2868,4 +2868,8 @@ package ProjectCritiques {
     verification issue156Disp2 : Test { :>> id = "b462ee30-a28c-5be1-a679-da873c1851eb"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "wweatherholtz, obligations-deck review of 2026-08-20, verdict ACCEPT with no per-item note. SUPERSEDES the delegated disposition claudeOpus5 recorded for this finding under D0165 earlier the same day: they reviewed it themselves, so their judgment stands and mine is history rather than authority. Recorded as an additional disposition rather than an edit (D0108: a non-owner adds or supersedes, never overwrites)."; }
     part issue156Disp2R1 : TestResult { :>> id = "a40719bb-9f72-5e3b-95d4-6c8b30080713"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "513a1a4"; :>> judgedAt = "2026-08-20"; :>> judgedBy = "wweatherholtz"; }
     #Dispositions dependency from issue156Disp2 to issue156;
+
+    verification issue158Disp1 : Test { :>> id = "e1d56437-e821-5a9d-a828-132e8a0f1430"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "wweatherholtz, obligations-deck review of 2026-08-20, verdict ACCEPT with no per-item note. Their own report: they tapped ACCEPT on an aggregate summary row twice and nothing happened, which is what this finding records. Deck verdict Accept maps to DispositionKind::act."; }
+    part issue158Disp1R1 : TestResult { :>> id = "021fb5b6-592e-5fbf-a54f-e066821c125f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c063869"; :>> judgedAt = "2026-08-20"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue158Disp1 to issue158;
 }
