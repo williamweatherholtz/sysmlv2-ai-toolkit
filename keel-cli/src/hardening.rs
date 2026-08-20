@@ -44,11 +44,19 @@ pub fn hardening(root: &Path) -> Result<String, crate::view::ViewError> {
     .dump())
 }
 
-fn pct(part: usize, whole: usize) -> i64 {
-    if whole == 0 {
-        return 100;
-    }
-    i64::try_from(part * 100 / whole).unwrap_or(0)
+/// A percentage, or `None` when there is no population to take one OF (issue183).
+///
+/// This returned 100 for an empty population - a reasonable-looking divide-by-zero guard that turns
+/// "nothing was measured" into "everything passed". Against a tree with no `keel-cli/src`, which is what
+/// every downstream project is, the help lens reported 0 of 0 dispatched at 100%. A FALSE GREEN IS
+/// WORSE THAN A WRONG NUMBER, because nobody investigates a pass.
+fn pct(part: usize, whole: usize) -> Option<i64> {
+    (whole > 0).then(|| i64::try_from(part * 100 / whole).unwrap_or(0))
+}
+
+/// The value, or an explicit `unavailable` marker naming why nothing could be measured.
+fn measured(v: Option<i64>, why: &str) -> Json {
+    v.map_or_else(|| Json::s(format!("unavailable: {why}")), Json::Int)
 }
 
 fn count(n: usize) -> Json {
@@ -62,7 +70,19 @@ fn count(n: usize) -> Json {
 /// The CLI is the authority and the automation substrate (D0093). A subcommand absent from help is
 /// reachable only by reading `main.rs` or CLAUDE.md, which is not discoverability.
 fn help_coverage(root: &Path) -> Json {
-    let main = std::fs::read_to_string(root.join("keel-cli/src/main.rs")).unwrap_or_default();
+    // A LENS THAT CANNOT READ ITS INPUT SAYS SO (issue183). `unwrap_or_default` turned an unreadable
+    // file into an empty one, an empty one into an empty population, and an empty population into 100%.
+    let Ok(main) = std::fs::read_to_string(root.join("keel-cli/src/main.rs")) else {
+        return Json::Obj(vec![
+            ("available".to_string(), Json::Bool(false)),
+            (
+                "reason".to_string(),
+                Json::s(
+                    "keel-cli/src/main.rs is not readable from this root, so the CLI surface cannot be                      audited. This lens reads SOURCE - it answers about a source tree, never about an                      installed binary (D0169).",
+                ),
+            ),
+        ]);
+    };
     let dispatched = dispatch_arms(&main);
     let help = usage_text(&main);
     let (named, absent): (Vec<String>, Vec<String>) =
@@ -77,7 +97,8 @@ fn help_coverage(root: &Path) -> Json {
         ),
         ("dispatched".to_string(), count(dispatched.len())),
         ("namedInHelp".to_string(), count(named.len())),
-        ("coveragePct".to_string(), Json::Int(pct(named.len(), dispatched.len()))),
+        ("coveragePct".to_string(), measured(pct(named.len(), dispatched.len()), "nothing dispatched was found - the lens is mis-aimed")),
+        ("available".to_string(), Json::Bool(true)),
         ("absentFromHelp".to_string(), Json::Arr(absent.into_iter().map(Json::s).collect())),
     ])
 }
@@ -222,7 +243,7 @@ fn process_enforcement(root: &Path) -> Json {
         ("processes".to_string(), count(total)),
         ("enforced".to_string(), count(enforced.len())),
         ("declaredUnenforceable".to_string(), count(unenforceable.len())),
-        ("accountedPct".to_string(), Json::Int(pct(accounted, total))),
+        ("accountedPct".to_string(), measured(pct(accounted, total), "no processes declared")),
         ("undeclared".to_string(), Json::Arr(undeclared)),
         ("unenforceable".to_string(), Json::Arr(unenforceable)),
     ])
@@ -364,8 +385,20 @@ fn decision_follow_through(root: &Path) -> Json {
 /// separate viewer, so a route the console never calls is entirely legitimate. A route NOTHING declares
 /// is different - a consumer cannot discover it and a maintainer cannot tell it from a leftover.
 fn api_surface(root: &Path) -> Json {
-    let serve = std::fs::read_to_string(root.join("keel-cli/src/serve.rs")).unwrap_or_default();
-    let html = std::fs::read_to_string(root.join("keel-cli/assets/console.html")).unwrap_or_default();
+    let (Ok(serve), Ok(html)) = (
+        std::fs::read_to_string(root.join("keel-cli/src/serve.rs")),
+        std::fs::read_to_string(root.join("keel-cli/assets/console.html")),
+    ) else {
+        return Json::Obj(vec![
+            ("available".to_string(), Json::Bool(false)),
+            (
+                "reason".to_string(),
+                Json::s(
+                    "keel-cli/src/serve.rs or assets/console.html is not readable from this root, so                      the HTTP surface cannot be audited (issue183).",
+                ),
+            ),
+        ]);
+    };
     let routes = registered_routes(&serve);
     let advertised = advertised_endpoints(&serve);
     let mut unaccounted = Vec::new();
@@ -390,6 +423,7 @@ fn api_surface(root: &Path) -> Json {
                 "UNACCOUNTED, not unadvertised: D0114 commits a read API for a separate viewer, so a                  route the console never calls is legitimate. A route NOTHING declares cannot be                  discovered by a consumer or distinguished from a leftover by a maintainer.",
             ),
         ),
+        ("available".to_string(), Json::Bool(true)),
         ("routes".to_string(), count(routes.len())),
         ("advertised".to_string(), count(advertised.len())),
         ("unaccounted".to_string(), Json::Arr(unaccounted)),
@@ -568,6 +602,37 @@ mod tests {
             offenders.is_empty(),
             "date literal(s) used as a default in a write path: {offenders:#?}"
         );
+    }
+
+    /// THE CONTROL for issue183: a lens that cannot read its input must NOT report a percentage.
+    ///
+    /// `pct` returned 100 for an empty population, so against a tree with no `keel-cli/src` - which is
+    /// what every downstream project is - the help lens reported `0/0 dispatched -> 100%`. A false green
+    /// is worse than a wrong number, because nobody investigates a pass. D0169 already DOCUMENTED that
+    /// this lens reads a source tree; documenting a limitation is not enforcing it.
+    #[test]
+    fn a_percentage_is_never_reported_for_an_empty_population() {
+        assert_eq!(pct(0, 0), None, "an empty population has no percentage - not 100");
+        assert_eq!(pct(1, 0), None);
+        assert_eq!(pct(3, 4), Some(75));
+        assert_eq!(pct(0, 4), Some(0), "zero of four is a real 0%, not unavailable");
+        let unavailable = measured(None, "nothing to measure").dump();
+        assert!(
+            unavailable.contains("unavailable:"),
+            "an unmeasurable value must be a labelled string, got {unavailable}"
+        );
+    }
+
+    /// The lenses report `available: false` against a tree with no source, and never a green number.
+    #[test]
+    fn the_source_lenses_refuse_a_tree_with_no_source() {
+        // A directory that exists and contains no `keel-cli/` - the downstream shape.
+        let empty = std::path::Path::new("..").join("target");
+        let out = help_coverage(&empty);
+        let Json::Obj(fields) = &out else { panic!("expected an object") };
+        let keys: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).collect();
+        assert!(keys.contains(&"available"), "must say whether it could measure: {keys:?}");
+        assert!(!keys.contains(&"coveragePct"), "must NOT report a percentage it could not compute");
     }
 
     /// A string inside an arm's BODY is not a subcommand. Without the head-only scan, every literal in

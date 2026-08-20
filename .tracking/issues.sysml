@@ -2108,4 +2108,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDateNeverDefaulted to issue182;
+
+    part issue183 : Issue {
+        :>> id = "8e5ed0de-4b62-4cb0-8b3b-2d0af95cf5c3";
+        :>> title = "keel hardening reports 100 percent coverage when it cannot read the source at all";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY ATTACKING CODE I HAD WRITTEN ONE SPRINT EARLIER. keel hardening reports 'helpCoverage 0/0 dispatched -> 100%' and 'apiSurface routes 0 advertised 0 unaccounted 0' against a tree containing only .engine and .tracking - no keel-cli/src. THAT TREE IS EVERY DOWNSTREAM PROJECT: they install the binary and run it against their own model, they do not carry this source tree. So the lens built to stop wrong numbers hands a clean bill of health to every consumer it cannot measure, and does it silently. THE MECHANISM IS A HELPER I WROTE IN THE SAME SPRINT: pct(part, whole) returns 100 when whole is 0 - a reasonable-looking guard against divide-by-zero that turns 'nothing measured' into 'everything passed'. The lenses compound it by using unwrap_or_default() on the file read, so an unreadable source becomes an empty string and an empty string yields an empty population. A FALSE GREEN IS WORSE THAN A WRONG NUMBER: issue178's 13-that-was-3 was visible enough to correct, whereas nobody investigates a pass. D0169 already STATES this limitation in its consequences - that hardening reads the repo's main.rs and therefore audits a source tree rather than an installed binary - which makes this the sharper lesson: documenting a limitation is not enforcing it, and I documented it and then shipped the false green anyway. PREVENTING CHANGE: a lens that cannot read its input reports UNAVAILABLE with a reason and emits no percentage at all; pct refuses to answer for an empty population; a test pins both.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcLensCannotFalseGreen to issue183;
 }
