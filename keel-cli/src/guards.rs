@@ -1555,8 +1555,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 36] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date"];
+pub const GUARD_NAMES: [&str; 37] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1822,6 +1822,84 @@ pub fn impossible_evidence_dates(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard (issue166): every id-bearing declaration actually carries an `:>> id`.
+///
+/// HARD, and it closes an invariant that was unguarded. §1.3 makes identity an immutable UUID so items
+/// never collide on name — and `keel validate` passed with an `Issue` missing its `id` entirely. The only
+/// existing coverage was `engine-lint`, which is `.engine`-scoped by design, and the demoted python
+/// tracking validator (D0132), which fails correct files and so cannot be relied on. `duplicate-identity`
+/// catches two items SHARING an id and says nothing about an item having none.
+///
+/// A TEXT SCAN, not a model walk: an item with no identity is exactly the thing the model layer cannot
+/// see clearly, and this needs to run at commit speed. Measured at ~60ms over 8738 declarations, against
+/// a 156ms model build it does not perform.
+///
+/// STARTS AT ZERO with no grandfather line, because the corpus was measured first: 8738 id-bearing
+/// declarations across `.tracking` and `.engine`, none missing an id. A forward-only exemption would have
+/// been ceremony over an empty set.
+#[must_use]
+pub fn identity_present(root: &Path) -> GuardReport {
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let rel = relpath(root, path);
+        let decls = id_bearing_decls(&text);
+        for (name, ty, line, body) in decls {
+            scanned += 1;
+            if !body.contains(":>> id") {
+                violations.push(format!(
+                    "{rel}:{line}: {name} : {ty} carries NO `:>> id` - identity is an immutable UUID (section 1.3); an item without one cannot be referenced, superseded or attested against"
+                ));
+            }
+        }
+    }
+    GuardReport { name: "identity-present", scanned, warnings: Vec::new(), violations }
+}
+
+/// `(name, type, 1-based line, body-up-to-the-next-declaration)` for each id-bearing declaration.
+///
+/// The body stops at the NEXT declaration so a member can never borrow its sibling's id — the bug that
+/// would make this guard pass a file where one item has two ids and its neighbour none.
+fn id_bearing_decls(text: &str) -> Vec<(String, String, usize, String)> {
+    let starts: Vec<(usize, usize, String, String)> = text
+        .lines()
+        .enumerate()
+        .filter_map(|(i, raw)| {
+            let line = raw.trim_start();
+            if line.starts_with("//") {
+                return None;
+            }
+            let after_marker = line.strip_prefix('#').map_or(line, |r| {
+                r.split_once(char::is_whitespace).map_or("", |(_, rest)| rest.trim_start())
+            });
+            for kw in ["part ", "verification ", "requirement ", "use case "] {
+                if let Some(rest) = after_marker.strip_prefix(kw) {
+                    let (name, rest) = rest.split_once(':')?;
+                    let ty: String =
+                        rest.trim_start().chars().take_while(char::is_ascii_alphanumeric).collect();
+                    if ENGINE_ID_TYPES.contains(&ty.as_str()) && rest.contains('{') {
+                        return Some((i, i + 1, name.trim().to_string(), ty));
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+    let lines: Vec<&str> = text.lines().collect();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(k, (idx, line_no, name, ty))| {
+            let end = starts.get(k + 1).map_or(lines.len(), |n| n.0);
+            let body = lines.get(*idx..end).unwrap_or_default().join("\n");
+            (name.clone(), ty.clone(), *line_no, body)
+        })
+        .collect()
+}
+
 /// Script extensions a hook command may invoke. Deliberately EXCLUDES `.exe` and extensionless
 /// binaries: a not-yet-built `target/release/keel.exe` is a legitimate transient state that the hook
 /// commands already probe for, whereas a script is committed source that must exist to be referenced.
@@ -1905,6 +1983,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "resolver-kind" => Some(resolver_kind(root)),
         "stale-gate-prose" => Some(stale_gate_prose(root)),
         "impossible-evidence-date" => Some(impossible_evidence_dates(root)),
+        "identity-present" => Some(identity_present(root)),
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
@@ -2178,6 +2257,9 @@ const ENGINE_ID_TYPES: &[&str] = &[
     "Decision", "AISkill", "Agent", "Process", "ProcessStep", "TestResult", "Brief", "Persona", "Need",
     "Issue", "Story", "Release", "ChangeRequest", "Component", "DesignElement", "Test", "Viewpoint",
     "Indicator", "Measurement",
+    // Intake (D0166). A type absent from this list has its IDENTITY UNCHECKED - engine-lint never asks
+    // whether it carries an `:>> id` - so a new item type is only half-registered until it is here.
+    "Statement", "UserStory",
 ];
 
 /// Count `part|verification|requirement <name> : <IdType>` declarations in `text`.

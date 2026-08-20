@@ -75,4 +75,38 @@ package ProjectIntake20260820 {
     #Implicates dependency from us001 to issue165;
     #Implicates dependency from us002 to d0166;
     #Implicates dependency from us003 to d0161;
+
+    // ── second intake, same day: their instruction to wire the new types into parsing ────────────────
+    part st004 : Statement {
+        :>> id = "5a9c1e37-2b04-4d68-9f15-73ae08cb254f";
+        :>> title = "new items accepted; implement into parsing";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> text = "new items accepted. implement into parsing please";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-20"; :>> channel = StatementChannel::chat;
+    }
+
+    part us004 : UserStory {
+        :>> id = "c1b78f04-6d29-4a53-8e70-15fb92ce4370";
+        :>> title = "the accepted intake vocabulary and item types are accepted";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the new intake item types and the added implication kinds accepted as they stand";
+        :>> implication = ImplicationKind::attestation;
+        :>> triageNote = "attestation, and the scope is stated because the phrase `new items` is not precise: read as the intake types (Statement, UserStory) and the five ImplicationKind members added last turn, since those are what was newly proposed and unsigned. It is NOT read as accepting issue161-165, which are findings rather than proposals and need dispositions instead. If they meant those too, the disposition is theirs to give and this triage is the thing to disagree with.";
+    }
+
+    part us005 : UserStory {
+        :>> id = "e83d0a61-4f57-4b92-a608-27cb95e10df4";
+        :>> title = "the new item types are enforced wherever types are enumerated";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the new item types wired into parsing";
+        :>> soThat = "they are treated as first-class items rather than declared and ignored";
+        :>> implication = ImplicationKind::implementationChange;
+        :>> triageNote = "implementationChange rather than process: the sentence asks for code, not for a new way of working. WHAT IT TURNED OUT TO REQUIRE was wider than the words - the types parse fine, but they were absent from all three copies of the id-type list, and following that thread found that identity was not enforced for .tracking AT ALL (issue166). The story is recorded as they said it; the discovery lives in the issue.";
+    }
+
+    #DerivedFrom dependency from us004 to st004;
+    #DerivedFrom dependency from us005 to st004;
+    #Implicates dependency from us005 to issue166;
 }

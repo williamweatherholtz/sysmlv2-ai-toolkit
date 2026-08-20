@@ -1854,6 +1854,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcLegibleOutput to issue160;
 
+    part issue166 : Issue {
+        :>> id = "1c8fa470-93d2-4e56-b087-64ae35cb912f";
+        :>> title = "identity was unguarded for .tracking: keel validate passed with an Issue missing its id, and a new type needed registering in three separate lists";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND WHILE IMPLEMENTING THEIR INSTRUCTION to wire the new intake types into parsing, and the real gap was wider than the types. TWO DEFECTS. (1) IDENTITY WAS NOT ENFORCED FOR `.tracking` AT ALL. Section 1.3 makes identity an immutable UUID so items never collide on name - and `keel validate` reported 388 files clean with `issue159` stripped of its `:>> id`. The only coverage was `engine-lint`, which is `.engine`-scoped by design, and `validate_tracking.py`, which is the demoted python validator D0132 describes (48 of 388 files pass, so it cannot be relied on for anything). `duplicate-identity` catches two items SHARING an id and is silent about an item having none. An unguarded invariant is the honest-state gate believing something it never checks. (2) A NEW TYPE IS ONLY HALF-REGISTERED UNTIL THREE LISTS AGREE: `ENGINE_ID_TYPES` in guards.rs, and `_ID_TYPES` in both validate_instances.py and validate_tracking.py - a triplicated constant whose own Rust comment says it mirrors the python. Statement and UserStory were in none of them, so their identity went unchecked in the one place it was checked at all. FIXED: all three lists updated, and guard 37 `identity-present` now scans `.tracking` and `.engine` for every id-bearing declaration. VERIFIED BOTH WAYS on a NEW type and an ESTABLISHED one: clean tree PASS at 8738 declarations; a Statement stripped of its id FAILS and is named; an Issue stripped of its id FAILS. No grandfather line, because the corpus was measured before the guard was written and nothing was missing. Measured at ~200ms with no model build, per the rule sprint 347 set that no new guard lands unmeasured. THE TRIPLICATION ITSELF IS NOT FIXED and is left visible rather than papered over: the list should be derived from the schema the way `edge_kinds` and the marker vocabulary already are, which is a change to the python validators and belongs with issue160.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcIdentityPresent to issue166;
+
     part issue161 : Issue {
         :>> id = "cd07f3a1-6b48-4e25-9013-72ae5fc84b60";
         :>> title = "regenerating the review deck overwrites marks the human has not submitted yet";

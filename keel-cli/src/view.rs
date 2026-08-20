@@ -2738,6 +2738,12 @@ pub fn intake(root: &Path) -> Result<String, ViewError> {
     // The item types a UserStory can implicate. Declared at the top: an item after statements is
     // confusing because items exist from the start of the scope regardless.
     const DOWNSTREAM: [&str; 4] = ["Need", "SystemRequirement", "Issue", "Decision"];
+    // Kinds that owe no downstream item: an acceptance produces nothing, its outcome IS the
+    // acknowledgement; a question is answered, a priority applied by reordering, a convention adopted in
+    // prose, a correction absorbed by an existing record. Declared with DOWNSTREAM because both are items
+    // and an item after statements reads as a surprise.
+    const SELF_TERMINATING: [&str; 6] =
+        ["none", "attestation", "question", "priority", "convention", "correction"];
     let model = Model::build(root)?;
     let is = |n: &str, ty: &str| model.items.get(n).is_some_and(|i| i.type_name == ty);
 
@@ -2762,14 +2768,32 @@ pub fn intake(root: &Path) -> Result<String, ViewError> {
 
     let mut unparsed: Vec<String> =
         statements.iter().filter(|s| !cited.contains(s.as_str())).map(|s| (*s).clone()).collect();
+    // ONLY THE PRODUCTIVE KINDS OWE AN OUTCOME. The first version required a downstream item for every
+    // implication except `none`, and using it immediately flagged a legitimate `attestation` as unrouted:
+    // an acceptance PRODUCES nothing, its outcome IS the acknowledgement. Same for a question answered, a
+    // priority applied by reordering, a convention adopted in prose, a correction that edits an existing
+    // record. Reporting those as gaps would train the reader to ignore the number - the warning-fatigue
+    // failure issue160 records one layer up. They are counted separately as self-terminating, so they stay
+    // visible without being defects.
+    let kind_of = |s: &str| -> String {
+        model
+            .items
+            .get(s)
+            .and_then(|i| i.attrs.get("implication"))
+            .map(|k| k.rsplit("::").next().unwrap_or(k).to_string())
+            .unwrap_or_default()
+    };
     let mut unrouted: Vec<String> = stories
         .iter()
         .filter(|s| {
-            let kind = model.items.get(**s).and_then(|i| i.attrs.get("implication")).cloned().unwrap_or_default();
-            !kind.ends_with("none") && !routed.contains(s.as_str())
+            !SELF_TERMINATING.contains(&kind_of(s).as_str()) && !routed.contains(s.as_str())
         })
         .map(|s| (*s).clone())
         .collect();
+    let self_terminating = stories
+        .iter()
+        .filter(|s| SELF_TERMINATING.contains(&kind_of(s).as_str()))
+        .count();
     // A story with NO #DerivedFrom is an invention wearing a story's clothes - reported separately from
     // unrouted, because the two need different fixes: one needs a source, the other needs an outcome.
     let mut unsourced_stories: Vec<String> = stories
@@ -2811,6 +2835,7 @@ pub fn intake(root: &Path) -> Result<String, ViewError> {
         ("unparsed_statements".to_string(), cap(&unparsed, 20)),
         ("unrouted".to_string(), Json::Int(i64::try_from(unrouted.len()).unwrap_or(0))),
         ("unrouted_stories".to_string(), cap(&unrouted, 20)),
+        ("selfTerminating".to_string(), Json::Int(i64::try_from(self_terminating).unwrap_or(0))),
         ("storiesWithNoStatement".to_string(), Json::Int(i64::try_from(unsourced_stories.len()).unwrap_or(0))),
         ("storiesWithNoStatement_list".to_string(), cap(&unsourced_stories, 20)),
         ("downstreamItems".to_string(), Json::Int(i64::try_from(downstream_total).unwrap_or(0))),
