@@ -1865,6 +1865,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcIdentityPresent to issue166;
 
+    part issue167 : Issue {
+        :>> id = "3f0a92c8-51d7-4e63-b704-28ce15fa9673";
+        :>> title = "dcSharedParsedModel's own hypothesis was wrong: composite view reuse would save 20ms of a 7-second command";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PHASE-TIMED AND THE DoD's PREMISE IS REFUTED. dcSharedParsedModel asked whether composite views should reuse their component results rather than recomputing them. Measured inside `compute_readiness`: allGuards 4480ms, orientCompute 1508ms, grandfatherCritique 502ms, grandfatherCoverage 495ms, doneNames 290ms, and THE TWO COMPONENT VIEWS TOGETHER 19ms - computeCoverage 16ms and computeCritiqueCoverage 3ms. Reusing them would save 19ms of roughly 7000. That is the third premise of this backlog item to be wrong: it first claimed the parsed model was never cached (issue145 - it was), then that the cost was per-element git staleness (issue148 - it was my own guard), and now that composites recompute their components expensively. THE ACTUAL DISTRIBUTION: `keel assured` runs THE ENTIRE 37-GUARD SUITE inside a view (58%), computes ALL of orient just to read `.suspect` (20%), and derives two grandfather sets from the commit graph (14%). The guard suite is legitimate - readiness means invariants hold - so the honest remaining levers are orient-for-one-field and the grandfather derivations. AN OPTIMISATION WAS WRITTEN AND REVERTED, which is the second time this session the discipline held against my own work: I memoized `grandfathered_under` on the correct-by-construction argument that D0129 forbids rewriting history, then instrumented the call count rather than the clock and got `grandfathered x2` - two calls per command, nothing to reuse. The memo was deleted; the counter stayed, because the counter is the evidence. Counting beat timing again: phase timings on this host vary 15% run to run and would never have settled it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSharedParsedModel to issue167;
+
     part issue161 : Issue {
         :>> id = "cd07f3a1-6b48-4e25-9013-72ae5fc84b60";
         :>> title = "regenerating the review deck overwrites marks the human has not submitted yet";

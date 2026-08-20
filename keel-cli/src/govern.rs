@@ -217,7 +217,8 @@ fn names_present_at(repo: &Path, commit: &str) -> std::collections::HashSet<Stri
 /// unavailable) — the caller then treats EVERYTHING as grandfathered so the gate never spuriously
 /// blocks (conservative; matches the D0050 git-failure stance).
 #[must_use]
-pub fn grandfathered_under(root: &Path, decision: &str) -> Option<std::collections::HashSet<String>> {
+pub fn grandfathered_under(root: &Path, decision: &str) -> Option<std::collections::HashSet<String>>{
+    crate::perf::add(&crate::perf::GF_CALLS, 1);
     let commit = decision_intro_commit(root, decision)?;
     Some(names_present_at(root, &commit))
 }

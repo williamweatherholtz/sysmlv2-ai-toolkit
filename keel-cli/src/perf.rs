@@ -62,6 +62,35 @@ pub fn verbose() -> bool {
     *ON
 }
 
+/// Named phase timings, populated only when instrumentation is on.
+///
+/// A composite view is a sequence of expensive steps, and a total says nothing about which one to
+/// attack - the mistake that produced three wrong cost attributions before the per-argv tally existed.
+pub static PHASES: std::sync::Mutex<Option<std::collections::BTreeMap<String, u64>>> =
+    std::sync::Mutex::new(None);
+
+/// Time `f` under a phase name. Free when instrumentation is off.
+pub fn phase<T>(name: &str, f: impl FnOnce() -> T) -> T {
+    if !enabled() {
+        return f();
+    }
+    let t0 = std::time::Instant::now();
+    let out = f();
+    let ns = u64::try_from(t0.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    if let Ok(mut g) = PHASES.lock() {
+        *g.get_or_insert_with(std::collections::BTreeMap::new).entry(name.to_string()).or_insert(0) += ns;
+    }
+    out
+}
+
+/// Calls to `grandfathered_under`.
+///
+/// A COUNT, not a duration: phase timings on this host vary ~15% run to run, and a count is immune to
+/// that - the lesson the git-spawn work taught after three wrong attributions from wall clock. This
+/// counter is what refuted a memoization I had already written: 2 calls per command, so there was nothing
+/// to reuse and the memo was reverted rather than kept on a plausible story.
+pub static GF_CALLS: AtomicU64 = AtomicU64::new(0);
+
 /// Whether instrumentation is on. Read once; an env lookup per build call would itself be a cost.
 #[must_use]
 pub fn enabled() -> bool {
@@ -109,6 +138,20 @@ fn git_breakdown() -> String {
     })
 }
 
+/// Phase timings as report lines, slowest first.
+fn phase_breakdown() -> String {
+    use std::fmt::Write as _;
+    let Ok(g) = PHASES.lock() else { return String::new() };
+    let Some(map) = g.as_ref() else { return String::new() };
+    let mut rows: Vec<(&String, &u64)> = map.iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(a.1));
+    rows.iter().fold(String::new(), |mut s, (name, ns)| {
+        let _ = write!(s, "
+  phase {name} {}ms", ms(**ns));
+        s
+    })
+}
+
 /// Nanoseconds as whole milliseconds. Integer division, not a float cast: a report a human reads never
 /// needs sub-millisecond precision, and `u64 as f64` silently loses bits above 2^52.
 const fn ms(nanos: u64) -> u64 {
@@ -136,5 +179,5 @@ pub fn report() -> Option<String> {
         TREES_WALKED.load(Ordering::Relaxed),
         GIT_CALLS.load(Ordering::Relaxed),
         ms(GIT_NANOS.load(Ordering::Relaxed)),
-    ) + &git_breakdown())
+    ) + &format!(" | grandfathered x{}", GF_CALLS.load(Ordering::Relaxed)) + &git_breakdown() + &phase_breakdown())
 }

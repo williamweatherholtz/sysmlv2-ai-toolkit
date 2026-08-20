@@ -3100,7 +3100,7 @@ pub fn coverage(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let done = crate::orient::done_names(root);
     let task_suspect: HashSet<String> = crate::orient::compute(root).suspect.into_iter().collect();
-    let stale = compute_stale_verifications(root, &model);
+    let stale = crate::perf::phase("staleVerifications", || compute_stale_verifications(root, &model));
     let cov = compute_coverage(&model, &done, &task_suspect, &stale);
     let gf = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
 
@@ -4711,21 +4711,25 @@ fn finding_blockers(resolution: &[IssueStatus], model: &Model) -> (Vec<String>, 
 
 fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     let model = Model::build(root)?;
-    let done = crate::orient::done_names(root);
-    let suspect_vec = crate::orient::compute(root).suspect;
+    // PHASE-TIMED (dcSharedParsedModel): `assured` is 7-9s of which fingerprint, parse and git are
+    // ~1.4s, so the remaining 6s is in-view computation and a total cannot say which step. Each step
+    // is now named, so the next optimisation is aimed rather than guessed.
+    let done = crate::perf::phase("doneNames", || crate::orient::done_names(root));
+    let suspect_vec = crate::perf::phase("orientCompute", || crate::orient::compute(root).suspect);
     let task_suspect: HashSet<String> = suspect_vec.iter().cloned().collect();
     let stale = compute_stale_verifications(root, &model);
 
     // Charter-time scoping (D0081): only GOVERNED elements (created after the governing decision)
     // count as gaps — grandfathered elements are out of the gate.
-    let gf_cov = crate::govern::grandfathered_under(root, COVERAGE_DECISION);
-    let gf_crit = crate::govern::grandfathered_under(root, CRITIQUE_DECISION);
-    let coverage_gaps: Vec<String> = compute_coverage(&model, &done, &task_suspect, &stale)
+    let gf_cov = crate::perf::phase("grandfatherCoverage", || crate::govern::grandfathered_under(root, COVERAGE_DECISION));
+    let gf_crit = crate::perf::phase("grandfatherCritique", || crate::govern::grandfathered_under(root, CRITIQUE_DECISION));
+    let coverage_gaps: Vec<String> = crate::perf::phase("computeCoverage", || compute_coverage(&model, &done, &task_suspect, &stale))
         .into_iter()
         .filter(|c| !is_covered_tier(c.tier) && governed(gf_cov.as_ref(), &c.element))
         .map(|c| c.element)
         .collect();
-    let critique_gaps: Vec<String> = compute_critique_coverage(&model, &stale, &CritiquePolicy::load(root)?)
+    let policy = CritiquePolicy::load(root)?;
+    let critique_gaps: Vec<String> = crate::perf::phase("computeCritiqueCoverage", || compute_critique_coverage(&model, &stale, &policy))
         .into_iter()
         .filter(|c| !c.covered && governed(gf_crit.as_ref(), &c.element))
         .map(|c| c.element)
@@ -4735,13 +4739,18 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
 
     // Base invariant guards only — EXCLUDE `assured` (would recurse) and `critique` (composed
     // separately as critique_gaps). This is what "invariants green" means for readiness.
-    let invariant_violations: Vec<String> = crate::guards::GUARD_NAMES
-        .iter()
-        .copied()
-        .filter(|n| !matches!(*n, "assured" | "critique"))
-        .filter_map(|n| crate::guards::run_one(n, root))
-        .flat_map(|r| r.violations.into_iter().map(move |v| format!("{}: {v}", r.name)))
-        .collect();
+    // THE WHOLE GUARD SUITE, INSIDE A VIEW. Legitimate - readiness means invariants hold - but it makes
+    // `keel assured` cost `keel guard` PLUS every composed view, which is the single largest term and was
+    // invisible until it was named.
+    let invariant_violations: Vec<String> = crate::perf::phase("allGuards", || {
+        crate::guards::GUARD_NAMES
+            .iter()
+            .copied()
+            .filter(|n| !matches!(*n, "assured" | "critique"))
+            .filter_map(|n| crate::guards::run_one(n, root))
+            .flat_map(|r| r.violations.into_iter().map(move |v| format!("{}: {v}", r.name)))
+            .collect()
+    });
 
     Ok(ReadinessBlockers {
         coverage_gaps,
