@@ -2119,4 +2119,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcLensCannotFalseGreen to issue183;
+
+    part issue184 : Issue {
+        :>> id = "1131d3fd-3083-4011-a2ee-5295646c1231";
+        :>> title = "Every model write truncates before writing, so a death mid-write corrupts the truth";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED: 16 std::fs::write sites in write.rs and 5 more across actor.rs, enroll.rs and activation.rs. std::fs::write opens with truncate and then writes, so the file is momentarily EMPTY and then progressively filled. If the process dies in between - a kill, a power loss, an OOM, or a watchdog exit - the authoritative record is left truncated or half-written. Invariant 1 of this engine is that text is truth and everything else is a view; the write path to that truth is not atomic, and no temp-file-plus-rename helper exists anywhere in the crate. THE BLAST RADIUS IS BOUNDED AND I WILL NOT OVERSTATE IT: a truncated .sysml file fails the parser, so the gate turns corruption into a red gate rather than silent damage, and git holds the previous content. The dangerous case is narrower - a partial write that still PARSES, which is possible because these files are lists of independent items and a prefix of one is often syntactically complete once the closing brace happens to land. That file passes the gate and gets committed with items missing. ONE INTERACTION WORTH NOTING, WHICH I INTRODUCED THIS SESSION: sprint 364 added a 120-second watchdog that calls process::exit from a second thread. No hook currently writes, so it does not fire during a write today, but exit-from-another-thread plus a non-atomic write is exactly this corruption path, and I built half of it without noticing the other half was already there. PREVENTING CHANGE: one helper that writes a sibling temp file and renames over the target, used by every model write, plus a test that the target is old-or-new and never a prefix.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAtomicModelWrite to issue184;
 }

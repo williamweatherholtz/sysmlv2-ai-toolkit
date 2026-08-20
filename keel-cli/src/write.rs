@@ -90,6 +90,44 @@ pub fn gen_uuid() -> String {
     s
 }
 
+/// Write `content` to `path` ATOMICALLY: a sibling temp file, then a rename over the target (issue184).
+///
+/// `std::fs::write` truncates and then writes, so the target is momentarily EMPTY and then progressively
+/// filled. A death in between - a kill, an OOM, a watchdog exit from another thread - leaves the
+/// authoritative record truncated. Invariant 1 makes these files the TRUTH, and every one of the 21 write
+/// sites in this crate reached that truth non-atomically.
+///
+/// THE DANGEROUS CASE IS NOT THE OBVIOUS ONE. A truncated file fails the parser, so the gate converts
+/// corruption into a red gate. The case that survives is a PARTIAL write that still parses - these files
+/// are lists of independent items, so a prefix is often syntactically complete once a closing brace
+/// happens to land, and that file passes the gate with items silently missing.
+///
+/// The temp file is a SIBLING, not in a temp directory, because rename is only atomic within a
+/// filesystem. On Windows `fs::rename` fails if the target exists, so the target is removed first - a
+/// narrow window that is still strictly better than truncate-then-fill, and the temp file survives a
+/// failure at that point rather than the original being gone.
+///
+/// # Errors
+/// Returns the underlying [`std::io::Error`] if the temp write, the removal or the rename fails.
+pub fn write_atomic(path: &std::path::Path, content: impl AsRef<str>) -> std::io::Result<()> {
+    let tmp = path.with_extension(format!(
+        "{}.keel-tmp",
+        path.extension().map_or_else(String::new, |e| e.to_string_lossy().to_string())
+    ));
+    std::fs::write(&tmp, content.as_ref())?;
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            // Leave the temp file in place on failure: it holds the ONLY copy of the new content, and
+            // deleting it here would turn a failed write into a lost write.
+            Err(e)
+        }
+    }
+}
+
 // ── AST helpers ───────────────────────────────────────────────────────────────
 
 fn task_exists_in_pkg(pkg: &Package, name: &str) -> bool {
@@ -366,7 +404,7 @@ pub fn append_result(
         }
     }
 
-    std::fs::write(path, new_content)?;
+    write_atomic(path, new_content)?;
     Ok(uuid)
 }
 
@@ -460,7 +498,7 @@ pub fn append_critique(path: &Path, c: &Critique) -> Result<String, WriteError> 
         out.push_str(line);
         out.push('\n');
     }
-    std::fs::write(path, out)?;
+    write_atomic(path, out)?;
     Ok(format!("{prefix}{n}"))
 }
 
@@ -521,7 +559,7 @@ pub fn append_disposition(path: &Path, d: &Disposition) -> Result<String, WriteE
         out.push_str(line);
         out.push('\n');
     }
-    std::fs::write(path, out)?;
+    write_atomic(path, out)?;
     Ok(format!("{prefix}{n}"))
 }
 
@@ -568,7 +606,7 @@ pub fn set_attr(root: &Path, item: &str, attr: &str, literal: &str) -> Result<St
             format!("{}{{\n        {}{}", &block[..brace], new_attr, &block[brace + 1..])
         };
         let out = format!("{}{}{}", &content[..decl_off], updated_block, &content[block_end..]);
-        std::fs::write(&file, out)?;
+        write_atomic(&file, out)?;
         return Ok(file.strip_prefix(root).unwrap_or(&file).to_string_lossy().replace('\\', "/"));
     }
     Err(WriteError::TaskNotFound(item.to_owned()))
@@ -613,7 +651,7 @@ fn append_line_before_close(path: &Path, line: &str) -> Result<(), WriteError> {
         out.push_str(l);
         out.push('\n');
     }
-    std::fs::write(path, out)?;
+    write_atomic(path, out)?;
     Ok(())
 }
 
@@ -632,7 +670,7 @@ pub fn author_edge(root: &Path, file_rel: &str, kind: &str, from: &str, to: &str
     }
     if file_rel.replace('\\', "/").ends_with("authored.sysml") {
         let out = format!("{AUTHORED_HEADER}    {line}\n}}\n");
-        std::fs::write(&path, out)?;
+        write_atomic(&path, out)?;
         return Ok(());
     }
     Err(WriteError::InsertionPointNotFound(file_rel.to_owned()))
@@ -684,7 +722,7 @@ pub fn append_measurement(path: &Path, indicator: &str, value: &str, measured_at
         out.push_str(line);
         out.push('\n');
     }
-    std::fs::write(path, out)?;
+    write_atomic(path, out)?;
     Ok(format!("{prefix}{n}"))
 }
 
@@ -755,7 +793,7 @@ pub fn append_gate_result(
         }
     }
 
-    std::fs::write(path, new_content)?;
+    write_atomic(path, new_content)?;
     Ok(uuid)
 }
 
@@ -838,7 +876,7 @@ pub fn add_task(
         }
     }
 
-    std::fs::write(path, new_content)?;
+    write_atomic(path, new_content)?;
     Ok(uuid)
 }
 
@@ -907,12 +945,12 @@ pub fn create_item(root: &Path, it: &NewItem) -> Result<(String, String), WriteE
         out.push_str(&block);
         out.push('\n');
         out.push_str(&content[idx..]);
-        std::fs::write(&file, out)?;
+        write_atomic(&file, out)?;
     } else {
         let mut out = String::from(AUTHORED_HEADER);
         out.push_str(&block);
         out.push_str("}\n");
-        std::fs::write(&file, out)?;
+        write_atomic(&file, out)?;
     }
     Ok((name, ".tracking/authored.sysml".to_owned()))
 }
@@ -988,7 +1026,7 @@ pub fn record_decision(
         consequences_c = s(consequences),
     );
     let filename = format!("{nnnn}-{slug}.sysml");
-    std::fs::write(dir.join(&filename), file_text)?;
+    write_atomic(&dir.join(&filename), file_text)?;
     Ok((nnnn, format!(".engine/decisions/{filename}")))
 }
 
@@ -1029,7 +1067,7 @@ pub fn accept_decision(
          \x20   part {decision}AcceptR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
     );
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
-    std::fs::write(path, new_content)?;
+    write_atomic(path, new_content)?;
     Ok(u1)
 }
 
@@ -1069,8 +1107,58 @@ pub fn reject_decision(
          \x20   part {decision}RejectR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
     );
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
-    std::fs::write(path, new_content)?;
+    write_atomic(path, new_content)?;
     Ok(u1)
+}
+
+#[cfg(test)]
+mod atomic_write_tests {
+    use super::write_atomic;
+
+    /// The target ends up with the NEW content and no temp file survives (issue184). The property that
+    /// matters - never a PREFIX of the new content - cannot be tested without killing a process
+    /// mid-write, so what is pinned here is that the mechanism is a temp-then-rename rather than a
+    /// truncate, and that it cleans up after itself.
+    #[test]
+    fn a_write_replaces_the_target_and_leaves_no_temp_file() {
+        let dir = std::env::temp_dir().join("keel-atomic-write-test");
+        let _ = std::fs::create_dir_all(&dir);
+        let target = dir.join("model.sysml");
+        std::fs::write(&target, "old").expect("seed");
+        write_atomic(&target, "new content").expect("atomic write");
+        assert_eq!(std::fs::read_to_string(&target).expect("read"), "new content");
+        let strays: Vec<_> = std::fs::read_dir(&dir)
+            .expect("readdir")
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().contains("keel-tmp"))
+            .collect();
+        assert!(strays.is_empty(), "a temp file survived a successful write");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// No model write in this module may call `std::fs::write` directly. THE CONTROL: the defect was 21
+    /// sites each individually reasonable, so the property to pin is that no new one appears.
+    #[test]
+    fn no_model_write_bypasses_the_atomic_helper() {
+        let full = std::fs::read_to_string("src/write.rs").expect("write.rs is readable");
+        // PRODUCTION code only: a test's own seed write is not a model write, and scanning the test
+        // module made this test report itself.
+        let src = &full[..full.find("
+#[cfg(test)]").unwrap_or(full.len())];
+        let offenders: Vec<String> = src
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| {
+                let s = l.trim_start();
+                s.contains("std::fs::write(") && !s.starts_with("//") && !s.contains("&tmp,")
+            })
+            .map(|(i, l)| format!("{}: {}", i + 1, l.trim()))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "model write(s) bypassing write_atomic - a death mid-write truncates the truth: {offenders:#?}"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1222,7 +1310,7 @@ pub fn record_issue(root: &Path, n: &NewIssue) -> Result<(String, String), Write
     out.push('\n');
     out.push_str(&block);
     out.push_str(&text[close..]);
-    std::fs::write(&path, out)?;
+    write_atomic(&path, out)?;
     Ok((name, ".tracking/issues.sysml".to_owned()))
 }
 
@@ -1323,7 +1411,7 @@ pub fn record_claim(root: &Path, item: &str, actor: &str) -> Result<(String, Str
             .ok_or_else(|| WriteError::TaskNotFound(format!("{} (no package close)", file.display())))?;
         format!("{}\n\n{entry}{}", existing[..close].trim_end(), &existing[close..])
     };
-    std::fs::write(&file, text)?;
+    write_atomic(&file, text)?;
     Ok((name, format!(".tracking/claims/{}.sysml", sanitize_name(actor))))
 }
 
