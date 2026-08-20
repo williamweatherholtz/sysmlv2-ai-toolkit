@@ -1832,6 +1832,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcObligationDeck to issue158;
 
+    part issue159 : Issue {
+        :>> id = "7e2b05c4-9d13-4a68-b075-3f18ea6c92d7";
+        :>> title = "the review deck made the human copy their own judgments back, and the export itself took two clicks";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "TWO COMPLAINTS IN ONE MESSAGE, verbatim: 'how can I avoid having to copy for Claude? I want interactions I make to just be saved without manual copy. also, copy for Claude opens a button where I have to click copy again. why?' BOTH ARE THE SAME DEFECT AT DIFFERENT SCALES - a surface that makes the human do work the tool could do. (1) THE COPY STEP EXISTED BECAUSE I CHOSE THE SAFE DEFAULT AND NEVER REVISITED IT. The canvas skill says to default to localStorage plus a paste-back export, and to use the live-doc capability ONLY when a real-time round trip is a hard requirement. It WAS the requirement from the moment the deck became their channel on remote control, and I kept the default anyway - so they hand-copied a markdown block four separate times to submit judgments the page already held. Fixed by declaring `capabilities: {artifact: {}}`: on a live doc the page's markup IS the document, so a writer's own gesture - setting `data-verdict`, typing in an `<input>` - is appended as them and reaches the watching session with no export at all. (2) THE EXPORT DIALOG THEN CHARGED A SECOND CLICK, because `Copy for Claude` only OPENED the panel and the actual copy waited on a second button. Fixed by copying on open; the button remains for a retry and for a read-only view. FOUR CONTRACT RULES THAT WOULD HAVE BROKEN SYNC SILENTLY, all now honoured: shared content is authored as HTML by the generator and mutated only inside gesture handlers, never rendered from a JS object and never touched at load - so the old localStorage restore is GONE, because a load-time mutation saves nothing and a second record would disagree with the document; per-viewer chrome (which class sections are expanded) moved to `data-local-open` so collapsing a section is not broadcast as an edit; notes stay `<input>` because textarea values are not captured; and read-only is detected as a REJECTION - a body-level `claude:sync-off` - rather than assumed from any region switching off, which is the canvas skill's own anti-pattern 3. EIGHTH INSTANCE of the affordance family (issue141/143/152/154/155/157/158/159), and the first where the fix was to remove a step rather than to explain one.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcLiveDoc to issue159;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

@@ -197,9 +197,9 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;text-wrap:balan
 .grph .t{flex:1}
 .caret{width:9px;height:9px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);
   transform:rotate(45deg);transition:transform .15s}
-.grp[data-open=true] .caret{transform:rotate(-135deg)}
+.grp[data-local-open=true] .caret{transform:rotate(-135deg)}
 .grpb{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}
-.grp[data-open=true] .grpb{display:block}
+.grp[data-local-open=true] .grpb{display:block}
 .blurb{margin:12px 0;color:var(--ink3);font-size:13px}
 .card{border:1px solid var(--line);border-left:4px solid var(--h);border-radius:var(--r);
   padding:12px;margin:10px 0;background:var(--card)}
@@ -235,73 +235,84 @@ dialog textarea{width:100%;height:46vh;border:1px solid var(--line);border-radiu
   background:var(--paper);color:var(--ink);font:12px/1.5 var(--mono);padding:10px}
 .dlgrow{display:flex;gap:8px;margin-top:10px}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ro{display:none;margin:12px 0;padding:10px 12px;border:1px solid var(--maybe);
+  border-left:4px solid var(--maybe);border-radius:var(--r);color:var(--ink2);font-size:13px}
+body[data-local-readonly=true] .ro{display:block}
+body[data-local-readonly=true] .live{display:none}
+.live{margin:12px 0 0;color:var(--ink3);font-size:12px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
 """
 
 JS = """
-// STATE LIVES IN THE DOM + localStorage, keyed by each item's MINTED UUID and never by its label: this
-// deck is regenerated from a moving model, and label-keyed state orphans exactly when the most judgment
-// has been invested in it. `sigs` records the content signature at judgement time, so an item edited
-// after being judged re-surfaces with a badge instead of silently keeping a stale verdict.
-var KEY = 'keelObligations.v1';
-var S = JSON.parse(localStorage.getItem(KEY) || '{}');
-S.verdicts = S.verdicts || {}; S.notes = S.notes || {}; S.sigs = S.sigs || {};
-function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+// THE PAGE IS THE RECORD (artifact live-doc capability). On a live doc the runtime treats <body> as the
+// sync region: whatever a WRITER'S OWN GESTURE changes in the DOM - an attribute, a text input's value -
+// is appended to the document as them and reaches every view and the watching Claude session. So a tap on
+// Accept and a typed note ARE the submission. There is no copy step, which is the whole point of this
+// version: the human asked to stop copying and pasting their own judgments back.
+//
+// THREE RULES FROM THE CONTRACT, and each one is a thing that would silently break sync:
+//   1. Content is authored AS HTML by the generator and mutated directly in handlers. Nothing shared is
+//      rendered from a JS object, and nothing shared is touched at load - a load-time render saves
+//      nothing and can switch the element off for this view.
+//   2. Per-viewer chrome (which class sections are expanded) lives on `data-local-*`, so collapsing a
+//      section is not broadcast as an edit to everyone.
+//   3. Notes are <input> elements, never <textarea> or contenteditable-with-children: input values are
+//      captured, textarea values are not.
+//
+// localStorage is NOT used to hold verdicts any more. It would be a second record disagreeing with the
+// document, and the document is the one that reaches Claude.
+
+// Read-only is a REJECTION, not an assumption. A viewer who cannot write gets capture turned off and every
+// region - the adopted <body> included - gets artifact-sync-state="off". Only that body-level signal means
+// read-only; a single region switching off is a different fault and must not be reported as read-only
+// (that mistake is in the canvas skill's anti-pattern list).
+document.addEventListener('claude:sync-off', function(e){
+  if (e.target === document.body || e.target === document.documentElement) {
+    document.body.dataset.localReadonly = 'true';
+  }
+});
+document.addEventListener('claude:sync-lost', function(){
+  var el = document.getElementById('livenote');
+  if (el) el.textContent = 'a change did not reach the document yet - it will go with the next one';
+});
+
 var cards = [].slice.call(document.querySelectorAll('.card'));
-function apply(){
-  cards.forEach(function(c){
-    var u = c.dataset.uid;
-    if (S.verdicts[u]) c.dataset.verdict = S.verdicts[u];
-    var n = c.querySelector('.note'); if (n && S.notes[u]) n.value = S.notes[u];
-    c.querySelector('.chg').hidden = !(S.sigs[u] && S.sigs[u] !== c.dataset.sig);
-  });
-  var judged = cards.filter(function(c){ return c.dataset.verdict; }).length;
-  document.getElementById('cnt').textContent = judged + ' of ' + cards.length + ' judged';
+function judged(){ return cards.filter(function(c){ return c.dataset.verdict; }).length; }
+function count(){
+  document.getElementById('cnt').textContent = judged() + ' of ' + cards.length + ' judged';
 }
-apply();
+count();
+
 document.addEventListener('click', function(e){
   var h = e.target.closest('.grph');
-  if (h) { var g = h.closest('.grp'); var open = g.dataset.open !== 'true';
-    g.dataset.open = open ? 'true' : 'false';
+  if (h) { var g = h.closest('.grp'); var open = g.dataset.localOpen !== 'true';
+    g.dataset.localOpen = open ? 'true' : 'false';
     h.setAttribute('aria-expanded', open ? 'true' : 'false'); return; }
   var b = e.target.closest('.verdicts button');
-  if (b) { var c = b.closest('.card'), u = c.dataset.uid;
-    var next = c.dataset.verdict === b.dataset.v ? '' : b.dataset.v;
-    c.dataset.verdict = next;
-    if (next) { S.verdicts[u] = next; S.sigs[u] = c.dataset.sig; }
-    else { delete S.verdicts[u]; delete S.sigs[u]; }
-    save(); apply(); return; }
-  if (e.target.id === 'exp') { buildExport(); document.getElementById('dlg').showModal(); return; }
+  if (b) {
+    // THE GESTURE IS THE WRITE. Setting data-verdict inside this handler is what gets appended to the
+    // document as this viewer - no save call, no export, no copy.
+    var c = b.closest('.card');
+    c.dataset.verdict = c.dataset.verdict === b.dataset.v ? '' : b.dataset.v;
+    count(); return;
+  }
+  if (e.target.id === 'exp') { buildExport(); document.getElementById('dlg').showModal(); copyOut(); return; }
   if (e.target.id === 'close') { document.getElementById('dlg').close(); return; }
   if (e.target.id === 'copy') { copyOut(); return; }
-  if (e.target.id === 'clear') {
-    if (confirm('Clear every verdict and note stored in this browser?')) {
-      S = { verdicts:{}, notes:{}, sigs:{} }; save();
-      cards.forEach(function(c){ c.dataset.verdict = '';
-        var n = c.querySelector('.note'); if (n) n.value = ''; });
-      apply(); }
-    return; }
 });
-document.addEventListener('input', function(e){
-  var n = e.target.closest('.note');
-  if (n) { var u = n.closest('.card').dataset.uid;
-    if (n.value) S.notes[u] = n.value; else delete S.notes[u];
-    save(); }
-});
-// The clipboard API REJECTS inside a sandboxed artifact frame that lacks clipboard-write permission, and
-// the first version had a .then with no .catch - so the promise failed silently, the fallback never ran,
-// and the button did not even change its label. Every path now ends in either 'Copied' or an instruction,
-// because a control that appears to do nothing is the affordance defect this session keeps producing.
+
+// The clipboard API REJECTS inside a sandboxed artifact frame without clipboard-write permission, and a
+// .then() with no rejection handler fails silently - which shipped once and made the button look dead.
+// Every path ends in either 'Copied' or an instruction.
 function copyOut(){
   var ta = document.getElementById('out'), btn = document.getElementById('copy');
   function manual(){
-    // readonly blocks programmatic selection on iOS, so lift it for the copy and put it back.
     ta.removeAttribute('readonly');
     ta.focus();
-    try { ta.setSelectionRange(0, ta.value.length); } catch (e) { ta.select(); }
+    try { ta.setSelectionRange(0, ta.value.length); } catch (err) { ta.select(); }
     var done = false;
-    try { done = document.execCommand('copy'); } catch (e) { done = false; }
+    try { done = document.execCommand('copy'); } catch (err) { done = false; }
     ta.setAttribute('readonly', '');
     btn.textContent = done ? 'Copied' : 'Text selected - copy it';
   }
@@ -309,6 +320,9 @@ function copyOut(){
     navigator.clipboard.writeText(ta.value).then(function(){ btn.textContent = 'Copied'; }, manual);
   } else { manual(); }
 }
+
+// The export is now a FALLBACK, for a read-only view or a session where the grant is not active. It reads
+// the DOM, because the DOM is the record.
 function buildExport(){
   var L = ['# Keel obligations review', '', 'Generated ' + STAMP, ''];
   var names = { accept:'ACCEPT', maybe:'NEEDS WORK', reject:'REJECT' };
@@ -317,24 +331,27 @@ function buildExport(){
     if (!got.length) return;
     L.push('## ' + names[v] + ' (' + got.length + ')', '');
     got.forEach(function(c){
-      var note = (S.notes[c.dataset.uid] || '').trim();
+      var n = c.querySelector('.note'), note = n ? n.value.trim() : '';
       L.push('- **' + c.querySelector('code').textContent + '** (' + c.dataset.cls + ') - '
-        + c.querySelector('h3').textContent + (note ? '\\n  - note: ' + note : ''));
+        + c.querySelector('h3').textContent + (note ? '
+  - note: ' + note : ''));
     });
     L.push('');
   });
   var noted = cards.filter(function(c){
-    return !c.dataset.verdict && (S.notes[c.dataset.uid] || '').trim(); });
+    var n = c.querySelector('.note');
+    return !c.dataset.verdict && n && n.value.trim(); });
   if (noted.length) {
     L.push('## Notes without a verdict (' + noted.length + ')', '');
     noted.forEach(function(c){
-      L.push('- **' + c.querySelector('code').textContent + '** - ' + S.notes[c.dataset.uid].trim()); });
+      L.push('- **' + c.querySelector('code').textContent + '** - '
+        + c.querySelector('.note').value.trim()); });
     L.push('');
   }
-  var judged = cards.filter(function(c){ return c.dataset.verdict; }).length;
-  L.push(judged || noted.length ? '_' + judged + ' of ' + cards.length + ' items judged._'
-                               : '_No verdicts recorded yet._');
-  document.getElementById('out').value = L.join('\\n');
+  L.push(judged() || noted.length ? '_' + judged() + ' of ' + cards.length + ' items judged._'
+                                  : '_No verdicts recorded yet._');
+  document.getElementById('out').value = L.join('
+');
   document.getElementById('copy').textContent = 'Copy';
 }
 """
@@ -369,7 +386,7 @@ def render(items, generated_at, head_sha):
         ) or '<p class=empty>Nothing outstanding in this class.</p>'
         opened = "true" if rows else "false"
         sections.append(
-            '<section class=grp data-open="%s" style="--h:%s">'
+            '<section class=grp data-local-open="%s" style="--h:%s">'
             '<button class=grph aria-expanded="%s"><span class=n>%d</span>'
             '<span class=t>%s</span><span class=caret aria-hidden=true></span></button>'
             '<div class=grpb><p class=blurb>%s</p>%s</div></section>'
@@ -384,14 +401,18 @@ def render(items, generated_at, head_sha):
         + '<div class=wrap>\n<header class=top>\n  <h1>Keel Obligations Deck</h1>\n'
         + '  <p class=sub>%d item(s) waiting on you &middot; %s</p>\n' % (total, stamp)
         + '  <div class=stats>%s</div>\n' % stats
-        + '  <p class=how>Tap a class to open it. Give each item a verdict, add a note if you have one, '
-          'then <b>Copy for Claude</b> and paste it back. Judgments are stored in this browser and keyed '
-          'by each item&rsquo;s UUID, so regenerating the deck keeps them.</p>\n</header>\n'
+        + '  <p class=how>Tap a class to open it, then give each item a verdict and a note. '
+          '<b>Your taps save themselves and reach Claude &mdash; there is nothing to copy.</b></p>'
+        + '  <p class=live id=livenote>Live document: every verdict and note is appended as you, '
+          'the moment you make it.</p>'
+        + '  <p class=ro>This view is <b>read-only</b>, so nothing you change here is saved. Use '
+          '<b>Copy for Claude</b> at the bottom and paste the text back instead.</p>'
+        + '</header>\n'
         + "".join(sections)
         + "\n</div>\n"
         + '<div class=bar><span class=cnt id=cnt></span>'
           '<button class=ghost id=clear>Reset</button>'
-          '<button id=exp>Copy for Claude</button></div>\n'
+          '<button class=ghost id=exp>Copy for Claude</button></div>\n'
         + '<dialog id=dlg><textarea id=out readonly></textarea>'
           '<div class=dlgrow><button id=copy>Copy</button>'
           '<button class=ghost id=close>Close</button></div></dialog>\n'

@@ -59,7 +59,20 @@ awaiting disposition, sitting reviews due.
   print 0 — the artifact runtime supplies the `<head>`, so a non-ASCII byte relies on a charset
   declaration this file cannot make.
 
-### 3. Publish
+### 3. Publish as a LIVE DOC
+
+Publish with `capabilities: {artifact: {}}`. On a live doc the page's markup IS the document, so the
+human's verdict taps and typed notes are appended as them and reach this session with **no copy step** —
+which is the point (issue159; they hand-copied four exports before this shipped).
+
+**ORDERING RULE, and getting it backwards destroys their work:** a live doc holds their marks in the
+PUBLISHED page, so republishing a regenerated deck OVERWRITES them. Always **read their marks, act on
+them, and only then regenerate**. Never regenerate first to "refresh" a deck they may have been marking up.
+
+The export stays as a fallback for a read-only view and copies on open. Keep the same file path so the
+URL is stable.
+
+### 3b. Publish (legacy: static, paste-back)
 
 Publish with the Artifact tool. Keep the same file path on later runs so the URL is stable and their
 stored judgments (localStorage, keyed per artifact origin) survive. Hand them the URL, what the four
