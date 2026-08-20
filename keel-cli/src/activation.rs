@@ -44,6 +44,7 @@ pub enum GuardState {
 }
 
 /// The project's activation state plus the engine's unit definitions.
+/// `active_viewpoints` mirrors `active`: `None` means every declared viewpoint is active (D0164).
 #[derive(Debug, Default)]
 pub struct Activation {
     /// `None` = no manifest declared => every process is active (invariant 1).
@@ -51,6 +52,8 @@ pub struct Activation {
     units: BTreeMap<String, Unit>,
     /// Fail-loud problems: an unknown process or guard name, or unparseable TOML.
     pub errors: Vec<String>,
+    /// Declared viewpoints the project has activated. `None` = all (D0164).
+    pub active_viewpoints: Option<BTreeSet<String>>,
 }
 
 /// Read each process unit's guards FROM THE MODEL (D0139(D), replacing `process-units.toml`).
@@ -163,6 +166,13 @@ impl Activation {
                 Ok(v) => {
                     // A declared-but-empty `active` list is meaningful (activate nothing) and must be
                     // distinguished from an absent key (activate everything), so match on presence.
+                    // VIEWPOINT activation (D0164), the same shape and the same rule as processes: an
+                    // absent key means everything is active, a declared-but-empty list means activate
+                    // nothing, so presence must be matched rather than emptiness.
+                    if let Some(active) = v.get("viewpoints").and_then(|p| p.get("active")) {
+                        out.active_viewpoints =
+                            Some(str_list(Some(active)).into_iter().collect::<BTreeSet<String>>());
+                    }
                     if let Some(active) = v.get("processes").and_then(|p| p.get("active")) {
                         let set: BTreeSet<String> = str_list(Some(active)).into_iter().collect();
                         for p in &set {
@@ -221,6 +231,17 @@ impl Activation {
             }
         }
         GuardState::Core
+    }
+
+    /// True when viewpoint `v` is active. With no manifest key, every viewpoint is active (D0164).
+    ///
+    /// A viewpoint is a declared LENS, so deactivating it means the project does not look through it: it
+    /// stops being offered on a surface and its renderer stops being required to resolve. It does NOT
+    /// delete the declaration, and `concern-coverage` still reports the concern - an unwatched concern is
+    /// a fact about the project, and hiding it would turn a deliberate choice into an invisible gap.
+    #[must_use]
+    pub fn is_viewpoint_active(&self, v: &str) -> bool {
+        self.active_viewpoints.as_ref().is_none_or(|set| set.contains(v))
     }
 
     /// Declared units the project has NOT activated, sorted.

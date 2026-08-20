@@ -114,6 +114,12 @@ frozen (modify it only by out-of-band Decision).
   transform, a dry run reconciling control totals, green at every step. Never fabricate historical data.
 - **Authoring friction is the #1 risk (D0054).** The dominant MBSE failure mode is adoption friction, not
   bad architecture. If recording a fact is harder than a spreadsheet edit, fix that first.
+- **Adoption is declared (D0138/D0164).** `.engine/contracts/activation.toml` names the processes AND the
+  viewpoints this project has adopted; an absent file or section means everything is active, so a project
+  that never adopted a control has not violated it. `keel activation` reports both; `keel activate` /
+  `keel deactivate` take a process or a viewpoint name. Deactivating a viewpoint removes the LENS (it
+  leaves the surfaces and its renderer stops being gated) but `concern-coverage` still reports the
+  concern — otherwise coverage could be raised by switching off what it was failing.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
 - **`keel sync` / `keel land` are the integration path (D0129).** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` pushes and, on rejection, merges and **gates the

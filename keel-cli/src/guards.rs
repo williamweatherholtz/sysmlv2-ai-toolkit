@@ -756,7 +756,14 @@ pub fn viewpoint_renderer(root: &Path) -> GuardReport {
     let mut scanned = 0;
     let mut warnings = Vec::new();
     let mut violations = Vec::new();
+    // A DEACTIVATED viewpoint's renderer is not required to resolve (D0164), the same way a deactivated
+    // process's guards are skipped: a project that declared it does not look through this lens has not
+    // violated a rule about the lens. Reported in `keel activation`, never silent.
+    let act = crate::activation::Activation::load(root);
     for vp in vps {
+        if !act.is_viewpoint_active(&vp.name) {
+            continue;
+        }
         // A Viewpoint with NO renderer is a declared lens nothing can render, so it is judged rather
         // than skipped — the previous text scan only ever saw viewpoints that had the line at all.
         let r = vp.renderer;

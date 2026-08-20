@@ -7744,7 +7744,14 @@ pub(crate) fn surfaces_json(root: &Path) -> Result<String, ViewError> {
         .map(|(n, _)| n)
         .collect();
     names.sort();
+    // An INACTIVE viewpoint is not offered (D0164). Filtering here rather than in each consumer means the
+    // console nav, the act-surface obligation bar and anything else derived from surfaces all agree, and a
+    // project that deactivated a lens does not keep being invited to look through it.
+    let act = crate::activation::Activation::load(root);
     for n in names {
+        if !act.is_viewpoint_active(n) {
+            continue;
+        }
         let Some(i) = model.items.get(n) else { continue };
         let g = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
         let entry = Json::Obj(vec![

@@ -1799,6 +1799,17 @@ package ProjectIssues {
     }
     #Resolves dependency from dcOneClickToAct to issue155;
 
+    part issue156 : Issue {
+        :>> id = "9f26a0c8-5b73-4e14-8d05-72ce41b9f307";
+        :>> title = "I broke the activation manifest's write path while extending it, and the command reported success either way";
+        :>> createdAt = "2026-08-19";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "SELF-INFLICTED AND CAUGHT BY A ROUND-TRIP TEST, which is the only reason it is a footnote instead of a defect shipped into a contract. Extending `write_activation` to emit both the process and viewpoint sections, I changed its first parameter from the repo root to a pre-joined directory and dropped the `.engine/contracts` join, while every caller kept passing the root. The manifest was written to `<root>/activation.toml`, where `Activation::load` never looks - so `keel deactivate archDriftVP` printed `deactivated viewpoint`, wrote a file nobody reads, and changed nothing. THE COMMAND'S OUTPUT WAS IDENTICAL IN BOTH THE WORKING AND BROKEN CASE, which is what makes this class dangerous: I would have believed it. What caught it was checking the EFFECT rather than the report - `curl /api/surfaces | grep -c archDriftVP` returned 1 when it had to return 0. That is the same discipline that settled issue154 (the request log rather than the source) and the same one that failed for three rounds before it. FIXED by restoring the join inside the function, so callers pass a root and the function owns the path - which is also why the original was written that way. RE-VERIFIED after the later refactor that extracted `switch_viewpoint`, because a lint fix that moves code is exactly when a path regression sneaks back.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcViewpointActivation to issue156;
+
     part issue142 : Issue {
         :>> id = "9d1e604a-38c7-4b52-a70f-2c85be1379ad";
         :>> title = "a cold console load recomputes the whole corpus per view; and three measurement traps that made me misdiagnose it";

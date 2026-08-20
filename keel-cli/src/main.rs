@@ -1693,12 +1693,72 @@ const ACTIVATION_HEADER: &str = "\
 # Edit by hand, or use `keel activate <process>` / `keel deactivate <process>`.
 ";
 
-/// Write `activation.toml` with `active` set to exactly `set`.
-fn write_activation(root: &Path, set: &[String]) -> std::io::Result<()> {
+/// Write `activation.toml` with both active sets stated exactly.
+///
+/// BOTH sections are always written, even when one is unchanged (D0164). Writing only the section being
+/// edited would leave the other absent, and absent means EVERYTHING ACTIVE — so deactivating one
+/// viewpoint would silently re-activate every process the project had turned off. A partial write of a
+/// contract whose absence has meaning is a data-loss bug, not a convenience.
+fn write_activation(root: &Path, processes: &[String], viewpoints: &[String]) -> std::io::Result<()> {
+    // JOIN `.engine/contracts` HERE, as the original did. Taking a pre-joined directory instead was my
+    // regression and it wrote the manifest to the repo root, where `Activation::load` never looks - so
+    // `keel deactivate` reported success and changed nothing. Caught by round-tripping the command
+    // against the surfaces it is supposed to affect rather than by reading its output, which said
+    // "deactivated" either way.
     let dir = root.join(".engine/contracts");
     std::fs::create_dir_all(&dir)?;
-    let list = set.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
-    std::fs::write(dir.join("activation.toml"), format!("{ACTIVATION_HEADER}\n[processes]\nactive = [{list}]\n"))
+    std::fs::write(
+        dir.join("activation.toml"),
+        format!(
+            "{ACTIVATION_HEADER}
+[processes]
+active = [{}]
+
+[viewpoints]
+active = [{}]
+",
+            processes.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", "),
+            viewpoints.iter().map(|v| format!("\"{v}\"")).collect::<Vec<_>>().join(", "),
+        ),
+    )
+}
+
+/// Activate or deactivate one VIEWPOINT, writing both manifest sections (D0164).
+///
+/// Split out of `cmd_activation` to keep that function within the line budget, and because the two
+/// namespaces genuinely differ: a process switch turns guards on and off, a viewpoint switch turns a LENS
+/// on and off. Bundling them into one branchy function hid that.
+fn switch_viewpoint(
+    root: &Path,
+    act: &keel_cli::activation::Activation,
+    mode: &str,
+    target: &str,
+    all: &[String],
+    mut set: Vec<String>,
+) -> i32 {
+    let materialising = act.active_viewpoints.is_none();
+    if mode == "activate" {
+        if !set.iter().any(|v| v == target) {
+            set.push(target.to_string());
+        }
+    } else {
+        set.retain(|v| v != target);
+    }
+    set.sort();
+    // The PROCESS section must be rewritten too, unchanged: absence means everything active, so omitting
+    // it would silently re-activate every process the project had turned off.
+    let procs: Vec<String> = act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect();
+    if let Err(e) = write_activation(root, &procs, &set) {
+        eprintln!("error writing .engine/contracts/activation.toml: {e}");
+        return 1;
+    }
+    if materialising {
+        println!("No viewpoint manifest existed (all were active), so one was written with the current");
+        println!("effective state before applying this change.");
+    }
+    println!("{mode}d viewpoint `{target}`. Active viewpoints: {} of {}", set.len(), all.len());
+    println!("Read it back: keel activation | keel guard");
+    0
 }
 
 /// `keel activate <process>` / `keel deactivate <process>` / `keel activation` (D0138).
@@ -1732,6 +1792,18 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
                 None => println!("  [always  ] {p}  (asserts no guard — nothing to switch off)"),
             }
         }
+        // VIEWPOINTS (D0164), listed alongside processes because the human's direction was that they be
+        // switchable "just like processes" - and a switch whose state nobody can see is not a switch.
+        let vps = keel_cli::view::declared_viewpoints(&root).unwrap_or_default();
+        println!("
+viewpoints ({} declared):", vps.len());
+        for vp in &vps {
+            println!(
+                "  [{}] {}",
+                if act.is_viewpoint_active(&vp.name) { "active  " } else { "INACTIVE" },
+                vp.name
+            );
+        }
         println!("\ncore guards (never deactivatable):");
         for g in keel_cli::guards::GUARD_NAMES {
             if act.guard_state(g) == keel_cli::activation::GuardState::Core {
@@ -1745,6 +1817,18 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
         eprintln!("usage: keel {mode} <process> [ROOT]");
         return 2;
     };
+    // A name may be a process or a VIEWPOINT (D0164). Resolve in that order and refuse an ambiguous name
+    // rather than guessing: switching off the wrong thing is worse than asking again.
+    let vp_names: Vec<String> =
+        keel_cli::view::declared_viewpoints(&root).unwrap_or_default().into_iter().map(|v| v.name).collect();
+    let vp_active: Vec<String> = vp_names.iter().filter(|v| act.is_viewpoint_active(v)).cloned().collect();
+    if vp_names.iter().any(|v| v == target) && act.unit(target).is_some() {
+        eprintln!("error: `{target}` names both a process unit and a viewpoint - rename one; keel will not guess which to {mode}");
+        return 2;
+    }
+    if vp_names.iter().any(|v| v == target) {
+        return switch_viewpoint(&root, &act, mode, target, &vp_names, vp_active);
+    }
     if act.unit(target).is_none() {
         // Say WHICH of the two cases this is (issue149). "Not a declared process unit" was true and
         // read as "no such process", which is a different and wrong answer.
@@ -1772,7 +1856,7 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
         _ => set.retain(|p| p != target),
     }
     set.sort();
-    if let Err(e) = write_activation(&root, &set) {
+    if let Err(e) = write_activation(&root, &set, &vp_active) {
         eprintln!("error writing .engine/contracts/activation.toml: {e}");
         return 1;
     }
