@@ -23,11 +23,25 @@ kinds = ["human"]
 roles = ["supervisor"]
 
 [findingDisposition]
-# Dispositioning a finding at or above the Medium threshold (D0092). Human-only, and D0080 permits
-# an AI to disposition a LOW finding — that threshold lives in the guard, not here, because it is a
-# property of the FINDING rather than of the actor.
-kinds = ["human"]
-roles = ["supervisor"]
+# Dispositioning a finding at or above the Medium threshold (D0092). D0080 permits an AI to disposition
+# a LOW finding — that threshold lives in the guard, not here, because it is a property of the FINDING
+# rather than of the actor.
+#
+# DELEGATED TO THE AI BY THE HUMAN (D0165), 2026-08-20, verbatim: "auto accept issues by your
+# authority." This is the ONE class where their sign-off is no longer required, and it is a genuine
+# WEAKENING: they no longer see every Medium-and-above finding before it is dispositioned. Recorded here
+# rather than exempted in code so the check keeps running at full strength against a policy the project
+# chose, and so a reader of this contract sees the delegation instead of discovering it in a guard.
+#
+# An AI-recorded disposition is recorded AS AI-recorded: judgedBy names the AI actor and its
+# procedureText cites D0165, so nothing claims a human judged it. `keel dispositions` reports the judge
+# on every row — that is the audit trail this trades for throughput.
+#
+# TO WITHDRAW: restore `kinds = ["human"]`, `roles = ["supervisor"]`. One line, no code, no rebuild; the
+# guard then reports every AI-judged disposition above the threshold as a violation, which is correct for
+# a project that takes the delegation back.
+kinds = ["human", "ai"]
+roles = ["supervisor", "contributor"]
 
 [contentionAdjudication]
 # Adjudicating a contributor conflict (D0108 clause 5). Human-only: no contributor may resolve a

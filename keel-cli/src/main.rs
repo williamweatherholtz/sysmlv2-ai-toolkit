@@ -400,23 +400,24 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         problems.push(format!("keel guard:\n{}", failing.join("\n")));
     }
 
+    // THE HUMAN MAY BE BLOCKED WHETHER OR NOT THE MODEL IS (issue150, answering their own question about
+    // how this went unnoticed). The first version of this advisory sat INSIDE the green branch, so a red
+    // model masked it entirely: the turn reported the model and said nothing about an unreachable queue -
+    // the same single-channel blindness that let the console stay down while 70 items waited. The console
+    // is their oversight lens (D0093) and its availability is not a function of the model's honesty.
+    //
+    // ADVISORY, NEVER BLOCKING, in both branches: whether the console should be up is their call, and a
+    // gate that blocked on it would be the over-strict control that trains its actor to disable it
+    // (issue076/issue081), taking the honest-state checks in this same hook down with it.
+    let oversight = keel_cli::serve::obligations_total(root)
+        .filter(|total| *total > 0 && !console_is_up(CONSOLE_PORT))
+        .map(|total| format!(
+            "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. It holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Only port {CONSOLE_PORT} is checked; a console elsewhere is not detected."
+        ));
+
     if problems.is_empty() {
-        // GREEN, but the human may still be blocked. The console is their oversight lens (D0093), and
-        // this session repeatedly killed it to rebuild and then left it down while 70 items waited on
-        // them - which they had to notice and ask about. "Remember to restart serve" is the manual
-        // vigilance D0047 refuses, so the turn boundary checks it instead. ADVISORY, NEVER BLOCKING:
-        // whether the console should be up is the human's call, and a gate that blocked on it would be
-        // the over-strict control that trains its actor to disable it (issue076/issue081).
-        if let Some(total) = keel_cli::serve::obligations_total(root) {
-            if total > 0 && !console_is_up(CONSOLE_PORT) {
-                return hook_emit(&serde_json::json!({
-                    "systemMessage": format!(
-                        "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. Note it holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Checked only port {CONSOLE_PORT}; a console on another port is not detected."
-                    )
-                }));
-            }
-        }
-        return 0; // green, and the human is not blocked -> silent
+        // green, and the human is not blocked -> silent
+        return oversight.map_or(0, |msg| hook_emit(&serde_json::json!({ "systemMessage": msg })));
     }
     if already {
         // Second consecutive red: allow the stop with a loud warning rather than trapping the agent.
@@ -426,6 +427,12 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     let mut body = problems.join("\n\n");
     body.truncate(4000);
+    // Carry it into the BLOCKING reason too, so a dishonest model never swallows the fact that the
+    // human cannot reach their queue.
+    if let Some(msg) = &oversight {
+        body.push_str("\n\n");
+        body.push_str(msg);
+    }
     hook_emit(&serde_json::json!({
         "decision": "block",
         "reason": format!(
@@ -2237,22 +2244,29 @@ mod tests {
     #[test]
     fn the_oversight_advisory_never_blocks() {
         const MAIN_RS: &str = include_str!("main.rs");
-        // Index arithmetic rather than expect/panic: this crate denies both, and a test that trips a
-        // lint is a test someone deletes.
-        let hook_at = MAIN_RS.find("fn hook_stop(").unwrap_or(0);
-        assert!(hook_at > 0, "hook_stop must exist");
-        let hook = &MAIN_RS[hook_at..];
-        let adv_at = hook.find("[oversight]").unwrap_or(0);
-        assert!(adv_at > 0, "the oversight advisory must exist");
-        // Everything from the start of the GREEN branch up to the advisory must carry no block decision.
-        let green_at = hook[..adv_at].rfind("if problems.is_empty()").unwrap_or(0);
-        assert!(green_at > 0, "the green branch must exist");
-        let green = &hook[green_at..adv_at];
+        let at = MAIN_RS.find("fn hook_stop(").unwrap_or(0);
+        assert!(at > 0, "hook_stop must exist");
+        let hook = &MAIN_RS[at..];
+        // The property, not the layout: the advisory ALONE must resolve to a systemMessage. It now also
+        // appends to a blocking reason when the model is separately dishonest (issue150) - that block is
+        // caused by `problems`, never by the console being down - so the earlier version of this test,
+        // which scanned a region between two markers, asserted a structure rather than the property and
+        // failed the moment the advisory was hoisted out of the green branch.
+        let solo = hook.find("oversight.map_or(0,").unwrap_or(0);
+        assert!(solo > 0, "the advisory alone must resolve via map_or, returning 0 when absent");
+        // No char escape: the first line of the slice is the statement we care about.
+        let line_end = solo + hook[solo..].lines().next().map_or(0, str::len);
         assert!(
-            !green.contains("\"decision\": \"block\""),
-            "the green branch of hook_stop must never block -- the human's console being down is not              dishonest state"
+            hook[solo..line_end].contains("systemMessage"),
+            "the advisory's own emit must be a systemMessage -- the human's console being down is not              dishonest state and must never block a turn"
         );
-        assert!(green.contains("systemMessage"), "the advisory must emit a systemMessage");
+        // And a block must still be gated on `problems`, so nothing can reach it via the advisory.
+        let block = hook.find("\"decision\": \"block\"").unwrap_or(0);
+        assert!(block > 0, "the block emit must exist");
+        assert!(
+            hook[..block].contains("if problems.is_empty() {"),
+            "the block path must sit behind the problems check"
+        );
     }
 
     /// The advisory's count must come from the console's own obligation computation, not a second one.
