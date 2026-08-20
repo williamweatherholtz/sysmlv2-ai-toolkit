@@ -179,6 +179,11 @@ fn cmd_validate(args: &[String]) -> i32 {
 /// any internal error exits 0 silently.
 fn cmd_hook(args: &[String]) -> i32 {
     use std::io::Read as _;
+    // issue179: an unrecognised event already errors, but a flag should be told it is a flag.
+    if let Some(f) = args.first().filter(|a| a.starts_with('-')) {
+        eprintln!("error: `{f}` looks like a flag, not a hook event (issue179).");
+        return 2;
+    }
     let Some(event) = args.first().map(String::as_str) else {
         eprintln!("usage: keel hook <stop|post-edit|pre-bash|user-prompt>");
         return 2;
@@ -766,9 +771,9 @@ fn cmd_query0(args: &[String], usage: &str, f: fn(&std::path::Path) -> String) -
 
 // Name + optional root: `keel <name> <arg> [ROOT]`.
 fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> String) -> i32 {
-    let Some(arg) = args.first() else {
-        eprintln!("usage: keel {usage} <name> [ROOT]");
-        return 2;
+    let arg = match positional_arg(args, &format!("keel {usage} <name> [ROOT]"), "an item name") {
+        Ok(a) => a,
+        Err(code) => return code,
     };
     let root = match root_arg(args, &format!("keel {usage} <name> [ROOT]"), &[], 1) {
         Ok(r) => r,
@@ -1099,9 +1104,13 @@ fn cmd_critique_policy(args: &[String]) -> i32 {
 }
 
 fn cmd_governing_version(args: &[String]) -> i32 {
-    let Some(item) = args.first() else {
-        eprintln!("usage: keel governing-version <delivery Story name> [ROOT]");
-        return 2;
+    let item = match positional_arg(
+        args,
+        "keel governing-version <delivery Story name> [ROOT]",
+        "an item name",
+    ) {
+        Ok(a) => a,
+        Err(code) => return code,
     };
     let root = match root_arg(args, "keel governing-version <delivery Story name> [ROOT]", &[], 1) {
         Ok(r) => r,
@@ -1138,6 +1147,11 @@ fn cmd_suspect(args: &[String]) -> i32 {
 }
 
 fn cmd_view(args: &[String]) -> i32 {
+    // issue179: a view name resolves to a file under `.engine/views`, so a flag here is a path lookup.
+    if let Some(f) = args.first().filter(|a| a.starts_with('-')) {
+        eprintln!("error: `{f}` looks like a flag, not a view name (issue179).");
+        return 2;
+    }
     let Some(name) = args.first() else {
         eprintln!("usage: keel view <name> [ROOT]");
         return 2;
@@ -1325,7 +1339,7 @@ fn cmd_add_task(args: &[String]) -> i32 {
 /// `render <view> [--mode graph|table|review] [--root ROOT]` — modular interactive-artifact
 /// renderer over the view layer (D0086). Emits self-contained HTML to stdout (redirect to a file).
 fn cmd_render(args: &[String]) -> i32 {
-    let Some(view) = args.first().filter(|v| !v.starts_with("--")) else {
+    let Some(view) = args.first().filter(|v| !v.starts_with('-')) else {
         eprintln!("usage: keel render <view> [--mode graph|table|review] [--root ROOT]");
         eprintln!("  <view> = a declared view name (e.g. decisions, issues), or 'model' for the whole-model graph");
         return 2;
@@ -1357,7 +1371,7 @@ fn cmd_render(args: &[String]) -> i32 {
 /// `report <name> [--html] [--root ROOT]` — computed aggregate scorecard (D0087): assurance |
 /// traceability | quality-debt | flow. JSON by default; `--html` emits a human-digestible scorecard.
 fn cmd_report(args: &[String]) -> i32 {
-    let Some(name) = args.first().filter(|v| !v.starts_with("--")) else {
+    let Some(name) = args.first().filter(|v| !v.starts_with('-')) else {
         eprintln!("usage: keel report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] [--root ROOT]");
         return 2;
     };
@@ -1667,10 +1681,34 @@ fn scaffold_engine(dir: &Dir, dst_engine: &Path, count: &mut u32) -> std::io::Re
 /// `keel init DIR` (D0093) — scaffold a fresh project: the embedded engine (`.engine/`, with the
 /// architecture decisions remapped to read-only `reference/`), `CLAUDE.md`, and a starter `.tracking/`.
 /// Self-contained cold start; refuses to overwrite an existing `.engine/`.
+/// The first positional argument, REFUSING anything that looks like a flag (issue179).
+///
+/// `keel init --help` created a directory named `--help` and scaffolded a complete engine into it; 277
+/// files reached this repository and were committed before the CRLF warnings gave it away. `cmd_init`
+/// read `args.first()` directly and so never passed through `root_arg`, which has rejected unknown
+/// flags all along - the bypass was the bug, not the parsing.
+///
+/// A leading `-` is refused wherever a PATH or a NAME is expected. For `init` the stakes are highest,
+/// because its whole job is writing a tree to disk, so any string it accepts is a filesystem mutation.
+fn positional_arg<'a>(args: &'a [String], usage: &str, what: &str) -> Result<&'a String, i32> {
+    let Some(first) = args.first() else {
+        eprintln!("usage: {usage}");
+        return Err(2);
+    };
+    if first.starts_with('-') {
+        eprintln!("error: `{first}` looks like a flag, not {what}.");
+        eprintln!("  Refused rather than used: `keel init --help` once created a directory named");
+        eprintln!("  `--help` and scaffolded an engine into it (issue179).");
+        eprintln!("usage: {usage}");
+        return Err(2);
+    }
+    Ok(first)
+}
+
 fn cmd_init(args: &[String]) -> i32 {
-    let Some(target) = args.first() else {
-        eprintln!("usage: keel init DIR");
-        return 2;
+    let target = match positional_arg(args, "keel init DIR", "a directory") {
+        Ok(a) => a,
+        Err(code) => return code,
     };
     let dir = PathBuf::from(target);
     let engine_dst = dir.join(".engine");
@@ -1845,6 +1883,12 @@ fn switch_viewpoint(
 /// the opposite of what the caller asked for. So a first write MATERIALISES the current effective state
 /// (all declared units) and then applies the change, and says that it did.
 fn cmd_activation(mode: &str, args: &[String]) -> i32 {
+    // issue179: `activate`/`deactivate` take a process or viewpoint NAME; a flag would be looked up as
+    // one and reported as unknown, which reads as "no such process" rather than "unrecognised flag".
+    if let Some(f) = args.first().filter(|a| a.starts_with('-')) {
+        eprintln!("error: `{f}` looks like a flag, not a process or viewpoint name (issue179).");
+        return 2;
+    }
     let (target, root_arg) = match mode {
         "activation" => (None, args.first()),
         _ => (args.first(), args.get(1)),
@@ -2054,7 +2098,7 @@ fn cmd_record_issue(args: &[String]) -> i32 {
 /// this command makes the honest path easy without making the dishonest one possible.
 fn cmd_accept(args: &[String]) -> i32 {
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
-    let Some(decision) = args.first().filter(|a| !a.starts_with("--")) else {
+    let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
         eprintln!("usage: keel accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
         eprintln!();
         eprintln!("Records a HUMAN's acceptance of a proposed Decision (D0106). The note must be what they");

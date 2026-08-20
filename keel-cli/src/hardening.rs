@@ -501,6 +501,50 @@ mod tests {
         assert!(phantom.is_empty(), "advertised but not registered - would 404: {phantom:?}");
     }
 
+    /// THE CONTROL for issue179: every positional read is either flag-guarded or a keyword match.
+    ///
+    /// A TEXT CHECK over `main.rs` rather than a behavioural test, deliberately: the defect was a
+    /// BYPASS - `cmd_init` read `args.first()` directly and so never reached the helper that had been
+    /// rejecting unknown flags all along - so the property to pin is "nothing bypasses the guard", which
+    /// no single invocation can demonstrate. `keel init --help` scaffolded an engine into a directory
+    /// named `--help` and 277 files were committed before the CRLF warnings gave it away.
+    ///
+    /// A read is ACCEPTABLE when the line filters leading dashes, or when the value is immediately
+    /// matched/compared against known keywords (a flag then falls through to the unknown-keyword error).
+    /// The first version of this test counted every read and reported 11 violations, most of them
+    /// keyword dispatches - blunt, but it found four genuine ones I had missed.
+    #[test]
+    fn every_positional_read_is_flag_guarded() {
+        let main = std::fs::read_to_string("src/main.rs").expect("main.rs is readable");
+        let mut offenders = Vec::new();
+        for (i, line) in main.lines().enumerate() {
+            let trimmed = line.trim_start();
+            // A doc comment MENTIONING the pattern is not a read of it. Missing this made the test
+            // report its own explanatory comment as a violation.
+            if !line.contains("args.first()") || trimmed.starts_with("//") {
+                continue;
+            }
+            let guarded = line.contains("starts_with('-')")
+                || line.contains("let Some(first) = args.first()") // the helper itself
+                || line.contains("match args.first()")
+                || line.contains("== Some(")
+                || line.contains("!= Some(");
+            // `cmd_activation` and `cmd_hook` guard on a PRECEDING line, so accept a nearby guard too.
+            let nearby = main
+                .lines()
+                .skip(i.saturating_sub(6))
+                .take(7)
+                .any(|l| l.contains("starts_with('-')"));
+            if !guarded && !nearby {
+                offenders.push(format!("{}: {}", i + 1, line.trim()));
+            }
+        }
+        assert!(
+            offenders.is_empty(),
+            "positional read(s) that would accept a flag as a path or name: {offenders:#?}"
+        );
+    }
+
     /// A string inside an arm's BODY is not a subcommand. Without the head-only scan, every literal in
     /// `main.rs` became a phantom command.
     #[test]

@@ -2064,4 +2064,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcAdvertiseApiSurface to issue178;
+
+    part issue179 : Issue {
+        :>> id = "19786e13-c288-4f80-a95f-af867e7576cf";
+        :>> title = "keel init --help creates a directory named --help and scaffolds an engine into it";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY ACCIDENT AND THE ACCIDENT IS THE POINT. A robustness sweep in critique pass 2 ran '<cmd> --help' across every subcommand. keel init took '--help' as its DIR positional, scaffolded a complete engine into a directory literally named '--help', and 277 files were committed into this repository before I noticed the CRLF warnings scrolling past in the commit output. THE FAILURE MODE IS THE WORST AVAILABLE for this command: init's entire job is writing a tree to disk, and its path argument accepts any string, so a mistyped flag, an unsupported flag, or a shell-expansion accident becomes a filesystem mutation rather than an error. Nothing in the argument layer distinguishes a path from a flag: every command using the positional helpers accepts a leading-dash string as a name or a root. THE SECOND-ORDER DAMAGE is what makes this Critical rather than Medium - the stray tree contained 277 .sysml files including a full copy of .engine/reference/decisions, which means it entered the corpus that validate, the guards and every census walk. It did not break the gate this time because the scaffold is internally consistent, and that is luck, not design. THE PREVENTING CHANGE: reject any argument starting with '-' where a path or item name is expected, with a message naming the unrecognised flag, plus a test.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcFlagIsNotAPath to issue179;
 }
