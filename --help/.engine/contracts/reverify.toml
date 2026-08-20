@@ -1,0 +1,13 @@
+# Reverify command contract (D0101) — the REPRODUCIBLE gate `keel reverify` re-runs at HEAD to
+# refresh stale deliverable-drift verifications. On ALL commands exiting 0, `keel reverify --all-drift`
+# appends a fresh judged-at-HEAD TestResult to each drift-suspect deliverable task (honest: stamped only
+# after the real gate passed; never fabricated). On any non-zero exit, the tasks stay suspect.
+#
+# Downstream-overridable (like critique-policy.toml): a fresh `keel init` project edits these to its own
+# reproducible gate. Absent file => `keel reverify` is a no-op that reports "no reverify command configured".
+#
+# This project's gate (mirrors .github/workflows/ci.yml + the pre-commit Rust checks):
+commands = [
+    "cargo test --workspace --release",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+]

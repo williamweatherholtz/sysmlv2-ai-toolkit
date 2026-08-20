@@ -1,0 +1,10 @@
+# Original (accepted) + superseded decisions — a type + authored-attribute set membership.
+name = "decisions-active-and-superseded"
+concern = "Which decisions are in force vs superseded?"
+audience = "auditor"
+
+[select]
+type = "Decision"
+
+[select.attrs]
+status = ["accepted", "superseded"]

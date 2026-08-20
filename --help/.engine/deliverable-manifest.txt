@@ -1,0 +1,4 @@
+# deliverable-manifest.txt — declares which verification tasks depend on which DELIVERABLE SOURCE
+# files (D0050), so `keel suspect` flags a task suspect when its source changed since it was
+# verified. One entry per line:  task: <taskName> | <relpath> <relpath> ...
+# Empty for a new project — add an entry when you have a deliverable-source-dependent verification.

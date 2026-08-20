@@ -2042,4 +2042,26 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcCharterProvenanceSplit to issue176;
+
+    part issue177 : Issue {
+        :>> id = "73fe99bd-d7ca-4e2a-8871-44a7e34e14a0";
+        :>> title = "A read command given a nonexistent name exits 0 with a valid-looking empty result";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PROBED ACROSS EVERY NAME-TAKING READ COMMAND. 'keel trace .' returns rc=0 and {upstream: [], downstream: []}. 'keel trace-need .' returns rc=0 and {trace: []}. 'keel actor-trace .' and 'keel governing-version .' answer as though '.' were a real item - governing-version even reports a process and a process_def for it. 'keel boundary .' and 'keel item .' return an error KEY with rc=0, which is dual signalling: the payload says failure and the exit status says success. D0093 makes the CLI the authority AND the automation substrate. A consumer reads an empty relation set as 'this item has no relations', not as 'there is no such item', so a typo'd name in a script yields a silent wrong answer instead of a failure - and the wrong answer is the reassuring one. THE CLI IS ALSO INCONSISTENT WITH ITSELF: report, render and arch all exit nonzero on an unknown argument, so three commands get this right and six get it wrong. THE PREVENTING CHANGE: an unresolvable name exits nonzero with a message naming the item, uniformly, pinned by a test.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUnknownNameFails to issue177;
+
+    part issue178 : Issue {
+        :>> id = "6a4bdaa2-69b0-4fcc-bfaf-8a789f1c44c7";
+        :>> title = "13 of 46 HTTP routes are in neither the console nor the advertised API contract";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CORRECTED - THE FIRST NUMBER I RECORDED HERE WAS WRONG, AND THE CORRECTION IS THE MORE INTERESTING FACT. I first recorded 13 of 46 routes as unaccounted, from a probe that read only `fn api_version`'s BODY - which references KEEL_API_READ_ENDPOINTS and KEEL_API_WRITE_ENDPOINTS by NAME and so contains none of the endpoint strings. Measured against the actual constants: 46 routes registered, 38 advertised, and THREE in neither the advertised contract nor the console - /api/projects (GET, sibling discovery), /api/project (POST, project switch) and /api/scope (GET, srConsoleModelScopeResolved N-C3). Zero advertised-but-unregistered, so there are no phantom advertisements. THE ONE THAT MATTERS is /api/project: it is a POST, so an undeclared WRITE path exists outside KEEL_API_WRITE_ENDPOINTS, and D0093 makes that contract the automation substrate's discovery mechanism. THIS IS THE FIFTH HAND PROBE THIS SESSION TO PRODUCE A WRONG NUMBER, in the pass immediately after issue171 was recorded and cleared for exactly that reason - so the resolution is not just advertising three routes, it is making the API surface a LENS in `keel hardening` so nobody probes it by hand again.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcAdvertiseApiSurface to issue178;
 }

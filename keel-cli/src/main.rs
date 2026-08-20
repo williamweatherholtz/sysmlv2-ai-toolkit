@@ -774,6 +774,18 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
         Ok(r) => r,
         Err(code) => return code,
     };
+    // AN UNRESOLVABLE NAME IS A FAILURE, NOT AN EMPTY RESULT (issue177). Every command routed through
+    // here used to exit 0 for a name that does not exist, answering `{upstream: [], downstream: []}` -
+    // which a script reads as "no relations", the reassuring wrong answer. `report`, `render` and `arch`
+    // already exit nonzero on an unknown argument; these six did not, so the CLI was inconsistent with
+    // itself on the one interface D0093 makes the automation substrate.
+    if !keel_cli::queries::is_declared(&root, arg) {
+        eprintln!(
+            "keel {usage}: no item named `{arg}` is declared in this model.
+               An unknown name exits nonzero rather than answering with an empty result, because an empty              result reads as `this item has no relations` (issue177)."
+        );
+        return 1;
+    }
     println!("{}", f(&root, arg));
     0
 }
@@ -1095,6 +1107,13 @@ fn cmd_governing_version(args: &[String]) -> i32 {
         Ok(r) => r,
         Err(code) => return code,
     };
+    // Same rule as `cmd_query1` (issue177). This command has its own wrapper, which is exactly how it
+    // escaped the first fix: `keel governing-version .` reported a process AND a process definition for
+    // a name that does not exist, which is the most confidently wrong answer of the six.
+    if !keel_cli::queries::is_declared(&root, item) {
+        eprintln!("keel governing-version: no item named `{item}` is declared in this model.");
+        return 1;
+    }
     println!("{}", keel_cli::govern::governing_version(&root, item));
     0
 }

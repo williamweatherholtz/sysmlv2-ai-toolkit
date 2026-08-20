@@ -1,0 +1,33 @@
+// =====================================================================
+// D0097 — make the critique-lens POLICY declarative + downstream-overridable. The D0080 "Core-3"
+// required-lens-per-type map was hardcoded in the Rust toolchain (`required_lenses()` + the target-type
+// match). The LENS VOCABULARY (CritiqueLens: completeness/correctness/ambiguity/testability/feasibility/
+// consistency/necessity) is the requirement-quality canon — generic deficit-classes, correctly NOT
+// industry-specific — and stays in schema/core. What genuinely varies BY PROJECT is the required SET
+// (which types are critique targets, which lenses are mandatory per type). This Decision promotes that
+// policy from a hardcoded map to a declared `.engine/contracts/critique-policy.toml`, read by the
+// toolchain, shipped with a sound Core-3 default so overriding is OPT-IN (minimal friction).
+// Accepted 2026-06-24 by wweatherholtz ("implement as described. minimal friction since we're shipping
+// a great default").
+// =====================================================================
+package Decision0097 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #ProspectiveChange part d0097 : Decision {
+        :>> id = "97a7b8c9-2e7f-4081-a93a-516273849697";
+        :>> title = "D0097: critique-lens policy is DECLARED (critique-policy.toml), not hardcoded — generic lenses, project-overridable required set";
+        :>> createdAt = "2026-06-24";
+        :>> createdBy = "wweatherholtz";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Question raised: can critique lenses be modularized — different projects might merit different kinds of critique — or are our lenses generic deficit-classes? Examination: TWO separable layers. (1) The lens VOCABULARY (CritiqueLens enum, schema/core element.sysml) is the IEEE-830/ISO-29148 requirement-quality canon — completeness/correctness/ambiguity/testability/feasibility/consistency/necessity — generic quality dimensions that apply whatever the deliverable domain is; correctly NOT industry-specific. (2) The required-lens POLICY (which element types are critique targets, which subset of the canon is MANDATORY per type — the D0080 'Core-3': Need/SystemRequirement -> completeness/correctness/testability; Decision -> completeness/correctness/feasibility) was HARDCODED in the Rust toolchain (view.rs required_lenses() + the is_target match). The policy is the layer that legitimately varies by project (a safety-critical project might mandate a safety lens on every requirement; a research spike might gate only completeness) — and it was conspicuously the one assurance policy still expressed as a Rust match rather than declared data, unlike viewpoints (D0056/D0057) and the indicator watchlist (D0090).";
+        :>> decision = "Promote the required-lens policy from a hardcoded map to a DECLARED, downstream-overridable `.engine/contracts/critique-policy.toml` ([lenses] table: element-type -> required CritiqueLens list). The Rust toolchain READS it: `keel critique-coverage`, `guard critique`, and the report aggregates load the policy (a type with >=1 declared lens is a critique TARGET; each lens needs an independent method=critique verification for an element of that type to be COVERED). A new `keel critique-policy` view prints the active policy + its source. SEMANTICS: lens names are validated against the CritiqueLens canon (fail-loud on unknown); the accepted-only rule for Decision targets is intrinsic (not config); a missing file falls back to a built-in Core-3 default IDENTICAL to the shipped file, so behavior is unchanged with or without it. The lens VOCABULARY stays in schema/core (adding a variant remains a schema CHANGE). `keel init` ships critique-policy.toml with the Core-3 default, so a fresh project gets sound critique coverage with NO configuration — overriding is OPT-IN.";
+        :>> rationale = "ALTERNATIVES: (i) per-INDUSTRY lens sets baked into the engine — REJECTED: the lenses are generic deficit-classes, not domain vocabulary, so industry-specific lens SETS are the wrong abstraction; what varies is the required policy, not the lens meanings. (ii) leave the Core-3 hardcoded — REJECTED: it blocks downstream projects from tuning their assurance bar (D0093 product framing), and it was the lone assurance policy not declared like viewpoints/indicators. (iii) model the policy as schema-typed .sysml items — REJECTED for friction: TOML is already the sanctioned in-engine declarative-config format (D0075 views are .view.toml; the toml crate is a dep), and a TOML table is far lower-friction to edit than authoring schema-typed items, with no schema/core change. (iv) CHOSEN — declared TOML policy + great default + fail-loud validation + a view to confirm overrides. CRITERIA: correct-abstraction (policy not vocabulary) x consistency-with-declared-config-pattern x friction (D0054 — great default, opt-in override) x no-behavior-change-on-default.";
+        :>> consequences = "New declared surface `.engine/contracts/critique-policy.toml` (shipped by `keel init`, downstream-editable). view.rs gains a CritiquePolicy loader (validates lens names, Core-3 fallback) replacing the hardcoded required_lenses()/target map; `keel critique-policy` added; guard critique + critique-coverage + report aggregates read the policy. NO behavior change on this repo (the file encodes Core-3; critique-coverage still computes the same gap set). A new `critique-policy` Viewpoint declares the concern. Downstream projects tune their critique bar by editing one TOML table. The lens canon stays frozen in schema/core. Doc-sync: CLAUDE.md + element-critique process + README note the declared policy.";
+    }
+
+    verification d0097Accept : Test { :>> id = "97a7b8c9-2e7f-4081-b93a-516273849697"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of d0097 (declarative, downstream-overridable critique-lens policy in .engine/contracts/critique-policy.toml, default Core-3, opt-in override) via the explicit instruction 'implement as described. minimal friction since we're shipping a great default' on 2026-06-24, following the design laid out (lenses are generic deficit-classes kept in schema/core; the required-lens POLICY becomes declared TOML read by the toolchain, with a great shipped default so configuring is opt-in)."; }
+    part d0097AcceptR1 : TestResult { :>> id = "97a7b8c9-2e7f-4081-c93a-516273849697"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5e91069"; :>> judgedAt = "2026-06-24"; :>> judgedBy = "wweatherholtz"; }
+}

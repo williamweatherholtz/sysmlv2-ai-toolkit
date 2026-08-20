@@ -39,6 +39,7 @@ pub fn hardening(root: &Path) -> Result<String, crate::view::ViewError> {
         ("helpCoverage".to_string(), help_coverage(root)),
         ("processEnforcement".to_string(), process_enforcement(root)),
         ("decisionFollowThrough".to_string(), decision_follow_through(root)),
+        ("apiSurface".to_string(), api_surface(root)),
     ])
     .dump())
 }
@@ -349,6 +350,88 @@ fn decision_follow_through(root: &Path) -> Json {
     ])
 }
 
+// ── lens 4: does the HTTP surface declare itself? ────────────────────────────────────────────────
+
+/// Registered `/api` routes vs what `/api/version` advertises and what the console calls (issue178).
+///
+/// ISSUE172 ONE LAYER OUT, and it exists as a lens for the same reason: the FIFTH hand probe of this
+/// session to produce a wrong number was this exact question, asked one pass after the instrument was
+/// built to stop that happening. My probe read `fn api_version`'s body, which names the endpoint
+/// CONSTANTS rather than containing the endpoint strings, and so reported 13 unaccounted routes where
+/// there were 3.
+///
+/// UNACCOUNTED is the number that matters, not `unadvertised`: D0114 commits a versioned read API for a
+/// separate viewer, so a route the console never calls is entirely legitimate. A route NOTHING declares
+/// is different - a consumer cannot discover it and a maintainer cannot tell it from a leftover.
+fn api_surface(root: &Path) -> Json {
+    let serve = std::fs::read_to_string(root.join("keel-cli/src/serve.rs")).unwrap_or_default();
+    let html = std::fs::read_to_string(root.join("keel-cli/assets/console.html")).unwrap_or_default();
+    let routes = registered_routes(&serve);
+    let advertised = advertised_endpoints(&serve);
+    let mut unaccounted = Vec::new();
+    for r in &routes {
+        if advertised.contains(r) {
+            continue;
+        }
+        let base = r.split("/:").next().unwrap_or(r).trim_end_matches('/');
+        if !base.is_empty() && html.contains(base) {
+            continue;
+        }
+        unaccounted.push(Json::s(r.clone()));
+    }
+    // The reverse direction: advertising a route that does not exist is a promise to a consumer that
+    // will 404. Cheap to check once the two sets are in hand, and it has never been checked.
+    let phantom: Vec<Json> =
+        advertised.iter().filter(|a| !routes.contains(*a)).map(|a| Json::s(a.clone())).collect();
+    Json::Obj(vec![
+        (
+            "note".to_string(),
+            Json::s(
+                "UNACCOUNTED, not unadvertised: D0114 commits a read API for a separate viewer, so a                  route the console never calls is legitimate. A route NOTHING declares cannot be                  discovered by a consumer or distinguished from a leftover by a maintainer.",
+            ),
+        ),
+        ("routes".to_string(), count(routes.len())),
+        ("advertised".to_string(), count(advertised.len())),
+        ("unaccounted".to_string(), Json::Arr(unaccounted)),
+        ("advertisedButNotRegistered".to_string(), Json::Arr(phantom)),
+    ])
+}
+
+/// Every `.route("/api/...")` path registered on the router.
+#[must_use]
+pub fn registered_routes(serve: &str) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    let mut rest = serve;
+    while let Some(i) = rest.find(".route(\"") {
+        rest = &rest[i + ".route(\"".len()..];
+        let Some(e) = rest.find('"') else { break };
+        let path = &rest[..e];
+        if path.starts_with("/api/") {
+            out.insert(path.to_string());
+        }
+    }
+    out
+}
+
+/// Every endpoint string inside the two `KEEL_API_*_ENDPOINTS` constants.
+///
+/// Reads the CONSTANTS, not `api_version`'s body — the distinction the hand probe missed.
+#[must_use]
+pub fn advertised_endpoints(serve: &str) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    for name in ["const KEEL_API_READ_ENDPOINTS", "const KEEL_API_WRITE_ENDPOINTS"] {
+        let Some(i) = serve.find(name) else { continue };
+        let tail = &serve[i..];
+        let end = tail.find("];").unwrap_or(tail.len());
+        for lit in string_literals(&tail[..end]) {
+            if lit.starts_with("/api/") {
+                out.insert(lit);
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394,6 +477,28 @@ mod tests {
             "{} subcommand(s) dispatched but absent from the help CATALOGUE: {absent:?}",
             absent.len()
         );
+    }
+
+    /// THE CONTROL for issue178: no registered route may be undeclared, and nothing may be advertised
+    /// that is not registered. The second half has never been checked and would 404 a real consumer.
+    #[test]
+    fn every_registered_route_is_accounted_for() {
+        let serve = std::fs::read_to_string("src/serve.rs").expect("serve.rs is readable");
+        let html = std::fs::read_to_string("assets/console.html").expect("console.html is readable");
+        let routes = registered_routes(&serve);
+        let advertised = advertised_endpoints(&serve);
+        assert!(routes.len() > 30, "route scan found {} - the lens is mis-aimed", routes.len());
+        assert!(advertised.len() > 20, "advertisement scan found {} - mis-aimed", advertised.len());
+        let unaccounted: Vec<&String> = routes
+            .iter()
+            .filter(|r| {
+                !advertised.contains(*r)
+                    && !html.contains(r.split("/:").next().unwrap_or(r).trim_end_matches('/'))
+            })
+            .collect();
+        assert!(unaccounted.is_empty(), "route(s) declared by nothing: {unaccounted:?}");
+        let phantom: Vec<&String> = advertised.iter().filter(|a| !routes.contains(*a)).collect();
+        assert!(phantom.is_empty(), "advertised but not registered - would 404: {phantom:?}");
     }
 
     /// A string inside an arm's BODY is not a subcommand. Without the head-only scan, every literal in

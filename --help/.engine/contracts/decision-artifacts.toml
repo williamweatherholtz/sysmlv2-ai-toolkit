@@ -1,0 +1,46 @@
+# decision-artifacts — what an accepted Decision PROMISED to exist.
+#
+# issue174/D0169. An accepted Decision can promise an artifact that is never built, and nothing noticed:
+# D0161 was accepted on 2026-08-20 and its `.knowledge/` retrieval index did not exist. Acceptance was
+# recorded, the promise was not, and the model read as complete — which is the mechanism behind
+# "half-baked implementations floating out there".
+#
+# WHY A CONTRACT FILE RATHER THAN A FIELD ON `Decision`: `schema/core` is frozen (invariant 5) and this
+# question does not need a schema change to answer. A promise is also not a property OF the decision —
+# it is a claim about the tree, checked against the tree.
+#
+# WHY 64 ACCEPTED DECISIONS WITH NO CHARTERED WORK IS NOT THE METRIC: most are policy. D0001
+# "text files are truth" and D0018 "model-only state" need no implementing work, and reporting the raw
+# count as a finding would be metrics theater. Only a decision that promised a NAMED artifact appears
+# here, so the number means something when it is not zero.
+#
+# REPORTED, NEVER GATED. A Decision may legitimately be accepted long before it is built — D0161 was
+# accepted the day it was written — and blocking on an unbuilt promise would push the promise out of the
+# record rather than into it.
+#
+# REMOVAL PATH (D0163): delete this file; `keel hardening` reports `declared = 0` and says so.
+
+# ── kept ─────────────────────────────────────────────────────────────────────────────────────────
+# WHAT DOES NOT BELONG HERE, learned by putting it here and watching the lens call it unbuilt: D0134
+# promised in-loop gates IN THE BINARY and D0138 promised that adoption is DECLARED. Both are
+# capabilities, not files. I entered `keel-cli/src/hook.rs` (the code is in `main.rs`) and
+# `.engine/contracts/activation.toml` (absent by design - no manifest means everything is active), and
+# the lens correctly reported two false gaps. A promise belongs here only when the artifact's EXISTENCE
+# is the thing that was promised.
+
+[d0146]
+artifact = ".engine/contracts/attestation-policy.toml"
+
+[d0166]
+artifact = ".engine/schema/core/intake.sysml"
+
+[d0169]
+artifact = "keel-cli/src/hardening.rs"
+
+# ── outstanding ──────────────────────────────────────────────────────────────────────────────────
+
+# D0161 accepted 2026-08-20. THE ARCHETYPE this whole lens exists for: accepted, unbuilt, and invisible
+# until someone went looking. Left declared and unbuilt on purpose — this file's job is to make it
+# visible, not to make it disappear.
+[d0161]
+artifact = ".knowledge"

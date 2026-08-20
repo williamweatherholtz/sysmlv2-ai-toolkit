@@ -185,3 +185,69 @@ fn workflow_json(package: &str, name: &str, nodes: &[String], edges: &[(String, 
     obj.push(("waves".to_string(), Json::Arr(waves.into_iter().map(|w| Json::Arr(w.into_iter().map(Json::s).collect())).collect())));
     Json::Obj(obj)
 }
+
+/// Is `name` DECLARED anywhere in the model? A cheap text scan, no model build (issue177).
+///
+/// WHY THIS EXISTS. Every name-taking read command used to answer for a name that does not exist:
+/// `keel trace .` returned `{upstream: [], downstream: []}` with EXIT 0, and `keel governing-version .`
+/// reported a process and a process definition for it. D0093 makes the CLI the automation substrate, so
+/// a consumer reads an empty relation set as "this item has no relations" rather than "there is no such
+/// item" - and a typo in a script becomes a silent wrong answer, the reassuring kind.
+///
+/// A TEXT SCAN rather than `Model::build`, because this runs BEFORE the command decides to do real work
+/// and must not double its cost. It matches a declaration keyword followed by the name and a `:`, which
+/// is how every item in this model is introduced.
+#[must_use]
+pub fn is_declared(root: &Path, name: &str) -> bool {
+    const KEYWORDS: [&str; 8] =
+        ["part ", "verification ", "action ", "requirement ", "use case ", "item ", "attribute ", "enum "];
+    for base in [".tracking", ".engine"] {
+        for f in crate::collect_sysml(&root.join(base)) {
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            for raw in text.lines() {
+                let line = raw.trim_start();
+                if line.starts_with("//") {
+                    continue;
+                }
+                // A marker may precede the keyword: `#Capability part foo : Bar`.
+                let after_marker = line.strip_prefix('#').map_or(line, |r| {
+                    r.split_once(char::is_whitespace).map_or("", |(_, rest)| rest.trim_start())
+                });
+                for kw in KEYWORDS {
+                    if let Some(rest) = after_marker.strip_prefix(kw) {
+                        // A declaration may be bare (`action foo;` in a delivery run) or typed
+                        // (`part foo : Story {`). Stopping only at `:` kept the `;` and made every
+                        // bare action look undeclared - which broke `keel item <a backlog action>`.
+                        let decl =
+                            rest.split([':', ';', '{']).next().unwrap_or("").trim();
+                        if decl == name {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod declared_tests {
+    use super::is_declared;
+    use std::path::Path;
+
+    /// THE CONTROL for issue177. Both directions, because the interesting failure is the FALSE NEGATIVE:
+    /// my first scanner stopped at `:` and so kept the `;` from a bare `action foo;`, which made every
+    /// backlog action look undeclared and broke `keel item` for the most common item in this model.
+    #[test]
+    fn a_bare_action_and_a_typed_part_are_both_declared() {
+        // `..`, not `.`: a unit test's cwd is the CRATE dir, so `.` is `keel-cli/` and has no
+        // `.tracking` at all - the scan would return false for everything and the test would pass
+        // vacuously in the false-negative direction while failing in the true one.
+        let root = Path::new("..");
+        assert!(is_declared(root, "dcUnknownNameFails"), "a bare `action foo;` must resolve");
+        assert!(is_declared(root, "hardening1Story"), "a typed `part foo : Story` declaration must resolve");
+        assert!(!is_declared(root, "."), "`.` is a path, not an item - the bug that started issue177");
+        assert!(!is_declared(root, "definitely-not-an-item-anywhere"));
+    }
+}

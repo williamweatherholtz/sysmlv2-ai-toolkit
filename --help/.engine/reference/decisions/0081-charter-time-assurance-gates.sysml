@@ -1,0 +1,37 @@
+// =====================================================================
+// D0081 — the assurance gates respect CHARTER-TIME governance (D0068 freeze): prospective
+// assurance requirements (coverage D0079, critique D0080) bind only elements created AFTER the
+// governing decision landed; pre-decision elements are grandfathered. Wires guard critique +
+// guard assured HARD (now safe — they pass vacuously). Accepted 2026-06-20.
+// =====================================================================
+package Decision0081 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    part d0081 : Decision {
+        :>> id = "63940516-2c7d-4e8f-a081-516273849680";
+        :>> title = "D0081: charter-time scoping for the assurance gates (D0068 freeze) — grandfather pre-decision elements, hold future work to critique/coverage rigor; wire guard critique + guard assured hard";
+        :>> createdAt = "2026-06-20";
+        :>> createdBy = "wweatherholtz";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "The assurance gates built in Sprints 68-71 (coverage C/D0079, critique-coverage + guard critique + guard assured / D0080) demanded coverage and critique on EVERY Need/SystemRequirement/Decision, ignoring when each element was created. That reported 28 coverage + 105 critique gaps and made the human-chosen HARD gate impossible to wire honestly: enforcing it would block every commit (including its own wiring commit), and the only ways out were unacceptable (block all work, or fabricate rubber-stamp critiques — which violates the critique mechanism's independence/anti-theater rule). The engine already solved this exact class with D0068 (process governance by charter-LINEAGE + a computed governing-version, CHARTER-TIME FREEZE: an item is governed by the process in force as of its immutable creation commit; an in-flight item is immune to mid-flight process change), D0070 (#ProspectiveChange/#SafetyChange retroactivity), and D0062 (waiver precedent: pre-rigor work closed under its as-authored process). The assurance requirements are prospective, so by our own rules they should bind only future work.";
+        :>> decision = "Scope the assurance GATES by charter-time freeze (D0068). An assurance element (Need/SystemRequirement/accepted Decision) is GOVERNED by a prospective assurance requirement only if it was created AFTER the governing decision's INTRODUCTION commit (the commit that added the decision — when the rule landed): coverage(C) is governed by D0079, the critique requirement by D0080. Grandfather set = element names present at the governing decision's introduction commit (computed via git, govern::grandfathered_under). The GATES (`guard critique`, `guard assured`, and the gap sets feeding them) count only GOVERNED elements; grandfathered elements are out of the gate. The VIEWS (`sysmlv2 coverage`, `critique-coverage`) still SHOW every element with a `governed` flag + a full gap set for honest measurement — scoping changes enforcement, not visibility. Wire `guard critique` + `guard assured` into the enforced GUARD_NAMES (now safe: zero governed elements need work, so they pass vacuously) — future requirements/needs/decisions are held to full Core-3 critique + coverage rigor at commit time. In `assured`, stale_verifications is ADVISORY (the D0050 informational signal, cleared by re-verification — never a commit gate), not a readiness blocker. A future #SafetyChange MAY still force re-critique/re-coverage of grandfathered elements (the D0062/D0068 safety override is preserved). Conservative fail-safe: if charter history can't be read (git unavailable), treat all elements as grandfathered so the gate never spuriously blocks.";
+        :>> rationale = "This applies the engine's OWN governance (D0068 charter-time freeze + D0070 prospective class + D0062 waiver precedent) to the assurance layer — consistent, not a one-off. It resolves the hard-gate dilemma honestly: grandfather old work, enforce forward, never fabricate critiques. Measure-everything / gate-forward keeps the C measurement honest (the 28 coverage + 105 critique gaps remain VISIBLE as the real assurance picture) while making enforcement actionable (you can only be blocked by work you create under the rule). Introduction-commit baseline (not the acceptance-event judgedAgainst) is the right freeze point: it grandfathers everything that existed when the rule landed, including the governing decision itself, and holds only genuinely-new elements to rigor. ALTERNATIVES: (A) enforce on all elements now — REJECTED (blocks all commits or forces critique-theater on 105 historical elements); (B) keep the gates report-only forever — REJECTED (no forward rigor; the human explicitly chose a hard gate); (C) a one-time static waiver list (D0062-style) — REJECTED in favor of the general, self-maintaining freeze (new elements auto-enter scope without editing a list); (D CHOSEN) charter-time freeze scoping + wire hard. CRITERIA: reuse-our-own-governance x honest-measurement x forward-rigor x never-fabricate x self-maintaining. Dogfood: D0081 is itself the first element created under the critique rule, so it is genuinely critiqued (completeness/correctness/feasibility) in the same change — proving the pipeline end to end.";
+        :>> consequences = "guards.rs GUARD_NAMES 7 -> 9 (critique + assured enforced); govern.rs adds decision_intro_commit + grandfathered_under (git grandfather set) + names_present_at; view.rs scopes critique_gaps + compute_readiness coverage/critique gaps by govern::grandfathered_under, adds a `governed` flag to the coverage + critique-coverage views, adds a `governed_gaps` set to coverage, and splits assured into blocking categories vs the stale-verification advisory. The first GOVERNED element — d0081 itself — is critiqued (.tracking/critiques.sysml: completeness/correctness/feasibility by claudeOpus, independent of the wweatherholtz author) so the now-hard guard critique passes on this very commit. doc-sync: usage.md (charter-time scoping note on the coverage/critique/assured rows). Pairs with D0068 (charter-time freeze + governing-version), D0070 (#Prospective/#SafetyChange), D0062 (waiver precedent), D0050 (suspect = advisory), D0079 (coverage), D0080 (critique mechanism). Future work: the genuine critique CAMPAIGN over the grandfathered backlog stays VISIBLE in the views and can be done deliberately without the gate forcing it all at once.";
+    }
+
+    verification d0081Accept : Test {
+        :>> id = "63940516-2c7d-4e8f-a081-516273849681";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz attests acceptance of d0081 (charter-time scoping for the assurance gates: grandfather pre-decision elements via the D0068 freeze, hold future elements to critique/coverage rigor, wire guard critique + guard assured hard; stale verifications advisory; safety-change override preserved) by selecting 'Accept — scope by charter-time, wire hard' + 'Charter-time freeze' in the grandfathering dialogue on 2026-06-20.";
+    }
+    part d0081AcceptR1 : TestResult {
+        :>> id = "63940516-2c7d-4e8f-a081-516273849682";
+        :>> outcome = VerdictKind::pass;
+        :>> judgedAgainst = "5b90663";
+        :>> judgedAt = "2026-06-20";
+        :>> judgedBy = "wweatherholtz";
+    }
+}

@@ -56,6 +56,8 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/dispositions", "/api/processes", "/api/launchables", "/api/report/:name", "/api/history", "/api/recent",
     "/api/item/:name", "/api/section", "/api/slice", "/api/change-impact", "/api/snapshot", "/api/baseline-compare",
     "/api/computed/:cmd", "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations", "/api/grammar",
+    // issue178: registered but advertised by nothing, so a viewer could not discover them.
+    "/api/scope", "/api/projects",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -65,6 +67,9 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
     "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item", "/api/item/attr",
+    // issue178: a POST outside the declared write contract - the one that mattered, because the
+    // write contract is how an automation consumer discovers what it is allowed to change (D0093).
+    "/api/project",
 ];
 
 /// The `SysML` declaration keyword for a created item, by its type's meta-kind (D0126, `/api/item`). Keeps
