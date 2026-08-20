@@ -100,6 +100,14 @@ struct AppState {
     /// Per-view JSON cache keyed `view -> (fingerprint, json)` (D0094 serveLiveCache): recompute a view
     /// only when the model's content fingerprint changes; a materialized #View cache (regenerable, §2.1).
     cache: Arc<Mutex<HashMap<String, (u64, String)>>>,
+    /// The latest OBSERVED fingerprint, published by the single watcher task. Every SSE connection
+    /// subscribes to this instead of polling: before, each open tab ran its own 604-stat poll every
+    /// 1.5s, so three tabs cost 1200 stats a second to answer one question.
+    changes: tokio::sync::watch::Sender<u64>,
+    /// View keys with a background recompute IN FLIGHT (dcServeWarmCache). Without this, a page load
+    /// firing eight requests against a changed fingerprint would start eight recomputes of the same view
+    /// - a stampede that makes the first interaction after every commit slower, not faster.
+    refreshing: Arc<Mutex<std::collections::HashSet<String>>>,
 }
 
 /// Run the console server on `127.0.0.1:port` over `root`. Blocks until interrupted.
@@ -148,12 +156,92 @@ impl AppState {
     }
 }
 
+type ViewStore = Arc<Mutex<HashMap<String, (u64, String)>>>;
+static SHARED_CACHE: std::sync::OnceLock<ViewStore> = std::sync::OnceLock::new();
+
+/// The ONE computed-view store for this process (dcServeWarmCache).
+///
+/// A static rather than a field on `AppState` because the expensive internal callers - `obligation_count`
+/// computing four views to count them - are plain functions with no state handle, and before this they
+/// computed into a private local. The arrival burst therefore computed `orient` TWICE: once inside
+/// /api/obligations to read one number out of it, then again for /api/orient. `AppState` still holds a
+/// handle to this same Arc, so a root rebind clearing the cache clears it for both paths.
+fn view_store() -> ViewStore {
+    Arc::clone(SHARED_CACHE.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))))
+}
+
+/// Read `key` if it was computed against the CURRENT fingerprint, else compute, store and return it.
+///
+/// The key is the VIEW's name, never the route's: /api/dispositions and /api/computed/dispositions serve
+/// the same computation, and keying by route cached it twice and expired it twice.
+fn store_or_compute(
+    root: &Path,
+    key: &str,
+    compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>,
+) -> Option<String> {
+    let fp = crate::fingerprint::of(root);
+    let store = view_store();
+    let hit = {
+        let g = store.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        g.get(key).filter(|(cfp, _)| *cfp == fp).map(|(_, json)| json.clone())
+    };
+    if let Some(json) = hit {
+        return Some(json);
+    }
+    // Computed with the lock RELEASED. Holding it across a multi-second view computation would serialise
+    // the arrival burst behind whichever request arrived first - a cache that made the page slower.
+    let json = compute(root).ok()?;
+    {
+        let mut g = store.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        g.insert(key.to_string(), (fp, json.clone()));
+    }
+    Some(json)
+}
+
+/// THE ONE CHANGE DETECTOR (dcServeWarmCache).
+///
+/// It owns three jobs that were previously spread out or duplicated per connection: observe change,
+/// advance the epoch so reads re-read, and warm the arrival views before anyone asks for them.
+///
+/// It runs whether or not a browser is attached. If it only ran inside an SSE connection - which is where
+/// the poll used to live - a server with no open tab would never advance its epoch and would serve a
+/// pre-edit answer to the next arrival: a correctness bug rather than a slow path.
+fn spawn_watcher(state: &AppState) {
+    let root = state.rootpath();
+    let st = state.clone();
+    tokio::spawn(async move {
+        let mut last = crate::fingerprint::compute(&root);
+        let _ = st.changes.send(last);
+        loop {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            let now = tokio::task::spawn_blocking({
+                let r = root.clone();
+                move || crate::fingerprint::compute(&r)
+            })
+            .await
+            .unwrap_or(last);
+            if now != last {
+                last = now;
+                // ORDER MATTERS: advance the epoch FIRST so the warmers below - and any request arriving
+                // while they run - read the tree rather than the memo of the old tree.
+                crate::fingerprint::new_epoch();
+                for (key, f) in HOT_VIEWS {
+                    warm(&st, key, f, now);
+                }
+                let _ = st.changes.send(now);
+            }
+        }
+    });
+}
+
 async fn serve_async(root: PathBuf, port: u16) -> i32 {
     // CANONICALISE at startup. Served as given, a root of "." has no name and no parent, so the
     // surface could not say which project was active (N-C4 requires it always be named) and sibling
     // discovery found nothing. "." is a path, not an identity.
     let root = root.canonicalize().unwrap_or(root);
-    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), cache: Arc::new(Mutex::new(HashMap::new())) };
+    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())) };
+    spawn_watcher(&state);
+
     let app = Router::new()
         .route("/", get(index))
         // viewerKeelApi (D0114 shape B / N-6): the COMMITTED, VERSIONED read API contract. A separate
@@ -280,14 +368,38 @@ async fn index() -> Response {
 async fn log_request(req: Request, next: Next) -> Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
-    // A REQUEST IS THE POINT IN TIME (issue145). Bumping the epoch here means every fingerprint asked
-    // for while serving this request reads the tree at most once, and the request AFTER any write
-    // re-reads it -- a write arrives as a request too, so no write path needs to remember to invalidate.
-    // Without this, one page load fingerprinted the tree dozens of times: 37 in `assured` alone.
-    crate::fingerprint::new_epoch();
+    // A WRITE IS A POINT IN TIME; A READ IS NOT (dcServeWarmCache, refining issue145). Bumping the epoch
+    // on EVERY request meant each of the six requests in one page load re-statted 604 files to ask a
+    // question none of them had changed the answer to: measured, a cache HIT cost 137-208ms of which the
+    // fingerprint was ALL of it (`fp 180ms/604 stat, parse 0ms, build x0`).
+    //
+    // Reads now read the memo. What advances the epoch is an OBSERVED change - the watcher below compares
+    // fingerprints and bumps when they differ - or a write, which is this server's own doing and must be
+    // visible to the next read immediately. NOT a timer: the module's memo condition is that nothing
+    // expires on elapsed time, and an observation is not elapsed time.
+    let writes = method != axum::http::Method::GET;
+    if writes {
+        crate::fingerprint::new_epoch();
+    }
     let start = std::time::Instant::now();
     let resp = next.run(req).await;
-    let line = format!("[keel serve] {method} {path} -> {} ({}ms)", resp.status().as_u16(), start.elapsed().as_millis());
+    if writes {
+        // AND AGAIN AFTER. Bumping only before is not enough and the difference is the console's own
+        // acts: the handler runs inside epoch N and memoizes the PRE-write fingerprint under it, so the
+        // next read would answer from the cache of a tree that no longer exists until the watcher caught
+        // up 1.5s later. The human accepts a Decision and the count does not move - which is precisely
+        // the "I click accept and nothing changes" report that started this work.
+        crate::fingerprint::new_epoch();
+    }
+    // With KEEL_PERF set, each request reports the cost of ITS OWN work. `perf::report` prints at process
+    // exit, which never comes for a server, so before this the interactive surface was the one thing the
+    // instrumentation could not see.
+    let cost = crate::perf::interval().map_or_else(String::new, |s| format!("  [{s}]"));
+    let line = format!(
+        "[keel serve] {method} {path} -> {} ({}ms){cost}",
+        resp.status().as_u16(),
+        start.elapsed().as_millis()
+    );
     eprintln!("{line}");
     // Also append to keel-serve.log (best-effort; gitignored via *.log) so slow loads are inspectable.
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("keel-serve.log") {
@@ -1110,7 +1222,64 @@ fn with_status(body: &str, status: &str, extra: &str) -> String {
     )
 }
 
-fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>) -> Response {
+/// The views on the ARRIVAL path and the one-click destinations behind it (dcServeWarmCache).
+///
+/// Read off the console's own source rather than guessed: `buildNav` fetches `surfaces`, `obligationBar`
+/// fetches `obligations`, `render` fetches `orient`, and the obligation card's `dischargePanel` sends the
+/// human to `authority-queue` or `dispositions`. `review-queue` is the review panel's own list. Nothing
+/// else is warmed - warming a view nobody opened spends the human's CPU to no purpose.
+const HOT_VIEWS: [(&str, ViewFn); 6] = [
+    ("obligations", obligations_json),
+    ("surfaces", crate::view::surfaces_json),
+    ("orient", |r| Ok(crate::orient::compute(r).to_json())),
+    ("computed:authority-queue", crate::view::authority_queue),
+    ("computed:dispositions", crate::view::dispositions),
+    ("review-queue", crate::view::review_queue_json),
+];
+
+/// Recompute `key` in the background and store it under fingerprint `fp`.
+///
+/// One recompute per key at a time: a page load fires eight requests, and without the in-flight set a
+/// changed fingerprint would start eight copies of the same expensive view. Dropped silently if one is
+/// already running - the running one will store a result for this fingerprint or a later one, and either
+/// way the next request is warm.
+fn warm(state: &AppState, key: &str, compute: ViewFn, fp: u64) {
+    {
+        let mut inflight =
+            state.refreshing.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !inflight.insert(key.to_string()) {
+            return;
+        }
+    }
+    let root = state.rootpath();
+    let cache = Arc::clone(&state.cache);
+    let refreshing = Arc::clone(&state.refreshing);
+    let owned = key.to_string();
+    tokio::task::spawn_blocking(move || {
+        let result = compute(&root);
+        if let Ok(json) = result {
+            let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            guard.insert(owned.clone(), (fp, json));
+        }
+        // Clear the flag even on failure, or one error would wedge this view as un-refreshable for the
+        // life of the process - a silent permanent staleness, which is worse than a slow request.
+        let mut inflight = refreshing.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        inflight.remove(&owned);
+    });
+}
+
+type ViewFn = fn(&Path) -> Result<String, crate::view::ViewError>;
+
+/// `cached` for a view that CAPTURES something (a per-item detail keyed by name).
+///
+/// Blocks on recompute rather than serving stale, deliberately: these are per-item views, so the reader
+/// asked for THIS item and a stale answer about one item is more confusing than a short wait. There is
+/// also nothing sensible to warm - a reader opens one item, not all 8700.
+fn cached_owned(
+    state: &AppState,
+    key: &str,
+    compute: impl FnOnce(&Path) -> Result<String, crate::view::ViewError>,
+) -> Response {
     let fp = crate::fingerprint::of(&state.rootpath());
     let previous = {
         let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -1120,6 +1289,51 @@ fn cached(state: &AppState, key: &str, compute: impl FnOnce(&Path) -> Result<Str
         if cfp == fp {
             return ok_json(with_status(&json, "computed", ""));
         }
+    }
+    match tokio::task::block_in_place(|| compute(&state.rootpath())) {
+        Ok(json) => {
+            {
+                let mut guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                guard.insert(key.to_string(), (fp, json.clone()));
+            }
+            ok_json(with_status(&json, "computed", ""))
+        }
+        Err(e) => {
+            let reason = e.to_string().replace('"', "'");
+            if let Some((_, json)) = previous {
+                return ok_json(with_status(&json, "stale", &format!(",\"staleReason\":\"{reason}\"")));
+            }
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{{\"viewStatus\":\"failed\",\"reason\":\"{reason}\"}}"),
+            )
+                .into_response()
+        }
+    }
+}
+
+fn cached(state: &AppState, key: &str, compute: ViewFn) -> Response {
+    let fp = crate::fingerprint::of(&state.rootpath());
+    let previous = {
+        let guard = state.cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        guard.get(key).cloned()
+    };
+    if let Some((cfp, json)) = previous.clone() {
+        if cfp == fp {
+            return ok_json(with_status(&json, "computed", ""));
+        }
+        // STALE-WHILE-REVALIDATE (dcServeWarmCache). The fingerprint moved, so this value is out of date -
+        // but it was TRUE at a commit, and returning it labelled `stale` in microseconds beats blocking an
+        // interactive surface for seconds on a recompute the human did not ask for. Honest only because the
+        // label travels: serving it as `computed` is what N-C2 forbids, and the console renders the banner.
+        // The SSE change-push re-renders the page when the refresh lands, so the fresh value arrives
+        // without the reader doing anything.
+        warm(state, key, compute, fp);
+        return ok_json(with_status(
+            &json,
+            "stale",
+            ",\"staleReason\":\"the model changed and this view is recomputing; the page refreshes itself when it lands\"",
+        ));
     }
     // issue063: the compute can shell out to git (orient suspect/drift) for up to a second-plus on a cold
     // hit; run it via block_in_place so it never STARVES the multi-thread runtime's worker — other
@@ -1347,7 +1561,9 @@ fn computed_view(root: &Path, cmd: &str) -> Option<Result<String, crate::view::V
 /// GET /api/computed/:cmd — any declared viewpoint's computed JSON, so a card can land on the view its
 /// renderer names. Cached per command like every other view.
 async fn api_computed(State(s): State<AppState>, axum::extract::Path(cmd): axum::extract::Path<String>) -> Response {
-    let key = format!("computed:{cmd}");
+    // The VIEW's name is the key. It used to be prefixed "computed:", which cached `dispositions`
+    // separately from the identical JSON served by /api/dispositions.
+    let key = cmd.clone();
     // Ask the TABLE whether the command is bound; never compute a view to find out (issue146).
     computed_binding(&cmd).map_or_else(
         // Not an empty body and not a 200: a command with no binding is a stated gap, so the reader learns
@@ -1402,7 +1618,9 @@ fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
     };
     // The COUNT key per command; the JSON itself comes from computed_view, so the counter and the panel
     // can never disagree about which view a renderer names (one dispatch table, not two).
-    let json = computed_view(root, cmd)?.ok()?;
+    // THROUGH THE SHARED STORE, not a private compute: these four views are the same four the console
+    // fetches moments later, so computing them here also serves those requests.
+    let json = store_or_compute(root, cmd, |r| computed_view(r, cmd).unwrap_or_else(|| Err(crate::view::ViewError::NotFound(cmd.to_string()))))?;
     match cmd {
         "orient" => num(&json, "pendingAcceptances").map(|n| (n, None)),
         "dispositions" => num(&json, "undispositioned").map(|n| (n, None)),
@@ -1432,7 +1650,10 @@ fn obligation_count(root: &Path, cmd: &str) -> Option<(i64, Option<String>)> {
 /// # Errors
 /// Returns [`crate::view::ViewError`] if the surfaces view cannot be computed.
 pub fn obligations_json(root: &Path) -> Result<String, crate::view::ViewError> {
-    let surfaces = crate::view::surfaces_json(root)?;
+    // Through the store for the same reason as the counts below: /api/surfaces asks for this exact JSON
+    // on the same page load, and it is what tells us which viewpoints are act-surface.
+    let surfaces = store_or_compute(root, "surfaces", crate::view::surfaces_json)
+        .map_or_else(|| crate::view::surfaces_json(root), Ok)?;
     let parsed: serde_json::Value = serde_json::from_str(&surfaces).unwrap_or(serde_json::Value::Null);
     let act = parsed
         .get("surfaces")
@@ -1548,7 +1769,7 @@ async fn api_processes(State(s): State<AppState>) -> Response {
 }
 
 async fn api_report(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
-    cached(&s, &format!("report:{name}"), |r| crate::view::report(r, &name, false))
+    cached_owned(&s, &format!("report:{name}"), |r| crate::view::report(r, &name, false))
 }
 
 /// History reads ~/.claude transcripts (outside the fingerprint), so it is computed fresh (uncached).
@@ -1567,7 +1788,7 @@ async fn api_recent(State(s): State<AppState>) -> Response {
 
 /// GET /api/item/:name (D0094 serveItemIntrospect) — any item's detail (attrs + edges + neighbors).
 async fn api_item(State(s): State<AppState>, AxPath(name): AxPath<String>) -> Response {
-    cached(&s, &format!("item:{name}"), |r| crate::view::item_detail(r, &name))
+    cached_owned(&s, &format!("item:{name}"), |r| crate::view::item_detail(r, &name))
 }
 
 /// A bounded-section request (sr18ServeSectionCritique): exactly one of `view` (a declared view name)
@@ -1653,7 +1874,7 @@ async fn api_relations(State(s): State<AppState>, Query(q): Query<RelationsReq>)
         _ => "children",
     };
     let focus = q.focus;
-    cached(&s, &format!("relations:{kind}:{focus}"), move |r| crate::view::relations_json(r, &focus, kind))
+    cached_owned(&s, &format!("relations:{kind}:{focus}"), move |r| crate::view::relations_json(r, &focus, kind))
 }
 
 #[derive(serde::Deserialize)]
@@ -1806,18 +2027,27 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
 /// (~1.5s) and emit a `changed` event only when it flips, so the UI refetches event-driven (not blind
 /// polling). `ping` keepalives in between; `hello` carries the initial fingerprint.
 async fn api_events(State(s): State<AppState>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let root = s.rootpath();
+    // SUBSCRIBES to the watcher; does not poll. Each connection used to run its own 1.5s fingerprint
+    // loop, so the cost of watching scaled with the number of open tabs while the answer was identical
+    // for all of them. The `ping` still goes out on the same cadence so a dead connection is still
+    // detectable from the page - the header's `live:` indicator depends on traffic, not on change.
+    let mut rx = s.changes.subscribe();
     let stream = async_stream::stream! {
-        let mut last = crate::fingerprint::compute(&root);
-        yield Ok(Event::default().event("hello").data(last.to_string()));
+        // The guard is dropped BEFORE the yield: holding a watch borrow across an await makes the whole
+        // stream future non-Send and the router will not accept it.
+        let hello = { *rx.borrow_and_update() };
+        yield Ok(Event::default().event("hello").data(hello.to_string()));
         loop {
-            tokio::time::sleep(Duration::from_millis(1500)).await;
-            let now = crate::fingerprint::compute(&root);
-            if now == last {
-                yield Ok(Event::default().event("ping").data(""));
-            } else {
-                last = now;
-                yield Ok(Event::default().event("changed").data(now.to_string()));
+            match tokio::time::timeout(Duration::from_millis(1500), rx.changed()).await {
+                Ok(Ok(())) => {
+                    let now = { *rx.borrow_and_update() };
+                    yield Ok(Event::default().event("changed").data(now.to_string()));
+                }
+                // The sender is gone: the watcher task died, so this stream can no longer speak for the
+                // state of the tree. Ending the stream makes the page say `reconnecting` rather than
+                // sitting silently on a value nothing is refreshing.
+                Ok(Err(_)) => return,
+                Err(_) => yield Ok(Event::default().event("ping").data("")),
             }
         }
     };

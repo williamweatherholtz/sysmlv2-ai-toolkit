@@ -109,4 +109,40 @@ package ProjectIntake20260820 {
     #DerivedFrom dependency from us004 to st004;
     #DerivedFrom dependency from us005 to st004;
     #Implicates dependency from us005 to issue166;
+
+    // -- third intake, same day: where performance work counts ---------------------------------------
+    part st005 : Statement {
+        :>> id = "b47d0e59-3c81-4f26-9a05-71ef62cb840d";
+        :>> title = "performance is about keel serve, the interactive surface";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> text = "the performance i want is all targeted to the keel serve - the interactive surface.  i don't doubt the cli can be slow.  regardless, deploy performance improvements";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-20"; :>> channel = StatementChannel::chat;
+    }
+
+    part us006 : UserStory {
+        :>> id = "6e91f3a4-2b07-4d58-8c16-40db93ae7512";
+        :>> title = "performance work is measured on the interactive surface, not the CLI";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "performance effort targeted at keel serve, the interactive surface";
+        :>> soThat = "the surface I actually operate is fast, whatever the CLI costs";
+        :>> implication = ImplicationKind::scopeConstraint;
+        :>> triageNote = "scopeConstraint, not priority: a priority statement reorders existing work, and this instead BOUNDS what counts as a performance improvement at all. It is the correction of a real misdirection - five prior performance sprints all measured CLI commands, and this session's instrumentation could only ever report at process exit, so the server was structurally unmeasurable (issue168). Reading it as merely 'do serve first' would have kept the same instrument pointed at the same wrong surface.";
+    }
+
+    part us007 : UserStory {
+        :>> id = "0a5c47e2-8d63-4b19-9f70-25ba1ce30684";
+        :>> title = "ship the performance improvements rather than another measurement";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the performance improvements deployed";
+        :>> soThat = "the work turns into something I can feel, not another report";
+        :>> implication = ImplicationKind::implementationChange;
+        :>> triageNote = "implementationChange, and the word `regardless` is what makes it a separate story from the scope constraint: they are saying ship it EVEN IF my scoping argument differs from theirs. It reads as a response to sprint 358, which delivered a refutation and shipped no fix and said so - a defensible outcome once, and an instruction not to repeat it.";
+    }
+
+    #DerivedFrom dependency from us006 to st005;
+    #DerivedFrom dependency from us007 to st005;
+    #Implicates dependency from us006 to issue168;
+    #Implicates dependency from us007 to d0167;
 }

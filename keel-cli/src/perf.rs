@@ -159,6 +159,33 @@ const fn ms(nanos: u64) -> u64 {
 }
 
 #[must_use]
+/// Read the counters, then ZERO them, returning a one-line summary of the interval.
+///
+/// A long-running server can never be observed by [`report`], which prints once at process exit: `keel
+/// serve` does not exit until the human stops caring. This is the same numbers scoped to an INTERVAL, so
+/// each HTTP request can report its own cost - the only way to see which part of a cache HIT is slow.
+pub fn interval() -> Option<String> {
+    if !enabled() {
+        return None;
+    }
+    let take = |c: &AtomicU64| c.swap(0, std::sync::atomic::Ordering::Relaxed);
+    let (fp, parse, stats, builds, cached, git, gitns) = (
+        take(&FINGERPRINT_NANOS),
+        take(&PARSE_NANOS),
+        take(&FILES_STATTED),
+        take(&BUILD_CALLS),
+        take(&CACHE_HITS),
+        take(&GIT_CALLS),
+        take(&GIT_NANOS),
+    );
+    Some(format!(
+        "fp {}ms/{stats} stat · parse {}ms · build x{builds} ({cached} cached) · git x{git} in {}ms",
+        fp / 1_000_000,
+        parse / 1_000_000,
+        gitns / 1_000_000
+    ))
+}
+
 pub fn report() -> Option<String> {
     if !enabled() {
         return None;

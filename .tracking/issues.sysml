@@ -1943,4 +1943,26 @@ package ProjectIssues {
     }
     #Resolves dependency from dcSharedParsedModel to issue142;
     #Resolves dependency from issue142Fix to issue142;
+
+    part issue168 : Issue {
+        :>> id = "cfd4d038-eaeb-40ff-a2df-f060af545dfc";
+        :>> title = "KEEL_PERF cannot observe a running server: perf::report prints only at process exit";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Every performance number produced in this session was a CLI number, because that is the only thing the instrumentation could see. perf::report is emitted once at process exit and keel serve does not exit, so the INTERACTIVE surface - the one the human said was the only one they cared about - was structurally unobservable. The consequence was not a missing number but a WRONG TARGET: a cache HIT on the interactive surface cost 137-208ms of which the fingerprint was ALL of it (fp 180ms/604 stat, parse 0ms, build x0, git x0), and no prior performance sprint could have found that, because none of them could measure a server. FIXED BY perf::interval(), which reads and ZEROES the counters and is emitted per request in the serve log, so each request reports the cost of its own work. THE RECURRABLE LESSON: an instrumentation surface that cannot observe a long-running process silently redirects every investigation to the short-running one.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from d0167 to issue168;
+
+    part issue169 : Issue {
+        :>> id = "a8319810-7827-45ae-9686-586b6b340b6e";
+        :>> title = "The console cache was keyed by ROUTE and bypassed by its own most expensive caller";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Two independent wastes on every console arrival, both structural rather than algorithmic. (1) obligation_count computed four views into a private local to read ONE number out of each, then the console fetched three of those same four through the HTTP cache - so orient was computed TWICE per page load, and the first compute was thrown away after yielding a single integer. The cache was unreachable from the expensive caller because it was a field on AppState and obligation_count is a plain function; a process-wide store fixes it, and AppState now holds a handle to the same Arc so a root rebind still clears both. (2) The cache key was the ROUTE, not the VIEW: /api/dispositions and /api/computed/dispositions serve identical JSON and cached it twice under two keys, so each expired independently and neither warmed the other. THE PATTERN WORTH KEEPING: a cache whose key names the caller rather than the computation will always undercount its own hit rate, and the duplicate is invisible in any single request.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0167 to issue169;
 }

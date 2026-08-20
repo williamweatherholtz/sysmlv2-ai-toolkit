@@ -19,11 +19,20 @@
 //!   - A CLI command is one-shot and read-only, so its whole process is ONE epoch: the fingerprint is
 //!     computed once no matter how many views ask for it. There is no window in which a file could
 //!     change and be missed, because the process ends.
-//!   - `serve` bumps the epoch at the START of every HTTP request, so each request sees one consistent
-//!     snapshot and the request AFTER any write re-reads. A write arrives as a request too, so this
-//!     needs no special case.
-//!   - The change DETECTOR must never read a memo — it is the thing detecting change. The SSE poll loop
-//!     calls [`compute`] directly.
+//!   - In `serve`, the epoch advances on an OBSERVED CHANGE or a WRITE — never on a read (D0167).
+//!     Bumping it per request meant the six requests of one page load each re-statted 604 files to ask
+//!     a question none of them had changed the answer to; measured, a cache HIT cost 137–208ms of which
+//!     the fingerprint was ALL of it. The single watcher task compares fingerprints every 1.5s and bumps
+//!     when they DIFFER, and a non-GET bumps both before and after it runs, so the console's own acts are
+//!     visible to the next read immediately. An observation is not elapsed time: nothing here expires on
+//!     a timer, which was the condition attached to authorising the memo at all.
+//!     THE COST, stated rather than buried: an edit made OUTSIDE the server is seen up to 1.5s late, and
+//!     during that window a read is answered `computed` from the pre-edit value. That window is bounded
+//!     by the change-detection interval, which already governed when a page could learn of an out-of-band
+//!     edit — nothing tells the page to refetch sooner — so it is not a new blindness, only a relocated
+//!     one. A write through the server has NO window.
+//!   - The change DETECTOR must never read a memo — it is the thing detecting change. The watcher calls
+//!     [`compute`] directly.
 //!
 //! The memo is keyed by root as well as epoch: one process may be asked about more than one tree, and
 //! answering for the wrong one would be a correctness bug rather than a slow path.
@@ -40,9 +49,10 @@ static MEMO: std::sync::Mutex<Option<(u64, std::path::PathBuf, u64)>> = std::syn
 
 /// Declare a new point in time: the next [`of`] call re-reads the tree.
 ///
-/// Called per HTTP request by `serve`. NOT called by CLI commands — a one-shot read-only process is a
-/// single point in time by construction, which is what makes one fingerprint per process correct
-/// rather than merely cheap.
+/// In `serve`, called by the watcher when it OBSERVES a change and by the request middleware around a
+/// non-GET (D0167) — never by a read, which is what keeps a cache hit from costing 604 stats. NOT called
+/// by CLI commands: a one-shot read-only process is a single point in time by construction, which is what
+/// makes one fingerprint per process correct rather than merely cheap.
 pub fn new_epoch() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
 }
@@ -102,6 +112,34 @@ mod tests {
         let fb = of(b);
         assert_eq!(of(a), fa, "asking again for the same root in one epoch must be stable");
         assert_ne!(fa, fb, "two different trees must not share one memoized fingerprint");
+    }
+
+    /// A READ must not advance the epoch, and a WRITE must (D0167). This is the property that makes the
+    /// interactive surface cheap, and getting it backwards is invisible in any single request: the page
+    /// would still be correct, just 50x slower, which is exactly how the cost hid for as long as it did.
+    #[test]
+    fn the_epoch_is_advanced_by_writes_and_observations_not_by_reads() {
+        let src = std::fs::read_to_string("src/serve.rs").expect("serve.rs is readable");
+        let mw = src
+            .split_once("async fn log_request")
+            .expect("the request middleware exists")
+            .1;
+        let body = &mw[..mw.find("
+async fn ").unwrap_or(mw.len())];
+        assert!(
+            body.contains("let writes = method != axum::http::Method::GET"),
+            "the middleware must distinguish reads from writes before touching the epoch"
+        );
+        assert_eq!(
+            body.matches("crate::fingerprint::new_epoch()").count(),
+            2,
+            "a write bumps BEFORE (so the handler reads fresh) and AFTER (so the next read sees the write)"
+        );
+        assert!(
+            !body.contains("
+    crate::fingerprint::new_epoch();"),
+            "an UNCONDITIONAL bump in the middleware is the regression this test exists to catch"
+        );
     }
 
     /// A new epoch must re-read. Verified by observing that the memo is not consulted across a bump,
