@@ -1976,4 +1976,70 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcUuidWellFormed to issue170;
+
+    part issue171 : Issue {
+        :>> id = "0a96695b-0e6d-4231-a62d-3e6a8cf8cc48";
+        :>> title = "The hardening audit has no reusable instrument: four of its own probes were wrong before they were right";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED IN THE PASS THAT FOUND IT. Running the architectural-critique process, four throwaway probes produced wrong numbers before being corrected: (1) a regex matching ': Process' also matched ': ProcessStep', reporting 131 processes where there are 24; (2) help-text extraction reported 'keel orient' and 'keel assured' as commands that do not exist, when both had been run minutes earlier in the same session; (3) a second attempt reported 0 of 72 subcommands documented; (4) a registry probe reported 0 skills registered against 35 real declarations, which would have become a phantom-drift finding. EACH WRONG NUMBER WAS ONE EDIT FROM BECOMING A RECORDED FINDING, and a recorded finding directs the next session. The audit's questions are stable and recurring - subcommand-help coverage, process enforcement, decision follow-through, field liveness - and D0040 says a recurring task without a skill leaks process knowledge into conversation history. This one leaks worse than that: it leaks WRONG ANSWERS into the model. THE PREVENTING CHANGE is that the audit's questions become computed views alongside the rest, so the next pass reads numbers rather than inventing probes.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcAuditInstrument to issue171;
+
+    part issue172 : Issue {
+        :>> id = "3338d10b-348f-40ea-811c-1e4af9e4b2f8";
+        :>> title = "keel --help names 38 of 72 subcommands: 47 percent of the CLI is undiscoverable from its own front door";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED: 72 top-level subcommands are dispatched in main.rs; keel --help names 38. The 34 absent include assured, intake, rootedness, suspect, reverify, dispositions, open-issues, indicators, concern-coverage, tier-satisfaction, sitting-coverage, governing-version, critique-coverage, orphans, outstanding, recent, trace, trace-need and workflows. Several are commands CLAUDE.md instructs a reader to run, and several are the primary lenses of the discipline - a reader who has not read CLAUDE.md cannot find them at all. D0093 makes the CLI the authority and the automation substrate; an authority that under-reports its own surface by half is a discoverability defect in the one interface everything else is built on. THE ROOT CAUSE IS DUAL TRUTH: help is a hand-maintained string next to a hand-maintained match statement, so the two drift silently and only ever in one direction. THE PREVENTING CHANGE is deriving help FROM the dispatch table, with a test asserting every arm is reachable from help output.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHelpFromDispatch to issue172;
+
+    part issue173 : Issue {
+        :>> id = "473586ea-eb2b-495d-9799-07c66d8efabe";
+        :>> title = "13 of 19 processes assert no guard, so adoption is a claim rather than a control";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel activation prints 'asserts no guard - nothing to switch off' for 13 of 19 processes: actor-enrollment, architectural-critique, definition-of-done, definition-of-ready, deploy, diagram, distributed-collaboration, indicator, intake, introduction, knowledge-graph-memory, migration, report. Six assert guards (agile-workflow 5, decision-authoring 5, doc-sync 1, element-critique 1, issue-resolution 1, render 1). D0141 says processes assert their constraints; for 68 percent of the catalogue the assertion is empty. THREE CONSEQUENCES, none of them visible today: the process cannot be enforced, so following it is discipline rather than a control (D0047 says manual vigilance is not a control); activate and deactivate are no-ops on it, so D0138's declared adoption is meaningless for those 13; and a downstream project adopting the engine gets 13 documents it can violate silently. WHAT MAKES THIS SUBTLE RATHER THAN SIMPLE: some are genuinely unenforceable by a text guard - definition-of-done is a judgment, a critique is a judgment - and that distinction is exactly what nothing records. So the fix is not 13 new guards; it is that each process states whether its constraint is machine-checkable, and the ratio becomes an indicator rather than a gate, per invariant 7.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcProcessEnforcement to issue173;
+
+    part issue174 : Issue {
+        :>> id = "835c67cf-580e-4067-a51f-170f2f021a2e";
+        :>> title = "An accepted Decision can promise an artifact that is never built and nothing notices";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0161 was ACCEPTED on 2026-08-20 and its .knowledge retrieval index DOES NOT EXIST on disk. That is the mechanism behind the human's report of half-baked implementations floating around: acceptance is recorded, the promise is not tracked, and the model reads as complete. 64 of 161 accepted Decisions carry no CharteredBy work at all - and MOST OF THOSE ARE CORRECT, because a policy Decision such as D0001 text-files-are-truth or D0018 model-only-state needs no implementing work. THAT AMBIGUITY IS THE DEFECT, not the count: the model cannot distinguish 'accepted and needs nothing' from 'accepted and abandoned', so neither a human nor a view can tell which of the 64 is a problem. I nearly reported the 64 as the finding, which would have been metrics theater. THE PREVENTING CHANGE: a Decision that promises a named artifact declares it, and a computed view reports accepted Decisions whose promised artifact is absent. NOT a gate - a Decision may legitimately be accepted long before it is built, and blocking would push the promise out of the record rather than into it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDecisionFollowThrough to issue174;
+
+    part issue175 : Issue {
+        :>> id = "9d6f8e83-e9e4-42ed-b356-e43b310da62b";
+        :>> title = "actualHours is populated in 4 of 358 sprints but reported as estimation discipline";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel audit reports missing_actualHours_count 354 against 358 sprint files - the field carries data in roughly 1 percent of the corpus. D0072 accepted actualHours as the record of AI time, and the audit surfaces the gap under estimation_discipline as though it were a practice with drift. A field populated 1 percent of the time is not a practice with drift; it is either a dead field wearing a practice's clothes, or a practice nobody performs. Both readings are worse than choosing. WHY IT MATTERS BEYOND TIDINESS: a metric that has been red for 354 consecutive sprints trains every reader to skip it, which is issue160's warning fatigue one layer down, and it inflates the audit's output with a number nobody will ever act on. THE CHOICE: either the write path fills it as a matter of course - a human will not type it and an AI has no clock it trusts - or D0072 is superseded and the field and its metric are REMOVED. Per the doc-removal rule, removal means gone, not a note saying it used to exist.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcActualHoursOrRetire to issue175;
+
+    part issue176 : Issue {
+        :>> id = "5c08a339-ab16-408a-a6bf-d641f48bc6bb";
+        :>> title = "One number covers both legitimate engine evolution and work the AI invented";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel rootedness: of 360 delivery Stories, 306 are chartered by a Decision, 53 reach a Need, 1 is an orphan. keel intake: 472 of 480 downstream items are unsourced - no recorded human Statement behind them. The engine's stated purpose is tracking work that satisfies stakeholder needs, and 85 percent of its own work is chartered by a Decision I wrote. D0064 explicitly permits decision-driven engine evolution, AND THAT PERMISSION IS WHAT MAKES THE NUMBER UNFALSIFIABLE: every one of the 306 is defensible by construction, so the metric cannot fail and therefore cannot inform. THE HONEST QUESTION IT SHOULD ANSWER is whether a charter bottoms out in something a human asked for. A Decision that traces to a Statement or a Need is grounded; a Decision that traces only to my own judgment is not, and the two are currently counted identically. THE PREVENTING CHANGE: split decision_chartered by whether the chartering Decision is itself rooted. The number is not the problem - the fact that one number covers both cases is. Report unsourced as a FLOOR on the record, never as a claim about the human, since nothing can force a statement to be written down.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCharterProvenanceSplit to issue176;
 }
