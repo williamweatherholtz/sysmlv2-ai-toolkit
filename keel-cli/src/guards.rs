@@ -33,6 +33,19 @@ impl GuardReport {
         for v in &self.violations {
             println!("  ERROR {v}");
         }
+        // SELF-CONTRADICTION CHECK (issue180). A guard cannot find a violation in a population of
+        // zero, so `0 scanned, 1 violation(s)` means the guard is not reporting what it examined. Three
+        // guards printed exactly that while working correctly, which made `scanned` useless as a
+        // liveness signal - the only signal separating a guard whose population is legitimately empty
+        // from one that is mis-aimed and can never fire. Surfaced in the RUNNER rather than as a test,
+        // so it holds for every guard added after this one without anybody remembering to.
+        if self.scanned == 0 && !self.violations.is_empty() {
+            println!(
+                "  WARN  guard `{}` reports {} violation(s) against a scan count of 0 - it is not                  reporting the population it examined (issue180)",
+                self.name,
+                self.violations.len()
+            );
+        }
         println!(
             "[guard:{}] {} — {} scanned, {} warning(s), {} violation(s)",
             self.name,
@@ -404,12 +417,12 @@ Err(e) => GuardReport { name: "charter", scanned: 0, warnings: Vec::new(), viola
 pub fn requirement_rootedness(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared capabilityRootednessRule (single gate source).
     match crate::view::rule_violations_opt(root, "capabilityRootednessRule") {
-        Ok(Some((_scanned, gaps))) => {
+        Ok(Some((scanned, gaps))) => {
             let violations = gaps
                 .into_iter()
                 .map(|c| format!("{c}: #Capability with no #DerivedFrom edge to a Need — state the driving Need (D0099)"))
                 .collect();
-            GuardReport { name: "requirement-rootedness", scanned: 0, warnings: Vec::new(), violations }
+            GuardReport { name: "requirement-rootedness", scanned, warnings: Vec::new(), violations }
         }
                 // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
         // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
@@ -592,13 +605,13 @@ pub fn critique(root: &Path) -> GuardReport {
 /// not correct when written, it was undetected).
 #[must_use]
 pub fn edge_endpoints(root: &Path) -> GuardReport {
-    match crate::view::dangling_edge_endpoints(root) {
-        Ok(bad) => {
+    match crate::view::dangling_edge_endpoints_scanned(root) {
+        Ok((scanned, bad)) => {
             let violations = bad
                 .into_iter()
                 .map(|e| format!("{e} — a typed edge must connect two declared items; declare the item or remove the edge, never repoint it at something convenient"))
                 .collect();
-            GuardReport { name: "edge-endpoints", scanned: 0, warnings: Vec::new(), violations }
+            GuardReport { name: "edge-endpoints", scanned, warnings: Vec::new(), violations }
         }
         Err(e) => GuardReport { name: "edge-endpoints", scanned: 0, warnings: Vec::new(), violations: vec![format!("error resolving edge endpoints: {e}")] },
     }
@@ -879,13 +892,13 @@ pub fn manifest_coverage(root: &Path) -> GuardReport {
 /// so the highest-stakes elements require cognition-distinct (human/tool) independence.
 #[must_use]
 pub fn critic_independence(root: &Path) -> GuardReport {
-    match crate::view::critical_independence_gaps(root) {
-        Ok(gaps) => {
+    match crate::view::critical_independence_gaps_scanned(root) {
+        Ok((scanned, gaps)) => {
             let violations = gaps
                 .into_iter()
                 .map(|e| format!("{e}: target of a Critical-severity finding but has only aiModel critiques — requires a human/tool critic (D0080 independence, issue031)"))
                 .collect();
-            GuardReport { name: "critic-independence", scanned: 0, warnings: Vec::new(), violations }
+            GuardReport { name: "critic-independence", scanned, warnings: Vec::new(), violations }
         }
         Err(e) => GuardReport { name: "critic-independence", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading critique independence: {e}")] },
     }
@@ -2417,6 +2430,46 @@ pub fn engine_lint(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
+}
+
+#[cfg(test)]
+mod scan_count_tests {
+    use super::{GuardReport, GUARD_NAMES};
+
+    /// No guard may be written to report violations against a zero scan count (issue180). The RUNNER
+    /// surfaces it at print time; this pins that the check exists, since a silent regression here makes
+    /// `scanned` untrustworthy again and untrustworthy numbers get used.
+    #[test]
+    fn the_runner_flags_a_violation_against_an_empty_scan() {
+        let src = std::fs::read_to_string("src/guards.rs").expect("guards.rs is readable");
+        assert!(
+            src.contains("self.scanned == 0 && !self.violations.is_empty()"),
+            "the self-contradiction check must survive in GuardReport::print"
+        );
+    }
+
+    /// Every guard reporting a real population today keeps reporting one. Guards whose population is
+    /// legitimately empty at this commit are excluded BY NAME rather than by a blanket allowance, so a
+    /// guard silently going quiet cannot hide behind them.
+    #[test]
+    fn the_guards_that_report_a_population_still_do() {
+        const LEGITIMATELY_EMPTY: [&str; 6] = [
+            "charter",                   // scans CHANGED files
+            "process-change",            // scans CHANGED process definitions
+            "retro-backlog",             // scans retro findings needing a backlog item
+            "doc-sync",                  // scans CHANGED doc surface
+            "base-first-justification",  // scans new base-construct adoptions
+            "ownership",                 // scans cross-owner edits
+        ];
+        let root = std::path::Path::new("..");
+        for name in GUARD_NAMES {
+            if LEGITIMATELY_EMPTY.contains(&name) {
+                continue;
+            }
+            let Some(r): Option<GuardReport> = super::run_one(name, root) else { continue };
+            assert!(r.scanned > 0, "guard `{name}` reports a zero population - mis-aimed, or newly empty and needing an entry in LEGITIMATELY_EMPTY");
+        }
+    }
 }
 
 #[cfg(test)]

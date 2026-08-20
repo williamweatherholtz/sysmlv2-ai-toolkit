@@ -2075,4 +2075,26 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcFlagIsNotAPath to issue179;
+
+    part issue180 : Issue {
+        :>> id = "c26385cd-e58c-4944-9f80-361535d342d2";
+        :>> title = "Nine of 38 guards report 0 scanned, so the one signal for guard liveness is absent where it matters";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CORRECTED - I FIRST WROTE NINE AND THE TRUE NUMBER IS THREE. Nine guards report `0 scanned`, but six of them compute the count correctly and report zero because their population is genuinely empty at this commit: `charter` and `process-change` scan CHANGED files, `base-first-justification`, `doc-sync`, `retro-backlog` and `ownership` each have a real computed site and hardcode zero only on their error or rule-absent paths. THAT IS CORRECT BEHAVIOUR and reporting it as a defect would have been metrics theater. THE REAL SET IS THREE, identified by having NO computed scan site anywhere in the function: `critic-independence`, `edge-endpoints` and `requirement-rootedness`. The last is the clearest - it destructures its own count into a discard binding, `Ok(Some((_scanned, gaps)))`. THEY STILL ENFORCE, verified rather than assumed: a deliberately dangling #Resolves edge made edge-endpoints FAIL, printing '0 scanned, 0 warning(s), 1 violation(s)' - output that contradicts itself, because a guard cannot find a violation in a population of zero. SO THE DEFECT IS EPISTEMIC, NOT FUNCTIONAL: `scanned` is the only signal separating a guard whose population is legitimately empty from one that is mis-aimed and can never fire, and it is missing in three cases while looking identical to six where it is fine. THIS IS THE THIRD OVERSTATED FINDING IN FOUR PASSES - 13 routes that were 3, nine guards that are three - and every one came from reading a summary number instead of the mechanism behind it. PREVENTING CHANGE: those three report a real population size, and a test asserts that no guard reports a violation with a zero scan count, which is the self-contradiction that makes the field untrustworthy.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcGuardScanCount to issue180;
+
+    part issue181 : Issue {
+        :>> id = "8e9bb06c-6b26-4e92-83ee-dbc484e14409";
+        :>> title = "keel hook blocks forever on stdin and holds a lock on the binary, wedging every later build";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "OBSERVED THREE TIMES IN ONE TURN. cmd_hook reads its payload with an unbounded stdin().read_to_string(). If the parent process goes away without closing stdin - a cancelled turn, an orphaned invocation - the hook waits forever, and on Windows a running keel.exe holds a file lock on target/release/keel.exe, so every subsequent cargo build fails with 'failed to remove file ... Access is denied (os error 5)'. During hardening pass 4 a stray keel.exe had to be found with tasklist and killed by PID three separate times before a build would proceed. THE IN-LOOP GATE CAN WEDGE THE BUILD IT EXISTS TO GATE, and it does so in a disguise: the error names cargo and a file permission, so it reads as a toolchain or antivirus problem rather than as the hook. CLAUDE.md already warns that keel serve holds the binary and says to serve a COPY; nothing warns about the hook, because nobody knew. This is also the engine doing to itself exactly what it is told not to do - leaving a lingering process. PREVENTING CHANGE: a bounded hook lifetime. A watchdog thread exits the process after a few seconds, and it exits 0 when it fires, because D0134 says a hook never fails a turn.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHookBoundedLife to issue181;
 }

@@ -1937,6 +1937,24 @@ pub fn marker_census(root: &Path) -> Result<String, ViewError> {
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
+/// The population `dangling_edge_endpoints` examines, so its guard can report a scan count (issue180).
+///
+/// The guard used to hardcode `scanned: 0` while finding real violations, printing
+/// `0 scanned, 1 violation(s)` - output that contradicts itself, since a violation cannot be found in an
+/// empty population. `scanned` is the only signal separating a guard whose population is legitimately
+/// empty from one that is mis-aimed and can never fire.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub fn dangling_edge_endpoints_scanned(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let n = Model::build(root)?.edges.len();
+    Ok((n, dangling_edge_endpoints(root)?))
+}
+
+/// Typed edges whose endpoint names are not declared items — the `edge-endpoints` guard's finding set.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
 pub fn dangling_edge_endpoints(root: &Path) -> Result<Vec<String>, ViewError> {
     let model = Model::build(root)?;
     // A DOWNSTREAM project resolves endpoints against one more place than the Model views: the
@@ -3730,6 +3748,25 @@ fn verified_method_mix(model: &Model) -> Vec<(String, usize)> {
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
+/// The population `critical_independence_gaps` examines, so its guard can report a scan count (issue180).
+///
+/// The guard used to hardcode `scanned: 0` while finding real violations, printing
+/// `0 scanned, 1 violation(s)` - output that contradicts itself, since a violation cannot be found in an
+/// empty population. `scanned` is the only signal separating a guard whose population is legitimately
+/// empty from one that is mis-aimed and can never fire.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
+pub fn critical_independence_gaps_scanned(root: &Path) -> Result<(usize, Vec<String>), ViewError> {
+    let n = Model::build(root)?.items.len();
+    Ok((n, critical_independence_gaps(root)?))
+}
+
+/// Elements targeted by a Critical-severity finding whose only critiques are `aiModel` — the
+/// `critic-independence` guard's finding set.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be built.
 pub fn critical_independence_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
     let model = Model::build(root)?;
     let mut critical_targets: HashSet<String> = HashSet::new();

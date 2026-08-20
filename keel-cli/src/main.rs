@@ -188,6 +188,19 @@ fn cmd_hook(args: &[String]) -> i32 {
         eprintln!("usage: keel hook <stop|post-edit|pre-bash|user-prompt>");
         return 2;
     };
+    // BOUNDED LIFETIME (issue180b). `read_to_string` on stdin blocks until EOF, and if the parent goes
+    // away WITHOUT closing stdin the hook waits forever - holding a Windows file lock on
+    // `target/release/keel.exe`, so every later `cargo build` fails with `Access is denied`. That
+    // happened three times in one turn, and the error names cargo and a file permission, so it reads as
+    // a toolchain problem rather than as the hook. An in-loop gate that can wedge the build it gates is
+    // the worst failure mode available to it.
+    //
+    // The watchdog exits 0, never nonzero: D0134 says a hook NEVER fails a turn, so a hook that gave up
+    // waiting must look exactly like a hook with nothing to say.
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(HOOK_DEADLINE_SECS));
+        std::process::exit(0);
+    });
     let mut raw = String::new();
     let _ = std::io::stdin().read_to_string(&mut raw);
     let payload: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
@@ -345,6 +358,13 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
 /// The default console port. One constant, because the hook advisory names it to the reader and a
 /// wrong number in an advisory is worse than no advisory.
 const CONSOLE_PORT: u16 = 7777;
+
+/// How long a hook process may live before it gives up and exits 0 (issue180b).
+///
+/// Generous enough that the real work always finishes - the stop hook runs validate plus 38 guards,
+/// measured at 6-10s - and short enough that an orphaned process releases the binary before it blocks a
+/// build. The alternative, an unbounded wait, wedged three builds in a single turn.
+const HOOK_DEADLINE_SECS: u64 = 120;
 
 /// Is a KEEL console answering on `127.0.0.1:<port>`?
 ///
