@@ -131,7 +131,9 @@ frozen (modify it only by out-of-band Decision).
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by remote config and
   hooks. Integrate by merge.
-- **Provenance is never defaulted (D0129).** `keel actor set <id>` binds this machine, `KEEL_ACTOR` sets
+- **Provenance is never defaulted (D0129) — the ACTOR *and* the DATE (issue182).** Five write paths
+  used to fall back to a hardcoded `2026-01-01`, fabricating when the evidence was judged; they now
+  refuse without `--at` / `--judged-at`. `keel actor set <id>` binds this machine, `KEEL_ACTOR` sets
   it per session, or pass `--judged-by`/`--author`/`--by`. Otherwise the write **refuses**. Actor KIND is
   asked, never inferred: an AI is `Actor` with `kind = ActorKind::ai`, never a `Person`.
 - **Multi-contributor work (D0108/D0129).** Each item is owned by its `createdBy`; only the owner edits

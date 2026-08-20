@@ -545,6 +545,31 @@ mod tests {
         );
     }
 
+    /// THE CONTROL for issue182: no write path may DEFAULT a provenance date.
+    ///
+    /// Five did, to the literal `2026-01-01`, so a result written without a date claimed it happened in
+    /// January. Latent - no corpus item ever carried it - but guard 36 exists precisely to catch evidence
+    /// citing a date it could not have had, and this was the write path fabricating one. Mentioning the
+    /// literal in a comment or an error message is fine; USING it as a fallback is not.
+    #[test]
+    fn no_write_path_defaults_a_provenance_date() {
+        let main = std::fs::read_to_string("src/main.rs").expect("main.rs is readable");
+        let offenders: Vec<String> = main
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| {
+                let s = l.trim_start();
+                !s.starts_with("//")
+                    && (s.contains("unwrap_or_else(|| \"20") || s.contains("unwrap_or(\"20"))
+            })
+            .map(|(i, l)| format!("{}: {}", i + 1, l.trim()))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "date literal(s) used as a default in a write path: {offenders:#?}"
+        );
+    }
+
     /// A string inside an arm's BODY is not a subcommand. Without the head-only scan, every literal in
     /// `main.rs` became a phantom command.
     #[test]

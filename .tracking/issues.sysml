@@ -2097,4 +2097,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcHookBoundedLife to issue181;
+
+    part issue182 : Issue {
+        :>> id = "78fac3af-7cd0-45fd-96c9-d9252eaa4d97";
+        :>> title = "Five write paths silently default a provenance date to the literal 2026-01-01";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED: append-result, append-gate-result, record-measurement, snapshot-indicators and apply-review all read their date flag as flag(args, X).unwrap_or_else(|| '2026-01-01'.to_owned()). CLAUDE.md states that provenance is never defaulted - a rule implemented for the ACTOR, where a missing actor makes the write REFUSE. The DATE has no such protection and falls back to a false constant. A TestResult or Measurement written without an explicit date therefore claims it happened on 2026-01-01, which corrupts any indicator series and feeds guard 36 impossible-evidence-date, whose entire purpose is catching evidence that cites a date it could not have had. Guard 36 exists because I once fabricated an attestation mechanically (issue144); this is the same failure with a different field, sitting in the write path rather than in my editing. LATENT, NOT ACTIVE, AND THAT IS PART OF THE FINDING: zero items in the corpus carry 2026-01-01, because every real invocation has passed an explicit date. It is a trap that has never fired. FOUND BY A WRITE-API SMOKE TEST invoking every write command with no arguments and diffing the tree: eleven refused cleanly and keel snapshot-indicators MUTATED THE TREE, stamping two Measurements dated 2026-01-01 with no confirmation and no explicit intent. PREVENTING CHANGE: refuse rather than default - an AI has no clock it can attest to and a human will not silently want a January date in August - which also makes the bare invocation refuse, clearing both halves of this with one change.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDateNeverDefaulted to issue182;
 }

@@ -1224,6 +1224,27 @@ fn flag(args: &[String], name: &str) -> Option<String> {
     })
 }
 
+/// A provenance DATE, refused rather than defaulted (issue182).
+///
+/// Five write paths read this as `flag(args, ..).unwrap_or_else(|| "2026-01-01".to_owned())`. CLAUDE.md
+/// says provenance is never defaulted; that rule was implemented for the ACTOR, where a missing actor
+/// makes the write refuse, and the DATE fell back to a false constant. A result written without a date
+/// claimed it happened on 2026-01-01, which corrupts any series and feeds guard 36 - whose whole job is
+/// catching evidence that cites a date it could not have had.
+///
+/// REFUSED, not defaulted to today: an AI has no clock it can honestly attest to, and guessing is what
+/// produced the constant in the first place. The caller states the date or the write does not happen.
+fn provenance_date(args: &[String], flag_name: &str, usage: &str) -> Result<String, i32> {
+    flag(args, flag_name).ok_or_else(|| {
+        eprintln!("error: --{flag_name} YYYY-MM-DD is required.");
+        eprintln!(
+            "  A provenance date is never defaulted (issue182): it used to fall back to 2026-01-01."
+        );
+        eprintln!("usage: {usage}");
+        2
+    })
+}
+
 fn cmd_append_result(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
         eprintln!("usage: keel append-result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
@@ -1245,7 +1266,10 @@ fn cmd_append_result(args: &[String]) -> i32 {
         Err(msg) => { eprintln!("{msg}"); return 2; }
     };
     // Callers should pass --judged-at for determinism; this is a safe fallback.
-    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let judged_at = match provenance_date(args, "judged-at", "keel <write> --judged-at YYYY-MM-DD ...") {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
 
     match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by) {
         Ok(uuid) => { println!("{uuid}"); 0 }
@@ -1274,7 +1298,10 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
         Err(msg) => { eprintln!("{msg}"); return 2; }
     };
     // Callers should pass --judged-at for determinism; this is a safe fallback.
-    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let judged_at = match provenance_date(args, "judged-at", "keel <write> --judged-at YYYY-MM-DD ...") {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
 
     let notes = flag(args, "notes");
     match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref()) {
@@ -1464,7 +1491,10 @@ fn cmd_record_measurement(args: &[String]) -> i32 {
         || find_repo_root().map_or_else(|| PathBuf::from(".tracking/indicators.sysml"), |r| r.join(".tracking").join("indicators.sysml")),
         PathBuf::from,
     );
-    let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let at = match provenance_date(args, "at", "keel <write> --at YYYY-MM-DD ...") {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
     let source = flag(args, "source").unwrap_or_default();
     let by = match keel_cli::actor::resolve(&keel_cli::actor::root_for(&file), flag(args, "by").as_deref()) {
         Ok(a) => a,
@@ -1498,7 +1528,10 @@ fn cmd_snapshot_indicators(args: &[String]) -> i32 {
         }
     };
     let file = flag(args, "file").map_or_else(|| root.join(".tracking").join("indicators.sysml"), PathBuf::from);
-    let at = flag(args, "at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let at = match provenance_date(args, "at", "keel <write> --at YYYY-MM-DD ...") {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
     let by = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
         Ok(a) => a,
         Err(msg) => { eprintln!("{msg}"); return 2; }
@@ -1591,7 +1624,10 @@ fn cmd_apply_review(args: &[String]) -> i32 {
     };
     let judged_by = flag(args, "judged-by").filter(|s| !s.is_empty()).or_else(|| Some(batch.judged_by.clone()).filter(|s| !s.is_empty())).unwrap_or_else(|| "human".to_owned());
     let sha = flag(args, "sha").filter(|s| !s.is_empty()).or_else(|| Some(batch.judged_against.clone()).filter(|s| !s.is_empty())).unwrap_or_else(|| "uncommitted".to_owned());
-    let judged_at = flag(args, "judged-at").unwrap_or_else(|| "2026-01-01".to_owned());
+    let judged_at = match provenance_date(args, "judged-at", "keel <write> --judged-at YYYY-MM-DD ...") {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
     let critiques = root.join(".tracking").join("critiques.sysml");
 
     let mut count = 0u32;
