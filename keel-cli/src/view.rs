@@ -3965,10 +3965,35 @@ fn rd_charter_class(model: &Model, story: &str) -> &'static str {
         tk == "Need" || (tk == "SystemRequirement" && rd_sr_rooted(model, t)) || rd_derives_need(model, t)
     });
     if reaches_need {
-        "need"
-    } else {
-        "decision"
+        return "need";
     }
+    // ISSUE176: `decision` used to be ONE bucket covering two different things. D0064 permits
+    // decision-driven engine evolution, and that permission is what made the number unfalsifiable -
+    // every charter was defensible by construction, so the metric could not fail and therefore could
+    // not inform. Split by whether the CHARTERING DECISION is itself grounded in something a human
+    // said or wanted: a Decision citing a Statement (D0166) or a Need is `decision_rooted`; a Decision
+    // resting only on my own judgment is `decision_ungrounded`. Neither is a violation - the point is
+    // that they are now COUNTABLE apart.
+    if charters.iter().any(|d| rd_decision_grounded(model, d)) {
+        "decision_rooted"
+    } else {
+        "decision_ungrounded"
+    }
+}
+
+/// Does this chartering Decision itself rest on something a human asked for?
+///
+/// Grounded means: an inbound `derivedfrom`/`implicates` edge from a `Statement` or `UserStory` (the
+/// intake chain, D0166), or an edge of its own reaching a `Need`. Anything else is my own judgment,
+/// which is legitimate under D0064 and still worth counting separately.
+fn rd_decision_grounded(model: &Model, decision: &str) -> bool {
+    let touches = |name: &str| -> bool {
+        matches!(model.items.get(name).map_or("", |i| i.type_name.as_str()), "Statement" | "UserStory" | "Need")
+    };
+    model
+        .edges
+        .iter()
+        .any(|e| (e.to == decision && touches(&e.from)) || (e.from == decision && touches(&e.to)))
 }
 
 /// `#Capability` items lacking a `#DerivedFrom` edge to a Need — the requirement-rootedness HARD gate
@@ -4399,7 +4424,11 @@ pub fn rootedness(root: &Path) -> Result<String, ViewError> {
         ("rootedness".to_string(), Json::s("requirement rootedness (D0098/D0099, issue047): charter-source burndown over delivery Stories — `need` reaches a Need, `decision` is legitimate decision-driven engine evolution (D0064), `orphan` has no charter. The HARD gate (`guard requirement-rootedness`) fires only on a #Capability item with no #DerivedFrom->Need.")),
         ("total".to_string(), n(stories.len())),
         ("need_rooted".to_string(), n(count("need"))),
-        ("decision_chartered".to_string(), n(count("decision"))),
+        // Split per issue176: one number used to cover both legitimate engine evolution and work
+        // nobody asked for. `decision_chartered` is retained as their SUM so no existing reader breaks.
+        ("decision_chartered".to_string(), n(count("decision_rooted") + count("decision_ungrounded"))),
+        ("decision_rooted".to_string(), n(count("decision_rooted"))),
+        ("decision_ungrounded".to_string(), n(count("decision_ungrounded"))),
         ("orphan".to_string(), n(count("orphan"))),
         ("orphans".to_string(), Json::Arr(orphans)),
         ("capability_violations".to_string(), Json::Arr(gate)),

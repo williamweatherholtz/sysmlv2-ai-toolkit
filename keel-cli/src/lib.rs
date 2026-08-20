@@ -35,6 +35,7 @@ pub mod claim;
 pub mod enroll;
 pub mod govern;
 pub mod guards;
+pub mod hardening;
 pub mod indexer;
 pub mod migrate;
 mod json;

@@ -155,4 +155,24 @@ package ProjectIndicators {
     #Measures dependency from velocityIndicatorM1 to velocityIndicator;
     part volatilityIndicatorM1 : Measurement { :>> id = "3c9f159b-81d2-49c4-a808-ac71b3738f95"; :>> value = "0.00"; :>> measuredAt = "2026-06-22"; :>> source = "snapshot (computed reading)"; :>> createdBy = "claudeOpus"; }
     #Measures dependency from volatilityIndicatorM1 to volatilityIndicator;
+
+    // issue175/D0169. `keel audit` reported `missing_actualHours_count` under `estimation_discipline`,
+    // where it sat at 354 of 358 sprints - 1% populated - for the entire history of the project. A number
+    // that has been red for 354 consecutive sprints is not a practice with drift; it trains every reader
+    // to skip the metric, which is issue160's warning fatigue one layer down.
+    //
+    // IT BECOMES AN INDICATOR because no defensible threshold exists (invariant 7). A human will not type
+    // hours and an AI has no clock it can honestly attest to, so any target would be invented. Demoting
+    // it says the true thing: this is watched, not enforced, and nobody has yet justified a boundary.
+    // Promote it to a requirement only if a justified boundary emerges - which is exactly the D0088 rule.
+    part estimationFeedbackIndicator : Indicator {
+        :>> id = "1d1c0110-0110-4110-9110-516273840110";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> measures = "Delivery sprints recording actualHours (%) - whether the estimate-to-actual feedback loop D0072 describes is actually closed. 4 of 358 at declaration.";
+        :>> goal = IndicatorGoal::maximize;
+        :>> unit = "%";
+        :>> method = MeasurementMethod::computed;
+        :>> collectionRef = "keel audit -> estimation_discipline.actualHours_pct";
+    }
 }

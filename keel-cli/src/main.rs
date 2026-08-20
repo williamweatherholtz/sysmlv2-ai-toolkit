@@ -894,6 +894,23 @@ fn cmd_sitting_coverage(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_hardening(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel hardening [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::hardening::hardening(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("keel hardening: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_concern_coverage(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel concern-coverage [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -2089,42 +2106,91 @@ fn cmd_enroll(rest: &[String]) -> i32 {
 ///
 /// Extracted from `main` because a dispatcher whose fallback is thirty lines of `eprintln!` makes
 /// the DISPATCH unreadable — the lint that forced this out is doing the right job.
+/// The subcommand catalogue: ONE table, printed here and asserted COMPLETE by
+/// `hardening::tests::every_dispatched_subcommand_is_documented`.
+///
+/// It used to be a wall of `eprintln!` beside a hand-maintained `match`, and the two drifted in
+/// one direction only: 35 of 75 subcommands were dispatched and never described (issue172). A
+/// table plus a test is not full derivation — clap would be — but it makes the drift impossible
+/// to land rather than merely unlikely.
+const CATALOGUE: &[&str] = &[
+    "  version | --version [--json] which build is this — release version + build commit + guard inventory",
+    "  init DIR                     scaffold the engine into a NEW project (D0093 cold start)",
+    "  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)",
+    "  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history",
+    "  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)",
+    "  verification [--pending]         EXAMINED vs EXERCISED, split — never one number",
+    "  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
+    "  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>",
+    "                                   computed views over an AUTHORED CodeElement registry (D0148)",
+    "  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)",
+    "  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
+    "  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)",
+    "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
+    "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
+    "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
+    "  validate [ROOT]              semantic-validate all .tracking/ files",
+    "  check FILE...                parse-check one or more .sysml files",
+    "  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)",
+    "  ls [ROOT]                    list .tracking/ .sysml files",
+    "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
+    "  whats-next [ROOT]            print ready task names (one per line)",
+    "  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)",
+    "  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)",
+    "  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)",
+    "  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)",
+    "  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)",
+    "  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)",
+    "  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
+    "  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
+    "  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance (D0106)",
+    "  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]",
+    "assured [ROOT]               composite READY/NOT-READY assurance verdict + per-check detail (D0079)",
+    "audit [ROOT]                 retrospective adherence: charter, ceremony, estimation, sitting review",
+    "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
+    "hardening [ROOT]             the critique process's own questions, computed (issue171/D0169)",
+    "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
+    "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
+    "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
+    "suspect [ROOT]               done work whose evidence has DRIFTED from the tree it was judged against",
+    "outstanding [ROOT]           every not-done item, flat — the burndown without the ranking",
+    "orphans [ROOT]               items nothing references: tasks with no DoD, issues with no resolver",
+    "recent [ROOT]                git-derived activity timeline: commits touching .tracking/.engine (sr15)",
+    "intake [ROOT]                statements -> user stories -> routing: unparsed, unrouted, unsourced (D0166)",
+    "dispositions [ROOT]          findings by verdict — act / acceptRisk / dismiss / undispositioned (D0165)",
+    "authority-queue [ROOT]       what awaits a HUMAN's authority, and what may not be self-attested",
+    "attestation-coverage [ROOT]  accepted Decisions lacking a passing acceptance result (D0066)",
+    "open-issues [ROOT]           every OPEN issue + its resolvers + whether each resolver is complete (D0077)",
+    "indicators [ROOT]            MONITORED with no enforced threshold — never gated (invariant 7)",
+    "snapshot-indicators [ROOT]   stamp the current indicator values as a dated series point",
+    "record-measurement --indicator I --value V [--at DATE]  add one measurement to an indicator series",
+    "rootedness [ROOT]            charter-source burndown: need-rooted vs decision-chartered vs orphan (D0099)",
+    "tier-satisfaction [ROOT]     per tier, the fraction cleanly satisfied downstream (Needs -> SRs -> tests)",
+    "concern-coverage [ROOT]      declared viewpoints vs stakeholder concerns — which concerns nothing serves",
+    "critique-coverage [ROOT]     per-element required-lens matrix + the gap set (D0097)",
+    "critique-policy [ROOT]       which antagonistic lenses each assurance-element type REQUIRES (D0097)",
+    "sitting-coverage [ROOT]      per-sitting human review currency, grandfathered at D0155's line",
+    "governing-version <item> [ROOT]  which process version governs this item",
+    "decisions [ROOT]             load-bearing decisions, ranked by how much depends on them",
+    "business [ROOT]              the what/why layer: Brief -> Personas -> Needs -> UseCases (D0107)",
+    "launchables [ROOT]           the console's launchable set, computed from declared skills + processes",
+    "workflows [ROOT]             the six workflows and their phases",
+    "contentions [ROOT]           recorded disagreements between contributors awaiting adjudication (D0108)",
+    "trace <item> [ROOT]          every typed edge reaching an item, both directions",
+    "trace-need <need> [ROOT]     one Need's full satisfaction chain down to test results",
+    "boundary <element> [ROOT]    one element's interface surface — takes an ELEMENT, not a root",
+    "boundary-sweep [ROOT]        tier-satisfaction white-box sweep, per Need-slice",
+    "reprocess-candidates [ROOT]  items whose governing process version has moved on since they were judged",
+];
+
+/// The subcommand catalogue, printed when no arm matches.
 fn print_usage() -> i32 {
     eprintln!("keel <subcommand> [args]");
-            eprintln!("  version | --version [--json] which build is this — release version + build commit + guard inventory");
-            eprintln!("  init DIR                     scaffold the engine into a NEW project (D0093 cold start)");
-            eprintln!("  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)");
-            eprintln!("  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history");
-            eprintln!("  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)");
-            eprintln!("  verification [--pending]         EXAMINED vs EXERCISED, split — never one number");
-            eprintln!("  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)");
-            eprintln!("  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>");
-            eprintln!("                                   computed views over an AUTHORED CodeElement registry (D0148)");
-    eprintln!("  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)");
-            eprintln!("  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage");
-            eprintln!("  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)");
-            eprintln!("  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)");
-            eprintln!("  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step");
-            eprintln!("  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)");
-            eprintln!("  validate [ROOT]              semantic-validate all .tracking/ files");
-            eprintln!("  check FILE...                parse-check one or more .sysml files");
-        eprintln!("  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)");
-            eprintln!("  ls [ROOT]                    list .tracking/ .sysml files");
-            eprintln!("  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)");
-            eprintln!("  whats-next [ROOT]            print ready task names (one per line)");
-            eprintln!("  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)");
-            eprintln!("  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)");
-            eprintln!("  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)");
-            eprintln!("  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)");
-            eprintln!("  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)");
-            eprintln!("  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)");
-            eprintln!("  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
-            eprintln!("  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]");
-            eprintln!("  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance (D0106)");
-            eprintln!("  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]");
+    for line in CATALOGUE {
+        eprintln!("  {line}");
+    }
     2
 }
-
 /// A read-only view subcommand: run `f` against the repo root and print its JSON, or the error as
 /// JSON so a consumer parsing stdout gets a parseable answer either way.
 fn cmd_view0(
@@ -2208,6 +2274,7 @@ fn main() {
         Some("attestation-coverage") => cmd_attestation_coverage(rest),
         Some("orphans") => cmd_orphans(rest),
         Some("audit") => cmd_audit(rest),
+        Some("hardening") => cmd_hardening(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),

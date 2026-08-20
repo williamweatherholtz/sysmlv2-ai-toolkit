@@ -392,6 +392,26 @@ pub fn audit(root: &Path) -> Result<String, AlgoError> {
             Json::Obj(vec![
                 ("missing_estimatedPoints".to_string(), Json::Arr(scan.missing_points)),
                 ("missing_actualHours_count".to_string(), jint(scan.missing_hours)),
+                // issue175: actualHours is an INDICATOR, not a discipline metric. It sat at 4 of 358
+                // for the whole project history, and a number red for 354 consecutive sprints teaches
+                // every reader to skip the metric it lives in. No defensible threshold exists - a human
+                // will not type hours and an AI has no clock it can attest to - so per invariant 7 it is
+                // WATCHED, not enforced. The percentage and the pointer are carried here so the number
+                // stays visible without masquerading as a target.
+                (
+                    "actualHours_pct".to_string(),
+                    jint(
+                        ((scan.sprint_files - scan.missing_hours.min(scan.sprint_files)) * 100)
+                            .checked_div(scan.sprint_files)
+                            .unwrap_or(0),
+                    ),
+                ),
+                (
+                    "actualHours_note".to_string(),
+                    Json::s(
+                        "INDICATOR, not a target (issue175/invariant 7): tracked as                          `estimationFeedbackIndicator`, reported by `keel indicators`, gated by nothing.                          Promote to a requirement only if a justified boundary emerges (D0088).",
+                    ),
+                ),
             ]),
         ),
         (
