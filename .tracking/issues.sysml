@@ -2405,4 +2405,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcPrePushBehindCheck to issue209;
+
+    part issue210 : Issue {
+        :>> id = "df39fbf6-f424-480f-911b-1ee5cf9d9026";
+        :>> title = "Concurrent contributors merge-conflict at the shared append anchor: critiques and issues funnel to one brace";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 6 (srDcPerActorWriteTargets x completeness). Obligations and runs are per-file (conflict-free by construction) and claims were the motivating per-actor case - but append_critique and the issue recorder insert every contributor's records at the same package-closing brace of critiques.sysml / issues.sysml. Two clones appending concurrently conflict textually at identical lines; the .keel-write-lock covers one machine only. Forward-only fix: per-actor target files; readers glob .tracking already.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcPerActorAppendFiles to issue210;
 }
