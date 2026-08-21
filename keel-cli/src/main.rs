@@ -931,6 +931,31 @@ fn cmd_sitting_coverage(args: &[String]) -> i32 {
     }
 }
 
+fn cmd_deck(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel deck [ROOT] [--out FILE]", &["out"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::deck::html(&root) {
+        Ok(h) => {
+            if let Some(out) = flag(args, "out") {
+                if let Err(e) = keel_cli::write::write_atomic(std::path::Path::new(&out), &h) {
+                    eprintln!("keel deck: writing {out}: {e}");
+                    return 1;
+                }
+                println!("deck -> {out}");
+            } else {
+                println!("{h}");
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("keel deck: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_hardening(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel hardening [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -2268,6 +2293,7 @@ const CATALOGUE: &[&str] = &[
     "audit [ROOT]                 retrospective adherence: charter, ceremony, estimation, sitting review",
     "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
     "hardening [ROOT]             the critique process's own questions, computed (issue171/D0169)",
+    "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
     "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
@@ -2394,6 +2420,7 @@ fn main() {
         Some("orphans") => cmd_orphans(rest),
         Some("audit") => cmd_audit(rest),
         Some("hardening") => cmd_hardening(rest),
+        Some("deck") => cmd_deck(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),

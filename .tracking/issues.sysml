@@ -2207,4 +2207,15 @@ package ProjectIssues {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcEmittedJsMustParse to issue191;
+
+    part issue192 : Issue {
+        :>> id = "d05bff8f-bfdd-4bd3-9e3e-e9e8b16fd21d";
+        :>> title = "The deck's save path lived in the one component that cannot run locally, so every fix shipped untested";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THEIR QUESTION - how is this so hard - HAS AN ARCHITECTURAL ANSWER. The deck saved through the Claude artifact live-doc runtime: closed, remote, and unrunnable locally. Every fix was therefore inference-then-deploy-then-ask-the-human, across five versions - three killed by my own syntax errors, two by contract misreadings, and NONE testable before publish. The failure was not any one bug; it was placing the critical path where no test could reach it. THE FIX MOVES THE PATH: keel deck generates the page from the engine, keel serve serves it at /deck, and every tap saves through the server's own POST endpoints - the same tested write API the console uses - with the artifact mechanism demoted to a fallback the page selects only when /api/version does not answer. THE PROOF IS THE TEST: test_deck_e2e.py drives the whole loop with httpx against a served copy, 13 checks green, and it caught FOUR real defects before deploy that previously would each have been a round-trip through the human: a missing actor binding, an actor NAME written into the CriticKind enum field, a sitting critique that counted for nothing because sitting-coverage computes over Covers edges, and naive reads landing in D0167's staleness window. One inverse gap surfaced too: the help catalogue advertised keel deck before the dispatch landed, because the coverage control checks dispatched-implies-documented and not the reverse.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckInRust to issue192;
 }

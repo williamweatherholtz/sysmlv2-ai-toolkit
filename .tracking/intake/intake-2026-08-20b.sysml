@@ -98,4 +98,45 @@ package ProjectIntake20260820B {
 
     #DerivedFrom dependency from us014 to st008;
     #DerivedFrom dependency from us015 to st009;
+
+    // -- sixth intake: the deck moves into the engine and gets tested before deploy ---------------
+    part st010 : Statement {
+        :>> id = "b70e94c2-5a38-4d61-8f27-40ca85be1d59";
+        :>> title = "make the artifact locally in rust, test thoroughly, then deploy; use httpx";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "how is this so hard? make the artifact locally in rust, test rhoroughally, then deploy it. use httpx";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+    part st011 : Statement {
+        :>> id = "c81f05d3-6b49-4e72-9038-51db96cf2e60";
+        :>> title = "advertise the deck in the cli";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "advertize this in the cli";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+
+    part us016 : UserStory {
+        :>> id = "d92a16e4-7c50-4f83-a149-62ec07da3f71";
+        :>> title = "the deck is built by the engine and its save loop is tested before any deploy";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the review deck generated in Rust, its whole save loop tested locally with httpx, and only then deployed";
+        :>> soThat = "a broken deck is caught by a test instead of by me, on my phone, five times";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture, not implementationChange: the instruction moves WHERE THE SAVE PATH LIVES - out of the untestable artifact runtime and into the engine's own HTTP API, with the artifact mechanism demoted to fallback. 'How is this so hard' is answered honestly in issue192: the previous architecture put the critical path in the one component that cannot run locally, so every fix was inference-then-deploy-then-ask. The rhetorical question is treated as the architectural instruction it is.";
+    }
+    part us017 : UserStory {
+        :>> id = "e03b27f5-8d61-4a94-b250-73fd18eb4082";
+        :>> title = "the deck is discoverable from the CLI";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the deck advertised in the cli";
+        :>> soThat = "I can find it without reading a chat transcript";
+        :>> implication = ImplicationKind::implementationChange;
+        :>> triageNote = "implementationChange: two lines on existing surfaces - the help CATALOGUE (whose coverage test would have failed the build without one of them) and the keel serve startup banner. The catalogue control caught its own inverse gap along the way: a help line for a command that did not dispatch.";
+    }
+
+    #DerivedFrom dependency from us016 to st010;
+    #DerivedFrom dependency from us017 to st011;
+    #Implicates dependency from us016 to issue192;
 }
