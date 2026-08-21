@@ -21,10 +21,8 @@ package EngineWork {
         // Acceptance criteria are NOT a text blob — each is an atomic Test
         // linked by `verify` (EngineVerification + EngineRelationships).
         // estimatedPoints: pre-sprint Fibonacci integer (1/2/3/5/8/13).
-        // actualPoints: revised Fibonacci size if scope changed mid-sprint.
         // actualHours: wall-clock hours spent — recorded at sprint closeOut (D0038).
         attribute estimatedPoints : Integer[0..1];
-        attribute actualPoints : Integer[0..1];
         attribute actualHours : Real[0..1];
     }
 
