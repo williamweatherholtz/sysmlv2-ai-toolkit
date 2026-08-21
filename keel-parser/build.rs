@@ -8,10 +8,11 @@ const SYSML_V2_SPEC_URL: &str =
     "https://raw.githubusercontent.com/Systems-Modeling/SysML-v2-Release/master/README.md";
 
 /// Expected SHA-256 hex digest of the file at SYSML_V2_SPEC_URL.
-/// Set to all-zeros as an explicit "not yet pinned" sentinel.
-/// Run with SYSML_V2_SPEC_OFFLINE=0 and let the build print the actual SHA to pin it.
+/// Pinned 2026-08-21 (sr13SpecPin: the all-zeros sentinel meant the divergence check had never
+/// verified anything). A mismatch means the spec release manifest moved: review the change, then
+/// update this digest to the actual value the failing build prints.
 const SYSML_V2_GRAMMAR_SHA: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "e86a23b3cefc0835fffc34d2970028ed3e227121f65eab43ad2f314e46a778a7";
 
 fn sha256_hex(data: &[u8]) -> String {
     use sha2::{Digest, Sha256};
