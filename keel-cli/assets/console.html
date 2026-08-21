@@ -194,7 +194,7 @@ function closeItem(){stopModalAgent();document.getElementById('modal').classList
 function mlog(s){const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent+=s;l.scrollTop=l.scrollHeight}}
 async function runAgentModal(action,target,section,boundary){
  stopModalAgent();const l=document.getElementById('mlog');if(l){l.style.display='block';l.textContent=`=== ${action}: ${boundary?('black-box '+boundary):target}${section?(' @ '+section):''} ===\n`}
- // srServeApproveGate (D0109): fetch + show the PLAN, require explicit approval, THEN execute (approved=1).
+ // srServeApproveGate (D0109): fetch + show the PLAN, require explicit approval, THEN execute (approved=true).
  let q='action='+encodeURIComponent(action)+'&target='+encodeURIComponent(target||'');
  if(section)q+='&section='+encodeURIComponent(section); // sr18: section-scoped critique
  if(boundary)q+='&boundary='+encodeURIComponent(boundary); // sr19: black-box interface critique
@@ -203,7 +203,10 @@ async function runAgentModal(action,target,section,boundary){
  mlog('PLAN — review before approving (srServeApproveGate):\n  action: '+plan.action+'\n  target: '+plan.target+'\n  executable: '+plan.executable+'\n\n  prompt:\n  '+String(plan.prompt||'').replace(/\n/g,'\n  ')+'\n\n');
  if(!plan.executable){mlog('[blocked] not executable — a non-declared launchable / unsupported action. See the Launch tab / `keel launchables`.\n');return}
  if(!confirm('Approve + run this '+plan.action+'?\n\n'+plan.prompt)){mlog('[cancelled] not approved — nothing ran.\n');return}
- mes=new EventSource('/api/agent/stream?'+q+'&approved=1');
+ // srServeApproveGateHuman: the approval is the named human's attestation, bound to the exact
+ // reviewed plan (planHash) — a cancelled name prompt approves nothing.
+ const approver=judgedBy();if(!approver){mlog('[cancelled] no approver named — nothing ran.\n');return}
+ mes=new EventSource('/api/agent/stream?'+q+'&approved=true&approved_by='+encodeURIComponent(approver)+'&plan_hash='+encodeURIComponent(plan.planHash||''));
  mes.addEventListener('status',e=>mlog('· '+e.data+'\n\n'));
  mes.addEventListener('agent',e=>{const t=renderAgentEvent(e.data);if(t)mlog(t)});
  mes.addEventListener('done',e=>{mlog('\n\n'+e.data+'\n');stopModalAgent()});

@@ -2317,4 +2317,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from storyAmbientActorAudit to issue201;
+
+    part issue202 : Issue {
+        :>> id = "bbba1954-33a9-470f-861c-f7861854a4c0";
+        :>> title = "The console's approve gesture never parsed: approved=1 vs a strict-bool server";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "runAgentModal has always executed with '&approved=1' while AgentReq declares approved: bool and the query deserializer accepts only 'true'/'false' - so every approved execution from the console died as 'Failed to deserialize query string' BEFORE any gate ran. The approve gate looked structural while its only sanctioned client could not get through it; masked in this repo because the agent bridge was toggled off in serve settings. Found live-probing srServeApproveGateHuman for sprint 393. Fix: the client sends approved=true.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyLaunchApprovalHuman to issue202;
 }

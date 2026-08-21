@@ -1034,6 +1034,19 @@ struct AgentReq {
     /// sets it only after the human reviews the /api/agent/plan output and clicks approve.
     #[serde(default)]
     approved: bool,
+    /// srServeApproveGateHuman: the registered Person whose click IS the approval. Required for any
+    /// execute — the actor is data the gesture carries, and an AI actor is refused by KIND.
+    #[serde(default)]
+    approved_by: Option<String>,
+    /// srServeApproveGateHuman clause 3: the plan hash echoed from GET /api/agent/plan, binding the
+    /// approval to the EXACT reviewed route — an edited route needs a fresh review.
+    #[serde(default)]
+    plan_hash: Option<String>,
+}
+
+/// The identity of a reviewed plan: what the human saw is what the approval covers.
+fn plan_identity(action: &str, target: &str, prompt: &str) -> String {
+    crate::arch::stable_hash(&format!("{action}\u{1f}{target}\u{1f}{prompt}"))
 }
 
 /// sr19 black-box critique prompt: critique the INTERFACES (cut edges) of a Need-slice boundary for
@@ -1184,6 +1197,7 @@ fn claude_in_dirs(path: &std::ffi::OsStr, pathext: Option<&std::ffi::OsStr>) -> 
 /// approving. The console shows this, then calls /api/agent/stream with approved=1 on approval.
 async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Response {
     let (action_ok, launch_undefined, prompt) = request_plan(&s.rootpath(), &q);
+    let plan_hash = plan_identity(&q.action, &q.target, &prompt);
     let json = crate::json::Json::Obj(vec![
         ("plan".to_string(), crate::json::Json::s("agent-request plan (srServeApproveGate) — review, then execute with approved=1")),
         ("action".to_string(), crate::json::Json::s(q.action)),
@@ -1191,6 +1205,7 @@ async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) ->
         ("action_ok".to_string(), crate::json::Json::Bool(action_ok)),
         ("launch_undefined".to_string(), crate::json::Json::Bool(launch_undefined)),
         ("executable".to_string(), crate::json::Json::Bool(action_ok && !launch_undefined)),
+        ("planHash".to_string(), crate::json::Json::s(plan_hash)),
         ("prompt".to_string(), crate::json::Json::s(prompt)),
         ("requires_approval".to_string(), crate::json::Json::Bool(true)),
     ])
@@ -1236,6 +1251,26 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
             yield Ok(Event::default().event("error").data("approval required (srServeApproveGate/D0109): GET /api/agent/plan to review the parsed route + exact prompt, then re-invoke this stream with approved=1. The agent never runs on an unreviewed/unapproved route (closes issue059)."));
             return;
         }
+        // srServeApproveGateHuman: the approval is a HUMAN attestation, kind checked before role - a
+        // bare approved=1 flag let ANY caller (an AI included) approve its own routing. The approver
+        // arrives IN the gesture (issue199's class), and the approval binds to the EXACT reviewed
+        // plan: an edited route hashes differently and needs a fresh review.
+        let approver = q.approved_by.as_deref().map_or("", str::trim).to_string();
+        if !crate::actor::person_names(&root).contains(&approver) {
+            yield Ok(Event::default().event("error").data(format!("approval refused (srServeApproveGateHuman): `{approver}` is not a registered Person - execution needs a human approver named in the request (approved_by), and an AI actor is refused by KIND before role.")));
+            return;
+        }
+        match q.plan_hash.as_deref().map(str::trim) {
+            Some(h) if h == plan_identity(&q.action, &q.target, &prompt) => {}
+            Some(_) => {
+                yield Ok(Event::default().event("error").data("approval refused (srServeApproveGateHuman): the route changed since the plan you reviewed - GET /api/agent/plan again and approve the CURRENT plan (plan_hash mismatch)."));
+                return;
+            }
+            None => {
+                yield Ok(Event::default().event("error").data("approval refused (srServeApproveGateHuman): plan_hash is required - the approval covers the exact plan the human reviewed, so echo planHash from GET /api/agent/plan."));
+                return;
+            }
+        }
         if over_cap {
             yield Ok(Event::default().event("error").data(format!("busy: {AGENT_MAX_CONCURRENT} agent runs already in flight \u{2014} try again shortly")));
             return;
@@ -1249,7 +1284,7 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         // D0182 run lifecycle for LAUNCHED PROCESS RUNS: dirty-tree refusal + spawn snapshot.
         // The critique action keeps its lighter path (read-mostly, reviewed in-stream).
         let run_setup = if q.action == "launch" {
-            match crate::launcher::prepare(&root, &q.target) {
+            match crate::launcher::prepare(&root, &q.target, &approver) {
                 Ok(s) => Some(s),
                 Err(e) => {
                     yield Ok(Event::default().event("error").data(e));
@@ -1343,6 +1378,7 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
                     id: setup.id.clone(),
                     process: setup.process.clone(),
                     actor: setup.actor.clone(),
+                    approved_by: setup.approved_by.clone(),
                     head_at_spawn: setup.head_at_spawn.clone(),
                     fingerprint_at_spawn: setup.fingerprint_at_spawn,
                     started: setup.started,
@@ -2828,5 +2864,27 @@ mod view_status_tests {
         // No render path may emit content without a status — including an array body.
         let s = with_status("[1,2]", "computed", "");
         assert!(s.contains(r#""viewStatus":"computed""#) && s.contains(r#""data":[1,2]"#));
+    }
+
+    /// srServeSingleSpawnPoint: exactly one function spawns the agent, and this check makes a second
+    /// spawn path FAIL THE GATE rather than pass unnoticed. The marker is the agent invocation's
+    /// distinctive argument; git plumbing spawns (orient.rs) carry a different shape entirely.
+    #[test]
+    fn single_agent_spawn_point() {
+        let marker = "--include-partial-messages";
+        assert_eq!(
+            include_str!("serve.rs").matches(marker).count(),
+            // the spawn site + this test's own marker string
+            2,
+            "srServeSingleSpawnPoint: the agent must be spawned from exactly ONE site in serve.rs"
+        );
+        for (name, src) in [
+            ("main.rs", include_str!("main.rs")),
+            ("launcher.rs", include_str!("launcher.rs")),
+            ("orient.rs", include_str!("orient.rs")),
+            ("deck.rs", include_str!("deck.rs")),
+        ] {
+            assert_eq!(src.matches(marker).count(), 0, "unexpected agent spawn path in {name}");
+        }
     }
 }

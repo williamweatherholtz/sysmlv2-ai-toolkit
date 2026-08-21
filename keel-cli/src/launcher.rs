@@ -25,11 +25,11 @@ use std::path::{Path, PathBuf};
 
 /// The machine-local run-record schema, declared here and exempt from existence checks by design.
 ///
-/// Fields: `id, process, actor, startedTs, headAtSpawn, fingerprintAtSpawn, exit, turns,
-/// durationMs, timedOut, gate ("green"|"red"|"not-run"), diffFiles`.
-pub const RUN_RECORD_FIELDS: [&str; 12] = [
-    "id", "process", "actor", "startedTs", "headAtSpawn", "fingerprintAtSpawn", "exit", "turns", "durationMs",
-    "timedOut", "gate", "diffFiles",
+/// Fields: `id, process, actor, approvedBy, startedTs, headAtSpawn, fingerprintAtSpawn, exit,
+/// turns, durationMs, timedOut, gate ("green"|"red"|"not-run"), diffFiles`.
+pub const RUN_RECORD_FIELDS: [&str; 13] = [
+    "id", "process", "actor", "approvedBy", "startedTs", "headAtSpawn", "fingerprintAtSpawn", "exit", "turns",
+    "durationMs", "timedOut", "gate", "diffFiles",
 ];
 
 /// A prepared (not yet spawned) run.
@@ -37,6 +37,9 @@ pub struct RunSetup {
     pub id: String,
     pub process: String,
     pub actor: String,
+    /// The registered Person whose approval spawned this run (srServeApproveGateHuman): the launch
+    /// gesture carries its approver, and the run records name them - never resolved from a binding.
+    pub approved_by: String,
     pub head_at_spawn: String,
     pub fingerprint_at_spawn: u64,
     pub started: std::time::SystemTime,
@@ -47,7 +50,7 @@ pub struct RunSetup {
 /// # Errors
 /// A dirty tree (the single-writer rule — the refusal is also PM's `launch-dirty-refusal` ledger
 /// event, the PESS-2 watch metric), an unbound actor, or an unreadable HEAD.
-pub fn prepare(root: &Path, process: &str) -> Result<RunSetup, String> {
+pub fn prepare(root: &Path, process: &str, approved_by: &str) -> Result<RunSetup, String> {
     let dirty = crate::gitx::git()
         .arg("-C")
         .arg(root)
@@ -76,6 +79,7 @@ pub fn prepare(root: &Path, process: &str) -> Result<RunSetup, String> {
         id: crate::write::gen_uuid(),
         process: process.to_string(),
         actor,
+        approved_by: approved_by.to_string(),
         head_at_spawn: head,
         fingerprint_at_spawn: crate::fingerprint::of(root),
         started: std::time::SystemTime::now(),
@@ -176,6 +180,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
         u64::try_from(setup.started.elapsed().map_or(0, |d| d.as_millis())).unwrap_or(u64::MAX);
     let record = serde_json::json!({
         "id": setup.id, "process": setup.process, "actor": setup.actor,
+        "approvedBy": setup.approved_by,
         "startedTs": started_ts, "headAtSpawn": setup.head_at_spawn,
         "fingerprintAtSpawn": setup.fingerprint_at_spawn.to_string(),
         "exit": exit, "turns": turns, "durationMs": duration_ms, "timedOut": timed_out,
@@ -203,13 +208,14 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
              package Run{short} {{\n\
              \x20   private import EngineElement::*;\n\
              \x20   private import EngineVerification::*;\n\n\
-             \x20   verification run{short}Gate : Test {{ :>> id = \"{}\"; :>> title = \"launched run {short}: {} - post-run gate\"; :>> createdAt = \"{}\"; :>> createdBy = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"Post-run gate over the run-start-to-working-tree diff ({} file(s): {}). validate + activation-filtered guards + blocking rules. Turns {}; duration {}ms; timedOut {}. THE DIFF AWAITS HUMAN REVIEW regardless of this verdict. Problems at gate: {}\"; }}\n\
+             \x20   verification run{short}Gate : Test {{ :>> id = \"{}\"; :>> title = \"launched run {short}: {} - post-run gate\"; :>> createdAt = \"{}\"; :>> createdBy = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"Launch approved by {} against the reviewed plan (srServeApproveGateHuman). REACHABILITY RESIDUAL (srServeBoundedReachableContext): the run received only its declared inputs as context but could READ the whole repository; the enforced bound is the post-run whole-tree gate plus unconditional human diff review, not input scoping. Post-run gate over the run-start-to-working-tree diff ({} file(s): {}). validate + activation-filtered guards + blocking rules. Turns {}; duration {}ms; timedOut {}. THE DIFF AWAITS HUMAN REVIEW regardless of this verdict. Problems at gate: {}\"; }}\n\
              \x20   part run{short}GateR1 : TestResult {{ :>> id = \"{}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{}\"; :>> judgedAt = \"{}\"; :>> judgedBy = \"{}\"; }}\n\
              }}\n",
             crate::write::gen_uuid(),
             esc(&setup.process),
             crate::scaffold::today(),
             setup.actor,
+            esc(&setup.approved_by),
             diff_files.len(),
             esc(&diff_files.join(", ")),
             turns,
@@ -282,14 +288,14 @@ mod tests {
     fn dirty_tree_refuses_and_clean_tree_snapshots() {
         let root = git_root("prepare");
         std::fs::write(root.join("scratch.txt"), "uncommitted").expect("write");
-        let refused = prepare(&root, "critique").map(|_| ());
+        let refused = prepare(&root, "critique", "tester").map(|_| ());
         assert!(refused.is_err(), "dirty tree must refuse");
         assert!(refused.unwrap_err().contains("DIRTY"));
         let ledger = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).expect("ledger");
         assert!(ledger.contains("launch-dirty-refusal"), "the refusal is PM's watch metric");
         std::fs::remove_file(root.join("scratch.txt")).expect("rm");
         std::fs::write(root.join(".keel").join("actor"), "hum").expect("bind");
-        let setup = prepare(&root, "critique").expect("clean tree prepares");
+        let setup = prepare(&root, "critique", "tester").expect("clean tree prepares");
         assert!(!setup.head_at_spawn.is_empty(), "K12 needs the spawn HEAD");
     }
 
@@ -300,7 +306,7 @@ mod tests {
         let root = git_root("finish");
         std::fs::create_dir_all(root.join(".keel")).expect("mkdir");
         std::fs::write(root.join(".keel").join("actor"), "hum").expect("bind");
-        let setup = prepare(&root, "demo").expect("prepare");
+        let setup = prepare(&root, "demo", "tester").expect("prepare");
         let clean = finish(&root, &setup, Some(0), 3, false).expect("finish clean");
         assert!(clean.summary_path.is_none(), "empty diff -> no tracked summary");
         assert!(clean.local_record.exists(), "the local record always exists");
