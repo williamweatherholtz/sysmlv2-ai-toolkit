@@ -1618,8 +1618,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 41] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift"];
+pub const GUARD_NAMES: [&str; 42] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2120,6 +2120,93 @@ pub fn claude_surface_drift(root: &Path) -> GuardReport {
     }
 }
 
+/// Guard 42: an accepted `#ProspectiveChange` Decision is reachable by a tracked-item edge (D0188).
+///
+/// WARNING-TIER by D0188's composed rule with D0180: promotion to hard is a recorded review citing
+/// the fire-ledger evidence window, never a default. FORWARD-ONLY: the boundary is D0188's own
+/// recorded acceptance date, read from the model (never hardcoded); the 64 historical gaps are not
+/// retro-failed. THE LANDING-SPRINT GRACE: the most recently accepted violator is exempt — in this
+/// repo's practice acceptance and the chartered work land together, but a multi-contributor project
+/// may accept in one integration and charter in the next.
+#[must_use]
+#[allow(clippy::too_many_lines)]
+pub fn decision_scaffolding(root: &Path) -> GuardReport {
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut texts: Vec<(String, String)> = Vec::new();
+    for f in &files {
+        if let Ok(t) = std::fs::read_to_string(f) {
+            texts.push((relpath(root, f), t));
+        }
+    }
+    // The forward-only boundary: d0188's own acceptance date. Absent (downstream trees without the
+    // decision) → the guard has no boundary and passes with zero scanned — adoption is by decision.
+    let boundary = texts
+        .iter()
+        .find_map(|(_, t)| {
+            let i = t.find("part d0188AcceptR")?;
+            let j = t[i..].find("judgedAt = \"")? + i + "judgedAt = \"".len();
+            t.get(j..j + 10).map(str::to_string)
+        });
+    let Some(boundary) = boundary else {
+        return GuardReport { name: "decision-scaffolding", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    };
+    // Accepted #ProspectiveChange decisions with their own acceptance dates.
+    let mut candidates: Vec<(String, String)> = Vec::new(); // (decision, acceptedAt)
+    for (_, t) in &texts {
+        for line in t.lines() {
+            let l = line.trim_start();
+            let Some(rest) = l.strip_prefix("#ProspectiveChange part ") else { continue };
+            let Some((name, tail)) = rest.split_once(':') else { continue };
+            if !tail.trim_start().starts_with("Decision") {
+                continue;
+            }
+            let name = name.trim().to_string();
+            if !t.contains("DecisionStatus::accepted") {
+                continue;
+            }
+            let accepted_at = t
+                .find(&format!("part {name}AcceptR"))
+                .and_then(|i| {
+                    let j = t[i..].find("judgedAt = \"")? + i + "judgedAt = \"".len();
+                    t.get(j..j + 10).map(str::to_string)
+                })
+                .unwrap_or_default();
+            if !accepted_at.is_empty() && accepted_at.as_str() >= boundary.as_str() {
+                candidates.push((name, accepted_at));
+            }
+        }
+    }
+    let scanned = candidates.len();
+    // Reachability: any inbound tracked-item edge (charteredby/derivedfrom/resolves) or satisfy.
+    let reachable = |d: &str| -> bool {
+        let charter = "#CharteredBy dependency from ";
+        texts.iter().any(|(_, t)| {
+            t.lines().any(|l| {
+                let l = l.trim_start();
+                ((l.starts_with(charter) || l.starts_with("#DerivedFrom dependency from ") || l.starts_with("#Resolves dependency from "))
+                    && l.trim_end().trim_end_matches(';').ends_with(&format!(" to {d}")))
+                    || l.starts_with(&format!("satisfy {d} by "))
+            })
+        })
+    };
+    let mut bare: Vec<(String, String)> = candidates.into_iter().filter(|(d, _)| !reachable(d)).collect();
+    // Landing-sprint grace: the newest violator by acceptance date is exempt.
+    bare.sort_by(|a, b| a.1.cmp(&b.1));
+    if !bare.is_empty() {
+        bare.pop();
+    }
+    let warnings = bare
+        .into_iter()
+        .map(|(d, at)| {
+            format!(
+                "{d} (accepted {at}): an accepted #ProspectiveChange Decision with NO inbound tracked-item edge — it promises process change but charters no work (D0188). Add a #CharteredBy/#DerivedFrom/#Resolves edge from the item that delivers it, or record why none is needed."
+            )
+        })
+        .collect();
+    GuardReport { name: "decision-scaffolding", scanned, warnings, violations: Vec::new() }
+}
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2282,6 +2369,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
         "claude-surface-drift" => Some(claude_surface_drift(root)), // hard (D0174/K7) — a mutated hook command is a silently weakened control
+        "decision-scaffolding" => Some(decision_scaffolding(root)), // WARNING-tier (D0188, composed with D0180) — an accepted promise chartering no work
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

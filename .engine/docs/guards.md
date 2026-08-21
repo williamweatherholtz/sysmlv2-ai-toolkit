@@ -1,8 +1,8 @@
 # Guard reference
 
-`keel guard` runs **35** forward guards, kernel-free. **26 hard-blocking** (exit ≠ 0 on any violation)
-and **9 warning-only** (visible every commit, never blocking). `keel version` reports this split
-computed from the enforced set, so it cannot drift from what actually runs.
+`keel guard` runs **42** forward guards, kernel-free — hard-blocking (exit ≠ 0 on any violation)
+and warning-only (visible every commit, never blocking). `keel version` reports the exact split
+computed from the enforced set — read it there rather than here, so the number has one home.
 
 Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands.
 
@@ -44,6 +44,9 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `attestation-authority` | A disposition of a finding at or above Medium must be judged by a registered `Person` (D0092/D0080). Extends to dispositions the human-only rule `confirmation-authenticity` already enforces for Decision acceptance. Medium AND ABOVE only: D0080 explicitly permits an AI to disposition a LOW finding, and this repo contains a correct documented example — a guard demanding a human on every disposition would fail legitimate work and force either a false attestation or a bypass |
 
 ## Warning-only
+
+| `decision-scaffolding` | An accepted `#ProspectiveChange` Decision must be reachable by a tracked-item edge (charteredby/derivedfrom/resolves/satisfy) — it promises process change, so it charters work (D0188, answering the human's "the scaffolding under a decision isn't being made"). WARNING-tier by D0188's composed rule with D0180: promotion to hard is a recorded review citing the fire-ledger window. Forward-only from D0188's own recorded acceptance date, read from the model; the newest violator is exempt (the landing-sprint grace). |
+
 
 Visible on every commit, never blocking — the D0102 *promote-once-low-noise* pattern.
 
