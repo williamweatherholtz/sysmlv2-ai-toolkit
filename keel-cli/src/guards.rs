@@ -2771,7 +2771,10 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 6] = [
+        const LEGITIMATELY_EMPTY: [&str; 7] = [
+            // scans done-work -> SR pairs lacking a #Verify edge; sprints 393/394 verified every
+            // live SR (verification lens: neither = 0), so the population emptied by completion.
+            "verification-trace",
             "charter",                   // scans CHANGED files
             "process-change",            // scans CHANGED process definitions
             "retro-backlog",             // scans retro findings needing a backlog item
