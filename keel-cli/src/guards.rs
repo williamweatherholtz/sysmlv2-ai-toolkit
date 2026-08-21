@@ -373,7 +373,7 @@ pub fn ceremony(root: &Path) -> GuardReport {
 // ── charter guard (newly-added delivery Story declares its #CharteredBy edge) ───────────────────
 
 fn git_stdout(root: &Path, args: &[&str]) -> String {
-    std::process::Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(args)
@@ -1724,7 +1724,7 @@ fn items_with_attrs(src: &str, filename: &str) -> HashMap<String, (String, Vec<S
 
 /// The file's content at HEAD, or `None` if it is newly added.
 fn head_blob(root: &Path, path: &str) -> Option<String> {
-    let out = std::process::Command::new("git")
+    let out = crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["show", &format!("HEAD:{path}")])

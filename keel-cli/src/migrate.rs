@@ -560,7 +560,7 @@ pub fn check_preconditions(root: &Path, dry_run: bool) -> Option<Refusal> {
     if !root.join(".engine").is_dir() {
         return Some(Refusal::NotAKeelProject);
     }
-    let out = std::process::Command::new("git")
+    let out = crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["status", "--porcelain", "--", ".tracking", ".engine"])

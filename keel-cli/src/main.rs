@@ -264,7 +264,7 @@ method=confirmation needs explicit human sign-off. Invoke the engine-triage skil
     // editing items). Those land uncommitted with no signal, and a blanket `git add -A` once swept an
     // accepted D0126/D0127 into a sprint commit unnoticed. Silent when the tree is clean.
     let git = |args: &[&str]| -> String {
-        std::process::Command::new("git")
+        keel_cli::gitx::git()
             .arg("-C")
             .arg(root)
             .args(args)
@@ -2186,7 +2186,7 @@ fn cmd_accept(args: &[String]) -> i32 {
         eprintln!("error: no Decision '{decision}' under .engine/decisions/.");
         return 2;
     };
-    let sha = std::process::Command::new("git")
+    let sha = keel_cli::gitx::git()
         .arg("-C")
         .arg(&root)
         .args(["rev-parse", "--short", "HEAD"])

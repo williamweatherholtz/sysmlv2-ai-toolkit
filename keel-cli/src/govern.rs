@@ -9,7 +9,6 @@
 //! byte-parity, per D0076 (orient is the single source of truth for suspect).
 
 use std::path::Path;
-use std::process::Command;
 
 use crate::algo::{is_word, story_names};
 use crate::json::Json;
@@ -21,10 +20,11 @@ const GOVERNING_PROCESS_STORY: &str = ".engine/workflows/delivery.sysml";
 
 /// Run `git -C <repo> <args>`; return non-empty trimmed stdout lines, or `[]` on failure.
 fn git_lines(repo: &Path, args: &[&str]) -> Vec<String> {
-    crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    // The CALL count now happens in gitx::git() at construction; only the rich detail
+    // (argv tally, wall time) stays here, so the two layers never double-count.
     crate::perf::note_git(args);
     let output = crate::perf::timed(&crate::perf::GIT_NANOS, || {
-        Command::new("git").arg("-C").arg(repo).args(args).output()
+        crate::gitx::git().arg("-C").arg(repo).args(args).output()
     });
     match output {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
@@ -49,7 +49,7 @@ fn def_change_commits(repo: &Path, path: &str) -> Vec<String> {
 
 /// True if commit `a` is an ancestor of `b`.
 fn is_ancestor(repo: &Path, a: &str, b: &str) -> bool {
-    Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(repo)
         .args(["merge-base", "--is-ancestor", a, b])

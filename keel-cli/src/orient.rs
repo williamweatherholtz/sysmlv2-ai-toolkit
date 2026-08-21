@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::Path,
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use crate::indexer::{ExtractedIndex, TaskData};
@@ -151,7 +151,7 @@ pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
     if sha.is_empty() {
         return false;
     }
-    Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(repo)
         .args(["cat-file", "-t", sha])
@@ -169,7 +169,7 @@ pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
 /// is IDENTICAL to the pre-change ls-tree+show path (a `DoD` is authored on one line in this model).
 fn git_criterion_at(sha: &str, task: &str, repo: &Path) -> Option<String> {
     let dod_pfx = format!("verification {task}DoD");
-    let grep = Command::new("git")
+    let grep = crate::gitx::git()
         .arg("-C")
         .arg(repo)
         .args(["grep", "-h", "-F", "--no-color", "-e", &dod_pfx, sha, "--", ".tracking"])
@@ -236,7 +236,7 @@ fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
     if shas.is_empty() {
         return out;
     }
-    let spawn = Command::new("git")
+    let spawn = crate::gitx::git()
         .arg("-C").arg(repo)
         .args(["cat-file", "--batch-check"])
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
@@ -273,7 +273,7 @@ pub(crate) fn batch_cat_blobs(repo: &Path, keys: &[String]) -> HashMap<String, O
     if keys.is_empty() {
         return out;
     }
-    let spawn = Command::new("git")
+    let spawn = crate::gitx::git()
         .arg("-C").arg(repo)
         .args(["cat-file", "--batch"])
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
@@ -445,7 +445,7 @@ fn changed_paths_since(repo: &Path, sha: &str) -> Vec<String> {
     if sha.is_empty() {
         return Vec::new();
     }
-    Command::new("git")
+    crate::gitx::git()
         .arg("-C").arg(repo)
         .args(["diff", "--name-only", &format!("{sha}..HEAD")])
         .output()

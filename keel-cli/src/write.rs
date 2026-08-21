@@ -1583,7 +1583,7 @@ fn record_claim_locked(root: &Path, item: &str, actor: &str) -> Result<(String, 
     let dir = root.join(".tracking").join("claims");
     std::fs::create_dir_all(&dir)?;
     let file = dir.join(format!("{}.sysml", sanitize_name(actor)));
-    let sha = std::process::Command::new("git")
+    let sha = crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["rev-parse", "--short", "HEAD"])
@@ -1592,7 +1592,7 @@ fn record_claim_locked(root: &Path, item: &str, actor: &str) -> Result<(String, 
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_owned())
         .unwrap_or_default();
-    let at = std::process::Command::new("git")
+    let at = crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["log", "-1", "--format=%cs"])

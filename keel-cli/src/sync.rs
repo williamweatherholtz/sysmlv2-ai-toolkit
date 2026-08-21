@@ -26,7 +26,6 @@
 //! with no `keel` binary. Same reasoning as D0134 moving the in-loop gates into the binary.
 
 use std::path::Path;
-use std::process::Command;
 
 /// How this clone stands relative to its upstream.
 pub struct Divergence {
@@ -65,7 +64,7 @@ impl Divergence {
 }
 
 fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
-    let out = Command::new("git").arg("-C").arg(repo).args(args).output().map_err(|e| e.to_string())?;
+    let out = crate::gitx::git().arg("-C").arg(repo).args(args).output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {

@@ -630,8 +630,8 @@ fn model_at_commit(root: &Path, commit: &str, tag: &str) -> Result<Model, ViewEr
     let root_s = root.to_string_lossy().to_string();
     let tmp = std::env::temp_dir().join(format!("keel-bl-{tag}-{}", commit.replace(|c: char| !c.is_alphanumeric(), "")));
     let tmp_s = tmp.to_string_lossy().to_string();
-    let _ = std::process::Command::new("git").args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
-    let added = std::process::Command::new("git")
+    let _ = crate::gitx::git().args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
+    let added = crate::gitx::git()
         .args(["-C", &root_s, "worktree", "add", "--detach", "--quiet", &tmp_s, commit])
         .output()
         .is_ok_and(|o| o.status.success());
@@ -639,7 +639,7 @@ fn model_at_commit(root: &Path, commit: &str, tag: &str) -> Result<Model, ViewEr
         return Err(ViewError::Track("baseline-compare".to_string(), format!("cannot check out commit '{commit}' (unknown ref?)")));
     }
     let model = Model::build(&tmp);
-    let _ = std::process::Command::new("git").args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
+    let _ = crate::gitx::git().args(["-C", &root_s, "worktree", "remove", "--force", &tmp_s]).output();
     model
 }
 
@@ -4071,7 +4071,7 @@ fn rc_matches_subject(info: &ItemInfo, subject: &str) -> bool {
 /// Repo-relative, forward-slashed files git reports as newly-ADDED in the staged index — the `newlyAdded`
 /// scope set (matches the charter/sprint-coverage guards' forward-only semantics). Empty if git fails.
 fn staged_added_files(root: &Path) -> std::collections::HashSet<String> {
-    std::process::Command::new("git")
+    crate::gitx::git()
         .arg("-C").arg(root)
         .args(["diff", "--cached", "--name-only", "--diff-filter=A"])
         .output()
@@ -5113,10 +5113,11 @@ fn sampled_commits(root: &Path, n: usize) -> Vec<String> {
 
 /// Run `git -C root <args>` and capture stdout, or `None` on non-zero exit / failure.
 fn git_out(root: &Path, args: &[&str]) -> Option<String> {
-    crate::perf::add(&crate::perf::GIT_CALLS, 1);
+    // The CALL count now happens in gitx::git() at construction; only the rich detail
+    // (argv tally, wall time) stays here, so the two layers never double-count.
     crate::perf::note_git(args);
     let out = crate::perf::timed(&crate::perf::GIT_NANOS, || {
-        std::process::Command::new("git").arg("-C").arg(root).args(args).output()
+        crate::gitx::git().arg("-C").arg(root).args(args).output()
     })
     .ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
@@ -6104,7 +6105,7 @@ fn days_between(from: &str, to: &str) -> i64 {
 /// Deterministic — two contributors computing this queue against the same commit get the same ages,
 /// which a clock would not give them.
 fn repo_today(root: &Path) -> String {
-    std::process::Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["log", "-1", "--format=%cs"])

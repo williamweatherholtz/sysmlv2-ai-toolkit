@@ -23,10 +23,9 @@
 //! It is an AUDIT, never a gate (D0098). It blocks nothing, because completeness is a burndown.
 
 use std::path::Path;
-use std::process::Command;
 
 fn git(repo: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git").arg("-C").arg(repo).args(args).output().ok()?;
+    let out = crate::gitx::git().arg("-C").arg(repo).args(args).output().ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 

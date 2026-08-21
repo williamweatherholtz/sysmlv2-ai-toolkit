@@ -461,7 +461,7 @@ async fn cors_localhost(req: Request, next: Next) -> Response {
 
 /// Current short HEAD of `root` (for a disposition's `judgedAgainst`); `"uncommitted"` if git fails.
 fn git_head(root: &Path) -> String {
-    std::process::Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["rev-parse", "--short", "HEAD"])
@@ -473,7 +473,7 @@ fn git_head(root: &Path) -> String {
 
 /// ISO-8601 commit date of HEAD (the snapshot's `as-of`); `"unknown"` if git fails.
 fn git_head_date(root: &Path) -> String {
-    std::process::Command::new("git")
+    crate::gitx::git()
         .arg("-C")
         .arg(root)
         .args(["log", "-1", "--format=%cs", "HEAD"])
