@@ -275,9 +275,14 @@ body[data-local-readonly=true] #exp{display:inline-block}
 .card[data-cls=acceptance]{border-left-width:5px}
 .card[data-cls=acceptance]>header{display:flex;align-items:center;gap:8px}
 .card[data-cls=acceptance]>header::after{content:'needs your signature';margin-left:auto;
-  font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--acc);font-weight:700}
+  font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--h);font-weight:700}
 body[data-local-readonly=true] .live{display:none}
 .live{margin:12px 0 0;color:var(--ink3);font-size:12px}
+/* SELF-REPORT (issue188). `script ok` appears only if the script ran to its last statement;
+   its ABSENCE means every listener above the throw never registered, which is how a deck with
+   dead buttons was published and reported as working. */
+.sub::after{content:' \00b7 script did NOT finish';color:var(--reject);font-weight:700}
+body[data-local-js=ok] .sub::after{content:' \00b7 script ok';color:var(--accept);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
 """
@@ -306,8 +311,13 @@ JS = """
 // read-only; a single region switching off is a different fault and must not be reported as read-only
 // (that mistake is in the canvas skill's anti-pattern list).
 document.addEventListener('claude:sync-off', function(e){
-  if (e.target === document.body || e.target === document.documentElement) {
-    document.body.dataset.localReadonly = 'true';
+  // DO NOT FLAG READ-ONLY HERE (issue188). A region can go off for reasons that say nothing about
+  // whether this viewer may write - including a script touching the DOM, which is how this page
+  // disabled itself. Read-only is now concluded ONLY from a write that was actually REJECTED, in
+  // confirmSaved, where the runtime gives a reason code. This handler only reports what happened.
+  var el = document.getElementById('livenote');
+  if (el && (e.target === document.body || e.target === document.documentElement)) {
+    el.textContent = 'the document stopped accepting changes here - a verdict may not reach Claude';
   }
 });
 document.addEventListener('claude:sync-lost', function(){
@@ -316,6 +326,14 @@ document.addEventListener('claude:sync-lost', function(){
 });
 
 var LABEL = { accept:'accepted', maybe:'needs work', reject:'rejected', '':'' };
+
+// THE PAGE SAYS WHETHER ITS OWN SCRIPT SURVIVED (issue188, the lesson of issue152 applied here).
+// A script that throws leaves every listener below the throw unregistered, and the page looks
+// identical - which is exactly how a deck with dead buttons got published and reported as working.
+// This runs LAST, so `script ok` in the header means every listener above it registered. It writes a
+// `data-local-*` attribute rather than text: per-viewer chrome is exempt from the sync region, so the
+// marker cannot itself trip the region-off that broke the buttons in the first place.
+function markScriptAlive(){ document.body.dataset.localJs = 'ok'; }
 
 // POSITIVE CONFIRMATION, not an assumption. `claude.use('artifact')` resolves null when this view cannot
 // write at all; `sync(fn)` resolves once what fn changed has been appended and REJECTS with a code if it
@@ -345,7 +363,13 @@ function judged(){ return cards.filter(function(c){ return c.dataset.verdict; })
 function count(){
   document.getElementById('cnt').textContent = judged() + ' of ' + cards.length + ' judged';
 }
-count();
+// NO DOM WRITE AT LOAD - THIS IS WHAT BROKE THE BUTTONS (issue188).
+// On a live doc the runtime switches a sync region OFF when the region's DOM is changed by SCRIPT
+// rather than by a gesture. Calling count() here wrote `#cnt.textContent` the instant the page loaded,
+// so the body's region went off before the human touched anything, the sync-off handler flagged the
+// whole view read-only, and every subsequent tap reported `not saved`. The initial count is now
+// RENDERED INTO THE HTML by the generator - the contract's own instruction, "write content as HTML in
+// the page and mutate it directly in handlers" - and count() runs only from inside a handler.
 
 document.addEventListener('click', function(e){
   var h = e.target.closest('.grph');
@@ -424,6 +448,9 @@ function buildExport(){
 ');
   document.getElementById('copy').textContent = 'Copy';
 }
+
+// LAST STATEMENT IN THE SCRIPT. If the header does not say `script ok`, everything above threw.
+markScriptAlive();
 """
 
 
@@ -485,9 +512,11 @@ def render(items, generated_at, head_sha):
         + '</header>\n'
         + "".join(sections)
         + "\n</div>\n"
-        + '<div class=bar><span class=cnt id=cnt></span>'
-          '<button class=ghost id=clear>Reset</button>'
-          '<button class=ghost id=exp>Copy for Claude</button></div>\n'
+        # The count is RENDERED HERE, not written by script at load (issue188): a load-time DOM
+        # write switches the live-doc sync region off and every button stops saving.
+        + ('<div class=bar><span class=cnt id=cnt>0 of %d judged</span>' % total)
+        + '<button class=ghost id=clear>Reset</button>'
+        + '<button class=ghost id=exp>Copy for Claude</button></div>\n'
         + '<dialog id=dlg><textarea id=out readonly></textarea>'
           '<div class=dlgrow><button id=copy>Copy</button>'
           '<button class=ghost id=close>Close</button></div></dialog>\n'

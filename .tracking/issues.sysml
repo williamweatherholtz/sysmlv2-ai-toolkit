@@ -2163,4 +2163,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcDeckIsPortable to issue187;
+
+    part issue188 : Issue {
+        :>> id = "bd83596c-080f-4b47-a2e0-01f95802fbe2";
+        :>> title = "The published deck disabled its own live-doc sync at load, so every button reported not saved";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY THE HUMAN: mobile artifact buttons do not work. ROOT CAUSE IS AN ANTI-PATTERN THE SKILL ITSELF DOCUMENTS, which I wrote and then violated. On a live doc the runtime treats the body as a sync region and saves what a GESTURE changes; a DOM change made by SCRIPT is not a save, it is a signal that the region is no longer a faithful record, so the runtime switches the region OFF. count() was called at the end of the script and set the bottom bars textContent. That one line ran before the human touched anything, took the region off, and then my claude:sync-off handler set data-local-readonly=true - which is the second documented anti-pattern, concluding read-only from a benign region-off rather than from a rejected write. The page therefore declared itself unwritable at load and every tap answered not saved. I PUBLISHED IT AND REPORTED IT AS WORKING TWICE WITHOUT TESTING A SINGLE TAP, which is the part that matters more than the CSS: a script that throws or a region that goes off leaves a page that looks IDENTICAL to a working one, and I had already built the js-ok marker for the console for exactly this reason (issue152) and did not carry it to the deck. TWO FURTHER DEFECTS FOUND IN THE SAME INSPECTION, both introduced by me one sprint earlier: var(--acc) is not a declared custom property, so the needs-your-signature ribbon lost its colour silently; and the self-report set an attribute that nothing rendered, which is the same defect as a dead button - the state exists and nobody can see it. PREVENTING CHANGE: no DOM write outside a gesture handler; read-only only from a sync() rejection; the page reports whether its own script survived; and every claim verified from the EMITTED HTML rather than from the generator source.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckButtonsLive to issue188;
 }

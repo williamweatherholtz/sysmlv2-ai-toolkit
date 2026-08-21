@@ -97,7 +97,14 @@ and nothing more — do not invent a rationale for them. A tap in a browser is t
 specific item it sits on; it is not licence to infer their position on anything else, and it is not
 sign-off on a claim the deck did not state.
 
-## The export must actually leave the page
+## The export is a FALLBACK, and hidden unless it is the only thing that works
+
+`#exp` is `display:none` until `data-local-readonly=true`. An always-visible copy button teaches the
+reader that copying is the route, which is the habit the live doc exists to remove — and it was asked
+for twice. It is not deleted: a read-only viewer has no other way to return anything, and there it is
+the only thing that works.
+
+### When it does show, it must actually leave the page
 
 The clipboard API REJECTS inside a sandboxed artifact frame without `clipboard-write` permission. A
 `.then()` with no rejection handler therefore fails silently and the button does not even change its
@@ -105,6 +112,62 @@ label — which is what shipped first, and the human had to select the text by h
 passes `manual` as the rejection handler, lifts `readonly` so iOS can select programmatically, and ends
 every path in either `Copied` or `Text selected - copy it`. Never leave a control that can appear to do
 nothing.
+
+## The live doc switches itself off if script touches the DOM (issue188)
+
+**This is the defect that shipped a deck whose buttons did nothing, twice reported as working.** Read
+this section before changing the generator; every rule here cost a broken publish.
+
+On a live doc the runtime treats the `<body>` as a sync region and saves what a **gesture** changes. A
+DOM change made by **script** is not a save — it is a signal that the region is no longer a faithful
+record, so the runtime switches the region **off**. Everything below follows from that one sentence.
+
+### 1. Never write to the DOM at load
+
+`count()` was called at the end of the script and set `#cnt.textContent`. That single line ran before
+the human touched anything, took the body's region off, and made every later tap report `not saved`.
+
+- Render initial content **in the generator**, as HTML. The contract's own words: *write content as HTML
+  in the page and mutate it directly in handlers.*
+- A DOM write may only happen **inside a gesture handler**.
+- Per-viewer chrome (`data-local-*`, `<artifact-local>`) is exempt — that is where a self-report marker
+  and any restored UI state belong.
+
+### 2. Read-only is concluded from a REJECTED WRITE, never from `claude:sync-off`
+
+A region can go off for reasons that say nothing about whether this viewer may write — including rule 1
+firing. The handler that flagged `data-local-readonly` on any body-level sync-off turned a self-inflicted
+region-off into a page that declared itself unwritable.
+
+- `claude:sync-off` may only **report**.
+- Read-only follows a `sync()` rejection carrying `not_writer` / `not_granted`, and nothing else.
+
+### 3. The page must say whether its own script survived
+
+A script that throws leaves every listener below the throw unregistered, and the page looks **identical**.
+That is indistinguishable from a working page with nothing to do, which is how a dead deck was published
+and reported as fine — twice.
+
+- The last statement sets a `data-local-*` marker; CSS shows `script ok` when present and
+  `script did NOT finish` when absent, so **absence is the signal**.
+- The marker writes an attribute, not text, so the self-report cannot itself trip rule 1.
+
+### 4. Verify from the EMITTED HTML, never from the generator
+
+Reading the python settles what was intended. Counting the output settles what the reader gets. Every
+claim in the sprint that shipped this was checked against the generator; the two defects that mattered
+were both visible in the output.
+
+Check, on the generated file: zero top-level DOM mutations before the click listener registers; the
+count present as text; the marker as the last statement; `Sign` occurring exactly as often as
+`data-cls="acceptance"`; `#exp{display:none}` present; a `--custom-property` used by CSS actually
+declared (`var(--acc)` was not, and the ribbon silently lost its colour).
+
+### 5. Publish, then ask — do not assert
+
+A deck cannot be tested from here. Hand over the URL and say what to look for: whether the header reads
+`script ok`, and whether a tap turns a card and shows `saved`. **Never report the buttons as working on
+the strength of having written them.**
 
 ## Guardrails
 
