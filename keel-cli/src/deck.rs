@@ -376,6 +376,7 @@ function saveLocal(card,verdict){
   var url='', body=null;
   if(cls==='finding'){
     if(verdict==='maybe'){say(card,'noted - needs-work carries no disposition; the note travels with your next verdict');return;}
+    if(!HUMAN){say(card,'no registered human reviewer - a disposition may not be recorded without its judge');return;}
     url='/api/disposition';
     body={finding:name,verdict:(verdict==='accept'?'act':'dismiss'),rationale:(note||'tapped on the deck by '+HUMAN+' with no per-item note'),judged_at:today,judged_by:HUMAN};
   } else if(cls==='acceptance'){

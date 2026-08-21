@@ -299,27 +299,52 @@ fn headless_ask(root: &Path, path: &str, session: &str, run_id: &str) -> bool {
     let ask_id = console_http("POST", "/api/run/ask", Some(&ask_body))
         .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok())
         .and_then(|v| v.get("id").and_then(serde_json::Value::as_str).map(str::to_string));
+    let mut denied_by: Option<String> = None;
     if let Some(id) = ask_id {
         // ~60s bounded wait (the hook deadline is 100s+; margin per charter note 2)
         for _ in 0..30 {
             std::thread::sleep(std::time::Duration::from_secs(2));
-            let answer = console_http("GET", &format!("/api/run/answer?id={id}"), None)
-                .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok())
-                .and_then(|v| v.get("answer").and_then(serde_json::Value::as_str).map(str::to_string));
+            let v = console_http("GET", &format!("/api/run/answer?id={id}"), None)
+                .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok());
+            let answer = v.as_ref().and_then(|v| v.get("answer").and_then(serde_json::Value::as_str).map(str::to_string));
+            let by = v.as_ref().and_then(|v| v.get("by").and_then(serde_json::Value::as_str)).unwrap_or("").to_string();
             match answer.as_deref() {
-                Some("allow") => return true,
-                Some("deny") => break,
+                Some("allow") => {
+                    // issue200/K7: the ALLOW is a human authorization of a protected write and must
+                    // leave a record naming the human, exactly as the override tier's consumption
+                    // does. Recorded under the APPROVER — theirs is the judgment being recorded.
+                    let approver = if by.is_empty() { "unknown".to_string() } else { by };
+                    let _ = keel_cli::write::record_obligation(
+                        root,
+                        "ask-allow",
+                        &format!("headless run write ALLOWED by {approver}: {path}"),
+                        &format!("{approver} allowed a launched run's ({run_id}) ask-tier write to {path} from the console approve queue (D0182 headless mapping; issue200/K7 - an authorization is a recorded fact, not an evaporating click). Discharge: review the landed write, then triage with a #Resolves edge."),
+                        &approver,
+                    );
+                    return true;
+                }
+                Some("deny") => {
+                    if !by.is_empty() {
+                        denied_by = Some(by);
+                    }
+                    break;
+                }
                 _ => {}
             }
         }
     }
-    // deny + queued obligation (auto-deny branch / expiry / console down)
-    if let Ok(actor) = keel_cli::actor::resolve(root, None) {
+    // deny + queued obligation: a HUMAN's deny is recorded as their judgment (issue200); expiry or
+    // an absent console stays attributed to the run's own actor, because nobody judged anything.
+    let (actor, why) = denied_by.as_ref().map_or_else(
+        || (keel_cli::actor::resolve(root, None), "no human approval arrived within the bounded wait, so it was DENIED".to_string()),
+        |by| (Ok(by.clone()), format!("{by} DENIED it from the console approve queue")),
+    );
+    if let Ok(actor) = actor {
         let _ = keel_cli::write::record_obligation(
             root,
             "headless-ask",
             &format!("headless run write denied pending review: {path}"),
-            &format!("A launched run ({run_id}) requested an ask-tier write to {path}; no human approval arrived within the bounded wait, so it was DENIED and queued (D0182 headless mapping). Discharge: review whether the write should happen, perform or decline it, and triage with a #Resolves edge."),
+            &format!("A launched run ({run_id}) requested an ask-tier write to {path}; {why} and queued (D0182 headless mapping). Discharge: review whether the write should happen, perform or decline it, and triage with a #Resolves edge."),
             &actor,
         );
     }

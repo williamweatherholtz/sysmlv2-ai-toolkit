@@ -2295,4 +2295,26 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDeckFindingJudgedBy to issue199;
+
+    part issue200 : Issue {
+        :>> id = "27907d18-5560-429b-a64f-206b66f5385b";
+        :>> title = "The console approve-queue answer carries no actor and an allow leaves no record";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "POST /api/run/answer records the human's allow/deny of a launched run's ask-tier write as a bare boolean: no field names who answered, no Person check runs, and on allow NOTHING is recorded anywhere - the write proceeds and the authorization evaporates (the deny path at least queues an obligation). This is the issue197/199 class on the ask channel plus a K7-shape gap: the recorded-override tier records consumption as a tracked obligation, and the ask tier - the same judgment made through a different gesture - records nothing. Rule: the actor is data the gesture carries, never ambient state any layer resolves.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyAmbientActorAudit to issue200;
+
+    part issue201 : Issue {
+        :>> id = "4d303ad8-2e60-415e-8e1b-933e0392803d";
+        :>> title = "The ask queue's doc claims the console renders it, but no surface exists - the ask tier is deny-only in practice";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "GET /api/run/asks is documented 'the human-facing queue (console renders it)' yet console.html contains zero references to it: a launched run's ask-tier write can never be approved, only expire to deny+obligation after the 60s bounded wait. The endpoint doc asserts a client that does not exist - dual truth between code comment and shipped console. Discharge: an approve-queue section on the console that polls /api/run/asks and answers with the named human.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from storyAmbientActorAudit to issue201;
 }

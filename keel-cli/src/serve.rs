@@ -48,7 +48,11 @@ fn console_build() -> &'static str {
 ///
 /// `SemVer`: a breaking change to any `/api/*` read contract bumps the major version. A separate viewer
 /// app pins this; `GET /api/version` reports it.
-pub const KEEL_API_VERSION: &str = "1.17.0";
+// 2.0.0 (issue199/issue200, D0178/K6): BREAKING — the judgment write endpoints (disposition,
+// decision/accept, decision/reject, gate-result) now REQUIRE judged_by in the body, and run/answer
+// requires a registered-Person `by`. The binding fallback on judgment writes was the misattribution
+// vector three times; a writer that omits the judge is refused, never guessed for.
+pub const KEEL_API_VERSION: &str = "2.0.0";
 
 /// The stable, committed read endpoints a viewer may depend on (the versioned contract surface).
 const KEEL_API_READ_ENDPOINTS: &[&str] = &[
@@ -58,6 +62,8 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
     "/api/computed/:cmd", "/api/critique-plan", "/api/boundary", "/api/boundary-sweep", "/api/events", "/api/check", "/api/fingerprint", "/api/index", "/api/relations", "/api/grammar",
     // issue178: registered but advertised by nothing, so a viewer could not discover them.
     "/api/scope", "/api/projects",
+    // issue200/issue201: the registered-Person set, so no page ships a hardcoded human name.
+    "/api/persons",
 ];
 
 /// The committed WRITE endpoints a viewer may drive to change the model THROUGH keel processes + the
@@ -98,7 +104,10 @@ const AGENT_MAX_TURNS: &str = "30";
 const AGENT_MAX_CONCURRENT: usize = 2;
 
 /// id -> (path, session, answer: None = pending) — the headless-ask proxy queue (D0182).
-type AskQueue = HashMap<String, (String, String, Option<bool>)>;
+/// id → (path, session, answer). The answer carries WHO answered (issue200, D0178/K6): the approve
+/// click is a human judgment, and the actor is data the gesture carries — an unattributed allow
+/// would authorize a protected write with no record naming the human.
+type AskQueue = HashMap<String, (String, String, Option<(bool, String)>)>;
 
 #[derive(Clone)]
 struct AppState {
@@ -284,6 +293,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/business", get(api_business))
         .route("/api/launchables", get(api_launchables))
         .route("/api/dispositions", get(api_dispositions))
+        .route("/api/persons", get(api_persons))
         .route("/api/processes", get(api_processes))
         .route("/api/report/:name", get(api_report))
         .route("/api/computed/:cmd", get(api_computed))
@@ -548,14 +558,9 @@ async fn api_deck_sitting(
     axum::Json(b): axum::Json<DeckSittingReq>,
 ) -> Response {
     let root = s.rootpath();
-    let actors = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")).unwrap_or_default();
-    let is_person = actors.lines().any(|l| {
-        let l = l.trim_start();
-        !l.starts_with("//")
-            && l.strip_prefix("part ")
-                .and_then(|r| r.split_once(':'))
-                .is_some_and(|(n, after)| n.trim() == b.by && after.trim_start().starts_with("Person"))
-    });
+    // One Person registry, one reader: the same actor::person_names the D0178 carve-out and the
+    // run-answer check use — three surfaces disagreeing on who counts as a Person is its own defect.
+    let is_person = crate::actor::person_names(&root).iter().any(|n| n == &b.by);
     if !is_person {
         return (
             StatusCode::BAD_REQUEST,
@@ -631,12 +636,13 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}'\"}}")).into_response(),
     };
     let sha = git_head(&s.rootpath());
-    let judged_by = match crate::actor::resolve(&s.rootpath(), body.judged_by.as_deref()) {
-        Ok(a) => a,
-        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
-        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
-        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    // issue197/issue199, closed at the endpoint (D0178/K6): a disposition is a judgment, and the
+    // actor is data the gesture carries — never ambient state this layer resolves. The old binding
+    // fallback is exactly how the human's 19 deck taps were recorded as the session AI.
+    let Some(judged_by) = body.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the actor is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
+    let judged_by = judged_by.to_string();
     let critiques = s.rootpath().join(".tracking").join("critiques.sysml");
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
@@ -694,14 +700,14 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
-        Ok(a) => a,
-        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
-        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
-        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    // D0178/K6 (issue199's class): accepting a Decision is the human sign-off itself — the signer
+    // must arrive IN the gesture. The binding fallback would let an empty body sign as whoever this
+    // machine is bound to; `refuse_ai_judgment` below only catches the AI-bound case.
+    let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let sha = git_head(&s.rootpath());
-    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.note) {
+    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &b.note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -726,14 +732,12 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
     if b.rationale.trim().is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"a rejection rationale is required\"}".to_string()).into_response();
     }
-    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
-        Ok(a) => a,
-        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
-        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
-        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    // D0178/K6 (issue199's class): same rule as accept — the rejecting human arrives IN the gesture.
+    let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let sha = git_head(&s.rootpath());
-    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, &judged_by, &b.rationale) {
+    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &b.rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -756,12 +760,13 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
     let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
     };
-    let judged_by = match crate::actor::resolve(&s.rootpath(), b.judged_by.as_deref()) {
-        Ok(a) => a,
-        // D0129/issue072: an omitted actor used to default to a named HUMAN, silently forging a
-        // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
-        Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
+    // D0178/K6 (issue199's class): this endpoint's documented purpose is the review queue's human
+    // sign-off of a confirmation gate, so the signer must arrive IN the gesture. (AI ceremony gates
+    // go through the CLI's append-gate-result, which has its own explicit-actor semantics.)
+    let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
+    let judged_by = judged_by.to_string();
     let sha = git_head(&s.rootpath());
     let note = b.note.as_deref().filter(|t| !t.is_empty());
     let verdict = match b.verdict.as_deref() {
@@ -1436,14 +1441,15 @@ async fn api_run_asks(State(s): State<AppState>) -> Response {
             asks.iter()
                 .map(|(id, (path, session, answer))| {
                     format!(
-                        "{{\"id\":\"{id}\",\"path\":\"{}\",\"session\":\"{}\",\"state\":\"{}\"}}",
+                        "{{\"id\":\"{id}\",\"path\":\"{}\",\"session\":\"{}\",\"state\":\"{}\",\"by\":\"{}\"}}",
                         path.replace('"', "'"),
                         session.replace('"', "'"),
                         match answer {
                             None => "pending",
-                            Some(true) => "allowed",
-                            Some(false) => "denied",
-                        }
+                            Some((true, _)) => "allowed",
+                            Some((false, _)) => "denied",
+                        },
+                        answer.as_ref().map_or("", |(_, by)| by).replace('"', "'")
                     )
                 })
                 .collect()
@@ -1457,32 +1463,47 @@ struct RunAnswerPoll {
     id: String,
 }
 
-/// GET /api/run/answer?id=X — the hook's poll: pending | allow | deny.
+/// GET /api/run/answer?id=X — the hook's poll: pending | allow | deny, plus WHO answered (`by`), so
+/// the hook can record the authorization against the human who gave it (issue200/K7).
 async fn api_run_answer_poll(State(s): State<AppState>, Query(q): Query<RunAnswerPoll>) -> Response {
     let state = s
         .asks
         .lock()
         .ok()
-        .and_then(|asks| asks.get(&q.id).map(|(_, _, a)| *a));
-    let word = match state {
-        None => "unknown",
-        Some(None) => "pending",
-        Some(Some(true)) => "allow",
-        Some(Some(false)) => "deny",
+        .and_then(|asks| asks.get(&q.id).map(|(_, _, a)| a.clone()));
+    let (word, by) = match state {
+        None => ("unknown", String::new()),
+        Some(None) => ("pending", String::new()),
+        Some(Some((true, by))) => ("allow", by),
+        Some(Some((false, by))) => ("deny", by),
     };
-    ok_json(format!("{{\"answer\":\"{word}\"}}"))
+    ok_json(format!("{{\"answer\":\"{word}\",\"by\":\"{}\"}}", by.replace('"', "'")))
 }
 
 #[derive(serde::Deserialize)]
 struct RunAnswerReq {
     id: String,
     allow: bool,
+    by: String,
 }
 
 /// POST /api/run/answer — the HUMAN's click on the console approve queue (the human channel).
+/// `by` is required and must be a registered Person (issue200, D0178/K6): allowing a launched run's
+/// protected write is a human judgment, and an AI must not be able to answer its own ask.
 async fn api_run_answer(State(s): State<AppState>, axum::Json(b): axum::Json<RunAnswerReq>) -> Response {
+    let by = b.by.trim().to_string();
+    if !crate::actor::person_names(&s.rootpath()).contains(&by) {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "{{\"error\":\"`{}` is not a registered Person - answering a run's ask is a human judgment and may not be recorded as an AI (issue200/D0178)\"}}",
+                by.replace('"', "'")
+            ),
+        )
+            .into_response();
+    }
     let known = s.asks.lock().is_ok_and(|mut asks| {
-        asks.get_mut(&b.id).map(|slot| slot.2 = Some(b.allow)).is_some()
+        asks.get_mut(&b.id).map(|slot| slot.2 = Some((b.allow, by))).is_some()
     });
     if known {
         ok_json(format!("{{\"ok\":true,\"id\":\"{}\"}}", b.id))
@@ -2136,6 +2157,16 @@ async fn api_launchables(State(s): State<AppState>) -> Response {
 
 async fn api_dispositions(State(s): State<AppState>) -> Response {
     cached(&s, "dispositions", crate::view::dispositions)
+}
+
+/// GET /api/persons (issue200/issue201) — the registered `Person` set. Pages offer these as the
+/// judgedBy choices instead of shipping a hardcoded human name; the write endpoints still verify.
+async fn api_persons(State(s): State<AppState>) -> Response {
+    let names: Vec<String> = crate::actor::person_names(&s.rootpath())
+        .into_iter()
+        .map(|n| format!("\"{}\"", n.replace('"', "'")))
+        .collect();
+    ok_json(format!("{{\"persons\":[{}]}}", names.join(",")))
 }
 
 async fn api_processes(State(s): State<AppState>) -> Response {

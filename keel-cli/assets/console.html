@@ -41,6 +41,7 @@
  <div class="sub">Technical smooth sailing · <b>build __KEEL_BUILD__</b><span id="build" class="muted" style="color:#7d8a97"></span></div></header>
 <nav id="nav"></nav>
 <div id="status">loading…</div>
+<div id="askbar"></div>
 <main id="main"></main>
 <div id="modal"></div>
 <script>
@@ -144,6 +145,38 @@ function card(l,v,d,tone,attrs){return `<div class="c ${tone||''}"${attrs||''}><
 async function get(u){const r=await fetch(u);let j=null;try{j=await r.json()}catch(_){}
  if(!r.ok){const e=new Error((j&&(j.reason||j.viewStatus))||('HTTP '+r.status));e.viewStatus=(j&&j.viewStatus)||'failed';throw e}
  return j}
+// issue199/issue200 class rule: the actor is data the gesture carries — every judgment prompt asks,
+// nothing defaults, and a cancelled prompt records NOTHING. Persons come from the model, not a
+// name baked into this page.
+let PERSONS=[];
+(async()=>{try{PERSONS=(await get('/api/persons')).persons||[]}catch(_){}})();
+function judgedBy(){
+ const d=PERSONS.length===1?PERSONS[0]:'';
+ const by=(prompt('Your name (judgedBy) — this judgment is recorded as YOURS:'+(PERSONS.length?' ['+PERSONS.join(', ')+']':''),d)||'').trim();
+ if(!by){status.textContent='not recorded — a judgment needs the judge’s name (issue199)';return null}
+ return by;
+}
+// issue201: the approve queue for launched runs' ask-tier writes. Without this surface an ask can
+// only expire to deny — the doc claimed a renderer that did not exist.
+async function renderAsks(){
+ const bar=document.getElementById('askbar');
+ try{
+  const d=await get('/api/run/asks');
+  const pend=(d.asks||[]).filter(a=>a.state==='pending');
+  bar.innerHTML=pend.length?('<div style="background:#7a4a00;color:#fff;padding:8px 16px;font-size:12px">'+pend.map(a=>
+   'a launched run asks to write <code>'+esc(a.path)+'</code> (session '+esc(a.session.slice(0,8))+') '+
+   '<button onclick="answerAsk(\''+esc(a.id)+'\',true)">Allow</button> <button onclick="answerAsk(\''+esc(a.id)+'\',false)">Deny</button>'
+  ).join('<br>')+'</div>'):'';
+ }catch(_){bar.innerHTML=''}
+}
+async function answerAsk(id,allow){
+ const by=judgedBy();if(!by)return;
+ try{const r=await fetch('/api/run/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id,allow,by})});
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
+  status.textContent=(allow?'allowed':'denied')+' as '+by+' (recorded)';renderAsks();
+ }catch(e){status.textContent='answer error: '+e.message}
+}
+setInterval(renderAsks,5000);renderAsks();
 // A view's own status decides how it is drawn. An empty COMPUTED view says so; a STALE one says
 // when it was last true; a FAILED one says why. None of them renders as the others (N-C2).
 function statusBanner(d){
@@ -178,7 +211,8 @@ async function runAgentModal(action,target,section,boundary){
 }
 async function addTestResult(task){
  const v=(document.getElementById('trv')||{}).value||'pass';
- try{const r=await fetch('/api/testresult',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,verdict:v,judged_at:new Date().toISOString().slice(0,10),judged_by:'wweatherholtz'})});
+ const by=judgedBy();if(!by)return;
+ try{const r=await fetch('/api/testresult',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,verdict:v,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   mlog('recorded TestResult '+j.name+' ('+j.verdict+') on '+task+'\n');
  }catch(e){mlog('error: '+e.message+'\n')}
@@ -248,7 +282,7 @@ function openBoundaryCritique(need){
 async function disposition(finding,verdict){
  const rationale=prompt(`Rationale for "${verdict}" on ${finding}:`,'');
  if(rationale===null)return;
- const by=prompt('Your name (judgedBy):','wweatherholtz')||'';
+ const by=judgedBy();if(!by)return;
  status.textContent='recording disposition…';
  try{
   const r=await fetch('/api/disposition',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({finding,verdict,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
@@ -269,7 +303,7 @@ async function disposition(finding,verdict){
 async function acceptDecision(name,file){
  const note=prompt('Acceptance note for '+name+' — your rationale. This IS your recorded sign-off:','');
  if(note===null)return;
- const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ const by=judgedBy();if(!by)return;
  status.textContent='recording acceptance…';
  try{const r=await fetch('/api/decision/accept',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
@@ -279,7 +313,7 @@ async function acceptDecision(name,file){
 async function acceptGate(name,file){
  const note=prompt('Acceptance note for '+name+' (optional) — this IS your recorded sign-off:','');
  if(note===null)return;
- const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ const by=judgedBy();if(!by)return;
  status.textContent='recording acceptance…';
  try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'pass',note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
@@ -289,7 +323,7 @@ async function acceptGate(name,file){
 async function rejectDecision(name,file){
  const rationale=prompt('REJECT '+name+' — rationale (required). This IS your recorded judgment:','');
  if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
- const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ const by=judgedBy();if(!by)return;
  status.textContent='recording rejection…';
  try{const r=await fetch('/api/decision/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
@@ -299,7 +333,7 @@ async function rejectDecision(name,file){
 async function rejectGate(name,file){
  const rationale=prompt('REJECT '+name+' — rationale (required). This IS your recorded judgment:','');
  if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
- const by=prompt('Your name (judgedBy):','wweatherholtz')||'wweatherholtz';
+ const by=judgedBy();if(!by)return;
  status.textContent='recording rejection…';
  try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'fail',note:rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
