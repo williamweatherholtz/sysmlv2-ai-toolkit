@@ -117,7 +117,7 @@ package EngineSkillRegistry {
     part sprintReview : AISkill {
         :>> id = "f597ch3c-0e45-4b7f-ab80-0e37e4h3g000";
         :>> title = "sprint-review";
-        :>> purpose = "Per-sitting human review (D0049): summarize the sitting's sprints + metrics (velocity/efficiency/accuracy), run the transcript scan that feeds the autonomous retro, and record the human's explicit confirmation of the sitting — the single human gate.";
+        :>> purpose = "Deploys .engine/processes/review-critique.sysml (D0172). Per-sitting human review (D0049): summarize the sitting's sprints + metrics (velocity/efficiency/accuracy), run the transcript scan that feeds the autonomous retro, and record the human's explicit confirmation of the sitting — the single human gate.";
         :>> location = ".engine/skills/sprint-review/SKILL.md";
         :>> triggerCondition = "Sprint review gate; asked for velocity, efficiency, estimate accuracy, or process issues.";
         :>> writePolicy = WritePolicy::direct;
@@ -133,7 +133,7 @@ package EngineSkillRegistry {
     part sprintRetro : AISkill {
         :>> id = "b719ej5e-2a67-4d9b-cd02-2a59a6j5i222";
         :>> title = "sprint-retro";
-        :>> purpose = "Autonomously retro the just-finished sprint (D0049/D0131), deploying the retrospective in .engine/processes/agile-workflow.sysml: retroIdentify (name what was AVOIDABLE — preventable by a guard/rule/skill/doc/check — including findings against this thread's own earlier work), retroTrack (EACH avoidable issue becomes a tracked Issue with severity PLUS its resolving backlog action placed at its correct PRIORITY, since declaration order IS priority (D0052) — or the retro states explicitly why no item is needed; writing a lesson into a doc, a commit message or agent memory INSTEAD of tracking it is forbidden, because a lesson that terminates in prose is not retained (D0018/issue085)), retroPromote (a behavior-changing finding becomes a Decision via the Change Request path). Record the retro gate (method=analyze, AI-judged) — no human input. Backstopped by guard:retro-backlog.";
+        :>> purpose = "Deploys .engine/processes/review-critique.sysml (D0172). Autonomously retro the just-finished sprint (D0049/D0131), deploying the retrospective in .engine/processes/agile-workflow.sysml: retroIdentify (name what was AVOIDABLE — preventable by a guard/rule/skill/doc/check — including findings against this thread's own earlier work), retroTrack (EACH avoidable issue becomes a tracked Issue with severity PLUS its resolving backlog action placed at its correct PRIORITY, since declaration order IS priority (D0052) — or the retro states explicitly why no item is needed; writing a lesson into a doc, a commit message or agent memory INSTEAD of tracking it is forbidden, because a lesson that terminates in prose is not retained (D0018/issue085)), retroPromote (a behavior-changing finding becomes a Decision via the Change Request path). Record the retro gate (method=analyze, AI-judged) — no human input. Backstopped by guard:retro-backlog.";
         :>> location = ".engine/skills/sprint-retro/SKILL.md";
         :>> triggerCondition = "Sprint retro gate; asked for retrospective or process improvement dispatch.";
         :>> writePolicy = WritePolicy::direct;

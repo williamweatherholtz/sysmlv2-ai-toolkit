@@ -58,4 +58,44 @@ package ProjectIntake20260820B {
     #Implicates dependency from us012 to issue174;
     #Implicates dependency from us012 to issue175;
     #Implicates dependency from us012 to issue176;
+
+    // -- fifth intake: retros must produce items; reviews must critique; the buttons still fail ----
+    part st008 : Statement {
+        :>> id = "a95c03e7-4b61-4d28-8f50-72ba16ce9d40";
+        :>> title = "retros should identify recurring issues as items; reviews should run the 3 critique passes; new process";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> text = "are we identifying these recurring issues in sprint retros? we should be. and have sprint reviews with the 3 critique pass and add those items two. new process";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-20"; :>> channel = StatementChannel::chat;
+    }
+    part st009 : Statement {
+        :>> id = "c07d5b29-8e43-4a16-9f62-31ba84ce5d07";
+        :>> title = "buttons still do not work: they press but do not latch";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> text = "buttons still funny work. I press them but they don't latch. they indicate state do they should latch [corrected:] still don't* work";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-20"; :>> channel = StatementChannel::chat;
+    }
+
+    part us014 : UserStory {
+        :>> id = "e63b90f4-2a57-4c81-8d05-46ca72be1d38";
+        :>> title = "a recurring retro finding becomes a tracked item, enforced";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "sprint retros to turn recurring issues into tracked items, and sprint reviews to run the critique passes and track what they find";
+        :>> soThat = "a lesson learned five times costs five sprints once, not five times";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "process, and the evidence for the gap is exact: the retro-backlog guard passes when ANY tracked item is co-staged in the commit, so a retro finding never needs ITS OWN item as long as the sprint recorded something else - and every hardening commit did. The heredoc failure appears in five retros and zero backlog items. Their word `two` is read as `too`.";
+    }
+    part us015 : UserStory {
+        :>> id = "f24a81c5-9d30-4e67-8b19-50ca63be7f24";
+        :>> title = "a tapped verdict latches visibly";
+        :>> createdAt = "2026-08-20"; :>> createdBy = "claudeOpus5";
+        :>> asA = "reviewer on a phone";
+        :>> iWant = "a verdict button to latch and show its state when pressed";
+        :>> soThat = "I can tell what I have judged";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "bug, second report on the same surface after a fix I verified only from the emitted HTML. Their correction narrows it: the tap registers ('funny work', 'they press') but state does not LATCH - so the click path runs and either the attribute write or its CSS rendering is undone or never lands. That distinguishes it from issue188's dead-at-load script, which the script-ok marker now rules in or out on sight.";
+    }
+
+    #DerivedFrom dependency from us014 to st008;
+    #DerivedFrom dependency from us015 to st009;
 }

@@ -229,6 +229,12 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;text-wrap:balan
 .card[data-verdict=maybe] .vd{background:var(--maybe);color:#1a1200}
 .card[data-verdict=reject] .vd{background:var(--reject)}
 .sv{font:11px var(--mono);color:var(--ink3)}
+.sv::after{content:attr(data-local-sv)}
+#livenote::after{content:attr(data-local-note);color:var(--maybe)}
+#dbglog{font:10px/1.6 var(--mono);color:var(--ink3);margin:10px 0;max-height:9em;overflow-y:auto;
+  border:1px dashed var(--line);border-radius:8px;padding:6px 9px}
+#dbglog:empty{display:none}
+#copy::after{content:attr(data-local-copied)}
 .card header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .card code{font:600 12px/1 var(--mono);color:var(--ink3)}
 .chg{font:600 10px/1 var(--sans);text-transform:uppercase;letter-spacing:.06em;
@@ -315,14 +321,17 @@ document.addEventListener('claude:sync-off', function(e){
   // whether this viewer may write - including a script touching the DOM, which is how this page
   // disabled itself. Read-only is now concluded ONLY from a write that was actually REJECTED, in
   // confirmSaved, where the runtime gives a reason code. This handler only reports what happened.
-  var el = document.getElementById('livenote');
-  if (el && (e.target === document.body || e.target === document.documentElement)) {
-    el.textContent = 'the document stopped accepting changes here - a verdict may not reach Claude';
+  // async event: data-local only, never textContent (that write is what killed the region).
+  if (e.target === document.body || e.target === document.documentElement) {
+    var el = document.getElementById('livenote');
+    if (el) el.setAttribute('data-local-note', 'the document stopped accepting changes - a verdict may not reach Claude');
+    dbg('sync-off on body');
   }
 });
 document.addEventListener('claude:sync-lost', function(){
   var el = document.getElementById('livenote');
-  if (el) el.textContent = 'a change did not reach the document yet - it will go with the next one';
+  if (el) el.setAttribute('data-local-note', 'a change did not reach the document yet - it will go with the next one');
+  dbg('sync-lost');
 });
 
 var LABEL = { accept:'accepted', maybe:'needs work', reject:'rejected', '':'' };
@@ -342,21 +351,54 @@ function markScriptAlive(){ document.body.dataset.localJs = 'ok'; }
 // believes they recorded and which never reached the document is the worst outcome available here.
 var ART = (window.claude && claude.use) ? claude.use('artifact') : Promise.resolve(null);
 function confirmSaved(card){
+  // ASYNC FEEDBACK NEVER TOUCHES SYNCED DOM (issue188 round 2). The first version of this function
+  // wrote sv.textContent from promise callbacks. That is an ASYNC script write to the synced region,
+  // so the runtime switched the region off and REVERTED the tap it was meant to confirm - the
+  // feedback mechanism was destroying the save. All status now goes to a data-local-* attribute
+  // (exempt from sync) rendered by CSS attr(), and the verdict is RE-ASSERTED inside sync(fn), where
+  // changes are attributed to the write explicitly.
   var sv = card.querySelector('.sv');
-  if (!sv) return;
-  sv.textContent = 'saving...';
+  var want = card.dataset.verdict;
+  var say = function(msg){ if (sv) sv.setAttribute('data-local-sv', msg); };
+  say('saving\u2026');
   ART.then(function(a){
-    if (!a || !a.sync) { sv.textContent = 'not saved - use Copy for Claude'; return; }
-    return a.sync(function(){}).then(
-      function(){ sv.textContent = 'saved'; },
+    if (!a || !a.sync) { say('not saved - this view cannot write'); flagReadonly(); return; }
+    return a.sync(function(){
+      // Inside sync(fn) the change is attributed beyond doubt. Idempotent if the tap already held.
+      if (card.dataset.verdict !== want) { card.dataset.verdict = want; }
+    }).then(
+      function(){
+        say('saved');
+        // READBACK: if anything later reverts the attribute, the card says so instead of lying.
+        setTimeout(function(){
+          if (card.dataset.verdict !== want) { say('REVERTED - tell Claude you saw this'); dbg('revert on ' + card.dataset.uid); }
+        }, 1200);
+      },
       function(err){
-        sv.textContent = 'NOT saved (' + ((err && err.code) || 'unknown') + ') - use Copy for Claude';
-        if (err && (err.code === 'not_writer' || err.code === 'not_granted')) {
-          document.body.dataset.localReadonly = 'true';
-        }
+        var code = (err && err.code) || 'unknown';
+        say('NOT saved (' + code + ')');
+        dbg('sync rejected: ' + code);
+        if (code === 'not_writer' || code === 'not_granted') { flagReadonly(); }
       });
-  }).catch(function(){ sv.textContent = 'not saved - use Copy for Claude'; });
+  }).catch(function(e){ say('not saved'); dbg('sync threw: ' + e); });
 }
+
+// data-local-readonly is per-viewer chrome; setting it from async code is safe by the same rule.
+function flagReadonly(){ document.body.dataset.localReadonly = 'true'; }
+
+// THE EVENT LOG lives in an <artifact-local> element, which the contract exempts from sync entirely -
+// script may write it freely, async included. It exists so the next field report can say WHICH step
+// failed instead of describing a symptom.
+function dbg(msg){
+  var el = document.getElementById('dbglog');
+  if (!el) return;
+  var line = document.createElement('div');
+  line.textContent = new Date().toISOString().slice(11, 19) + ' ' + msg;
+  el.insertBefore(line, el.firstChild);
+  while (el.children.length > 8) { el.removeChild(el.lastChild); }
+}
+window.onerror = function(m, s, l){ dbg('ERROR ' + m + ' @' + l); return false; };
+
 
 var cards = [].slice.call(document.querySelectorAll('.card'));
 function judged(){ return cards.filter(function(c){ return c.dataset.verdict; }).length; }
@@ -409,7 +451,7 @@ function copyOut(){
     btn.textContent = done ? 'Copied' : 'Text selected - copy it';
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(ta.value).then(function(){ btn.textContent = 'Copied'; }, manual);
+    navigator.clipboard.writeText(ta.value).then(function(){ btn.setAttribute('data-local-copied', 'Copied'); // async: data-local only (issue188) }, manual);
   } else { manual(); }
 }
 
@@ -446,7 +488,7 @@ function buildExport(){
                                   : '_No verdicts recorded yet._');
   document.getElementById('out').value = L.join('
 ');
-  document.getElementById('copy').textContent = 'Copy';
+  document.getElementById('copy').setAttribute('data-local-copied', 'Copy');
 }
 
 // LAST STATEMENT IN THE SCRIPT. If the header does not say `script ok`, everything above threw.
@@ -507,6 +549,7 @@ def render(items, generated_at, head_sha):
           '<b>Your taps save themselves and reach Claude &mdash; there is nothing to copy.</b></p>'
         + '  <p class=live id=livenote>Live document: every verdict and note is appended as you, '
           'the moment you make it.</p>'
+        + '<artifact-local><div id=dbglog></div></artifact-local>'
         + '  <p class=ro>This view is <b>read-only</b>, so nothing you change here is saved. Use '
           '<b>Copy for Claude</b> at the bottom and paste the text back instead.</p>'
         + '</header>\n'
@@ -520,7 +563,7 @@ def render(items, generated_at, head_sha):
         + '<dialog id=dlg><textarea id=out readonly></textarea>'
           '<div class=dlgrow><button id=copy>Copy</button>'
           '<button class=ghost id=close>Close</button></div></dialog>\n'
-        + '<script>\nvar STAMP = %s;\n%s</script>\n' % (json.dumps("%s / HEAD %s" % (generated_at, head_sha)), JS)
+        + '<script>\nvar STAMP = %s;\n%s</script>\n' % (json.dumps("%s / HEAD %s / deck v3" % (generated_at, head_sha)), JS)
     )
 
 

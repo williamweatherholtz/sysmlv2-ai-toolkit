@@ -169,6 +169,24 @@ A deck cannot be tested from here. Hand over the URL and say what to look for: w
 `script ok`, and whether a tap turns a card and shows `saved`. **Never report the buttons as working on
 the strength of having written them.**
 
+### 6. NOTHING asynchronous may write synced DOM — the feedback can destroy the save
+
+Round 2 of the same defect, reported as "they press but don't latch". The tap path was clean: setting
+`data-verdict` synchronously in the click handler is gesture-attributed and IS the save. But
+`confirmSaved`'s **promise callbacks** then wrote `sv.textContent = 'saved'` — an async script write to
+the synced region — so the runtime cut the region and **reverted the very tap the message was
+confirming**. The confirmation mechanism was destroying the thing it confirmed.
+
+- Synced DOM is written **only synchronously inside a gesture handler**. Promise callbacks, timers,
+  `sync-lost`/`sync-off` events, `window.onerror` — all of it writes `data-local-*` attributes
+  (exempt), rendered by CSS `content: attr(...)`, or an `<artifact-local>` element (exempt entirely).
+- Re-assert the gesture's change **inside `sync(fn)`** — changes made in `fn` are attributed beyond
+  doubt, and the re-assertion is idempotent when the tap already held.
+- A **readback** a second later compares the attribute to what was set and says `REVERTED` on the card
+  if it moved — so the next field report names the step, not the symptom.
+- The mechanical check for pass 4: no `.then(`, `.catch(` or `setTimeout(` body may assign
+  `textContent`/`innerHTML` outside the `<artifact-local>` panel. Count it in the emitted HTML.
+
 ## Guardrails
 
 - **Never record a `method=confirmation` result from a tap you did not receive.** The deck is a

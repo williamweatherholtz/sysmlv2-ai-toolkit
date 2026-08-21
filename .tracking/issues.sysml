@@ -2174,4 +2174,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDeckButtonsLive to issue188;
+
+    part issue189 : Issue {
+        :>> id = "a6f5d762-2da2-4926-9b1a-50f23688d204";
+        :>> title = "The retro-backlog guard is satisfied by any co-staged item, so retro findings never become work";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "ASKED BY THE HUMAN: are we identifying these recurring issues in sprint retros? THE HONEST ANSWER IS NO, AND THE CONTROL THAT SHOULD FORCE IT HAS A HOLE. retro_backlog_warnings returns empty the moment the commit stages .tracking/issues.sysml or .tracking/backlog.sysml - ANY tracked item, for ANY reason. Every hardening commit staged issues.sysml for the pass's own findings, so the guard was satisfied vacuously while the retro's AVOIDABLE-ISSUE lines went untracked. THE MEASURED CONSEQUENCE: one failure class - shell-mangled authoring, the heredoc problem - appears in FIVE retros of this single session, was relearned each time, and produced zero backlog items, zero controls, and a sixth occurrence in sprint 371. A retro that only writes lessons is manual vigilance with better formatting, and D0047 says manual vigilance is not a control. THE PREVENTING CHANGE is two-layered: the review-critique process (D0172) makes second-occurrence findings items by rule, and this item tightens the guard so the co-staged item must be tied to THE FINDING rather than to the commit.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRetroGuardTiesFinding to issue189;
 }
