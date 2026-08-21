@@ -2416,4 +2416,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcPerActorAppendFiles to issue210;
+
+    part issue211 : Issue {
+        :>> id = "9db10731-3eaf-4c55-b1f9-48295f31aa35";
+        :>> title = "The release pipeline publishes without gating: release.yml runs no tests, no validate, no guards";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 9 (srRelPublishedArtifact x completeness). The tag-triggered workflow builds and publishes three platform binaries with ZERO gate steps - the deploy process promises a full gate between green trunk and tag, but the promise rests on tagger discipline plus ci.yml having happened to run on that commit. A publish is the engine's most outward-facing write and the only one with no gate of its own. Cheap close: a gate job the publish job requires.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcReleaseGatedPublish to issue211;
 }
