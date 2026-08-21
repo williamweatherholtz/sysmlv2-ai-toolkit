@@ -1481,7 +1481,7 @@ struct RunAnswerReq {
 
 /// POST /api/run/answer — the HUMAN's click on the console approve queue (the human channel).
 async fn api_run_answer(State(s): State<AppState>, axum::Json(b): axum::Json<RunAnswerReq>) -> Response {
-    let known = s.asks.lock().ok().is_some_and(|mut asks| {
+    let known = s.asks.lock().is_ok_and(|mut asks| {
         asks.get_mut(&b.id).map(|slot| slot.2 = Some(b.allow)).is_some()
     });
     if known {
