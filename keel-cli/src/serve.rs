@@ -72,6 +72,8 @@ const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
     "/api/project",
     // issue192: the deck records a sitting review as the HUMAN critique it is.
     "/api/deck/sitting",
+    // D0181/D0182 (P5): the launch form, the headless-ask proxy queue, and the console commit action.
+    "/api/launch/form", "/api/run/ask", "/api/run/asks", "/api/run/answer", "/api/commit",
 ];
 
 /// The `SysML` declaration keyword for a created item, by its type's meta-kind (D0126, `/api/item`). Keeps
@@ -95,6 +97,9 @@ const AUTHORABLE_EDGE_KINDS: &[&str] = &["satisfy", "allocate", "Supersede", "De
 const AGENT_MAX_TURNS: &str = "30";
 const AGENT_MAX_CONCURRENT: usize = 2;
 
+/// id -> (path, session, answer: None = pending) — the headless-ask proxy queue (D0182).
+type AskQueue = HashMap<String, (String, String, Option<bool>)>;
+
 #[derive(Clone)]
 struct AppState {
     /// The ACTIVE project root. Switchable at runtime (srConsoleProjectRebind / N-C4): a supervisor
@@ -104,6 +109,10 @@ struct AppState {
     root: Arc<Mutex<PathBuf>>,
     /// In-flight agent-bridge runs (concurrency guardrail, D0094).
     agents: Arc<AtomicUsize>,
+    /// Pending headless-ask proxies (D0182/P1.1): a launched run's pre-write hook posts an ask here
+    /// and polls for the human's answer; expiry on the hook side maps to deny + a recorded
+    /// obligation. id -> (path, session, answer: None=pending).
+    asks: Arc<Mutex<AskQueue>>,
     /// Per-view JSON cache keyed `view -> (fingerprint, json)` (D0094 serveLiveCache): recompute a view
     /// only when the model's content fingerprint changes; a materialized #View cache (regenerable, §2.1).
     cache: Arc<Mutex<HashMap<String, (u64, String)>>>,
@@ -246,7 +255,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     // surface could not say which project was active (N-C4 requires it always be named) and sibling
     // discovery found nothing. "." is a path, not an identity.
     let root = root.canonicalize().unwrap_or(root);
-    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())) };
+    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), asks: Arc::new(Mutex::new(AskQueue::new())), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())) };
     spawn_watcher(&state);
 
     let app = Router::new()
@@ -285,6 +294,11 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // THESE endpoints - the tested path. GET is uncached: it is an act surface, always current.
         .route("/deck", get(deck_page))
         .route("/api/deck/sitting", post(api_deck_sitting))
+        .route("/api/launch/form", get(api_launch_form))
+        .route("/api/run/ask", post(api_run_ask))
+        .route("/api/run/asks", get(api_run_asks))
+        .route("/api/run/answer", get(api_run_answer_poll).post(api_run_answer))
+        .route("/api/commit", post(api_commit))
         .route("/view/report/:name", get(view_report))
         .route("/view/diagram", get(view_diagram))
         // persistent serve settings (e.g. the agent-bridge toggle — claude -p billing control)
@@ -1179,6 +1193,7 @@ async fn api_agent_plan(State(s): State<AppState>, Query(q): Query<AgentReq>) ->
     ok_json(json)
 }
 
+#[allow(clippy::too_many_lines)] // one SSE generator = one run lifecycle; splitting it would smear the yield points
 async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let root = s.rootpath();
     // sr17 critique + D0109 launch (model-driven launcher; non-freeform: a launch target must be is_launchable).
@@ -1226,6 +1241,19 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
             yield Ok(Event::default().event("error").data("the `claude` CLI is not on PATH \u{2014} the agent bridge is optional. Install Claude Code and log in to your Claude subscription/enterprise to enable in-console actions (do NOT set ANTHROPIC_API_KEY \u{2014} that forces API-rate billing). The read console, views, and reports work without it."));
             return;
         }
+        // D0182 run lifecycle for LAUNCHED PROCESS RUNS: dirty-tree refusal + spawn snapshot.
+        // The critique action keeps its lighter path (read-mostly, reviewed in-stream).
+        let run_setup = if q.action == "launch" {
+            match crate::launcher::prepare(&root, &q.target) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    yield Ok(Event::default().event("error").data(e));
+                    return;
+                }
+            }
+        } else {
+            None
+        };
         yield Ok(Event::default().event("status").data(format!("launching `claude` (turn cap {AGENT_MAX_TURNS}): {prompt}")));
         // Windows: `claude` is a `.cmd` npm shim that CreateProcess cannot spawn directly, so route via
         // `cmd /C` (which resolves claude.cmd on PATH). Unix: spawn `claude` directly. Either way the
@@ -1237,6 +1265,15 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         } else {
             tokio::process::Command::new("claude")
         };
+        // Spawn hardening (D0182/P5.5): absolute KEEL_BIN so the run's hooks resolve THIS binary;
+        // the run's stamped actor; KEEL_RUN_ID arms the headless-ask mapping in `keel hook pre-write`.
+        if let Ok(exe) = std::env::current_exe() {
+            command.env("KEEL_BIN", exe);
+        }
+        if let Some(setup) = &run_setup {
+            command.env("KEEL_ACTOR", &setup.actor);
+            command.env("KEEL_RUN_ID", &setup.id);
+        }
         let spawned = command
             .args(["-p", &prompt, "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--max-turns", AGENT_MAX_TURNS])
             .current_dir(&root)
@@ -1255,24 +1292,241 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
         // SSE stream is dropped, dropping `killer` BEFORE `child` (reverse decl order) so the whole
         // `cmd`+`claude.exe` tree is reaped, not just the direct child. Disarmed on normal exit below.
         let mut killer = TreeKiller(child.id());
+        // Per-run WALL-CLOCK timeout (P5.5): --max-turns bounds turns, not stalls. A run that stops
+        // producing output for the full budget is killed and recorded timed-out.
+        const RUN_WALL_CLOCK_SECS: u64 = 1800;
+        let mut turns: u64 = 0;
+        let mut timed_out = false;
         if let Some(out) = child.stdout.take() {
             let mut lines = tokio::io::BufReader::new(out).lines();
             loop {
-                match lines.next_line().await {
-                    Ok(Some(line)) => yield Ok(Event::default().event("agent").data(line)),
-                    Ok(None) => break,
-                    Err(e) => {
+                match tokio::time::timeout(std::time::Duration::from_secs(RUN_WALL_CLOCK_SECS), lines.next_line()).await {
+                    Err(_) => {
+                        timed_out = true;
+                        yield Ok(Event::default().event("error").data(format!("run TIMED OUT after {RUN_WALL_CLOCK_SECS}s of silence - killing the agent tree (P5.5)")));
+                        break;
+                    }
+                    Ok(Ok(Some(line))) => {
+                        if line.contains("\"type\":\"assistant\"") {
+                            turns += 1;
+                        }
+                        yield Ok(Event::default().event("agent").data(line));
+                    }
+                    Ok(Ok(None)) => break,
+                    Ok(Err(e)) => {
                         yield Ok(Event::default().event("error").data(format!("read error: {e}")));
                         break;
                     }
                 }
             }
         }
-        let code = child.wait().await.ok().and_then(|st| st.code());
+        let code = if timed_out {
+            drop(killer); // fire the tree killer NOW - the child is wedged
+            killer = TreeKiller(None); // disarmed placeholder so the later disarm is a no-op
+            None
+        } else {
+            child.wait().await.ok().and_then(|st| st.code())
+        };
         killer.disarm(); // normal exit — the child is already reaped; don't taskkill a dead/recycled PID
+        // Post-run gate + records (D0182): validate + guards + rules over the run's diff, the local
+        // run record always, ONE tracked summary for non-empty diffs, the diff routed to human
+        // review UNCONDITIONALLY.
+        if let Some(setup) = &run_setup {
+            let outcome = tokio::task::spawn_blocking({
+                let root = root.clone();
+                let setup2 = crate::launcher::RunSetup {
+                    id: setup.id.clone(),
+                    process: setup.process.clone(),
+                    actor: setup.actor.clone(),
+                    head_at_spawn: setup.head_at_spawn.clone(),
+                    fingerprint_at_spawn: setup.fingerprint_at_spawn,
+                    started: setup.started,
+                };
+                move || crate::launcher::finish(&root, &setup2, code, turns, timed_out)
+            })
+            .await;
+            match outcome {
+                Ok(Ok(o)) => {
+                    let verdict = if o.diff_files.is_empty() { "empty diff (local record only)".to_string() }
+                        else if o.gate_green { format!("gate GREEN over {} file(s) - diff awaits your review", o.diff_files.len()) }
+                        else { format!("gate RED ({} problem(s)) - run recorded FAILED; diff still awaits your review", o.problems.len()) };
+                    yield Ok(Event::default().event("status").data(format!("post-run gate: {verdict}")));
+                }
+                Ok(Err(e)) => yield Ok(Event::default().event("error").data(format!("post-run records failed: {e}"))),
+                Err(e) => yield Ok(Event::default().event("error").data(format!("post-run gate task failed: {e}"))),
+            }
+        }
         yield Ok(Event::default().event("done").data(format!("agent finished (exit {code:?})")));
     };
     Sse::new(stream)
+}
+
+#[derive(serde::Deserialize)]
+struct LaunchFormReq {
+    target: String,
+}
+
+/// GET `/api/launch/form?target=X` (D0181/P5.1, THIN by the `DoD`'s own scope-pressure clause): the
+/// per-process input form, generated from the MODEL — the declared purpose and steps of the
+/// launchable, plus the one free-text field the launcher accepts today. Inputs stay untyped until
+/// D0185's typed producedArtifact lands (the recorded trigger); breadth is demand-driven.
+async fn api_launch_form(State(s): State<AppState>, Query(q): Query<LaunchFormReq>) -> Response {
+    let root = s.rootpath();
+    if !crate::view::is_launchable(&root, &q.target).unwrap_or(false) {
+        return (StatusCode::NOT_FOUND, format!("{{\"error\":\"`{}` is not a declared launchable - see keel launchables\"}}", q.target.replace('"', "'"))).into_response();
+    }
+    // purpose + steps from the model text (the process/skill declaration), never hardcoded
+    let mut purpose = String::new();
+    let mut steps: Vec<String> = Vec::new();
+    for f in crate::collect_sysml(&root.join(".engine").join("processes"))
+        .into_iter()
+        .chain(crate::collect_sysml(&root.join(".engine").join("skills")))
+    {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        if !text.contains(&format!("part {} ", q.target)) && !text.contains(&format!("action {} ", q.target)) && !f.file_name().is_some_and(|n| n.to_string_lossy().contains(&q.target)) {
+            continue;
+        }
+        for line in text.lines() {
+            let l = line.trim_start();
+            if let Some(v) = l.strip_prefix(":>> purpose = \"") {
+                if purpose.is_empty() {
+                    purpose = v.split('"').next().unwrap_or("").to_string();
+                }
+            }
+            if let Some(v) = l.strip_prefix(":>> title = \"") {
+                if l.contains("ProcessStep") || steps.len() < 24 {
+                    steps.push(v.split('"').next().unwrap_or("").to_string());
+                }
+            }
+        }
+        if !purpose.is_empty() {
+            break;
+        }
+    }
+    let steps_json: Vec<String> = steps.iter().take(12).map(|s| format!("\"{}\"", s.replace('"', "'"))).collect();
+    ok_json(format!(
+        "{{\"target\":\"{}\",\"purpose\":\"{}\",\"declaredSteps\":[{}],\"fields\":[{{\"name\":\"prompt\",\"kind\":\"text\",\"label\":\"task input (typed fields arrive with D0185's typed contracts)\"}}],\"flow\":\"GET /api/agent/plan to review, then /api/agent/stream with approved=1 - approve-before-execute is structural\"}}",
+        q.target.replace('"', "'"),
+        purpose.replace('"', "'"),
+        steps_json.join(",")
+    ))
+}
+
+#[derive(serde::Deserialize)]
+struct RunAskReq {
+    path: String,
+    session: String,
+}
+
+/// POST /api/run/ask (D0182 headless-ask proxy): a launched run's pre-write hook registers an ask
+/// and receives an id to poll. The human answers from the console; hook-side expiry maps to deny.
+async fn api_run_ask(State(s): State<AppState>, axum::Json(b): axum::Json<RunAskReq>) -> Response {
+    let id = crate::write::gen_uuid();
+    if let Ok(mut asks) = s.asks.lock() {
+        asks.insert(id.clone(), (b.path, b.session, None));
+    }
+    ok_json(format!("{{\"id\":\"{id}\"}}"))
+}
+
+/// GET /api/run/asks — the human-facing queue (console renders it; a pending ask is an obligation).
+async fn api_run_asks(State(s): State<AppState>) -> Response {
+    let rows: Vec<String> = s.asks.lock().map_or_else(
+        |_| Vec::new(),
+        |asks| {
+            asks.iter()
+                .map(|(id, (path, session, answer))| {
+                    format!(
+                        "{{\"id\":\"{id}\",\"path\":\"{}\",\"session\":\"{}\",\"state\":\"{}\"}}",
+                        path.replace('"', "'"),
+                        session.replace('"', "'"),
+                        match answer {
+                            None => "pending",
+                            Some(true) => "allowed",
+                            Some(false) => "denied",
+                        }
+                    )
+                })
+                .collect()
+        },
+    );
+    ok_json(format!("{{\"asks\":[{}]}}", rows.join(",")))
+}
+
+#[derive(serde::Deserialize)]
+struct RunAnswerPoll {
+    id: String,
+}
+
+/// GET /api/run/answer?id=X — the hook's poll: pending | allow | deny.
+async fn api_run_answer_poll(State(s): State<AppState>, Query(q): Query<RunAnswerPoll>) -> Response {
+    let state = s
+        .asks
+        .lock()
+        .ok()
+        .and_then(|asks| asks.get(&q.id).map(|(_, _, a)| *a));
+    let word = match state {
+        None => "unknown",
+        Some(None) => "pending",
+        Some(Some(true)) => "allow",
+        Some(Some(false)) => "deny",
+    };
+    ok_json(format!("{{\"answer\":\"{word}\"}}"))
+}
+
+#[derive(serde::Deserialize)]
+struct RunAnswerReq {
+    id: String,
+    allow: bool,
+}
+
+/// POST /api/run/answer — the HUMAN's click on the console approve queue (the human channel).
+async fn api_run_answer(State(s): State<AppState>, axum::Json(b): axum::Json<RunAnswerReq>) -> Response {
+    let known = s.asks.lock().ok().is_some_and(|mut asks| {
+        asks.get_mut(&b.id).map(|slot| slot.2 = Some(b.allow)).is_some()
+    });
+    if known {
+        ok_json(format!("{{\"ok\":true,\"id\":\"{}\"}}", b.id))
+    } else {
+        (StatusCode::NOT_FOUND, "{\"error\":\"unknown ask id\"}".to_string()).into_response()
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct CommitReq {
+    message: String,
+}
+
+/// POST /api/commit (D0182 charter note 3, the dirty-tree friction valve): console accepts land
+/// uncommitted by design, so accept-then-launch would hit the dirty-tree refusal — the HUMAN
+/// clicking commit here is correct attribution for integrating their own accepts. Runs the normal
+/// commit path, so the pre-commit gate applies unbypassed.
+async fn api_commit(State(s): State<AppState>, axum::Json(b): axum::Json<CommitReq>) -> Response {
+    if b.message.trim().len() < 8 {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"a commit message of at least 8 characters is required\"}".to_string()).into_response();
+    }
+    let root = s.rootpath();
+    let add = crate::gitx::git().arg("-C").arg(&root).args(["add", "-A"]).output();
+    if !add.as_ref().is_ok_and(|o| o.status.success()) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "{\"error\":\"git add failed\"}".to_string()).into_response();
+    }
+    let msg_file = root.join(".keel").join("console-commit-msg.txt");
+    let _ = std::fs::create_dir_all(root.join(".keel"));
+    if crate::write::write_atomic(&msg_file, b.message.as_str()).is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "{\"error\":\"cannot stage the commit message\"}".to_string()).into_response();
+    }
+    let out = crate::gitx::git().arg("-C").arg(&root).args(["commit", "-F"]).arg(&msg_file).output();
+    match out {
+        Ok(o) if o.status.success() => ok_json("{\"ok\":true,\"committed\":true}".to_string()),
+        Ok(o) => {
+            let text = format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr));
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("{{\"error\":\"commit gate refused\",\"detail\":\"{}\"}}", text.replace('"', "'").replace(['\n', '\r'], " ").chars().take(1500).collect::<String>()),
+            )
+                .into_response()
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{e}\"}}")).into_response(),
+    }
 }
 
 /// A request to attach a resolver to a finding (sr16): on ACT, create a tracked `#Resolves` task.

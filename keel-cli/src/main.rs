@@ -271,6 +271,61 @@ fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
     }
 }
 
+
+/// Minimal raw-HTTP call to the LOCAL console (dependency-free; localhost only). Returns the body.
+fn console_http(method: &str, path: &str, body: Option<&str>) -> Option<String> {
+    use std::io::{Read as _, Write as _};
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], CONSOLE_PORT));
+    let mut s = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(500)).ok()?;
+    let _ = s.set_read_timeout(Some(std::time::Duration::from_millis(1500)));
+    let payload = body.unwrap_or("");
+    let req = format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{CONSOLE_PORT}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+        payload.len()
+    );
+    s.write_all(req.as_bytes()).ok()?;
+    let mut buf = String::new();
+    let _ = s.read_to_string(&mut buf);
+    buf.split("\r\n\r\n").nth(1).map(str::to_string)
+}
+
+/// The D0182 headless-ask mapping, hook side: inside a LAUNCHED RUN (`KEEL_RUN_ID` set) there is no
+/// harness prompt, so an ask-tier write maps to the console approve queue - the ask-pending entry
+/// is registered BEFORE any wait, the wait is bounded WELL under the hook deadline, and expiry or
+/// an absent console maps to DENY plus a queued obligation (charter note 2: never let the harness
+/// timeout decide).
+fn headless_ask(root: &Path, path: &str, session: &str, run_id: &str) -> bool {
+    let ask_body = serde_json::json!({"path": path, "session": session}).to_string();
+    let ask_id = console_http("POST", "/api/run/ask", Some(&ask_body))
+        .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok())
+        .and_then(|v| v.get("id").and_then(serde_json::Value::as_str).map(str::to_string));
+    if let Some(id) = ask_id {
+        // ~60s bounded wait (the hook deadline is 100s+; margin per charter note 2)
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            let answer = console_http("GET", &format!("/api/run/answer?id={id}"), None)
+                .and_then(|b| serde_json::from_str::<serde_json::Value>(&b).ok())
+                .and_then(|v| v.get("answer").and_then(serde_json::Value::as_str).map(str::to_string));
+            match answer.as_deref() {
+                Some("allow") => return true,
+                Some("deny") => break,
+                _ => {}
+            }
+        }
+    }
+    // deny + queued obligation (auto-deny branch / expiry / console down)
+    if let Ok(actor) = keel_cli::actor::resolve(root, None) {
+        let _ = keel_cli::write::record_obligation(
+            root,
+            "headless-ask",
+            &format!("headless run write denied pending review: {path}"),
+            &format!("A launched run ({run_id}) requested an ask-tier write to {path}; no human approval arrived within the bounded wait, so it was DENIED and queued (D0182 headless mapping). Discharge: review whether the write should happen, perform or decline it, and triage with a #Resolves edge."),
+            &actor,
+        );
+    }
+    false
+}
+
 /// The declared adoption profile: `strict`, `guided`, or `undeclared` (pre-adoption trees).
 fn adoption_profile(root: &Path) -> &'static str {
     match std::fs::read_to_string(root.join(".engine").join("contracts").join("adoption-profile.toml")) {
@@ -386,6 +441,19 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
             );
         }
         (None, "strict") => {
+            if let Ok(run_id) = std::env::var("KEEL_RUN_ID") {
+                // Headless launched run: no prompt exists - console proxy, else deny + obligation.
+                if headless_ask(root, &path, session, &run_id) {
+                    println!("[keel] headless ask APPROVED from the console queue - write allowed");
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                            "permissionDecisionReason": format!("[keel] headless run: the ask-tier write to {path} was not approved within the bounded wait - DENIED and queued as an obligation (D0182)")}})
+                    );
+                }
+                return 0;
+            }
             println!(
                 "{}",
                 serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",

@@ -33,6 +33,7 @@ pub mod schema;
 pub mod history;
 pub mod claim;
 pub mod deck;
+pub mod launcher;
 pub mod enroll;
 pub mod gitx;
 pub mod govern;
