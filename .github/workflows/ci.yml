@@ -30,3 +30,8 @@ jobs:
           ./target/release/keel validate .
           ./target/release/keel guard
           ./target/release/keel check-engine .
+          ./target/release/keel rules --enforce
+      # Layer 3, hook-independent (K15/D0179): re-derive every pushed commit's verdict from the
+      # tree alone — the issue116 control, now remote. No hook having run is assumed.
+      - name: keel audit-history (tree-derived verdicts over the pushed range)
+        run: ./target/release/keel audit-history --since "${{ github.event.before || 'HEAD~1' }}" || ./target/release/keel audit-history --max 20

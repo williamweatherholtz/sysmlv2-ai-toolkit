@@ -1,0 +1,8 @@
+# Adoption profile — DECLARED, never inferred (D0174/P0.4).
+#
+# The SELF-BUILD runs `guided`: the D0176 tier detection and the D0178 matcher run on every fire
+# and the fire-ledger accrues the D0180 evidence, while enforcement stays advisory here until a
+# promotion decision cites at least three sprints of that evidence (K14). Fresh scaffolds default
+# to `strict`. Changing this file is a control-plane write (D0179/K7).
+profile = "guided"
+declaredAt = "2026-08-21"

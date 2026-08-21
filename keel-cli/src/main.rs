@@ -63,7 +63,7 @@ const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry
 /// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
 /// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
 /// path (D0175's fence). POSIX sh.
-const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL_BIN:-${KEEL:-keel}}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\n";
+const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL_BIN:-${KEEL:-keel}}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel rules --enforce'\n\"$KEEL\" rules --enforce || { echo 'pre-commit: DECLARED RULES FAILED — commit aborted'; exit 1; }\n";
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -233,7 +233,7 @@ fn cmd_hook(args: &[String]) -> i32 {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
         "user-prompt" => hook_user_prompt(&root),
-        "pre-bash" => hook_pre_bash(&payload),
+        "pre-bash" => hook_pre_bash(&payload, &root),
         "pre-write" => hook_pre_write(&payload, &root),
         "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
         other => {
@@ -271,35 +271,131 @@ fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
     }
 }
 
-/// `PreToolUse` on Write|Edit over a PROTECTED fact surface (D0174/D-P0a), invoked by the
-/// scaffolded pure-shell test when the binary IS present. Profile-aware (P0.4):
-///   - `strict`  → deny, naming the sanctioned command (K13 deny-and-provide);
-///   - `guided`  → advisory line, allow;
-///   - no adoption-profile contract (the self-build, pre-P0 projects) → advisory, allow —
-///     CLAUDE.md §4 sanctions direct editing here until P1 lands the tiered model.
+/// The declared adoption profile: `strict`, `guided`, or `undeclared` (pre-adoption trees).
+fn adoption_profile(root: &Path) -> &'static str {
+    match std::fs::read_to_string(root.join(".engine").join("contracts").join("adoption-profile.toml")) {
+        Ok(t) if t.lines().any(|l| l.trim().starts_with("profile") && l.contains("strict")) => "strict",
+        Ok(t) if t.lines().any(|l| l.trim().starts_with("profile") && l.contains("guided")) => "guided",
+        _ => "undeclared",
+    }
+}
+
+/// A pending override unlock (D0176 tier 3): single-use, target-path-bound, expiring. The consuming
+/// session is recorded in the obligation fact — the CLI cannot know the harness session a priori, so
+/// session-binding is realized as short expiry + single use + consumed-by-session recorded.
+const OVERRIDE_TTL_SECS: u64 = 900;
+
+fn override_path(root: &Path) -> PathBuf {
+    root.join(".keel").join("override.json")
+}
+
+/// Consume a matching unlock: returns the reason when `path` is covered. Deletes the unlock (single
+/// use) and records the tracked obligation naming the path ACTUALLY written (K7); on a failed
+/// tracked write, degrades to a local ledger entry with a sync obligation (charter note 1).
+fn consume_override(root: &Path, written_path: &str, session: &str) -> Option<String> {
+    let op = override_path(root);
+    let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&op).ok()?).ok()?;
+    let target = v.get("path").and_then(serde_json::Value::as_str)?.replace('\\', "/");
+    let created = v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    if now.saturating_sub(created) > OVERRIDE_TTL_SECS {
+        let _ = std::fs::remove_file(&op);
+        eprintln!("[keel] override unlock EXPIRED ({OVERRIDE_TTL_SECS}s) — run `keel override` again if still needed");
+        return None;
+    }
+    if !written_path.contains(&target) && !target.contains(written_path) {
+        return None; // path-bound: an unlock for one file covers no other
+    }
+    let reason = v.get("reason").and_then(serde_json::Value::as_str).unwrap_or("(no reason recorded)").to_string();
+    let actor = v.get("actor").and_then(serde_json::Value::as_str).unwrap_or("unknown").to_string();
+    let _ = std::fs::remove_file(&op); // single-use
+    let title = format!("override used: direct write to {written_path}");
+    let desc = format!(
+        "A recorded override unlocked a direct write (D0176 tier 3). Path actually written: {written_path}. Reason given: {reason}. Session: {session}. Discharge: a human reviews the write and triages this obligation with a #Resolves edge."
+    );
+    match keel_cli::write::record_obligation(root, "override", &title, &desc, &actor) {
+        Ok(p) => eprintln!("[keel] override consumed — obligation recorded: {}", p.display()),
+        Err(e) => {
+            // The tracked write failed (possibly BECAUSE the target is the corrupted file being
+            // repaired) — local ledger + sync obligation, never a silent unlock (K7).
+            ledger_emit(root, session, "override-obligation-UNSYNCED", 1, 0);
+            eprintln!("[keel] override consumed but the tracked obligation could not be written ({e}) — a local ledger entry holds it; SYNC OBLIGATION: record it with `keel record issue` once the tree is writable");
+        }
+    }
+    Some(reason)
+}
+
+/// `PreToolUse` on Write|Edit over `.tracking`/`.engine` fact surfaces — the D0176 three-tier model,
+/// invoked by the scaffolded pure-shell test when the binary is present.
+///
+///   tier 1 — API-owned surfaces: hard deny ABSENT A RECORDED OVERRIDE, refusal naming the command;
+///   tier 2 — other `.tracking` writes: `permissionDecision: "ask"` (the harness prompt is a human
+///            channel; the headless mapping is D0182's, exercised by the P5 launcher);
+///   tier 3 — the recorded override reaches every tier (a corrupted API-owned file is repairable).
+///
+/// Profile-aware (P0.4/D0176): `strict` blocks as above; `guided`/`undeclared` is ADVISORY-FIRST —
+/// the same detection runs, the fire-ledger accrues the D0180 evidence, and promotion to blocking is
+/// a recorded decision citing it (K14).
 fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
     let path = payload
         .pointer("/tool_input/file_path")
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default()
         .replace('\\', "/");
-    let Some((surface, sanctioned)) =
-        keel_cli::claude_surface::PROTECTED_PATHS.iter().find(|(p, _)| path.contains(p))
-    else {
+    let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    // Control plane first (D0179/K7): weakening or redirecting enforcement is approval-gated and,
+    // under strict, leaves an orient-visible record — never a quiet config edit.
+    if keel_cli::claude_surface::CONTROL_PLANE_PATHS.iter().any(|p| path.contains(p)) {
+        if adoption_profile(root) == "strict" {
+            if let Ok(actor) = keel_cli::actor::resolve(root, None) {
+                let _ = keel_cli::write::record_obligation(
+                    root,
+                    "control-plane",
+                    &format!("control-plane write requested: {path}"),
+                    &format!("A Write|Edit touched enforcement configuration ({path}), session {session} (D0179/K7). The harness asked the human; this fact records that the control plane moved. Discharge: review the diff and triage with a #Resolves edge."),
+                    &actor,
+                );
+            }
+            println!(
+                "{}",
+                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
+                    "permissionDecisionReason": format!("[keel] {path} is CONTROL PLANE (D0179/K7) - approve only if you intend to change enforcement; the write is recorded")}})
+            );
+        } else {
+            println!("[keel] control-plane write: {path} (D0179 - ask-tier under strict; the fire-ledger records this fire)");
+        }
         return 0;
-    };
-    let strict = std::fs::read_to_string(root.join(".engine").join("contracts").join("adoption-profile.toml"))
-        .is_ok_and(|t| t.lines().any(|l| l.trim().starts_with("profile") && l.contains("strict")));
-    if strict {
-        let reason = format!(
-            "[keel] {surface} is an API-owned fact surface (D0174). Use the sanctioned path: {sanctioned}. Direct edits here bypass identity, provenance, and locking."
-        );
-        println!(
-            "{}",
-            serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}})
-        );
-    } else {
-        println!("[keel advisory] {surface} is an API-owned fact surface - prefer: {sanctioned}");
+    }
+    if !(path.contains(".tracking/") || path.contains(".engine/decisions/")) {
+        return 0;
+    }
+    if let Some(reason) = consume_override(root, &path, session) {
+        println!("[keel] override active for this write (reason: {reason}) - recorded, single-use");
+        return 0;
+    }
+    let tier1 = keel_cli::claude_surface::PROTECTED_PATHS.iter().find(|(p, _)| path.contains(p));
+    let profile = adoption_profile(root);
+    match (tier1, profile) {
+        (Some((surface, sanctioned)), "strict") => {
+            let reason = format!(
+                "[keel] {surface} is an API-owned fact surface (D0176 tier 1). Use the sanctioned path: {sanctioned} - or, for what the API cannot express, `keel override {path} --reason \"...\"` (single-use, recorded, reviewed)."
+            );
+            println!(
+                "{}",
+                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}})
+            );
+        }
+        (None, "strict") => {
+            println!(
+                "{}",
+                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
+                    "permissionDecisionReason": format!("[keel] direct write to {path} (D0176 tier 2) - approve, or route through the write API")}})
+            );
+        }
+        (Some((surface, sanctioned)), _) => {
+            println!("[keel advisory] {surface} is an API-owned fact surface (D0176 tier 1 in strict) - prefer: {sanctioned}");
+        }
+        (None, _) => {} // tier 2 stays silent in advisory profiles: a comment on every ordinary edit is noise (issue094 rule)
     }
     0
 }
@@ -332,8 +428,131 @@ fn hook_subagent_stop(payload: &serde_json::Value, root: &Path, session: &str) -
 /// Prints nothing when there is nothing to say, which is the common case and the point: a hook that
 /// comments on ordinary commands becomes noise the reader skips, at which point it looks like
 /// coverage while providing none.
-fn hook_pre_bash(payload: &serde_json::Value) -> i32 {
+/// Whitespace tokenization with single/double-quote awareness — argv-level, so a commit MESSAGE
+/// describing `--no-verify` never matches (D0176/P1.2: no raw-string regex over commands).
+fn bash_tokens(cmd: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    for c in cmd.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (None, '\'' | '"') => quote = Some(c),
+            (None, c) if c.is_whitespace() => {
+                if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            }
+            (_, c) => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// The D0176/D0178 Bash matcher verdict for one command.
+enum BashVerdict {
+    Clean,
+    /// Unambiguous control-bypass pattern — blocking in strict, advisory otherwise.
+    Block(String),
+    /// Human-judgment / actor-identity operation — never keel-exempt (K6); ask in strict.
+    Ask(String),
+}
+
+/// Classify a Bash command per the accepted tiering. UNQUOTED tokens only for operator detection —
+/// tokenization strips quotes, so `>` inside a message is not a redirect... it IS stripped into the
+/// token stream; operators are matched as standalone tokens or known flags, never substrings of
+/// prose (the tokenizer keeps quoted text glued to its word, so `"a > b"` is one token, not three).
+fn bash_classify(root: &Path, cmd: &str) -> BashVerdict {
+    let toks = bash_tokens(cmd);
+    let has_tok = |t: &str| toks.iter().any(|x| x == t);
+    let tracking_target =
+        toks.iter().any(|x| {
+            let tracked = (x.contains(".tracking/") || x.contains(".tracking\\")) && std::path::Path::new(x).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"));
+            tracked || x.contains(".claude/settings") || x.contains(".claude\\settings")
+        });
+    // Unambiguous operator-level bypass patterns (issue116 vector included).
+    if (has_tok(">") || has_tok(">>") || has_tok("tee")) && tracking_target {
+        return BashVerdict::Block("redirection into a fact surface - use the keel write API".to_string());
+    }
+    if has_tok("sed") && has_tok("-i") && tracking_target {
+        return BashVerdict::Block("in-place sed over a fact surface - use the keel write API".to_string());
+    }
+    if toks.windows(2).any(|w| matches!(w, [a, b] if a.ends_with("git") && b == "commit")) && has_tok("--no-verify") {
+        return BashVerdict::Block("git commit --no-verify skips the commit gate".to_string());
+    }
+    if toks.iter().any(|x| x == "SKIP_VALIDATE=1" || x == "SKIP_KEEL=1") {
+        return BashVerdict::Block("SKIP_VALIDATE/SKIP_KEEL bypasses the gate - fix the red instead".to_string());
+    }
+    if toks.windows(3).any(|w| matches!(w, [a, b, c] if a.ends_with("git") && b == "config" && c.contains("core.hooksPath"))) {
+        return BashVerdict::Block("git config core.hooksPath is the issue116 control-bypass vector (K7)".to_string());
+    }
+    // The keel carve-out (D0178): keel-invoking commands are exempt EXCEPT the derived
+    // human-judgment/actor-identity set, which is never exempt.
+    let keel_idx = toks.iter().position(|t| {
+        let base = t.rsplit(['/', '\\']).next().unwrap_or(t);
+        base == "keel" || base == "keel.exe"
+    });
+    if let Some(i) = keel_idx {
+        if let Some(sub) = toks.get(i + 1) {
+            if keel_cli::write::human_judgment_ops().contains(&sub.as_str()) {
+                return BashVerdict::Ask(format!(
+                    "keel {sub} records human judgment or mutates actor identity (K6/K7) - it runs only from a channel the human holds"
+                ));
+            }
+        }
+    }
+    // Invocations carrying a PERSON's identity (KEEL_ACTOR= / --by / --judged-by naming a Person).
+    let persons = keel_cli::actor::person_names(root);
+    if !persons.is_empty() {
+        for (j, t) in toks.iter().enumerate() {
+            let named = t
+                .strip_prefix("KEEL_ACTOR=")
+                .map(str::to_string)
+                .or_else(|| (t == "--by" || t == "--judged-by").then(|| toks.get(j + 1).cloned().unwrap_or_default()));
+            if let Some(n) = named {
+                if persons.iter().any(|p| p == &n) {
+                    return BashVerdict::Ask(format!(
+                        "this command writes as the PERSON `{n}` (K6) - a human identity is asserted only from the human's own channel"
+                    ));
+                }
+            }
+        }
+    }
+    BashVerdict::Clean
+}
+
+fn hook_pre_bash(payload: &serde_json::Value, root: &Path) -> i32 {
     let cmd = payload.pointer("/tool_input/command").and_then(serde_json::Value::as_str).unwrap_or_default();
+    // D0176/D0178 tiering first: unambiguous bypass patterns and the never-exempt set.
+    let profile = adoption_profile(root);
+    match bash_classify(root, cmd) {
+        BashVerdict::Block(why) => {
+            if profile == "strict" {
+                println!(
+                    "{}",
+                    serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                        "permissionDecisionReason": format!("[keel] {why} (D0176; blocking under the strict profile)")}})
+                );
+                return 0;
+            }
+            println!("[keel] BLOCKED-under-strict pattern: {why} (advisory here; promotion cites the fire-ledger, D0180)");
+        }
+        BashVerdict::Ask(why) => {
+            if profile == "strict" {
+                println!(
+                    "{}",
+                    serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
+                        "permissionDecisionReason": format!("[keel] {why}")}})
+                );
+                return 0;
+            }
+            println!("[keel] human-channel operation: {why} (ask-tier under strict; advisory here)");
+        }
+        BashVerdict::Clean => {}
+    }
     let advisories = keel_cli::shellcheck::inspect(cmd);
     if advisories.is_empty() {
         return 0;
@@ -515,16 +734,38 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         }
         problems.push(s);
     }
+    // Through run_all, not a run_one loop: run_all applies the ACTIVATION filter, so a guard whose
+    // process this project deactivated no longer blocks turns (D0177/P1.5 fixing the guards.rs
+    // bypass the proposal cited — hook_stop was the one caller that skipped the filter).
     let mut failing: Vec<String> = Vec::new();
-    for name in keel_cli::guards::GUARD_NAMES {
-        if let Some(r) = keel_cli::guards::run_one(name, root) {
-            for v in r.violations.iter().take(5) {
-                failing.push(format!("  [{name}] {v}"));
-            }
+    for r in keel_cli::guards::run_all(root) {
+        for v in r.violations.iter().take(5) {
+            failing.push(format!("  [{}] {v}", r.name));
         }
     }
     if !failing.is_empty() {
         problems.push(format!("keel guard:\n{}", failing.join("\n")));
+    }
+    // Declared rules gate the turn (D0177/P1.5): blocking rules block; warning rules report only at
+    // their own surfaces (`keel rules`), not here — a turn boundary repeats no warning noise.
+    match keel_cli::view::check(root) {
+        Ok(json) => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+                let empty = Vec::new();
+                let mut broken: Vec<String> = Vec::new();
+                for r in v.get("rules").and_then(|x| x.as_array()).unwrap_or(&empty) {
+                    if r.get("severity").and_then(|s| s.as_str()) == Some("blocking") {
+                        for viol in r.get("violations").and_then(|x| x.as_array()).unwrap_or(&empty).iter().take(5) {
+                            broken.push(format!("  [rule {}] {viol}", r.get("rule").and_then(|s| s.as_str()).unwrap_or("?")));
+                        }
+                    }
+                }
+                if !broken.is_empty() {
+                    problems.push(format!("keel rules (blocking):\n{}", broken.join("\n")));
+                }
+            }
+        }
+        Err(e) => problems.push(format!("keel rules: cannot evaluate declared rules: {e}")),
     }
 
     // THE HUMAN MAY BE BLOCKED WHETHER OR NOT THE MODEL IS (issue150, answering their own question about
@@ -563,9 +804,31 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         return oversight.map_or(0, |msg| hook_emit(&serde_json::json!({ "systemMessage": msg })));
     }
     if already {
-        // Second consecutive red: allow the stop with a loud warning rather than trapping the agent.
+        // Second consecutive red: allow the stop (loop-avoidance stands, issue081) but the yield is
+        // now a TRACKED obligation visible in orient, surviving console downtime (D0176/P1.7) — a
+        // yield that lives only in a hook message evaporates with the transcript.
+        let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("");
+        let first = problems.first().map(|p| p.chars().take(500).collect::<String>()).unwrap_or_default();
+        // An unresolvable actor goes straight to the ledger: a tracked fact with a fabricated
+        // createdBy would deepen the red it records (the actors guard would fire on it).
+        let recorded = keel_cli::actor::resolve(root, None).map_err(keel_cli::write::WriteError::Parse).and_then(|actor| {
+            keel_cli::write::record_obligation(
+                root,
+                "red-yield",
+                "turn gate yielded while red - the tree needs a correction pass",
+                &format!("The Stop hook's second red pass yielded (loop avoidance). Session: {session}. First problem at yield: {first}. Discharge: make the tree green and triage this obligation with a #Resolves edge."),
+                &actor,
+            )
+        });
+        let note = match recorded {
+            Ok(p) => format!("A tracked obligation was recorded at {} (orient-visible).", p.display()),
+            Err(e) => {
+                ledger_emit(root, session, "red-yield-obligation-UNSYNCED", 1, 0);
+                format!("The obligation could NOT be tracked ({e}) - it sits in the local ledger; record it once the tree is writable.")
+            }
+        };
         return hook_emit(&serde_json::json!({
-            "systemMessage": "[in-loop gate] Still red after a correction pass — allowing the stop to avoid a loop. Do NOT commit until keel validate + guard are green."
+            "systemMessage": format!("[in-loop gate] Still red after a correction pass — allowing the stop to avoid a loop. Do NOT commit until keel validate + guard are green. {note}")
         }));
     }
     let mut body = problems.join("\n\n");
@@ -1276,6 +1539,40 @@ fn cmd_sync_claude(args: &[String]) -> i32 {
     }
 }
 
+
+/// `keel override <path> --reason "<text>"` (D0176 tier 3) — the sanctioned unlock for a direct
+/// write the API cannot express. Single-use, target-path-bound, expiring; consumption records an
+/// orient-visible obligation naming the path actually written (K7). Never a silent env var.
+fn cmd_override(args: &[String]) -> i32 {
+    const USAGE: &str = "keel override <path> --reason \"why the API cannot express this write\"";
+    let target = match positional_arg(args, USAGE, "a file path") {
+        Ok(a) => a.replace('\\', "/"),
+        Err(code) => return code,
+    };
+    let Some(reason) = flag(args, "reason").filter(|r| r.trim().len() >= 10) else {
+        eprintln!("error: --reason is required (at least 10 characters) - the reason IS the record (D0176).");
+        eprintln!("usage: {USAGE}");
+        return 2;
+    };
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    let actor = match keel_cli::actor::resolve(&root, None) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("keel override: {msg}");
+            return 1;
+        }
+    };
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let _ = std::fs::create_dir_all(root.join(".keel"));
+    let unlock = serde_json::json!({"path": target, "reason": reason, "actor": actor, "ts": ts});
+    if let Err(e) = keel_cli::write::write_atomic(&override_path(&root), unlock.to_string()) {
+        eprintln!("keel override: cannot write the unlock: {e}");
+        return 1;
+    }
+    println!("override armed for `{target}` - SINGLE USE, expires in {OVERRIDE_TTL_SECS}s; consumption records an obligation (D0176/K7).");
+    0
+}
+
 fn cmd_hardening(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel hardening [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -1314,14 +1611,44 @@ fn cmd_concern_coverage(args: &[String]) -> i32 {
 // spec-compat file checker; the D0105 name reconciliation is a tracked follow-up). Runs ALONGSIDE
 // `keel guard` until parity retires each guard (guardsToRulesMigration).
 fn cmd_rules(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel rules [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel rules [ROOT] [--enforce]", &["enforce"], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
     match keel_cli::view::check(&root) {
         Ok(json) => {
-            println!("{json}");
-            0
+            if !args.iter().any(|a| a == "--enforce") {
+                println!("{json}");
+                return 0;
+            }
+            // The gate form (D0177/P1.5): blocking rules FAIL the caller; warnings print.
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else {
+                eprintln!("rules --enforce: internal: unparsable rule report");
+                return 1;
+            };
+            let empty = Vec::new();
+            let mut blocked = 0usize;
+            for r in v.get("rules").and_then(|x| x.as_array()).unwrap_or(&empty) {
+                let viols = r.get("violations").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+                if viols.is_empty() {
+                    continue;
+                }
+                let name = r.get("rule").and_then(|s| s.as_str()).unwrap_or("?");
+                let sev = r.get("severity").and_then(|s| s.as_str()).unwrap_or("?");
+                for viol in &viols {
+                    println!("[rule {name} - {sev}] {viol}");
+                }
+                if sev == "blocking" {
+                    blocked += viols.len();
+                }
+            }
+            if blocked > 0 {
+                println!("rules: {blocked} blocking violation(s)");
+                1
+            } else {
+                println!("rules: enforced clean");
+                0
+            }
         }
         Err(e) => {
             eprintln!("rules error: {e}");
@@ -2567,6 +2894,21 @@ fn cmd_record_issue(args: &[String]) -> i32 {
 /// Person-typed actor, so an AI accepting its own proposal fails the gate rather than passing it —
 /// this command makes the honest path easy without making the dishonest one possible.
 fn cmd_accept(args: &[String]) -> i32 {
+    // Channel layer (D0178/P1.3, best-effort by recorded design): in a session bearing
+    // agent-environment markers, `keel accept` requires a TTY-interactive human or the console
+    // approve queue - the actor binding alone is agent-mutable state. The write layer (AI-kind
+    // refusal) and the tree-derived audit are the real controls; this is the friction layer.
+    {
+        use std::io::IsTerminal as _;
+        let agent_marked = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_BRIDGE_SESSION_ID"]
+            .iter()
+            .any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()));
+        if agent_marked && !std::io::stdin().is_terminal() {
+            eprintln!("keel accept: this session carries agent-environment markers and no interactive terminal (D0178/K6).");
+            eprintln!("  Acceptance is the human's own act: run `keel accept` from YOUR terminal, or accept from the console approve queue / the deck.");
+            return 1;
+        }
+    }
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
     let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
         eprintln!("usage: keel accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
@@ -2686,6 +3028,7 @@ const CATALOGUE: &[&str] = &[
     "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
     "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
     "  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift (D0174)",
+    "  override <path> --reason R   arm a single-use, path-bound write unlock; consumption records an obligation (D0176)",
     "  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary (D0134/D0174)",
@@ -2817,6 +3160,7 @@ fn main() {
         Some("mint") => cmd_mint(rest),
         Some("new") => cmd_new(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
+        Some("override") => cmd_override(rest),
         Some("decision-follow-through") => cmd_decision_follow_through(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
@@ -2881,7 +3225,44 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_guard_args, remap_engine_path, root_arg, Path};
+    use super::{bash_classify, bash_tokens, classify_guard_args, remap_engine_path, root_arg, BashVerdict, Path};
+
+    /// D0176/P1.2: argv-level matching — operators as tokens, never substrings of prose. A commit
+    /// message DESCRIBING --no-verify does not match; the real flag does; the keel carve-out
+    /// exempts ordinary keel commands but NEVER the human-judgment set.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup: a failed mkdir should abort the test loudly
+    fn bash_matcher_is_argv_level_and_carves_out_human_judgment() {
+        let root = std::env::temp_dir().join("keel-bash-classify");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        std::fs::write(
+            root.join(".tracking").join("actors.sysml"),
+            "package A {\n    part hum : Person { :>> name = \"H\"; }\n}\n",
+        )
+        .expect("actors");
+        assert!(matches!(bash_classify(&root, "git commit --no-verify -m x"), BashVerdict::Block(_)));
+        assert!(
+            matches!(bash_classify(&root, "git commit -m \"never use --no-verify\""), BashVerdict::Clean),
+            "prose inside quotes is ONE token and must not match"
+        );
+        assert!(matches!(bash_classify(&root, "echo x > .tracking/issues.sysml"), BashVerdict::Block(_)));
+        assert!(matches!(bash_classify(&root, "sed -i s/a/b/ .tracking/backlog.sysml"), BashVerdict::Block(_)));
+        assert!(matches!(bash_classify(&root, "git config core.hooksPath /dev/null"), BashVerdict::Block(_)));
+        assert!(matches!(bash_classify(&root, "SKIP_VALIDATE=1 git commit -m x"), BashVerdict::Block(_)));
+        assert!(matches!(bash_classify(&root, "keel validate ."), BashVerdict::Clean), "ordinary keel is exempt");
+        assert!(matches!(bash_classify(&root, "keel accept d1 --by hum"), BashVerdict::Ask(_)), "accept is never exempt");
+        assert!(matches!(bash_classify(&root, "keel actor set hum"), BashVerdict::Ask(_)), "actor mutation is never exempt");
+        assert!(
+            matches!(bash_classify(&root, "KEEL_ACTOR=hum keel append-result --file f --task t --sha s"), BashVerdict::Ask(_)),
+            "writing AS a Person routes to the human channel"
+        );
+        assert!(
+            matches!(bash_classify(&root, "KEEL_ACTOR=someAi keel append-result --file f --task t --sha s"), BashVerdict::Clean),
+            "writing as a non-Person is the normal agent case"
+        );
+        assert_eq!(bash_tokens("a \"b c\" d"), vec!["a", "b c", "d"], "quoted text glues to one token");
+    }
 
     /// issue150: the oversight advisory must be ADVISORY. A turn boundary that blocked because a server
     /// was not running would be the over-strict gate that trains its actor to disable it, taking the

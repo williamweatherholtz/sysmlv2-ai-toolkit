@@ -422,6 +422,123 @@ fn detect_indent(lines: &[&str], def_start: usize, def_close: usize) -> String {
 
 // ── parse helper ─────────────────────────────────────────────────────────────
 
+/// The write-API operation table with the DECLARED human-judgment attribute (D0178).
+///
+/// The protected set is DERIVED from this, never hand-enumerated at call sites — `apply-review` is
+/// the case a hand list misses. `true` = records a HUMAN's judgment / mutates control state and is
+/// never agent-exempt.
+pub const WRITE_OPS: &[(&str, bool)] = &[
+    ("accept", true),
+    ("apply-review", true),
+    ("actor", true),  // actor-identity mutation (K7)
+    ("enroll", true), // Person enrollment (K7)
+    ("deactivate", true), // control weakening (K7)
+    ("record", false),
+    ("add-task", false),
+    ("append-result", false),
+    ("append-gate-result", false),
+    ("new", false),
+    ("mint", false),
+    ("override", false),
+];
+
+/// The derived never-agent-exempt subcommand set (D0178).
+#[must_use]
+pub fn human_judgment_ops() -> Vec<&'static str> {
+    WRITE_OPS.iter().filter(|(_, h)| *h).map(|(n, _)| *n).collect()
+}
+
+/// Record an orient-visible OBLIGATION fact (D0176/K7).
+///
+/// One Issue per file under `.tracking/obligations/`, so recording can never deadlock on the very
+/// file being repaired (charter note 1). Returns the file written.
+///
+/// # Errors
+/// Io on an unwritable tree — the CALLER degrades to the local ledger with a sync obligation.
+pub fn record_obligation(root: &Path, slug: &str, title: &str, description: &str, actor: &str) -> Result<std::path::PathBuf, WriteError> {
+    let dir = root.join(".tracking").join("obligations");
+    std::fs::create_dir_all(&dir)?;
+    let id = gen_uuid();
+    let short = &id[..8];
+    let path = dir.join(format!("{slug}-{short}.sysml"));
+    let esc = |s: &str| sanitize_field(s);
+    let text = format!(
+        "// OBLIGATION (auto-recorded, D0176/K7): a control was overridden or yielded; a human review\n\
+         // discharges it (triage with a #Resolves edge). One file per fact so recording never deadlocks\n\
+         // on the file being repaired.\n\
+         package Obligation{short} {{\n\
+         \x20   private import EngineElement::*;\n\n\
+         \x20   part obligation{short} : Issue {{\n\
+         \x20       :>> id = \"{id}\";\n\
+         \x20       :>> title = \"{}\";\n\
+         \x20       :>> createdAt = \"{}\"; :>> createdBy = \"{actor}\";\n\
+         \x20       :>> description = \"{}\";\n\
+         \x20       :>> discoveredInField = false;\n\
+         \x20       :>> severity = Severity::Low;\n\
+         \x20   }}\n\
+         }}\n",
+        esc(title),
+        crate::scaffold::today(),
+        esc(description),
+    );
+    write_atomic(&path, text)?;
+    Ok(path)
+}
+
+/// True when `{task}DoD`'s declared method is `confirmation` — searched at package level and inside
+/// action defs, the two places a `DoD` verification lives.
+fn dod_method_is_confirmation(pkg: &Package, task_name: &str) -> bool {
+    let dod = format!("{task_name}DoD");
+    let is_conf = |v: &keel_parser::ast::Verification| {
+        v.name == dod
+            && v.attributes.iter().any(|a| {
+                a.name == "method"
+                    && match &a.value {
+                        keel_parser::ast::Value::EnumLit { member, .. } => member == "confirmation",
+                        keel_parser::ast::Value::Str(s) | keel_parser::ast::Value::Ident(s) => s.contains("confirmation"),
+                        _ => false,
+                    }
+            })
+    };
+    pkg.items.iter().any(|item| match item {
+        Item::Verification(v) => is_conf(v),
+        Item::ActionDef(def) => def.verifications.iter().any(is_conf),
+        _ => false,
+    })
+}
+
+/// The model root above `target` (the directory holding `.tracking`/`.engine`), when any.
+fn model_root_of(target: &Path) -> Option<std::path::PathBuf> {
+    let mut cur = target;
+    while let Some(parent) = cur.parent() {
+        if matches!(parent.file_name().and_then(|n| n.to_str()), Some(".tracking" | ".engine")) {
+            return parent.parent().map(std::path::Path::to_path_buf);
+        }
+        cur = parent;
+    }
+    None
+}
+
+/// D0178/K6 write-layer check: refuse when `judged_by` is a registered AI-kind actor. An
+/// UNREGISTERED name is refused too — an attestation by nobody is not weaker than one by an AI.
+fn refuse_ai_judgment(path: &Path, judged_by: &str, what: &str) -> Result<(), WriteError> {
+    let Some(root) = model_root_of(path) else {
+        return Ok(()); // outside a model tree (unit-test scratch) — the actors guard owns registry integrity
+    };
+    if !root.join(".tracking").join("actors.sysml").exists() {
+        return Ok(());
+    }
+    match crate::actor::kind_of(&root, judged_by).as_deref() {
+        Some("human") => Ok(()),
+        Some(_) => Err(WriteError::Parse(format!(
+            "{what} records a HUMAN's judgment and `{judged_by}` is registered as an AI actor — refused (D0178/K6). Acceptance flows through channels the human holds."
+        ))),
+        None => Err(WriteError::Parse(format!(
+            "{what} records a HUMAN's judgment and `{judged_by}` is not a registered actor — refused (D0178/K6)."
+        ))),
+    }
+}
+
 fn parse_file(path: &Path) -> Result<Package, WriteError> {
     let src = std::fs::read_to_string(path)?;
     let fname = path.to_string_lossy();
@@ -477,6 +594,11 @@ fn append_result_locked(
 
     if !task_exists_in_pkg(&pkg, task_name) {
         return Err(WriteError::TaskNotFound(task_name.to_owned()));
+    }
+    // K6 (D0178): a `method=confirmation` result IS a human attestation — the write layer refuses an
+    // AI-kind judge regardless of what any hook or caller claimed.
+    if dod_method_is_confirmation(&pkg, task_name) {
+        refuse_ai_judgment(path, judged_by, "a method=confirmation result")?;
     }
 
     let n = max_result_n(&pkg, task_name) + 1;
@@ -1221,6 +1343,7 @@ fn accept_decision_locked(
     judged_by: &str,
     note: &str,
 ) -> Result<String, WriteError> {
+    refuse_ai_judgment(path, judged_by, "accepting a Decision")?;
     let content = std::fs::read_to_string(path)?;
     if !content.contains(&format!("part {decision} : Decision")) {
         return Err(WriteError::TaskNotFound(decision.to_owned()));
@@ -1386,6 +1509,53 @@ mod atomic_write_tests {
 mod tests {
     use super::{gen_uuid, sanitize_field};
     use std::collections::HashSet;
+
+    fn k6_root(tag: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("keel-k6-{tag}"));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".tracking").join("delivery")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".engine").join("decisions")).expect("mkdir");
+        std::fs::write(
+            root.join(".tracking").join("actors.sysml"),
+            "package ProjectActors {\n    part hum : Person { :>> name = \"H\"; }\n    part bot : Actor { :>> name = \"B\"; :>> kind = ActorKind::ai; }\n}\n",
+        )
+        .expect("actors");
+        root
+    }
+
+    /// K6/D0178 write layer: accepting a Decision refuses an AI-kind actor and an unregistered
+    /// name; a registered Person passes. The check binds INSIDE the write, under the lock — no
+    /// caller, hook, or transport can route around it.
+    #[test]
+    fn accept_decision_refuses_ai_and_unregistered_judges() {
+        let root = k6_root("accept");
+        let d = root.join(".engine").join("decisions").join("0001-t.sysml");
+        let body = "package D1 {\n    part d1 : Decision { :>> id = \"e2e00000-0000-4000-8000-00000000d001\"; :>> status = DecisionStatus::proposed; }\n}\n";
+        std::fs::write(&d, body).expect("decision");
+        let ai = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "bot", "their words");
+        assert!(ai.is_err(), "an AI-kind judge must be refused");
+        assert!(format!("{}", ai.unwrap_err()).contains("AI actor"), "the refusal names the cause");
+        let nobody = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "ghost", "their words");
+        assert!(nobody.is_err(), "an unregistered judge must be refused");
+        let human = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "hum", "their words");
+        assert!(human.is_ok(), "a registered Person accepts: {human:?}");
+    }
+
+    /// K6/D0178 write layer: a `method=confirmation` result refuses an AI-kind judge; an ordinary
+    /// `method=test` result does not (AI-recorded test evidence is the normal case, D0049).
+    #[test]
+    fn confirmation_results_are_human_only_at_the_write_layer() {
+        let root = k6_root("confirm");
+        let f = root.join(".tracking").join("delivery").join("x.sysml");
+        let body = "package X {\n    action def Run {\n        action tconf;\n        verification tconfDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000c001\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"human attests\"; }\n        action ttest;\n        verification ttestDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000c002\"; :>> method = VerificationMethod::test; :>> procedureText = \"machine verifies\"; }\n    }\n}\n";
+        std::fs::write(&f, body).expect("write");
+        let ai_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "bot");
+        assert!(ai_conf.is_err(), "an AI judging a confirmation must be refused");
+        let hum_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "hum");
+        assert!(hum_conf.is_ok(), "a Person judging a confirmation passes: {hum_conf:?}");
+        let ai_test = super::append_result(&f, "ttest", "abc1234", "pass", "2026-08-21", "bot");
+        assert!(ai_test.is_ok(), "an AI judging a method=test result is the normal case: {ai_test:?}");
+    }
 
     /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,
     /// and 10000 mints contain no duplicate. The command exists so identity is never hand-authored;

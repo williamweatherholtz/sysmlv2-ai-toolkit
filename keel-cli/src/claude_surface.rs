@@ -46,6 +46,12 @@ pub const PROTECTED_PATHS: [(&str, &str); 5] = [
     (".engine/decisions/", "keel record decision, accepted only via keel accept (human-only)"),
 ];
 
+/// Control-plane surfaces (D0179/K7): a write here weakens or redirects enforcement.
+///
+/// Approval-gated (ask) and recorded — never a quiet config edit. The pure-shell test covers them
+/// too, so with the binary absent a control-plane write is denied rather than silently allowed.
+pub const CONTROL_PLANE_PATHS: [&str; 3] = [".claude/settings.json", ".githooks/", "output-styles/keel.md"];
+
 /// POSIX-sh binary resolution used by every scaffolded hook: `KEEL_BIN` (absolute, injected by the
 /// launcher) then PATH; missing → a VISIBLE warning naming the install path, exit 0 (D0134: a hook
 /// never fails a turn on infrastructure absence — the warning is the K2 visibility, and the
@@ -75,7 +81,7 @@ fn hook_entry(cmd: &str, timeout: u64, status: &str) -> serde_json::Value {
 /// pass silently (K2).
 fn protected_path_command() -> String {
     let mut pats = String::new();
-    for (p, _) in PROTECTED_PATHS {
+    for p in PROTECTED_PATHS.iter().map(|(p, _)| *p).chain(CONTROL_PLANE_PATHS) {
         let win = p.replace('/', "\\\\");
         let _ = write!(pats, "*'{p}'*|*'{win}'*|");
     }
@@ -172,7 +178,7 @@ jobs:
       - name: guards
         run: keel guard .
       - name: rules
-        run: keel rules . || true   # blocking activates with P1 (rules wired into gates)
+        run: keel rules . --enforce
       - name: audit-history
         run: keel audit-history --since origin/main || true
 ";

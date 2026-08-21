@@ -103,6 +103,11 @@ if [ -n "$sysml_staged" ]; then
     echo "pre-commit: keel check-engine ."
     "$KEEL" check-engine . || {
         echo "pre-commit: CHECK-ENGINE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    # Declared rules gate the commit (D0177/P1.5): blocking rules fail; warnings print. This is the
+    # modularity keystone - a project adds a blocking control by DECLARING a rule, no Rust, no fork.
+    echo "pre-commit: keel rules --enforce"
+    "$KEEL" rules --enforce || {
+        echo "pre-commit: DECLARED RULES FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
 # Rust validation: clippy -D warnings across the workspace (<5s incremental)

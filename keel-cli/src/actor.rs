@@ -43,6 +43,51 @@ pub fn root_for(hint: &Path) -> PathBuf {
 /// committing it would re-create the shared-default defect it exists to remove.
 pub const BINDING_PATH: &str = ".keel/actor";
 
+/// The registered kind of `name`: `"human"`, `"ai"`, or `None` when unregistered.
+///
+/// A `Person` (or `kind = ActorKind::human`) is human. Reads `.tracking/actors.sysml` — the registry
+/// is the authority (D0178: the write layer refuses AI-kind actors on human-judgment records, and
+/// that check needs KIND).
+#[must_use]
+pub fn kind_of(root: &Path, name: &str) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")).ok()?;
+    let needle = format!("part {name} :");
+    for line in text.lines() {
+        let l = line.trim_start();
+        if !l.starts_with(&needle) {
+            continue;
+        }
+        if l.contains(": Person") {
+            return Some("human".to_string());
+        }
+        if l.contains("ActorKind::human") {
+            return Some("human".to_string());
+        }
+        if l.contains("ActorKind::ai") {
+            return Some("ai".to_string());
+        }
+        return Some("unknown".to_string());
+    }
+    None
+}
+
+/// Every registered `Person` name — the set the D0178 Bash carve-out matches `--by`/`--judged-by`/
+/// `KEEL_ACTOR=` values against.
+#[must_use]
+pub fn person_names(root: &Path) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")) else {
+        return Vec::new();
+    };
+    text.lines()
+        .filter_map(|line| {
+            let l = line.trim_start();
+            let rest = l.strip_prefix("part ")?;
+            let (name, after) = rest.split_once(':')?;
+            after.trim_start().starts_with("Person").then(|| name.trim().to_string())
+        })
+        .collect()
+}
+
 /// Resolve the acting actor from explicit sources only.
 ///
 /// # Errors

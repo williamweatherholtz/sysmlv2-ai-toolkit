@@ -133,8 +133,9 @@ frozen (modify it only by out-of-band Decision).
   its own `sync` position, so every computed answer states the tree it was computed against.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
-  **machine-dependent** — green on one clone, not-done on every other. Enforced by remote config and
-  hooks. Integrate by merge.
+  **machine-dependent** — green on one clone, not-done on every other. Enforced by the local hooks
+  and by CI's tree-derived `keel audit-history` over every pushed range (K15/D0179) — nothing remote
+  assumes a hook ran. Integrate by merge.
 - **Provenance is never defaulted (D0129) — the ACTOR *and* the DATE (issue182).** Five write paths
   used to fall back to a hardcoded `2026-01-01`, fabricating when the evidence was judged; they now
   refuse without `--at` / `--judged-at`. `keel actor set <id>` binds this machine, `KEEL_ACTOR` sets
