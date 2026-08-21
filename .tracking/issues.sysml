@@ -2328,4 +2328,26 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyLaunchApprovalHuman to issue202;
+
+    part issue203 : Issue {
+        :>> id = "6e376360-890f-4c73-aca0-588c0ad340c5";
+        :>> title = "The enforcement-point inventory misses the build-time spec-pin check, whose failure mode is warn-allow";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 1 (srK02FailLoud x completeness). The hardening lens's enforcementPoints enumerates hooks, pre-commit, CI, serve and launcher gates - but not keel-parser's build-time spec-pin check, whose network-error path resolves to ALLOW with a warning and whose digest was the dead all-zeros sentinel for its whole life until sprint 396. srK02's own statement demands timeout-resolves-to-allow points be recorded as residuals; this one never was, which is how a dead control stayed invisible.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcEnforcementPointSpecPin to issue203;
+
+    part issue204 : Issue {
+        :>> id = "d1af2402-a027-4db2-b98d-cad1138a2d18";
+        :>> title = "srK06's letter contradicts the sanctioned D0165 delegation: the acceptance endpoint is agent-invokable with a human's name";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 1 (srK06HumanChannel x completeness). The write layer refuses AI-KIND actors, but nothing distinguishes a human typing judged_by=wweatherholtz from an agent typing it: POST /api/decision/accept succeeds from any localhost process, and this session accepted D0191 that way under the sanctioned delegation practice (recording their verbatim chat words). The requirement says human-judgment records originate only from a channel the agent cannot invoke. Either the SR gets a recorded delegation clause or the delegation path closes and acceptances become human-gesture-only - a direction Decision for the human.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHumanChannelDelegationRule to issue204;
 }
