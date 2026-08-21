@@ -313,7 +313,7 @@ fetch('/api/version').then(function(r){return r.json();}).then(function(j){
   if(j && j.apiVersion){MODE='local';
     document.getElementById('how').setAttribute('data-local-transport','transport: keel serve (tested path)');}
 }).catch(function(){
-  document.getElementById('how').setAttribute('data-local-transport','transport: artifact live-doc (fallback)');
+  document.getElementById('how').setAttribute('data-local-transport','transport: artifact page only - judgments marked here DO NOT reach keel; use the local deck or tell Claude your verdicts');
 });
 
 var ART = (window.claude && claude.use) ? claude.use('artifact') : Promise.resolve(null);
@@ -354,7 +354,7 @@ function saveArtifact(card,verdict){
   ART.then(function(a){
     if(!a||!a.sync){say(card,'not saved - this view cannot write');return;}
     return a.sync(function(){ if(card.getAttribute('data-verdict')!==verdict){card.setAttribute('data-verdict',verdict);} })
-      .then(function(){say(card,'saved');
+      .then(function(){say(card,'marked in page - NOT confirmed in keel');
         setTimeout(function(){
           if(card.getAttribute('data-verdict')!==verdict){say(card,'REVERTED - tell Claude you saw this');dbg('revert on '+card.getAttribute('data-name'));}
         },1200);},

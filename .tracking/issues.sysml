@@ -2218,4 +2218,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDeckInRust to issue192;
+
+    part issue193 : Issue {
+        :>> id = "322ce985-20dc-4446-89e7-7e768337d54c";
+        :>> title = "The artifact transport is write-only from keel's perspective, and its saved label was the runtime marking its own homework";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED WITH THE HUMAN AS THE FAR INSTRUMENT, which is the only end-to-end test this transport permits. Their phone: transport=artifact-fallback, taps latch, label says saved. This session: a fresh fetch of the served document AFTER their taps shows every data-verdict empty and every note input valueless. CONCLUSION, stated as two independent facts: sync() resolving proves the RUNTIME accepted the write, and nothing more; and no read path available to this session returns viewer appends - so whether the append persists or not, keel cannot consume it, which makes the artifact transport WRITE-ONLY into a layer the receiver never sees. THE LABEL WAS THEREFORE AN OVERCLAIM: a confirmation only the sender witnesses is not a confirmation. Their question named it exactly - if we cannot tell whether it saved properly, why indicate saved at all. The verdicts they recorded on the phone are stranded in that layer and cannot be recovered by this session. THE FIX SHIPPED: the fallback label now reads marked-in-page-NOT-confirmed-in-keel, the transport line says judgments marked there do not reach keel, and the word saved is reserved for the LOCAL transport where a write-API 200 plus a computed-view read-back make it true. THE STRUCTURAL CONSEQUENCE: mobile needs a route to the TESTED transport - keel serve exposed to the phone via their remote-control or a tunnel - which is an infrastructure decision that is theirs to make, recorded here rather than assumed.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHonestSaveLabel to issue193;
 }
