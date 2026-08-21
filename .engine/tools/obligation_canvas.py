@@ -459,7 +459,13 @@ function copyOut(){
     btn.setAttribute('data-local-copied', done ? ' - copied' : ' - text selected, copy it');
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(ta.value).then(function(){ btn.setAttribute('data-local-copied', 'Copied'); // async: data-local only (issue188) }, manual);
+    // issue191: a regex fix once appended an end-of-line comment INSIDE this single-line .then(),
+    // commenting out `}, manual);` and unbalancing the whole script - which is why every listener in
+    // the deck was dead from v3 onward while three real fixes shipped untestable. Multi-line now, so
+    // no line-scoped edit can swallow structure again.
+    navigator.clipboard.writeText(ta.value).then(
+      function(){ btn.setAttribute('data-local-copied', ' - copied'); },
+      manual);
   } else { manual(); }
 }
 
@@ -478,7 +484,6 @@ function buildExport(){
       // on every line was pure noise (their words: duplicate titles, IDs, etc).
       L.push('- `' + c.querySelector('code').textContent + '` ' + c.querySelector('h3').textContent
         + (note ? ' -- ' + note : ''));
-  - note: ' + note : ''));
     });
     L.push('');
   });
@@ -494,8 +499,7 @@ function buildExport(){
   }
   L.push(judged() || noted.length ? '_' + judged() + ' of ' + cards.length + ' items judged._'
                                   : '_No verdicts recorded yet._');
-  document.getElementById('out').value = L.join('
-');
+  document.getElementById('out').value = L.join(String.fromCharCode(10));
   document.getElementById('copy').setAttribute('data-local-copied', 'Copy');
 }
 
@@ -557,7 +561,7 @@ def render(items, generated_at, head_sha):
         '<meta name=viewport content="width=device-width,initial-scale=1">\n'
         "<style>%s</style>\n" % CSS
         + '<div class=wrap>\n<header class=top>\n  <h1>Keel Obligations Deck</h1>\n'
-        + '  <p class=sub>%d item(s) waiting on you &middot; %s &middot; deck v4</p>\n' % (total, stamp)
+        + '  <p class=sub>%d item(s) waiting on you &middot; %s &middot; deck v5</p>\n' % (total, stamp)
         + '  <div class=stats>%s</div>\n' % stats
         + '  <p class=how>Tap a class to open it, then give each item a verdict and a note. '
           '<b>Your taps save themselves and reach Claude &mdash; there is nothing to copy.</b></p>'

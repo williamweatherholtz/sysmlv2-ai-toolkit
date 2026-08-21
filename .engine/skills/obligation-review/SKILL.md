@@ -122,6 +122,24 @@ On a live doc the runtime treats the `<body>` as a sync region and saves what a 
 DOM change made by **script** is not a save — it is a signal that the region is no longer a faithful
 record, so the runtime switches the region **off**. Everything below follows from that one sentence.
 
+### 0. Pass zero, before every other check: the emitted script must PARSE
+
+`node --check` on the extracted `<script>` content, as a hard gate before publish. The deck shipped
+with THREE syntax errors and was therefore completely dead from its first version: an end-of-line
+comment appended by a regex fix swallowed a `.then()`'s closing braces; a stray fragment of a replaced
+multi-line statement survived as a bare line; a heredoc-eaten `\n` split a string literal in two. A
+syntax error runs NOTHING — no listener, no self-report marker, no debug log — so four rounds of real
+fixes shipped untestable, and every string-level audit passed because **a file full of the right
+strings in the right places parses as nothing**. Checking spelling is not checking grammar.
+
+```
+python extract_js.py deck.html > deck.js && node --check deck.js
+```
+
+Corollary for edits: never append an end-of-line `//` comment via a line-scoped regex — on a
+single-line statement it comments out the rest of the statement. Newlines in emitted JS are written as
+`String.fromCharCode(10)` where any authoring layer might eat a backslash.
+
 ### 1. Never write to the DOM at load
 
 `count()` was called at the end of the script and set `#cnt.textContent`. That single line ran before

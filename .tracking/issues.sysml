@@ -2196,4 +2196,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDeckSyncAddressable to issue190;
+
+    part issue191 : Issue {
+        :>> id = "191f1851-b361-4a84-817f-d99604155a1e";
+        :>> title = "The deck's script never parsed: three syntax errors meant no listener ever registered, in any version";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THE HUMAN READ THE INSTRUMENT AND IT WAS RIGHT: script did not finish. Extracting the emitted script and running node --check - available on PATH the entire time - found THREE syntax errors. (1) Sprint 372's regex fix appended an end-of-line comment INSIDE a single-line .then(), commenting out the closing braces and unbalancing the file. (2) A stray fragment of a replaced multi-line push ('- note: quote plus note colon quote') survived an old edit as a bare line. (3) A backslash-n eaten by a heredoc split L.join's string literal across two lines - the shell-mangling class, fossilised in the artifact. A SYNTAX ERROR RUNS NOTHING: no listener, no marker, no debug log. Every button report across v1-v4 was this one defect wearing different diagnoses, and the three real fixes shipped along the way - the load-time DOM write, the async isolation, the data-id addressing - were all genuine contract violations that were UNTESTABLE because the page could not execute at all. THE VERIFICATION GAP IS THE FINDING: every audit I ran grepped strings in the emitted HTML - marker present, marker last, counts right - and a file full of strings in the right places parses as nothing. I checked spelling and never grammar. PREVENTING CHANGE: node --check on the extracted script is pass ZERO of the deck checklist, before any string check, because a parse failure makes every other check meaningless.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcEmittedJsMustParse to issue191;
 }
