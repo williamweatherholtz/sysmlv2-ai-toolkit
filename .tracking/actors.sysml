@@ -31,4 +31,5 @@ package ProjectActors {
     // than a gap: `ActorKind` is human|ai deliberately, and tool-ness belongs on the CRITIQUE
     // (`critiquedBy = CriticKind::tool`) while the identity in `judgedBy` stays the actor who ran
     // it. A kernel-adjudicated critique is recorded that way — see .tracking/panel-critiques.sysml.
+    part claudeFable5 : Actor { :>> name = "Claude Fable 5"; :>> kind = ActorKind::ai; :>> role = "contributor"; }
 }

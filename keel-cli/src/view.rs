@@ -2272,6 +2272,138 @@ pub fn concern_coverage(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+/// Latest `{stem}R<n>` outcome among the model's `TestResult`s (e.g. stem = `dcMintCommandDoD`),
+/// optionally scoped to one source file.
+fn dft_latest_result(model: &Model, stem: &str, file: Option<&str>) -> Option<String> {
+    let prefix = format!("{stem}R");
+    let mut best: Option<(u32, String)> = None;
+    for (rname, rinfo) in &model.items {
+        if rinfo.type_name != "TestResult" || file.is_some_and(|f| rinfo.file != f) {
+            continue;
+        }
+        let Some(n) = rname.strip_prefix(&prefix).and_then(|t| t.parse::<u32>().ok()) else { continue };
+        let outcome =
+            rinfo.attrs.get("outcome").map(|o| o.rsplit(':').next().unwrap_or(o).to_string()).unwrap_or_default();
+        if best.as_ref().is_none_or(|(bn, _)| n > *bn) {
+            best = Some((n, outcome));
+        }
+    }
+    best.map(|(_, o)| o)
+}
+
+/// An item's evidence state: its own `{item}DoD` results; for a sprint Story, the file's `story…DoD`
+/// results (the ceremony convention — the story's doneness IS its sprint `DoD`); else no evidence.
+fn dft_evidence(model: &Model, item: &str) -> String {
+    if let Some(o) = dft_latest_result(model, &format!("{item}DoD"), None) {
+        return o;
+    }
+    if let Some(info) = model.items.get(item) {
+        if info.type_name == "Story" && !info.file.is_empty() {
+            let stems: std::collections::BTreeSet<String> = model
+                .items
+                .iter()
+                .filter(|(n, i)| {
+                    i.type_name == "TestResult" && i.file == info.file && n.starts_with("story") && n.contains("DoDR")
+                })
+                .filter_map(|(n, _)| n.rfind("DoDR").map(|k| n[..k + 3].to_string()))
+                .collect();
+            for stem in stems {
+                if let Some(o) = dft_latest_result(model, &stem, Some(&info.file)) {
+                    return o;
+                }
+            }
+        }
+    }
+    "no evidence".to_string()
+}
+
+/// `keel decision-follow-through` — the promise-to-work chain, per accepted Decision (us020/issue174).
+///
+/// Their note, verbatim in st015: "the scaffolding under a decision isn't being made - is there no
+/// downstream backlog items? user stories? verification test cases?". For EVERY accepted Decision:
+/// the tracked items reaching it by typed edge, each item's evidence state, and the GAPS — accepted
+/// Decisions with zero downstream items.
+///
+/// FIRST-CLASS, not a lens buried in `keel hardening`: that lens answers a narrower question
+/// (declared artifact promises from `.engine/contracts/decision-artifacts.toml`); this view answers
+/// the model's own question — does the promise-to-work chain exist as EDGES — and the output names
+/// the lens as complementary rather than leaving the reader to reconcile two numbers.
+///
+/// NOT A GATE: a Decision may be legitimately accepted with no work ("we won't do X" needs nothing),
+/// which is why `gaps` is a list to read, not a verdict. Whether some subset becomes a guard is
+/// dcDecisionScaffoldingGuard's PROPOSED Decision, gated on the human's st014 ("depends on what is
+/// being asserted").
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be read.
+pub fn decision_follow_through(root: &Path) -> Result<String, ViewError> {
+    const INBOUND: [&str; 4] = ["charteredby", "derivedfrom", "resolves", "satisfy"];
+    let model = Model::build(root)?;
+    let evidence = |item: &str| dft_evidence(&model, item);
+
+    let mut decisions: Vec<(&String, &ItemInfo)> = model
+        .items
+        .iter()
+        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").is_some_and(|s| s.ends_with("accepted")))
+        .collect();
+    decisions.sort_by(|a, b| a.0.cmp(b.0));
+
+    let mut gaps: Vec<Json> = Vec::new();
+    let mut with_downstream = 0usize;
+    let mut rows: Vec<Json> = Vec::new();
+    for (name, info) in &decisions {
+        let mut inbound: Vec<&Edge> = model
+            .edges
+            .iter()
+            .filter(|e| e.to == **name && INBOUND.contains(&e.kind.as_str()))
+            .collect();
+        inbound.sort_by(|a, b| a.from.cmp(&b.from).then(a.kind.cmp(&b.kind)));
+        inbound.dedup_by(|a, b| a.from == b.from && a.kind == b.kind);
+        if inbound.is_empty() {
+            gaps.push(Json::s((*name).clone()));
+            continue;
+        }
+        with_downstream += 1;
+        let items: Vec<Json> = inbound
+            .iter()
+            .map(|e| {
+                Json::Obj(vec![
+                    ("item".to_string(), Json::s(e.from.clone())),
+                    ("edge".to_string(), Json::s(e.kind.clone())),
+                    (
+                        "kind".to_string(),
+                        Json::s(model.items.get(&e.from).map(|i| i.type_name.clone()).unwrap_or_default()),
+                    ),
+                    ("evidence".to_string(), Json::s(evidence(&e.from))),
+                ])
+            })
+            .collect();
+        rows.push(Json::Obj(vec![
+            ("decision".to_string(), Json::s((*name).clone())),
+            ("title".to_string(), Json::s(info.attrs.get("title").cloned().unwrap_or_default())),
+            ("items".to_string(), Json::Arr(items)),
+        ]));
+    }
+    let out = Json::Obj(vec![
+        (
+            "note".to_string(),
+            Json::s(
+                "The promise-to-work chain, computed from typed edges (charteredby/derivedfrom/resolves/satisfy). \
+                 `gaps` lists accepted Decisions with ZERO downstream tracked items - some are legitimate \
+                 (a Decision that needs no work), which is why this is a view to read, never a verdict. \
+                 Complementary: `keel hardening`'s decisionFollowThrough lens checks DECLARED artifact \
+                 promises; this view checks the model's edges.",
+            ),
+        ),
+        ("acceptedDecisions".to_string(), Json::Int(i64::try_from(decisions.len()).unwrap_or(i64::MAX))),
+        ("withDownstream".to_string(), Json::Int(i64::try_from(with_downstream).unwrap_or(i64::MAX))),
+        ("gapCount".to_string(), Json::Int(i64::try_from(gaps.len()).unwrap_or(i64::MAX))),
+        ("gaps".to_string(), Json::Arr(gaps)),
+        ("decisions".to_string(), Json::Arr(rows)),
+    ]);
+    Ok(out.dump())
+}
+
 /// Dispositions view (D0092): every >= Medium finding + its typed disposition verdict.
 ///
 /// Each verdict is `act`/`acceptRisk`/`dismiss` or `undispositioned` — the computed read of the

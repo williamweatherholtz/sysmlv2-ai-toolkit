@@ -1068,6 +1068,58 @@ fn cmd_new(args: &[String]) -> i32 {
     }
 }
 
+/// `keel decision-follow-through [ROOT] [--table]` (dcDecisionFollowThroughView/us020) — JSON is the
+/// authority; `--table` renders the same data for eyes: one line per accepted Decision with
+/// downstream work, then the gaps.
+fn cmd_decision_follow_through(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel decision-follow-through [ROOT] [--table]", &["table"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    let json = match keel_cli::view::decision_follow_through(&root) {
+        Ok(j) => j,
+        Err(e) => {
+            eprintln!("keel decision-follow-through: {e}");
+            return 1;
+        }
+    };
+    if !args.iter().any(|a| a == "--table") {
+        println!("{json}");
+        return 0;
+    }
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else {
+        eprintln!("keel decision-follow-through: internal: view emitted unparsable JSON");
+        return 1;
+    };
+    let empty = Vec::new();
+    println!(
+        "accepted {}   with-downstream {}   gaps {}",
+        v.get("acceptedDecisions").and_then(serde_json::Value::as_i64).unwrap_or(0),
+        v.get("withDownstream").and_then(serde_json::Value::as_i64).unwrap_or(0),
+        v.get("gapCount").and_then(serde_json::Value::as_i64).unwrap_or(0),
+    );
+    for d in v.get("decisions").and_then(|x| x.as_array()).unwrap_or(&empty) {
+        let items = d.get("items").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+        let summary: Vec<String> = items
+            .iter()
+            .map(|i| {
+                format!(
+                    "{} ({})",
+                    i.get("item").and_then(|x| x.as_str()).unwrap_or("?"),
+                    i.get("evidence").and_then(|x| x.as_str()).unwrap_or("?"),
+                )
+            })
+            .collect();
+        println!("  {}  <-  {}", d.get("decision").and_then(|x| x.as_str()).unwrap_or("?"), summary.join(", "));
+    }
+    let gaps: Vec<&str> =
+        v.get("gaps").and_then(|x| x.as_array()).unwrap_or(&empty).iter().filter_map(|g| g.as_str()).collect();
+    if !gaps.is_empty() {
+        println!("  GAPS (no downstream tracked item): {}", gaps.join(", "));
+    }
+    0
+}
+
 fn cmd_hardening(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel hardening [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -2408,6 +2460,7 @@ const CATALOGUE: &[&str] = &[
     "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
     "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
     "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
+    "  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
     "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
@@ -2537,6 +2590,7 @@ fn main() {
         Some("deck") => cmd_deck(rest),
         Some("mint") => cmd_mint(rest),
         Some("new") => cmd_new(rest),
+        Some("decision-follow-through") => cmd_decision_follow_through(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
