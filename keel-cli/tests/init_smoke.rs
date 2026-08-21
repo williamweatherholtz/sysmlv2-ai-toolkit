@@ -28,20 +28,20 @@ impl Drop for TmpProject {
     }
 }
 
-/// Count files under `dir` (recursively) matching `pred`.
-fn walk_count(dir: &Path, pred: &dyn Fn(&Path) -> bool) -> usize {
-    let mut n = 0;
+/// Collect file paths under `dir` (recursively) matching `pred`.
+fn walk_paths(dir: &Path, pred: &dyn Fn(&Path) -> bool) -> Vec<String> {
+    let mut out = Vec::new();
     if let Ok(rd) = std::fs::read_dir(dir) {
         for e in rd.flatten() {
             let p = e.path();
             if p.is_dir() {
-                n += walk_count(&p, pred);
+                out.extend(walk_paths(&p, pred));
             } else if pred(&p) {
-                n += 1;
+                out.push(p.to_string_lossy().to_string());
             }
         }
     }
-    n
+    out
 }
 
 #[test]
@@ -60,10 +60,18 @@ fn init_scaffolds_a_working_project() {
     // the new project's OWN decisions dir is created fresh + empty.
     assert!(dir.join(".engine").join("reference").join("decisions").is_dir(), "reference/decisions/ missing");
     assert!(dir.join(".engine").join("decisions").is_dir(), "fresh decisions/ missing");
-    // scaffoldEngineDevExclude: the engine-DEV-only kernel/Python toolchain must NOT ship downstream.
-    assert!(!dir.join(".engine").join("tools").exists(), ".engine/tools/ leaked into the scaffold (engine-dev only)");
-    let py = walk_count(&dir.join(".engine"), &|p| p.extension().is_some_and(|e| e == "py" || e == "pyc"));
-    assert_eq!(py, 0, "{py} python file(s) leaked into the scaffold (engine-dev only)");
+    // scaffoldEngineDevExclude: the engine-DEV-only kernel/Python toolchain must NOT ship downstream —
+    // EXCEPT the two tools the portable obligation-review process deploys BY PATH (D0171): guard 39
+    // (tool-reference) fails a scaffold whose process references tools it never received, which is
+    // exactly what CI caught on the guard's first landing. Exactly those two, nothing else.
+    let py: Vec<String> = walk_paths(&dir.join(".engine"), &|p| p.extension().is_some_and(|e| e == "py" || e == "pyc"));
+    let mut names: Vec<&str> = py.iter().map(|p| p.rsplit(['/', '\\']).next().unwrap_or(p)).collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        vec!["deck_inbox_record.py", "test_deck_e2e.py"],
+        "scaffolded python must be exactly the portable deck tools; got {names:?}"
+    );
     // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel validate/guard; NO conda/kernel).
     let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
     assert!(hook.contains("keel") && hook.contains("validate") && hook.contains("guard"), "pre-commit gate missing keel validate/guard");

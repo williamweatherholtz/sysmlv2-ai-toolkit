@@ -42,8 +42,20 @@ pub fn remap_engine_path(rel: &Path) -> PathBuf {
 
 /// Engine-DEV-only embedded paths EXCLUDED from the scaffold (D0093 boundary): the kernel/Python
 /// toolchain and any compiled-Python cache. Downstream projects use the Rust path (D0048).
+///
+/// EXCEPT the tools a shipped process DEPLOYS BY PATH: the obligation-review process (D0171,
+/// portable) names the deck e2e and the inbox recorder, and guard 39 (`tool-reference`) rightly
+/// fails a fresh scaffold whose process references tools it never received — CI caught exactly that
+/// on the guard's first landing. Both are self-contained (httpx + stdlib), kernel-free, and carry no
+/// repo-specific state, so shipping them keeps D0048 intact.
 #[must_use]
 pub fn is_engine_dev_only(rel: &Path) -> bool {
+    const PORTABLE_TOOLS: [&str; 2] = ["test_deck_e2e.py", "deck_inbox_record.py"];
+    if rel.parent().is_some_and(|p| p.ends_with("tools"))
+        && rel.file_name().is_some_and(|f| PORTABLE_TOOLS.iter().any(|t| f == *t))
+    {
+        return false;
+    }
     rel.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();
         s == "tools" || s == "__pycache__"
