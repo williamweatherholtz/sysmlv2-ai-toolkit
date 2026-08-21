@@ -261,6 +261,21 @@ dialog textarea{width:100%;height:46vh;border:1px solid var(--line);border-radiu
 .ro{display:none;margin:12px 0;padding:10px 12px;border:1px solid var(--maybe);
   border-left:4px solid var(--maybe);border-radius:var(--r);color:var(--ink2);font-size:13px}
 body[data-local-readonly=true] .ro{display:block}
+/* COPY IS A FALLBACK, NOT A ROUTE. The point of the live doc is that a verdict reaches the watching
+   session with no copy step, and an always-visible "Copy for Claude" button teaches the reader that
+   copying is what they are meant to do - which is how the deck trained a habit it did not need. The
+   button exists only for a view that genuinely cannot write, and there it is the ONLY thing that
+   works, so it appears exactly then and never otherwise. */
+#exp{display:none}
+body[data-local-readonly=true] #exp{display:inline-block}
+/* A SIGNATURE IS NOT A VERDICT. The acceptance class asks for something no other class does and no AI
+   may supply, so it carries a heavier rail and its own ribbon rather than only a different hue - a
+   colour alone is a legend lookup, and the reader should not have to consult a legend to notice that
+   a card needs their name on it. */
+.card[data-cls=acceptance]{border-left-width:5px}
+.card[data-cls=acceptance]>header{display:flex;align-items:center;gap:8px}
+.card[data-cls=acceptance]>header::after{content:'needs your signature';margin-left:auto;
+  font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--acc);font-weight:700}
 body[data-local-readonly=true] .live{display:none}
 .live{margin:12px 0 0;color:var(--ink3);font-size:12px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -429,13 +444,18 @@ def render(items, generated_at, head_sha):
             '<header><code>%s</code><span class=vd></span><span class=sv></span></header>'
             '<h3>%s</h3><p class=meta>%s</p>%s'
             '<div class=verdicts role=group aria-label="verdict">'
-            '<button data-v=accept>Accept</button>'
+            '<button data-v=accept>%s</button>'
             '<button data-v=maybe>Needs work</button>'
             '<button data-v=reject>Reject</button></div>'
             '<input class=note type=text placeholder="why, or what to change&hellip;" aria-label="note">'
             '</article>' % (
                 esc(i["uid"]), i["sig"], key, esc(i["name"]), esc(i["title"]), esc(i["meta"]),
                 ('<p class=body>%s</p>' % esc(i["body"])) if i["body"] else "",
+                # A DECISION IS SIGNED, NOT VOTED ON. `method=confirmation` records a HUMAN's word and
+                # an AI cannot supply it, so the verb on an acceptance card says SIGN rather than
+                # Accept - the same gesture on a finding means "I agree with the disposition", and
+                # conflating the two is how an instruction gets read as a signature.
+                "Sign" if key == "acceptance" else "Accept",
             )
             for i in rows
         ) or '<p class=empty>Nothing outstanding in this class.</p>'

@@ -2152,4 +2152,15 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcDeadCoreFields to issue186;
+
+    part issue187 : Issue {
+        :>> id = "141bed83-b024-4002-b6cf-d08bee960e0e";
+        :>> title = "The obligation deck could not travel, and copy-paste was still taught as the route";
+        :>> createdAt = "2026-08-20";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THEIR INSTRUCTION named five properties for the review deck: mobile, automatic feedback with NO copy-paste, Claude-hosted artifact, clearly delineates decisions, reusable anywhere keel is used. THREE ALREADY HELD, and saying so keeps the change honest: the deck is a 680px fluid column with a device-width viewport, it publishes as a Claude-hosted artifact, and it is already a live doc - the artifact capability appends a verdict or note as the viewer at the moment of the gesture. TWO DID NOT HOLD. FIRST, IT WAS NOT REUSABLE: obligation-review was a SKILL with no PROCESS behind it. D0128 makes a process the movable unit and the keel activate command operates on processes, so a skill deploying nothing cannot travel - a downstream project would have to copy a python file by hand and somehow know it existed. SECOND, COPY-PASTE WAS STILL A ROUTE: the Copy for Claude button sat in the bottom bar of every view including fully writable ones, so the reader was taught that copying is what they are meant to do, which is the habit the live doc exists to remove and which they have now asked to be rid of twice. A THIRD GAP THEY NAMED AS A PRIORITY rather than a defect: decisions were delineated only by hue. Every non-acceptance class asks for a judgment an AI could in principle have formed and is deferring; an acceptance asks for something an AI may NEVER supply. Rendering both with the same green Accept button is the confusion that produced issue144, and a colour is a legend lookup - the reader should not have to consult a legend to notice a card needs their name on it. NOTE ON THIS RECORD: the text above was damaged when first written - backticked command names in a shell argument were executed as command substitution and their words silently DELETED from the description, leaving 'the movable unit and  operates on processes'. Repaired by hand. It is the fourth time this session that authoring content through a shell let the shell reinterpret it, and the remedy recorded three times already is the Write tool.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckIsPortable to issue187;
 }
