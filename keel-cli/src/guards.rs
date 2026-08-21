@@ -2065,7 +2065,7 @@ fn id_values(line: &str) -> Vec<String> {
 
 /// 8-4-4-4-12 groups of `[0-9a-z]`, exactly. Written out rather than regexed because the guard path
 /// stays dependency-light, and because the group lengths ARE the specification.
-fn uuid_shaped(v: &str) -> bool {
+pub(crate) fn uuid_shaped(v: &str) -> bool {
     let groups: Vec<&str> = v.split('-').collect();
     groups.len() == 5
         && [8usize, 4, 4, 4, 12].iter().zip(&groups).all(|(want, g)| {

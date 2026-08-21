@@ -1387,6 +1387,19 @@ mod tests {
     use super::{gen_uuid, sanitize_field};
     use std::collections::HashSet;
 
+    /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,
+    /// and 10000 mints contain no duplicate. The command exists so identity is never hand-authored;
+    /// checking against the guard's predicate (not a re-derivation) keeps mint and guard one truth.
+    #[test]
+    fn minted_ids_satisfy_guard_38_and_do_not_collide_at_10k() {
+        let mut seen = HashSet::new();
+        for _ in 0..10_000 {
+            let u = gen_uuid();
+            assert!(crate::guards::uuid_shaped(&u), "guard 38 rejects a minted id: {u}");
+            assert!(seen.insert(u), "duplicate within 10000 mints");
+        }
+    }
+
     #[test]
     fn sanitize_field_makes_a_safe_one_line_literal() {
         // record_decision (issue054) — field values must not break the one-line SysML string literal.

@@ -448,7 +448,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         .filter(|total| *total > 0 && (bridged || !console_is_up(CONSOLE_PORT)))
         .map(|total| if bridged {
             format!(
-                "[oversight] {total} item(s) are waiting on the HUMAN, and this session is BRIDGED (CLAUDE_CODE_BRIDGE_SESSION_ID is set), so a localhost console may not be reachable for them. Publish the review deck instead of starting `keel serve`: run the `obligation-review` skill (`python .engine/tools/obligation_canvas.py . -o <path>` then publish it), and hand them the URL."
+                "[oversight] {total} item(s) are waiting on the HUMAN, and this session is BRIDGED (CLAUDE_CODE_BRIDGE_SESSION_ID is set), so a localhost console may not be reachable for them. Publish the review deck instead of starting `keel serve`: run the `obligation-review` skill (`keel deck . --out <path>`, publish per the skill with the mcp inbox declared), and hand them the URL."
             )
         } else {
             format!(
@@ -954,6 +954,46 @@ fn cmd_deck(args: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// `keel mint [N]` (us019/issue170) — engine-minted v4 UUIDs, one per line, nothing else on stdout,
+/// composable into any authoring script.
+///
+/// Exists so no authoring path depends on an AI generating identity by hand: two hand-minted ids
+/// were mangled before guard 38 existed, and manual diligence is not a control (D0047). What this
+/// prints is tested against guard 38's OWN shape predicate, so mint and guard stay one truth.
+fn cmd_mint(args: &[String]) -> i32 {
+    const USAGE: &str = "keel mint [N]   (N >= 1, default 1)";
+    let n: u64 = match args {
+        [] => 1,
+        [a] => {
+            if a.starts_with('-') {
+                // the positional_arg convention (issue179): a leading dash is never a count
+                eprintln!("error: `{a}` looks like a flag, not a count.");
+                eprintln!("usage: {USAGE}");
+                return 2;
+            }
+            match a.parse::<u64>() {
+                Ok(n) if n >= 1 => n,
+                _ => {
+                    eprintln!("error: `{a}` is not a count of at least 1.");
+                    eprintln!("usage: {USAGE}");
+                    return 2;
+                }
+            }
+        }
+        _ => {
+            eprintln!("usage: {USAGE}");
+            return 2;
+        }
+    };
+    let mut out = String::new();
+    for _ in 0..n {
+        out.push_str(&keel_cli::write::gen_uuid());
+        out.push('\n');
+    }
+    print!("{out}");
+    0
 }
 
 fn cmd_hardening(args: &[String]) -> i32 {
@@ -2294,6 +2334,7 @@ const CATALOGUE: &[&str] = &[
     "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
     "hardening [ROOT]             the critique process's own questions, computed (issue171/D0169)",
     "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
+    "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
     "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
@@ -2421,6 +2462,7 @@ fn main() {
         Some("audit") => cmd_audit(rest),
         Some("hardening") => cmd_hardening(rest),
         Some("deck") => cmd_deck(rest),
+        Some("mint") => cmd_mint(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
