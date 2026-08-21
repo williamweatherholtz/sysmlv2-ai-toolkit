@@ -1601,8 +1601,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 39] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference"];
+pub const GUARD_NAMES: [&str; 40] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2040,6 +2040,34 @@ pub fn tool_reference(root: &Path) -> GuardReport {
     GuardReport { name: "tool-reference", scanned, warnings: Vec::new(), violations }
 }
 
+/// Guard 40: no `.sysml` in the model carries the scaffold's FILL-ME token (dcSprintScaffold).
+///
+/// `keel new sprint` writes every judgment-bearing text as [`crate::scaffold::PLACEHOLDER`] so the
+/// skeleton is honest about being unfilled — and THIS guard is what makes that honesty enforceable:
+/// an unfilled scaffold cannot pass a gate or be committed, by construction rather than diligence.
+/// Also in the fast per-edit tier (`keel gate --fast`), so the rejection lands at edit time.
+#[must_use]
+pub fn scaffold_placeholder(root: &Path) -> GuardReport {
+    let mut files = crate::collect_sysml(&root.join(".tracking"));
+    files.extend(crate::collect_sysml(&root.join(".engine")));
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        scanned += 1;
+        let rel = relpath(root, path);
+        for (n, line) in text.lines().enumerate() {
+            if line.contains(crate::scaffold::PLACEHOLDER) {
+                violations.push(format!(
+                    "{rel}:{}: unfilled scaffold text — fill it in; a placeholder is not a recorded judgment",
+                    n + 1
+                ));
+            }
+        }
+    }
+    GuardReport { name: "scaffold-placeholder", scanned, warnings: Vec::new(), violations }
+}
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2200,6 +2228,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "identity-present" => Some(identity_present(root)),
         "identity-well-formed" => Some(identity_well_formed(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
+        "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

@@ -47,6 +47,7 @@ pub mod orient;
 pub mod process_cmd;
 pub mod queries;
 pub mod reverify;
+pub mod scaffold;
 pub mod serve;
 pub mod sync;
 pub mod shellcheck;

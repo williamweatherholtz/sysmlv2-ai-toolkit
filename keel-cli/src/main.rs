@@ -501,7 +501,7 @@ fn cmd_gate(args: &[String]) -> i32 {
         .or_else(find_repo_root)
         .unwrap_or_else(|| PathBuf::from("."));
     if !fast {
-        eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary)");
+        eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder)");
         return 2;
     }
 
@@ -515,8 +515,8 @@ fn cmd_gate(args: &[String]) -> i32 {
         println!("PARSE: {} — {}", e.file.display(), e.message);
         failed = true;
     }
-    // The two EXACT guards — set membership and duplicate detection, no heuristics.
-    for name in ["duplicate-identity", "marker-vocabulary"] {
+    // The EXACT fast-tier guards — set membership, duplicate detection, unfilled scaffolds. No heuristics.
+    for name in ["duplicate-identity", "marker-vocabulary", "scaffold-placeholder"] {
         if let Some(r) = keel_cli::guards::run_one(name, &root) {
             for v in &r.violations {
                 println!("GUARD [{name}]: {v}");
@@ -994,6 +994,78 @@ fn cmd_mint(args: &[String]) -> i32 {
     }
     print!("{out}");
     0
+}
+
+/// `keel new sprint <N> <slug> --charter <decision> [--points P]` (dcSprintScaffold/us019) — the
+/// engine scaffolds the ceremony record: ids minted, provenance from the bound actor (refused when
+/// absent), placeholders the fast gate rejects. See [`keel_cli::scaffold`].
+fn cmd_new(args: &[String]) -> i32 {
+    const USAGE: &str = "keel new sprint <NUMBER> <slug> --charter <decision> [--points P]";
+    if args.first().map(String::as_str) != Some("sprint") {
+        eprintln!("usage: {USAGE}");
+        return 2;
+    }
+    let rest = args.get(1..).unwrap_or(&[]);
+    let positionals: Vec<&String> = {
+        let mut out = Vec::new();
+        let mut skip = false;
+        for a in rest {
+            if skip {
+                skip = false;
+                continue;
+            }
+            if a.starts_with("--") {
+                skip = true; // every flag here takes a value
+                continue;
+            }
+            out.push(a);
+        }
+        out
+    };
+    let [number_arg, slug] = positionals.as_slice() else {
+        eprintln!("usage: {USAGE}");
+        return 2;
+    };
+    let Ok(number) = number_arg.parse::<u32>() else {
+        eprintln!("error: `{number_arg}` is not a sprint number.");
+        eprintln!("usage: {USAGE}");
+        return 2;
+    };
+    let Some(charter) = flag(rest, "charter") else {
+        eprintln!("error: --charter <decision> is required — a sprint's story is chartered, never orphaned.");
+        eprintln!("usage: {USAGE}");
+        return 2;
+    };
+    let points: u32 = match flag(rest, "points") {
+        None => 1,
+        Some(p) => match p.parse() {
+            Ok(n) if n >= 1 => n,
+            _ => {
+                eprintln!("error: --points takes a count of at least 1.");
+                return 2;
+            }
+        },
+    };
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    // The provenance rule: the author is the bound actor, REFUSED when absent — never defaulted.
+    let actor = match keel_cli::actor::resolve(&root, None) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("keel new sprint: {msg}");
+            return 1;
+        }
+    };
+    match keel_cli::scaffold::sprint(&root, number, slug, &charter, points, &actor) {
+        Ok(path) => {
+            println!("scaffolded -> {}", path.display());
+            println!("fill every {} before judging any gate - `keel gate --fast` rejects it until then", keel_cli::scaffold::PLACEHOLDER);
+            0
+        }
+        Err(e) => {
+            eprintln!("keel new sprint: {e}");
+            1
+        }
+    }
 }
 
 fn cmd_hardening(args: &[String]) -> i32 {
@@ -2335,6 +2407,7 @@ const CATALOGUE: &[&str] = &[
     "hardening [ROOT]             the critique process's own questions, computed (issue171/D0169)",
     "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
     "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
+    "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
     "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
@@ -2463,6 +2536,7 @@ fn main() {
         Some("hardening") => cmd_hardening(rest),
         Some("deck") => cmd_deck(rest),
         Some("mint") => cmd_mint(rest),
+        Some("new") => cmd_new(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
