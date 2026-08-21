@@ -2394,4 +2394,15 @@ package ProjectIssues {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from storyCritiquePass3 to issue208;
+
+    part issue209 : Issue {
+        :>> id = "825d6252-9a87-4ba0-8d2a-91a19fa21e26";
+        :>> title = "A raw git push lands a contribution gated only in isolation - no pre-push hook forces the merged-tree loop";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 5 (srDcGateOnMergedTree x completeness). keel land runs the full fetch-integrate-gate-push loop with bounded retries, but nothing stops a raw git push: .githooks carries pre-commit/post-commit/pre-merge-commit and no pre-push, so an isolation-gated or stale-ref contribution lands on the shared trunk and CI flags it only after the fact. The SR's letter: a contribution shall NEVER land having been gated only in isolation. Cheap structural close: a pre-push behind-ness check that names keel land as the path.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcPrePushBehindCheck to issue209;
 }
