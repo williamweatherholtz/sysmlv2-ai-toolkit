@@ -439,6 +439,23 @@ fn is_sysml(p: &str) -> bool {
 }
 
 fn is_process_def(p: &str) -> bool {
+    // D0184/p3aKeystoneExtension: a skill body or an activation/attestation policy IS process
+    // definition — the keystone lock covers them exactly as it covers processes and workflows.
+    // Contracts that are MACHINE STATE registries (unit-ids, installed-units) are import/export
+    // bookkeeping, not process definition, and stay outside the lock.
+    if p.starts_with(".engine/skills/")
+        && (is_sysml(p) || std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("md")))
+    {
+        return true;
+    }
+    if p.starts_with(".engine/contracts/")
+        && !p.ends_with("unit-ids.toml")
+        && !p.ends_with("installed-units.toml")
+        && !p.ends_with("deck-inbox.toml")
+        && !p.ends_with("adoption-profile.toml")
+    {
+        return true;
+    }
     is_sysml(p) && (p.starts_with(".engine/processes/") || p.starts_with(".engine/workflows/"))
 }
 

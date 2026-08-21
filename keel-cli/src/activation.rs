@@ -94,7 +94,11 @@ fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
             guards.sort();
             guards.dedup();
             let skills = deploying_skills(root, &stem);
-            units.insert(stem, Unit { skills, rules: Vec::new(), guards });
+            // D0184/p3aRuleAttribution: a declared rule's owning unit comes from the
+            // rule-owners contract - unit.rules is no longer hardcoded empty, so export
+            // carries the teeth (P4b) and the association is data a project edits, not Rust.
+            let rules = rule_owners(root).into_iter().filter(|(_, owner)| owner == &stem).map(|(r, _)| r).collect();
+            units.insert(stem, Unit { skills, rules, guards });
         }
     }
     units
@@ -151,6 +155,26 @@ fn str_list(v: Option<&toml::Value>) -> Vec<String> {
     v.and_then(toml::Value::as_array)
         .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
         .unwrap_or_default()
+}
+
+/// The declared rule -> owning-unit association (D0184).
+///
+/// Read from `.engine/contracts/rule-owners.toml`, lines `ruleName = "processStem"`. A rule with no
+/// owner belongs to the project core (exported by nothing). Changing this file is process
+/// definition - the keystone lock covers it.
+#[must_use]
+pub fn rule_owners(root: &std::path::Path) -> Vec<(String, String)> {
+    let Ok(text) = std::fs::read_to_string(root.join(".engine").join("contracts").join("rule-owners.toml")) else {
+        return Vec::new();
+    };
+    text.lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| {
+            let (rule, owner) = l.split_once('=')?;
+            let owner = owner.trim().trim_matches('"');
+            (!owner.is_empty()).then(|| (rule.trim().to_string(), owner.to_string()))
+        })
+        .collect()
 }
 
 impl Activation {
@@ -221,16 +245,19 @@ impl Activation {
     /// Classify a guard: core, or owned by an active/inactive process.
     #[must_use]
     pub fn guard_state(&self, guard: &str) -> GuardState {
+        // A guard is ACTIVE if ANY active unit asserts it (D0183 killing first-match-wins): two
+        // units may share a guard, and the first-registered one being deactivated must not switch
+        // off enforcement another active unit still owns.
+        let mut inactive_owner: Option<String> = None;
         for (proc_name, unit) in &self.units {
             if unit.guards.iter().any(|g| g == guard) {
-                return if self.is_process_active(proc_name) {
-                    GuardState::Active(proc_name.clone())
-                } else {
-                    GuardState::Inactive(proc_name.clone())
-                };
+                if self.is_process_active(proc_name) {
+                    return GuardState::Active(proc_name.clone());
+                }
+                inactive_owner.get_or_insert_with(|| proc_name.clone());
             }
         }
-        GuardState::Core
+        inactive_owner.map_or(GuardState::Core, GuardState::Inactive)
     }
 
     /// True when viewpoint `v` is active. With no manifest key, every viewpoint is active (D0164).

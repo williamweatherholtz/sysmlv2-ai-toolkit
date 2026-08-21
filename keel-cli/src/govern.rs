@@ -13,8 +13,31 @@ use std::path::Path;
 use crate::algo::{is_word, story_names};
 use crate::json::Json;
 
-/// Convention (D0069): a sprint `Story` is governed by the Delivery workflow.
+/// Convention (D0069): a sprint `Story` is governed by the Delivery workflow — the FALLBACK when
+/// per-item resolution finds nothing more specific.
 const GOVERNING_PROCESS_STORY: &str = ".engine/workflows/delivery.sysml";
+
+/// The governing definition for `item`, resolved PER ITEM from its charter edges (K10/D0183):
+/// the item's `#CharteredBy` Decision's introduction commit is inspected for the process/workflow
+/// definition files it touched — a Decision that landed a process change governs the work it
+/// charters through that definition. Falls back to the D0069 kind convention (Story → Delivery)
+/// when the charter touched no definition, which is the common EXECUTE case.
+fn governing_def_for(repo: &Path, item: &str) -> String {
+    // the charter edge: `#CharteredBy dependency from <item> to <decision>` anywhere in .tracking
+    let charter_decision = git_lines(repo, &["grep", "-h", &format!("#CharteredBy dependency from {item} to"), "HEAD", "--", ".tracking"])
+        .into_iter()
+        .next()
+        .and_then(|l| l.split_whitespace().last().map(|d| d.trim_end_matches(';').to_string()));
+    if let Some(decision) = charter_decision {
+        if let Some(commit) = decision_intro_commit(repo, &decision) {
+            let touched = git_lines(repo, &["show", "--name-only", "--format=", &commit, "--", ".engine/processes", ".engine/workflows"]);
+            if let Some(def) = touched.into_iter().find(|f| std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
+                return def;
+            }
+        }
+    }
+    GOVERNING_PROCESS_STORY.to_string()
+}
 
 // ── git plumbing ──────────────────────────────────────────────────────────────
 
@@ -226,6 +249,7 @@ pub fn grandfathered_under(root: &Path, decision: &str) -> Option<std::collectio
 // ── the resolver ──────────────────────────────────────────────────────────────
 
 struct GovernData {
+    governing_def: String,
     item: String,
     error: Option<String>,
     item_commit: Option<String>,
@@ -237,8 +261,10 @@ struct GovernData {
 }
 
 fn govern_resolve(repo: &Path, pcs: &[ProcChange], item: &str) -> GovernData {
+    let governing_def = governing_def_for(repo, item);
     let Some(item_commit) = item_intro_commit(repo, item) else {
         return GovernData {
+            governing_def,
             item: item.to_string(),
             error: Some("no introduction commit found in .tracking/delivery".to_string()),
             item_commit: None,
@@ -249,7 +275,7 @@ fn govern_resolve(repo: &Path, pcs: &[ProcChange], item: &str) -> GovernData {
             reprocess: Vec::new(),
         };
     };
-    let def_commits = def_change_commits(repo, GOVERNING_PROCESS_STORY);
+    let def_commits = def_change_commits(repo, &governing_def);
     let governing = def_commits.iter().find(|c| is_ancestor(repo, c, &item_commit)).cloned();
     let later_count = def_commits.iter().filter(|c| !is_ancestor(repo, c, &item_commit)).count();
 
@@ -270,6 +296,7 @@ fn govern_resolve(repo: &Path, pcs: &[ProcChange], item: &str) -> GovernData {
     reprocess.sort();
 
     GovernData {
+        governing_def,
         item: item.to_string(),
         error: None,
         item_commit: Some(item_commit),
@@ -292,7 +319,7 @@ fn governing_version_json(d: &GovernData) -> Json {
     let process_as_it_was = d
         .governing
         .as_ref()
-        .map_or(Json::Null, |g| Json::s(format!("git show {g}:{GOVERNING_PROCESS_STORY}")));
+        .map_or(Json::Null, |g| Json::s(format!("git show {g}:{}", d.governing_def)));
     let after_json: Vec<Json> = d
         .after
         .iter()
@@ -302,8 +329,8 @@ fn governing_version_json(d: &GovernData) -> Json {
     Json::Obj(vec![
         ("item".to_string(), Json::s(d.item.clone())),
         ("process".to_string(), Json::s("Delivery")),
-        ("process_def".to_string(), Json::s(GOVERNING_PROCESS_STORY)),
-        ("convention".to_string(), Json::s("a sprint Story is governed by Delivery (D0069 work->process by kind)")),
+        ("process_def".to_string(), Json::s(d.governing_def.clone())),
+        ("convention".to_string(), Json::s("resolved per item from its charter edges (K10/D0183); Story->Delivery is the fallback (D0069)")),
         ("item_commit".to_string(), Json::s(item_commit)),
         ("governing_version_commit".to_string(), governing_commit),
         ("process_as_it_was".to_string(), process_as_it_was),

@@ -39,7 +39,7 @@ fn risk_rank(order: &[String], risk: &str) -> usize {
 /// drift when the toolchain moved and every element would report as changed after an upgrade. Lines
 /// are trimmed and blanks dropped so a CRLF checkout does not read as drift — this repo is developed
 /// on Windows and consumed on CI, and a hash that disagrees between the two would be worse than none.
-fn stable_hash(text: &str) -> String {
+pub(crate) fn stable_hash(text: &str) -> String {
     let norm: String =
         text.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect::<Vec<_>>().join("\n");
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
