@@ -2185,4 +2185,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRetroGuardTiesFinding to issue189;
+
+    part issue190 : Issue {
+        :>> id = "cd2fbb25-3882-4791-adf1-0330cf19ee8f";
+        :>> title = "The deck's synced elements carried data-uid, but the runtime addresses sync by data-id - no tap was recordable";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THIRD REPORT OF THE SAME SYMPTOM, and the first diagnosis made from evidence instead of from the contract's prose. Fetching the PUBLISHED artifact returned the frame runtime preamble itself, and its patch layer reads: document.querySelector with a data-id selector, and an attribute allowlist of data-star, aria-star, class, hidden, value, checked. Synced elements are ADDRESSED BY data-id. The deck's cards carried data-uid - the canvas skill's template says data-id and the generator renamed it during a rewrite - so no mutation on any card was addressable by the sync layer, nothing the human did could be recorded, and every tap reverted. Rounds one and two fixed REAL defects (a load-time DOM write, async feedback into the synced region) that were necessary but not sufficient, and both were verified only against the emitted FILE. THE SAME FETCH FOUND TWO MORE: the deck v3 stamp I told the human to look for lived only inside a JS variable and never rendered - my verification checked presence-in-file, and the visible page never showed it - and the script-ok marker CSS escape was mangled so the header read b7 instead of a separator. THREE LESSONS, now in the skill: the sync key is data-id, full stop; script writes NO text into a synced region under any code path, because a rule with no exceptions survives; and a claim about what the human will SEE is verified against the SERVED page, not the local file. PREVENTING CHANGE shipped as deck v4 with all three, plus the emitted-HTML audit extended to count data-id coverage per card.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckSyncAddressable to issue190;
 }

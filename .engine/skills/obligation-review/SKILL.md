@@ -187,6 +187,31 @@ confirming**. The confirmation mechanism was destroying the thing it confirmed.
 - The mechanical check for pass 4: no `.then(`, `.catch(` or `setTimeout(` body may assign
   `textContent`/`innerHTML` outside the `<artifact-local>` panel. Count it in the emitted HTML.
 
+### 7. `data-id` is the sync key — an element without one cannot be saved
+
+Third latch failure, diagnosed from the runtime itself: fetching the published artifact returns the
+frame preamble, whose patch layer addresses every synced element by `[data-id="..."]` with an attribute
+allowlist of `data-*`, `aria-*`, `class`, `hidden`, `value`, `checked`. **A mutation on an element with
+no `data-id` is unaddressable, therefore unrecordable, therefore reverts.** The canvas template said
+`data-id`; this generator had renamed it `data-uid` and every tap silently un-happened.
+
+- Every element whose state must persist carries `data-id` (cards, note inputs — anything mutated).
+- Mutations are `data-*` attribute sets or input `value`/`checked` — the allowlist, nothing else.
+- Rule 1's corollary is now absolute: script writes **no text** into the synced region under ANY code
+  path, gesture included. The pill and the count render via CSS `content` from attributes. One rule
+  with no exceptions survives; a rule with a defensible carve-out gets carved.
+
+### 8. Verify the SERVED page for anything the human is told to look at
+
+I told the human "the header says deck v3" — the stamp existed only inside a JS variable and **never
+rendered**. My check searched the file and passed; the screen never showed it. And the served CSS
+revealed an escape (`\00b7`) mangled to `b7`, invisible in the local file's raw bytes.
+
+- A claim about what the human will SEE is checked against the **published artifact** (WebFetch its
+  URL), not the local file.
+- Version stamps go in **rendered text**, ASCII-only, in the sub-header — a stamp is for eyes.
+- The served page also carries the runtime preamble: when sync misbehaves, READ IT before theorizing.
+
 ## Guardrails
 
 - **Never record a `method=confirmation` result from a tap you did not receive.** The deck is a

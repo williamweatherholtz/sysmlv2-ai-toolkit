@@ -228,6 +228,10 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;text-wrap:balan
 .card[data-verdict=accept] .vd{background:var(--accept)}
 .card[data-verdict=maybe] .vd{background:var(--maybe);color:#1a1200}
 .card[data-verdict=reject] .vd{background:var(--reject)}
+.card[data-verdict=accept] .vd::after{content:'accepted'}
+.card[data-verdict=maybe] .vd::after{content:'needs work'}
+.card[data-verdict=reject] .vd::after{content:'rejected'}
+.bar .cnt::after{content:attr(data-local-cnt)}
 .sv{font:11px var(--mono);color:var(--ink3)}
 .sv::after{content:attr(data-local-sv)}
 #livenote::after{content:attr(data-local-note);color:var(--maybe)}
@@ -287,8 +291,8 @@ body[data-local-readonly=true] .live{display:none}
 /* SELF-REPORT (issue188). `script ok` appears only if the script ran to its last statement;
    its ABSENCE means every listener above the throw never registered, which is how a deck with
    dead buttons was published and reported as working. */
-.sub::after{content:' \00b7 script did NOT finish';color:var(--reject);font-weight:700}
-body[data-local-js=ok] .sub::after{content:' \00b7 script ok';color:var(--accept);font-weight:600}
+.sub::after{content:' - script did NOT finish';color:var(--reject);font-weight:700}
+body[data-local-js=ok] .sub::after{content:' - script ok';color:var(--accept);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
 """
@@ -403,7 +407,8 @@ window.onerror = function(m, s, l){ dbg('ERROR ' + m + ' @' + l); return false; 
 var cards = [].slice.call(document.querySelectorAll('.card'));
 function judged(){ return cards.filter(function(c){ return c.dataset.verdict; }).length; }
 function count(){
-  document.getElementById('cnt').textContent = judged() + ' of ' + cards.length + ' judged';
+  // data-local-* is per-viewer chrome, exempt from sync - safe from any code path.
+  document.getElementById('cnt').setAttribute('data-local-cnt', judged() + ' of ' + cards.length + ' judged');
 }
 // NO DOM WRITE AT LOAD - THIS IS WHAT BROKE THE BUTTONS (issue188).
 // On a live doc the runtime switches a sync region OFF when the region's DOM is changed by SCRIPT
@@ -426,7 +431,8 @@ document.addEventListener('click', function(e){
     var c = b.closest('.card');
     var next = c.dataset.verdict === b.dataset.v ? '' : b.dataset.v;
     c.dataset.verdict = next;
-    var vd = c.querySelector('.vd'); if (vd) vd.textContent = LABEL[next] || '';
+    // NO text writes into the synced region, even in a gesture: the pill renders via CSS from
+    // data-verdict, so the ONLY mutation is one allowlisted data-* attribute on a data-id element.
     count();
     confirmSaved(c);
     return;
@@ -448,7 +454,9 @@ function copyOut(){
     var done = false;
     try { done = document.execCommand('copy'); } catch (err) { done = false; }
     ta.setAttribute('readonly', '');
-    btn.textContent = done ? 'Copied' : 'Text selected - copy it';
+    // data-local only, even here: this path runs synchronously in a gesture, but one rule with no
+    // exceptions survives me better than a rule with a defensible carve-out (issue190).
+    btn.setAttribute('data-local-copied', done ? ' - copied' : ' - text selected, copy it');
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(ta.value).then(function(){ btn.setAttribute('data-local-copied', 'Copied'); // async: data-local only (issue188) }, manual);
@@ -509,22 +517,28 @@ def render(items, generated_at, head_sha):
     for key, label, hue, blurb in CLASSES:
         rows = by_cls[key]
         cards = "".join(
-            '<article class=card data-uid="%s" data-sig="%s" data-cls="%s" data-verdict="">'
+            # data-id IS THE SYNC KEY (issue190). The runtime's patch layer addresses synced elements by
+            # [data-id=...] with an allowlist of data-*/aria-*/class/hidden/value/checked. A mutation on
+            # an element with no data-id cannot be addressed, so it cannot be recorded - and an
+            # unrecordable change REVERTS, which is exactly the tap-then-unlatch the human saw three
+            # times. The canvas template said data-id; this generator had renamed it data-uid.
+            '<article class=card data-id="%s" data-uid="%s" data-sig="%s" data-cls="%s" data-verdict="">'
             '<header><code>%s</code><span class=vd></span><span class=sv></span></header>'
             '<h3>%s</h3><p class=meta>%s</p>%s'
             '<div class=verdicts role=group aria-label="verdict">'
             '<button data-v=accept>%s</button>'
             '<button data-v=maybe>Needs work</button>'
             '<button data-v=reject>Reject</button></div>'
-            '<input class=note type=text placeholder="why, or what to change&hellip;" aria-label="note">'
+            '<input class=note type=text data-id="%s-note" placeholder="why, or what to change&hellip;" aria-label="note">'
             '</article>' % (
-                esc(i["uid"]), i["sig"], key, esc(i["name"]), esc(i["title"]), esc(i["meta"]),
+                esc(i["uid"]), esc(i["uid"]), i["sig"], key, esc(i["name"]), esc(i["title"]), esc(i["meta"]),
                 ('<p class=body>%s</p>' % esc(i["body"])) if i["body"] else "",
                 # A DECISION IS SIGNED, NOT VOTED ON. `method=confirmation` records a HUMAN's word and
                 # an AI cannot supply it, so the verb on an acceptance card says SIGN rather than
                 # Accept - the same gesture on a finding means "I agree with the disposition", and
                 # conflating the two is how an instruction gets read as a signature.
                 "Sign" if key == "acceptance" else "Accept",
+                esc(i["uid"]),
             )
             for i in rows
         ) or '<p class=empty>Nothing outstanding in this class.</p>'
@@ -543,7 +557,7 @@ def render(items, generated_at, head_sha):
         '<meta name=viewport content="width=device-width,initial-scale=1">\n'
         "<style>%s</style>\n" % CSS
         + '<div class=wrap>\n<header class=top>\n  <h1>Keel Obligations Deck</h1>\n'
-        + '  <p class=sub>%d item(s) waiting on you &middot; %s</p>\n' % (total, stamp)
+        + '  <p class=sub>%d item(s) waiting on you &middot; %s &middot; deck v4</p>\n' % (total, stamp)
         + '  <div class=stats>%s</div>\n' % stats
         + '  <p class=how>Tap a class to open it, then give each item a verdict and a note. '
           '<b>Your taps save themselves and reach Claude &mdash; there is nothing to copy.</b></p>'
@@ -557,7 +571,7 @@ def render(items, generated_at, head_sha):
         + "\n</div>\n"
         # The count is RENDERED HERE, not written by script at load (issue188): a load-time DOM
         # write switches the live-doc sync region off and every button stops saving.
-        + ('<div class=bar><span class=cnt id=cnt>0 of %d judged</span>' % total)
+        + ('<div class=bar><span class=cnt id=cnt data-local-cnt="0 of %d judged"></span>' % total)
         + '<button class=ghost id=clear>Reset</button>'
         + '<button class=ghost id=exp>Copy for Claude</button></div>\n'
         + '<dialog id=dlg><textarea id=out readonly></textarea>'
