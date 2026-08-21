@@ -1124,12 +1124,13 @@ const RETRO_NO_ITEM_JUSTIFICATIONS: &[&str] = &["no new item", "no item needed",
 
 /// Warnings for staged sprint records whose retro names a finding with nothing tracked and no reason.
 fn retro_backlog_warnings(changed: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
-    let tracked_co_staged = changed
-        .iter()
-        .any(|p| p.ends_with(".tracking/issues.sysml") || p.ends_with(".tracking/backlog.sysml"));
-    if tracked_co_staged {
-        return Vec::new(); // a tracked item WAS co-recorded in this commit
-    }
+    // THE CO-STAGED ITEM MUST BE TIED TO THE FINDING, NOT TO THE COMMIT (issue189 / D0172 step 4).
+    // This function used to return empty whenever the commit staged issues.sysml or backlog.sysml AT
+    // ALL - so a sprint that recorded its own unrelated findings satisfied the guard while its retro's
+    // AVOIDABLE-ISSUE went untracked. Measured consequence: one failure class reached FIVE retros and
+    // zero items, because every commit co-staged something. The exemption is now PER RETRO: the retro's
+    // own text must NAME a tracked item (dcCamelCase or issueNNN) or carry a no-item justification.
+    let _ = changed; // retained in the signature so existing callers and tests keep their shape
     let mut out = Vec::new();
     for (path, text) in sprint_texts {
         let upper = text.to_uppercase();
@@ -1140,11 +1141,43 @@ fn retro_backlog_warnings(changed: &[String], sprint_texts: &[(String, String)])
         if RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(j)) {
             continue; // explicitly justified as needing no item
         }
+        // The retro text NAMES the item it produced: `dcXxx` (a backlog action) or `issueNNN`.
+        if names_tracked_item(text) {
+            continue;
+        }
         out.push(format!(
             "{path}: the retro names a finding (AVOIDABLE-ISSUE / LESSON) but this commit records NO tracked Issue or backlog action, and gives no reason — a retro finding must become a tracked, prioritized item or say explicitly why it needs none (issue085; D0018 — never let a lesson terminate in prose)"
         ));
     }
     out
+}
+
+/// Does this retro text NAME a tracked item — `dcCamelCase` or `issueNNN`?
+///
+/// Word-boundary checked on both sides, because `producedX` must not satisfy `produced` and prose like
+/// `reduced` must not match `dc`. No regex: the guard path stays dependency-light (D0048).
+fn names_tracked_item(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let boundary =
+        |i: usize| i.checked_sub(1).and_then(|j| bytes.get(j)).is_none_or(|b| !b.is_ascii_alphanumeric());
+    let mut from = 0;
+    while let Some(rel) = text[from..].find("dc") {
+        let s = from + rel;
+        // dc + UpperCamel, at a word boundary: a named backlog action.
+        if boundary(s) && text[s + 2..].starts_with(|c: char| c.is_ascii_uppercase()) {
+            return true;
+        }
+        from = s + 2;
+    }
+    let mut from = 0;
+    while let Some(rel) = text[from..].find("issue") {
+        let s = from + rel;
+        if boundary(s) && text[s + 5..].starts_with(|c: char| c.is_ascii_digit()) {
+            return true;
+        }
+        from = s + 5;
+    }
+    false
 }
 
 /// Test-only re-export of the pure warning builder (the view self-tests exercise it).
@@ -2430,6 +2463,49 @@ pub fn engine_lint(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
+}
+
+#[cfg(test)]
+mod retro_tie_tests {
+    use super::{names_tracked_item, retro_backlog_warnings_for_test};
+
+    /// THE CONTROL for issue189: co-staging a tracked file no longer satisfies the guard - the retro's
+    /// own text must name the item its finding produced. The old behaviour let one failure class reach
+    /// five retros and zero items, because every commit staged issues.sysml for something else.
+    #[test]
+    fn a_co_staged_file_no_longer_excuses_an_unnamed_finding() {
+        let changed = vec![".tracking/issues.sysml".to_string()];
+        let sprints = vec![(
+            "sprintX.sysml".to_string(),
+            "retro: AVOIDABLE-ISSUE: the same mistake again, described in prose.".to_string(),
+        )];
+        let w = retro_backlog_warnings_for_test(&changed, &sprints);
+        assert_eq!(w.len(), 1, "an unnamed finding must warn even when tracked files are co-staged");
+    }
+
+    /// A retro that NAMES its item, or justifies having none, is clean.
+    #[test]
+    fn naming_the_item_or_justifying_none_satisfies_the_guard() {
+        let changed: Vec<String> = Vec::new();
+        for text in [
+            "AVOIDABLE-ISSUE: shell mangling, occurrence six - now tracked as dcAuthorViaWriteTool.",
+            "AVOIDABLE-ISSUE: the counter was wrong; recorded as issue188 with a resolver.",
+            "AVOIDABLE-ISSUE: a one-off typo; no new item - the edit gate already catches this class.",
+        ] {
+            let w = retro_backlog_warnings_for_test(&changed, &[("s.sysml".to_string(), text.to_string())]);
+            assert!(w.is_empty(), "should be clean: {text}");
+        }
+    }
+
+    /// Word boundaries: prose containing `dc` or `issue` must not satisfy the naming check.
+    #[test]
+    fn prose_lookalikes_do_not_count_as_items() {
+        assert!(!names_tracked_item("the dc motor issue was discussed at length"));
+        assert!(!names_tracked_item("reproduced changes"));
+        assert!(names_tracked_item("tracked as dcFooBar"));
+        assert!(names_tracked_item("see issue123"));
+        assert!(!names_tracked_item("tissue42 is not an item"));
+    }
 }
 
 #[cfg(test)]

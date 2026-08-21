@@ -7605,8 +7605,12 @@ mod tests {
 
         // A finding with nothing tracked and no reason -> warn (the sprint-247 failure).
         assert_eq!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
-        // Same finding, but a tracked item co-recorded in this commit -> clean.
-        assert!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).is_empty());
+        // D0172/issue189 CHANGED THIS CASE: co-staging a tracked file no longer excuses the finding
+        // - that exemption let one failure class reach five retros and zero items, because every
+        // commit staged issues.sysml for something else. The retro must NAME its item now.
+        assert_eq!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
+        // Naming the item the finding produced -> clean (the D0172 tie).
+        assert!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel - tracked as issue073.")).is_empty());
         // Same finding, explicitly justified as needing none -> clean. The obligation is that the
         // CHOICE is stated, not that an item always exists (a duplicate control is noise).
         assert!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded.")).is_empty());
