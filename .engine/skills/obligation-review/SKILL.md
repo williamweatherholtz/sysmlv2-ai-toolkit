@@ -66,7 +66,7 @@ Only the session holds connector access, so the session pulls:
 
 1. `get_sheet_summary` on the inbox sheet with filter `Processed = false`.
 2. Write the rows to `rows.json` as
-   `[{rowId, uid, name, kind, verdict, note, by, at}]`.
+   `[{rowId, uid, name, kind, verdict, note, by, at, head}]` (`head` = the DeckHead column).
 3. `python .engine/tools/deck_inbox_record.py rows.json --base http://127.0.0.1:7777 --root .`
    — records each row through the write API and **verifies each from the computed view**; a row is
    `verified`, `REFUSED`, `UNVERIFIED`, or `triage` (a needs-work note; nothing recorded). Dedup is

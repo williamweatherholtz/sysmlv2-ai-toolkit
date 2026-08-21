@@ -73,6 +73,15 @@ def record(rows: list[dict], base: str, root: Path) -> list[dict]:
         rid, name, kind = r.get("rowId"), r.get("name", ""), r.get("kind", "")
         verdict, note, by = r.get("verdict", ""), r.get("note", ""), r.get("by", "")
         res = {"rowId": rid, "name": name, "kind": kind, "verdict": verdict}
+        # The attestation text carries the SUBSTANCE of the event, not a bare row pointer: who tapped
+        # what, delivered as which row, when, against which deck. Their note, when present, is quoted
+        # verbatim ahead of it (issue197's sibling defect: "via deck inbox row N" attested nothing).
+        event = (
+            f"{by} tapped {verdict} on the {name} card in the obligations deck"
+            f" (deck HEAD {r.get('head', '?')}), delivered through the connector inbox as row {rid}"
+            f" at {r.get('at', '?')}"
+        )
+        attest = f"Their note, verbatim: '{note}'. {event}." if note else f"{event} with no per-item note."
 
         if kind == "finding":
             if verdict == "maybe":
@@ -80,9 +89,13 @@ def record(rows: list[dict], base: str, root: Path) -> list[dict]:
                 res["detail"] = f"needs-work note for the AI, nothing recorded: {note}"
             else:
                 v = "act" if verdict == "accept" else "dismiss"
+                # judged_by is the row's By — the verdict is THEIRS. Omitting it lets the server
+                # attribute their tap to the session actor (issue197: a High disposition landed as
+                # judgedBy=claudeOpus5, legal under D0165's delegation and therefore invisible to
+                # every guard, but false).
                 p = c.post("/api/disposition", json={
                     "finding": name, "verdict": v,
-                    "rationale": note or f"via deck inbox row {rid}", "judged_at": today})
+                    "rationale": attest, "judged_at": today, "judged_by": by})
                 if p.status_code != 200:
                     res["outcome"] = "REFUSED"
                     res["detail"] = p.text[:200]
@@ -104,8 +117,7 @@ def record(rows: list[dict], base: str, root: Path) -> list[dict]:
                 else:
                     url = "/api/decision/accept" if verdict == "accept" else "/api/decision/reject"
                     body = {"decision": name, "file": f, "judged_at": today, "judged_by": by}
-                    body["note" if verdict == "accept" else "rationale"] = (
-                        note or f"via deck inbox row {rid}")
+                    body["note" if verdict == "accept" else "rationale"] = attest
                     p = c.post(url, json=body)
                     if p.status_code != 200:
                         res["outcome"] = "REFUSED"
@@ -117,7 +129,7 @@ def record(rows: list[dict], base: str, root: Path) -> list[dict]:
                         res["outcome"] = "verified" if ok else "UNVERIFIED"
         elif kind == "sitting":
             p = c.post("/api/deck/sitting", json={
-                "story": name, "verdict": verdict, "note": note, "by": by, "judged_at": today})
+                "story": name, "verdict": verdict, "note": attest, "by": by, "judged_at": today})
             if p.status_code != 200:
                 res["outcome"] = "REFUSED"
                 res["detail"] = p.text[:200]

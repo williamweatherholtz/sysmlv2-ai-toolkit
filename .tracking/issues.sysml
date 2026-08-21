@@ -2262,4 +2262,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcToolReferenceGuard to issue196;
+
+    part issue197 : Issue {
+        :>> id = "f8ed6b7a-4c92-4a51-b368-a7ba25cf9eec";
+        :>> title = "The inbox recorder attributed the human's finding verdict to the session AI, and D0165's delegation made the misattribution guard-invisible";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THE FIRST REAL PULL EXPOSED IT: the human tapped Accept on issue159 (severity High) from their phone; the row carried By=wweatherholtz; the recorder's finding path never forwarded judged_by, so the server resolved the SESSION actor and the disposition landed as judgedBy=claudeOpus5. EVERY GUARD PASSED, correctly: D0165 delegates finding dispositions to the AI ('auto accept issues by your authority'), so an AI judge on a High finding is policy-compliant - which is exactly why a MISATTRIBUTED one is invisible to attestation-authority. The record was self-consistent and false: it claimed an AI judgment under delegation when a human had judged. A sibling defect in the same writes: the default attestation text was 'via deck inbox row N' - a pointer, not an attestation. CAUGHT by the standing diff-before-stage review, before commit. FIXED AT THE ROOT: the corrected records name the human who tapped and describe the event; the recorder now ALWAYS forwards the row's By as judged_by on every path (finding, acceptance, sitting) and composes attestation text carrying the substance - who tapped what, delivered as which row, when, against which deck HEAD, with their note quoted verbatim when present. THE STRUCTURAL LESSON: a delegation policy widens who MAY judge, which narrows what guards can catch - so attribution correctness for delegated classes rests on the write path, and the write path must treat the actor as data it carries, never ambient state it inherits.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRecorderForwardsBy to issue197;
 }
