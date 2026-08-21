@@ -24,7 +24,7 @@ The engine tracks the *work of building things*. Every substantive request must 
 routed through the discipline **before** acting. CLAUDE.md §3 is the source of truth;
 this skill is the per-request checklist that makes the route-first step visible and
 mandatory, so nothing slips past silently. It is fired every turn by a `UserPromptSubmit`
-hook (`.engine/tools/triage_reminder.py`, D0064).
+hook (`keel hook user-prompt`, in the binary; D0064).
 
 ## The checklist (do this first, every time)
 

@@ -8,10 +8,16 @@
 //!
 //! THE ARCHITECTURE THAT BREAKS THE LOOP: the deck's save path is now `keel serve`'s existing POST
 //! endpoints — the same ones the console has used all along — which are Rust, local, and exercised
-//! end-to-end by an httpx test before anything is published. The artifact live-doc mechanism is
-//! DEMOTED TO FALLBACK for the phone, where the page cannot reach a local server. The page detects its
-//! transport at load: same-origin `/api/version` answers → LOCAL mode (tested); otherwise → artifact
-//! mode (the contract-compliant v5 mechanism).
+//! end-to-end by an httpx test before anything is published. The page detects its transport at load:
+//! same-origin `/api/version` answers → LOCAL mode (tested); otherwise → INBOX mode: each tap is
+//! delivered as a row to the sheet named in `.engine/contracts/deck-inbox.toml` through the viewer's
+//! Smartsheet connector (Claude artifact `mcp` capability), and the STORE'S row id is the receipt the
+//! page shows — real receiver-side acknowledgment. The AI session pulls unprocessed rows, records
+//! them through the keel write API, verifies the computed view, and checks Processed.
+//!
+//! WHY THE LIVE-DOC MECHANISM IS GONE (issue194): its appends silently dropped — `sync()` resolved,
+//! the page said saved, and neither keel nor the viewer's own reload ever saw the write. A transport
+//! with no receiver-side acknowledgment cannot carry a save label (D0018 applied to a button).
 //!
 //! Save routing per class, all through EXISTING write paths:
 //!   - finding    → POST /api/disposition   (Accept→act, Reject→dismiss; "Needs work" carries a note)
@@ -32,6 +38,8 @@ struct Item {
     uid: String,
     title: String,
     meta: String,
+    /// Repo-relative path of the file declaring the item — `/api/decision/accept|reject` require it.
+    file: String,
 }
 
 /// The sole registered human reviewer, read from the actors registry.
@@ -61,11 +69,34 @@ fn sole_human(root: &Path) -> Option<String> {
     found
 }
 
-/// `name -> (id, title)` for every declared item — the same scan guard 37 walks.
-fn item_index(root: &Path) -> std::collections::BTreeMap<String, (String, String)> {
+/// The remote-inbox config from `.engine/contracts/deck-inbox.toml`, emitted as a JS object literal.
+///
+/// The MOBILE transport (issue194): when the page cannot reach keel serve it delivers each tap as a
+/// row to this sheet through the viewer's Smartsheet connector. Every field is REQUIRED — a partial
+/// config yields `null`, and the page then claims no transport rather than half of one.
+fn inbox_js(root: &Path) -> String {
+    let path = root.join(".engine").join("contracts").join("deck-inbox.toml");
+    let Ok(text) = std::fs::read_to_string(path) else { return "null".to_string() };
+    let Ok(v) = text.parse::<toml::Value>() else { return "null".to_string() };
+    let Some(sheet) = v.get("sheet_id").and_then(toml::Value::as_integer) else { return "null".to_string() };
+    let Some(cols) = v.get("columns").and_then(toml::Value::as_table) else { return "null".to_string() };
+    let mut c = String::new();
+    for key in ["uid", "name", "kind", "verdict", "note", "by", "at", "deck_head"] {
+        let Some(id) = cols.get(key).and_then(toml::Value::as_integer) else { return "null".to_string() };
+        let _ = write!(c, "{}{}:{id}", if c.is_empty() { "" } else { "," }, key.replace('_', ""));
+    }
+    format!("{{sheet:{sheet},cols:{{{c}}}}}")
+}
+
+/// `name -> (id, title, repo-relative file)` for every declared item — the same scan guard 37 walks.
+fn item_index(root: &Path) -> std::collections::BTreeMap<String, (String, String, String)> {
     let mut out = std::collections::BTreeMap::new();
     for base in [".tracking", ".engine"] {
         for f in crate::collect_sysml(&root.join(base)) {
+            let rel = f
+                .strip_prefix(root)
+                .map_or_else(|_| f.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string())
+                .replace('\\', "/");
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
             let mut lines = text.lines().peekable();
             while let Some(raw) = lines.next() {
@@ -103,7 +134,7 @@ fn item_index(root: &Path) -> std::collections::BTreeMap<String, (String, String
                     }
                 }
                 if !id.is_empty() {
-                    out.insert(name, (id, title));
+                    out.insert(name, (id, title, rel.clone()));
                 }
             }
         }
@@ -117,7 +148,7 @@ fn collect(root: &Path) -> Vec<Item> {
     let mut items: Vec<Item> = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
     let mut add = |cls: &'static str, name: &str, meta: String| {
-        let Some((uid, title)) = idx.get(name) else { return };
+        let Some((uid, title, file)) = idx.get(name) else { return };
         if !seen.insert(uid.clone()) {
             return;
         }
@@ -131,6 +162,7 @@ fn collect(root: &Path) -> Vec<Item> {
             uid: uid.clone(),
             title: if shown.is_empty() { name.to_string() } else { shown },
             meta,
+            file: file.clone(),
         });
     };
     let parse = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null);
@@ -200,7 +232,7 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
             let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
             let _ = write!(
                 cards,
-                "<article class=card data-id=\"{u}\" data-name=\"{n}\" data-cls=\"{c}\" data-verdict=\"\">\
+                "<article class=card data-id=\"{u}\" data-name=\"{n}\" data-cls=\"{c}\" data-file=\"{f}\" data-verdict=\"\">\
                  <header><code>{n}</code><span class=vd></span><span class=sv></span></header>\
                  <h3>{t}</h3><p class=meta>{m}</p>\
                  <div class=verdicts><button data-v=accept>{verb}</button>\
@@ -210,6 +242,7 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
                 u = esc(&i.uid),
                 n = esc(&i.name),
                 c = cls,
+                f = esc(&i.file),
                 t = esc(&i.title),
                 m = esc(&i.meta),
             );
@@ -232,12 +265,14 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
          <p class=sub>{count} item(s) waiting on you &middot; HEAD {sha} &middot; deck v6-rust</p>\n\
          <p class=how id=how data-local-mode=\"detecting\">Tap a verdict; it records straight into keel.</p>\n\
          <artifact-local><div id=dbglog></div></artifact-local></header>\n{sections}</div>\n\
-         <script>\nvar HUMAN={human};\n{js}</script>\n",
+         <script>\nvar HUMAN={human};\nvar HEAD={head};\nvar INBOX={inbox};\n{js}</script>\n",
         css = CSS,
         count = items.len(),
         sha = esc(&head_sha),
         sections = sections,
         human = Json::s(human).dump(),
+        head = Json::s(head_sha.clone()).dump(),
+        inbox = inbox_js(root),
         js = JS,
     ))
 }
@@ -300,23 +335,37 @@ background:transparent;color:var(--ink);font:14px var(--sans)}
 
 /// The page script. TINY by design, ASCII only, newline via fromCharCode, node-checked in tests.
 const JS: &str = r"
-var MODE = 'artifact';
+var MODE = 'none';
+var MCP = null, SERVER = 'Smartsheet';
 function dbg(m){var el=document.getElementById('dbglog');if(!el)return;
   var d=document.createElement('div');d.textContent=m;el.insertBefore(d,el.firstChild);
   while(el.children.length>8){el.removeChild(el.lastChild);}}
 window.onerror=function(m,s,l){dbg('ERROR '+m+' @'+l);return false;};
+function setHow(m){document.getElementById('how').setAttribute('data-local-transport',m);}
 
 // TRANSPORT DETECTION. Same-origin /api/version answering with apiVersion means keel serve is on the
 // other side: the TESTED path. Anything else (the claude.ai artifact frame included, where this fetch
-// 404s) falls back to the artifact live-doc mechanism.
+// fails) tries the INBOX: taps are delivered as rows to the keel-deck-inbox sheet through the
+// viewer's Smartsheet connector, and the store's row id is the receipt. No connector -> say so.
 fetch('/api/version').then(function(r){return r.json();}).then(function(j){
-  if(j && j.apiVersion){MODE='local';
-    document.getElementById('how').setAttribute('data-local-transport','transport: keel serve (tested path)');}
-}).catch(function(){
-  document.getElementById('how').setAttribute('data-local-transport','transport: artifact page only - judgments marked here DO NOT reach keel; use the local deck or tell Claude your verdicts');
-});
+  if(j && j.apiVersion){MODE='local';setHow('transport: keel serve (tested path)');}
+  else{initInbox();}
+}).catch(function(){initInbox();});
 
-var ART = (window.claude && claude.use) ? claude.use('artifact') : Promise.resolve(null);
+function initInbox(){
+  if(!INBOX||!(window.claude&&claude.use)){setHow('transport: NONE - nothing tapped here reaches keel; tell Claude your verdicts');return;}
+  claude.use('mcp').then(function(m){
+    if(!m){setHow('transport: NONE - this view cannot reach the inbox; tell Claude your verdicts');return;}
+    MCP=m;MODE='inbox';
+    setHow('transport: claude inbox - each tap is delivered to your keel-deck-inbox sheet with a receipt; Claude records it into keel');
+    m.listTools().then(function(lt){
+      var i,j,s;
+      for(i=0;i<lt.servers.length;i++){s=lt.servers[i];
+        for(j=0;j<s.tools.length;j++){if(s.tools[j].name==='add_rows'){SERVER=s.server;dbg('inbox via '+SERVER);return;}}}
+      dbg('no connector offers add_rows');
+    }).catch(function(e){dbg('listTools: '+((e&&e.code)||e));});
+  }).catch(function(e){setHow('transport: NONE - tell Claude your verdicts');dbg('use(mcp): '+e);});
+}
 
 function say(card,msg){var sv=card.querySelector('.sv');if(sv)sv.setAttribute('data-local-sv',msg);}
 
@@ -333,7 +382,8 @@ function saveLocal(card,verdict){
     if(verdict==='maybe'){say(card,'noted - tell Claude what to change via the note, then Sign or Reject');return;}
     if(!HUMAN){say(card,'no registered human reviewer - cannot sign from the deck');return;}
     url=(verdict==='accept')?'/api/decision/accept':'/api/decision/reject';
-    body={decision:name,judged_at:today,judged_by:HUMAN,note:(note||'signed via deck')};
+    body={decision:name,file:card.getAttribute('data-file'),judged_at:today,judged_by:HUMAN};
+    if(verdict==='accept'){body.note=(note||'signed via deck');}else{body.rationale=(note||'rejected via deck');}
   } else {
     if(!HUMAN){say(card,'no registered human reviewer - a sitting review may not be recorded as an AI');return;}
     url='/api/deck/sitting';
@@ -349,17 +399,35 @@ function saveLocal(card,verdict){
     .catch(function(e){say(card,'NOT saved - is keel serve up?');dbg('POST '+url+' threw: '+e);});
 }
 
-function saveArtifact(card,verdict){
-  say(card,'saving...');
-  ART.then(function(a){
-    if(!a||!a.sync){say(card,'not saved - this view cannot write');return;}
-    return a.sync(function(){ if(card.getAttribute('data-verdict')!==verdict){card.setAttribute('data-verdict',verdict);} })
-      .then(function(){say(card,'marked in page - NOT confirmed in keel');
-        setTimeout(function(){
-          if(card.getAttribute('data-verdict')!==verdict){say(card,'REVERTED - tell Claude you saw this');dbg('revert on '+card.getAttribute('data-name'));}
-        },1200);},
-            function(err){say(card,'NOT saved ('+((err&&err.code)||'unknown')+')');dbg('sync rejected: '+((err&&err.code)||'?'));});
-  }).catch(function(e){say(card,'not saved');dbg('sync threw: '+e);});
+// THE INBOX SAVE. The label ladder (D0018 on a button): the STORE'S row id earns 'delivered to
+// inbox'; only keel's own API earns 'saved to keel'; ambiguous outcomes say UNKNOWN and invite a
+// re-tap - a duplicate row is harmless because Claude dedups by uid, latest wins. Write errors are
+// branched per contract code; never collapsed into one banner.
+function saveInbox(card,verdict){
+  if(!MCP){say(card,'NOT delivered - no transport; tell Claude this verdict');return;}
+  var cls=card.getAttribute('data-cls'), name=card.getAttribute('data-name'), uid=card.getAttribute('data-id');
+  var noteEl=card.querySelector('.note'), note=noteEl?noteEl.value.trim():'';
+  var C=INBOX.cols;
+  var row={toBottom:true,cells:[
+    {columnId:C.uid,value:uid},{columnId:C.name,value:name},{columnId:C.kind,value:cls},
+    {columnId:C.verdict,value:verdict},{columnId:C.note,value:note},
+    {columnId:C.by,value:HUMAN||'unknown'},{columnId:C.at,value:new Date().toISOString()},
+    {columnId:C.deckhead,value:HEAD}]};
+  say(card,'delivering...');
+  MCP.callTool(SERVER,'add_rows',{sheet_id:INBOX.sheet,rows:[row]}).then(function(r){
+    var p=r&&r.payload, got=p&&p.result&&p.result[0]&&p.result[0].id;
+    if(got){say(card,'delivered to inbox row '+(p.result[0].rowNumber||'?')+' - Claude records it into keel');}
+    else{say(card,'delivered, receipt unreadable - ask Claude to check the inbox');dbg('ack: '+JSON.stringify(p).slice(0,140));}
+  },function(err){
+    var c=(err&&err.code)||'unknown';
+    if(c==='needs_reauth'){say(card,'NOT delivered - reconnect Smartsheet in claude.ai Settings, Connectors, then tap again');}
+    else if(c==='server_not_connected'){say(card,'NOT delivered - add Smartsheet in claude.ai Settings, Connectors, then tap again');}
+    else if(c==='selection_required'){say(card,'NOT delivered - choose a Smartsheet connector when prompted, then tap again');}
+    else if(c==='tool_error'){say(card,'inbox REFUSED: '+String((err&&err.message)||'').slice(0,90));}
+    else if(c==='server_unavailable'||c==='upstream_error'||c==='cancelled'){say(card,'delivery UNKNOWN - tap again to retry; a duplicate row is harmless');}
+    else{say(card,'NOT delivered ('+c+')');}
+    dbg('add_rows '+c+': '+((err&&err.message)||''));
+  });
 }
 
 document.addEventListener('click',function(e){
@@ -373,7 +441,7 @@ document.addEventListener('click',function(e){
   var next=card.getAttribute('data-verdict')===b.getAttribute('data-v')?'':b.getAttribute('data-v');
   card.setAttribute('data-verdict',next);
   if(!next){say(card,'cleared (nothing recorded)');return;}
-  if(MODE==='local'){saveLocal(card,next);}else{saveArtifact(card,next);}
+  if(MODE==='local'){saveLocal(card,next);}else{saveInbox(card,next);}
 });
 
 // LAST STATEMENT: `script ok` in the header means every listener above registered.
@@ -392,7 +460,8 @@ mod tests {
         let dir = std::env::temp_dir().join("keel-deck-jscheck");
         let _ = std::fs::create_dir_all(&dir);
         let js_path = dir.join("deck.js");
-        std::fs::write(&js_path, format!("var HUMAN=\"t\";\n{JS}")).expect("write js");
+        std::fs::write(&js_path, format!("var HUMAN=\"t\";\nvar HEAD=\"x\";\nvar INBOX=null;\n{JS}"))
+            .expect("write js");
         match std::process::Command::new("node").arg("--check").arg(&js_path).output() {
             Ok(out) => {
                 assert!(
@@ -428,5 +497,34 @@ mod tests {
     #[test]
     fn the_liveness_marker_is_last() {
         assert!(JS.trim_end().ends_with("document.body.setAttribute('data-local-js','ok');"));
+    }
+
+    /// The live-doc mechanism is RETIRED (issue194: its appends silently dropped). Nothing in the
+    /// script may reach for it again; the mobile fallback is the inbox, whose ack is the store's.
+    #[test]
+    fn the_dead_live_doc_mechanism_stays_dead() {
+        assert!(!JS.contains(".sync("), "live-doc sync() reappeared in the deck script");
+        assert!(!JS.contains("use('artifact')"), "the artifact capability reappeared in the deck script");
+        assert!(JS.contains("callTool"), "the inbox transport is missing from the deck script");
+    }
+
+    /// The inbox config round-trips from the contract file, and a missing or PARTIAL file yields
+    /// `null` — the page must claim no transport rather than half of one.
+    #[test]
+    fn inbox_config_all_or_nothing() {
+        let dir = std::env::temp_dir().join("keel-deck-inbox-cfg");
+        let contracts = dir.join(".engine").join("contracts");
+        let _ = std::fs::create_dir_all(&contracts);
+        let _ = std::fs::remove_file(contracts.join("deck-inbox.toml"));
+        assert_eq!(inbox_js(&dir), "null", "absent file must yield null");
+        let full = "sheet_id = 42\n[columns]\nuid = 1\nname = 2\nkind = 3\nverdict = 4\nnote = 5\nby = 6\nat = 7\ndeck_head = 8\n";
+        std::fs::write(contracts.join("deck-inbox.toml"), full).expect("write cfg");
+        assert_eq!(
+            inbox_js(&dir),
+            "{sheet:42,cols:{uid:1,name:2,kind:3,verdict:4,note:5,by:6,at:7,deckhead:8}}"
+        );
+        let partial = "sheet_id = 42\n[columns]\nuid = 1\n";
+        std::fs::write(contracts.join("deck-inbox.toml"), partial).expect("write cfg");
+        assert_eq!(inbox_js(&dir), "null", "partial config must yield null");
     }
 }

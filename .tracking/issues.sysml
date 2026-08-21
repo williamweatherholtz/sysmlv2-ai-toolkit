@@ -2229,4 +2229,37 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcHonestSaveLabel to issue193;
+
+    part issue194 : Issue {
+        :>> id = "c5ba3e47-1f69-4d28-a035-74ed92fc6bb8";
+        :>> title = "The live-doc appends never persisted at all - the write dropped, not just the read path";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "issue193 established the artifact transport was write-only from the receiver's perspective; the human's follow-up closed the remaining question: 'they're not recoverable it seems. nothing is there' - their marks were absent from their OWN phone's page too, so the append never persisted in any layer. sync() resolved and the write was silently discarded. THE MECHANISM IS THEREFORE DEAD AS A TRANSPORT, not merely unreadable, and it is RETIRED: the deck script contains no live-doc call, and deck::tests::the_dead_live_doc_mechanism_stays_dead keeps it out. THE REPLACEMENT is the artifact mcp capability: each tap delivers one ROW to the keel-deck-inbox Smartsheet sheet (.engine/contracts/deck-inbox.toml) with the viewer's own connector credentials, and the STORE's reply - a row id - is a real receiver-side acknowledgment the page shows as its receipt ('delivered to inbox row N', never 'saved'). The session pulls Processed=false rows and records them through the write API (.engine/tools/deck_inbox_record.py), verifying every row from the COMPUTED VIEW before marking it processed; duplicates dedup by latest-At per (uid, kind), so the page can safely invite a re-tap on an ambiguous write outcome. TESTED: the add_rows request/response pair observed live (capability contract requirement); the pulled-row rehearsal ran the real delivered row through a served COPY and read the disposition back from the computed view; the tunnel option is closed by their constraint - the controlling device is not guaranteed on their VPN.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcInboxTransport to issue194;
+
+    part issue195 : Issue {
+        :>> id = "d6cb4f58-2a70-4e39-b146-85fe03ad7cc9";
+        :>> title = "The deck's local acceptance save omitted the API's required `file` field, and the e2e leg that would have caught it only ran when an acceptance happened to be pending";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by reading the RECEIVER'S contract while wiring the inbox recorder: /api/decision/accept and /api/decision/reject deserialize a required `file` (repo-relative decision path), and the deck's saveLocal sent {decision, judged_at, judged_by, note} - every acceptance tap on the local transport would have been a 422. LATENT BECAUSE CONDITIONAL: the e2e tested only what the copied tree happened to have pending, and it never had a pending acceptance, so the leg never ran - a test that skips silently on an empty precondition verifies nothing about that leg. FIXED: every card now carries data-file (the item index records each item's declaring file), saveLocal sends it, and the e2e authors a THROWAWAY proposed decision on the copy so the acceptance leg ALWAYS runs - it now asserts the card renders, carries the file, the POST returns 200, and orient's pendingAcceptances drops the decision.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcInboxTransport to issue195;
+
+    part issue196 : Issue {
+        :>> id = "e7dc5a69-3b81-4f40-c257-96af14be8dda";
+        :>> title = "Sprint 377 recorded the python generator as deleted while the file and two doc references remained";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 377's closeOut gate says 'the python generator DELETED, not tombstoned' - and obligation_canvas.py still sat in .engine/tools with live references in the process purpose and the skills registry, plus the whole SKILL.md still describing the retired live-doc architecture. A deletion claimed but never executed, and no control checked either half: the claim sat in gate prose (D0151 - no gate reads prose), and nothing verified doc references resolve. This is the verify-the-wrong-surface family, filesystem edition: the claim was checked against the intent, not against ls. FIXED AT THE ROOT: the file is deleted, the three doc surfaces rewritten to the current architecture, and guard 39 (tool-reference) now fails the build when the LIVING doc surface (processes, skills, docs, contracts, workflows, rules, CLAUDE.md) references an .engine/tools file that does not exist - scope excludes decisions and .tracking, which are historical records and may truthfully name retired tools. The guard's first dry run found a SECOND stale reference (triage_reminder.py, retired into the binary long ago, still named in the engine-triage skill).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcToolReferenceGuard to issue196;
 }

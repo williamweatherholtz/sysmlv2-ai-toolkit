@@ -1601,8 +1601,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 38] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed"];
+pub const GUARD_NAMES: [&str; 39] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -1970,6 +1970,76 @@ pub fn identity_well_formed(root: &Path) -> GuardReport {
     GuardReport { name: "identity-well-formed", scanned, warnings: Vec::new(), violations }
 }
 
+/// Guard 39: a tool the LIVING doc surface references must EXIST (issue196).
+///
+/// Sprint 377's closeOut recorded the python deck generator as deleted while the file still sat in
+/// `.engine/tools/` with two live references — a claimed deletion nobody ran `ls` against
+/// (verify-the-wrong-surface, filesystem edition). Its first dry run found a SECOND stale reference
+/// (a retired hook script still named in a skill). The checkable half is mechanical: every
+/// `.engine/tools/<file>` mentioned in processes, skills, docs, or CLAUDE.md must resolve on disk.
+///
+/// SCOPE IS THE LIVING SURFACE ONLY — decisions and `.tracking` are historical records and may name
+/// tools that no longer exist, truthfully. The no-tombstones rule applies to what this guard scans;
+/// immutability applies to what it does not.
+#[must_use]
+pub fn tool_reference(root: &Path) -> GuardReport {
+    fn walk(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if p.extension().is_some_and(|x| {
+                x.eq_ignore_ascii_case("md") || x.eq_ignore_ascii_case("sysml") || x.eq_ignore_ascii_case("toml")
+            }) {
+                out.push(p);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    for base in ["processes", "skills", "docs", "contracts", "workflows", "rules"] {
+        walk(&root.join(".engine").join(base), &mut files);
+    }
+    let claude = root.join("CLAUDE.md");
+    if claude.exists() {
+        files.push(claude);
+    }
+    let needle = ".engine/tools/";
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let mut reported = std::collections::BTreeSet::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let rel = relpath(root, path);
+        for (n, line) in text.lines().enumerate() {
+            let mut rest = line;
+            while let Some(i) = rest.find(needle) {
+                let tail = &rest[i..];
+                let end = tail
+                    .find(|c: char| !(c.is_ascii_alphanumeric() || "._/-".contains(c)))
+                    .unwrap_or(tail.len());
+                let mut tok = &tail[..end];
+                while tok.ends_with('.') || tok.ends_with('-') {
+                    tok = &tok[..tok.len() - 1];
+                }
+                rest = &tail[needle.len()..];
+                // a bare directory mention carries no filename; only a file reference is checkable
+                if !tok.rsplit('/').next().is_some_and(|f| f.contains('.')) {
+                    continue;
+                }
+                scanned += 1;
+                if !root.join(tok).exists() && reported.insert(tok.to_string()) {
+                    violations.push(format!(
+                        "{rel}:{}: references `{tok}`, which does not exist - a follower hits a dead path, and a claimed deletion that left references is a claim nobody verified",
+                        n + 1
+                    ));
+                }
+            }
+        }
+    }
+    GuardReport { name: "tool-reference", scanned, warnings: Vec::new(), violations }
+}
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2129,6 +2199,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "impossible-evidence-date" => Some(impossible_evidence_dates(root)),
         "identity-present" => Some(identity_present(root)),
         "identity-well-formed" => Some(identity_well_formed(root)),
+        "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
+
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
         "viewpoint-renderer" => Some(viewpoint_renderer(root)),
@@ -2550,7 +2622,7 @@ mod scan_count_tests {
 
 #[cfg(test)]
 mod identity_form_tests {
-    use super::{id_values, uuid_shaped};
+    use super::{id_values, tool_reference, uuid_shaped};
 
     /// The shape predicate, on the two ids I actually mangled and the deliberate mnemonic convention it
     /// must NOT break. Written as a table because the interesting cases are the near-misses.
@@ -2595,6 +2667,32 @@ mod identity_form_tests {
             .1;
         let listed = body[..body.find("];").expect("the list is closed")].matches('"').count() / 2;
         assert_eq!(listed, 15, "the declared size and the actual entries must agree");
+    }
+
+    /// Guard 39: a living-surface reference to a missing tool is a violation; a reference to an
+    /// existing tool and a bare directory mention are not; `.tracking` (history) is out of scope.
+    #[test]
+    fn tool_reference_flags_only_missing_files_on_the_living_surface() {
+        let root = std::env::temp_dir().join("keel-toolref-guard");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine").join("skills")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".engine").join("tools")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        std::fs::write(root.join(".engine").join("tools").join("real.py"), "# real").expect("write");
+        std::fs::write(
+            root.join(".engine").join("skills").join("s.md"),
+            "run `.engine/tools/real.py` then .engine/tools/gone.py. See .engine/tools/ for more.\n",
+        )
+        .expect("write");
+        std::fs::write(
+            root.join(".tracking").join("h.sysml"),
+            "// history may truthfully say .engine/tools/retired.py existed\n",
+        )
+        .expect("write");
+        let report = tool_reference(&root);
+        assert_eq!(report.scanned, 2, "two file references scanned (the bare directory mention is not one)");
+        assert_eq!(report.violations.len(), 1, "{:?}", report.violations);
+        assert!(report.violations[0].contains(".engine/tools/gone.py"));
     }
 }
 

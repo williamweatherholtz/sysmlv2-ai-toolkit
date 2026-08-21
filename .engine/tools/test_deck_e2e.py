@@ -38,6 +38,29 @@ def main(repo: Path) -> int:
     exe_copy = work / "keel.exe"
     shutil.copy2(exe, exe_copy)
 
+    # A THROWAWAY PROPOSED DECISION so the acceptance leg always runs (it was skipped whenever the
+    # tree had no pending acceptance, which is how the missing `file` field in the deck's accept
+    # body stayed latent). Copy-only fixture; the copy is deleted at the end.
+    (work / ".engine" / "decisions" / "9998-e2e-throwaway.sysml").write_text(
+        "// D9998 - e2e fixture: a proposed decision the deck accepts through the API.\n"
+        "package Decision9998 {\n"
+        "    private import EngineElement::*;\n"
+        "    private import EngineWork::*;\n"
+        "    private import EngineVerification::*;\n"
+        "    private import EngineRelationships::*;\n"
+        "    part d9998 : Decision {\n"
+        '        :>> id = "e2e00000-0000-4000-8000-000000009998";\n'
+        '        :>> title = "D9998: e2e throwaway - accepted via the deck API";\n'
+        '        :>> createdAt = "2026-08-21";\n'
+        '        :>> createdBy = "claudeOpus5";\n'
+        "        :>> status = DecisionStatus::proposed;\n"
+        '        :>> context = "e2e fixture"; :>> decision = "e2e fixture";\n'
+        '        :>> rationale = "e2e fixture"; :>> consequences = "e2e fixture";\n'
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
     srv = subprocess.Popen(
         [str(exe_copy), "serve", str(work), "--port", str(PORT)],
         stdout=subprocess.DEVNULL,
@@ -105,6 +128,33 @@ def main(repo: Path) -> int:
                     break
                 time.sleep(0.5)
             check("the COMPUTED VIEW shows the finding dispositioned", ok)
+
+        # ── 2b. a decision acceptance, exactly as the deck's JS sends it ───────────────────────
+        page2 = c.get("/deck").text
+        check("the pending acceptance renders as a card", 'data-name="d9998"' in page2)
+        check(
+            "the card carries the decision's file (the accept API requires it)",
+            'data-file=".engine/decisions/9998-e2e-throwaway.sysml"' in page2,
+        )
+        r = c.post(
+            "/api/decision/accept",
+            json={
+                "decision": "d9998",
+                "file": ".engine/decisions/9998-e2e-throwaway.sysml",
+                "note": "e2e: signed via deck",
+                "judged_at": "2026-08-21",
+                "judged_by": "wweatherholtz",
+            },
+        )
+        check("POST /api/decision/accept is 200", r.status_code == 200, r.text[:120])
+        ok = False
+        for _ in range(20):
+            pend = c.get("/api/orient").json().get("pendingAcceptances", [])
+            if "d9998" not in pend:
+                ok = True
+                break
+            time.sleep(0.5)
+        check("the COMPUTED VIEW no longer lists the acceptance as pending", ok)
 
         # ── 3. a sitting review as the human ───────────────────────────────────────────────────
         sit_before = c.get("/api/computed/sitting-coverage").json()

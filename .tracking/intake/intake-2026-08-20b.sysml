@@ -139,4 +139,27 @@ package ProjectIntake20260820B {
     #DerivedFrom dependency from us016 to st010;
     #DerivedFrom dependency from us017 to st011;
     #Implicates dependency from us016 to issue192;
+
+    // -- seventh intake: the mobile transport must WORK, with both ends verifiable -----------------
+    part st012 : Statement {
+        :>> id = "a3f81c25-9d47-4b06-8e13-52cb70da4f96";
+        :>> title = "the phone verdicts are gone; no VPN is possible; make the remote artifact pipeline work and test it";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "#1 they're not recoverable it seems. nothing is there. #2 can't do- the device I remote control from can't be guaranteed to be on my vpn. just make the remote artifact pipeline worked. test again if you made fixes";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+
+    part us018 : UserStory {
+        :>> id = "b4a92d36-0e58-4c17-9f24-63dc81eb5aa7";
+        :>> title = "mobile verdicts reach keel through a transport both ends can verify";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "taps on the published deck to actually arrive, from any network, with an acknowledgment the receiver side can check";
+        :>> soThat = "I can clear my queue from my phone without wondering whether my input was recorded";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture: their #1 closed the diagnosis (the live-doc appends never persisted - nothing on their own reload either, so the write itself dropped) and their #2 closed the tunnel option (the controlling device is not guaranteed on their VPN). The remaining channel that works from any network AND carries a receiver-side acknowledgment is the artifact mcp capability: the page delivers each tap as a ROW to a Smartsheet inbox with the viewer's own connector credentials, the STORE acks with a row id the page shows as its receipt, and the AI session pulls unprocessed rows and records them through the tested write API with computed-view verification. Every leg except the single in-page callTool is machine-testable, and that call's request/response shape was observed live before publish, per the capability contract.";
+    }
+
+    #DerivedFrom dependency from us018 to st012;
+    #Implicates dependency from us018 to issue194;
 }
