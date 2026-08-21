@@ -2895,7 +2895,12 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 7] = [
+        const LEGITIMATELY_EMPTY: [&str; 9] = [
+            // both D0191 guards scan ENVIRONMENT-DEPENDENT populations: release-recorded scans git
+            // tags (absent in CI's tag-less clone) and enrollment-binding scans the machine-local
+            // .keel/actor binding (gitignored, absent on CI) - locally both scan real populations.
+            "release-recorded",
+            "enrollment-binding",
             // scans done-work -> SR pairs lacking a #Verify edge; sprints 393/394 verified every
             // live SR (verification lens: neither = 0), so the population emptied by completion.
             "verification-trace",
