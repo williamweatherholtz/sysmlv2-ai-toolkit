@@ -1,0 +1,21 @@
+// D0183 (PROPOSED — NOT YET ACCEPTED) — D-P4a: process units are versioned, updateable by supersession, and imports handshake enforcement (P4b executes under this Decision jointly with D-P3a)
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0183Accept event on sign-off.
+package Decision0183 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    part d0183 : Decision {
+        :>> id = "461631f2-bea0-4886-ab40-9c2b5f71c51c";
+        :>> title = "D-P4a: process units are versioned, updateable by supersession, and imports handshake enforcement (P4b executes under this Decision jointly with D-P3a)";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "keel process import refuses all name collisions - correct for safety, but it means install-once: a shared process can never receive an upstream revision. Export units carry guards only as names that silently lose their teeth on an older binary, and the unit format keys everything on file stems, which the panel showed breaks unit identity, activation entries, deploying-skill recovery, and guard_state (first-match-wins) under any supersession scheme. Three-way merging has no recorded base because import records nothing. Reviewed by a 9-member adversarial panel (2 pessimists, 2 optimists, 3 correctness critics, 1 reduction advocate, 1 systems engineer) across three rounds under an honesty rule; round 3 verdict 9 ACCEPT / 0 OBJECT, uncompelled. Full evidence and finding-to-resolution map: docs/proposals/2026-08-21-production-readiness-design.md sections 10-12. NOTE per the 2026-08-14 panel precedent (.tracking/panel-critiques.sysml): the panelists are subagent contexts of the authoring model, a rigor framing, NOT independent critics - this record claims convergence, never critic-independence.";
+        :>> decision = "Unit identity is a versioned id in the manifest, not the file stem. Import writes an install record (versioned unit id, version, per-file content hashes) as a tracked fact - the three-way base; pre-existing installs bootstrap by treating local as base with explicit human confirmation. import --update does a three-way comparison (recorded base / upstream-new / local): local assert-constraint additions are never silently clobbered, divergence refuses with a report; the superseded definition gets its supersede edge with the mandatory ProspectiveChange/SafetyChange marker so reprocess-candidates fires. Import rewrites activation.toml atomically (old unit out, successor in) and guard_state treats a guard as active if ANY active unit asserts it. The version handshake diffs the unit's required guards against the binary's inventory (keel version prints it): missing teeth means refuse or loudly degrade with a recorded Issue - never prose-lands-teeth-silently-missing. governing-version generalizes off the hardcoded delivery.sysml path to any process/workflow def, resolved per item from its charter edges.";
+        :>> rationale = "Updateable and portable are two of the four goal adjectives, and neither requires the declarative-controls migration - only the rule-attribution slice (D-P3a) for the rules half (P4b). The supersession route reuses the engine's existing retroactivity semantics instead of inventing versioning.";
+        :>> consequences = "Shared processes gain a real update path with the suspicion machinery firing downstream. Acceptance: a unit exported from A imports into B with guards verified against B's binary; a later upstream revision lands by supersession without clobbering B's local additions; affected work appears in reprocess-candidates; the imported process appears as a launchable action in B's console. Charters the p4a* tasks and p4bRulesTravel.";
+    }
+}

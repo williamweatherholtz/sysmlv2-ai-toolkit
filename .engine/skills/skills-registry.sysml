@@ -292,6 +292,14 @@ package EngineSkillRegistry {
         :>> triggerCondition = "A contributor acts from a machine with no engine identity binding; a new human or AI joins the project; `keel` reports no acting actor; or provenance/authority is in question.";
         :>> writePolicy = WritePolicy::direct;
     }
+    part adversarialPanelReviewSkill : AISkill {
+        :>> id = "a9b4e9f0-492a-4aa3-983c-28402a4b8cff";
+        :>> title = "adversarial-panel-review";
+        :>> purpose = "Deploys .engine/processes/adversarial-panel-review.sysml (D0187), the Adversarial Panel Review process: convene a persona-diverse critic panel (pessimists, optimists, correctness/consistency/mechanism pedants, a scope reducer, a systems engineer deriving kernel invariants) whose ACCEPT verdicts are conditional on named, verifiable changes; dispatch rounds in parallel with cross-panelist digests from round 2; resolve every flip condition in an artifact revision carrying a finding-to-resolution map; iterate to uncompelled unanimity; record surviving outcomes as tracked facts. Carries the permanent independence honesty note: same-model subagent panelists are a rigor framing recording critiquedBy = aiModel - convergence is claimed, critic independence never is.";
+        :>> location = ".engine/skills/adversarial-panel-review/SKILL.md";
+        :>> triggerCondition = "A design artifact carries enough scope or risk that one author's judgment should not be the last word - a multi-work-package plan, a schema or process change, a direction Decision - and the human has asked for panel review or accepted its cost. Not for small mechanical changes: a full panel is expensive by design.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part distributedCollaborationSkill : AISkill {
         :>> id = "0d610002-0812-4102-9b3e-000000110002";
         :>> title = "distributed-collaboration";

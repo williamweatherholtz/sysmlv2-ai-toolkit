@@ -2273,4 +2273,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRecorderForwardsBy to issue197;
+
+    part issue198 : Issue {
+        :>> id = "128fbd0c-7a1f-4b04-9993-08b65e0b9860";
+        :>> title = "nAiGovernanceInLoop names MCP - a mechanism that does not exist - and its failing critique sat untriaged";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "nAiGovernanceInLoopCorrectnessCritique (critiques.sysml, verdict fail) found the Need clause solution-bound: 'CLI + MCP surface serves discovery' names a technology, not a need; the concern it stands for is served by the output style, keel orient, and the hook surface, with no MCP server built - 'the clause was never the requirement'. That failing critique produced no Issue, violating the triage invariant (CLAUDE.md section 3). This Issue records it; the resolver is the d0186 direction Decision, which answers the critique on the record (MCP demoted to a trigger-gated direction binding K13 and harness portability) rather than overriding it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0186 to issue198;
 }

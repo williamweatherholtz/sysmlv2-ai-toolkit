@@ -71,3 +71,7 @@ reason = "Rendering a graph for a human to look at. The `viewpoint-renderer` gua
 [reportView]
 checkable = false
 reason = "Same as `diagramView`: computing and presenting a scorecard. `render` asserts the renderer guard. Whether a reader acted on the report is outside the model — and if it were inside, it would be an obligation, which the console already tracks."
+
+[adversarialPanelReview]
+checkable = false
+reason = "A critique round is a judgment by construction, same shape as [critique]: whether a panelist's finding is real, whether a resolution is substantive rather than a renaming, and whether unanimity was uncompelled are all judgments about argument quality that no text predicate can read. The checkable residue is tiny and indirect (the recorded outputs - Decisions, Issues, tasks - are gated like any other facts). A guard could only count findings, which would make rigor look enforced while enforcing nothing."
