@@ -220,4 +220,9 @@ package ProjectIntake20260820B {
     #DerivedFrom dependency from us020 to st016;
     #Implicates dependency from us019 to issue170;
     #Implicates dependency from us020 to issue174;
+
+    #DerivedFrom dependency from dcMintCommand to us019;
+    #DerivedFrom dependency from dcSprintScaffold to us019;
+    #DerivedFrom dependency from dcDecisionFollowThroughView to us020;
+    #DerivedFrom dependency from dcDecisionScaffoldingGuard to us020;
 }
