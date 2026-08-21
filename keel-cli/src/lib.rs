@@ -45,6 +45,7 @@ pub mod fingerprint;
 pub mod perf;
 pub mod orient;
 pub mod process_cmd;
+pub mod claude_surface;
 pub mod queries;
 pub mod reverify;
 pub mod scaffold;

@@ -58,8 +58,12 @@ const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry
 /// A RUST-ONLY pre-commit gate scaffolded into a fresh project (`.githooks/pre-commit`). Runs
 /// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
 /// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
-/// Degrades to a skip (never blocks) if `keel` isn't on PATH. POSIX sh.
-const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: '$KEEL' not on PATH — keel gate skipped (install keel to enforce)\"; exit 0; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\n";
+///
+/// FAILS LOUD without the binary (K2/P0.3, D0174): the previous version skipped with a printed
+/// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
+/// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
+/// path (D0175's fence). POSIX sh.
+const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\nKEEL=\"${KEEL_BIN:-${KEEL:-keel}}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\n";
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -209,16 +213,114 @@ fn cmd_hook(args: &[String]) -> i32 {
         return 0; // not a keel project -> silent no-op, correctly
     }
 
-    match event {
+    // Fire-ledger + subagent baseline (D0174/P0.1, D0180): every fire leaves one machine-local
+    // JSONL line keyed by session id and event — the SINGLE instrumentation path the
+    // hooks-actually-fired checks read. A session's FIRST fire also stores the tree fingerprint,
+    // which is the SubagentStop baseline (P0.6).
+    let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+    // Never write the baseline from the subagent-stop event itself: a subagent whose FIRST fire is
+    // its own stop would baseline against the post-work tree and silently skip the gate — found by
+    // running the branch, not by reading it.
+    if !session.is_empty() && event != "subagent-stop" {
+        let bl = root.join(".keel").join("metrics").join(format!("baseline-{session}.fp"));
+        if !bl.exists() {
+            let _ = std::fs::create_dir_all(root.join(".keel").join("metrics"));
+            let _ = std::fs::write(&bl, keel_cli::fingerprint::of(&root).to_string());
+        }
+    }
+    let started = std::time::Instant::now();
+    let code = match event {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
         "user-prompt" => hook_user_prompt(&root),
         "pre-bash" => hook_pre_bash(&payload),
+        "pre-write" => hook_pre_write(&payload, &root),
+        "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
         other => {
-            eprintln!("unknown hook event '{other}' (expected stop|post-edit|pre-bash|user-prompt)");
+            eprintln!("unknown hook event '{other}' (expected stop|post-edit|pre-bash|user-prompt|pre-write|subagent-stop)");
             2
         }
+    };
+    ledger_emit(&root, &session, event, code, started.elapsed().as_millis());
+    code
+}
+
+/// Append one fire-ledger line (machine-local, `.keel/metrics/hooks.jsonl`, gitignored class).
+/// Best-effort by design: the ledger is evidence infrastructure, and a full disk must not turn an
+/// advisory hook into a blocker — but a write failure is still printed, never swallowed (K2).
+fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
+    use std::io::Write as _;
+    let dir = root.join(".keel").join("metrics");
+    if std::fs::create_dir_all(&dir).is_err() {
+        eprintln!("[keel] fire-ledger unavailable: cannot create {}", dir.display());
+        return;
     }
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let decision = if exit == 0 { "allow" } else { "block" };
+    let line = format!(
+        "{}\n",
+        serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": u64::try_from(ms).unwrap_or(u64::MAX)})
+    );
+    let appended = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("hooks.jsonl"))
+        .and_then(|mut f| f.write_all(line.as_bytes()));
+    if let Err(e) = appended {
+        eprintln!("[keel] fire-ledger write failed: {e}");
+    }
+}
+
+/// `PreToolUse` on Write|Edit over a PROTECTED fact surface (D0174/D-P0a), invoked by the
+/// scaffolded pure-shell test when the binary IS present. Profile-aware (P0.4):
+///   - `strict`  → deny, naming the sanctioned command (K13 deny-and-provide);
+///   - `guided`  → advisory line, allow;
+///   - no adoption-profile contract (the self-build, pre-P0 projects) → advisory, allow —
+///     CLAUDE.md §4 sanctions direct editing here until P1 lands the tiered model.
+fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
+    let path = payload
+        .pointer("/tool_input/file_path")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .replace('\\', "/");
+    let Some((surface, sanctioned)) =
+        keel_cli::claude_surface::PROTECTED_PATHS.iter().find(|(p, _)| path.contains(p))
+    else {
+        return 0;
+    };
+    let strict = std::fs::read_to_string(root.join(".engine").join("contracts").join("adoption-profile.toml"))
+        .is_ok_and(|t| t.lines().any(|l| l.trim().starts_with("profile") && l.contains("strict")));
+    if strict {
+        let reason = format!(
+            "[keel] {surface} is an API-owned fact surface (D0174). Use the sanctioned path: {sanctioned}. Direct edits here bypass identity, provenance, and locking."
+        );
+        println!(
+            "{}",
+            serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}})
+        );
+    } else {
+        println!("[keel advisory] {surface} is an API-owned fact surface - prefer: {sanctioned}");
+    }
+    0
+}
+
+/// `SubagentStop` (D0174/P0.6): gate ONLY when the tree changed during the subagent's lifetime.
+/// Baseline = the fingerprint stored at the session's first hook fire; no baseline → a
+/// `systemMessage` advisory, never a block (a read-only subagent pays nothing).
+fn hook_subagent_stop(payload: &serde_json::Value, root: &Path, session: &str) -> i32 {
+    let bl = root.join(".keel").join("metrics").join(format!("baseline-{session}.fp"));
+    let Ok(baseline) = std::fs::read_to_string(&bl) else {
+        println!(
+            "{}",
+            serde_json::json!({"systemMessage": "[keel] subagent tree not gated: no baseline fingerprint for this session (first hook fire was this one)"})
+        );
+        return 0;
+    };
+    if baseline.trim() == keel_cli::fingerprint::of(root).to_string() {
+        return 0; // wrote nothing — pays nothing
+    }
+    // The tree changed under this subagent: same gate as the turn boundary.
+    hook_stop(payload, root)
 }
 
 /// `PreToolUse` on Bash: advise on host/shell adaptation before the command runs (issue094).
@@ -661,6 +763,19 @@ fn cmd_orient(args: &[String]) -> i32 {
                 1
             }
         };
+    }
+    // K2 visibility (D0174/P0.3): a scaffolded commit gate that git is not wired to run is a
+    // silently-open enforcement point. Warn LOUDLY on stderr — the JSON on stdout stays pure.
+    if root.join(".githooks").join("pre-commit").exists() {
+        let wired = keel_cli::gitx::git()
+            .arg("-C")
+            .arg(&root)
+            .args(["config", "core.hooksPath"])
+            .output()
+            .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty());
+        if !wired {
+            eprintln!("[keel] WARNING: .githooks/pre-commit exists but core.hooksPath is UNSET — the commit gate never runs. Fix: git config core.hooksPath .githooks (D0174/K2).");
+        }
     }
     println!("{}", orient::compute(&root).to_json());
     0
@@ -1118,6 +1233,47 @@ fn cmd_decision_follow_through(args: &[String]) -> i32 {
         println!("  GAPS (no downstream tracked item): {}", gaps.join(", "));
     }
     0
+}
+
+/// `keel sync-claude [ROOT] [--check]` (D0174/P0.2) — regenerate the keel-owned subset of the
+/// `.claude/` surface in place (foreign entries survive), or with `--check` report drift and
+/// version skew without writing. `--check` IS the `claude-surface-drift` guard's implementation.
+fn cmd_sync_claude(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel sync-claude [ROOT] [--check]", &["check"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    let check = args.iter().any(|a| a == "--check");
+    match keel_cli::claude_surface::sync_claude(&root, check) {
+        Ok(r) => {
+            if check {
+                for d in &r.drift {
+                    println!("DRIFT: {d}");
+                }
+                if let Some((old, new)) = &r.version_skew {
+                    println!("REGENERATE: surface stamped by generator {old}, this binary is {new} — run `keel sync-claude` (an obligation, not a violation)");
+                }
+                if r.drift.is_empty() {
+                    println!("claude-surface: keel-owned subset matches this binary's generator ({} registry skill(s))", r.registry_count);
+                    0
+                } else {
+                    1
+                }
+            } else {
+                println!(
+                    "claude-surface synced: settings.json merged (keel-owned entries only), output style, {}/{} skill(s), version {} stamped.",
+                    r.skills_written,
+                    r.registry_count,
+                    keel_cli::claude_surface::SURFACE_VERSION
+                );
+                0
+            }
+        }
+        Err(e) => {
+            eprintln!("keel sync-claude: {e}");
+            1
+        }
+    }
 }
 
 fn cmd_hardening(args: &[String]) -> i32 {
@@ -1950,8 +2106,51 @@ fn positional_arg<'a>(args: &'a [String], usage: &str, what: &str) -> Result<&'a
     Ok(first)
 }
 
+/// The D0174/P0 slice of `init`: the declared adoption-profile fact, the `.claude/` enforcement
+/// surface (five hook events, output style, per-registry skills), the optional CI template, and
+/// wiring `core.hooksPath` when a `.git` exists.
+fn init_enforcement_surface(dir: &Path, engine_dst: &Path, profile: &str) -> Result<(), i32> {
+    let contracts = engine_dst.join("contracts");
+    let _ = std::fs::create_dir_all(&contracts);
+    let profile_fact = format!(
+        "# Adoption profile — DECLARED at init, never inferred (D0174/P0.4).
+         # strict: blocking in-loop gates from day one. guided: advisory-first; promote to blocking
+         # with `keel sync-claude` after the D0180 evidence window, citing the fire-ledger.
+         profile = \"{profile}\"
+declaredAt = \"{}\"
+",
+        keel_cli::scaffold::today()
+    );
+    if let Err(e) = std::fs::write(contracts.join("adoption-profile.toml"), profile_fact) {
+        eprintln!("error writing adoption-profile.toml: {e}");
+        return Err(1);
+    }
+    match keel_cli::claude_surface::sync_claude(dir, false) {
+        Ok(r) => println!(
+            ".claude/ scaffolded: settings.json (5 hook events), output style, {} skill(s) (= registry count {}).",
+            r.skills_written, r.registry_count
+        ),
+        Err(e) => {
+            eprintln!("error scaffolding .claude/: {e}");
+            return Err(1);
+        }
+    }
+    let wf = dir.join(".github").join("workflows");
+    let _ = std::fs::create_dir_all(&wf);
+    if let Err(e) = std::fs::write(wf.join("keel-gate.yml"), keel_cli::claude_surface::CI_TEMPLATE) {
+        eprintln!("error writing CI template: {e}");
+        return Err(1);
+    }
+    if dir.join(".git").exists() {
+        let _ = keel_cli::gitx::git().arg("-C").arg(dir).args(["config", "core.hooksPath", ".githooks"]).status();
+        println!("core.hooksPath set to .githooks (the commit gate is live).");
+    }
+    Ok(())
+}
+
 fn cmd_init(args: &[String]) -> i32 {
-    let target = match positional_arg(args, "keel init DIR", "a directory") {
+    const USAGE: &str = "keel init DIR [--profile strict|guided]";
+    let target = match positional_arg(args, USAGE, "a directory") {
         Ok(a) => a,
         Err(code) => return code,
     };
@@ -1961,6 +2160,29 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error: {} already contains a .engine/ — refusing to overwrite", dir.display());
         return 2;
     }
+    // Adoption profile: DECLARED, never inferred (D0174/P0.4 — the issue089/129 lockout class died
+    // of inference). Default applies only to a PROVABLY EMPTY directory (strict: a fresh scaffold
+    // starts green, init_smoke proves it); any directory with existing content requires the flag.
+    let profile = match flag(args, "profile") {
+        Some(p) if p == "strict" || p == "guided" => p,
+        Some(p) => {
+            eprintln!("error: --profile takes `strict` or `guided`, not `{p}`.");
+            eprintln!("usage: {USAGE}");
+            return 2;
+        }
+        None => {
+            let has_content =
+                std::fs::read_dir(&dir).is_ok_and(|rd| rd.flatten().any(|e| e.file_name() != ".git"));
+            if has_content {
+                eprintln!("error: {} has existing content — an adoption profile must be DECLARED, never inferred (D0174).", dir.display());
+                eprintln!("  --profile strict   blocking in-loop gates from day one (fresh projects)");
+                eprintln!("  --profile guided   advisory-first; promote to blocking later, citing measured evidence (D0180)");
+                eprintln!("usage: {USAGE}");
+                return 2;
+            }
+            "strict".to_string()
+        }
+    };
     let mut count = 0u32;
     if let Err(e) = scaffold_engine(&ENGINE_DIR, &engine_dst, &mut count) {
         eprintln!("error scaffolding engine: {e}");
@@ -2019,7 +2241,10 @@ fn cmd_init(args: &[String]) -> i32 {
         use std::os::unix::fs::PermissionsExt as _;
         let _ = std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o755));
     }
-    println!("Scaffolded the engine into {} ({count} engine file(s)).", dir.display());
+    if let Err(code) = init_enforcement_surface(&dir, &engine_dst, &profile) {
+        return code;
+    }
+    println!("Scaffolded the engine into {} ({count} engine file(s)). Adoption profile: {profile} (declared).", dir.display());
     println!();
     println!("Next:");
     println!("  1. cd {}", dir.display());
@@ -2460,9 +2685,10 @@ const CATALOGUE: &[&str] = &[
     "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
     "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
     "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
+    "  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift (D0174)",
     "  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
-    "hook post-edit|stop|pre-bash the in-loop gates, in the binary — no python runtime (D0134)",
+    "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary (D0134/D0174)",
     "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
     "suspect [ROOT]               done work whose evidence has DRIFTED from the tree it was judged against",
     "outstanding [ROOT]           every not-done item, flat — the burndown without the ranking",
@@ -2590,6 +2816,7 @@ fn main() {
         Some("deck") => cmd_deck(rest),
         Some("mint") => cmd_mint(rest),
         Some("new") => cmd_new(rest),
+        Some("sync-claude") => cmd_sync_claude(rest),
         Some("decision-follow-through") => cmd_decision_follow_through(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),

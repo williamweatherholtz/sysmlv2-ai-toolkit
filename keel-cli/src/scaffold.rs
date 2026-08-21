@@ -72,7 +72,7 @@ pub fn sprint(
         return Err(format!("refusing to overwrite {}", path.display()));
     }
 
-    let today = chrono_date();
+    let today = today();
     let mut cap = slug.to_owned();
     if let Some(first) = cap.get_mut(0..1) {
         first.make_ascii_uppercase();
@@ -128,7 +128,8 @@ fn decision_exists(root: &Path, name: &str) -> bool {
 
 /// Today as `YYYY-MM-DD` from the system clock — the one authoring field where the real clock IS the
 /// truth (a scaffold is created now; only JUDGMENT dates are refused-not-defaulted).
-fn chrono_date() -> String {
+#[must_use]
+pub fn today() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());

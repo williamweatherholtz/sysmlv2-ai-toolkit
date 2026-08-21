@@ -24,13 +24,32 @@ what makes a "keel is blocking me" report diagnosable.
 
 **2. Scaffold a project.**
 ```
-keel init myproject
+keel init myproject                      # a fresh (empty) directory defaults to --profile strict
+keel init existing --profile guided     # a directory with existing content REQUIRES a declared profile
 cd myproject
 git init && git config core.hooksPath .githooks   # enable the Rust-only keel pre-commit gate
 ```
 `keel init` lays down the engine (`.engine/`, with the architecture decisions as read-only
-`reference/`), `CLAUDE.md` (how to work here), a starter `.tracking/`, and a kernel-free
-`.githooks/pre-commit` (runs `keel validate` + `keel guard`).
+`reference/`), `CLAUDE.md` (how to work here), a starter `.tracking/`, a kernel-free
+`.githooks/pre-commit` (runs `keel validate` + `keel guard`; **fails loud when the binary is
+absent**, naming this release page), **the full in-loop enforcement surface** (`.claude/`:
+five hook events, the keel output style, discoverable skills, and the protected-path check —
+regenerate any time with `keel sync-claude`, drift-checked by `keel sync-claude --check`), and an
+optional CI workflow (`.github/workflows/keel-gate.yml`) so verification runs hook-independent.
+The adoption profile is **declared, never inferred** (`strict` = blocking gates from day one;
+`guided` = advisory-first, promoted later citing measured evidence) and is recorded in
+`.engine/contracts/adoption-profile.toml`.
+
+Releases ship verified binaries for Windows, Linux, and macOS; expect the latest tagged release to
+be current — install from this repository's
+[Releases page](https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases) only (no
+package managers, no auto-update, no install scripts — deliberately, D0175).
+
+**Harness support:** in-loop enforcement (hooks, output style, protected paths) is
+**Claude-Code-bound** today. On any other harness you still get the CLI, the commit and CI gates,
+and `keel audit-history` — the layer that re-derives every verdict from the tree, hook-independent.
+An MCP surface is a recorded direction (D0186), trigger-gated: if you need keel on a second
+harness in real use, say so — that is the trigger.
 
 **3. Start working.** Read `CLAUDE.md`, then either run the guided **`introduction`** skill
 (captures your first need and runs your first sprint) or jump straight in:

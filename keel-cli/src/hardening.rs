@@ -40,6 +40,7 @@ pub fn hardening(root: &Path) -> Result<String, crate::view::ViewError> {
         ("processEnforcement".to_string(), process_enforcement(root)),
         ("decisionFollowThrough".to_string(), decision_follow_through(root)),
         ("apiSurface".to_string(), api_surface(root)),
+        ("enforcementPoints".to_string(), enforcement_points(root)),
     ])
     .dump())
 }
@@ -464,6 +465,69 @@ pub fn advertised_endpoints(serve: &str) -> std::collections::BTreeSet<String> {
         }
     }
     out
+}
+
+// ── lens 6: the enforcement-point inventory (K2, D0174/P0.7) ─────────────────────────────────────
+
+/// Every enforcement point with its absent/error/timeout behavior — enumerated and reported, so no
+/// point is silently open without appearing here (kernel invariant K2).
+///
+/// The TIMEOUT column matters most: the harness resolves a hook timeout to ALLOW, which nothing at
+/// this layer can change — so every timeout-resolves-to-allow point is listed as a recorded
+/// residual whose visibility is the fire-ledger (an expected fire with no ledger line is the
+/// detection signal, read by PM's analysis and the P5 post-run gate).
+fn enforcement_points(root: &Path) -> Json {
+    const HOOK_TIMEOUT: &str = "harness resolves to ALLOW - recorded residual; detection = expected fire with no fire-ledger line";
+    let settings: serde_json::Value = std::fs::read_to_string(root.join(".claude").join("settings.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or(serde_json::Value::Null);
+    let has_event = |ev: &str| settings.pointer(&format!("/hooks/{ev}")).is_some();
+    let hooks_wired = root.join(".githooks").join("pre-commit").exists()
+        && crate::gitx::git()
+            .arg("-C")
+            .arg(root)
+            .args(["config", "core.hooksPath"])
+            .output()
+            .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty());
+    let ci = root.join(".github").join("workflows").exists()
+        && std::fs::read_dir(root.join(".github").join("workflows")).is_ok_and(|rd| {
+            rd.flatten().any(|e| {
+                std::fs::read_to_string(e.path()).is_ok_and(|t| t.contains("keel validate") || t.contains("keel guard"))
+            })
+        });
+    let row = |point: &str, present: bool, absent: &str, error: &str, timeout: &str| {
+        Json::Obj(vec![
+            ("point".to_string(), Json::s(point)),
+            ("present".to_string(), Json::Bool(present)),
+            ("absent".to_string(), Json::s(absent)),
+            ("error".to_string(), Json::s(error)),
+            ("timeout".to_string(), Json::s(timeout)),
+        ])
+    };
+    let rows = vec![
+        row("hook UserPromptSubmit (route-first)", has_event("UserPromptSubmit"), "no routing reminder - advisory only, nothing gates", "prints and allows (D0134)", HOOK_TIMEOUT),
+        row("hook PostToolUse post-edit (fast tier)", has_event("PostToolUse"), "per-edit gate lost; turn/commit tiers still gate (K15)", "loud warning, allows", HOOK_TIMEOUT),
+        row("hook Stop (turn gate)", has_event("Stop"), "turn gate lost; commit/CI tiers still gate (K15)", "loud warning, allows", HOOK_TIMEOUT),
+        row("hook PreToolUse pre-bash (shell advisory)", has_event("PreToolUse"), "advisory only, nothing gates", "prints and allows", HOOK_TIMEOUT),
+        row("hook PreToolUse pre-write (protected paths)", has_event("PreToolUse"), "PURE-SHELL fallback DENIES without the binary, loudly (P0.3)", "deny message malformed -> harness asks", HOOK_TIMEOUT),
+        row("hook SubagentStop (subagent tree gate)", has_event("SubagentStop"), "subagent writes reach the turn gate instead", "loud warning, allows", HOOK_TIMEOUT),
+        row("pre-commit .githooks (commit gate)", hooks_wired, "UNSET hooksPath = never runs - orient warns loudly; binary absent = exit 1 with the install path (K2, fail-loud)", "exit 1, commit blocked", "n/a - synchronous, no harness deadline"),
+        row("CI keel gate (layer 3, hook-independent)", ci, "no remote verification; audit-history still re-derives locally (K15)", "CI red", "CI runner timeout -> red, visible"),
+        row(&format!("guards at gate tiers ({} enforced)", crate::guards::GUARD_NAMES.len()), true, "guards run inside validate/gate/commit paths - absent only if the binary is absent (see pre-commit row)", "guard error = violation, fails loud (issue183 rule)", "n/a - in-process"),
+        row("declared rules", true, "report-only until P1.5 wires them into hook stop, pre-commit, and CI - RECORDED RESIDUAL (d0177)", "rule parse error reported", "n/a - in-process"),
+    ];
+    Json::Obj(vec![
+        (
+            "note".to_string(),
+            Json::s(
+                "Kernel invariant K2: no enforcement point is silently open without appearing here. \
+                 Rows where `present` is false are open points on THIS tree; timeout-resolves-to-allow \
+                 rows are residuals whose visibility is the fire-ledger.",
+            ),
+        ),
+        ("points".to_string(), Json::Arr(rows)),
+    ])
 }
 
 #[cfg(test)]

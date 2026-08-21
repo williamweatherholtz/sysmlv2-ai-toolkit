@@ -72,6 +72,30 @@ fn init_scaffolds_a_working_project() {
         vec!["deck_inbox_record.py", "test_deck_e2e.py"],
         "scaffolded python must be exactly the portable deck tools; got {names:?}"
     );
+    // D0174/P0: the in-loop enforcement surface ships with init — five hook events, the output
+    // style, one skill per registry entry (counts asserted equal), the declared adoption profile,
+    // and the optional CI template. Behavioral parity (K3) is what downstream gets.
+    let settings: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.join(".claude").join("settings.json")).expect(".claude/settings.json not scaffolded"),
+    )
+    .expect("settings.json must be valid JSON");
+    for ev in ["UserPromptSubmit", "PostToolUse", "Stop", "PreToolUse", "SubagentStop"] {
+        assert!(settings.pointer(&format!("/hooks/{ev}")).is_some(), "scaffolded settings missing hook event {ev}");
+    }
+    assert_eq!(settings["outputStyle"], "keel", "the keel output style is the response contract (D0130)");
+    assert!(
+        !settings.to_string().contains("./target/"),
+        "cwd-relative binary probe is the P0.3 forbidden pattern"
+    );
+    assert!(dir.join(".claude").join("output-styles").join("keel.md").is_file(), "output style not scaffolded");
+    let skill_dirs = std::fs::read_dir(dir.join(".claude").join("skills")).expect(".claude/skills missing").count();
+    let registry = std::fs::read_to_string(dir.join(".engine").join("skills").join("skills-registry.sysml")).expect("registry");
+    assert_eq!(skill_dirs, registry.matches(":>> location = ").count(), "skills scaffolded != registry count (P0.1)");
+    let profile = std::fs::read_to_string(dir.join(".engine").join("contracts").join("adoption-profile.toml"))
+        .expect("adoption profile fact not recorded");
+    assert!(profile.contains("profile = \"strict\""), "empty-dir default is strict, DECLARED (P0.4)");
+    assert!(dir.join(".github").join("workflows").join("keel-gate.yml").is_file(), "CI template not scaffolded");
+
     // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel validate/guard; NO conda/kernel).
     let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
     assert!(hook.contains("keel") && hook.contains("validate") && hook.contains("guard"), "pre-commit gate missing keel validate/guard");

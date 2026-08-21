@@ -1,4 +1,86 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook post-edit",
+            "shell": "bash",
+            "statusMessage": "keel fast gate",
+            "timeout": 60,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook pre-bash",
+            "shell": "bash",
+            "statusMessage": "shell adaptation advisory",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "IN=$(cat); case \"$IN\" in *'.tracking/issues.sysml'*|*'.tracking\\\\issues.sysml'*|*'.tracking/backlog.sysml'*|*'.tracking\\\\backlog.sysml'*|*'.tracking/critiques.sysml'*|*'.tracking\\\\critiques.sysml'*|*'.tracking/delivery/'*|*'.tracking\\\\delivery\\\\'*|*'.engine/decisions/'*|*'.engine\\\\decisions\\\\'*) K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); if [ -n \"$K\" ]; then printf '%s' \"$IN\" | \"$K\" hook pre-write; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[keel] protected fact surface and the keel binary is ABSENT - refusing a blind write. Install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases ; then use the sanctioned write commands (keel --help).\"}}'; fi;; *) : ;; esac",
+            "shell": "bash",
+            "statusMessage": "protected-path check",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook stop",
+            "shell": "bash",
+            "statusMessage": "keel turn gate",
+            "timeout": 180,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook subagent-stop",
+            "shell": "bash",
+            "statusMessage": "subagent tree gate",
+            "timeout": 120,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook user-prompt",
+            "shell": "bash",
+            "statusMessage": "route-first checklist",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "outputStyle": "keel",
   "permissions": {
     "deny": [
       "Skill(systems-engineering)",
@@ -11,63 +93,6 @@
       "Skill(critic-premortem)",
       "Skill(critic-stakeholder)",
       "Skill(critic-traceability)"
-    ]
-  },
-  "outputStyle": "keel",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook user-prompt || true",
-            "timeout": 30,
-            "statusMessage": "route-first checklist"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook post-edit || true",
-            "timeout": 120,
-            "statusMessage": "in-loop edit gate"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook stop || true",
-            "timeout": 180,
-            "statusMessage": "in-loop honest-state gate"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { [ -x ./target/release/keel.exe ] && K=./target/release/keel.exe; }; [ -n \"$K\" ] || { [ -x ./target/release/keel ] && K=./target/release/keel; }; [ -n \"$K\" ] && \"$K\" hook pre-bash || true",
-            "timeout": 15,
-            "statusMessage": "shell-adaptation advisory"
-          }
-        ]
-      }
     ]
   }
 }

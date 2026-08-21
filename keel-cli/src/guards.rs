@@ -1601,8 +1601,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 40] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder"];
+pub const GUARD_NAMES: [&str; 41] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2068,6 +2068,41 @@ pub fn scaffold_placeholder(root: &Path) -> GuardReport {
     GuardReport { name: "scaffold-placeholder", scanned, warnings: Vec::new(), violations }
 }
 
+/// Guard 41: the keel-owned `.claude/` enforcement surface matches this binary's generator
+/// (D0174/P0.2). The check IS `keel sync-claude --check` — one implementation, one surface.
+///
+/// A project with NO `.claude/` directory has not adopted the in-loop surface and passes with a
+/// note (CLI + commit/CI gates remain its enforcement; the D0186 harness-support matrix states
+/// this). Version skew is a WARNING ("regenerate"), never a violation — the entries may be
+/// semantically current under an older stamp. Drift in the keel-owned subset is a violation:
+/// a mutated hook command is a silently weakened control (K7).
+#[must_use]
+pub fn claude_surface_drift(root: &Path) -> GuardReport {
+    if !root.join(".claude").exists() {
+        return GuardReport { name: "claude-surface-drift", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    }
+    match crate::claude_surface::sync_claude(root, true) {
+        Ok(r) => {
+            let warnings = r
+                .version_skew
+                .map(|(old, new)| vec![format!("surface stamped by generator {old}, binary is {new} — run `keel sync-claude` (regenerate obligation)")])
+                .unwrap_or_default();
+            GuardReport {
+                name: "claude-surface-drift",
+                scanned: r.registry_count + 2, // settings.json + output style + the skills
+                warnings,
+                violations: r.drift,
+            }
+        }
+        Err(e) => GuardReport {
+            name: "claude-surface-drift",
+            scanned: 0,
+            warnings: Vec::new(),
+            violations: vec![format!("cannot evaluate the surface: {e}")],
+        },
+    }
+}
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2229,6 +2264,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "identity-well-formed" => Some(identity_well_formed(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
+        "claude-surface-drift" => Some(claude_surface_drift(root)), // hard (D0174/K7) — a mutated hook command is a silently weakened control
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

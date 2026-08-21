@@ -161,7 +161,7 @@ frozen (modify it only by out-of-band Decision).
 ```
 keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
-keel guard             # all 40 forward guards — see .engine/docs/guards.md
+keel guard             # all 41 forward guards — see .engine/docs/guards.md
 keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder (~0.35s)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
@@ -186,10 +186,17 @@ constructs the kernel rejects, and never blocks. Its number is tracked as `confo
 (`keel indicators`) rather than gated, because a rejection may be the pilot kernel's gap rather than
 ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 
-In-loop gating (D0128/D0130/D0134): `keel hook post-edit` runs the fast tier after each `.sysml` edit;
-`keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is dishonest;
-`keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) — **advisory, never
-blocking**, and silent unless it has something to say. When the model is GREEN, `hook stop` also advises
+In-loop gating (D0128/D0130/D0134/D0174): `keel hook post-edit` runs the fast tier after each `.sysml`
+edit; `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is
+dishonest; `keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) —
+**advisory, never blocking**, and silent unless it has something to say; `keel hook pre-write` guards
+the protected fact surfaces (deny in strict-profile projects, advisory here until P1 lands the tiered
+model — the pure-shell fallback denies when the binary is absent); `keel hook subagent-stop` gates a
+subagent only when the tree changed during its lifetime. Every hook fire appends one line to the
+machine-local fire-ledger (`.keel/metrics/hooks.jsonl`, D0180) — the single instrumentation path the
+hooks-actually-fired checks read. The whole `.claude/` surface is engine-generated: `keel sync-claude`
+regenerates the keel-owned subset in place (user entries survive), and `sync-claude --check` is the
+`claude-surface-drift` guard. When the model is GREEN, `hook stop` also advises
 (never blocks) if items are waiting on the human and no console answers on 127.0.0.1:7777 — the human's
 oversight lens being down is not dishonest state, but leaving it down while their queue fills is a
 failure the turn boundary can see and I cannot be trusted to remember (issue150). All live in the binary — no extra runtime.
