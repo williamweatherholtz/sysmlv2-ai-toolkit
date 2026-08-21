@@ -225,4 +225,13 @@ package ProjectIntake20260820B {
     #DerivedFrom dependency from dcSprintScaffold to us019;
     #DerivedFrom dependency from dcDecisionFollowThroughView to us020;
     #DerivedFrom dependency from dcDecisionScaffoldingGuard to us020;
+
+    // -- ninth intake: the production-readiness proposal is ingested, all the way down --------------
+    part st017 : Statement {
+        :>> id = "f8f40512-6c1b-49bb-8fce-46cb7e5bf6bb";
+        :>> title = "ingest the production-readiness proposal and plan to implement every bit of it - needs, use cases, all the way down";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "you should have received a new backlog item from anotehr AI process here - C:/Users/WilliamWeatherholtz/claude_code/sysmlv2-ai-toolkit/docs/proposals/2026-08-21-production-readiness-design.md.  ingest it and let's carefully plan to impelemtn every bit of it.  new needs, use cases, ... all the way down.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
 }
