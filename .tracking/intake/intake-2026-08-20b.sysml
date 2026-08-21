@@ -162,4 +162,62 @@ package ProjectIntake20260820B {
 
     #DerivedFrom dependency from us018 to st012;
     #Implicates dependency from us018 to issue194;
+
+    // -- eighth intake: the noted needs-work verdicts from the first full deck review (2026-08-21) --
+    part st013 : Statement {
+        :>> id = "c5ba3e58-2a70-4b17-9f24-85fe03ad7cd0";
+        :>> title = "UUIDs should be minted programmatically, not by AI diligence";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "we should be programatically creating UUIDs, not via AI diligence";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+    part st014 : Statement {
+        :>> id = "d6cb4f69-3b81-4c28-a035-96af14be8de1";
+        :>> title = "whether unguarded process assertions matter depends on what is being asserted";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "depends on what is being asserted.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+    part st015 : Statement {
+        :>> id = "e7dc5a7a-4c92-4d39-b146-a7ba25cf9ef2";
+        :>> title = "decisions are landing without their downstream scaffolding - backlog items, user stories, verification";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "because the scaffolding under a decision isn't being made - is there no downstream backlog items?  user stories?  verification test cases to those items?  sounds like we're not following processes again.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+    part st016 : Statement {
+        :>> id = "f8ed6b8b-5da3-4e40-c257-b8cb36da0f03";
+        :>> title = "sparse actualHours reported as discipline is more process ignorance";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> text = "again more process ignorance";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-21"; :>> channel = StatementChannel::chat;
+    }
+
+    part us019 : UserStory {
+        :>> id = "0a1f7c92-6eb4-4f51-8368-c9dc47eb1014";
+        :>> title = "the engine mints identity; no write path depends on an AI generating a UUID by hand";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "every id minted programmatically - the write API already assigns ids, and the paths where an AI authors items directly (backlog entries, sprints, decisions) get a keel command or template that mints them";
+        :>> soThat = "identity correctness stops depending on model diligence, which is the same class of vigilance D0047 says is not a control - guards 37/38 catch absence and malformation after the fact, but nothing prevents authoring one by hand";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture: their note on issue170. The gap is the DIRECT-AUTHORING paths: write-API writes already mint ids (uuid v4 in write.rs), but sprint files, backlog items, and decisions are authored as text where the AI invents each uuid - two were mangled, which is what issue170 recorded. Candidate shape: `keel new sprint|item|decision` scaffolding with minted ids, or `keel mint [n]` for use inside authoring scripts.";
+    }
+    part us020 : UserStory {
+        :>> id = "1b2a8da3-7fc5-4062-9479-daed58fc2125";
+        :>> title = "an accepted Decision carries its downstream scaffolding - backlog items, stories, and verification - or the gap is computed and visible";
+        :>> createdAt = "2026-08-21"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "the promise-to-work chain enforced: a Decision whose consequences promise artifacts must trace to backlog items / user stories, and those to verification, with the gaps surfaced as a computed view and the worst class guarded";
+        :>> soThat = "a Decision cannot promise an artifact that is never built with nothing noticing (issue174, which I accepted-with-note), and process conformance is checked by the engine rather than asserted by the AI";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "process: their issue174 note, verbatim in st015, plus st014 (the guard question depends on WHAT is asserted) and st016 (sparse actualHours reported as discipline). These three notes share one root: the engine asserts process-following in places where nothing computes it. Existing partial coverage: decision-requirement-link (warning-only), verification-trace (warning-only), keel hardening decision-follow-through lens. The work: decide with the human what is being asserted per D0173-style proposal, then promote the right subset from warning to computed-view-plus-guard. Routes to a proposed Decision before any guard changes (D0070).";
+    }
+
+    #DerivedFrom dependency from us019 to st013;
+    #DerivedFrom dependency from us020 to st014;
+    #DerivedFrom dependency from us020 to st015;
+    #DerivedFrom dependency from us020 to st016;
+    #Implicates dependency from us019 to issue170;
+    #Implicates dependency from us020 to issue174;
 }

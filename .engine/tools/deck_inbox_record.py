@@ -53,8 +53,12 @@ def dedup(rows: list[dict]) -> list[dict]:
     return list(latest.values())
 
 
-def poll(read, want, tries: int = 20) -> bool:
-    """Poll a computed-view read until `want(value)` - D0167 reads after writes may serve stale."""
+def poll(read, want, tries: int = 60) -> bool:
+    """Poll a computed-view read until `want(value)` - D0167 reads after writes may serve stale.
+
+    60 tries (~30s): a 10s window expired mid-batch on the first real 16-write pull and reported a
+    correctly-recorded fact UNVERIFIED. A false UNVERIFIED costs a manual investigation; the label
+    stays honest either way, so the window errs long."""
     for _ in range(tries):
         try:
             if want(read()):
