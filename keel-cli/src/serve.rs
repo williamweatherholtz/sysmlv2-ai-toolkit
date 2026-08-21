@@ -633,7 +633,7 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         "act" => "act",
         "accept-risk" | "acceptRisk" => "acceptRisk",
         "dismiss" => "dismiss",
-        other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}'\"}}")).into_response(),
+        other => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict '{other}' - send one of act | accept-risk | dismiss (srK13: a refusal names the sanctioned path)\"}}")).into_response(),
     };
     let sha = git_head(&s.rootpath());
     // issue197/issue199, closed at the endpoint (D0178/K6): a disposition is a judgment, and the
@@ -1544,7 +1544,7 @@ async fn api_run_answer(State(s): State<AppState>, axum::Json(b): axum::Json<Run
     if known {
         ok_json(format!("{{\"ok\":true,\"id\":\"{}\"}}", b.id))
     } else {
-        (StatusCode::NOT_FOUND, "{\"error\":\"unknown ask id\"}".to_string()).into_response()
+        (StatusCode::NOT_FOUND, "{\"error\":\"unknown ask id - GET /api/run/asks for the live queue (srK13: a refusal names the sanctioned path)\"}".to_string()).into_response()
     }
 }
 

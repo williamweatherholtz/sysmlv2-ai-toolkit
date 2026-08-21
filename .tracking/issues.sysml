@@ -2361,4 +2361,37 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcActorRebindLedger to issue205;
+
+    part issue206 : Issue {
+        :>> id = "9a95f749-b0f1-459c-948a-fcbc9fdc0eea";
+        :>> title = "A launched run's gate verdict is not re-derivable from committed truth: the fire-ledger input is machine-local";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 3 (srK15TreeDerivable x completeness). finish() pushes a gate-reddening problem when no fire-ledger line follows the spawn; the ledger is gitignored, so no other clone can re-derive the verdict. K3's accidental-enforcement-loss check and K15's tree-derivability contradict inside one verdict; the resolver states both reconciliation options.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRunGateTreeDerivable to issue206;
+
+    part issue207 : Issue {
+        :>> id = "4850545b-966a-4b17-a9c5-1811d740648d";
+        :>> title = "Successful override consumptions are uncounted: the ledger line exists only on the failure path";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 3 (srK14MeasuredEffect x completeness). consume_override records the tracked obligation and ledger-emits only when that write FAILS, so enforcement-report's override counter counts unsynced failures and misses every normal consumption - a promotion review citing the report would under-read override pressure structurally.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcOverrideCountedOnSuccess to issue207;
+
+    part issue208 : Issue {
+        :>> id = "0b604c90-d017-4153-a1a5-92612d971f77";
+        :>> title = "Two refusals named no sanctioned path (unknown-verdict, unknown-ask-id)";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 3 (srK13DenyAndProvide x completeness). /api/disposition's unknown-verdict 400 named the bad value but not the valid set; /api/run/answer's unknown-ask-id 404 pointed nowhere. Both violate srK13's letter (every refusal names an available sanctioned path). FIXED in the same sprint: the messages now name act|accept-risk|dismiss and GET /api/run/asks. Recorded as a finding rather than a silent patch (D0172).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from storyCritiquePass3 to issue208;
 }
