@@ -2284,4 +2284,15 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from d0186 to issue198;
+
+    part issue199 : Issue {
+        :>> id = "7d327b5b-5117-4cf5-a62e-1eccdd9cad3c";
+        :>> title = "The local deck's finding tap recorded the session AI as judge - the issue197 class on the local path";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human dispositioned 19 findings on the local console deck; every record landed judgedBy=claudeFable5 because saveLocal's finding body omitted judged_by, so the server resolved the machine binding - the exact defect issue197 fixed on the INBOX path, unfixed on the LOCAL path (the sprint-380 fix went into the recorder, not the page). Guard-invisible again: D0165's delegation makes an AI judge legal. Caught by the out-of-band diff review; the 19 records corrected to the human who tapped, before commit; the page now sends judged_by=HUMAN with a substantive default rationale. THE CLASS RULE, third occurrence, now final: EVERY write surface that carries a human gesture names that human in the request body - the actor is data the gesture carries, never ambient state any layer resolves.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckFindingJudgedBy to issue199;
 }

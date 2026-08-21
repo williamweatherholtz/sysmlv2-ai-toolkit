@@ -377,7 +377,7 @@ function saveLocal(card,verdict){
   if(cls==='finding'){
     if(verdict==='maybe'){say(card,'noted - needs-work carries no disposition; the note travels with your next verdict');return;}
     url='/api/disposition';
-    body={finding:name,verdict:(verdict==='accept'?'act':'dismiss'),rationale:(note||'via deck'),judged_at:today};
+    body={finding:name,verdict:(verdict==='accept'?'act':'dismiss'),rationale:(note||'tapped on the deck by '+HUMAN+' with no per-item note'),judged_at:today,judged_by:HUMAN};
   } else if(cls==='acceptance'){
     if(verdict==='maybe'){say(card,'noted - tell Claude what to change via the note, then Sign or Reject');return;}
     if(!HUMAN){say(card,'no registered human reviewer - cannot sign from the deck');return;}
