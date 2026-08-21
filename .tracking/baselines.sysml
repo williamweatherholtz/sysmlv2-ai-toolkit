@@ -82,4 +82,15 @@ package ProjectBaselines {
         :>> commit = "aba9e6f";
         :>> purpose = "toolchainWatch: all three feature areas deferred (D0041). baselineView: Release schema + baselines.sysml + report.py Baselines tab (D0042).";
     }
+    // v0.1.0 backfill (D0191): the tag predates the Release-recording convention; guard 43's
+    // first run caught the gap. The commit is the tag's own, read from git - recorded, not invented.
+    part release010 : Release {
+        :>> id = "4ec95968-eaff-48cd-92b8-610a7c427670";
+        :>> title = "v0.1.0 - first tagged release";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> commit = "a0f5afc";
+        :>> purpose = "The first tagged release, tagged 2026-06 at the v0.1.0 release-prep commit. Recorded retroactively on guard 43 (release-recorded) catching that the tag had no authored Release item.";
+    }
+
 }

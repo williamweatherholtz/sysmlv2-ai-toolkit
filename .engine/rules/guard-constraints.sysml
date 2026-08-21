@@ -48,4 +48,8 @@ package EngineGuardConstraints {
 
     // doc-sync
     constraint def docSync;
+
+    // D0191: the admitted-gap guards, unit-owned by deploy and actor-enrollment.
+    constraint def releaseRecorded;
+    constraint def enrollmentBinding;
 }

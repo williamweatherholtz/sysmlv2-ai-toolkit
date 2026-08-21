@@ -1618,8 +1618,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 42] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding"];
+pub const GUARD_NAMES: [&str; 44] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2207,6 +2207,128 @@ pub fn decision_scaffolding(root: &Path) -> GuardReport {
     GuardReport { name: "decision-scaffolding", scanned, warnings, violations: Vec::new() }
 }
 
+/// Guard 43 (D0191, WARNING tier, owned by the `deploy` unit).
+///
+/// Every local version tag has a `Release` item naming it whose recorded commit matches the tag's commit — "a version was
+/// recorded" and "the reconciled version matches the tag" were process-enforcement.toml's own
+/// admitted checkable claims, unguarded until now. Zero tags scans zero and passes, so a project
+/// without releases (or without the deploy unit) is untouched.
+#[must_use]
+pub fn release_recorded(root: &Path) -> GuardReport {
+    let tags: Vec<String> = crate::gitx::git()
+        .arg("-C")
+        .arg(root)
+        .arg("tag")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.starts_with('v') && l[1..].starts_with(|c: char| c.is_ascii_digit()))
+        .map(str::to_string)
+        .collect();
+    // Every authored Release block: (declaring file, title, commit).
+    let mut releases: Vec<(String, String)> = Vec::new(); // (title, commit)
+    for f in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let mut title = String::new();
+        let mut commit = String::new();
+        let mut in_release = false;
+        for line in text.lines() {
+            let l = line.trim_start();
+            if l.starts_with("part ") && l.contains(": Release {") {
+                in_release = true;
+                title.clear();
+                commit.clear();
+            }
+            if in_release {
+                if let Some(v) = l.strip_prefix(":>> title = \"") {
+                    title = v.split('"').next().unwrap_or("").to_string();
+                }
+                if let Some(v) = l.strip_prefix(":>> commit = \"") {
+                    commit = v.split('"').next().unwrap_or("").to_string();
+                }
+                if l.trim_end() == "}" {
+                    in_release = false;
+                    releases.push((title.clone(), commit.clone()));
+                }
+            }
+        }
+    }
+    let mut warnings = Vec::new();
+    for tag in &tags {
+        let Some((_, recorded)) = releases.iter().find(|(title, _)| title.contains(tag.as_str())) else {
+            warnings.push(format!(
+                "tag `{tag}` has NO Release item naming it — what shipped is not an authored fact (D0191; record it in .tracking/baselines.sysml)"
+            ));
+            continue;
+        };
+        let tag_commit = crate::gitx::git()
+            .arg("-C")
+            .arg(root)
+            .args(["rev-parse", "--short", &format!("{tag}^{{commit}}")])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+        if !tag_commit.is_empty() && !recorded.is_empty() && !tag_commit.starts_with(recorded.as_str()) && !recorded.starts_with(tag_commit.as_str()) {
+            warnings.push(format!(
+                "tag `{tag}` points at {tag_commit} but its Release item records commit {recorded} — the recorded release and the shipped tag disagree (D0191)"
+            ));
+        }
+    }
+    GuardReport { name: "release-recorded", scanned: tags.len(), warnings, violations: Vec::new() }
+}
+
+/// Guard 44 (D0191, WARNING tier, owned by the `actor-enrollment` unit).
+///
+/// When a machine binding (`.keel/actor`) exists, its name resolves to a registered `Person`, or to
+/// an `Actor` carrying a declared kind. Until now NOTHING validated the binding file — a name that is unregistered or
+/// kindless surfaced only when some downstream write refused. An absent binding scans zero: binding
+/// is per-machine and optional until a write needs an actor.
+#[must_use]
+pub fn enrollment_binding(root: &Path) -> GuardReport {
+    let Some(bound) = std::fs::read_to_string(root.join(crate::actor::BINDING_PATH))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    else {
+        return GuardReport { name: "enrollment-binding", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    };
+    let actors = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")).unwrap_or_default();
+    let mut warnings = Vec::new();
+    let decl = actors.lines().find_map(|line| {
+        let l = line.trim_start();
+        l.strip_prefix("part ")
+            .and_then(|r| r.split_once(':'))
+            .filter(|(n, _)| n.trim() == bound)
+            .map(|(_, after)| after.trim_start().to_string())
+    });
+    match decl {
+        None => warnings.push(format!(
+            "machine binding `.keel/actor` names `{bound}`, which is NOT a registered actor — enroll it (`keel enroll`) or rebind (`keel actor set`) before it strands a write (D0191)"
+        )),
+        Some(after) if after.starts_with("Person") => {}
+        Some(after) => {
+            // An Actor must carry a kind; single-line and block forms both keep the kind within
+            // the declaring region, so scan from the declaration to the next `part `.
+            let region = actors
+                .split_once(&format!("part {bound}"))
+                .map(|(_, rest)| rest.split("\npart ").next().unwrap_or(rest).to_string())
+                .unwrap_or_default();
+            if !region.contains("ActorKind::") {
+                warnings.push(format!(
+                    "machine binding `.keel/actor` names `{bound}` ({}), which declares NO kind — an actor whose kind is unstated defeats the human/AI attestation distinction (D0106/D0191)",
+                    after.split_whitespace().next().unwrap_or("?")
+                ));
+            }
+        }
+    }
+    GuardReport { name: "enrollment-binding", scanned: 1, warnings, violations: Vec::new() }
+}
+
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2370,6 +2492,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
         "claude-surface-drift" => Some(claude_surface_drift(root)), // hard (D0174/K7) — a mutated hook command is a silently weakened control
         "decision-scaffolding" => Some(decision_scaffolding(root)), // WARNING-tier (D0188, composed with D0180) — an accepted promise chartering no work
+        "release-recorded" => Some(release_recorded(root)), // WARNING-tier (D0191, deploy unit) — a shipped tag with no authored Release item
+        "enrollment-binding" => Some(enrollment_binding(root)), // WARNING-tier (D0191, actor-enrollment unit) — a machine binding naming an unregistered or kindless actor
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

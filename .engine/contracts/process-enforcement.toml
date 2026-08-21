@@ -48,10 +48,6 @@ reason = "Onboarding a reader into the engine. Its output is a person's understa
 checkable = false
 reason = "Traversal and recall of the model as a graph. Whether the right thing was recalled is a judgment about relevance; D0161's retrieval index is the artifact, and its EXISTENCE is now checked by decision-artifacts.toml rather than by a process guard."
 
-[actorEnrollment]
-checkable = true
-reason = "UNDER-GUARDED, not unguardable, and this is a real gap. `keel enroll` already verifies the gate as its last step, so the checkable claims — an enrolled actor is registered, has a kind, and is bound on the machine — are all text properties. The `actors` guard covers registration but is CORE rather than owned by this unit, which is why the unit reports zero. Fixing the ownership is tracked separately; recording it as checkable is the honest state."
-
 [distributedCollaboration]
 checkable = true
 reason = "UNDER-GUARDED. D0108's ownership rule — a non-owner ADDS or SUPERSEDES and never overwrites in place — is a property of a diff against git history, which is mechanical. Nothing checks it today. This is the entry I would most expect a reviewer to act on."
@@ -59,10 +55,6 @@ reason = "UNDER-GUARDED. D0108's ownership rule — a non-owner ADDS or SUPERSED
 [migration]
 checkable = true
 reason = "UNDER-GUARDED. D0067's gated expand/migrate/contract with a committed transform and a dry run reconciling control totals is a sequence of artifacts, all of which exist or do not. `marker-census` computes exactly the control total the process requires and is not bound to it."
-
-[deploy]
-checkable = true
-reason = "UNDER-GUARDED. A release's claims — a version was recorded, a reconciled version matches the tag — are text properties over authored items."
 
 [diagramView]
 checkable = false

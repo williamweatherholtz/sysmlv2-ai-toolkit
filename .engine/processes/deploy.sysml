@@ -6,12 +6,15 @@
 package EngineDeploy {
     private import EngineElement::*;     // Cadence / Owner
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0191: the guard this process owns
 
     action deploy : Process {
         :>> id = "0d730001-0814-5301-9b3e-000000230001";
         :>> title = "Release (cut, publish, record)";
         :>> purpose = "Turn a green trunk into an obtainable, recorded release: a reconciled version, a full gate, a tag that CI builds and publishes for every platform, and a `Release` item so what shipped is an AUTHORED FACT whose contents are computed rather than remembered. Cadence is per-milestone, not per-sprint — a release marks a coherent capability step, and cutting one per sprint would make the tag meaningless.";
         :>> cadence = Cadence::adHoc;
+        // D0191: the release claims (a version recorded, reconciled with its tag) are guarded, unit-owned.
+        assert constraint enforcesReleaseRecorded : releaseRecorded;
     }
 
     action relReconcileVersion : ProcessStep {

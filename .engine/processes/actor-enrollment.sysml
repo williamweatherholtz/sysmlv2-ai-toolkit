@@ -16,12 +16,15 @@
 package EngineActorEnrollment {
     private import EngineElement::*;     // Cadence / Owner
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0191: the guard this process owns
 
     action actorEnrollment : Process {
         :>> id = "0d5f0001-0812-4f01-9b3e-00000000f001";
         :>> title = "Actor enrollment (identity, kind, role, binding, gate)";
         :>> purpose = "Take an uninitiated contributor — human or AI, on a machine that has never run the engine — to the point of being able to author truthfully: acting identity established, kind and role recorded, the actor registered, the machine bound to that identity so later facts are attributed correctly, and the local gate proven to run. Self-service by design (supervisors are asynchronous, D0129), and REFUSING rather than enrolling into indeterminate identity or a silently-dead gate. This is the process that makes provenance true (nProvenanceTrue) and authority checkable (nAuthorityFollowsRecordedKind); every other guarantee depends on it.";
         :>> cadence = Cadence::adHoc;
+        // D0191: the machine binding resolves to a registered actor with a kind - guarded, unit-owned.
+        assert constraint enforcesEnrollmentBinding : enrollmentBinding;
     }
 
     action enIdentify : ProcessStep {
