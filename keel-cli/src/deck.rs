@@ -354,7 +354,10 @@ function saveArtifact(card,verdict){
   ART.then(function(a){
     if(!a||!a.sync){say(card,'not saved - this view cannot write');return;}
     return a.sync(function(){ if(card.getAttribute('data-verdict')!==verdict){card.setAttribute('data-verdict',verdict);} })
-      .then(function(){say(card,'saved');},
+      .then(function(){say(card,'saved');
+        setTimeout(function(){
+          if(card.getAttribute('data-verdict')!==verdict){say(card,'REVERTED - tell Claude you saw this');dbg('revert on '+card.getAttribute('data-name'));}
+        },1200);},
             function(err){say(card,'NOT saved ('+((err&&err.code)||'unknown')+')');dbg('sync rejected: '+((err&&err.code)||'?'));});
   }).catch(function(e){say(card,'not saved');dbg('sync threw: '+e);});
 }
