@@ -2350,4 +2350,15 @@ package ProjectIssues {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcHumanChannelDelegationRule to issue204;
+
+    part issue205 : Issue {
+        :>> id = "e2790cb8-87e3-4171-80da-5c555839b7cd";
+        :>> title = "Actor rebinding - a weakening class srK07 itself names - leaves no durable record";
+        :>> createdAt = "2026-08-21";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by critique pass 2 (srK07RecordedWeakening x completeness). keel actor set validates against the registry and writes the machine-local gitignored .keel/actor, and nothing else: no ledger event, no tracked fact, no visibility surface. The harness ask-tier covers an AGENT invoking it; a human or bypass-mode invocation is invisible, and guard 44 checks only the binding's current value, never the transition. srK07's own words: weakening shall leave 'always both a record and visibility'.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcActorRebindLedger to issue205;
 }
