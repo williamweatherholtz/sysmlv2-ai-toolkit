@@ -43,6 +43,7 @@ pub mod migrate;
 mod json;
 pub mod fingerprint;
 pub mod perf;
+pub mod pm;
 pub mod orient;
 pub mod process_cmd;
 pub mod claude_surface;

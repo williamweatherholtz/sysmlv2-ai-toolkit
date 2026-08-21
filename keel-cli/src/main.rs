@@ -1573,6 +1573,26 @@ fn cmd_override(args: &[String]) -> i32 {
     0
 }
 
+
+/// `keel enforcement-report [ROOT]` (D0180/K14) — fires, blocks, overrides, red-yields, and the
+/// adherence trend, computed from the machine-local fire-ledger. Promotion decisions cite this.
+fn cmd_enforcement_report(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel enforcement-report [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::pm::enforcement_report(&root) {
+        Ok(j) => {
+            println!("{j}");
+            0
+        }
+        Err(e) => {
+            eprintln!("keel enforcement-report: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_hardening(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel hardening [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -3029,6 +3049,7 @@ const CATALOGUE: &[&str] = &[
     "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
     "  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift (D0174)",
     "  override <path> --reason R   arm a single-use, path-bound write unlock; consumption records an obligation (D0176)",
+    "  enforcement-report [ROOT]    fires/blocks/overrides/red-yields from the fire-ledger - promotions cite this (D0180)",
     "  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
     "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
     "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary (D0134/D0174)",
@@ -3161,6 +3182,7 @@ fn main() {
         Some("new") => cmd_new(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
         Some("override") => cmd_override(rest),
+        Some("enforcement-report") => cmd_enforcement_report(rest),
         Some("decision-follow-through") => cmd_decision_follow_through(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),

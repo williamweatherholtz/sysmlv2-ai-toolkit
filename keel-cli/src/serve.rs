@@ -1653,6 +1653,7 @@ fn computed_binding(cmd: &str) -> Option<ComputedFn> {
         "orient" => |root: &Path| Ok(crate::orient::compute(root).to_json()),
         "dispositions" => crate::view::dispositions,
         "decision-follow-through" => crate::view::decision_follow_through,
+        "enforcement-report" => crate::pm::enforcement_report,
         "authority-queue" => crate::view::authority_queue,
         "sitting-coverage" => crate::view::sitting_coverage,
         "open-issues" => crate::view::open_issues,
