@@ -3120,4 +3120,13 @@ package ProjectCritiques {
     part wellFormedStoryHRev1R1 : TestResult { :>> id = "c99df376-0442-4fe2-801c-3df992a9f937"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "92254e1"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "wweatherholtz"; }
     #Verify dependency from wellFormedStoryHRev1 to wellFormedStory;
     #Covers dependency from wellFormedStoryHRev1 to wellFormedStory;
+    verification issue160Disp1 : Test { :>> id = "b69c2c33-e840-4e06-afd2-7b85dc014b65"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::dismiss; :>> procedureText = "wweatherholtz in chat, 2026-08-21, of the deck's remaining queue: 'these are super irrelevant. proceed until there's a real decision for me, not just issues with no direction.' Dismissed on their explicit word."; }
+    part issue160Disp1R1 : TestResult { :>> id = "93cd54f5-6784-47bc-8425-c3cf49b78352"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue160Disp1 to issue160;
+    verification issue164Disp1 : Test { :>> id = "26c3fe8c-740f-47b0-b572-f635840c5a85"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::dismiss; :>> procedureText = "wweatherholtz in chat, 2026-08-21, of the deck's remaining queue: 'these are super irrelevant. proceed until there's a real decision for me, not just issues with no direction.' Dismissed on their explicit word."; }
+    part issue164Disp1R1 : TestResult { :>> id = "93d5442c-97a5-43ac-a222-c378624955c9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue164Disp1 to issue164;
+    verification issue199Disp1 : Test { :>> id = "d2980a16-fb24-4a16-ac7c-4509cf8c938b"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::dismiss; :>> procedureText = "wweatherholtz in chat, 2026-08-21, of the deck's remaining queue: 'these are super irrelevant. proceed until there's a real decision for me, not just issues with no direction.' Dismissed on their explicit word."; }
+    part issue199Disp1R1 : TestResult { :>> id = "f45abe13-63a9-4d24-9d3a-d9248692433d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue199Disp1 to issue199;
 }
