@@ -11,7 +11,7 @@ package LiveAllocations {
     // kernel invariants -> their carrying units
     allocate srK01ValidatedChannel to ceWriteApi;
     allocate srK02FailLoud to ceHookDispatch;
-    allocate srK05ComputedCompletion to ceComputedViews;
+    allocate srK05ComputedCompletion to ceViewCore;
     allocate srK06HumanChannel to ceServeJudgment;
     allocate srK06HumanChannel to ceWriteApi;
     allocate srK07RecordedWeakening to ceHookDispatch;

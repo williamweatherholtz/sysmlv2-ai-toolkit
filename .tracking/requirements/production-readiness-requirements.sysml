@@ -225,4 +225,7 @@ package ProductionReadinessRequirements {
         :>> kind = RequirementKind::functional;
     }
 
+    // srK16's Need root (upstream fleshing, sprint 418): the release-discipline Need owns the outward boundary.
+    satisfy nReleaseDiscipline by srK16OutwardPublishGated;
+
 }

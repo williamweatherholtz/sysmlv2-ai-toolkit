@@ -235,11 +235,29 @@ package ProjectCodeRegistry {
     // verdict over the merged tree IS the feedback land's retry loop consumes.
     #Feedback dependency from ceGuards to ceSyncIntegration;
     #Controls dependency from ceServeJudgment to ceWriteApi;
-    #Feedback dependency from ceComputedViews to ceServeJudgment;
+    #Feedback dependency from ceViewCore to ceServeJudgment;
     #Controls dependency from ceHookDispatch to ceWriteApi;
     #Feedback dependency from ceGuards to ceHookDispatch;
     #Controls dependency from ceLauncher to ceHookDispatch;
     #Feedback dependency from ceGuards to ceLauncher;
     #Feedback dependency from ceAuditHistory to ceSyncIntegration;
+
+    // ---- Sprint 418 (dcViewRsRestructure): the #Restructure flag on ceComputedViews resolves by
+    // the split - view.rs (8159 lines, ~235 defs) became view/ with a model-core mod.rs plus four
+    // cohesive lens submodules (checks/critique/reports/staleness), pure move, 280 tests green,
+    // every caller untouched via re-exports. The flagged item is claudeOpus5's, so it is
+    // SUPERSEDED rather than edited (D0108); its historical #Feedback edge stays readable.
+    part ceViewCore : CodeElement {
+        :>> id = "6779df0e-334b-4549-9343-958fd4cad74d";
+        :>> title = "view/ - the model core (mod.rs) plus the split lens submodules";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "module";
+        :>> filePath = "keel-cli/src/view/mod.rs";
+        :>> riskClass = RiskClass::correctness;
+        :>> invariantSafety = InvariantSafety::checked;
+        :>> stpaRole = StpaRole::sensor;
+    }
+    #Supersede dependency from ceViewCore to ceComputedViews;
+    #Feedback dependency from ceViewCore to ceGuards;
 
 }
