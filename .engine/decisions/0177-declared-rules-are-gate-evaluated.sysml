@@ -1,4 +1,4 @@
-// D0177 (PROPOSED — NOT YET ACCEPTED) — D-P1b: declared rules are gate-evaluated - the modularity keystone
+// D0177 (status: the `status` field below is the truth) — D-P1b: declared rules are gate-evaluated - the modularity keystone
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0177Accept event on sign-off.
 package Decision0177 {

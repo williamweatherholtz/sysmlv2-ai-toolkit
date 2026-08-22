@@ -1,4 +1,4 @@
-// D0129 (PROPOSED — NOT YET ACCEPTED) — Operate keel as an asynchronous remote mostly-AI team:
+// D0129 (status: the `status` field below is the truth) — Operate keel as an asynchronous remote mostly-AI team:
 // two-lane integration, ancestry-preserving merges, true provenance, claimed work, actor enrollment.
 // Acceptance is a separate explicit human gate (method=confirmation, D0106): flip status + add the
 // d0129Accept event on sign-off. On acceptance, d0014 (main-only/no-branches) becomes superseded.

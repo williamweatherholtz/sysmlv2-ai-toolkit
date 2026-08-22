@@ -1,4 +1,4 @@
-// D0185 (PROPOSED — NOT YET ACCEPTED) — D-P3b (direction, not scope): complete the declarative-controls migration when a trigger fires
+// D0185 (status: the `status` field below is the truth) — D-P3b (direction, not scope): complete the declarative-controls migration when a trigger fires
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0185Accept event on sign-off.
 package Decision0185 {

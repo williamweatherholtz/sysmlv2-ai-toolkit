@@ -1,4 +1,4 @@
-// D0186 (PROPOSED — NOT YET ACCEPTED) — D-P2 (direction, not scope): an MCP surface is a future binding of deny-and-provide and harness portability, trigger-gated
+// D0186 (status: the `status` field below is the truth) — D-P2 (direction, not scope): an MCP surface is a future binding of deny-and-provide and harness portability, trigger-gated
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0186Accept event on sign-off.
 package Decision0186 {

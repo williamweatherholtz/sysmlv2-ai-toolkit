@@ -1,5 +1,5 @@
 // =====================================================================
-// D0124 (PROPOSED — NOT YET ACCEPTED) — the viewer's encoding channels are a MODULAR REGISTRY.
+// D0124 (status: the `status` field below is the truth) — the viewer's encoding channels are a MODULAR REGISTRY.
 // Adding an encoding type = adding one channel module; the panel/apply/legend are generated from the
 // registry (no channel-specific branches). Refines D0120 (encoding-spec design); serves srEncodingModular
 // (N-18). Human-directed 2026-07-15 ("these encoding types should be modular... add different types going

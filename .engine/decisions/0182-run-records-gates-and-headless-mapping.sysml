@@ -1,4 +1,4 @@
-// D0182 (PROPOSED — NOT YET ACCEPTED) — D-P5b: run records, post-run gates, the headless-ask mapping, and single-writer-per-tree during a run
+// D0182 (status: the `status` field below is the truth) — D-P5b: run records, post-run gates, the headless-ask mapping, and single-writer-per-tree during a run
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0182Accept event on sign-off.
 package Decision0182 {

@@ -1,4 +1,4 @@
-// D0176 (PROPOSED — NOT YET ACCEPTED) — D-P1a: API-owned facts are written only through the write API; override unlocks reach every tier and are recorded
+// D0176 (status: the `status` field below is the truth) — D-P1a: API-owned facts are written only through the write API; override unlocks reach every tier and are recorded
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0176Accept event on sign-off.
 package Decision0176 {

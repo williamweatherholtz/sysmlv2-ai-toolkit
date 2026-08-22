@@ -1,4 +1,4 @@
-// D0175 (PROPOSED — NOT YET ACCEPTED) — D-P0b: the scaffold points at the existing release channel; distribution scope is fenced to the documented install path
+// D0175 (status: the `status` field below is the truth) — D-P0b: the scaffold points at the existing release channel; distribution scope is fenced to the documented install path
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0175Accept event on sign-off.
 package Decision0175 {

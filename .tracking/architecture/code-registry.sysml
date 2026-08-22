@@ -174,4 +174,60 @@ package ProjectCodeRegistry {
     // the computed views to do it. The #Feedback edge is the return path.
     #Controls dependency from ceGuards to ceWriteApi;
     #Feedback dependency from ceComputedViews to ceGuards;
+    // ---- Panel R1 completions (SE finding 3, ARCH finding 6, AERO finding 4): the registry's own
+    // criterion is 'units whose failure would matter', and it omitted the HUMAN channel, the
+    // enforcement backstop, the git spawn point, the hook dispatch, and the run lifecycle - the AI
+    // write channel was risk-classified while the human control loop was not. Added by claudeFable5
+    // (D0108: a non-owner ADDS items).
+    part ceServeJudgment : CodeElement {
+        :>> id = "5b699a20-9f20-4f0f-8c6f-6ceca731e0b2";
+        :>> title = "serve.rs - the human-judgment write endpoints and oversight console";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "module";
+        :>> filePath = "keel-cli/src/serve.rs";
+        :>> riskClass = RiskClass::security;
+        :>> invariantSafety = InvariantSafety::enforced;
+        :>> stpaRole = StpaRole::actuator;
+    }
+    part ceAuditHistory : CodeElement {
+        :>> id = "3a37e521-7c23-4a4c-ab4f-a63c596dc6d3";
+        :>> title = "history.rs - tree-derived gate verdicts over pushed ranges (the K15 backstop)";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "module";
+        :>> filePath = "keel-cli/src/history.rs";
+        :>> riskClass = RiskClass::correctness;
+        :>> invariantSafety = InvariantSafety::enforced;
+        :>> stpaRole = StpaRole::sensor;
+    }
+    part ceGitSpawn : CodeElement {
+        :>> id = "839ca144-5679-4546-bf31-48a4d065f65a";
+        :>> title = "gitx.rs - the single git spawn point";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "module";
+        :>> filePath = "keel-cli/src/gitx.rs";
+        :>> riskClass = RiskClass::dataLoss;
+        :>> invariantSafety = InvariantSafety::checked;
+        :>> stpaRole = StpaRole::actuator;
+    }
+    part ceHookDispatch : CodeElement {
+        :>> id = "7252ae36-0cf4-4a80-811f-1606a4148e43";
+        :>> title = "main.rs cmd_hook - the in-loop enforcement dispatch (5 events + watchdog + fire-ledger)";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "function";
+        :>> filePath = "keel-cli/src/main.rs";
+        :>> riskClass = RiskClass::correctness;
+        :>> invariantSafety = InvariantSafety::checked;
+        :>> stpaRole = StpaRole::controller;
+    }
+    part ceLauncher : CodeElement {
+        :>> id = "484c45da-26fe-48a8-9713-04c0a47c12f9";
+        :>> title = "launcher.rs - the run lifecycle (dirty refusal, spawn snapshot, post-run gate, run records)";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> kind = "module";
+        :>> filePath = "keel-cli/src/launcher.rs";
+        :>> riskClass = RiskClass::correctness;
+        :>> invariantSafety = InvariantSafety::enforced;
+        :>> stpaRole = StpaRole::controller;
+    }
+
 }

@@ -1,4 +1,4 @@
-// D0179 (PROPOSED — NOT YET ACCEPTED) — D-P1d: control-plane writes - including actor-identity mutation - are approval-gated and recorded (kernel invariant K7)
+// D0179 (status: the `status` field below is the truth) — D-P1d: control-plane writes - including actor-identity mutation - are approval-gated and recorded (kernel invariant K7)
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0179Accept event on sign-off.
 package Decision0179 {

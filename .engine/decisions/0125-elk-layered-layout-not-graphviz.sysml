@@ -1,5 +1,5 @@
 // =====================================================================
-// D0125 (PROPOSED — NOT YET ACCEPTED) — the explorer graph uses a MATURE LAYERED layout (ELK, in
+// D0125 (status: the `status` field below is the truth) — the explorer graph uses a MATURE LAYERED layout (ELK, in
 // cytoscape), NOT Graphviz. The model is a DAG; force-directed (cose) scattered it (overlap/crossings/
 // fanout). ELK layered (Sugiyama) fixes that while keeping cytoscape's interactivity + the encoding's
 // manual positioning. Graphviz (viz.js) is browser-renderable but reserved for a future static export.

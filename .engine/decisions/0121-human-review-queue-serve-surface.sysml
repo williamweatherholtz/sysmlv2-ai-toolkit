@@ -1,5 +1,5 @@
 // =====================================================================
-// D0121 (PROPOSED — NOT YET ACCEPTED) — the HUMAN REVIEW QUEUE + acceptance surface in keel serve.
+// D0121 (status: the `status` field below is the truth) — the HUMAN REVIEW QUEUE + acceptance surface in keel serve.
 // A computed review-queue view lists user-gated items (proposed Decisions + pending confirmation
 // gates, ceremony-filtered); keel serve renders it at a URL (a "Review" tab) and RECORDS the human's
 // acceptance as fact via the write API. Realises the D0093 dual-surface human-oversight loop.

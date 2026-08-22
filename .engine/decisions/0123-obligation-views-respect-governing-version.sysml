@@ -1,5 +1,5 @@
 // =====================================================================
-// D0123 (PROPOSED — NOT YET ACCEPTED) — obligation-views respect creation-time GOVERNING-VERSION (no
+// D0123 (status: the `status` field below is the truth) — obligation-views respect creation-time GOVERNING-VERSION (no
 // grandfathering); sprint-ceremony phases (incl. retro) need NO human confirmation; declare `retro`
 // as a Delivery phase. Fixes issue068. Human-directed 2026-07-15 ("items should only be governed by
 // the process at the time of creation... historical work shouldn't be grandfathered into changed

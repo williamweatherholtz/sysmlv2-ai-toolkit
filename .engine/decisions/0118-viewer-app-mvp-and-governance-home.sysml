@@ -1,5 +1,5 @@
 // =====================================================================
-// D0118 (PROPOSED — NOT YET ACCEPTED) — the keel-viewer APP MVP architecture + the viewer program's
+// D0118 (status: the `status` field below is the truth) — the keel-viewer APP MVP architecture + the viewer program's
 // governance home. (a) The app is a BUILDLESS, generative static SPA over keel's committed API
 // (shape B / D0114, generative / D0117). (b) The viewer PROGRAM is governed in THIS (keel) repo,
 // where its Needs/Decisions already live; the sysmlv2-viewer repo holds the CODE deliverable only.

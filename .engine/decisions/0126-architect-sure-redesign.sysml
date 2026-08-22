@@ -1,4 +1,4 @@
-// D0126 (PROPOSED — NOT YET ACCEPTED) — Architect Sure — viewer redesign: drafting-register identity, browse-first discovery, computed displayLabel
+// D0126 (status: the `status` field below is the truth) — Architect Sure — viewer redesign: drafting-register identity, browse-first discovery, computed displayLabel
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0126Accept event on sign-off.
 package Decision0126 {

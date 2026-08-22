@@ -1,4 +1,4 @@
-// D0189 (PROPOSED — NOT YET ACCEPTED) — D0189: the deck-UX polish cluster is out of scope until the human reopens it
+// D0189 (status: the `status` field below is the truth) — D0189: the deck-UX polish cluster is out of scope until the human reopens it
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0189Accept event on sign-off.
 package Decision0189 {

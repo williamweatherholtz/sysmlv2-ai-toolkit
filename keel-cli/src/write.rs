@@ -1322,6 +1322,18 @@ pub fn record_decision(
     Ok((nnnn, format!(".engine/decisions/{filename}")))
 }
 
+/// Rewrite the scaffolded proposed-header comment on acceptance - the status FIELD is the truth;
+/// a prose restatement that contradicts it is the D0105 dual-truth class (panel R1, auto finding 5).
+fn rewrite_proposed_header(path: &Path) -> Result<(), WriteError> {
+    let text = std::fs::read_to_string(path)?;
+    let stale = "(PROPOSED \u{2014} NOT YET ACCEPTED)";
+    if text.contains(stale) {
+        let fixed = text.replace(stale, "(status: the `status` field below is the truth)");
+        write_atomic(path, fixed)?;
+    }
+    Ok(())
+}
+
 /// Accept a PROPOSED Decision (D0121 human review loop).
 ///
 /// Flips `status = DecisionStatus::proposed` to `accepted` and appends the required acceptance event — a
@@ -1354,6 +1366,9 @@ fn accept_decision_locked(
     note: &str,
 ) -> Result<String, WriteError> {
     refuse_ai_judgment(path, judged_by, "accepting a Decision")?;
+    // Panel R1 (automotive finding 5): the scaffolded header restated the status as prose and went
+    // stale on acceptance - dual truth against the status field (D0105). Acceptance rewrites it.
+    rewrite_proposed_header(path)?;
     let content = std::fs::read_to_string(path)?;
     if !content.contains(&format!("part {decision} : Decision")) {
         return Err(WriteError::TaskNotFound(decision.to_owned()));

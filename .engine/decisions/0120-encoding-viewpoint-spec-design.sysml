@@ -1,5 +1,5 @@
 // =====================================================================
-// D0120 (PROPOSED — NOT YET ACCEPTED) — design direction for N-18 axis->visual-encoding viewpoints.
+// D0120 (status: the `status` field below is the truth) — design direction for N-18 axis->visual-encoding viewpoints.
 // A DECLARATIVE visual-encoding SPEC per viewpoint (channel<-attribute bindings: colour / x-position /
 // swimlane / nested-swimlane) that AUTO-GENERATES from schema+data semantics, with a manual override
 // layer. Derives from nViewerEncodingViewpoints (N-18); composes on the standard view kinds (D0119);

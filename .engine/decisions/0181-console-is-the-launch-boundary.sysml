@@ -1,4 +1,4 @@
-// D0181 (PROPOSED — NOT YET ACCEPTED) — D-P5a: the console is the launch boundary for routine EXECUTE and RECORD work
+// D0181 (status: the `status` field below is the truth) — D-P5a: the console is the launch boundary for routine EXECUTE and RECORD work
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0181Accept event on sign-off.
 package Decision0181 {

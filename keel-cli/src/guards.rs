@@ -2343,10 +2343,10 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 pub fn control_event_coverage(root: &Path) -> GuardReport {
     /// Every ledger event name the binary emits. A NEW `ledger_emit` call site must add its event
     /// here AND to the contract - this constant going stale is exactly what the two-way diff warns on.
-    const EMITTED_LEDGER: [&str; 11] = [
+    const EMITTED_LEDGER: [&str; 12] = [
         "post-edit", "stop", "user-prompt", "pre-bash", "pre-write", "subagent-stop",
         "launch-dirty-refusal", "override-consumed", "override-obligation-UNSYNCED",
-        "red-yield-obligation-UNSYNCED", "actor-rebind",
+        "red-yield-obligation-UNSYNCED", "actor-rebind", "hook-watchdog-timeout",
     ];
     const INVENTORY_POINTS: [(&str, &str); 2] = [("spec-pin-check", "build-time spec pin"), ("pre-push-behind", "pre-push .githooks")];
     let path = root.join(".engine").join("contracts").join("control-events.toml");

@@ -1,4 +1,4 @@
-// D0127 (PROPOSED — NOT YET ACCEPTED) — Relationship grammar as a COMPUTED view (observed triples) + scope-aware creation
+// D0127 (status: the `status` field below is the truth) — Relationship grammar as a COMPUTED view (observed triples) + scope-aware creation
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0127Accept event on sign-off.
 package Decision0127 {

@@ -1,4 +1,4 @@
-// D0178 (PROPOSED — NOT YET ACCEPTED) — D-P1c: writes recording human judgment are human-channel-only (kernel invariant K6)
+// D0178 (status: the `status` field below is the truth) — D-P1c: writes recording human judgment are human-channel-only (kernel invariant K6)
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0178Accept event on sign-off.
 package Decision0178 {

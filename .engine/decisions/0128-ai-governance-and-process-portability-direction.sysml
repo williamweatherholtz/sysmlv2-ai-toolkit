@@ -1,4 +1,4 @@
-// D0128 (PROPOSED — NOT YET ACCEPTED) — Direction: in-loop AI governance + modular process portability + dogfooded release (CLI+MCP)
+// D0128 (status: the `status` field below is the truth) — Direction: in-loop AI governance + modular process portability + dogfooded release (CLI+MCP)
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0128Accept event on sign-off.
 package Decision0128 {

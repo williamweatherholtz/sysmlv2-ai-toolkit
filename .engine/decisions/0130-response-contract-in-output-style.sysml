@@ -1,4 +1,4 @@
-// D0130 (PROPOSED — NOT YET ACCEPTED) — The AI's response contract lives in a SYSTEM-PROMPT output
+// D0130 (status: the `status` field below is the truth) — The AI's response contract lives in a SYSTEM-PROMPT output
 // style, and honest-state gating moves to the turn boundary via a Stop hook. CLAUDE.md stops being
 // the sole home of the contract, because it is the weakest layer that can hold it.
 // Acceptance is a separate explicit human gate (D0106): flip status + add the d0130Accept event.

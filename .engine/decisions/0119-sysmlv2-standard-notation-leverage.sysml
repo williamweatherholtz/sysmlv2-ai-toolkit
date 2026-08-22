@@ -1,5 +1,5 @@
 // =====================================================================
-// D0119 (PROPOSED — NOT YET ACCEPTED) — how the viewer leverages the STANDARD SysML v2 representations.
+// D0119 (status: the `status` field below is the truth) — how the viewer leverages the STANDARD SysML v2 representations.
 // Research (2026-07-15, cited spike sprint224): OMG finalized SysML v2 + KerML 1.0 + Systems Modeling
 // API & Services 1.0 on 21 Jul 2025 (formal/25-09-03). Direction: adopt the standard at the DATA/API +
 // view-kind-vocabulary layer; treat the graphical notation as an approximation target (no reusable web

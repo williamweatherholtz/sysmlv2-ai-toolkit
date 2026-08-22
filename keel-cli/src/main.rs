@@ -225,9 +225,15 @@ fn cmd_hook(args: &[String]) -> i32 {
     // the worst failure mode available to it.
     //
     // The watchdog exits 0, never nonzero: D0134 says a hook NEVER fails a turn, so a hook that gave up
-    // waiting must look exactly like a hook with nothing to say.
+    // waiting must look exactly like a hook with nothing to say — to the HARNESS. To the ledger it
+    // must not (panel R1, robotics finding 4 / K2): a wedged hook that vanished without a line was
+    // the one fail-SILENT branch inside the layer the enforcement-report reads, invisible to D0180's
+    // single instrumentation path. The watchdog now appends its own line before exiting.
     std::thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_secs(HOOK_DEADLINE_SECS));
+        if let Some(root) = find_repo_root() {
+            ledger_emit(&root, "", "hook-watchdog-timeout", 0, u128::from(HOOK_DEADLINE_SECS) * 1000);
+        }
         std::process::exit(0);
     });
     let mut raw = String::new();

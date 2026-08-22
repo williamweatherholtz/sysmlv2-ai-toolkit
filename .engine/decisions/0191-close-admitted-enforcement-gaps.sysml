@@ -1,4 +1,4 @@
-// D0191 (PROPOSED — NOT YET ACCEPTED) — D0191: the deploy and actor-enrollment admitted gaps get their guards
+// D0191 (status: the `status` field below is the truth) — D0191: the deploy and actor-enrollment admitted gaps get their guards
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0191Accept event on sign-off.
 // APPLICATION NOTES (the enforcement-gap family this Decision opened):

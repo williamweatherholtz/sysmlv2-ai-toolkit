@@ -1,5 +1,5 @@
 // =====================================================================
-// D0122 (PROPOSED — NOT YET ACCEPTED) — CR: add `rejected` to the DecisionStatus enum (schema/core).
+// D0122 (status: the `status` field below is the truth) — CR: add `rejected` to the DecisionStatus enum (schema/core).
 // Enables the review loop's REJECT-with-rationale path (D0121): a rejected proposed Decision flips
 // status -> rejected + records a {d}Reject judgment. schema/core is FROZEN, so this needs explicit
 // human sign-off. Human-directed 2026-07-15 ("we have an accept button, but not a reject (with

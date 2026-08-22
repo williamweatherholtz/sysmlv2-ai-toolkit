@@ -1,4 +1,4 @@
-// D0183 (PROPOSED — NOT YET ACCEPTED) — D-P4a: process units are versioned, updateable by supersession, and imports handshake enforcement (P4b executes under this Decision jointly with D-P3a)
+// D0183 (status: the `status` field below is the truth) — D-P4a: process units are versioned, updateable by supersession, and imports handshake enforcement (P4b executes under this Decision jointly with D-P3a)
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0183Accept event on sign-off.
 package Decision0183 {

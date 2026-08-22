@@ -1,4 +1,4 @@
-// D0193 (PROPOSED — NOT YET ACCEPTED) — D0193: every control-relevant event emits a counted record - one coverage control for the family
+// D0193 (status: the `status` field below is the truth) — D0193: every control-relevant event emits a counted record - one coverage control for the family
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0193Accept event on sign-off.
 // ERRATUM (sprint 407, issue212): the context below cites "issue208" for the uncounted-override

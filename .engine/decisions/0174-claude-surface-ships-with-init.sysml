@@ -1,4 +1,4 @@
-// D0174 (PROPOSED — NOT YET ACCEPTED) — D-P0a: the .claude/ surface is engine-derived, keel-scope-owned, ships with keel init, and owns the protected-path deny list
+// D0174 (status: the `status` field below is the truth) — D-P0a: the .claude/ surface is engine-derived, keel-scope-owned, ships with keel init, and owns the protected-path deny list
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0174Accept event on sign-off.
 package Decision0174 {
