@@ -137,4 +137,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcProptestReservedWords to issue225;
+
+    part issue226 : Issue {
+        :>> id = "b9aa7ad7-e1b0-40cb-9462-d629c5863ad8";
+        :>> title = "The enforcement contract claimed D0108's ownership rule was unchecked - stale since sprint 293";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "process-enforcement.toml [distributedCollaboration] said 'Nothing checks it today. This is the entry I would most expect a reviewer to act on' - but the ownership guard has existed since sprint 293 (1b2fd4f, 2026-08-15): staged-diff vs HEAD, item-level field comparison against the bound actor, D0067 migration keystone exemption. A dual truth (D0018): the hardening view faithfully reported a stale declaration, and sprint 421 chartered dcOwnershipDiffGuard to build a guard that already existed. The contract text was never swept when the guard landed - a doc-sync miss on a CONTRACT surface. Control: the unit now asserts the constraint (D0139(D) unit-ownership), so the enforcement map computes from the model instead of restating it in prose.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcOwnershipDiffGuard to issue226;
 }
