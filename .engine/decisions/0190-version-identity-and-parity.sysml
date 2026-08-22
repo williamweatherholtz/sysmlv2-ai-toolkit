@@ -7,7 +7,9 @@ package Decision0190 {
     private import EngineVerification::*;
     private import EngineRelationships::*;
 
-    part d0190 : Decision {
+    // #ProspectiveChange (D0070) - governs the engine-version.toml contract, the parity warning at
+    // the gate entry points, and the version-identity reporting surfaces.
+    #ProspectiveChange part d0190 : Decision {
         :>> id = "1ab6fa76-f80d-4671-8352-afbeac7d291f";
         :>> title = "D0190: one declared version identity, parity-checked before authoring";
         :>> createdAt = "2026-08-21";

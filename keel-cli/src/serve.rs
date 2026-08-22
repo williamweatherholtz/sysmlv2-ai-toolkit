@@ -1800,6 +1800,9 @@ async fn api_version() -> Response {
     let weps = KEEL_API_WRITE_ENDPOINTS.iter().map(|e| Json::s((*e).to_string())).collect();
     ok_json(Json::Obj(vec![
         ("apiVersion".to_string(), Json::s(KEEL_API_VERSION.to_string())),
+        // D0190: the binary version is the one declared semver; the rest are derived facts beside it.
+        ("binaryVersion".to_string(), Json::s(env!("CARGO_PKG_VERSION").to_string())),
+        ("surfaceVersion".to_string(), Json::s(crate::claude_surface::SURFACE_VERSION.to_string())),
         // The CONSOLE build, distinct from the API version (issue153): the API contract can hold steady
         // across many page changes, so a page cannot tell whether it is current by reading apiVersion.
         ("consoleBuild".to_string(), Json::s(console_build().to_string())),

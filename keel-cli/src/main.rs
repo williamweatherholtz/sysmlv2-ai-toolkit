@@ -134,12 +134,37 @@ fn root_arg(args: &[String], usage: &str, known: &[&str], positionals: usize) ->
 
 // ── subcommands ───────────────────────────────────────────────────────────────
 
+
+/// D0190: the engine-version parity warning. The DECLARED version (engine-version.toml, stamped by
+/// init and re-stamped by migrate) answers one question only: which binary's checks is this on-disk
+/// engine defined against? A mismatch WARNS and names `keel migrate` - never blocks, because skew is
+/// not dishonest state (D0098), and never gates or skips anything (migrate derives its vintage from
+/// the TREE, per its own no-stamp rule - this declaration exists for the warning, the two designs
+/// answer different questions). Absent declaration = pre-D0190 project, silent (forward-only, issue068).
+fn engine_version_skew(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".engine").join("contracts").join("engine-version.toml")).ok()?;
+    let declared = text
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("engine").map(|r| r.trim_start_matches(['=', ' ']).trim_matches('"').to_string()))
+        .filter(|v| !v.is_empty())?;
+    let binary = env!("CARGO_PKG_VERSION");
+    if declared == binary {
+        return None;
+    }
+    Some(format!(
+        "[keel] engine-version SKEW: this binary is {binary} but the on-disk engine declares {declared} (engine-version.toml).          The checks may not match the engine they gate (the issue089/issue090 class). Run `keel migrate` to bring the tree current          (it re-stamps the declaration); advisory only - nothing is blocked (D0190/D0098)."
+    ))
+}
+
 fn cmd_validate(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel validate [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
 
+    if let Some(w) = engine_version_skew(&root) {
+        eprintln!("{w}");
+    }
     let report = validate_root(&root);
 
     for (path, diag) in &report.diagnostics {
@@ -818,6 +843,9 @@ Connection: close
 
 /// Turn-boundary gate: refuse to end the turn while the model is dishonest. Loop-safe.
 fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
+    if let Some(w) = engine_version_skew(root) {
+        eprintln!("{w}");
+    }
     let already = payload.get("stop_hook_active").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
     let mut problems: Vec<String> = Vec::new();
@@ -1222,6 +1250,9 @@ fn cmd_guard(args: &[String]) -> i32 {
         eprintln!("error: no .engine/ directory found. usage: keel guard [<name>] [ROOT]");
         return 2;
     };
+    if let Some(w) = engine_version_skew(&root) {
+        eprintln!("{w}");
+    }
     let Some(name) = name else {
         let reports = keel_cli::guards::run_all(&root);
         let mut all_ok = true;
@@ -2690,6 +2721,16 @@ fn cmd_init(args: &[String]) -> i32 {
     if let Err(code) = init_enforcement_surface(&dir, &engine_dst, &profile) {
         return code;
     }
+    // D0190: stamp the declared engine version - which binary's checks this engine is defined
+    // against. Re-stamped by `keel migrate`; read only by the parity warning, never by migrate.
+    let version_toml = format!(
+        "# engine-version - the binary version this on-disk engine's checks are defined against (D0190).\n# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate\n# derives its vintage from the tree, never from this file.\nengine = \"{}\"\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    if let Err(e) = std::fs::write(engine_dst.join("contracts").join("engine-version.toml"), version_toml) {
+        eprintln!("error writing engine-version.toml: {e}");
+        return 1;
+    }
     println!("Scaffolded the engine into {} ({count} engine file(s)). Adoption profile: {profile} (declared).", dir.display());
     println!();
     println!("Next:");
@@ -3231,6 +3272,15 @@ fn cmd_version(args: &[String]) -> i32 {
     }
     println!("keel {}", env!("CARGO_PKG_VERSION"));
     println!("build commit: {}", env!("KEEL_BUILD_COMMIT"));
+    // D0190: the binary version is the ONE declared semver; the others are derived facts reported
+    // beside it (a breaking API change is recorded in the release Decision, not versioned apart).
+    println!("api contract: {} (derived; breaking changes recorded in release Decisions)", keel_cli::serve::KEEL_API_VERSION);
+    println!("claude surface: {} (generated from this binary)", keel_cli::claude_surface::SURFACE_VERSION);
+    match find_repo_root().map(|r| engine_version_skew(&r)) {
+        Some(Some(w)) => println!("engine declared: SKEW - {w}"),
+        Some(None) => println!("engine declared: matches (engine-version.toml or pre-D0190 absent)"),
+        None => {}
+    }
     println!(
         "guards: {} ({hard} hard-blocking, {} warning-only)",
         keel_cli::guards::GUARD_NAMES.len(),

@@ -452,6 +452,7 @@ fn is_process_def(p: &str) -> bool {
         && !p.ends_with("unit-ids.toml")
         && !p.ends_with("installed-units.toml")
         && !p.ends_with("deck-inbox.toml")
+        && !p.ends_with("engine-version.toml") // D0190: machine-stamped by init/migrate, instance data
         && !p.ends_with("adoption-profile.toml")
     {
         return true;

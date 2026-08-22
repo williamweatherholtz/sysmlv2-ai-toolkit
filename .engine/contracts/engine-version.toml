@@ -1,0 +1,4 @@
+# engine-version - the binary version this on-disk engine's checks are defined against (D0190).
+# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate
+# derives its vintage from the tree, never from this file.
+engine = "0.2.3"

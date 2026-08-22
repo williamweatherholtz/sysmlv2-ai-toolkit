@@ -688,6 +688,17 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         eprintln!("  A step did not do what it reported. The tree is migrated but NOT verified — inspect `git diff` before committing.");
         return 1;
     }
+    // D0190: a completed migration re-stamps the declared engine version. The stamp is for the
+    // parity WARNING only - this command derives everything from the tree and never reads it, so
+    // the no-stamp rule in this module's header still holds for vintage detection.
+    let stamp = format!(
+        "# engine-version - the binary version this on-disk engine's checks are defined against (D0190).\n# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate\n# derives its vintage from the tree, never from this file.\nengine = \"{}\"\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    let stamp_path = root.join(".engine").join("contracts").join("engine-version.toml");
+    if let Err(e) = std::fs::write(&stamp_path, stamp) {
+        eprintln!("keel migrate: migration complete but the version re-stamp failed ({e}) - the parity warning will keep firing until engine-version.toml is updated.");
+    }
     println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
     println!();
     println!("  NEXT: run this project's own gate — `keel validate . && keel guard && keel check-engine .` — then commit.");
