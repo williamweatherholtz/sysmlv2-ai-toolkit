@@ -481,6 +481,19 @@ pub fn attestation_policy(root: &Path, class: &str) -> ClassPolicy {
     }
 }
 
+/// The recording delegation declared for one attestation class (D0192 OPTION A).
+///
+/// Names the Decision that authorizes an agent to RECORD a human's judgment, provided the record
+/// quotes their words verbatim and names them as judge. `None` = not declared — the substance check
+/// then demands nothing, and recording requires the human's own gesture.
+#[must_use]
+pub fn recording_delegation(root: &Path, class: &str) -> Option<String> {
+    let path = root.join(".engine").join("contracts").join("attestation-policy.toml");
+    let text = std::fs::read_to_string(path).ok()?;
+    let v = text.parse::<toml::Value>().ok()?;
+    v.get(class)?.get("delegatedRecording")?.as_str().map(str::to_owned)
+}
+
 /// Does `actor` satisfy `policy`? Returns the reason it does NOT, or `None` if it does.
 ///
 /// ROLES: an empty `roles` list means ANY role, INCLUDING an actor with none recorded. That is what

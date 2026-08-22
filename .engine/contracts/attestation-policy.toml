@@ -18,9 +18,21 @@
 
 [decisionAcceptance]
 # Accepting a Decision. Human-only under D0106 — an AI cannot supply a human's sign-off, and
-# `confirmation-authenticity` enforces the kind half independently of this file.
+# `confirmation-authenticity` enforces the kind half independently of this file. The JUDGE is always
+# the human; the line below delegates only the RECORDING.
 kinds = ["human"]
 roles = ["supervisor"]
+#
+# RECORDING DELEGATED TO THE AI BY THE HUMAN (D0192 OPTION A), 2026-08-22, verbatim: "option A is
+# fine. this hasn't been a real issue to date." An agent may record the human's acceptance when the
+# record quotes their words verbatim, names them as judge, and cites this delegation — the
+# `confirmation-authenticity` guard's `delegatedAcceptanceSubstanceRule` checks the quote is actually
+# there (forward-only from the acceptance date). STATED LIMIT (D0192): a fabricated quote defeats the
+# check; the protections are the human reading their own queue and the audit trail.
+#
+# TO WITHDRAW: delete the line below and the substance rule stops being demanded by this contract;
+# recording then requires the human's own gesture again (deck, console, TTY-checked CLI).
+delegatedRecording = "d0192"
 
 [findingDisposition]
 # Dispositioning a finding at or above the Medium threshold (D0092). D0080 permits an AI to disposition

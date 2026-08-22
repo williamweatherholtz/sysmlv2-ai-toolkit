@@ -14,6 +14,10 @@ package LiveAllocations {
     allocate srK05ComputedCompletion to ceViewCore;
     allocate srK06HumanChannel to ceServeJudgment;
     allocate srK06HumanChannel to ceWriteApi;
+    // D0192 OPTION A: the delegation clause lives in the same write surfaces plus the guard that checks quote substance.
+    allocate srK06aDelegatedRecording to ceServeJudgment;
+    allocate srK06aDelegatedRecording to ceWriteApi;
+    allocate srK06aDelegatedRecording to ceGuards;
     allocate srK07RecordedWeakening to ceHookDispatch;
     allocate srK12VerdictTraceability to ceLauncher;
     allocate srK12VerdictTraceability to ceAuditHistory;

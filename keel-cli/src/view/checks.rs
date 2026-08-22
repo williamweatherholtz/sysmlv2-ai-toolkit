@@ -122,6 +122,28 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         let judged_by = model.items.get(&ev).and_then(|i| i.attrs.get("judgedBy"));
         return Some(judged_by.and_then(|jb| model.items.get(jb)).is_some_and(|a| a.type_name == "Person"));
     }
+    // acceptQuotesDelegatedWords(cutoff): D0192 OPTION A substance check. The sibling acceptance event
+    // `<name>AcceptR1`, when judged on/after the cutoff date, must evidence its channel: the Test's
+    // procedureText quotes the human's conversational words (a single-quoted span of >= 10 chars) or
+    // cites a human surface gesture (deck/console). Earlier events are grandfathered (issue068
+    // forward-only). A MISSING event is acceptance-events' violation, not this rule's — vacuously true.
+    // STATED LIMIT (D0192): a fabricated quote defeats this; the protections behind it are the human
+    // reading their own queue and the audit trail.
+    if let Some(cutoff) = predicate_args(term, "acceptQuotesDelegatedWords(") {
+        let Some(judged_at) = model.items.get(&format!("{name}AcceptR1")).and_then(|i| i.attrs.get("judgedAt"))
+        else {
+            return Some(true);
+        };
+        if judged_at.as_str() < cutoff.trim() {
+            return Some(true);
+        }
+        let text = model
+            .items
+            .get(&format!("{name}Accept"))
+            .and_then(|i| i.attrs.get("procedureText"))
+            .map_or("", String::as_str);
+        return Some(quotes_conversational_words(text));
+    }
     // charterTargetType(T1,T2,...): every OUTGOING #CharteredBy edge from `name` targets an item whose
     // TYPE is in the allow-list. The enforceable slice of research-spike routing (issue055): once a
     // spike EXISTS, its charter must point at a real Issue or Decision, so the routing convention gains a
@@ -158,6 +180,26 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         }
     }
     None
+}
+
+/// Does an acceptance record carry its channel evidence (D0192 OPTION A)? True on a single-quoted
+/// span of at least 10 characters (the human's verbatim conversational words) or a named human
+/// surface gesture (deck/console).
+fn quotes_conversational_words(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    if lower.contains("deck") || lower.contains("console") {
+        return true;
+    }
+    let mut rest = text;
+    while let Some(open) = rest.find('\'') {
+        rest = &rest[open + 1..];
+        let Some(close) = rest.find('\'') else { break };
+        if rest[..close].chars().count() >= 10 {
+            return true;
+        }
+        rest = &rest[close + 1..];
+    }
+    false
 }
 
 /// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) for item `name`. Returns `None`
@@ -429,3 +471,26 @@ pub fn rootedness(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::quotes_conversational_words;
+
+    /// D0192 OPTION A: the substance check's boundary. A delegated record passes on a verbatim
+    /// single-quoted span (>= 10 chars) or a named human gesture; a bare assertion fails.
+    #[test]
+    fn delegated_records_must_quote_or_cite_a_gesture() {
+        // The real D0192 acceptance shape: quoted verbatim words.
+        assert!(quotes_conversational_words(
+            "OPTION A chosen. Their words, verbatim: 'option A is fine. this hasn't been a real issue to date' (chat, 2026-08-22)."
+        ));
+        // A deck tap is a human gesture — no quote needed.
+        assert!(quotes_conversational_words("signed via deck"));
+        assert!(quotes_conversational_words("accepted at the console review queue"));
+        // A bare assertion carries no channel evidence.
+        assert!(!quotes_conversational_words("the human approved this decision in chat"));
+        // A short quoted fragment is an apostrophe artifact, not conversational words.
+        assert!(!quotes_conversational_words("they said 'ok' and moved on"));
+        assert!(!quotes_conversational_words(""));
+    }
+}

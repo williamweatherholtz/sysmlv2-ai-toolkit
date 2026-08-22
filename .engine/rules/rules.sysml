@@ -119,6 +119,25 @@ package EngineRuleSet {
     }
     #JustifiedBy dependency from confirmationAuthenticityRule to d0106;
 
+    // D0192 OPTION A (the delegation clause, srK06aDelegatedRecording): an acceptance recorded under
+    // the declared recording delegation must EVIDENCE its channel - quote the human's conversational
+    // words verbatim (a single-quoted span) or cite a human surface gesture (deck/console). Forward-only
+    // from D0192's acceptance date (issue068): earlier events are grandfathered. GATING - the
+    // `confirmation-authenticity` guard sources this rule alongside confirmationAuthenticityRule.
+    // STATED LIMIT (from D0192 itself): an agent that fabricates a quote defeats this check; the
+    // protections behind it are the human reading their own queue and the audit trail.
+    part delegatedAcceptanceSubstanceRule : ElementRule {
+        :>> id = "f20caebc-aef4-4487-83d4-b4a1be0d8900";
+        :>> title = "A delegated acceptance record must quote the human's words (or cite their gesture)";
+        :>> subjectType = "Decision";
+        :>> predicate = "acceptQuotesDelegatedWords(2026-08-22)";
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "whereStatus(accepted)";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from delegatedAcceptanceSubstanceRule to d0192;
+
     // issue055 (the enforceable slice of research-spike routing): a WorkKind::research Story must charter
     // to a LEGITIMATE governing source — its originating Decision/Need/SystemRequirement, or (as a spike)
     // an Issue/proposed-Decision (the union the charter guard sanctions, D0068/issue055) — never an

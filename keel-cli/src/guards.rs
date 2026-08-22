@@ -166,7 +166,7 @@ pub fn actors(root: &Path) -> GuardReport {
 /// inherently un-gatable at commit and stays reminder-enforced.
 #[must_use]
 pub fn confirmation_authenticity(root: &Path) -> GuardReport {
-    match crate::view::rule_violations_opt(root, "confirmationAuthenticityRule") {
+    let mut report = match crate::view::rule_violations_opt(root, "confirmationAuthenticityRule") {
         Ok(Some((scanned, bad))) => {
             let violations = bad
                 .into_iter()
@@ -179,7 +179,28 @@ pub fn confirmation_authenticity(root: &Path) -> GuardReport {
         // visible) and pass; a MALFORMED rule still fails via Err below.
         Ok(None) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: vec!["declared rule `confirmationAuthenticityRule` is not present — this control is NOT ADOPTED by this project, so nothing was checked (D0136/issue090)".to_string()], violations: Vec::new() },
 Err(e) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings: Vec::new(), violations: vec![format!("error reading confirmation-authenticity rule: {e}")] },
+    };
+    // D0192 OPTION A substance half: when the attestation policy DECLARES a recording delegation for
+    // acceptances, a delegated record must actually quote the human's conversational words. Sourced
+    // from `delegatedAcceptanceSubstanceRule` (CONTRACT pattern, forward-only per the rule's cutoff).
+    // A declared delegation with no substance rule is warned — the policy promised a check that is
+    // not adopted — and no declared delegation means nothing is demanded here.
+    if let Some(delegation) = crate::activation::recording_delegation(root, "decisionAcceptance") {
+        match crate::view::rule_violations_opt(root, "delegatedAcceptanceSubstanceRule") {
+            Ok(Some((_, bad))) => {
+                for d in bad {
+                    report.violations.push(format!(
+                        "{d}: accepted on/after the delegation cutoff but its acceptance event neither quotes the human's words (a single-quoted span) nor cites their gesture — a record made under the {delegation} recording delegation must carry its channel evidence"
+                    ));
+                }
+            }
+            Ok(None) => report.warnings.push(format!(
+                "attestation-policy declares recording delegation {delegation} for decisionAcceptance but `delegatedAcceptanceSubstanceRule` is not declared — the delegation's substance check is NOT ADOPTED (D0192)"
+            )),
+            Err(e) => report.violations.push(format!("error reading delegatedAcceptanceSubstanceRule: {e}")),
+        }
     }
+    report
 }
 
 /// Guard: every `status=accepted` Decision carries a passing `dNNNNAcceptR1` event (D0066).

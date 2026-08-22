@@ -228,4 +228,19 @@ package ProductionReadinessRequirements {
     // srK16's Need root (upstream fleshing, sprint 418): the release-discipline Need owns the outward boundary.
     satisfy nReleaseDiscipline by srK16OutwardPublishGated;
 
+
+    // D0192 OPTION A (accepted 2026-08-22): srK06's letter and the sanctioned delegation practice
+    // contradicted (issue204); the human chose to amend the requirement. srK06HumanChannel is
+    // SUPERSEDED, not edited - it is claudeOpus5's item (D0108) and its history stays readable.
+    requirement srK06aDelegatedRecording : SystemRequirement {
+        :>> id = "3c5fe2bb-6f7b-44b9-8628-28ac0328aa0e";
+        :>> title = "K6a: human-judgment records come from a human-held channel or a declared, quote-carrying delegation";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> statement = "Records of human judgment (acceptance, confirmation) shall originate either from a channel the agent cannot invoke, or from an agent-recorded delegation that quotes the human's words verbatim, names them as judge, and cites the delegation decision; every recording delegation shall be declared per attestation class in the attestation policy, and a delegated record that carries no verbatim quote is a violation.";
+        :>> rationale = "D0192 OPTION A: the human works by stating verdicts in conversation, and forcing every acceptance through a browser gesture taxes the workflow they chose (D0054). The protection this trades away is stated plainly in D0192: an agent that fabricates a quote defeats the check - the remaining protections are the human reading their own queue and the audit trail. The write layer still refuses AI-KIND judges; this clause governs the recording channel, not the judge.";
+        :>> kind = RequirementKind::functional;
+    }
+    #Supersede dependency from srK06aDelegatedRecording to srK06HumanChannel;
+    satisfy nPavedWritePath by srK06aDelegatedRecording;
+
 }

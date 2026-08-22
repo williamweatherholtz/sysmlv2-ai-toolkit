@@ -97,6 +97,8 @@ package EngineSafetyInstances {
     #DerivedFrom dependency from srK15TreeDerivable to ehz1;
     #DerivedFrom dependency from srK01ValidatedChannel to ehz2;
     #DerivedFrom dependency from srK06HumanChannel to ehz3;
+    // D0192 OPTION A: the superseding clause constrains the same hazard - a fabricated human attestation.
+    #DerivedFrom dependency from srK06aDelegatedRecording to ehz3;
     #DerivedFrom dependency from srK05ComputedCompletion to ehz4;
     #DerivedFrom dependency from srK12VerdictTraceability to ehz4;
     #DerivedFrom dependency from srK02FailLoud to ehz5;
