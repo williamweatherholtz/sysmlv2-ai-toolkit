@@ -108,6 +108,10 @@ fn parse_dir(dir: &Path) -> Vec<keel_parser::ast::Package> {
 
 /// `keel trace-need <name>` — forward closure over satisfy/allocate edges from a Need
 /// (need -satisfy-> requirement -allocate-> component).
+///
+/// D0194: the June Component layer this closure walks is SUPERSEDED - the output says so, because
+/// serving it unlabeled as current truth was the panel's EHZ8 finding. Live allocation is the
+/// charter chain + the SR->CodeElement edges (see `keel arch` and allocations.sysml).
 #[must_use]
 pub fn trace_need(root: &Path, name: &str) -> String {
     let mut adj: HashMap<String, Vec<String>> = HashMap::new();
@@ -122,6 +126,7 @@ pub fn trace_need(root: &Path, name: &str) -> String {
     }
     Json::Obj(vec![
         ("need".to_string(), Json::s(name)),
+        ("componentLayer".to_string(), Json::s("HISTORICAL - the June Component set this closure reaches is superseded by D0194; live allocation is the charter chain + SR->CodeElement edges (keel arch, allocations.sysml)")),
         ("trace".to_string(), Json::Arr(reach(name, &adj).into_iter().map(Json::s).collect())),
     ])
     .dump()

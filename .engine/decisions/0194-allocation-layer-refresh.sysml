@@ -24,4 +24,17 @@ package Decision0194 {
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0194Accept : Test { :>> id = "92dd2ab5-9e17-43fb-aa87-2363ada593a9"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Their words, verbatim: 'looks great. proceed to implement' - said in direct response to the panel-consensus report whose closing line asked them to sign D0194/D0195 so the chartered work could execute. Covers this Decision as one of that named pair. D0192 is NOT covered: accepting it requires choosing option A or B, which a general go does not do - it stays proposed until they name one."; }
     part d0194AcceptR1 : TestResult { :>> id = "e298fd04-9f12-4db9-a326-0aec00febf46"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5207cbc"; :>> judgedAt = "2026-08-22"; :>> judgedBy = "wweatherholtz"; }
+    // APPLICATION (sprint 416, on the recorded acceptance): the June component layer is
+    // superseded - kept readable as the record of the 2026-06 architecture, no longer served
+    // as current. The live allocation mechanism is charter-chains + the SR->CodeElement edges
+    // in .tracking/architecture/allocations.sysml, with the coverage leg in tier-satisfaction.
+    #Supersede dependency from d0194 to schemaCoreComp;
+    #Supersede dependency from d0194 to workflowDefs;
+    #Supersede dependency from d0194 to validatorStack;
+    #Supersede dependency from d0194 to queryStack;
+    #Supersede dependency from d0194 to trackingData;
+    #Supersede dependency from d0194 to processDefs;
+    #Supersede dependency from d0194 to rustParserComp;
+    #Supersede dependency from d0194 to rustCliComp;
+
 }

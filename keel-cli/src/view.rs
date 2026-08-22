@@ -4662,6 +4662,16 @@ fn compute_tier_satisfaction(model: &Model) -> Vec<TierStat> {
         tier("Need", "satisfied-by SystemRequirement", &|n| has_out("satisfy", n), "Need"),
         // A SystemRequirement is verified iff a Test #Verify-links to it (verify edge Test->SR).
         tier("SystemRequirement", "verified-by Test", &|sr| has_in("verify", sr), "SystemRequirement"),
+        // D0194 (panel R1, all five panelists): an SR is ALLOCATED iff an allocate edge leaves it
+        // for a target that is not itself superseded - the coverage leg whose absence let 100%
+        // silently decay to ~25% over two months with nothing re-firing the obligation. Reads LOW
+        // and honest at introduction; the floor is the point, not the flattery (D0098).
+        tier(
+            "SystemRequirement",
+            "allocated-to live Component/CodeElement",
+            &|sr| model.edges.iter().any(|e| e.kind == "allocate" && e.from == *sr && !superseded_item(&e.to)),
+            "SystemRequirement (allocation)",
+        ),
     ]
 }
 
