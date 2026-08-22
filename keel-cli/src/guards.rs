@@ -2944,6 +2944,34 @@ mod retro_tie_tests {
 }
 
 #[cfg(test)]
+mod gate_order_tests {
+    use super::GATE_ORDER;
+
+    /// Panel R2 (robotics finding 2): `GATE_ORDER` is a compiled constant that hand-duplicates the
+    /// succession chain DECLARED in .engine/workflows/delivery.sysml - two homes for one fact.
+    /// This test binds them: a CR that edits the declared order breaks the build until the
+    /// constant follows, so the guard can never silently enforce a superseded ceremony order.
+    #[test]
+    fn gate_order_matches_the_declared_successions() {
+        let declared = include_str!("../../.engine/workflows/delivery.sysml");
+        let mut chain: Vec<(String, String)> = Vec::new();
+        for line in declared.lines() {
+            let l = line.trim();
+            if let Some(rest) = l.strip_prefix("first ") {
+                if let Some((a, b)) = rest.trim_end_matches(';').split_once(" then ") {
+                    chain.push((a.trim().to_lowercase(), b.trim().to_lowercase()));
+                }
+            }
+        }
+        assert_eq!(chain.len(), GATE_ORDER.len() - 1, "the declared chain must cover every adjacent GATE_ORDER pair");
+        for (i, pair) in GATE_ORDER.windows(2).enumerate() {
+            assert_eq!(chain[i].0, pair[0].to_lowercase(), "declared succession {i} disagrees with GATE_ORDER");
+            assert_eq!(chain[i].1, pair[1].to_lowercase(), "declared succession {i} disagrees with GATE_ORDER");
+        }
+    }
+}
+
+#[cfg(test)]
 mod scan_count_tests {
     use super::{GuardReport, GUARD_NAMES};
 

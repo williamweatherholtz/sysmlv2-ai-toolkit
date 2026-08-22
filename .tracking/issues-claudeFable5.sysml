@@ -82,4 +82,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcViewRsRestructure to issue220;
+
+    part issue221 : Issue {
+        :>> id = "d0c6bfe8-365e-4f80-b88a-b9d3069b4eb4";
+        :>> title = "EHZ9's controls trace to no standing requirement - removing the release gate would violate nothing recorded";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Panel R2, aerospace finding 1 (MINOR, unanimous-accept residue): the ungated-outward-publish hazard's controls (release gate, pre-push check, land's merged-tree gate) have no invariant/SR anchor - the K-set has no outward-publish member. Resolver: D0195 clause 8 (added round 2) charters the SR anchor under dcControlMapView's delivery.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcControlMapView to issue221;
+
+    part issue222 : Issue {
+        :>> id = "a33e001f-489b-4a17-a3ba-b71705c4d9b5";
+        :>> title = "GATE_ORDER hand-duplicated the declared ceremony successions - two homes for one fact";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Panel R2, robotics finding 2 (MINOR): guards.rs GATE_ORDER is a compiled constant duplicating the succession chain declared in .engine/workflows/delivery.sysml; post-ingestion both live in the model and a CR editing the declared order would leave the guard silently enforcing the old one. FIXED in-sprint: gate_order_matches_the_declared_successions parses the declared chain at compile time and fails the build on divergence.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from storyPanelRound1 to issue222;
 }
