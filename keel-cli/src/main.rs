@@ -2450,7 +2450,11 @@ fn cmd_apply_review(args: &[String]) -> i32 {
         Ok(d) => d,
         Err(c) => return c,
     };
-    let critiques = root.join(".tracking").join("critiques.sysml");
+    // issue210: apply-review's records land in the JUDGE's per-actor file (forward-only routing).
+    let Ok(critiques) = w::per_actor_file(&root, "critiques", &judged_by) else {
+        eprintln!("error: cannot open the per-actor critiques file");
+        return 1;
+    };
 
     let mut count = 0u32;
     for d in &batch.dispositions {

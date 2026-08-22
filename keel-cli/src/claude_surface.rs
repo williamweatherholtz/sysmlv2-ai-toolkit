@@ -39,9 +39,9 @@ pub const OUTPUT_STYLE: &str = include_str!("../../.claude/output-styles/keel.md
 /// Owned by D-P0a; P1/D-P1a layers ask/override semantics on top. Paths are substring-matched with
 /// both separators.
 pub const PROTECTED_PATHS: [(&str, &str); 5] = [
-    (".tracking/issues.sysml", "keel record issue"),
+    (".tracking/issues", "keel record issue"), // prefix: covers issues.sysml AND per-actor issues-<actor>.sysml (issue210)
     (".tracking/backlog.sysml", "keel add-task"),
-    (".tracking/critiques.sysml", "the disposition write API (POST /api/disposition) or keel apply-review"),
+    (".tracking/critiques", "the disposition write API (POST /api/disposition) or keel apply-review"), // prefix: covers per-actor files too (issue210)
     (".tracking/delivery/", "keel new sprint / keel append-gate-result / keel append-result"),
     (".engine/decisions/", "keel record decision, accepted only via keel accept (human-only)"),
 ];

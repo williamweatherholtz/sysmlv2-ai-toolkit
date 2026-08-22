@@ -584,7 +584,11 @@ async fn api_deck_sitting(
     } else {
         format!("sitting review via deck: {} - {}", b.verdict, b.note)
     };
-    let critiques = root.join(".tracking").join("critiques.sysml");
+    // issue210: the sitting critique lands in the REVIEWER's per-actor file.
+    let critiques = match crate::write::per_actor_file(&root, "critiques", &b.by) {
+        Ok(p) => p,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    };
     // The judgment is made against HEAD - the same commit source api_disposition uses - never
     // against a date masquerading as a sha (guard 36 exists precisely for that confusion).
     let sha = git_head(&root);
@@ -643,7 +647,11 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the actor is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let judged_by = judged_by.to_string();
-    let critiques = s.rootpath().join(".tracking").join("critiques.sysml");
+    // issue210: the disposition lands in the JUDGE's per-actor file.
+    let critiques = match crate::write::per_actor_file(&s.rootpath(), "critiques", &judged_by) {
+        Ok(p) => p,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    };
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),

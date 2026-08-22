@@ -1629,6 +1629,44 @@ mod tests {
 
 // ── record issue (D0129 srDcContentionAdjudication) ───────────────────────────
 
+
+/// issue210 (srDcPerActorWriteTargets): the per-actor append target.
+///
+/// FORWARD-ONLY routing for the two high-traffic record kinds (critiques, issues): new records land in
+/// `.tracking/<kind>-<actor>.sysml`, so concurrent contributors never append at the same textual
+/// anchor and their merges are conflict-free by construction; existing shared files stay where
+/// history put them. Readers glob `.tracking`, so reads are unchanged. The actor is
+/// registry-validated upstream and identifier-shaped; non-alphanumerics are stripped defensively
+/// for the package name only.
+///
+/// # Errors
+/// `WriteError::Io` when the file cannot be created.
+pub fn per_actor_file(root: &Path, kind: &str, actor: &str) -> Result<std::path::PathBuf, WriteError> {
+    let path = root.join(".tracking").join(format!("{kind}-{actor}.sysml"));
+    if !path.exists() {
+        let mut pkg_actor: String = actor.chars().filter(char::is_ascii_alphanumeric).collect();
+        if let Some(first) = pkg_actor.get_mut(0..1) {
+            first.make_ascii_uppercase();
+        }
+        let mut pkg_kind = kind.to_string();
+        if let Some(first) = pkg_kind.get_mut(0..1) {
+            first.make_ascii_uppercase();
+        }
+        let text = format!(
+            "// Per-actor {kind} records for {actor} (issue210/srDcPerActorWriteTargets): new records\n\
+             // route here so concurrent contributors never conflict at a shared append anchor.\n\
+             package {pkg_kind}{pkg_actor} {{\n\
+             \x20   private import EngineElement::*;\n\
+             \x20   private import EngineWork::*;\n\
+             \x20   private import EngineVerification::*;\n\
+             \x20   private import EngineRelationships::*;\n\
+             }}\n"
+        );
+        write_atomic(&path, text)?;
+    }
+    Ok(path)
+}
+
 /// A new `Issue`, with the triage that makes it well-formed on arrival.
 pub struct NewIssue<'a> {
     pub title: &'a str,
@@ -1676,14 +1714,26 @@ fn next_issue_number(text: &str) -> u32 {
 /// `WriteError::Io` on filesystem errors; `WriteError::TaskNotFound` if the issues file has no
 /// package close to insert before.
 pub fn record_issue(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
-    // issue185: lock the file this will read-modify-write, for its whole duration.
+    // issue185 + issue210: the legacy issues.sysml serves as the ALLOCATION mutex (it always exists)
+    // even though the new record lands in the author's per-actor file - two same-machine writers
+    // must not race the number scan.
     with_file_lock(&root.join(".tracking").join("issues.sysml"), || record_issue_locked(root, n))
 }
 
 fn record_issue_locked(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
-    let path = root.join(".tracking").join("issues.sysml");
+    // issue210: the number allocates over ALL of .tracking (per-actor files included), the record
+    // lands in the AUTHOR's file. A `part issueNNNDispM` declaration also drives the max, which can
+    // only skip numbers ahead, never collide - and the duplicate-identity guard backstops collisions
+    // from offline clones exactly as before.
+    let mut all_text = String::new();
+    for f in crate::collect_sysml(&root.join(".tracking")) {
+        if let Ok(s) = std::fs::read_to_string(&f) {
+            all_text.push_str(&s);
+        }
+    }
+    let path = per_actor_file(root, "issues", n.author)?;
     let text = std::fs::read_to_string(&path)?;
-    let num = next_issue_number(&text);
+    let num = next_issue_number(&all_text);
     let name = format!("issue{num:03}");
     let uuid = gen_uuid();
     let s = sanitize_field;
@@ -1713,14 +1763,14 @@ fn record_issue_locked(root: &Path, n: &NewIssue) -> Result<(String, String), Wr
     );
     let close = text
         .rfind('}')
-        .ok_or_else(|| WriteError::TaskNotFound("issues.sysml (no package close)".to_owned()))?;
+        .ok_or_else(|| WriteError::TaskNotFound("issues file (no package close)".to_owned()))?;
     let mut out = String::with_capacity(text.len() + block.len());
     out.push_str(text[..close].trim_end());
     out.push('\n');
     out.push_str(&block);
     out.push_str(&text[close..]);
     write_atomic(&path, out)?;
-    Ok((name, ".tracking/issues.sysml".to_owned()))
+    Ok((name, format!(".tracking/issues-{}.sysml", n.author)))
 }
 
 #[cfg(test)]
