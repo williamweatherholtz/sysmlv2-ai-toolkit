@@ -26,10 +26,12 @@ use std::path::{Path, PathBuf};
 /// The machine-local run-record schema, declared here and exempt from existence checks by design.
 ///
 /// Fields: `id, process, actor, approvedBy, startedTs, headAtSpawn, fingerprintAtSpawn, exit,
-/// turns, durationMs, timedOut, gate ("green"|"red"|"not-run"), diffFiles`.
-pub const RUN_RECORD_FIELDS: [&str; 13] = [
+/// turns, durationMs, timedOut, gate ("green"|"red"|"not-run"), diffFiles, ledgerSignal
+/// ("fired"|"SILENT"|"not-checked")` — the K3 signal is report-only (issue206): the gate verdict is
+/// a pure function of the tree, and this machine-local field carries what the tree cannot.
+pub const RUN_RECORD_FIELDS: [&str; 14] = [
     "id", "process", "actor", "approvedBy", "startedTs", "headAtSpawn", "fingerprintAtSpawn", "exit", "turns",
-    "durationMs", "timedOut", "gate", "diffFiles",
+    "durationMs", "timedOut", "gate", "diffFiles", "ledgerSignal",
 ];
 
 /// A prepared (not yet spawned) run.
@@ -115,6 +117,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
     // The gate: validate + activation-filtered guards + blocking rules — the same three surfaces
     // every other tier runs (K15: all re-derivable from the tree; no hook is trusted to have run).
     let mut problems: Vec<String> = Vec::new();
+    let mut fired_since_spawn_flag = false;
     if !diff_files.is_empty() {
         let report = crate::validate_root(root);
         for (p, d) in report.diagnostics.iter().take(10) {
@@ -142,7 +145,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
         }
         // Fire-ledger evidence against ACCIDENTAL enforcement loss (missing KEEL_BIN, unloaded
         // settings) — conditional on the run having written anything, never tamper-proof.
-        let fired_since_spawn = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl"))
+        fired_since_spawn_flag = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl"))
             .ok()
             .and_then(|t| {
                 let spawn_ts = setup.started.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
@@ -163,14 +166,16 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
                     .to_string(),
             );
         }
-        if !fired_since_spawn {
-            problems.push(
-                "no fire-ledger line since spawn: the run's hooks may not have fired (missing KEEL_BIN or unloaded settings) — enforcement loss is ACCIDENTAL-class evidence, review the transcript (K3)"
-                    .to_string(),
-            );
-        }
+        // issue206 (srK15 x K3, resolved per option (a) of its recorded fork): the fired-since-spawn
+        // signal above is REPORT-ONLY, never a gate input. The ledger is machine-local, so a verdict
+        // it reddened could not be re-derived from committed truth by any other clone - K15's
+        // tree-derivability wins the verdict; K3's enforcement-loss signal stays fully visible as
+        // ledgerSignal in both run records for the human review the diff already awaits.
+
     }
     let gate_green = problems.is_empty();
+    // issue206: the K3 signal, carried beside the verdict rather than inside it.
+    let ledger_signal = if diff_files.is_empty() { "not-checked" } else if fired_since_spawn_flag { "fired" } else { "SILENT" };
 
     // Machine-local record — always, empty diff included.
     let runs = root.join(".keel").join("runs");
@@ -186,6 +191,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
         "exit": exit, "turns": turns, "durationMs": duration_ms, "timedOut": timed_out,
         "gate": match (diff_files.is_empty(), gate_green) { (true, _) => "not-run", (false, true) => "green", (false, false) => "red" },
         "diffFiles": diff_files,
+        "ledgerSignal": ledger_signal,
     });
     let local_record = runs.join(format!("{}.json", setup.id));
     crate::write::write_atomic(&local_record, record.to_string()).map_err(|e| e.to_string())?;
@@ -208,7 +214,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
              package Run{short} {{\n\
              \x20   private import EngineElement::*;\n\
              \x20   private import EngineVerification::*;\n\n\
-             \x20   verification run{short}Gate : Test {{ :>> id = \"{}\"; :>> title = \"launched run {short}: {} - post-run gate\"; :>> createdAt = \"{}\"; :>> createdBy = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"Launch approved by {} against the reviewed plan (srServeApproveGateHuman). REACHABILITY RESIDUAL (srServeBoundedReachableContext): the run received only its declared inputs as context but could READ the whole repository; the enforced bound is the post-run whole-tree gate plus unconditional human diff review, not input scoping. Post-run gate over the run-start-to-working-tree diff ({} file(s): {}). validate + activation-filtered guards + blocking rules. Turns {}; duration {}ms; timedOut {}. THE DIFF AWAITS HUMAN REVIEW regardless of this verdict. Problems at gate: {}\"; }}\n\
+             \x20   verification run{short}Gate : Test {{ :>> id = \"{}\"; :>> title = \"launched run {short}: {} - post-run gate\"; :>> createdAt = \"{}\"; :>> createdBy = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"Launch approved by {} against the reviewed plan (srServeApproveGateHuman). REACHABILITY RESIDUAL (srServeBoundedReachableContext): the run received only its declared inputs as context but could READ the whole repository; the enforced bound is the post-run whole-tree gate plus unconditional human diff review, not input scoping. Post-run gate over the run-start-to-working-tree diff ({} file(s): {}). validate + activation-filtered guards + blocking rules. Turns {}; duration {}ms; timedOut {}; K3 ledgerSignal {} (report-only, issue206: machine-local, never a gate input). THE DIFF AWAITS HUMAN REVIEW regardless of this verdict. Problems at gate: {}\"; }}\n\
              \x20   part run{short}GateR1 : TestResult {{ :>> id = \"{}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{}\"; :>> judgedAt = \"{}\"; :>> judgedBy = \"{}\"; }}\n\
              }}\n",
             crate::write::gen_uuid(),
@@ -221,6 +227,7 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
             turns,
             duration_ms,
             timed_out,
+            ledger_signal,
             if problems.is_empty() { "none".to_string() } else { esc(&problems.join(" | ")).chars().take(1500).collect::<String>() },
             crate::write::gen_uuid(),
             setup.head_at_spawn,
