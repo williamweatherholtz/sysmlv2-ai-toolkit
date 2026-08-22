@@ -182,6 +182,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
                 return 1;
             }
             let path = root.join(BINDING_PATH);
+            let previous = std::fs::read_to_string(&path).map_or_else(|_| "(unbound)".to_string(), |s| s.trim().to_string());
             if let Some(parent) = path.parent() {
                 if let Err(e) = std::fs::create_dir_all(parent) {
                     eprintln!("error: cannot create {}: {e}", parent.display());
@@ -192,6 +193,12 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
                 eprintln!("error: cannot write {}: {e}", path.display());
                 return 1;
             }
+            // issue205/D0193 (srK07): a rebind is a weakening class and leaves a durable, surfaced
+            // record - one fire-ledger line naming BOTH bindings. The transition rides the ledger's
+            // `decision` string field (the frozen 6-field schema has no dedicated slot; the encoding
+            // is declared in .engine/contracts/control-events.toml) and `session` stays empty so the
+            // report's sessions-seen counter is not polluted with fake session ids.
+            rebind_ledger(root, &previous, id);
             println!("bound this machine to actor '{id}' ({})", path.display());
             println!("note: {BINDING_PATH} is machine-local and must never be committed.");
             0
@@ -200,6 +207,30 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
             eprintln!("unknown: keel actor {other} (expected 'show' or 'set <actorId>')");
             2
         }
+    }
+}
+
+/// Append the actor-rebind line to the fire-ledger (issue205/D0193). Best-effort like every ledger
+/// write (K2: a failure prints, never blocks a bind), same file + frozen schema as the hook ledger.
+fn rebind_ledger(root: &Path, previous: &str, new_binding: &str) {
+    use std::io::Write as _;
+    let dir = root.join(".keel").join("metrics");
+    if std::fs::create_dir_all(&dir).is_err() {
+        eprintln!("[keel] fire-ledger unavailable: cannot create {} - the rebind record was NOT written", dir.display());
+        return;
+    }
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let line = format!(
+        "{}\n",
+        serde_json::json!({"ts": ts, "session": "", "event": "actor-rebind", "decision": format!("{previous}->{new_binding}"), "exit": 0, "ms": 0})
+    );
+    let written = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("hooks.jsonl"))
+        .and_then(|mut f| f.write_all(line.as_bytes()));
+    if let Err(e) = written {
+        eprintln!("[keel] fire-ledger write failed ({e}) - the rebind record was NOT written");
     }
 }
 

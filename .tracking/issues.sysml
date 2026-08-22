@@ -2427,4 +2427,26 @@ package ProjectIssues {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcReleaseGatedPublish to issue211;
+
+    part issue212 : Issue {
+        :>> id = "78297c37-48b0-4c65-996e-956cc5f8b8e8";
+        :>> title = "A refused record shifted issue-number allocation, leaving off-by-one references across nine text surfaces";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The pass-3 issue batch's first record attempt was refused (its resolver story did not exist yet), so the sequence allocator gave the intended numbers to the NEXT two records: run-gate became issue206 (my texts said 207), override-counting became issue207 (texts said 208), and the re-recorded refusals issue became issue208 (texts said 206). Every EDGE in the model paired correctly - only the prose labels drifted, across critiques, three sprint records, two code comments, the guard doc, guards.md, the control-events contract, and accepted D0193's context. All corrected in-place this sprint except the accepted decision's context, which carries an erratum comment instead (a signed text is not edited). CLASS: prose that repeats an allocated identifier duplicates a fact the allocator owns; the durable practice is cite-after-allocation - read the number the write RETURNED, never the number intended.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from storyControlEventCoverage to issue212;
+
+    part issue213 : Issue {
+        :>> id = "814db1a5-e2ed-453d-83f5-9d7333be356b";
+        :>> title = "record decision never emits the D0070 marker - two landing commits refused for the same forgettable step";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Sprints 395 and 407 each hit the process-change guard's refusal because the governing decision lacked #ProspectiveChange - keel record decision does not emit it and nothing prompts for it. The guard is right both times; the friction is the tool's (D0054: authoring friction is the #1 risk). Resolver: a --process-change flag on record decision, with the guard's message naming it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcRecordDecisionMarkerFlag to issue213;
 }

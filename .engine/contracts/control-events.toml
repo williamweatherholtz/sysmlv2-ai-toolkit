@@ -1,0 +1,66 @@
+# control-events — the declared control-event list (D0193, srK14/srK07/srK02).
+#
+# Every event class whose OCCURRENCE is control-relevant is declared here with the record it must
+# leave. The `control-event-coverage` guard cross-checks this declaration against the event names the
+# binary emits: a declared event nothing emits, or an emitted event nothing declares, WARNS - so a
+# control-relevant event cannot silently exist without a counted record (the family behind issues
+# 203/205/207 and the sr13 dead sentinel: four instances found by verification, none by failure).
+#
+# `record` — where the occurrence lands:
+#   "ledger"    one line in .keel/metrics/hooks.jsonl (machine-local instrumentation, D0180's frozen
+#               6-field schema; NOT evidence-grade - counts, not verdicts)
+#   "tracked"   an authored fact under .tracking/ (evidence-grade; obligations, run records)
+#   "inventory" a row in the hardening lens's enforcementPoints (for points that check rather than fire)
+#
+# ENCODING NOTES, recorded here so no reader has to reverse-engineer them:
+#   - actor-rebind rides the ledger's `decision` string as "<old>-><new>" (the frozen schema has no
+#     dedicated slot and `session` must stay clean for the sessions-seen counter).
+#   - the hook events' `decision` is allow|block; blocks are the K14 promotion evidence.
+
+[post-edit]
+record = "ledger"
+note = "per-edit fast tier (D0134)"
+
+[stop]
+record = "ledger"
+note = "turn-boundary gate (D0130)"
+
+[user-prompt]
+record = "ledger"
+note = "route-first reminder (D0064) - advisory, fires counted"
+
+[pre-bash]
+record = "ledger"
+note = "shell advisory (issue094)"
+
+[pre-write]
+record = "ledger"
+note = "protected-fact-surface tiers (D0176)"
+
+[subagent-stop]
+record = "ledger"
+note = "subagent tree gate (D0174)"
+
+[launch-dirty-refusal]
+record = "ledger"
+note = "P5 single-writer refusal (D0182) - the PESS-2 watch metric"
+
+[override-consumed]
+record = "ledger"
+note = "issue207: the NORMAL consumption path, counted; the tracked obligation is the evidence half"
+
+[override-obligation-UNSYNCED]
+record = "ledger"
+note = "override consumed but the tracked obligation write FAILED - the recovery breadcrumb"
+
+[red-yield-obligation-UNSYNCED]
+record = "ledger"
+note = "loop-safety release recorded locally when the tracked obligation write failed"
+
+[actor-rebind]
+record = "ledger"
+note = "issue205 (srK07): a rebind is a weakening class; the line names old->new in `decision`"
+
+[spec-pin-check]
+record = "inventory"
+note = "issue203: the build-time spec-pin point lives in the enforcementPoints inventory (its warn-allow residual stated there), not the ledger - builds happen off-tree"

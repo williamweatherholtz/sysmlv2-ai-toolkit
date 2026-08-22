@@ -514,6 +514,10 @@ fn enforcement_points(root: &Path) -> Json {
         row("hook SubagentStop (subagent tree gate)", has_event("SubagentStop"), "subagent writes reach the turn gate instead", "loud warning, allows", HOOK_TIMEOUT),
         row("pre-commit .githooks (commit gate)", hooks_wired, "UNSET hooksPath = never runs - orient warns loudly; binary absent = exit 1 with the install path (K2, fail-loud)", "exit 1, commit blocked", "n/a - synchronous, no harness deadline"),
         row("CI keel gate (layer 3, hook-independent)", ci, "no remote verification; audit-history still re-derives locally (K15)", "CI red", "CI runner timeout -> red, visible"),
+        // issue203 (critique pass 1): this point existed since the parser crate's birth and was
+        // never in this inventory - which is how its all-zeros sentinel stayed dead for its whole
+        // life. Its network-error path resolves to ALLOW with a warning: the recorded residual.
+        row("build-time spec pin (keel-parser build.rs)", root.join("keel-parser").join("build.rs").exists(), "no build-time check on trees without the parser source (every downstream project) - the shipped binary was built against the pinned spec upstream", "SHA mismatch fails the build loudly (sr13SpecPin)", "network error or SYSML_V2_SPEC_OFFLINE resolves to ALLOW with a warning - RECORDED RESIDUAL (issue203)"),
         row(&format!("guards at gate tiers ({} enforced)", crate::guards::GUARD_NAMES.len()), true, "guards run inside validate/gate/commit paths - absent only if the binary is absent (see pre-commit row)", "guard error = violation, fails loud (issue183 rule)", "n/a - in-process"),
         row("declared rules", true, "report-only until P1.5 wires them into hook stop, pre-commit, and CI - RECORDED RESIDUAL (d0177)", "rule parse error reported", "n/a - in-process"),
     ];

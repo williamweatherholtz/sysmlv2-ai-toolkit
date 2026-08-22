@@ -57,6 +57,9 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
                 overrides += 1;
                 unsynced += 1;
             }
+            // issue207/D0193: the happy path emits override-consumed; both paths count as overrides
+            // and only the failure path counts as unsynced.
+            "override-consumed" => overrides += 1,
             ev if ev.starts_with("red-yield") => red_yields += 1,
             _ => {}
         }
@@ -158,5 +161,29 @@ mod tests {
         let per = d["perEvent"].as_array().expect("perEvent");
         assert!(per.iter().any(|e| e["event"] == "stop" && e["fires"] == 2 && e["blocks"] == 2));
         assert!(d["launcherFraction"].as_str().is_some_and(|s| s.contains("unavailable")), "absent P5 data says so");
+    }
+
+    /// issue207/D0193: BOTH override paths count as overrides; only the failure path counts as
+    /// unsynced. Before the fix the happy path emitted nothing and the report structurally
+    /// under-read override pressure in the K14 promotion evidence.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup
+    fn successful_override_consumptions_are_counted() {
+        let root = std::env::temp_dir().join("keel-pm-overrides");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keel").join("metrics")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let lines = [
+            r#"{"ts":1,"session":"s1","event":"override-consumed","decision":"allow","exit":0,"ms":0}"#,
+            r#"{"ts":2,"session":"s1","event":"override-consumed","decision":"allow","exit":0,"ms":0}"#,
+            r#"{"ts":3,"session":"s1","event":"override-obligation-UNSYNCED","decision":"block","exit":1,"ms":0}"#,
+        ]
+        .join("
+");
+        std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), lines).expect("write ledger");
+        let report = enforcement_report(&root).expect("report");
+        let d: serde_json::Value = serde_json::from_str(&report).expect("json");
+        assert_eq!(d["overrideLedgerEvents"], 3, "consumed + unsynced both count as overrides");
+        assert_eq!(d["overrideObligationsUnsynced"], 1, "only the failure path is unsynced");
     }
 }

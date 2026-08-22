@@ -394,7 +394,13 @@ fn consume_override(root: &Path, written_path: &str, session: &str) -> Option<St
         "A recorded override unlocked a direct write (D0176 tier 3). Path actually written: {written_path}. Reason given: {reason}. Session: {session}. Discharge: a human reviews the write and triages this obligation with a #Resolves edge."
     );
     match keel_cli::write::record_obligation(root, "override", &title, &desc, &actor) {
-        Ok(p) => eprintln!("[keel] override consumed — obligation recorded: {}", p.display()),
+        Ok(p) => {
+            // issue207/D0193 (srK14): the NORMAL consumption is counted too - without this line the
+            // report's override counter saw only the UNSYNCED failure path and structurally
+            // under-read override pressure in the very evidence promotion reviews must cite.
+            ledger_emit(root, session, "override-consumed", 0, 0);
+            eprintln!("[keel] override consumed — obligation recorded: {}", p.display());
+        }
         Err(e) => {
             // The tracked write failed (possibly BECAUSE the target is the corrupted file being
             // repaired) — local ledger + sync obligation, never a silent unlock (K7).

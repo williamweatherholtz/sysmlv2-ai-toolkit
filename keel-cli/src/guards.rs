@@ -1618,8 +1618,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 44] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding"];
+pub const GUARD_NAMES: [&str; 45] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2329,6 +2329,73 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 }
 
 
+/// Guard 45 (D0193, WARNING tier): every control-relevant event is DECLARED with its required
+/// record, and the declaration matches what the binary emits.
+///
+/// The family it closes (issues 203/205/207 + the sr13 sentinel): a control-relevant event with no
+/// counted record stays invisible until a verification campaign trips over it. The check is a
+/// two-way diff between `.engine/contracts/control-events.toml`'s ledger-record sections and the
+/// event names the binary's emitters use - a declared event nothing emits warns (dead declaration),
+/// an emitted event nothing declares warns (uncounted event). Inventory-record events are checked
+/// against the hardening lens's point list by name. Absent contract = not adopted, reported (D0136).
+#[must_use]
+pub fn control_event_coverage(root: &Path) -> GuardReport {
+    /// Every ledger event name the binary emits. A NEW `ledger_emit` call site must add its event
+    /// here AND to the contract - this constant going stale is exactly what the two-way diff warns on.
+    const EMITTED_LEDGER: [&str; 11] = [
+        "post-edit", "stop", "user-prompt", "pre-bash", "pre-write", "subagent-stop",
+        "launch-dirty-refusal", "override-consumed", "override-obligation-UNSYNCED",
+        "red-yield-obligation-UNSYNCED", "actor-rebind",
+    ];
+    const INVENTORY_POINTS: [(&str, &str); 1] = [("spec-pin-check", "build-time spec pin")];
+    let path = root.join(".engine").join("contracts").join("control-events.toml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return GuardReport {
+            name: "control-event-coverage",
+            scanned: EMITTED_LEDGER.len(),
+            warnings: vec!["control-events.toml is ABSENT - this control is NOT ADOPTED by this project (D0136: absence is a state, never a violation); the binary's control events go uncounted-by-declaration".to_string()],
+            violations: Vec::new(),
+        };
+    };
+    let mut declared_ledger: Vec<String> = Vec::new();
+    let mut declared_inventory: Vec<String> = Vec::new();
+    let mut current: Option<String> = None;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('[') && l.ends_with(']') {
+            current = Some(l[1..l.len() - 1].to_string());
+        } else if let (Some(name), Some(rest)) = (&current, l.strip_prefix("record")) {
+            let value = rest.trim_start_matches(['=', ' ']).trim_matches('"');
+            match value {
+                v if v.starts_with("ledger") => declared_ledger.push(name.clone()),
+                v if v.starts_with("inventory") => declared_inventory.push(name.clone()),
+                _ => {}
+            }
+        }
+    }
+    let mut warnings = Vec::new();
+    for d in &declared_ledger {
+        if !EMITTED_LEDGER.contains(&d.as_str()) {
+            warnings.push(format!("declared control event `{d}` (record=ledger) has NO emitter in the binary - a dead declaration reads as coverage that does not exist (D0193)"));
+        }
+    }
+    for e in EMITTED_LEDGER {
+        if !declared_ledger.iter().any(|d| d == e) {
+            warnings.push(format!("the binary emits ledger event `{e}` that control-events.toml does not declare - an uncounted-by-declaration control event, the issue203/205/207 family (D0193)"));
+        }
+    }
+    // Inventory-record events: the named point must exist in the enforcementPoints inventory text.
+    let inventory = crate::hardening::hardening(root).unwrap_or_default(); // the lens is the inventory's one authority; a compute failure reads as absent points, which warns rather than passes
+    for (event, point_needle) in INVENTORY_POINTS {
+        if declared_inventory.iter().any(|d| d == event) && !inventory.contains(point_needle) {
+            warnings.push(format!("declared control event `{event}` (record=inventory) names no matching enforcement point (`{point_needle}`) in the hardening lens (D0193/issue203)"));
+        }
+    }
+    let scanned = declared_ledger.len() + declared_inventory.len();
+    GuardReport { name: "control-event-coverage", scanned, warnings, violations: Vec::new() }
+}
+
+
 /// Every `:>> id = "…"` value on one line. A line may carry several: the sprint records declare an item
 /// and its result on one line each, and a per-line regex-free scan must not stop at the first.
 fn id_values(line: &str) -> Vec<String> {
@@ -2494,6 +2561,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-scaffolding" => Some(decision_scaffolding(root)), // WARNING-tier (D0188, composed with D0180) — an accepted promise chartering no work
         "release-recorded" => Some(release_recorded(root)), // WARNING-tier (D0191, deploy unit) — a shipped tag with no authored Release item
         "enrollment-binding" => Some(enrollment_binding(root)), // WARNING-tier (D0191, actor-enrollment unit) — a machine binding naming an unregistered or kindless actor
+        "control-event-coverage" => Some(control_event_coverage(root)), // WARNING-tier (D0193) — a control-relevant event with no counted record
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

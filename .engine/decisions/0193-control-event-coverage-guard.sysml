@@ -1,13 +1,18 @@
 // D0193 (PROPOSED — NOT YET ACCEPTED) — D0193: every control-relevant event emits a counted record - one coverage control for the family
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0193Accept event on sign-off.
+// ERRATUM (sprint 407, issue212): the context below cites "issue208" for the uncounted-override
+// finding; the allocator actually numbered it issue207 (a refused earlier record shifted the
+// sequence). The signed text is not edited; the correct pairing is in the model's edges.
 package Decision0193 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
     private import EngineRelationships::*;
 
-    part d0193 : Decision {
+    // #ProspectiveChange (D0070) - governs guard 45, the control-events.toml contract, and the
+    // re-chartering of the three folded resolvers.
+    #ProspectiveChange part d0193 : Decision {
         :>> id = "ff89ea3d-0f41-460d-9ff0-79e03c2d2971";
         :>> title = "D0193: every control-relevant event emits a counted record - one coverage control for the family";
         :>> createdAt = "2026-08-21";

@@ -1,6 +1,6 @@
 # Guard reference
 
-`keel guard` runs **44** forward guards, kernel-free — hard-blocking (exit ≠ 0 on any violation)
+`keel guard` runs **45** forward guards, kernel-free — hard-blocking (exit ≠ 0 on any violation)
 and warning-only (visible every commit, never blocking). `keel version` reports the exact split
 computed from the enforced set — read it there rather than here, so the number has one home.
 
@@ -48,6 +48,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `decision-scaffolding` | An accepted `#ProspectiveChange` Decision must be reachable by a tracked-item edge (charteredby/derivedfrom/resolves/satisfy) — it promises process change, so it charters work (D0188, answering the human's "the scaffolding under a decision isn't being made"). WARNING-tier by D0188's composed rule with D0180: promotion to hard is a recorded review citing the fire-ledger window. Forward-only from D0188's own recorded acceptance date, read from the model; the newest violator is exempt (the landing-sprint grace). |
 | `release-recorded` | Every local version tag (`v`-prefixed) has a `Release` item whose title names it and whose recorded commit matches the tag's commit (D0191, owned by the `deploy` unit) - process-enforcement.toml's own admitted checkable claims, unguarded until guard 43. WARNING-tier per the guided profile's advisory-first rule; zero tags scans zero, so a project without releases is untouched. First run caught both defect shapes: v0.1.0 had no Release item (backfilled), and v0.2.0's tag sits two housekeeping commits past its recorded commit (standing, accurate, owner's to reconcile). |
 | `enrollment-binding` | When a machine binding (`.keel/actor`) exists, its name resolves to a registered `Person` or to an `Actor` carrying a declared kind (D0191, owned by the `actor-enrollment` unit). Until guard 44 NOTHING validated the binding file - an unregistered or kindless name surfaced only when a downstream write refused. WARNING-tier; an absent binding scans zero (binding is per-machine and optional until a write needs an actor). |
+| `control-event-coverage` | Every control-relevant event is DECLARED in `.engine/contracts/control-events.toml` with its required record, and the declaration matches what the binary emits - a two-way diff (declared-not-emitted warns as a dead declaration; emitted-not-declared warns as an uncounted event). Closes the four-instance invisible-control-event family (issues 203/205/207 + the sr13 sentinel) with ONE control instead of per-instance sweeps (D0193/D0047). WARNING-tier; an absent contract reports not-adopted (D0136). |
 
 
 Visible on every commit, never blocking — the D0102 *promote-once-low-noise* pattern.
