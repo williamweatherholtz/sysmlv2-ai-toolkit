@@ -115,4 +115,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcDeckForkOptions to issue223;
+
+    part issue224 : Issue {
+        :>> id = "1a148a03-fc88-4705-8bc9-f36c9d6a9477";
+        :>> title = "The recording delegation covers acceptances only while the practice also records confirmation flips";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "srK06a completeness critique (srK06aCompl1, sprint 421): D0192 OPTION A declared the delegation and its quote-substance check for decisionAcceptance, but the identical practice - AI records the human's judgment on their verbatim words - also flips method=confirmation DoD results (sprint 420's dcHumanChannelDelegationRuleDoD flip is the live example), and no [confirmationRecord] policy class or substance demand exists there. Same asymmetry D0192 closed, one level down. Design note: a DoD result carries no note field, so where the quote lives is a design question, not a copy of the acceptance check.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcConfirmationRecordDelegation to issue224;
 }
