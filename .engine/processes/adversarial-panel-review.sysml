@@ -53,7 +53,7 @@ package ProcessAdversarialPanelReview {
         :>> title = "Record outcomes as tracked facts";
         :>> triggerCondition = "Unanimity reached, or the human has adjudicated the residue.";
         :>> actionText = "Everything that should outlive the conversation becomes a tracked fact through the write API: surviving findings that demand work become Issues or backlog tasks; direction outcomes become proposed Decisions awaiting human acceptance; charter-time residuals are carried into the Decisions they belong to. The recorded provenance carries the independence honesty note verbatim: same-model subagent panelists are a rigor framing whose critiques record critiquedBy = aiModel - the record claims convergence, never critic independence.";
-        :>> producedArtifact = "Proposed Decisions, Issues, and chartered tasks; the artifact itself referenced from them.";
+        :>> producedArtifact = "Proposed Decisions, Issues, and chartered tasks; the artifact itself referenced from them; and a KNOWLEDGE RECORD (D0196) at .tracking/knowledge/<slug>.sysml - a method=analyze Test carrying the replication block (process, process-def version pin, skill, roster, rounds, artifact paths) with per-round TestResults and plain-dependency edges to the process, the governing Decision, the sprint, and every produced item.";
         :>> owner = Owner::ai;
     }
 }
