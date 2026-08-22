@@ -2348,7 +2348,7 @@ pub fn control_event_coverage(root: &Path) -> GuardReport {
         "launch-dirty-refusal", "override-consumed", "override-obligation-UNSYNCED",
         "red-yield-obligation-UNSYNCED", "actor-rebind",
     ];
-    const INVENTORY_POINTS: [(&str, &str); 1] = [("spec-pin-check", "build-time spec pin")];
+    const INVENTORY_POINTS: [(&str, &str); 2] = [("spec-pin-check", "build-time spec pin"), ("pre-push-behind", "pre-push .githooks")];
     let path = root.join(".engine").join("contracts").join("control-events.toml");
     let Ok(text) = std::fs::read_to_string(&path) else {
         return GuardReport {

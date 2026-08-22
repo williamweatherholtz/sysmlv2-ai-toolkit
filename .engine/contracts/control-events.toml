@@ -61,6 +61,10 @@ note = "loop-safety release recorded locally when the tracked obligation write f
 record = "ledger"
 note = "issue205 (srK07): a rebind is a weakening class; the line names old->new in `decision`"
 
+[pre-push-behind]
+record = "inventory"
+note = "issue209: the pre-push behind-check lives in the enforcementPoints inventory - a shell hook cannot reach the ledger, and its refusals surface in the pusher's own terminal"
+
 [spec-pin-check]
 record = "inventory"
 note = "issue203: the build-time spec-pin point lives in the enforcementPoints inventory (its warn-allow residual stated there), not the ledger - builds happen off-tree"

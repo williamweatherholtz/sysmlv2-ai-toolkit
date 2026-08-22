@@ -1,6 +1,11 @@
 // D0191 (PROPOSED — NOT YET ACCEPTED) — D0191: the deploy and actor-enrollment admitted gaps get their guards
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0191Accept event on sign-off.
+// APPLICATION NOTES (the enforcement-gap family this Decision opened):
+//   - sprint 409: the deploy unit's release pipeline gained its publish gate (issue211).
+//   - sprint 410: the pre-push behind-check joined .githooks, the enforcementPoints inventory, and
+//     the control-events declaration (issue209) - the [pre-push-behind] row in control-events.toml
+//     is this Decision's enforcement family extending the D0193 contract by its own rules.
 package Decision0191 {
     private import EngineElement::*;
     private import EngineWork::*;

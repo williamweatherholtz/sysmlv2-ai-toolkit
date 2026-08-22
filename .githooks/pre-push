@@ -1,0 +1,29 @@
+#!/bin/sh
+# keel pre-push (issue209 / srDcGateOnMergedTree, D0191 family): a contribution shall never land
+# having been gated only in isolation. This hook forces the fetch-integrate-gate-push loop by
+# REFUSING a main push whose HEAD is not a descendant of the freshly-fetched trunk - behind-ness
+# detection ONLY, never a duplicate full gate (keel land already gates the MERGED tree; D0054
+# forbids re-verifying it on every push). Non-main refs (tags, scratch branches) pass untouched.
+# Fail-loud (K2): an unverifiable trunk refuses rather than allowing.
+remote="$1"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main) ;;
+    *) continue ;;
+  esac
+  # deleting or creating refs is not a behind-ness question
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  if ! git fetch -q "$remote" main; then
+    echo "[keel] pre-push REFUSED: cannot fetch $remote/main to verify the trunk (fail-loud, K2)." >&2
+    echo "        Sanctioned path: keel land (fetch, integrate by merge, gate the merged tree, push)." >&2
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor FETCH_HEAD "$local_sha"; then
+    echo "[keel] pre-push REFUSED: this push is NOT a fast-forward of the fetched trunk - it was" >&2
+    echo "        gated in isolation, and a contribution never lands that way (srDcGateOnMergedTree)." >&2
+    echo "        Sanctioned path: keel land - it fetches, integrates by MERGE, runs the full gate" >&2
+    echo "        against the MERGED tree, then pushes with bounded retries." >&2
+    exit 1
+  fi
+done
+exit 0

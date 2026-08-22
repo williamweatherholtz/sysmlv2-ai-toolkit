@@ -512,6 +512,7 @@ fn enforcement_points(root: &Path) -> Json {
         row("hook PreToolUse pre-bash (shell advisory)", has_event("PreToolUse"), "advisory only, nothing gates", "prints and allows", HOOK_TIMEOUT),
         row("hook PreToolUse pre-write (protected paths)", has_event("PreToolUse"), "PURE-SHELL fallback DENIES without the binary, loudly (P0.3)", "deny message malformed -> harness asks", HOOK_TIMEOUT),
         row("hook SubagentStop (subagent tree gate)", has_event("SubagentStop"), "subagent writes reach the turn gate instead", "loud warning, allows", HOOK_TIMEOUT),
+        row("pre-push .githooks (behind check)", root.join(".githooks").join("pre-push").exists(), "raw pushes land isolation-gated; CI still re-derives post-hoc (issue209's pre-fix state)", "fetch failure REFUSES the push (fail-loud, K2)", "n/a - synchronous, no harness deadline"),
         row("pre-commit .githooks (commit gate)", hooks_wired, "UNSET hooksPath = never runs - orient warns loudly; binary absent = exit 1 with the install path (K2, fail-loud)", "exit 1, commit blocked", "n/a - synchronous, no harness deadline"),
         row("CI keel gate (layer 3, hook-independent)", ci, "no remote verification; audit-history still re-derives locally (K15)", "CI red", "CI runner timeout -> red, visible"),
         // issue203 (critique pass 1): this point existed since the parser crate's birth and was
