@@ -1272,12 +1272,20 @@ pub fn record_decision(
     decision: &str,
     rationale: &str,
     consequences: &str,
+    marker: Option<&str>,
 ) -> Result<(String, String), WriteError> {
     let dir = root.join(".engine").join("decisions");
     let num = next_decision_number(&dir);
     let nnnn = format!("{num:04}");
     let uuid = gen_uuid();
     let s = sanitize_field;
+    // issue213 (D0193 family): the D0070 marker is emitted BY the recorder when the author states
+    // the decision governs a process/schema change - two landing commits were refused because the
+    // marker was a forgettable hand-edit. The governs-comment names the convention's source.
+    let marker_lines = marker.map_or_else(String::new, |m| {
+        format!("    // #{m} (D0070) - this Decision governs a process/schema change; the co-committed\n    // change rides the process-change guard's hard lock.\n    #{m} ")
+    });
+    let plain_indent = if marker.is_some() { "" } else { "    " };
     let file_text = format!(
         "// D{nnnn} (PROPOSED — NOT YET ACCEPTED) — {title_c}\n\
          // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit\n\
@@ -1287,7 +1295,7 @@ pub fn record_decision(
          \x20   private import EngineWork::*;\n\
          \x20   private import EngineVerification::*;\n\
          \x20   private import EngineRelationships::*;\n\n\
-         \x20   part d{nnnn} : Decision {{\n\
+         {marker_lines}{plain_indent}part d{nnnn} : Decision {{\n\
          \x20       :>> id = \"{uuid}\";\n\
          \x20       :>> title = \"{title_c}\";\n\
          \x20       :>> createdAt = \"{date_c}\";\n\
@@ -1300,6 +1308,8 @@ pub fn record_decision(
          \x20   }}\n\
          }}\n",
         title_c = s(title),
+        marker_lines = marker_lines,
+        plain_indent = plain_indent,
         date_c = s(date),
         author_c = s(author),
         context_c = s(context),

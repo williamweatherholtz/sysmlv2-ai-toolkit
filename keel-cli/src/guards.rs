@@ -487,7 +487,7 @@ fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) 
         return Vec::new();
     }
     vec![format!(
-        "process-def file(s) changed ({}) with NO co-committed process-change Decision (a #ProspectiveChange/#SafetyChange-marked .engine/decisions/*.sysml). D0070 hard lock: every process-def change — typos included — must record a process-change Decision.",
+        "process-def file(s) changed ({}) with NO co-committed process-change Decision (a #ProspectiveChange/#SafetyChange-marked .engine/decisions/*.sysml). D0070 hard lock: every process-def change — typos included — must record a process-change Decision. Record one with `keel record decision --process-change ...` (the flag emits the marker; issue213).",
         procdefs.join(", ")
     )]
 }

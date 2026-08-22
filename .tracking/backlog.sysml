@@ -590,6 +590,7 @@ package EngineBacklog {
         part rustS5CLIDoDR18 : TestResult { :>> id = "fc3bc03c-f2df-4206-95c6-3701a6420da6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c9999aa"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeOpus5"; }
         part rustS5CLIDoDR19 : TestResult { :>> id = "cc696dd0-f5fb-47f0-b3de-02e44b57fbb3"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         part rustS5CLIDoDR20 : TestResult { :>> id = "1b913d24-1f63-49ce-9b2b-9c7d2cc66e2d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2af2ac9"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        part rustS5CLIDoDR21 : TestResult { :>> id = "50f6acd6-7341-4150-89b7-951757f88b4b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         verification rustS5CLIRetroGate : Test { :>> id = "12345bcd-6789-4dea-f012-3456789abcde"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Sprint 5 retro held; process improvement items reviewed; any accepted changes recorded as Decisions with CR: commits; team lead confirms retro complete"; }
         verification rustS6OrientDoR : Test { :>> id = "23456cde-789a-4efb-0123-456789abcdef"; :>> method = VerificationMethod::inspect; :>> procedureText = "orient subcommand approach agreed: reads .tracking/state.sysml cursor + backlog.sysml outstanding/ready; outputs current phase, ready items, suspect items; exit 0; DoD accepted"; }
         part rustS6OrientDoRR1 : TestResult { :>> id = "f0e1d2c3-b4a5-4f6e-7d8c-9b0a1f2e3d4c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "38609e7"; :>> judgedAt = "2026-06-15"; :>> judgedBy = "claudeSonnet46"; }
@@ -655,6 +656,7 @@ package EngineBacklog {
         part rustS9writeApiDoDR10 : TestResult { :>> id = "a409a9ec-4f70-4487-9bf8-ada07a925e6a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cfdca16"; :>> judgedAt = "2026-08-15"; :>> judgedBy = "claudeOpus5"; }
         part rustS9writeApiDoDR11 : TestResult { :>> id = "dce09e2a-7f40-4203-852f-414c7095f9e6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c9999aa"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeOpus5"; }
         part rustS9writeApiDoDR12 : TestResult { :>> id = "13114117-52e0-4b2e-a822-621ebc6ba210"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        part rustS9writeApiDoDR13 : TestResult { :>> id = "fc5bdb53-1652-4bc4-8f46-0dd94f8d79b9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
 
         first dogfoodBusiness then dogfoodArchitecture;
         first dogfoodArchitecture then dogfoodDelivery;
@@ -739,6 +741,7 @@ package EngineBacklog {
         part writeApiDoDR10 : TestResult { :>> id = "eec81edd-2065-4960-bbe8-46ca14f213e9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cfdca16"; :>> judgedAt = "2026-08-15"; :>> judgedBy = "claudeOpus5"; }
         part writeApiDoDR11 : TestResult { :>> id = "34e863ee-0062-432e-8cc8-a663d7f26d8a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c9999aa"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeOpus5"; }
         part writeApiDoDR12 : TestResult { :>> id = "9fe5d36d-d1cf-4035-9811-3e891a30bfa8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        part writeApiDoDR13 : TestResult { :>> id = "8e7b0870-310f-411e-9955-4d76fa04b15c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         verification toolchainWatchDoD : Test { :>> id = "e08f7e87-bd2b-4702-be9f-b39a76dbb028"; :>> method = VerificationMethod::confirmation; :>> procedureText = "newer toolchain evaluated; expose/verify-by/derive adoption decided + recorded"; }
         part toolchainWatchDoDR1 : TestResult { :>> id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "aba9e6f"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeSonnet46"; }
 
@@ -793,6 +796,7 @@ package EngineBacklog {
         part rustToolchainFixDoDR25 : TestResult { :>> id = "b9e2ab43-c1cd-40b4-aad5-557a0d0b8f98"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         part rustToolchainFixDoDR26 : TestResult { :>> id = "031efba6-2b47-40d3-b425-290bfc459089"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2af2ac9"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         part rustToolchainFixDoDR27 : TestResult { :>> id = "682876bc-11e2-41c3-b7d1-d97d5e1ff9fe"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "40988a7"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        part rustToolchainFixDoDR28 : TestResult { :>> id = "afe6443e-2697-487b-9b5e-c7fab48a6866"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         verification deliverySkillsDoD : Test { :>> id = "b2c3d4e5-f607-4819-ab1c-2d3e4f506172"; :>> method = VerificationMethod::inspect; :>> procedureText = "build skill (cargo build + validators) and test/verify skill (cargo test + BDD + parity) created under .engine/skills/ and registered in skills-registry.sysml; each carries purpose/triggerCondition/writePolicy; repo-push reconciled to the main-only policy (issue009); doc-sync complete; validate_all green"; }
         part deliverySkillsDoDR1 : TestResult { :>> id = "c3d4e5f6-0718-492a-bc2d-3e4f50617294"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "14b7050"; :>> judgedAt = "2026-06-16"; :>> judgedBy = "claudeOpus"; }
         verification auditSkillDoD : Test { :>> id = "c3d4e5f6-0718-492a-bc2d-3e4f50617283"; :>> method = VerificationMethod::inspect; :>> procedureText = "architectural-critique SKILL.md created under .engine/skills/ and registered; encodes CAE (Goal->Strategy->Evidence) + GQM metric checks (gate-coverage, satisfy-coverage, deliverable-parity) + ATAM scenario walkthrough; critique process rewritten so findings are recorded as tracked Issue/Decision instances (not a prose doc); validate_all green"; }
@@ -1150,6 +1154,7 @@ package EngineBacklog {
         part serveItemActionsDoDR9 : TestResult { :>> id = "75796f5c-4d1d-4439-bacf-6132dff0ad64"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "0433ca6"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         part serveItemActionsDoDR10 : TestResult { :>> id = "3eb9c916-d925-4592-8f33-3ed597a9b053"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "2af2ac9"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
         part serveItemActionsDoDR11 : TestResult { :>> id = "4ea2965c-d7c5-48ab-8a0e-7ccd15a3a283"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "40988a7"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        part serveItemActionsDoDR12 : TestResult { :>> id = "bf2934da-4c8a-45e8-b36c-7e262c9dbbd0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
 
         // ── D0095 deferred rename (its own gated D0067 migration) ──
         action engineRename; // D0095: rename sysmlv2 -> keel (binary/package/docs/scaffold/CLAUDE.md) as a gated bulk migration.
@@ -1840,4 +1845,5 @@ package EngineBacklog {
         part dcReleaseGatedPublishDoDR1 : TestResult { :>> id = "ee27cf8e-f5d0-4612-a9e5-83287f89268e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d3ccabd"; :>> judgedAt = "2026-08-22"; :>> judgedBy = "claudeFable5"; }
         action dcRecordDecisionMarkerFlag;
         verification dcRecordDecisionMarkerFlagDoD : Test { :>> id = "f538caad-dc41-4efb-b9b9-67ecb0a872cb"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue213. SECOND occurrence (sprints 395 and 407) of the same commit-time refusal: keel record decision emits a plain Decision, the author forgets the #ProspectiveChange marker, and the process-change guard refuses the landing commit - correct behavior, avoidable friction (D0054). DO: keel record decision gains --process-change (and --safety-change) emitting the D0070 marker + a standard governs-comment; the guard's refusal message names the flag (srK13 deny-and-provide). VERIFY: a decision recorded with the flag carries the marker; a process-def commit citing it passes the guard; docs updated same commit."; }
+        part dcRecordDecisionMarkerFlagDoDR1 : TestResult { :>> id = "8ff5581b-44d7-4389-9351-e442bb122b29"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "58f54f0"; :>> judgedAt = "2026-08-22"; :>> judgedBy = "claudeFable5"; }
 }

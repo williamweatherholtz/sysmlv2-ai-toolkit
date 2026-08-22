@@ -2166,7 +2166,15 @@ fn cmd_record(args: &[String]) -> i32 {
         eprintln!("error: --date YYYY-MM-DD required (the attestation time is its own irreducible fact)");
         return 2;
     }
-    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences) {
+    // issue213: the D0070 marker as a first-class flag - forgetting it cost two landing commits.
+    let marker = if args.iter().any(|a| a == "--process-change") {
+        Some("ProspectiveChange")
+    } else if args.iter().any(|a| a == "--safety-change") {
+        Some("SafetyChange")
+    } else {
+        None
+    };
+    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
             println!("accept later via an explicit human sign-off (flip status + add the d{nnnn}Accept event).");
