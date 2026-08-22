@@ -148,4 +148,59 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcOwnershipDiffGuard to issue226;
+
+    part issue227 : Issue {
+        :>> id = "275707d4-a2be-4827-a539-98dc7ae8a677";
+        :>> title = "authority-queue and sitting-coverage disagree about the sitting-review obligation";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Process-value panel (human-factors lens), verified live by the convener: authority-queue reports '279 sprint(s) awaiting a sitting review, waitingDays 65, escalated true' while sitting-coverage reports due 6 with 313 grandfathered under the D0155 human attestation. Two computed views, one obligation, two answers - the exact dual-computation class D0018 forbids, in the pair of views the human uses to size their own duty.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSittingViewParity to issue227;
+
+    part issue228 : Issue {
+        :>> id = "66136aa6-703d-48ac-91db-602246631061";
+        :>> title = "Batch acknowledgments count as read reviews; the human override rate is unmeasured; escalation is toothless";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Process-value panel, 4 of 9 lenses convergent. VERIFIED: 65 of 105 covered sittings (62 percent) were signed in two batch chat utterances against deck cards rendering a title plus the literal string 'unreviewed'; zero reject/needs-work sitting verdicts exist in the record; the 279-sprint queue has been escalated 65 days while ~145 sprints landed on top of it. sitting-coverage counts a batch acknowledgment identically to a read review - the same one-number conflation the EXAMINED/EXERCISED split exists to prevent. The record is honest about what happened (verbatim batch words); the COUNT is not.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcOversightRedesign to issue228;
+
+    part issue229 : Issue {
+        :>> id = "d182fb95-f1e5-470a-9313-d703d2f9fe7b";
+        :>> title = "Claims gate selection but not landing, and claimedAt is authored where nothing else is trusted";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Process-value panel (multi-agent lens), two concrete interleavings: (1) A claims, goes stale, B claims and works, A resumes and LANDS - no holdership re-check exists at land, so both land green and duplication surfaces only on contradiction; (2) holdership = earliest un-expired claimedAt, and claimedAt is claimer-authored, never validated against the introducing commit's ancestry - a backdated claim steals holdership deterministically on every clone. The repo's own doctrine (D0013: git ancestry is the clock) supplies the fix and is not applied to claims.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcClaimLandCheck to issue229;
+
+    part issue230 : Issue {
+        :>> id = "4bfd8897-7f1c-4358-87bf-2776c1b97ba4";
+        :>> title = "Zero advisory blocks is uninformative: the ledger cannot distinguish deterrence from dead weight";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Process-value panel - empiricist, skeptic and AI-safety lenses independently: the fire-ledger records fires (1,164 pre-bash, 0 blocks) but not advisory content or whether the flagged action changed, so D0197's declared revisit condition is structurally untriggerable and the 'advisory tiers deter' hypothesis has no counterfactual arm. A monitor whose catches cannot be counted is indistinguishable from a blind one.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcAdvisoryInstrumentation to issue230;
+
+    part issue231 : Issue {
+        :>> id = "982b984a-105c-41e7-bfea-fec614644769";
+        :>> title = "The parser TCB has no ratchet: the skipped-statement count can grow silently";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Process-value panel (formal-methods lens). The parser is the trusted computing base of every view and guard - a statement class it skips is invisible to the whole enforcement stack (incident lineage: issue102 56 absent use-case usages, issue109 dangling endpoints only the kernel saw, issue119 edge-kind drift both directions, issue221-era bare-dependency skip). parser-coverage WARNS at 7 skipped today, but nothing goes red if the count grows, and no property-based round-trip pins skip-freedom over generated corpora.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcParserCoverageRatchet to issue231;
 }
