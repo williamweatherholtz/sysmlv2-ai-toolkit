@@ -24,9 +24,11 @@ use crate::json::Json;
 // existing `crate::view::X` path valid - callers are untouched by design.
 mod checks;
 mod critique;
+mod knowledge;
 mod reports;
 mod staleness;
 pub use checks::*;
+pub use knowledge::*;
 pub use critique::*;
 pub use reports::*;
 pub use staleness::*;
@@ -201,9 +203,10 @@ pub(crate) struct Model {
 /// issue104: `.engine/workflows` belongs here. The six workflow definitions are the one place this
 /// repo models behaviour in the base language (an `action def` with successions), so omitting them
 /// left their flow edges nowhere to land.
-fn model_dirs(root: &Path) -> [std::path::PathBuf; 7] {
+fn model_dirs(root: &Path) -> [std::path::PathBuf; 8] {
     [
         root.join(".tracking"),
+        root.join(".knowledge"), // D0161: declared Questions/Aliases - absent dir = nothing declared
         root.join(".engine").join("decisions"),
         root.join(".engine").join("processes"),
         root.join(".engine").join("views"),

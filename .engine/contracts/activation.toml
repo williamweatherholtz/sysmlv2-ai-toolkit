@@ -1,0 +1,20 @@
+# Process activation (D0138) — which processes THIS project has adopted.
+#
+# What activating a process does: turns on its whole unit (skill + declared rules + guards), as defined
+# by the engine in `.engine/contracts/process-units.toml`. Deactivating one stops its guards running,
+# and `keel guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
+#
+# DELETE THIS FILE to return to "everything is active", which is also the behaviour when no file
+# exists — so an existing project that never declares one is unaffected.
+#
+# CORE guards (identity, provenance, vocabulary, rootedness, well-formedness) are in no unit and CANNOT
+# be deactivated here. Activation exists to stop enforcing procedures you have not adopted; it is not a
+# switch that makes truthfulness optional.
+#
+# Edit by hand, or use `keel activate <process>` / `keel deactivate <process>`.
+
+[processes]
+active = ["actor-enrollment", "agile-workflow", "decision-authoring", "deploy", "distributed-collaboration", "doc-sync", "element-critique", "issue-resolution", "knowledge-graph-memory", "render"]
+
+[viewpoints]
+active = ["acceptancesPendingVP", "archCouplingVP", "archCoverageVP", "archCriticalityVP", "archDriftVP", "archElementsVP", "archStpaInputsVP", "attestationCoverageVP", "authorityQueueVP", "baselinesVP", "concernCoverageVP", "critiquePolicyVP", "decisionsVP", "diagramVP", "findingsAwaitingDispositionVP", "governingVersionVP", "indicatorsVP", "orientVP", "orphansVP", "renderVP", "reportVP", "reprocessVP", "requirementsVP", "rootednessVP", "safetyVP", "sittingReviewVP", "suspectVP", "tierSatisfactionVP", "traceabilityVP", "verificationExaminedVP", "verificationExercisedVP", "whatsNextVP"]

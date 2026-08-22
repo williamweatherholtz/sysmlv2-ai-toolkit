@@ -79,7 +79,7 @@ pub fn of(root: &Path) -> u64 {
 pub fn compute(root: &Path) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for base in [".tracking", ".engine"] {
+    for base in [".tracking", ".engine", ".knowledge"] {
         crate::perf::add(&crate::perf::TREES_WALKED, 1);
         let files = crate::collect_sysml(&root.join(base));
         crate::perf::add(&crate::perf::FILES_STATTED, files.len() as u64);

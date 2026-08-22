@@ -28,12 +28,17 @@
 package EngineKnowledgeGraphMemory {
     private import EngineElement::*;     // Cadence / Owner enums
     private import EngineProcess::*;
+    private import EngineGuardConstraints::*;  // D0161 part 3ii: the guard this process owns
 
     action knowledgeGraphMemory : Process {
         :>> id = "a41d7e05-3b92-4c68-8f17-52e0d9a6c3b4";
         :>> title = "Knowledge-Graph Memory";
-        :>> purpose = "Give an AI deterministic, constant-cost recall over a document corpus by extracting a typed graph from it and injecting the relevant facts before the model is asked — so retrieval is code, not conversation.";
+        :>> purpose = "Give an AI (or a human at the CLI) deterministic, constant-cost recall over a CORPUS by treating it as a typed graph and answering from traversal, not conversation. v2 (D0161): THE CORPUS IS A DECLARED PARAMETER with two cases - (a) a DOCUMENT corpus, extracted against the closed vocabulary with identity computed from type plus normalised name; (b) an ALREADY-TYPED MODEL, where nothing is extracted: entities are the existing items, relations the existing typed edges, identity the minted UUID they already carry. For keel's own corpus the model IS the graph, and the only authored inputs are human-owned Questions and Aliases under .knowledge/.";
         :>> cadence = Cadence::perItem;
+        // D0161 part 3ii: unit-owned well-formedness guard - makes this process a deactivatable UNIT
+        // (keel deactivate knowledge-graph-memory), which is the difference between a process that
+        // happens to be unused and one the project has DECLARED it does not run (D0138).
+        assert constraint enforcesQuestionCoverage : questionCoverage;
     }
 
     action kgQuestions : ProcessStep {
@@ -58,7 +63,7 @@ package EngineKnowledgeGraphMemory {
         :>> id = "a41d7e05-3b92-4c68-8f17-000000000s03";
         :>> title = "List the SHAPES facts take; each shape becomes a table";
         :>> triggerCondition = "The vocabulary is closed.";
-        :>> actionText = "Enumerate the shapes a fact can take in this domain, and give each shape a table. A thing exists; two things connect; a thing has another name — that is three tables, and three is not a magic number, it is what that model needs. Facts in other shapes — time-bounded facts, measurements, provenance-carrying facts — mean more tables, one per shape. Resist folding a new shape into an existing table with a nullable column: a shape that needs its own table and does not get one becomes the thing queries cannot express later.";
+        :>> actionText = "Enumerate the shapes a fact can take in this domain, and give each shape a table. A thing exists; two things connect; a thing has another name — that is three tables, and three is not a magic number, it is what that model needs. Facts in other shapes — time-bounded facts, measurements, provenance-carrying facts — mean more tables, one per shape. Resist folding a new shape into an existing table with a nullable column: a shape that needs its own table and does not get one becomes the thing queries cannot express later. v2 (D0161): for an ALREADY-TYPED corpus this step BINDS instead of declares - bind each fact shape to the corpus's existing type, and declare a table only for a shape none exists for (keel's corpus binds entity=item, relation=typed edge, alias=Alias, question=Question).";
         :>> producedArtifact = "The store schema — one table per fact shape.";
         :>> owner = Owner::ai;
     }
@@ -67,7 +72,7 @@ package EngineKnowledgeGraphMemory {
         :>> id = "a41d7e05-3b92-4c68-8f17-000000000s04";
         :>> title = "Extract the corpus against the vocabulary, with COMPUTED identity";
         :>> triggerCondition = "The schema exists.";
-        :>> actionText = "Have the AI extract every document against the closed vocabulary, emitting typed entities, typed relations and aliases. IDENTITY IS COMPUTED, NEVER LOOKED UP: an entity's id is a hash of its type and normalised name, so the same role named in two documents becomes one node with no matching service and no ML. This is what makes re-extraction safe — extraction varies run to run, and the hash is why re-runs MERGE instead of duplicating. Extraction works on unstructured prose; front matter carrying the vocabulary per document is maintenance discipline, not a prerequisite.";
+        :>> actionText = "Have the AI extract every document against the closed vocabulary, emitting typed entities, typed relations and aliases. IDENTITY IS COMPUTED, NEVER LOOKED UP: an entity's id is a hash of its type and normalised name, so the same role named in two documents becomes one node with no matching service and no ML. This is what makes re-extraction safe — extraction varies run to run, and the hash is why re-runs MERGE instead of duplicating. Extraction works on unstructured prose; front matter carrying the vocabulary per document is maintenance discipline, not a prerequisite. v2 (D0161): an ALREADY-TYPED corpus has nothing to extract - this step BINDS: entities are the existing items, relations the existing typed edges, and identity is the minted UUID those items already carry, so re-runs are trivially convergent.";
         :>> producedArtifact = "A populated graph: entities, relations, aliases, each carrying its source document.";
         :>> owner = Owner::ai;
     }
@@ -85,7 +90,7 @@ package EngineKnowledgeGraphMemory {
         :>> id = "a41d7e05-3b92-4c68-8f17-000000000s06";
         :>> title = "Inject the facts BEFORE the model thinks";
         :>> triggerCondition = "Recall returns facts as text.";
-        :>> actionText = "Wire recall into the harness's prompt-submit path so the facts are placed in front of the model as additional context before it begins, and so a visible line reports how many facts were recalled and how long it took. THIS STEP IS WHAT MAKES IT PUSH RATHER THAN PULL — a graph the model must decide to query is still pull, and inherits every cost this process exists to remove. The hook contract is harness-specific; the requirement is not: zero model calls on the prompt path, and the facts already present when the model wakes.";
+        :>> actionText = "Wire recall into the harness's prompt-submit path so the facts are placed in front of the model as additional context before it begins, and so a visible line reports how many facts were recalled and how long it took. THIS STEP IS WHAT MAKES IT PUSH RATHER THAN PULL — a graph the model must decide to query is still pull, and inherits every cost this process exists to remove. The hook contract is harness-specific; the requirement is not: zero model calls on the prompt path, and the facts already present when the model wakes. v2 (D0161): this step is TIER-CONDITIONAL, not mandatory - a corpus the human queries directly needs a COMMAND (keel why), not a prompt hook; requiring the hook made a CLI-only capability read as unfinished.";
         :>> producedArtifact = "A prompt-submit hook that injects recalled facts, with a visible recall count.";
         :>> owner = Owner::ai;
     }

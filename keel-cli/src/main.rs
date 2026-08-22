@@ -3237,6 +3237,8 @@ const CATALOGUE: &[&str] = &[
     "workflows [ROOT]             the six workflows and their phases",
     "contentions [ROOT]           recorded disagreements between contributors awaiting adjudication (D0108)",
     "controls [ROOT]              the two-way hazard/control diff: uncovered failure conditions + unanchored controls (D0195)",
+    "why <term> [ROOT]            answer from the model as a graph: seed on names/aliases, traverse, cite provenance + failing critiques (D0161)",
+    "knowledge question-coverage [ROOT]  per declared Question: does seeding find an entity and traversal reach an answer (D0161)",
     "trace <item> [ROOT]          every typed edge reaching an item, both directions",
     "trace-need <need> [ROOT]     one Need's full satisfaction chain down to test results",
     "boundary <element> [ROOT]    one element's interface surface — takes an ELEMENT, not a root",
@@ -3254,6 +3256,38 @@ fn print_usage() -> i32 {
 }
 /// A read-only view subcommand: run `f` against the repo root and print its JSON, or the error as
 /// JSON so a consumer parsing stdout gets a parseable answer either way.
+/// `keel why <term> [ROOT]` (D0161): seed on names/titles/aliases, traverse, answer with provenance.
+fn cmd_why(rest: &[String]) -> i32 {
+    let Some(term) = rest.first() else {
+        eprintln!("usage: keel why <term> [ROOT]");
+        return 2;
+    };
+    let Some(root) = rest.get(1).map(PathBuf::from).or_else(find_repo_root) else {
+        eprintln!("usage: keel why <term> [ROOT]");
+        return 2;
+    };
+    match keel_cli::view::why(&root, term) {
+        Ok(s) => {
+            println!("{s}");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
+/// `keel knowledge question-coverage [ROOT]` (D0161): per declared Question, does seeding find an
+/// entity and traversal reach an answer. Computed, never authored.
+fn cmd_knowledge(rest: &[String]) -> i32 {
+    if rest.first().map(String::as_str) != Some("question-coverage") {
+        eprintln!("usage: keel knowledge question-coverage [ROOT]");
+        return 2;
+    }
+    cmd_view0(rest.get(1..).unwrap_or(&[]), "knowledge question-coverage", keel_cli::view::question_coverage)
+}
+
 fn cmd_view0(
     rest: &[String],
     name: &'static str,
@@ -3369,6 +3403,8 @@ fn main() {
         Some("authority-queue") => cmd_view0(rest, "authority-queue", keel_cli::view::authority_queue),
         Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
         Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
+        Some("why") => cmd_why(rest),
+        Some("knowledge") => cmd_knowledge(rest),
         Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),

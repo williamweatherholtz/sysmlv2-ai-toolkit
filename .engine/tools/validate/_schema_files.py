@@ -28,6 +28,8 @@ SCHEMA_ORDER = [
     "schema/safety/stpa.sysml",
     # Optional module (D0148). After core/element.sysml, which it specializes; independent of safety.
     "schema/codeaudit/codeelement.sysml",
+    # Optional module (D0161). After core/element.sysml, which Question/Alias specialize.
+    "schema/knowledge/knowledge.sysml",
 ]
 
 

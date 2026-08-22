@@ -150,6 +150,10 @@ package ProductionReadinessRequirements {
     satisfy nPavedWritePath by srK13DenyAndProvide;
     satisfy nMeasuredEnforcement by srK14MeasuredEffect;
     satisfy nPavedWritePath by srK15TreeDerivable;
+    // Added by claudeFable5 (D0108: a non-owner ADDS typed edges), sprint 424: the D0161 trap
+    // question exposed this missing trace - srK15's own rationale ('green on one clone, not-done
+    // on every other') IS this Need's concern, and no edge said so.
+    satisfy nComputedStateMachineIndependent by srK15TreeDerivable;
 
     // ── verify: the section-3 WP map, typed - which chartered DoD discharges which invariant ──
     #Verify dependency from p1TieredDenyDoD to srK01ValidatedChannel;

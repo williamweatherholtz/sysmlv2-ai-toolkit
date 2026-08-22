@@ -672,7 +672,7 @@ pub fn stale_gate_prose(root: &Path) -> GuardReport {
     const CLAIMS: [&str; 3] = ["PENDING", "NOT yet accepted", "proposed/unaccepted"];
     let mut violations = Vec::new();
     let mut scanned = 0;
-    for dir in [".tracking", ".engine"] {
+    for dir in [".tracking", ".engine", ".knowledge"] {
         for f in crate::collect_sysml(&root.join(dir)) {
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
             let lines: Vec<&str> = text.lines().collect();
@@ -1640,8 +1640,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 45] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage"];
+pub const GUARD_NAMES: [&str; 46] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2351,6 +2351,29 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 }
 
 
+// ── question-coverage guard (declared knowledge facts are well-formed, D0161 part 3ii) ────────────
+
+/// Guard: declared knowledge facts are well-formed (D0161 part 3ii).
+///
+/// A `Question` carries its text; an `Alias` carries its term and maps to an existing element.
+/// WELL-FORMEDNESS only — coverage itself stays `keel knowledge question-coverage`,
+/// because gating on coverage would make the cheapest fix deleting the question (D0098). Zero
+/// declared facts = zero scanned, green: an absent `.knowledge/` is the feature unplugged (D0161
+/// part 3i), never a violation. Unit-owned by `knowledge-graph-memory`, so deactivating that process
+/// drops exactly this check.
+#[must_use]
+pub fn question_coverage(root: &Path) -> GuardReport {
+    match crate::view::knowledge_wellformedness(root) {
+        Ok((scanned, violations)) => GuardReport { name: "question-coverage", scanned, warnings: Vec::new(), violations },
+        Err(e) => GuardReport {
+            name: "question-coverage",
+            scanned: 0,
+            warnings: Vec::new(),
+            violations: vec![format!("error reading knowledge facts: {e}")],
+        },
+    }
+}
+
 /// Guard 45 (D0193, WARNING tier): every control-relevant event is DECLARED with its required
 /// record, and the declaration matches what the binary emits.
 ///
@@ -2584,6 +2607,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "release-recorded" => Some(release_recorded(root)), // WARNING-tier (D0191, deploy unit) — a shipped tag with no authored Release item
         "enrollment-binding" => Some(enrollment_binding(root)), // WARNING-tier (D0191, actor-enrollment unit) — a machine binding naming an unregistered or kindless actor
         "control-event-coverage" => Some(control_event_coverage(root)), // WARNING-tier (D0193) — a control-relevant event with no counted record
+        "question-coverage" => Some(question_coverage(root)), // D0161: declared knowledge facts are well-formed; coverage itself stays a view
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

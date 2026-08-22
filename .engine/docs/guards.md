@@ -12,6 +12,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 |---|---|
 | `actors` | `createdBy`/`judgedBy` reference a registered `ProjectActors` entry (D0037) |
 | `acceptance-events` | An accepted Decision carries a passing acceptance event (D0066) |
+| `question-coverage` | Declared knowledge facts are well-formed (D0161): a Question carries its text, an Alias carries its term and maps to an existing element. Well-formedness only - coverage stays a view; absent `.knowledge/` = unplugged, green. Unit-owned by `knowledge-graph-memory` |
 | `confirmation-authenticity` | That acceptance event is **human**-judged, never AI-fabricated (D0106/issue059), and — when the attestation policy declares a recording delegation (D0192 option A) — that a delegated acceptance actually quotes the human's words or cites their gesture, forward-only from the delegation date. Rule-sourced from both `confirmationAuthenticityRule` and `delegatedAcceptanceSubstanceRule` |
 | `attestation-substance` | A passing `method=confirmation` actually **says** something (D0130/issue083) |
 | `sprint-coverage` | Substantive work went through a sprint (D0064/issue020) |

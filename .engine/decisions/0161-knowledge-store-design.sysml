@@ -10,6 +10,9 @@
 // was coherent on its own and wrong in relation to something else, and every correction came from a
 // one-line question rather than from my own review.
 // #ProspectiveChange (D0070): amends an accepted process definition and names its store location.
+// APPLIED sprint 424 (2026-08-22): v2 process amendment, .knowledge/ store, keel why +
+// question-coverage, guard 46 unit-owned, both acceptance clauses exercised (trap passed after
+// repairing the missing srK15->nComputedStateMachineIndependent trace; rollback exercised live).
 package Decision0161 {
     private import EngineElement::*;
     private import EngineWork::*;

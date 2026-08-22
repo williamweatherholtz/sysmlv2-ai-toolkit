@@ -61,7 +61,8 @@ a content gate (frozen schema, a direction Decision) or an empty frontier.
 Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
 gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
-`governing-version`, `open-issues`, `indicators`, `intake`, `controls` (D0195: the two-way hazard/control diff), `hardening` (D0169: the
+`governing-version`, `open-issues`, `indicators`, `intake`, `controls` (D0195: the two-way hazard/control diff), `why <term>` +
+`knowledge question-coverage` (D0161: the model as a graph - seed on names/aliases, traverse, answer with provenance), `hardening` (D0169: the
 critique process's own questions - help coverage, process enforceability, decision follow-through) (D0166: what was said, what it
 became, and what nobody acted on - unparsed / unrouted / unsourced). Human-facing scorecards: `keel report
 <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any declared view

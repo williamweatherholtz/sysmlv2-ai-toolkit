@@ -206,7 +206,7 @@ fn workflow_json(package: &str, name: &str, nodes: &[String], edges: &[(String, 
 pub fn is_declared(root: &Path, name: &str) -> bool {
     const KEYWORDS: [&str; 8] =
         ["part ", "verification ", "action ", "requirement ", "use case ", "item ", "attribute ", "enum "];
-    for base in [".tracking", ".engine"] {
+    for base in [".tracking", ".engine", ".knowledge"] {
         for f in crate::collect_sysml(&root.join(base)) {
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
             for raw in text.lines() {

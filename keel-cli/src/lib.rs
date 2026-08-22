@@ -417,15 +417,22 @@ pub fn validate_root(root: &Path) -> Report {
     // register+validate was filesystem-order-dependent — a tracking file importing another package
     // (e.g. requirements.sysml importing ProjectBusiness) failed when validated before that package was
     // registered. Two-pass makes cross-package imports resolve regardless of iteration order.
-    let tracking_dir = root.join(".tracking");
-    if tracking_dir.is_dir() {
-        let mut parsed: Vec<(std::path::PathBuf, Package)> = Vec::new();
-        for path in collect_sysml(&tracking_dir) {
+    // `.knowledge` (D0161) validates exactly like `.tracking`: declared Questions/Aliases are
+    // instance facts under the same identity/reference/provenance authority. Absent dir = nothing.
+    let mut parsed: Vec<(std::path::PathBuf, Package)> = Vec::new();
+    for base in [".tracking", ".knowledge"] {
+        let dir = root.join(base);
+        if !dir.is_dir() {
+            continue;
+        }
+        for path in collect_sysml(&dir) {
             match parse_pkg(&path) {
                 Ok(pkg) => parsed.push((path, pkg)),
                 Err(e) => report.errors.push(e),
             }
         }
+    }
+    {
         for (_, pkg) in &parsed {
             registry.register(pkg);
         }
