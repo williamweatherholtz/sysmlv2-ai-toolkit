@@ -213,4 +213,16 @@ package ProductionReadinessRequirements {
     #CharteredBy dependency from p3aRuleAttribution to d0184;
     #CharteredBy dependency from p3aKeystoneExtension to d0184;
     #CharteredBy dependency from p4bRulesTravel to d0183;
+    // D0195 clause 8 (panel R2, aerospace finding 1): EHZ9's controls traced to no standing
+    // requirement - removing the release gate would have violated nothing recorded. Added by
+    // claudeFable5 (a non-owner ADDS items, D0108).
+    requirement srK16OutwardPublishGated : SystemRequirement {
+        :>> id = "69aeb905-e9c3-44ca-81dc-2dfe9f6daa77";
+        :>> title = "K16: no outward publish leaves the boundary ungated";
+        :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5";
+        :>> statement = "No artifact shall leave the system boundary (a release publish, a tag-triggered build, a landing on the shared trunk) without the full enforced gate having passed over the exact tree being shipped; a gate failure shall build nothing and publish nothing, visibly.";
+        :>> rationale = "Elevates the sprint-409 control layer (the release gate job the publish requires, the pre-push behind-check, land's gate-on-merged-tree) to a standing requirement, so the controls trace to something whose removal would be a recorded violation - the panel's finding was precisely that they did not. EHZ9 is the constrained hazard; issue211 is the incident lineage (the pipeline published with zero gate steps until sprint 409).";
+        :>> kind = RequirementKind::functional;
+    }
+
 }

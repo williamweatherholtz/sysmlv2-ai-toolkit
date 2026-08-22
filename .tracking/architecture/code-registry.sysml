@@ -230,4 +230,16 @@ package ProjectCodeRegistry {
         :>> stpaRole = StpaRole::controller;
     }
 
+    // ---- D0195 clause 5 (panel R2, aerospace finding 2): the control LOOP completed for the
+    // round-1 additions, and the stpa-inputs flag on ceSyncIntegration dispositioned - the gate
+    // verdict over the merged tree IS the feedback land's retry loop consumes.
+    #Feedback dependency from ceGuards to ceSyncIntegration;
+    #Controls dependency from ceServeJudgment to ceWriteApi;
+    #Feedback dependency from ceComputedViews to ceServeJudgment;
+    #Controls dependency from ceHookDispatch to ceWriteApi;
+    #Feedback dependency from ceGuards to ceHookDispatch;
+    #Controls dependency from ceLauncher to ceHookDispatch;
+    #Feedback dependency from ceGuards to ceLauncher;
+    #Feedback dependency from ceAuditHistory to ceSyncIntegration;
+
 }

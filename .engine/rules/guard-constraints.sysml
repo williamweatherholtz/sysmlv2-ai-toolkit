@@ -52,4 +52,37 @@ package EngineGuardConstraints {
     // D0191: the admitted-gap guards, unit-owned by deploy and actor-enrollment.
     constraint def releaseRecorded;
     constraint def enrollmentBinding;
+    // D0195 clause 1 (panel R1, aerospace flip 2): EVERY enforced guard has a constraint-def
+    // identity, not only the unit-owned ones - the model identity the control map and any
+    // future unit-ownership declaration binds to. Names are the guards' camelCased kebab names.
+    constraint def actors;
+    constraint def charter;
+    constraint def processChange;
+    constraint def manifestCoverage;
+    constraint def processSkill;
+    constraint def requirementRootedness;
+    constraint def markerVocabulary;
+    constraint def duplicateIdentity;
+    constraint def engineLint;
+    constraint def hookConfigIntegrity;
+    constraint def activationManifest;
+    constraint def sequenceMultiplicity;
+    constraint def parserCoverage;
+    constraint def baseFirstJustification;
+    constraint def edgeEndpoints;
+    constraint def ownership;
+    constraint def attestationAuthority;
+    constraint def typeCollision;
+    constraint def attributeVocabulary;
+    constraint def resolverKind;
+    constraint def staleGateProse;
+    constraint def impossibleEvidenceDate;
+    constraint def identityPresent;
+    constraint def identityWellFormed;
+    constraint def toolReference;
+    constraint def scaffoldPlaceholder;
+    constraint def claudeSurfaceDrift;
+    constraint def decisionScaffolding;
+    constraint def controlEventCoverage;
+
 }

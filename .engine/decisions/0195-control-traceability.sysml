@@ -1,6 +1,9 @@
 // D0195 (PROPOSED — NOT YET ACCEPTED) — D0195: controls get model identities - hazards, invariants, and the guards that discharge them become one computable trace
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0195Accept event on sign-off.
+// APPLICATION NOTES (sprint 417, on the recorded acceptance): clause 1 landed as the full
+// constraint-def set in guard-constraints.sysml; clause 2 as the 54-constraint / 53-edge control
+// map (.tracking/architecture/control-map.sysml); clauses 3-8 in the same sprint - see its record.
 package Decision0195 {
     private import EngineElement::*;
     private import EngineWork::*;

@@ -734,6 +734,24 @@ fn parse_hash_item(
     })))
 }
 
+/// Bare (marker-less) `dependency from X to Y;` - the base-SysML plain dependency (D0196).
+fn parse_bare_dependency(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError> {
+    let s = p.current_span();
+    p.advance(); // consume 'dependency'
+    p.expect(&TokenKind::From, filename)?;
+    let (from, _) = p.expect_ident(filename)?;
+    p.expect(&TokenKind::To, filename)?;
+    let (to, _) = p.expect_ident(filename)?;
+    let end = p.current_span();
+    p.expect(&TokenKind::Semicolon, filename)?;
+    Ok(Some(Item::Dependency(DependencyAnnotation {
+        marker: String::new(),
+        from,
+        to,
+        span: Span { start: s.start, end: end.start },
+    })))
+}
+
 fn parse_action_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError> {
     let s = p.current_span(); p.advance(); // consume 'action'
     if p.eat(&TokenKind::Def) {
@@ -808,6 +826,12 @@ fn parse_item(p: &mut Parser, filename: &str) -> Result<Option<Item>, ParseError
             parse_allocate(p, filename).map(|a| Some(Item::Allocate(a))),
 
         TokenKind::Hash if !had_abstract => parse_hash_item(p, filename),
+
+        // Bare `dependency from X to Y;` - base SysML v2's plain dependency, no marker (D0196's
+        // vanilla-first traceability). Previously a silently-skipped statement: kernel-conformant
+        // but invisible to every keel view - issue097's trap mirrored, caught when the control
+        // map's edges computed as absent (panel sprint 417).
+        TokenKind::Dependency if !had_abstract => parse_bare_dependency(p, filename),
 
         // `enum def Name { member; ... }` → EnumDef (Sprint 3)
         TokenKind::Enum => {

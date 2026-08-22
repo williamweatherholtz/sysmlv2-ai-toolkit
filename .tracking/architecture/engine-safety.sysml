@@ -105,4 +105,5 @@ package EngineSafetyInstances {
     #DerivedFrom dependency from srDcUniqueIdentityGuard to ehz6;
     #DerivedFrom dependency from srK07RecordedWeakening to ehz7;
     #DerivedFrom dependency from srK10Reprocess to ehz8;
+    #DerivedFrom dependency from srK16OutwardPublishGated to ehz9;
 }

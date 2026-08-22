@@ -4628,6 +4628,80 @@ struct TierStat {
     superseded: Vec<String>,
 }
 
+
+/// `keel controls` (D0195, panel R1 aerospace flip 2) — the two-way hazard/control diff.
+///
+/// Computes over `.tracking/architecture/engine-safety.sysml` (Hazard instances) and
+/// `control-map.sysml` (`SystemSafetyConstraint` instances with plain dependency edges to the
+/// hazards they discharge): hazards NO constraint reaches (the uncovered failure conditions — the
+/// question ARP4754A asks that could not previously be asked of this model), and constraints
+/// anchored to NO hazard (process-quality controls — reported, never warned away). Clause 7 rides
+/// along: a High/Critical Issue created after D0195's acceptance that references no hazard is the
+/// loss/hazard list going stale by the very EHZ8 mechanism it documents, and is listed.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn controls(root: &Path) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let hazards: Vec<&String> = {
+        let mut v: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Hazard").map(|(n, _)| n).collect();
+        v.sort();
+        v
+    };
+    let constraints: Vec<&String> = {
+        let mut v: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "SystemSafetyConstraint").map(|(n, _)| n).collect();
+        v.sort();
+        v
+    };
+    let reaches = |c: &str, h: &str| model.edges.iter().any(|e| e.kind == "dependency" && e.from == c && e.to == h);
+    let mut rows: Vec<Json> = Vec::new();
+    let mut uncovered: Vec<String> = Vec::new();
+    for h in &hazards {
+        let cs: Vec<Json> = constraints.iter().filter(|c| reaches(c, h)).map(|c| Json::s((*c).clone())).collect();
+        if cs.is_empty() {
+            uncovered.push((*h).clone());
+        }
+        rows.push(Json::Obj(vec![
+            ("hazard".to_string(), Json::s((*h).clone())),
+            ("controls".to_string(), Json::Arr(cs)),
+        ]));
+    }
+    let unanchored: Vec<Json> = constraints
+        .iter()
+        .filter(|c| !hazards.iter().any(|h| reaches(c, h)))
+        .map(|c| Json::s((*c).clone()))
+        .collect();
+    // Clause 7 (panel R2, automotive finding 1): forward-only from D0195's acceptance date.
+    let mut unlinked_incidents: Vec<Json> = Vec::new();
+    for (n, i) in &model.items {
+        if i.type_name != "Issue" {
+            continue;
+        }
+        let sev = i.attrs.get("severity").cloned().unwrap_or_default();
+        if sev != "High" && sev != "Critical" {
+            continue;
+        }
+        let created = i.attrs.get("createdAt").cloned().unwrap_or_default();
+        if created.as_str() < "2026-08-22" {
+            continue;
+        }
+        let text = i.attrs.get("description").cloned().unwrap_or_default();
+        let linked = text.to_ascii_lowercase().contains("ehz") || model.edges.iter().any(|e| e.kind == "dependency" && e.from == *n && e.to.starts_with("ehz"));
+        if !linked {
+            unlinked_incidents.push(Json::s(n.clone()));
+        }
+    }
+    unlinked_incidents.sort_by_key(Json::dump);
+    Ok(Json::Obj(vec![
+        ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side".to_string())),
+        ("hazards".to_string(), Json::Arr(rows)),
+        ("uncoveredHazards".to_string(), Json::Arr(uncovered.into_iter().map(Json::s).collect())),
+        ("unanchoredConstraints".to_string(), Json::Arr(unanchored)),
+        ("unlinkedHighIncidentsSinceD0195".to_string(), Json::Arr(unlinked_incidents)),
+    ])
+    .dump())
+}
+
 fn compute_tier_satisfaction(model: &Model) -> Vec<TierStat> {
     let has_out = |kind: &str, from: &str| model.edges.iter().any(|e| e.kind == kind && e.from == from);
     let has_in = |kind: &str, to: &str| model.edges.iter().any(|e| e.kind == kind && e.to == to);

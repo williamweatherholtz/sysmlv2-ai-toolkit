@@ -37,6 +37,10 @@ package LiveAllocations {
     allocate srServeApproveGateHuman to ceLauncher;
     allocate srServeSingleSpawnPoint to ceServeJudgment;
 
+    // outward-publish boundary (srK16, D0195 clause 8)
+    allocate srK16OutwardPublishGated to ceLandGate;
+    allocate srK16OutwardPublishGated to ceSyncIntegration;
+
     // portability
     allocate srDcPortableGate to ceGitSpawn;
 }

@@ -496,10 +496,24 @@ fn enforcement_points(root: &Path) -> Json {
                 std::fs::read_to_string(e.path()).is_ok_and(|t| t.contains("keel validate") || t.contains("keel guard"))
             })
         });
+    // D0195 clause 6 (panel R2, robotics finding 3): each point carries a one-word failure-mode
+    // classification derived from its own absent-behavior text, so the degraded-mode POLICY is
+    // readable in one column instead of reverse-engineered from prose per row.
+    let classify = |absent: &str| -> &'static str {
+        let a = absent.to_ascii_lowercase();
+        if a.contains("denies") || a.contains("exit 1") || a.contains("blocked") {
+            "fail-closed"
+        } else if a.contains("warn") || a.contains("loud") || a.contains("visible") || a.contains("red") {
+            "fail-open-announced"
+        } else {
+            "fail-open"
+        }
+    };
     let row = |point: &str, present: bool, absent: &str, error: &str, timeout: &str| {
         Json::Obj(vec![
             ("point".to_string(), Json::s(point)),
             ("present".to_string(), Json::Bool(present)),
+            ("failMode".to_string(), Json::s(classify(absent).to_string())),
             ("absent".to_string(), Json::s(absent)),
             ("error".to_string(), Json::s(error)),
             ("timeout".to_string(), Json::s(timeout)),
