@@ -40,6 +40,31 @@ struct Item {
     meta: String,
     /// Repo-relative path of the file declaring the item — `/api/decision/accept|reject` require it.
     file: String,
+    /// FORK options (issue223): a proposed Decision that enumerates `OPTION X (label)` choices gets
+    /// one sign button per option — a bare Sign on a fork solicits a gesture that cannot bind.
+    options: Vec<(String, String)>,
+}
+
+/// Extract `OPTION X (short label)` enumerations from a Decision file's text. Two or more make the
+/// decision a FORK; fewer yield an empty list and the ordinary single Sign button.
+fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
+    let Ok(text) = std::fs::read_to_string(root.join(rel_file)) else { return Vec::new() };
+    let mut out = Vec::new();
+    let mut rest = text.as_str();
+    while let Some(pos) = rest.find("OPTION ") {
+        rest = &rest[pos + 7..];
+        let Some(tok) = rest.chars().next().filter(char::is_ascii_uppercase) else { continue };
+        let Some(open) = rest.find('(') else { continue };
+        if rest[1..open].trim().is_empty() {
+            if let Some(close) = rest.find(')') {
+                let label = rest[open + 1..close].trim().to_string();
+                if !label.is_empty() && !out.iter().any(|(t, _)| *t == tok.to_string()) {
+                    out.push((tok.to_string(), label));
+                }
+            }
+        }
+    }
+    if out.len() >= 2 { out } else { Vec::new() }
 }
 
 /// The sole registered human reviewer, read from the actors registry.
@@ -163,6 +188,7 @@ fn collect(root: &Path) -> Vec<Item> {
             title: if shown.is_empty() { name.to_string() } else { shown },
             meta,
             file: file.clone(),
+            options: Vec::new(),
         });
     };
     let parse = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null);
@@ -186,6 +212,14 @@ fn collect(root: &Path) -> Vec<Item> {
     for s in sit.get("due_sprints").and_then(|v| v.as_array()).unwrap_or(&empty) {
         if let Some(n) = s.as_str() {
             add("sitting", n, "unreviewed".to_string());
+        }
+    }
+    for i in &mut items {
+        if i.cls == "acceptance" {
+            i.options = fork_options(root, &i.file);
+            if !i.options.is_empty() {
+                i.meta = format!("{} - FORK: signing chooses one option", i.meta);
+            }
         }
     }
     items
@@ -230,12 +264,25 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
         let mut cards = String::new();
         for i in &rows {
             let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
+            let accept_buttons = if i.options.is_empty() {
+                format!("<button data-v=accept>{verb}</button>")
+            } else {
+                let mut b = String::new();
+                for (tok, label) in &i.options {
+                    let _ = write!(
+                        b,
+                        "<button data-v=accept data-opt=\"OPTION {tok}\">{verb} {tok} - {l}</button>",
+                        l = esc(label)
+                    );
+                }
+                b
+            };
             let _ = write!(
                 cards,
                 "<article class=card data-id=\"{u}\" data-name=\"{n}\" data-cls=\"{c}\" data-file=\"{f}\" data-verdict=\"\">\
                  <header><code>{n}</code><span class=vd></span><span class=sv></span></header>\
                  <h3>{t}</h3><p class=meta>{m}</p>\
-                 <div class=verdicts><button data-v=accept>{verb}</button>\
+                 <div class=verdicts>{accept_buttons}\
                  <button data-v=maybe>Needs work</button><button data-v=reject>Reject</button></div>\
                  <input class=note type=text data-id=\"{u}-note\" placeholder=\"why, or what to change\" aria-label=\"note\">\
                  </article>",
@@ -322,7 +369,8 @@ border:0;border-left:4px solid var(--h);color:var(--ink);font:650 15px var(--san
 .sv::after{content:attr(data-local-sv)}
 .card h3{margin:7px 0 0;font-size:15px;font-weight:650;line-height:1.35}
 .meta{margin:6px 0 0;font:11px var(--mono);color:var(--ink3)}
-.verdicts{display:flex;gap:6px;margin:11px 0 0}
+.verdicts{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 0}
+.verdicts button[data-opt]{flex:1 1 100%}
 .verdicts button{flex:1;min-height:44px;border:1px solid var(--line);border-radius:9px;background:transparent;
 color:var(--ink2);font:600 13px var(--sans);cursor:pointer}
 .card[data-verdict=accept] button[data-v=accept]{background:var(--accept);border-color:var(--accept);color:#fff}
@@ -369,9 +417,10 @@ function initInbox(){
 
 function say(card,msg){var sv=card.querySelector('.sv');if(sv)sv.setAttribute('data-local-sv',msg);}
 
-function saveLocal(card,verdict){
+function saveLocal(card,verdict,opt){
   var cls=card.getAttribute('data-cls'), name=card.getAttribute('data-name');
   var noteEl=card.querySelector('.note'), note=noteEl?noteEl.value.trim():'';
+  if(opt){note=opt+(note?' - '+note:'');}
   var today=new Date().toISOString().slice(0,10);
   var url='', body=null;
   if(cls==='finding'){
@@ -404,10 +453,11 @@ function saveLocal(card,verdict){
 // inbox'; only keel's own API earns 'saved to keel'; ambiguous outcomes say UNKNOWN and invite a
 // re-tap - a duplicate row is harmless because Claude dedups by uid, latest wins. Write errors are
 // branched per contract code; never collapsed into one banner.
-function saveInbox(card,verdict){
+function saveInbox(card,verdict,opt){
   if(!MCP){say(card,'NOT delivered - no transport; tell Claude this verdict');return;}
   var cls=card.getAttribute('data-cls'), name=card.getAttribute('data-name'), uid=card.getAttribute('data-id');
   var noteEl=card.querySelector('.note'), note=noteEl?noteEl.value.trim():'';
+  if(opt){note=opt+(note?' - '+note:'');}
   var C=INBOX.cols;
   var row={toBottom:true,cells:[
     {columnId:C.uid,value:uid},{columnId:C.name,value:name},{columnId:C.kind,value:cls},
@@ -439,10 +489,13 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('.verdicts button');
   if(!b)return;
   var card=b.closest('.card');
-  var next=card.getAttribute('data-verdict')===b.getAttribute('data-v')?'':b.getAttribute('data-v');
+  var opt=b.getAttribute('data-opt')||'';
+  var same=card.getAttribute('data-verdict')===b.getAttribute('data-v')&&(card.getAttribute('data-opt-chosen')||'')===opt;
+  var next=same?'':b.getAttribute('data-v');
   card.setAttribute('data-verdict',next);
+  card.setAttribute('data-opt-chosen',next?opt:'');
   if(!next){say(card,'cleared (nothing recorded)');return;}
-  if(MODE==='local'){saveLocal(card,next);}else{saveInbox(card,next);}
+  if(MODE==='local'){saveLocal(card,next,opt);}else{saveInbox(card,next,opt);}
 });
 
 // LAST STATEMENT: `script ok` in the header means every listener above registered.
@@ -452,6 +505,36 @@ document.body.setAttribute('data-local-js','ok');
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// issue223: a Decision enumerating `OPTION X (label)` choices is a FORK — the deck must offer
+    /// one sign button per option, because a bare Sign tap on a fork cannot bind (D0192's tap was
+    /// solicited and wasted). Pinned to D0192's actual text shape.
+    #[test]
+    fn fork_options_parse_the_d0192_shape() {
+        let dir = std::env::temp_dir().join("keel-deck-forkcheck");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(
+            dir.join("d.sysml"),
+            ":>> decision = \"PROPOSED, two options costed - accepting this Decision means choosing ONE: \
+             OPTION A (amend the requirement): supersede srK06 ... OPTION B (close the path): acceptances \
+             become human-gesture-only ...\";",
+        )
+        .expect("write");
+        let opts = fork_options(&dir, "d.sysml");
+        assert_eq!(
+            opts,
+            vec![
+                ("A".to_string(), "amend the requirement".to_string()),
+                ("B".to_string(), "close the path".to_string())
+            ]
+        );
+        // A single option is NOT a fork: the ordinary Sign button stays.
+        std::fs::write(dir.join("one.sysml"), "OPTION A (only one)").expect("write");
+        assert!(fork_options(&dir, "one.sysml").is_empty());
+        // No options at all.
+        std::fs::write(dir.join("none.sysml"), "an ordinary decision text").expect("write");
+        assert!(fork_options(&dir, "none.sysml").is_empty());
+    }
 
     /// PASS ZERO (issue191, now enforced at the source): the emitted script must PARSE. Checked with
     /// node when available; a missing node SKIPS LOUDLY rather than passing vacuously (issue183's

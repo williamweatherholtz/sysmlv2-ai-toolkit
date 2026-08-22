@@ -104,4 +104,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from storyPanelRound1 to issue222;
+
+    part issue223 : Issue {
+        :>> id = "77e4e057-9c16-4e55-8d37-e699c8a057af";
+        :>> title = "The deck presents a fork Decision as a bare Sign card, soliciting an unbindable acceptance";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "d0192 enumerates OPTION A and OPTION B and states 'accepting this Decision means choosing ONE'; the deck rendered it as a single Sign button. wweatherholtz tapped it (inbox row uid 5b1d2b0e, At 2026-08-22T06:54:40Z, deck HEAD 3c9645e) and the tap could not be recorded - the gesture was solicited and then wasted, exactly the authoring-friction class D0054 names. The control (D0047): the deck detects OPTION-enumerating proposed decisions and renders one sign button per option, stamping the chosen option into the note so the recorded acceptance carries the choice.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeckForkOptions to issue223;
 }
