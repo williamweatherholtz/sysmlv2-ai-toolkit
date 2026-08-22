@@ -2963,7 +2963,11 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 9] = [
+        const LEGITIMATELY_EMPTY: [&str; 10] = [
+            // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
+            // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
+            // The population returns the moment the backlog holds ranked work again.
+            "priority-inversion",
             // both D0191 guards scan ENVIRONMENT-DEPENDENT populations: release-recorded scans git
             // tags (absent in CI's tag-less clone) and enrollment-binding scans the machine-local
             // .keel/actor binding (gitignored, absent on CI) - locally both scan real populations.
