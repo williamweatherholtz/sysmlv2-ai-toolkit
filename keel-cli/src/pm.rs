@@ -183,7 +183,7 @@ mod tests {
         std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), lines).expect("write ledger");
         let report = enforcement_report(&root).expect("report");
         let d: serde_json::Value = serde_json::from_str(&report).expect("json");
-        assert_eq!(d["overrideLedgerEvents"], 3, "consumed + unsynced both count as overrides");
+        assert_eq!(d["overrideLedgerEvents"], 999, "DELIBERATELY RED for the release-gate negative test - never lands on main");
         assert_eq!(d["overrideObligationsUnsynced"], 1, "only the failure path is unsynced");
     }
 }
