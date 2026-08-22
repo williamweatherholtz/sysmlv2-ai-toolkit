@@ -21,6 +21,6 @@ mod lexer;
 mod parser;
 
 pub use error::{LexError, ParseError};
-pub use lexer::tokenize;
+pub use lexer::{is_reserved_word, tokenize};
 pub use parser::parse;
 pub use registry::{Diagnostic, PackageRegistry};

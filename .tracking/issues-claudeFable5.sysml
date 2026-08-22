@@ -126,4 +126,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcConfirmationRecordDelegation to issue224;
+
+    part issue225 : Issue {
+        :>> id = "9000ce80-8947-4391-9976-c4f5d76dcc0f";
+        :>> title = "Parser proptest identifier strategy generates reserved words - latent CI flake";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The sprint-421 push went CI-red on prop_part_string_attr: the [a-zA-Z_][a-zA-Z0-9_]{0,31} strategy generated 'doc', which the lexer keywords and the parser correctly refuses as a bare identifier. No commit in the push touched the parser - the random seed found a latent generator defect. Control (D0047): the lexer exposes is_reserved_word (single source: the keyword match itself) and the strategy filters through it, so the generator cannot drift from the grammar; a deterministic test pins the refusal.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcProptestReservedWords to issue225;
 }

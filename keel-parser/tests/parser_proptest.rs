@@ -3,7 +3,10 @@ use keel_parser::ast::{Item, Value};
 use keel_parser::{parse, tokenize};
 
 fn arb_identifier() -> impl Strategy<Value = String> {
-    "[a-zA-Z_][a-zA-Z0-9_]{0,31}".prop_map(std::convert::identity)
+    // Reserved words are not valid BARE identifiers (issue225: CI's random seed generated `doc` and
+    // the parser correctly refused it). Filtered through the lexer's own predicate, never a copied
+    // list, so the strategy can't drift from the grammar.
+    "[a-zA-Z_][a-zA-Z0-9_]{0,31}".prop_filter("bare identifiers exclude reserved words", |s| !keel_parser::is_reserved_word(s))
 }
 
 fn arb_simple_string() -> impl Strategy<Value = String> {
@@ -66,4 +69,14 @@ proptest! {
             "expected Str({expected:?}), got {:?}", part.attributes[0].value
         );
     }
+}
+
+/// issue225 pinned deterministically: a reserved word as a bare part name is a parse ERROR (the
+/// behavior CI's random seed found), and the lexer's own predicate is what names the reserved set.
+#[test]
+fn reserved_word_is_not_a_bare_identifier() {
+    assert!(keel_parser::is_reserved_word("doc"));
+    assert!(keel_parser::is_reserved_word("dependency"));
+    assert!(!keel_parser::is_reserved_word("docs"));
+    assert!(parse_src("package P { part doc : T { } }").is_err());
 }

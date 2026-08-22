@@ -262,6 +262,15 @@ fn keyword_or_ident(s: &str) -> TokenKind {
     }
 }
 
+/// Is `s` a reserved word — lexed as a keyword token rather than an identifier?
+///
+/// The single source of truth for "not a valid bare name" (issue225): generators and validators
+/// ask this instead of duplicating the keyword list and drifting.
+#[must_use]
+pub fn is_reserved_word(s: &str) -> bool {
+    !matches!(keyword_or_ident(s), TokenKind::Ident(_))
+}
+
 /// Lex all tokens from `source`, appending a terminal [`TokenKind::Eof`].
 ///
 /// # Errors
