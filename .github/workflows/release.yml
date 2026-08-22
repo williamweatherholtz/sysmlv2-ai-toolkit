@@ -14,7 +14,28 @@ permissions:
   contents: write # required to create/update the GitHub Release
 
 jobs:
+  # issue211/D0191-family: the publish gate. A tag on a red or ungated commit used to build and
+  # PUBLISH anyway - the engine's most outward-facing write was the only one with no gate of its
+  # own. Same surfaces as ci.yml (clippy + tests + validate + guards) over the TAGGED commit; the
+  # build/publish matrix requires it, so a red tag builds nothing and ships nothing.
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace --release
+      - name: keel gate (validate + guards)
+        run: |
+          cargo build --release --bin keel
+          ./target/release/keel validate .
+          ./target/release/keel guard
+
   build:
+    needs: gate
     strategy:
       fail-fast: false
       matrix:
