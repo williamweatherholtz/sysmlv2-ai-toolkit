@@ -1640,8 +1640,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 46] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage"];
+pub const GUARD_NAMES: [&str; 47] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2351,6 +2351,58 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 }
 
 
+// ── claim-ancestry guard (a claim's date is bounded by the commit that introduced it, issue229) ───
+
+/// Guard: `claimedAt` cannot precede its own introducing commit by more than the expiry window.
+///
+/// issue229 (process-value panel, multi-agent lens): holdership = earliest un-expired `claimedAt`,
+/// and `claimedAt` is authored by the claimer — a backdated claim steals holdership deterministically
+/// on every clone. This applies the repo's own doctrine (D0013: git ancestry is the clock) to claims:
+/// the introducing commit's author date bounds how early the claim may say it was made. The bound is
+/// [`crate::claim::CLAIM_EXPIRY_DAYS`], because a claim older than the window is stale on arrival —
+/// backdating WITHIN the window remains possible and is stated here rather than hidden: the guard
+/// narrows the theft window from unbounded to the expiry span. An uncommitted claim has no
+/// introducing commit yet and is skipped — it cannot influence another clone until it lands.
+#[must_use]
+pub fn claim_ancestry(root: &Path) -> GuardReport {
+    let claims = match crate::claim::claims(root) {
+        Ok(c) => c,
+        Err(e) => {
+            return GuardReport {
+                name: "claim-ancestry",
+                scanned: 0,
+                warnings: Vec::new(),
+                violations: vec![format!("error reading claims: {e}")],
+            }
+        }
+    };
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for c in &claims {
+        if c.at.is_empty() {
+            continue;
+        }
+        let intro = crate::gitx::git()
+            .arg("-C")
+            .arg(root)
+            .args(["log", "--reverse", "--format=%ad", "--date=short", "-S", &c.name, "--", ".tracking/claims"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| String::from_utf8_lossy(&o.stdout).lines().next().map(str::to_owned));
+        let Some(intro_date) = intro.filter(|d| !d.is_empty()) else { continue }; // uncommitted claim
+        scanned += 1;
+        let lead = crate::view::days_between_pub(&c.at, &intro_date);
+        if lead > crate::claim::CLAIM_EXPIRY_DAYS {
+            violations.push(format!(
+                "{}: claimedAt {} predates its introducing commit ({intro_date}) by {lead} day(s) — more than the {}-day expiry window. Git ancestry is the clock (D0013); a claim cannot say it was made before it could have influenced any clone (issue229 backdating).",
+                c.name, c.at, crate::claim::CLAIM_EXPIRY_DAYS
+            ));
+        }
+    }
+    GuardReport { name: "claim-ancestry", scanned, warnings: Vec::new(), violations }
+}
+
 // ── question-coverage guard (declared knowledge facts are well-formed, D0161 part 3ii) ────────────
 
 /// Guard: declared knowledge facts are well-formed (D0161 part 3ii).
@@ -2608,6 +2660,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "enrollment-binding" => Some(enrollment_binding(root)), // WARNING-tier (D0191, actor-enrollment unit) — a machine binding naming an unregistered or kindless actor
         "control-event-coverage" => Some(control_event_coverage(root)), // WARNING-tier (D0193) — a control-relevant event with no counted record
         "question-coverage" => Some(question_coverage(root)), // D0161: declared knowledge facts are well-formed; coverage itself stays a view
+        "claim-ancestry" => Some(claim_ancestry(root)), // issue229: claimedAt bounded by the introducing commit (D0013 applied to claims)
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
@@ -3623,5 +3676,49 @@ mod viewpoint_enumeration_tests {
         let rows = crate::view::declared_viewpoints(&dir).unwrap();
         assert_eq!(rows.len(), 2, "one answer to what viewpoints exist");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod claim_ancestry_tests {
+    /// issue229 pinned: a claim whose `claimedAt` predates its own introducing commit by more than
+    /// the expiry window turns the guard RED; a same-day claim stays green. Scratch git repo so the
+    /// intro-commit lookup is real, not mocked.
+    #[test]
+    fn backdated_claim_is_refused_and_honest_claim_passes() {
+        let dir = std::env::temp_dir().join("keel-claim-ancestry-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".tracking").join("claims")).expect("mkdir");
+        let run = |args: &[&str]| {
+            let out = crate::gitx::git().arg("-C").arg(&dir).args(args).output().expect("git runs");
+            assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.email", "t@t"]);
+        run(&["config", "user.name", "t"]);
+        let claim_file = |claimed_at: &str| {
+            format!(
+                "package ProjectClaimsT {{\n    part claimT001 : Claim {{\n        :>> id = \"aaaaaaaa-6666-4666-9666-aaaaaaaaaaaa\";\n        :>> claimedItem = \"someItem\";\n        :>> claimedBy = \"tester\";\n        :>> claimedAt = \"{claimed_at}\";\n    }}\n}}\n"
+            )
+        };
+        // Backdated far beyond the window relative to the commit date (today).
+        std::fs::write(dir.join(".tracking/claims/tester.sysml"), claim_file("2020-01-01")).expect("write");
+        run(&["add", "-A"]);
+        run(&["commit", "-q", "-m", "claim"]);
+        crate::fingerprint::new_epoch();
+        let red = super::claim_ancestry(&dir);
+        assert_eq!(red.violations.len(), 1, "backdated claim must violate: {:?}", red.warnings);
+        assert!(red.violations[0].contains("predates its introducing commit"), "{}", red.violations[0]);
+        // An honest claim dated the day it was committed passes.
+        let today = {
+            let out = crate::gitx::git().arg("-C").arg(&dir).args(["log", "-1", "--format=%ad", "--date=short"]).output().expect("git");
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        std::fs::write(dir.join(".tracking/claims/tester.sysml"), claim_file(&today)).expect("write");
+        run(&["add", "-A"]);
+        run(&["commit", "-q", "-m", "honest claim"]);
+        crate::fingerprint::new_epoch();
+        let green = super::claim_ancestry(&dir);
+        assert!(green.violations.is_empty(), "{:?}", green.violations);
     }
 }

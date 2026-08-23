@@ -196,6 +196,13 @@ pub fn cmd_sync(repo: &Path) -> i32 {
 // @audit-hash ceLandGate
 pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     let branch = git(repo, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "HEAD".to_string());
+    // issue229 (process-value panel): claims gate SELECTION, and until now nothing re-checked
+    // holdership at LANDING — a contributor whose claim went stale could land onto an item another
+    // actor now holds, with the duplication surfacing only if the facts contradict. WARN, never
+    // block: the claim lane must not make work unlandable (a refused land strands facts, which is
+    // worse than a contention), but the actor must SEE the contention at the moment it becomes real
+    // and record the Issue for human adjudication (D0108) rather than discover it at integration.
+    warn_if_landing_on_held_items(repo, &branch);
     for attempt in 1..=max_attempts {
         println!("keel land: pushing {branch} -> origin (attempt {attempt}/{max_attempts})");
         if git(repo, &["push", "origin", &branch]).is_ok() {
@@ -239,6 +246,41 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     eprintln!("keel land: still rejected after {max_attempts} attempts — heavy contention. Backing off.");
     eprintln!("  Re-run shortly. Never force-push: it would orphan every evidence anchor behind it (issue071).");
     1
+}
+
+/// The issue229 land-time holdership check: if any OUTGOING commit touches the declaring file of an
+/// item another actor holds LIVE, say so loudly with the holder's name and the D0108 remedy.
+/// File-granular by design (an item-level diff would re-parse two trees per land): coarse in the
+/// safe direction — it can warn about a neighbor edit in a shared file, never stay silent about a
+/// held item's own file.
+fn warn_if_landing_on_held_items(repo: &Path, branch: &str) {
+    let me = crate::actor::resolve(repo, None).unwrap_or_default();
+    if me.is_empty() {
+        return; // no bound actor: nothing to attribute the landing to (the write paths refuse anyway)
+    }
+    let held = crate::claim::held_by_others(repo, &me).unwrap_or_default();
+    if held.is_empty() {
+        return;
+    }
+    let Ok(outgoing) = git(repo, &["diff", "--name-only", &format!("origin/{branch}..HEAD")]) else {
+        return; // no upstream to compare against — first push, nothing to warn about yet
+    };
+    let changed: std::collections::HashSet<String> =
+        outgoing.lines().map(|l| l.trim().replace('\\', "/")).collect();
+    let Ok(model_files) = crate::view::item_files(repo) else { return };
+    let file_of: std::collections::HashMap<String, String> = model_files.into_iter().collect();
+    for (item, holder) in held {
+        if let Some(file) = file_of.get(&item) {
+            if changed.contains(file) {
+                eprintln!(
+                    "keel land: WARNING — this landing changes {file}, which declares '{item}', an item {holder} holds a LIVE claim on (issue229)."
+                );
+                eprintln!(
+                    "  If your change touches '{item}' itself: record the contention as an Issue for HUMAN adjudication (D0108) — do not resolve it in your own favour. Landing proceeds; the warning is the record's cue."
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]
