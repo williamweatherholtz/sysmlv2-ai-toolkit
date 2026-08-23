@@ -203,4 +203,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcParserCoverageRatchet to issue231;
+
+    part issue232 : Issue {
+        :>> id = "9ddea0e0-6144-4ea2-be50-b51f0f83497f";
+        :>> title = "claim-ancestry's verdict depended on clone depth - CI-red on its first push";
+        :>> createdAt = "2026-08-22";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Guard 47 resolved a claim's introducing commit with git log -S; on CI's default depth-1 checkout the oldest VISIBLE commit is the clone boundary, so the guard flagged claudeOpus5's honest 2026-08-15 claim as backdated (intro misread as 2026-08-22) while the full-history local clone passed - a depth-dependent verdict, the exact K15 machine-dependence the guard cites D0013 to prevent, caught by CI within minutes of landing. Control: the guard SKIPS LOUDLY on shallow repos (absence of history is a state, not a violation - the enrollment-binding precedent) and ci.yml checks out fetch-depth 0 so the real check runs where it matters.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcClaimLandCheck to issue232;
 }

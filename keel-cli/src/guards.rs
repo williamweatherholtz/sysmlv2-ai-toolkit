@@ -2376,6 +2376,28 @@ pub fn claim_ancestry(root: &Path) -> GuardReport {
             }
         }
     };
+    // A SHALLOW clone cannot resolve introduction commits — the oldest visible commit is the clone
+    // boundary, not the claim's birth, and judging against it flags honest claims (this exact guard
+    // went CI-red on its first push because checkout@v4 defaults to depth 1). Depth-dependent
+    // verdicts are the machine-dependence K15 forbids: on a shallow repo this guard SKIPS LOUDLY.
+    let shallow = crate::gitx::git()
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--is-shallow-repository"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .is_some_and(|o| String::from_utf8_lossy(&o.stdout).trim() == "true");
+    if shallow {
+        return GuardReport {
+            name: "claim-ancestry",
+            scanned: 0,
+            warnings: vec![
+                "SHALLOW clone: introduction commits cannot be resolved, so claim dates were NOT checked here (a depth-dependent verdict would be the K15 machine-dependence this guard exists to prevent). CI checks out full history for this reason.".to_string(),
+            ],
+            violations: Vec::new(),
+        };
+    }
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for c in &claims {
