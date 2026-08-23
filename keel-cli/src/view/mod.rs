@@ -3653,11 +3653,20 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
     // (4) Per-sitting reviews still owed, in force from D0073. Reported as ONE batched row, because
     // D0049 makes the review per SITTING rather than per sprint — a row per sprint would misstate
     // the ask by two orders of magnitude and invite exactly the rubber-stamping being avoided.
+    //
+    // issue227 (the process-value panel's High finding): this row previously grandfathered only on
+    // the D0073 in-force DATE while `sitting-coverage` grandfathers on the D0155 human attestation
+    // (present-at-introduction-commit) — two views, one obligation, two answers (279 vs 6). ONE
+    // computation now: the same D0155 basis, with the grandfathered count reported beside the due
+    // count rather than hidden, and the escalation clock starting from the oldest DUE item.
     let (rev_from, rev_dec) = in_force_from("perSittingReview");
     let covered = covered_sprints(&model);
+    let gf = crate::govern::grandfathered_under(root, SITTING_DECISION);
+    let is_gf = |s: &str| gf.as_ref().is_some_and(|g| g.contains(s));
     let mut sprints: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
     sprints.sort();
     let mut owed = 0usize;
+    let mut grandfathered = 0usize;
     let mut oldest = String::new();
     for s in sprints {
         if covered.contains(s.as_str()) {
@@ -3665,7 +3674,11 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
         }
         let since = model.items.get(s).and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default();
         if since.is_empty() || days_between(rev_from, &since) < 0 {
-            continue; // grandfathered: predates the per-sitting review obligation
+            continue; // predates the per-sitting review obligation itself (D0073)
+        }
+        if is_gf(s) {
+            grandfathered += 1; // accepted-unreviewed by human attestation (D0155) — counted, never due
+            continue;
         }
         owed += 1;
         if oldest.is_empty() || since < oldest {
@@ -3678,7 +3691,9 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
             item: format!("{owed} sprint(s) awaiting a sitting review"),
             origin: "multiple".to_owned(),
             since: oldest,
-            note: format!("BATCHED per sitting (D0049), not per sprint — in force from {rev_from} ({rev_dec})"),
+            note: format!(
+                "BATCHED per sitting (D0049), not per sprint — in force from {rev_from} ({rev_dec}); due = uncovered AND not D0155-grandfathered, matching `keel sitting-coverage` (issue227); {grandfathered} grandfathered sitting(s) excluded and reported by that view"
+            ),
         });
     }
 
