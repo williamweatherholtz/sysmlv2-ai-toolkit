@@ -152,8 +152,10 @@ frozen (modify it only by out-of-band Decision).
   an instruction or from the work being done. A confirmation FLIP recorded on the human's chat words
   carries a companion quote receipt — `<test>Attest<N>` quoting them verbatim (D0198; guard-enforced
   forward from 2026-08-23). **Confirm only what tests can't (D0051):** never ask a human
-  to confirm a green test. Sprint closeOut and retro are AI-recorded and autonomous (D0049); the single
-  human gate is the per-**sitting** review.
+  to confirm a green test. Sprint closeOut and retro are AI-recorded and autonomous (D0049). The human's
+  only inherent gates are direction decisions that block work and confirmations they choose to give;
+  sitting review is an OPTIONAL pull-audit, never scheduled or owed (D0204) - coverage keeps computing
+  as a record, and no surface presents it as the human's debt.
 - **There is no prose state document (D0018).** Where things stand is computed; what's next is the ranked
   frontier; how to work here is this file. Never author a status, worklist, or handoff doc — if resuming
   requires knowledge, it belongs in the model.

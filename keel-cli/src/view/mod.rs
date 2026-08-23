@@ -2555,37 +2555,6 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
     Ok(out.dump())
 }
 
-/// D0200 clause 5 (escalation with teeth): the oversight debt, for the throttle.
-///
-/// Returns `Some((due_count, oldest_age_days))` when at least one DUE (not grandfathered) sitting
-/// exists; the CALLER decides what age escalates. One computation, shared with authority-queue.
-///
-/// # Errors
-/// Returns [`ViewError`] if the model cannot be read.
-pub fn oversight_debt(root: &Path) -> Result<Option<(usize, i64)>, ViewError> {
-    let model = Model::build(root)?;
-    let covered = covered_sprints(&model);
-    let gf = crate::govern::grandfathered_under(root, SITTING_DECISION);
-    let is_gf = |s: &str| gf.as_ref().is_some_and(|g| g.contains(s));
-    let today = repo_today_pub(root);
-    let mut due = 0usize;
-    let mut oldest_age = 0i64;
-    for (name, info) in &model.items {
-        if info.type_name != "Story" || covered.contains(name.as_str()) || is_gf(name) {
-            continue;
-        }
-        let since = info.attrs.get("createdAt").map_or("", String::as_str);
-        if since.is_empty() {
-            continue;
-        }
-        due += 1;
-        if !today.is_empty() {
-            oldest_age = oldest_age.max(days_between_pub(since, &today));
-        }
-    }
-    Ok(if due == 0 { None } else { Some((due, oldest_age)) })
-}
-
 /// True if an action name looks like it produces a permanent automated GUARD/check (D0047/issue039).
 /// Heuristic (this feeds a WARN diagnostic, not a hard gate): the resolver naming convention in use.
 fn is_guard_producing(name: &str) -> bool {
@@ -3706,53 +3675,11 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
         });
     }
 
-    // (4) Per-sitting reviews still owed, in force from D0073. Reported as ONE batched row, because
-    // D0049 makes the review per SITTING rather than per sprint — a row per sprint would misstate
-    // the ask by two orders of magnitude and invite exactly the rubber-stamping being avoided.
-    //
-    // issue227 (the process-value panel's High finding): this row previously grandfathered only on
-    // the D0073 in-force DATE while `sitting-coverage` grandfathers on the D0155 human attestation
-    // (present-at-introduction-commit) — two views, one obligation, two answers (279 vs 6). ONE
-    // computation now: the same D0155 basis, with the grandfathered count reported beside the due
-    // count rather than hidden, and the escalation clock starting from the oldest DUE item.
-    let (rev_from, rev_dec) = in_force_from("perSittingReview");
-    let covered = covered_sprints(&model);
-    let gf = crate::govern::grandfathered_under(root, SITTING_DECISION);
-    let is_gf = |s: &str| gf.as_ref().is_some_and(|g| g.contains(s));
-    let mut sprints: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
-    sprints.sort();
-    let mut owed = 0usize;
-    let mut grandfathered = 0usize;
-    let mut oldest = String::new();
-    for s in sprints {
-        if covered.contains(s.as_str()) {
-            continue;
-        }
-        let since = model.items.get(s).and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default();
-        if since.is_empty() || days_between(rev_from, &since) < 0 {
-            continue; // predates the per-sitting review obligation itself (D0073)
-        }
-        if is_gf(s) {
-            grandfathered += 1; // accepted-unreviewed by human attestation (D0155) — counted, never due
-            continue;
-        }
-        owed += 1;
-        if oldest.is_empty() || since < oldest {
-            oldest.clone_from(&since);
-        }
-    }
-    if owed > 0 {
-        awaiting.push(Awaiting {
-            kind: "perSittingReview".to_owned(),
-            item: format!("{owed} sprint(s) awaiting a sitting review"),
-            origin: "multiple".to_owned(),
-            since: oldest,
-            note: format!(
-                "BATCHED per sitting (D0049), not per sprint — in force from {rev_from} ({rev_dec}); due = uncovered AND not D0155-grandfathered, matching `keel sitting-coverage` (issue227); {grandfathered} grandfathered sitting(s) excluded and reported by that view"
-            ),
-        });
-    }
-
+    // (4) D0204 (pullOversight): sitting coverage is deliberately NOT an authority-queue row.
+    // It computes as a RECORD of the AI's governance (`keel sitting-coverage`: read/batch split,
+    // due census, override-rate indicator) and stays reviewable on demand - but it is never
+    // presented as something AWAITING the human. Their words: "I don't need a schedule, or 'due'
+    // items." The queue lists only what genuinely blocks on their judgment.
     let mut escalated = 0usize;
     let rows: Vec<Json> = awaiting
         .iter()

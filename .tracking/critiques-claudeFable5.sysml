@@ -59,4 +59,13 @@ package CritiquesClaudeFable5 {
     verification issue230Disp1 : Test { :>> id = "955618b0-2eb2-461e-b811-a56afa73e8a0"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation: resolver dcAdvisoryInstrumentation is chartered on the frontier; the design touches the frozen D0193 ledger contract and will carry its own decision when executed."; }
     part issue230Disp1R1 : TestResult { :>> id = "e94e742f-f839-4fa1-8504-bc02f798db65"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
     #Dispositions dependency from issue230Disp1 to issue230;
+    verification issue232Disp1 : Test { :>> id = "946f97ec-e690-445d-ad46-bfb20affa24f"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation. fixed same-day - shallow-clone skip + CI full history."; }
+    part issue232Disp1R1 : TestResult { :>> id = "4c154186-5a3d-48a4-876a-df14567f603b"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ef4443"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue232Disp1 to issue232;
+    verification issue233Disp1 : Test { :>> id = "ee99f343-4c13-4e31-831c-75409b6f9c8d"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation. fixed in sprint 429 - only the tapped option highlights."; }
+    part issue233Disp1R1 : TestResult { :>> id = "1344fd11-53e6-4391-b4d0-8a7586ac1223"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ef4443"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue233Disp1 to issue233;
+    verification issue234Disp1 : Test { :>> id = "5da385c3-631e-462a-ad34-5cc276459a2c"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation. fixed in sprint 429 - decision cards render their own deciding context."; }
+    part issue234Disp1R1 : TestResult { :>> id = "a45cfcb6-c8c9-4e3f-9dc2-6ae972e477ea"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7ef4443"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue234Disp1 to issue234;
 }

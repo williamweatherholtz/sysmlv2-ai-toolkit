@@ -43,30 +43,8 @@ struct Item {
     /// FORK options (issue223): a proposed Decision that enumerates `OPTION X (label)` choices gets
     /// one sign button per option — a bare Sign on a fork solicits a gesture that cannot bind.
     options: Vec<(String, String)>,
-    /// D0200 sampling: a sitting card marked for DEEP review (N random + M risk-flagged per deck);
-    /// the rest offer Batch-acknowledge, which records the distinct batch verdict, never a read.
-    deep: bool,
 }
 
-/// A sprint's computed delta for its sitting card (D0200 clause 2): the DELIVERED text from the
-/// story `DoD` plus the pass/fail result census — raw evidence the human can judge, never narrative.
-fn sitting_digest(root: &Path, rel_file: &str) -> Option<(String, usize, usize)> {
-    let text = std::fs::read_to_string(root.join(rel_file)).ok()?;
-    let delivered = text
-        .find("procedureText = \"DELIVERED")
-        .and_then(|i| {
-            let start = i + "procedureText = \"".len();
-            text[start..].find('"').map(|j| text[start..start + j].to_string())
-        })
-        .or_else(|| {
-            let i = text.find("procedureText = \"")? + "procedureText = \"".len();
-            let j = text[i..].find('"')?;
-            Some(text[i..i + j].to_string())
-        })?;
-    let pass = text.matches("VerdictKind::pass").count();
-    let fail = text.matches("VerdictKind::fail").count();
-    Some((delivered, pass, fail))
-}
 
 /// A Decision's own deciding context for the card (their feedback, 2026-08-23: "there is not
 /// sufficient context to make these decisions generally"). Returns `(context, decision)` text
@@ -227,7 +205,6 @@ fn collect(root: &Path) -> Vec<Item> {
             meta,
             file: file.clone(),
             options: Vec::new(),
-            deep: false,
         });
     };
     let parse = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null);
@@ -247,12 +224,7 @@ fn collect(root: &Path) -> Vec<Item> {
             }
         }
     }
-    let sit = parse(crate::view::sitting_coverage(root).unwrap_or_default());
-    for s in sit.get("due_sprints").and_then(|v| v.as_array()).unwrap_or(&empty) {
-        if let Some(n) = s.as_str() {
-            add("sitting", n, "unreviewed".to_string());
-        }
-    }
+    // D0204: sittings are not collected - the deck is blockers + critical, never review debt.
     for i in &mut items {
         if i.cls == "acceptance" {
             i.options = fork_options(root, &i.file);
@@ -261,69 +233,14 @@ fn collect(root: &Path) -> Vec<Item> {
             }
         }
     }
-    mark_deep_samples(root, &mut items);
     items
 }
 
-/// D0200 clause 3: per deck, N=2 randomly-sampled + M=1 risk-flagged sitting cards are marked for
-/// DEEP review; the rest offer explicit Batch-acknowledge. The random pick is seeded from HEAD so
-/// the same tree deals the same hand (a re-opened deck must not reshuffle the ask); risk = the
-/// sprint file leaning hardest on guard/decision/schema surfaces.
-fn mark_deep_samples(root: &Path, items: &mut [Item]) {
-    let risk = |it: &Item| -> usize {
-        std::fs::read_to_string(root.join(&it.file)).map_or(0, |txt| {
-            let l = txt.to_lowercase();
-            l.matches("guard").count() + l.matches("decision").count() + l.matches("schema").count()
-        })
-    };
-    // Pick by UID first (no index math), mutate in one pass after.
-    let sittings: Vec<(String, usize)> =
-        items.iter().filter(|i| i.cls == "sitting").map(|i| (i.uid.clone(), risk(i))).collect();
-    if sittings.is_empty() {
-        return;
-    }
-    let mut deep: Vec<String> = Vec::new();
-    if let Some((uid, _)) = sittings.iter().max_by_key(|(_, r)| *r) {
-        deep.push(uid.clone());
-    }
-    let seed: usize = crate::gitx::git()
-        .arg("-C")
-        .arg(root)
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .ok()
-        .map_or(0, |o| o.stdout.iter().map(|b| *b as usize).sum());
-    let open: Vec<&String> = sittings.iter().map(|(u, _)| u).filter(|u| !deep.contains(u)).collect();
-    for k in 0..2usize.min(open.len()) {
-        if let Some(uid) = open.get((seed / (k + 1)) % open.len()) {
-            if !deep.contains(*uid) {
-                deep.push((*uid).clone());
-            }
-        }
-    }
-    let risk_uid = deep.first().cloned().unwrap_or_default();
-    for it in items.iter_mut().filter(|i| i.cls == "sitting") {
-        if deep.contains(&it.uid) {
-            it.deep = true;
-            it.meta = if it.uid == risk_uid {
-                "DEEP REVIEW - risk-flagged (touches the most guard/decision/schema surface)".to_string()
-            } else {
-                "DEEP REVIEW - randomly sampled this deck".to_string()
-            };
-        } else {
-            it.meta = "batch-ackable (sampled out this deck - D0200)".to_string();
-        }
-    }
-}
 
 /// One card's HTML. Extracted from [`html`]'s section loop (clippy line budget) — behavior identical.
 fn render_card(root: &Path, i: &Item, cls: &str) -> String {
     let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
-    let accept_buttons = if cls == "sitting" && !i.deep {
-        // D0200 clause 3: sampled-out sittings are batch-acknowledged EXPLICITLY (a distinct
-        // verdict the coverage count never conflates with a read) — reviewing anyway stays open.
-        "<button data-v=batch-ack>Batch-acknowledge</button><button data-v=accept>Reviewed it</button>".to_string()
-    } else if i.options.is_empty() {
+    let accept_buttons = if i.options.is_empty() {
         format!("<button data-v=accept>{verb}</button>")
     } else {
         let mut b = String::new();
@@ -345,16 +262,6 @@ fn render_card(root: &Path, i: &Item, cls: &str) -> String {
                 "<details class=why><summary>what this decides, and why</summary><div><p><b>Why it came up:</b> {}</p><p><b>What is being decided:</b> {}</p></div></details>",
                 esc(&ctx),
                 esc(&dec)
-            )
-        })
-    } else if cls == "sitting" {
-        // D0200 clause 2: the judgeable delta — the sprint's own DELIVERED text and its result
-        // census, so an accept can mean examined-the-work rather than trusted-the-title.
-        sitting_digest(root, &i.file).map_or_else(String::new, |(delivered, pass, fail)| {
-            format!(
-                "<details class=why{}><summary>what this sprint delivered ({pass} pass / {fail} fail)</summary><div><p>{}</p></div></details>",
-                if i.deep { " open" } else { "" },
-                esc(&delivered)
             )
         })
     } else {
@@ -404,10 +311,12 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
         .ok()
         .filter(|o| o.status.success())
         .map_or_else(|| "?".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-    let classes: [(&str, &str, &str); 3] = [
-        ("acceptance", "Decisions awaiting your signature", "#4c5fd7"),
-        ("finding", "Findings awaiting disposition", "#b5651d"),
-        ("sitting", "Sitting reviews due", "#7d4f9c"),
+    // D0204 (pullOversight): the deck shows what BLOCKS on the human and what is critical -
+    // never their homework. The sitting section is deliberately gone; sittings stay reviewable on
+    // demand (console, API) and `keel sitting-coverage` keeps the record.
+    let classes: [(&str, &str, &str); 2] = [
+        ("acceptance", "Decisions blocking work - your call", "#4c5fd7"),
+        ("finding", "Critical findings", "#b5651d"),
     ];
     let mut sections = String::new();
     for (cls, label, hue) in classes {

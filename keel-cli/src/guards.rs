@@ -552,28 +552,14 @@ pub fn process_change(root: &Path) -> GuardReport {
         .filter(|p| is_decision_file(p))
         .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
         .collect();
-    let mut violations = keystone_violations(&changed, &decision_texts);
+    let violations = keystone_violations(&changed, &decision_texts);
     let scanned = changed.iter().filter(|p| is_process_def(p)).count();
-    // D0200 clause 5 (their OPTION A): ESCALATION WITH TEETH. When the human's DUE sitting queue
-    // has aged past the escalation threshold, new CHANGE-route work stops landing until the debt
-    // shrinks — the meaningful-human-control criterion: the human's absence must change system
-    // behavior. Only process-def changes throttle (delivery work and the review-recording writes
-    // that SHRINK the debt land freely, so there is no deadlock), and only on ESCALATED debt —
-    // fresh due sittings never block anything.
-    if scanned > 0 {
-        if let Ok(Some((due, oldest_age))) = crate::view::oversight_debt(root) {
-            if oldest_age >= OVERSIGHT_ESCALATE_DAYS {
-                violations.push(format!(
-                    "process-def change while the oversight debt is ESCALATED: {due} due sitting review(s), oldest {oldest_age} day(s) old (threshold {OVERSIGHT_ESCALATE_DAYS}). D0200 clause 5: new CHANGE-route work queues until the review debt shrinks — record the due sittings (or have them batch-acknowledged) and re-commit; delivery work is unaffected."
-                ));
-            }
-        }
-    }
+    // D0204 (pullOversight): the short-lived D0200 clause-5 throttle - refusing process-def commits
+    // while the human's review queue aged - is deliberately ABSENT. Nothing gates the AI's work on
+    // the human's attention cadence; the records stay auditable, the ask is gone.
     GuardReport { name: "process-change", scanned, warnings: Vec::new(), violations }
 }
 
-/// D0200 clause 5's escalation threshold — the same 14 days `authority-queue` escalates at.
-const OVERSIGHT_ESCALATE_DAYS: i64 = 14;
 
 // ── doc-sync guard (D0113: the doc-sync discipline made a CONTROL — was pure vigilance) ────────────
 
