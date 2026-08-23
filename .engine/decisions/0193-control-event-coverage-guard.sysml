@@ -12,6 +12,8 @@ package Decision0193 {
 
     // #ProspectiveChange (D0070) - governs guard 45, the control-events.toml contract, and the
     // re-chartering of the three folded resolvers.
+    // APPLIED sprint 433 (2026-08-23): the declared event list gains advisory-issued and
+    // advisory-repeated (issue230) - the contract mechanism this Decision built, used as designed.
     #ProspectiveChange part d0193 : Decision {
         :>> id = "ff89ea3d-0f41-460d-9ff0-79e03c2d2971";
         :>> title = "D0193: every control-relevant event emits a counted record - one coverage control for the family";

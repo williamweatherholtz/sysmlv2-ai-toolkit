@@ -264,7 +264,7 @@ fn cmd_hook(args: &[String]) -> i32 {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
         "user-prompt" => hook_user_prompt(&root),
-        "pre-bash" => hook_pre_bash(&payload, &root),
+        "pre-bash" => hook_pre_bash(&payload, &root, &session),
         "pre-write" => hook_pre_write(&payload, &root),
         "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
         other => {
@@ -654,7 +654,7 @@ fn bash_classify(root: &Path, cmd: &str) -> BashVerdict {
     BashVerdict::Clean
 }
 
-fn hook_pre_bash(payload: &serde_json::Value, root: &Path) -> i32 {
+fn hook_pre_bash(payload: &serde_json::Value, root: &Path, session: &str) -> i32 {
     let cmd = payload.pointer("/tool_input/command").and_then(serde_json::Value::as_str).unwrap_or_default();
     // D0176/D0178 tiering first: unambiguous bypass patterns and the never-exempt set.
     let profile = adoption_profile(root);
@@ -669,6 +669,7 @@ fn hook_pre_bash(payload: &serde_json::Value, root: &Path) -> i32 {
                 return 0;
             }
             println!("[keel] BLOCKED-under-strict pattern: {why} (advisory here; promotion cites the fire-ledger, D0180)");
+            ledger_advisory(root, session, &why);
         }
         BashVerdict::Ask(why) => {
             if profile == "strict" {
@@ -680,6 +681,7 @@ fn hook_pre_bash(payload: &serde_json::Value, root: &Path) -> i32 {
                 return 0;
             }
             println!("[keel] human-channel operation: {why} (ask-tier under strict; advisory here)");
+            ledger_advisory(root, session, &why);
         }
         BashVerdict::Clean => {}
     }
@@ -688,12 +690,38 @@ fn hook_pre_bash(payload: &serde_json::Value, root: &Path) -> i32 {
         return 0;
     }
     println!("[shell-adaptation -- CLAUDE.md sec 6, the #1 avoidable-friction class (issue094)]");
+    let mut spoken = String::new();
     for a in &advisories {
         println!("  {}", a.what);
         println!("    fix: {}", a.fix);
+        spoken.push_str(&a.what);
     }
     println!("  Advisory only -- nothing is blocked. If the command errors or hangs, SWITCH TOOLS rather than re-issuing the same form.");
+    // issue230 (D0197's untriggerable revisit condition): an advisory that SPEAKS leaves its own
+    // ledger event, and speaking the SAME advice again in the same session leaves a repeat event —
+    // the mechanical ignore signal. Heeded is then computable as issued-without-repeat
+    // (approximate, and enforcement-report says so). Silent fires stay one plain pre-bash line.
+    ledger_advisory(root, session, &spoken);
     0
+}
+
+/// The issue230 advisory instrumentation: emit `advisory-issued` for a spoken advisory, plus
+/// `advisory-repeated` when the same advice hash was already the session's last one — all within
+/// the frozen 6-field schema (events are declared vocabulary, fields are not touched).
+fn ledger_advisory(root: &Path, session: &str, spoken: &str) {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    spoken.hash(&mut h);
+    let digest = format!("{:x}", h.finish());
+    let dir = root.join(".keel").join("metrics");
+    let _ = std::fs::create_dir_all(&dir);
+    let marker = dir.join(format!("last-advice-{}.hash", if session.is_empty() { "nosession" } else { session }));
+    let repeated = std::fs::read_to_string(&marker).is_ok_and(|prev| prev.trim() == digest);
+    let _ = std::fs::write(&marker, &digest);
+    ledger_emit(root, session, "advisory-issued", 0, 0);
+    if repeated {
+        ledger_emit(root, session, "advisory-repeated", 0, 0);
+    }
 }
 
 /// `UserPromptSubmit`: inject the route-first checklist, plus a warning about out-of-band writes.

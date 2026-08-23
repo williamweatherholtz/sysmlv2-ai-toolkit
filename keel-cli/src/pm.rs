@@ -23,11 +23,26 @@ use std::path::Path;
 /// The frozen field set — the schema test asserts emitted lines carry exactly these.
 pub const LEDGER_FIELDS: [&str; 6] = ["ts", "session", "event", "decision", "exit", "ms"];
 
+/// The tracked-side counters (`#ProcessDefect` marks, synced override obligations, run records) —
+/// extracted from [`enforcement_report`] for the line budget; behavior identical.
+fn tracked_counts(root: &Path) -> (usize, usize, usize) {
+    let mut process_defects = 0usize;
+    for f in crate::collect_sysml(&root.join(".tracking")) {
+        if let Ok(t) = std::fs::read_to_string(&f) {
+            process_defects += t.matches("#ProcessDefect").count();
+        }
+    }
+    let tracked_obligations =
+        std::fs::read_dir(root.join(".tracking").join("obligations")).map_or(0, |rd| rd.flatten().count());
+    let run_records = std::fs::read_dir(root.join(".keel").join("runs")).map_or(0, |rd| rd.flatten().count());
+    (process_defects, tracked_obligations, run_records)
+}
+
 /// Compute the enforcement report.
 ///
 /// # Errors
-/// Never errors on an absent ledger — absence is a finding ("no fires recorded"), not a failure.
-/// The signature matches the computed-view convention so serve's cache can hold it.
+/// Never errors on an absent ledger — absence is a finding, not a failure; the `Result` signature
+/// matches the computed-view convention so serve's cache can hold it.
 pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError> {
     let ledger = root.join(".keel").join("metrics").join("hooks.jsonl");
     let text = std::fs::read_to_string(&ledger).unwrap_or_default();
@@ -36,6 +51,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
     let mut overrides = 0u64;
     let mut unsynced = 0u64;
     let mut red_yields = 0u64;
+    let mut advisory_issued = 0u64;
+    let mut advisory_repeated = 0u64;
     let mut malformed = 0u64;
     let mut lines = 0u64;
     for line in text.lines() {
@@ -53,6 +70,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
             }
         }
         match event.as_str() {
+            "advisory-issued" => advisory_issued += 1,
+            "advisory-repeated" => advisory_repeated += 1,
             ev if ev.starts_with("override-obligation") => {
                 overrides += 1;
                 unsynced += 1;
@@ -69,21 +88,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
             slot.1 += 1;
         }
     }
-    // Adherence trend: the already-tracked #ProcessDefect-marked issues (D0180's chosen signal).
-    let process_defects = {
-        let mut n = 0usize;
-        for f in crate::collect_sysml(&root.join(".tracking")) {
-            if let Ok(t) = std::fs::read_to_string(&f) {
-                n += t.matches("#ProcessDefect").count();
-            }
-        }
-        n
-    };
-    // Tracked override obligations (consumed unlocks that DID sync).
-    let tracked_obligations =
-        std::fs::read_dir(root.join(".tracking").join("obligations")).map_or(0, |rd| rd.flatten().count());
-    let runs_dir = root.join(".keel").join("runs");
-    let run_records = std::fs::read_dir(&runs_dir).map_or(0, |rd| rd.flatten().count());
+    let (process_defects, tracked_obligations, run_records) = tracked_counts(root);
     let events_json: Vec<Json> = per_event
         .into_iter()
         .map(|(ev, (fires, blocks))| {
@@ -107,6 +112,17 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         ("sessionsSeen".to_string(), Json::Int(i64::try_from(sessions.len()).unwrap_or(i64::MAX))),
         ("perEvent".to_string(), Json::Arr(events_json)),
         ("redYields".to_string(), Json::Int(i64::try_from(red_yields).unwrap_or(i64::MAX))),
+        // issue230: spoken advisories vs silent fires, and the repeat-as-ignore signal. APPROXIMATE
+        // by stated design: heeded = issued without the same advice hash recurring in-session; a
+        // heeded advisory and a never-retried command are indistinguishable, and the note says so.
+        ("advisoryIssued".to_string(), Json::Int(i64::try_from(advisory_issued).unwrap_or(i64::MAX))),
+        ("advisoryRepeated".to_string(), Json::Int(i64::try_from(advisory_repeated).unwrap_or(i64::MAX))),
+        ("advisoryApproxHeedPct".to_string(), if advisory_issued == 0 { Json::Null } else {
+            let rep = f64::from(u32::try_from(advisory_repeated).unwrap_or(u32::MAX));
+            let iss = f64::from(u32::try_from(advisory_issued).unwrap_or(u32::MAX));
+            Json::s(format!("{:.0}", 100.0 - rep * 100.0 / iss))
+        }),
+        ("advisoryNote".to_string(), Json::s("issued counts advisories that actually SPOKE (silent fires excluded); repeated = the same advice hash again in the same session (the mechanical ignore signal). D0197's revisit condition reads these two numbers.".to_string())),
         ("overrideLedgerEvents".to_string(), Json::Int(i64::try_from(overrides).unwrap_or(i64::MAX))),
         ("overrideObligationsUnsynced".to_string(), Json::Int(i64::try_from(unsynced).unwrap_or(i64::MAX))),
         ("overrideObligationsTracked".to_string(), Json::Int(i64::try_from(tracked_obligations).unwrap_or(i64::MAX))),
