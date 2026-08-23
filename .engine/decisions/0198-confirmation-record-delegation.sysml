@@ -9,6 +9,8 @@ package Decision0198 {
 
     // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
     // change rides the process-change guard's hard lock.
+    // APPLIED sprint 430 (2026-08-23), OPTION A per their deck tap: [confirmationRecord] policy
+    // class, delegatedConfirmationSubstanceRule + quote-receipt predicate, guard sourcing, docs.
     #ProspectiveChange part d0198 : Decision {
         :>> id = "3eeb62cd-cc0b-4ba2-b0a6-537603bed20a";
         :>> title = "D0198: extend the D0192 recording delegation to confirmation flips - companion record, or an attestation field on TestResult";

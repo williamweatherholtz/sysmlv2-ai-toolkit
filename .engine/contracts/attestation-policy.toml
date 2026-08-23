@@ -55,6 +55,24 @@ delegatedRecording = "d0192"
 kinds = ["human", "ai"]
 roles = ["supervisor", "contributor"]
 
+[confirmationRecord]
+# Flipping a method=confirmation result (a DoD checkbox, a launch approval) as a HUMAN's judgment.
+# The JUDGE is always the human; kinds/roles bind the judge exactly as decisionAcceptance does.
+kinds = ["human"]
+roles = ["supervisor"]
+#
+# RECORDING DELEGATED TO THE AI BY THE HUMAN (D0198 OPTION A), 2026-08-23, chosen by deck tap
+# (uid 3eeb62cd, note OPTION A). An agent may flip a confirmation result on the human's behalf when a
+# COMPANION attestation record (<test>Attest<N>, method=confirmation) quotes their words verbatim -
+# the quote-receipt that gives the flip the evidence shape acceptance events always had. The
+# `confirmation-authenticity` guard's `delegatedConfirmationSubstanceRule` demands the receipt
+# (forward-only from the acceptance date). STATED LIMIT (the D0192 family): a fabricated quote
+# defeats the check; the protections are the human's own queue and the audit trail - and tap-to-sign
+# (D0201), if adopted, hardens this channel too.
+#
+# TO WITHDRAW: delete the line below; confirmation flips then require the human's own gesture.
+delegatedRecording = "d0198"
+
 [contentionAdjudication]
 # Adjudicating a contributor conflict (D0108 clause 5). Human-only: no contributor may resolve a
 # contention in favour of its own conclusion, and an AI resolving one would be doing exactly that

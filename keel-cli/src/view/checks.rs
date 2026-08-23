@@ -144,6 +144,40 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
             .map_or("", String::as_str);
         return Some(quotes_conversational_words(text));
     }
+    // confirmationQuotesOrAttested(cutoff): D0198 OPTION A (quote receipts). A method=confirmation
+    // Test whose LATEST result is a human-judged pass on/after the cutoff must carry its evidence:
+    // its own procedureText quotes the human's words / cites their gesture, OR a companion record
+    // `<name>Attest<N>` (method=confirmation, quoting text, passing result) exists. Acceptance
+    // events (`*Accept`) keep delegatedAcceptanceSubstanceRule; companion records themselves
+    // (`*Attest<N>`) are evidence, not subjects. Pre-cutoff and AI-judged results: vacuously true
+    // (issue068 forward-only; an AI-judged confirmation is confirmationAuthenticityRule's business).
+    if let Some(cutoff) = predicate_args(term, "confirmationQuotesOrAttested(") {
+        if attrs.get("method").map(String::as_str) != Some("confirmation")
+            || name.ends_with("Accept")
+            || is_attest_companion(name)
+        {
+            return Some(true);
+        }
+        let Some((outcome, judged_at, judged_by)) = latest_result_full(model, name) else {
+            return Some(true); // unanswered confirmation = pending obligation, not a defect
+        };
+        let human = model.items.get(&judged_by).is_some_and(|a| a.type_name == "Person");
+        if outcome != "pass" || !human || judged_at.as_str() < cutoff.trim() {
+            return Some(true);
+        }
+        let own_text = attrs.get("procedureText").map_or("", String::as_str);
+        if quotes_conversational_words(own_text) {
+            return Some(true);
+        }
+        let receipt = model.items.iter().any(|(cn, ci)| {
+            cn.starts_with(name)
+                && is_attest_companion(cn)
+                && ci.attrs.get("method").map(String::as_str) == Some("confirmation")
+                && quotes_conversational_words(ci.attrs.get("procedureText").map_or("", String::as_str))
+                && latest_result(model, cn).is_some_and(|(o, _)| o == "pass")
+        });
+        return Some(receipt);
+    }
     // charterTargetType(T1,T2,...): every OUTGOING #CharteredBy edge from `name` targets an item whose
     // TYPE is in the allow-list. The enforceable slice of research-spike routing (issue055): once a
     // spike EXISTS, its charter must point at a real Issue or Decision, so the routing convention gains a
@@ -180,6 +214,36 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         }
     }
     None
+}
+
+/// Is `name` a quote-receipt companion — `<test>Attest<N>` (D0198 OPTION A naming convention)?
+fn is_attest_companion(name: &str) -> bool {
+    name.rfind("Attest").is_some_and(|i| {
+        i > 0 && !name[i + 6..].is_empty() && name[i + 6..].chars().all(|c| c.is_ascii_digit())
+    })
+}
+
+/// `(outcome, judgedAt, judgedBy)` of the HIGHEST-numbered `<v>R<n>` result — the fields the
+/// D0198 quote-receipt predicate needs beside [`latest_result`]'s `(outcome, judgedAgainst)`.
+fn latest_result_full(model: &Model, v: &str) -> Option<(String, String, String)> {
+    let mut best: Option<(u32, String, String, String)> = None;
+    for (name, info) in &model.items {
+        let Some(suf) = name.strip_prefix(v) else { continue };
+        let Some(digits) = suf.strip_prefix('R') else { continue };
+        if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(n) = digits.parse::<u32>() else { continue };
+        if best.as_ref().is_none_or(|(bn, _, _, _)| n > *bn) {
+            best = Some((
+                n,
+                info.attrs.get("outcome").cloned().unwrap_or_default(),
+                info.attrs.get("judgedAt").cloned().unwrap_or_default(),
+                info.attrs.get("judgedBy").cloned().unwrap_or_default(),
+            ));
+        }
+    }
+    best.map(|(_, o, at, by)| (o, at, by))
 }
 
 /// Does an acceptance record carry its channel evidence (D0192 OPTION A)? True on a single-quoted

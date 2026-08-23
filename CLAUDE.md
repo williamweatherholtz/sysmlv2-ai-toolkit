@@ -149,7 +149,9 @@ frozen (modify it only by out-of-band Decision).
   contributor with **`actor-enrollment`**.
 - **Confirmation results need explicit human sign-off.** A `method=confirmation` verification *is* a human
   attestation — record it only on their explicit confirmation of that specific claim, never inferred from
-  an instruction or from the work being done. **Confirm only what tests can't (D0051):** never ask a human
+  an instruction or from the work being done. A confirmation FLIP recorded on the human's chat words
+  carries a companion quote receipt — `<test>Attest<N>` quoting them verbatim (D0198; guard-enforced
+  forward from 2026-08-23). **Confirm only what tests can't (D0051):** never ask a human
   to confirm a green test. Sprint closeOut and retro are AI-recorded and autonomous (D0049); the single
   human gate is the per-**sitting** review.
 - **There is no prose state document (D0018).** Where things stand is computed; what's next is the ranked

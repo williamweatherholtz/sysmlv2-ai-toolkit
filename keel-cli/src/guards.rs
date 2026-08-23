@@ -200,6 +200,24 @@ Err(e) => GuardReport { name: "confirmation-authenticity", scanned: 0, warnings:
             Err(e) => report.violations.push(format!("error reading delegatedAcceptanceSubstanceRule: {e}")),
         }
     }
+    // D0198 OPTION A (quote receipts): the same contract pattern for confirmation FLIPS — when the
+    // policy declares the confirmationRecord recording delegation, a human-judged flip after the
+    // cutoff must quote the human itself or carry a companion `<test>Attest<N>` record that does.
+    if let Some(delegation) = crate::activation::recording_delegation(root, "confirmationRecord") {
+        match crate::view::rule_violations_opt(root, "delegatedConfirmationSubstanceRule") {
+            Ok(Some((_, bad))) => {
+                for d in bad {
+                    report.violations.push(format!(
+                        "{d}: a human-judged confirmation flip after the delegation cutoff carries no quote receipt — neither its own text nor a companion <test>Attest<N> record quotes the human's words (D0198 {delegation})"
+                    ));
+                }
+            }
+            Ok(None) => report.warnings.push(format!(
+                "attestation-policy declares recording delegation {delegation} for confirmationRecord but `delegatedConfirmationSubstanceRule` is not declared — the delegation's substance check is NOT ADOPTED (D0198)"
+            )),
+            Err(e) => report.violations.push(format!("error reading delegatedConfirmationSubstanceRule: {e}")),
+        }
+    }
     report
 }
 

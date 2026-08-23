@@ -138,6 +138,23 @@ package EngineRuleSet {
     }
     #JustifiedBy dependency from delegatedAcceptanceSubstanceRule to d0192;
 
+    // D0198 OPTION A (quote receipts): a human-judged confirmation FLIP recorded on/after the
+    // delegation date must carry its evidence - its own text quotes the human's words or cites
+    // their gesture, OR a companion <test>Attest<N> record does. Acceptance events keep their own
+    // rule; companion records are the evidence, not subjects. Forward-only (issue068). GATING via
+    // the confirmation-authenticity guard. STATED LIMIT: a fabricated quote defeats it (D0192 family).
+    part delegatedConfirmationSubstanceRule : ElementRule {
+        :>> id = "7e348a2e-92f7-4bb0-a1c4-6d84f0b5c9e1";
+        :>> title = "A delegated confirmation flip carries its quote receipt";
+        :>> subjectType = "Test";
+        :>> predicate = "confirmationQuotesOrAttested(2026-08-23)";
+        :>> severity = RuleSeverity::blocking;
+        :>> onViolation = ViolationKind::block;
+        :>> appliesWhen = "all";
+        :>> exemptions = "";
+    }
+    #JustifiedBy dependency from delegatedConfirmationSubstanceRule to d0198;
+
     // issue055 (the enforceable slice of research-spike routing): a WorkKind::research Story must charter
     // to a LEGITIMATE governing source — its originating Decision/Need/SystemRequirement, or (as a spike)
     // an Issue/proposed-Decision (the union the charter guard sanctions, D0068/issue055) — never an
