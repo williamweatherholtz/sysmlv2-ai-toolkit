@@ -3269,7 +3269,7 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 10] = [
+        const LEGITIMATELY_EMPTY: [&str; 11] = [
             // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
             // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
             // The population returns the moment the backlog holds ranked work again.
@@ -3284,6 +3284,7 @@ mod scan_count_tests {
             "verification-trace",
             "charter",                   // scans CHANGED files
             "process-change",            // scans CHANGED process definitions
+            "judgment-request-quality",  // scans PROPOSED fork decisions - zero between forks is the healthy state (D0207: most decisions auto-accept and never ask)
             "retro-backlog",             // scans retro findings needing a backlog item
             "doc-sync",                  // scans CHANGED doc surface
             "base-first-justification",  // scans new base-construct adoptions
