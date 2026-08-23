@@ -1662,8 +1662,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 47] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry"];
+pub const GUARD_NAMES: [&str; 48] =
+    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2406,6 +2406,80 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 }
 
 
+// ── judgment-request-quality guard (a fork must earn the ask, D0207 clause 3) ────────────────────
+
+/// Guard: a PROPOSED fork Decision carries everything a human needs to judge it.
+///
+/// Their words (D0207): "there's not a strong shortname, not good rationale, not good alternatives
+/// or implications (i.e. the 'why'), there's no statement of research. all these should be provided
+/// if you're reaching out for my judgment." A fork (a decision enumerating OPTIONs) is the one shape
+/// that still reaches out — so before it may even be proposed it must have: a short name leading the
+/// title (one word before the colon), a substantive rationale, a RESEARCH statement grounding the
+/// choice, and per-option implications (a COST per OPTION). Non-fork decisions auto-accept under the
+/// standing consent and are not scanned here. Accepted history is out of scope (status filter).
+#[must_use]
+pub fn judgment_request_quality(root: &Path) -> GuardReport {
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        if !text.contains("status = DecisionStatus::proposed") {
+            continue;
+        }
+        let rel = relpath(root, &path);
+        let options = text.matches("OPTION ").count();
+        let distinct_options = {
+            let mut toks: Vec<char> = Vec::new();
+            let mut rest = text.as_str();
+            while let Some(i) = rest.find("OPTION ") {
+                rest = &rest[i + 7..];
+                if let Some(c) = rest.chars().next().filter(char::is_ascii_uppercase) {
+                    if !toks.contains(&c) {
+                        toks.push(c);
+                    }
+                }
+            }
+            toks.len()
+        };
+        if distinct_options < 2 {
+            continue; // not a fork — auto-accepts under D0207, never reaches out
+        }
+        scanned += 1;
+        let field = |name: &str| -> String {
+            let key = format!("{name} = \"");
+            text.find(&key).and_then(|i| {
+                let s = i + key.len();
+                text[s..].find('"').map(|j| text[s..s + j].to_string())
+            }).unwrap_or_default()
+        };
+        let title = field("title");
+        let short = title.split(':').next().unwrap_or("").trim();
+        if short.is_empty() || short.contains(' ') || short.chars().count() > 28 {
+            violations.push(format!(
+                "{rel}: fork decision's title does not lead with a strong short name (one word before the colon, <= 28 chars) — got \"{short}\" (D0207: the ask must be recognizable at a glance)"
+            ));
+        }
+        if field("rationale").chars().count() < 200 {
+            violations.push(format!(
+                "{rel}: fork decision's rationale is under 200 chars — a request for judgment must carry its why (D0207)"
+            ));
+        }
+        if !text.contains("RESEARCH") {
+            violations.push(format!(
+                "{rel}: fork decision carries no RESEARCH statement — what was looked at before asking (panel precedent, literature, prior art, or 'none found, and here is where I looked') (D0207)"
+            ));
+        }
+        let costs = text.matches("COST").count();
+        if costs < distinct_options {
+            violations.push(format!(
+                "{rel}: {distinct_options} option(s) but only {costs} COST statement(s) — every alternative carries its implications or the choice is not informed (D0207)"
+            ));
+        }
+        let _ = options;
+    }
+    GuardReport { name: "judgment-request-quality", scanned, warnings: Vec::new(), violations }
+}
+
 // ── claim-ancestry guard (a claim's date is bounded by the commit that introduced it, issue229) ───
 
 /// Guard: `claimedAt` cannot precede its own introducing commit by more than the expiry window.
@@ -2739,6 +2813,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "control-event-coverage" => Some(control_event_coverage(root)), // WARNING-tier (D0193) — a control-relevant event with no counted record
         "question-coverage" => Some(question_coverage(root)), // D0161: declared knowledge facts are well-formed; coverage itself stays a view
         "claim-ancestry" => Some(claim_ancestry(root)), // issue229: claimedAt bounded by the introducing commit (D0013 applied to claims)
+        "judgment-request-quality" => Some(judgment_request_quality(root)), // D0207: a fork must earn the ask
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),

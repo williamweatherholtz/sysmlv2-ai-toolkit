@@ -12,6 +12,36 @@ set -euo pipefail
 
 KEEL=./target/release/keel
 
+# ── AUTO mode (D0207 standing consent): a non-fork proposed decision auto-accepts at issue
+# creation. The issue is notification + the forever-open override thread; the receipt says plainly
+# that nothing was individually reviewed. Inputs: AUTO_DECISION, ISSUE_NUMBER, ISSUE_URL, GH_TOKEN.
+if [ -n "${AUTO_DECISION:-}" ]; then
+  today=$(date -u +%F)
+  note="AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on ${ISSUE_URL}."
+  "$KEEL" accept "$AUTO_DECISION" --note "$note" --by wweatherholtz --date "$today"
+  "$KEEL" validate .
+  "$KEEL" guard
+  git config user.name "keel-recorder"
+  git config user.email "keel-recorder@users.noreply.github.com"
+  git add .engine .tracking   # scoped: never the workflow's own scratch files (cards.json, auto_queue.txt)
+  git commit -m "Auto-accept ${AUTO_DECISION} under standing consent (D0207) - override thread: ${ISSUE_URL}
+
+Gate: run in-workflow (GITHUB_TOKEN pushes do not retrigger ci.yml); audit-history re-derives.
+
+Co-Authored-By: keel githubChannel recorder <keel-recorder@users.noreply.github.com>"
+  for attempt in 1 2 3; do
+    if git push origin main; then
+      sha=$(git rev-parse --short HEAD)
+      gh issue comment "$ISSUE_NUMBER" --body "**Auto-accepted** under your standing consent (D0207) - not individually reviewed. Commit ${sha}. Reply \`reject <why>\` here anytime to reverse; this thread stays the override surface."
+      gh issue close "$ISSUE_NUMBER" --reason completed --comment "In the tree. Nothing needs you unless you disagree."
+      exit 0
+    fi
+    git fetch origin main && git merge --no-edit origin/main && "$KEEL" validate . && "$KEEL" guard
+  done
+  gh issue comment "$ISSUE_NUMBER" --body "Auto-accept FAILED after 3 push attempts; the sweeper or next session will complete it."
+  exit 1
+fi
+
 # ── who ────────────────────────────────────────────────────────────────────────────────────────
 actor=$(grep -E "^${COMMENT_USER} *= *\"" .engine/contracts/github-actors.toml | sed 's/.*= *"\(.*\)"/\1/' || true)
 if [ -z "$actor" ]; then
@@ -48,9 +78,16 @@ if gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body' | grep 
 fi
 
 if [ "$verdict" = "reject" ]; then
-  # v1 scope, stated in D0205: rejection is acknowledged in-thread and recorded by the session -
-  # the rejection path gets its own write plumbing when first exercised for real.
-  gh issue comment "$ISSUE_NUMBER" --body "Rejection noted and will be recorded (receipt-for-comment: $COMMENT_ID). The issue stays open until the rejection is in the tree."
+  # Rejection / post-fact override (D0205 v1 scope + D0207 clause 2): acknowledged in-thread,
+  # reopened if the issue was closed (an auto-acceptance being overridden), labeled for the
+  # session to record the superseding reversal - accepted history is never rewritten in place.
+  state=$(gh issue view "$ISSUE_NUMBER" --json state --jq .state)
+  if [ "$state" = "CLOSED" ]; then
+    gh issue reopen "$ISSUE_NUMBER"
+  fi
+  gh label create needs-reversal --force --color D93F0B --description "override of an auto-acceptance awaiting the superseding record" >/dev/null 2>&1 || true
+  gh issue edit "$ISSUE_NUMBER" --add-label needs-reversal
+  gh issue comment "$ISSUE_NUMBER" --body "Override noted (receipt-for-comment: $COMMENT_ID). The superseding reversal will be recorded - this issue stays open until it is in the tree."
   exit 0
 fi
 
@@ -67,7 +104,7 @@ note="${option:+OPTION $option - }their words, verbatim: '$first_line' (GitHub c
 
 git config user.name "keel-recorder"
 git config user.email "keel-recorder@users.noreply.github.com"
-git add -A
+git add .engine .tracking   # scoped: never the workflow's own scratch files (cards.json, auto_queue.txt)
 git commit -m "Record ${decision} acceptance via githubChannel (comment ${COMMENT_ID} by ${COMMENT_USER})
 
 Gesture: ${COMMENT_URL}

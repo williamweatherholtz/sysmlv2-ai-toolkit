@@ -18,6 +18,14 @@ package EngineSkillRegistry {
     private import EngineElement::*;     // WritePolicy enum
     private import EngineSkills::*;
 
+    part decisionChannelSkill : AISkill {
+        :>> id = "2f82837a-bdd6-4c9b-9b2a-0e21af075f62";
+        :>> title = "decision-channel";
+        :>> purpose = "Deploys .engine/processes/decision-channel.sysml: decisions travel as GitHub issues - non-forks auto-accept under standing consent with receipts and a forever-open override thread; forks earn the ask via the judgment-request-quality bar. Portable: adopt + copy the workflow files per SKILL.md (D0205/D0207).";
+        :>> location = ".engine/skills/decision-channel/SKILL.md";
+        :>> triggerCondition = "A Decision is being proposed, published, recorded, or overridden through the GitHub channel; or a downstream project adopts the channel.";
+        :>> writePolicy = WritePolicy::direct;
+    }
     part engineTriage : AISkill {
         :>> id = "5b3f6f3e-91a4-4f47-9f57-1f2f3a4b5c6d";
         :>> title = "engine-triage";

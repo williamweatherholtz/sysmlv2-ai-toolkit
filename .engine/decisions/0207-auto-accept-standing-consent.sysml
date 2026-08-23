@@ -1,0 +1,27 @@
+// D0207 (status: the `status` field below is the truth) — autoAccept: decisions auto-accept on being raised; only forks reach out, and a fork must earn the ask
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0207Accept event on sign-off.
+package Decision0207 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0207 : Decision {
+        :>> id = "7069e851-f6d3-43ed-849d-9877ba69ec5f";
+        :>> title = "autoAccept: decisions auto-accept on being raised; only forks reach out, and a fork must earn the ask";
+        :>> createdAt = "2026-08-23";
+        :>> createdBy = "claudeFable5";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "Their words, 2026-08-23, verbatim: 'we need to pare down requests. issues raised are automatically accepted. they can be customizedly changed post-fact... maybe I do like one issue per decision, to keep me focused... decisions that are generated today aren't sufficiently clear. there's not a strong shortname, not good rationale, not good alternatives or implications (i.e. the why), there's no statement of research. all these should be provided if you're reaching out for my judgment. formalize this as a process, and make it so other projects can inherit and use this ability right away.' The githubChannel (D0205) had just gone live with every decision as a blocking ask; this direction inverts the default: consent is standing, attention is reserved for genuine forks, and any ask must be worth their focus. RESEARCH: the process-value panel's human-factors lens (2026-08-22) documented that universal asks converge to rubber-stamping (62 percent batch coverage, 0 percent override rate) - consent-by-default with per-item override is the standard remedy in the HITL literature the panel cited; keel precedent is D0165 (standing disposition delegation, 'auto accept issues by your authority'), extended here from findings to decisions with the same declared-and-revocable shape.";
+        :>> decision = "FOUR CLAUSES. (1) AUTO-ACCEPT: a non-fork proposed Decision is accepted AT ISSUE CREATION under this standing consent - the GitHub issue is raised as notification and override surface, receives the auto-acceptance receipt, and closes immediately; the acceptance event is judgedBy the human, its note stating plainly AUTO-ACCEPTED under standing consent, quoting the standing words, marked with the machine token AUTO-ACCEPTED and linking the issue, so views can always split auto from individually-judged acceptances (never one number). (2) OVERRIDE ANYTIME: a reject or change comment on the (closed) decision issue reopens it, is acknowledged in-thread, and the reversal is recorded as a superseding fact - accepted history is never rewritten. (3) FORKS EARN THE ASK: a decision enumerating options cannot auto-accept (accepting means choosing) and MUST carry, guard-enforced before it can even be proposed: a strong short name leading the title, substantive rationale, alternatives with implications (per-option COST), and a RESEARCH statement grounding the choice - the judgment-request-quality guard blocks a fork that lacks any of these. (4) PORTABLE PROCESS: decision-channel becomes a keel process unit (steps, skill, owned guard) that downstream projects adopt with keel activate decision-channel plus the documented workflow-file install - inheritable right away.";
+        :>> rationale = "The panel showed universal asks destroy the attention they solicit; standing consent with loud receipts and a permanent override thread preserves both velocity and the human's real authority - every auto-acceptance is visible, reversible, and honestly labeled as not individually reviewed. Reserving the ask for forks, and pricing the ask with a quality bar, makes 'reaching out' mean something again.";
+        :>> consequences = "attestation-policy [decisionAcceptance] declares standingConsent = d0207 beside the existing delegations (one contract, all delegations); guard 48 judgment-request-quality (unit-owned by decision-channel); decision-issue.yml auto-accepts non-forks including a sweep of already-open non-fork issues (D0206 retireInbox becomes the first live auto-acceptance); decision-record.yml handles override comments on closed issues; CLAUDE.md's acceptance doctrine updated. Rejecting returns every decision to a blocking ask.";
+    }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0207Accept : Test { :>> id = "7262008f-392a-48ee-a8e7-2ebde55dce04"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Accepted on their explicit direction. Their words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact... formalize this as a process, and make it so other projects can inherit and use this ability right away' (chat, 2026-08-23)."; }
+    part d0207AcceptR1 : TestResult { :>> id = "92205d63-7813-45ac-aeba-087a2d2a2d62"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "da538c2"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+}

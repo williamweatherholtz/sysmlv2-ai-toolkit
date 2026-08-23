@@ -14,7 +14,7 @@
 # Edit by hand, or use `keel activate <process>` / `keel deactivate <process>`.
 
 [processes]
-active = ["actor-enrollment", "agile-workflow", "decision-authoring", "deploy", "distributed-collaboration", "doc-sync", "element-critique", "issue-resolution", "knowledge-graph-memory", "render"]
+active = ["actor-enrollment", "agile-workflow", "decision-authoring", "decision-channel", "deploy", "distributed-collaboration", "doc-sync", "element-critique", "issue-resolution", "knowledge-graph-memory", "render"]
 
 [viewpoints]
 active = ["acceptancesPendingVP", "archCouplingVP", "archCoverageVP", "archCriticalityVP", "archDriftVP", "archElementsVP", "archStpaInputsVP", "attestationCoverageVP", "authorityQueueVP", "baselinesVP", "concernCoverageVP", "critiquePolicyVP", "decisionsVP", "diagramVP", "findingsAwaitingDispositionVP", "governingVersionVP", "indicatorsVP", "orientVP", "orphansVP", "renderVP", "reportVP", "reprocessVP", "requirementsVP", "rootednessVP", "safetyVP", "sittingReviewVP", "suspectVP", "tierSatisfactionVP", "traceabilityVP", "verificationExaminedVP", "verificationExercisedVP", "whatsNextVP"]

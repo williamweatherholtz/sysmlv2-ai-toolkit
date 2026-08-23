@@ -86,5 +86,6 @@ package EngineGuardConstraints {
     constraint def controlEventCoverage;
     constraint def questionCoverage;      // guard 46 (D0161): declared knowledge facts are well-formed
     constraint def claimAncestry;         // guard 47 (issue229): claimedAt bounded by its introducing commit
+    constraint def judgmentRequestQuality; // guard 48 (D0207): a fork decision must earn the ask
 
 }

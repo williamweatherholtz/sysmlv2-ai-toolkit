@@ -33,6 +33,14 @@ roles = ["supervisor"]
 # TO WITHDRAW: delete the line below and the substance rule stops being demanded by this contract;
 # recording then requires the human's own gesture again (deck, console, TTY-checked CLI).
 delegatedRecording = "d0192"
+#
+# STANDING CONSENT (D0207), 2026-08-23, verbatim: "issues raised are automatically accepted. they
+# can be customizedly changed post-fact." A NON-FORK proposed Decision is accepted at issue creation;
+# the acceptance note carries the AUTO-ACCEPTED machine token, quotes the standing words, and links
+# the issue where the override stays open forever. Forks are excluded - accepting means choosing -
+# and the judgment-request-quality guard prices the ask. TO WITHDRAW: delete the line below;
+# decisions return to individually-judged acceptance.
+standingConsent = "d0207"
 
 [findingDisposition]
 # Dispositioning a finding at or above the Medium threshold (D0092). D0080 permits an AI to disposition
