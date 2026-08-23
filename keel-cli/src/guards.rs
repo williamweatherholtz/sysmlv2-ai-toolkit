@@ -2879,7 +2879,33 @@ fn parser_coverage(root: &Path) -> GuardReport {
             head.join(", ")
         ));
     }
-    GuardReport { name: "parser-coverage", scanned, warnings, violations: Vec::new() }
+    // issue231 (process-value panel, formal-methods lens): the RATCHET. The parser is the TCB of
+    // every guard and view, and a warning whose count can grow silently is a control people learn
+    // to scroll past. With a committed baseline declared, EXCEEDING it is a violation — never mere
+    // presence (the D0132 all-or-nothing lesson): the 7 legacy successions stay a warning, a NEW
+    // skipped class goes red. Shrinking below baseline warns to ratchet the baseline DOWN, so the
+    // bound only ever tightens. Absent contract = ratchet not adopted, stated (D0136).
+    let mut violations = Vec::new();
+    let baseline_path = root.join(".engine").join("contracts").join("parser-coverage-baseline.toml");
+    match std::fs::read_to_string(&baseline_path) {
+        Ok(text) => match text.parse::<toml::Value>().ok().and_then(|v| v.get("skipped").and_then(toml::Value::as_integer)) {
+            Some(baseline) => {
+                let baseline = usize::try_from(baseline).unwrap_or(0);
+                if total > baseline {
+                    violations.push(format!(
+                        "skipped-statement count {total} EXCEEDS the committed baseline {baseline} — a new statement class became invisible to every guard and view (issue231 ratchet). Either teach keel-parser the construct, or raise the baseline IN THE SAME COMMIT with the reason (a visible diff, never silent growth)."
+                    ));
+                } else if total < baseline {
+                    warnings.push(format!(
+                        "skipped-statement count {total} is BELOW the baseline {baseline} — ratchet it down in parser-coverage-baseline.toml so the bound keeps what the parser gained (issue231)."
+                    ));
+                }
+            }
+            None => violations.push("parser-coverage-baseline.toml exists but has no integer `skipped` key — a malformed ratchet must fail loud, not silently un-adopt".to_string()),
+        },
+        Err(_) => warnings.push("no parser-coverage baseline declared (.engine/contracts/parser-coverage-baseline.toml) — the skipped count can grow without a red gate (issue231 ratchet not adopted; D0136: absence is a state, stated)".to_string()),
+    }
+    GuardReport { name: "parser-coverage", scanned, warnings, violations }
 }
 
 /// WARNING-level: every multi-valued feature assignment `:>> f = (a, b, c)` in the model (issue101).

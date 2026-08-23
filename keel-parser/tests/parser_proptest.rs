@@ -80,3 +80,40 @@ fn reserved_word_is_not_a_bare_identifier() {
     assert!(!keel_parser::is_reserved_word("docs"));
     assert!(parse_src("package P { part doc : T { } }").is_err());
 }
+
+/// issue231's second half (the ShardStore lightweight-formal-methods pattern): any composition of
+/// SUPPORTED statement forms parses with ZERO skipped statements — skip-freedom over generated
+/// corpora, so a parser regression that silently drops a supported form is caught by generation,
+/// not by whoever next greps the census.
+fn arb_supported_statement() -> impl Strategy<Value = String> {
+    let ident = arb_identifier();
+    prop_oneof![
+        (arb_identifier(), arb_identifier(), arb_simple_string()).prop_map(|(n, t, v)| format!(
+            "part {n} : {t} {{ :>> title = \"{v}\"; }}"
+        )),
+        (arb_identifier(), arb_identifier()).prop_map(|(n, t)| format!(
+            "verification {n} : {t} {{ :>> id = \"aaaaaaaa-0000-4000-9000-aaaaaaaaaaaa\"; }}"
+        )),
+        (arb_identifier(), arb_identifier()).prop_map(|(a, b)| format!("dependency from {a} to {b};")),
+        (arb_identifier(), arb_identifier()).prop_map(|(a, b)| format!("#Verify dependency from {a} to {b};")),
+        (arb_identifier(), arb_identifier()).prop_map(|(a, b)| format!("satisfy {a} by {b};")),
+        (arb_identifier(), arb_identifier()).prop_map(|(a, b)| format!("allocate {a} to {b};")),
+        ident.prop_map(|n| format!("action {n};")),
+    ]
+}
+
+proptest! {
+    #[test]
+    fn supported_statements_are_never_skipped(
+        pkg_name in arb_identifier(),
+        stmts in proptest::collection::vec(arb_supported_statement(), 1..12)
+    ) {
+        let src = format!("package {pkg_name} {{\n    {}\n}}", stmts.join("\n    "));
+        let pkg = parse_src(&src).expect("supported forms must parse");
+        prop_assert!(
+            pkg.skipped.is_empty(),
+            "supported statement silently skipped in:\n{src}\nskipped: {:?}",
+            pkg.skipped.iter().map(|s| (&s.lead, s.line)).collect::<Vec<_>>()
+        );
+    }
+}
