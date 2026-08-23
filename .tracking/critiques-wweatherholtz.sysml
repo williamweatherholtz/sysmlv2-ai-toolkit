@@ -183,4 +183,40 @@ package CritiquesWweatherholtz {
     part deckForkOptionsStoryHRev1R1 : TestResult { :>> id = "de0c711e-6677-4ee9-943e-201c64dccb66"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
     #Verify dependency from deckForkOptionsStoryHRev1 to deckForkOptionsStory;
     #Covers dependency from deckForkOptionsStoryHRev1 to deckForkOptionsStory;
+    verification sittingViewParityStoryHRev1 : Test { :>> id = "1039116e-1f6a-4dd3-8dec-f3680eb39272"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part sittingViewParityStoryHRev1R1 : TestResult { :>> id = "dd2f49db-693c-4ddd-8323-e434c37de4e5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from sittingViewParityStoryHRev1 to sittingViewParityStory;
+    #Covers dependency from sittingViewParityStoryHRev1 to sittingViewParityStory;
+    verification claimLandCheckStoryHRev1 : Test { :>> id = "4fbf5988-02f5-40e5-9e07-37d2694c9418"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part claimLandCheckStoryHRev1R1 : TestResult { :>> id = "fa4e5cda-22fd-4c30-b0c3-b5d90aa01fd6"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from claimLandCheckStoryHRev1 to claimLandCheckStory;
+    #Covers dependency from claimLandCheckStoryHRev1 to claimLandCheckStory;
+    verification ownershipUnitBindingStoryHRev1 : Test { :>> id = "63283831-0e3c-43d6-9667-61bcfcd3b62b"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part ownershipUnitBindingStoryHRev1R1 : TestResult { :>> id = "ad609d2c-352d-4a8d-a1d9-ea7cbdbff8fc"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from ownershipUnitBindingStoryHRev1 to ownershipUnitBindingStory;
+    #Covers dependency from ownershipUnitBindingStoryHRev1 to ownershipUnitBindingStory;
+    verification judgeableDeckStoryHRev1 : Test { :>> id = "07f842c0-0491-4b57-a81e-600a886a62d8"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part judgeableDeckStoryHRev1R1 : TestResult { :>> id = "cc46c597-facd-406a-8c23-1329bc89f703"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from judgeableDeckStoryHRev1 to judgeableDeckStory;
+    #Covers dependency from judgeableDeckStoryHRev1 to judgeableDeckStory;
+    verification processValuePanelStoryHRev1 : Test { :>> id = "4f1794c6-e1e8-423a-b468-86f6cce75230"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part processValuePanelStoryHRev1R1 : TestResult { :>> id = "1ef78519-0ef3-4db2-bbf9-f958cfb9cd39"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from processValuePanelStoryHRev1 to processValuePanelStory;
+    #Covers dependency from processValuePanelStoryHRev1 to processValuePanelStory;
+    verification verificationHygieneStoryHRev1 : Test { :>> id = "4bc08c02-b262-45a4-bf67-2f2bf5d0a291"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part verificationHygieneStoryHRev1R1 : TestResult { :>> id = "c6e38e14-b165-4ffc-9473-19e01701b5e7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from verificationHygieneStoryHRev1 to verificationHygieneStory;
+    #Covers dependency from verificationHygieneStoryHRev1 to verificationHygieneStory;
+    verification parserRatchetStoryHRev1 : Test { :>> id = "75b0c232-1075-4339-a904-847025d899a4"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part parserRatchetStoryHRev1R1 : TestResult { :>> id = "a5785869-34f5-45f9-9cc2-3fde78a33f12"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from parserRatchetStoryHRev1 to parserRatchetStory;
+    #Covers dependency from parserRatchetStoryHRev1 to parserRatchetStory;
+    verification knowledgeStoreStoryHRev1 : Test { :>> id = "d48c287d-6094-4b40-9587-4d9c6cb6cdb5"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part knowledgeStoreStoryHRev1R1 : TestResult { :>> id = "e6bec45a-a26d-461c-aa5a-b73896b9bc13"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from knowledgeStoreStoryHRev1 to knowledgeStoreStory;
+    #Covers dependency from knowledgeStoreStoryHRev1 to knowledgeStoreStory;
+    verification proptestReservedWordsStoryHRev1 : Test { :>> id = "27a43530-a2b3-47d3-8a33-44aaf0bd6b05"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-23T13:08Z, deck HEAD 28dacb9) - a voluntary pull-audit under D0204, per-sitting individual taps."; }
+    part proptestReservedWordsStoryHRev1R1 : TestResult { :>> id = "325ffa17-4efe-48ad-8e50-5fd5e90b680f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6b3f6fd"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from proptestReservedWordsStoryHRev1 to proptestReservedWordsStory;
+    #Covers dependency from proptestReservedWordsStoryHRev1 to proptestReservedWordsStory;
 }
