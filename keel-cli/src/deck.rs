@@ -50,7 +50,7 @@ struct Item {
 /// sufficient context to make these decisions generally"). Returns `(context, decision)` text
 /// pulled from the decision file — the card renders them in a collapsible panel so a signature
 /// can be a judgment, not a trust gesture.
-fn decision_digest(root: &Path, rel_file: &str) -> Option<(String, String)> {
+pub(crate) fn decision_digest(root: &Path, rel_file: &str) -> Option<(String, String)> {
     let text = std::fs::read_to_string(root.join(rel_file)).ok()?;
     let field = |name: &str| -> Option<String> {
         let key = format!("{name} = \"");
@@ -63,7 +63,7 @@ fn decision_digest(root: &Path, rel_file: &str) -> Option<(String, String)> {
 
 /// Extract `OPTION X (short label)` enumerations from a Decision file's text. Two or more make the
 /// decision a FORK; fewer yield an empty list and the ordinary single Sign button.
-fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
+pub(crate) fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
     let Ok(text) = std::fs::read_to_string(root.join(rel_file)) else { return Vec::new() };
     let mut out = Vec::new();
     let mut rest = text.as_str();
@@ -81,6 +81,62 @@ fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
         }
     }
     if out.len() >= 2 { out } else { Vec::new() }
+}
+
+/// `keel decision-card [NAME] [--proposed]` (D0205 githubChannel).
+///
+/// The decision's own deciding context as machine-readable JSON, for the Action that opens
+/// GitHub issues. One
+/// parser (this module's), two consumers (the deck panel and the issue body) — never a second
+/// extraction that can drift.
+///
+/// # Errors
+/// Returns an error string when the named decision does not exist.
+pub fn decision_cards(root: &Path, name: Option<&str>, proposed_only: bool) -> Result<String, String> {
+    let idx = item_index(root);
+    let mut cards: Vec<Json> = Vec::new();
+    for (n, (uid, title, file)) in &idx {
+        if !n.starts_with('d') || !file.contains("decisions/") {
+            continue;
+        }
+        if let Some(want) = name {
+            if n != want {
+                continue;
+            }
+        }
+        let Ok(text) = std::fs::read_to_string(root.join(file)) else { continue };
+        let status = text
+            .find("status = DecisionStatus::")
+            .map(|i| {
+                let s = &text[i + "status = DecisionStatus::".len()..];
+                s.split(';').next().unwrap_or("").trim().to_string()
+            })
+            .unwrap_or_default();
+        if proposed_only && status != "proposed" {
+            continue;
+        }
+        let (ctx, dec) = decision_digest(root, file).unwrap_or_default();
+        let opts: Vec<Json> = fork_options(root, file)
+            .into_iter()
+            .map(|(tok, label)| {
+                Json::Obj(vec![("key".to_string(), Json::s(tok)), ("label".to_string(), Json::s(label))])
+            })
+            .collect();
+        cards.push(Json::Obj(vec![
+            ("name".to_string(), Json::s(n.clone())),
+            ("uid".to_string(), Json::s(uid.clone())),
+            ("title".to_string(), Json::s(title.clone())),
+            ("status".to_string(), Json::s(status)),
+            ("file".to_string(), Json::s(file.clone())),
+            ("context".to_string(), Json::s(ctx)),
+            ("decision".to_string(), Json::s(dec)),
+            ("options".to_string(), Json::Arr(opts)),
+        ]));
+    }
+    if name.is_some() && cards.is_empty() {
+        return Err(format!("decision {} not found", name.unwrap_or("?")));
+    }
+    Ok(Json::Obj(vec![("cards".to_string(), Json::Arr(cards))]).dump())
 }
 
 /// The sole registered human reviewer, read from the actors registry.
@@ -130,7 +186,7 @@ fn inbox_js(root: &Path) -> String {
 }
 
 /// `name -> (id, title, repo-relative file)` for every declared item — the same scan guard 37 walks.
-fn item_index(root: &Path) -> std::collections::BTreeMap<String, (String, String, String)> {
+pub(crate) fn item_index(root: &Path) -> std::collections::BTreeMap<String, (String, String, String)> {
     let mut out = std::collections::BTreeMap::new();
     for base in [".tracking", ".engine"] {
         for f in crate::collect_sysml(&root.join(base)) {

@@ -254,14 +254,28 @@ fn quotes_conversational_words(text: &str) -> bool {
     if lower.contains("deck") || lower.contains("console") {
         return true;
     }
-    let mut rest = text;
-    while let Some(open) = rest.find('\'') {
-        rest = &rest[open + 1..];
-        let Some(close) = rest.find('\'') else { break };
-        if rest[..close].chars().count() >= 10 {
-            return true;
+    // A quote span closes at an apostrophe NOT followed by a letter — otherwise every contraction
+    // ("let's", "doesn't") truncates the span and an honest verbatim quote fails the check (found
+    // live: the D0205 acceptance quoting 'yep let's go' scanned as 7 chars). An apostrophe with a
+    // letter right after is part of the words, not the closing quote.
+    let bytes = text.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes.get(i) == Some(&b'\'') {
+            let mut j = i + 1;
+            while j < bytes.len() {
+                if bytes.get(j) == Some(&b'\'') && !bytes.get(j + 1).is_some_and(u8::is_ascii_alphabetic) {
+                    break;
+                }
+                j += 1;
+            }
+            if j < bytes.len() && text.get(i + 1..j).is_some_and(|s| s.chars().count() >= 10) {
+                return true;
+            }
+            i = j + 1;
+        } else {
+            i += 1;
         }
-        rest = &rest[close + 1..];
     }
     false
 }
@@ -553,6 +567,8 @@ mod tests {
         assert!(quotes_conversational_words("accepted at the console review queue"));
         // A bare assertion carries no channel evidence.
         assert!(!quotes_conversational_words("the human approved this decision in chat"));
+        // Contractions inside the quote must not terminate the span (the 'yep let's go' incident).
+        assert!(quotes_conversational_words("Their words, verbatim: 'yep let's go' (chat)"));
         // A short quoted fragment is an apostrophe artifact, not conversational words.
         assert!(!quotes_conversational_words("they said 'ok' and moved on"));
         assert!(!quotes_conversational_words(""));

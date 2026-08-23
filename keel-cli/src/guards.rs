@@ -1744,6 +1744,30 @@ pub fn type_collision(root: &Path) -> GuardReport {
 /// Deliberately AST-based rather than diff-line based: a diff hunk does not know which item a
 /// changed line belongs to, and guessing from indentation would misattribute an edit — the one
 /// thing an ownership check must never do.
+/// Is a non-owner diff exactly the sanctioned ACCEPT TRANSFORM (D0205) — the same attribute set
+/// with only `status` moving from proposed to accepted?
+fn is_accept_transform(old_attrs: &[String], new_attrs: &[String]) -> bool {
+    if old_attrs.len() != new_attrs.len() {
+        return false;
+    }
+    let mut status_flip = false;
+    let old_set: std::collections::HashSet<&String> = old_attrs.iter().collect();
+    let new_set: std::collections::HashSet<&String> = new_attrs.iter().collect();
+    for gone in old_set.difference(&new_set) {
+        if gone.starts_with("status=") && gone.contains("proposed") {
+            status_flip = true;
+        } else {
+            return false; // some other attribute changed — not the sanctioned transform
+        }
+    }
+    for came in new_set.difference(&old_set) {
+        if !(came.starts_with("status=") && came.contains("accepted")) {
+            return false;
+        }
+    }
+    status_flip
+}
+
 fn items_with_attrs(src: &str, filename: &str) -> HashMap<String, (String, Vec<String>)> {
     let mut out = HashMap::new();
     let Ok(tokens) = keel_parser::tokenize(src, filename) else { return out };
@@ -1847,6 +1871,15 @@ pub fn ownership(root: &Path) -> GuardReport {
             let Some((old_owner, old_attrs)) = old.get(name) else { continue }; // added item
             scanned += 1;
             if old_attrs == new_attrs {
+                continue;
+            }
+            // D0205 (githubChannel): the ACCEPT TRANSFORM is the one sanctioned non-owner edit — a
+            // recording channel (the GitHub Action, the serve endpoint) flips a Decision's status
+            // from proposed to accepted on the human's authenticated gesture. Recognized MECHANICALLY:
+            // the ONLY attribute that changed is `status`, exactly proposed -> accepted. Anything
+            // else a non-owner touches (title, rationale, a second attr riding along) still violates.
+            // The acceptance EVENT items the same write appends are ADDS and were always permitted.
+            if is_accept_transform(old_attrs, new_attrs) {
                 continue;
             }
             let owner = if old_owner.is_empty() { owner } else { old_owner };
@@ -3791,5 +3824,25 @@ mod claim_ancestry_tests {
         crate::fingerprint::new_epoch();
         let green = super::claim_ancestry(&dir);
         assert!(green.violations.is_empty(), "{:?}", green.violations);
+    }
+}
+
+#[cfg(test)]
+mod accept_transform_tests {
+    use super::is_accept_transform;
+
+    /// D0205: the sanctioned non-owner edit is EXACTLY status proposed->accepted; anything else —
+    /// the reverse flip, a rider attribute, a different field — still violates ownership.
+    #[test]
+    fn only_the_forward_status_flip_is_sanctioned() {
+        let old = vec!["status=proposed".to_string(), "title=x".to_string()];
+        let fwd = vec!["status=accepted".to_string(), "title=x".to_string()];
+        assert!(is_accept_transform(&old, &fwd));
+        let rev_old = vec!["status=accepted".to_string(), "title=x".to_string()];
+        let rev_new = vec!["status=proposed".to_string(), "title=x".to_string()];
+        assert!(!is_accept_transform(&rev_old, &rev_new), "reverse flip is not sanctioned");
+        let rider = vec!["status=accepted".to_string(), "title=CHANGED".to_string()];
+        assert!(!is_accept_transform(&old, &rider), "a rider edit is not sanctioned");
+        assert!(!is_accept_transform(&old, &old), "no change is not a transform");
     }
 }

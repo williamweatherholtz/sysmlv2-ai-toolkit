@@ -1,0 +1,13 @@
+# github-actors — GitHub login -> keel actor mapping (D0205 githubChannel).
+#
+# The recording Action maps `github.event.comment.user.login` through THIS committed table to the
+# keel actor named in the acceptance's judgedBy. An unmapped login is REFUSED, never defaulted
+# (issue182: provenance is never defaulted) - the workflow's allowlist gate should make that
+# unreachable, and this table is the second, tree-committed opinion.
+#
+# Logins are matched exactly and case-sensitively as GitHub reports them. Only HUMANS belong here:
+# this table exists to attribute human judgment, and mapping a bot login would recreate the
+# AI-recorded-as-human class (issue072/073) at the channel layer.
+
+[logins]
+williamweatherholtz = "wweatherholtz"

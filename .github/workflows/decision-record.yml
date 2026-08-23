@@ -1,0 +1,80 @@
+# decision-record (D0205 githubChannel): the human's one-letter comment on a decision issue becomes
+# a recorded acceptance in the tree, with a receipt in the same thread and the issue auto-closing as
+# the push-notified done-signal. HARDENED per the red-team checklist: allowlisted login is the FIRST
+# condition (the repo is public - anyone can comment, only the mapped human can record); the comment
+# body travels via env only; permissions are scoped per job; the keel binary records, never an agent.
+name: decision-record
+on:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '*/30 * * * *'   # the sweeper: re-drives any gesture the event path missed
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: decision-record   # serialize recorders - the repo-level mirror of .keel-write-lock
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: >
+      github.event_name != 'issue_comment' ||
+      (
+        contains(github.event.issue.labels.*.name, 'decision') &&
+        github.event.issue.state == 'open' &&
+        github.event.comment.user.login == 'williamweatherholtz' &&
+        github.event.comment.user.type == 'User'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: acknowledge the gesture (eyes on the comment)
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" -f content=eyes || true
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          fetch-depth: 0   # claim-ancestry + audit-history need history (issue229/232)
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
+      - name: build keel
+        run: cargo build --release -p keel-cli --bin keel
+      - name: record from the triggering comment
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}   # env only - never shell-interpolated
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+          COMMENT_USER: ${{ github.event.comment.user.login }}
+        run: bash .github/scripts/record_decision.sh
+      - name: sweep missed gestures
+        if: github.event_name != 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for n in $(gh issue list --state open --label decision --json number --jq '.[].number'); do
+            # latest comment by the allowlisted human that has no receipt yet
+            gh issue view "$n" --json comments \
+              --jq '[.comments[] | select(.author.login == "williamweatherholtz")] | last | {id: .id, body: .body, url: .url}' > c.json || continue
+            cid=$(jq -r '.id // empty' c.json)
+            [ -z "$cid" ] && continue
+            if gh issue view "$n" --json comments --jq '.comments[].body' | grep -q "receipt-for-comment: $cid"; then
+              continue
+            fi
+            echo "sweeping issue $n comment $cid"
+            ISSUE_NUMBER="$n" \
+            COMMENT_BODY="$(jq -r .body c.json)" \
+            COMMENT_ID="$cid" \
+            COMMENT_URL="$(jq -r .url c.json)" \
+            COMMENT_USER="williamweatherholtz" \
+            bash .github/scripts/record_decision.sh
+          done

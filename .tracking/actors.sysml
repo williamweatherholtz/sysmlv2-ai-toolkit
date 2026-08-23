@@ -32,4 +32,11 @@ package ProjectActors {
     // (`critiquedBy = CriticKind::tool`) while the identity in `judgedBy` stays the actor who ran
     // it. A kernel-adjudicated critique is recorded that way — see .tracking/panel-critiques.sysml.
     part claudeFable5 : Actor { :>> name = "Claude Fable 5"; :>> kind = ActorKind::ai; :>> role = "contributor"; }
+
+    // D0205 (githubChannel): the GitHub Actions recorder - durable compute that transcribes the
+    // human's authenticated issue-comment gesture into the tree while the local machine is off.
+    // kind=ai (it is automation, never a Person); it RECORDS human judgment under the D0192-family
+    // delegation and never supplies it - the acceptance's judgedBy stays the mapped human, and the
+    // ownership guard admits only the exact accept transform from a non-owner.
+    part githubRecorder : Actor { :>> name = "GitHub Actions recorder (keel binary in CI, D0205)"; :>> kind = ActorKind::ai; :>> role = "contributor"; }
 }
