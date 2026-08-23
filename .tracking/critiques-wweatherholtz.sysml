@@ -169,4 +169,18 @@ package CritiquesWweatherholtz {
     part viewRestructureStoryHRev1R1 : TestResult { :>> id = "3333f3b1-a708-4eb2-80a7-11336e4f1953"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3c9645e"; :>> judgedAt = "2026-08-22"; :>> judgedBy = "wweatherholtz"; }
     #Verify dependency from viewRestructureStoryHRev1 to viewRestructureStory;
     #Covers dependency from viewRestructureStoryHRev1 to viewRestructureStory;
+    verification issue227Disp1 : Test { :>> id = "9ed2d982-90f7-4c67-8692-ca7174904e35"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "wweatherholtz tapped Accept on the issue227 card (deck HEAD 55d1381, At 2026-08-23T01:15-16Z). the dual-computation fix (sprint 426) is delivered - both views read one due count."; }
+    part issue227Disp1R1 : TestResult { :>> id = "f578fba8-48f5-4dcc-8877-b037164f7539"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue227Disp1 to issue227;
+    verification issue228Disp1 : Test { :>> id = "7e23e128-8f6d-45fc-a145-be1065a4819f"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "wweatherholtz tapped Accept on the issue228 card (deck HEAD 55d1381, At 2026-08-23T01:15-16Z). resolver dcOversightRedesign now unblocked by their D0200 OPTION A signature."; }
+    part issue228Disp1R1 : TestResult { :>> id = "170be164-4b5e-467c-96f5-f706ae589b17"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Dispositions dependency from issue228Disp1 to issue228;
+    verification delegationClauseStoryHRev1 : Test { :>> id = "cf05b766-5a4a-496a-b4a7-a732f38e6368"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-22T15:31Z, deck HEAD c116a61)."; }
+    part delegationClauseStoryHRev1R1 : TestResult { :>> id = "c3ce7feb-93d1-4ddc-b569-4632ce7c6ce5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from delegationClauseStoryHRev1 to delegationClauseStory;
+    #Covers dependency from delegationClauseStoryHRev1 to delegationClauseStory;
+    verification deckForkOptionsStoryHRev1 : Test { :>> id = "a0e7b81c-fda1-4c10-8f9f-dc8009fdf180"; :>> method = VerificationMethod::critique; :>> lens = CritiqueLens::completeness; :>> critiquedBy = CriticKind::human; :>> procedureText = "sitting review via deck: accept - Their deck tap (At 2026-08-22T15:31Z, deck HEAD c116a61)."; }
+    part deckForkOptionsStoryHRev1R1 : TestResult { :>> id = "de0c711e-6677-4ee9-943e-201c64dccb66"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from deckForkOptionsStoryHRev1 to deckForkOptionsStory;
+    #Covers dependency from deckForkOptionsStoryHRev1 to deckForkOptionsStory;
 }

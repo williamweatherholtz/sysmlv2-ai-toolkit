@@ -214,4 +214,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcClaimLandCheck to issue232;
+
+    part issue233 : Issue {
+        :>> id = "16880abf-9d8b-43fa-b453-d092aaa1ae3d";
+        :>> title = "Fork cards highlighted every option as selected - eleven contradictory taps on one decision";
+        :>> createdAt = "2026-08-23";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Their report, 2026-08-23: 'deck shows multiple sign options as being selected.' Root cause: the accept-styling CSS keyed on data-v=accept, shared by EVERY option button on a fork card, so any accepted fork lit all its options; the human fought the UI and the inbox recorded eleven d0201 rows with contradictory options (A/B/C within seconds) - none of which can bind. The unbindable-gesture class (issue223) recurring one level down: the tap bound correctly in DATA (data-opt-chosen) but lied in PIXELS.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckJudgeableCards to issue233;
+
+    part issue234 : Issue {
+        :>> id = "8cad950c-c902-44a2-b2ba-a857c3539872";
+        :>> title = "Decision cards carried no deciding context - a signature could only be a trust gesture";
+        :>> createdAt = "2026-08-23";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Their words, 2026-08-23: 'there is not sufficient context to make these decisions generally... it's not even clear what's really being proposed because there are so many references and obscure change or value implications.' The acceptance card rendered title + 'proposed - needs your signature' and nothing else; the D0200 judgeable-cards finding applied to decisions as much as sittings, and the panel's rubber-stamp evidence was partly THIS.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDeckJudgeableCards to issue234;
 }

@@ -50,4 +50,13 @@ package CritiquesClaudeFable5 {
     verification issue226Disp1 : Test { :>> id = "a6305e6c-5925-4db3-a91a-ac7945170301"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation (their words: 'auto accept issues by your authority'). fixed in sprint 423 - the unit asserts the ownership guard, the stale contract claim deleted, D0199 queued."; }
     part issue226Disp1R1 : TestResult { :>> id = "6a54664c-4a38-4ece-8e3b-6be6d03adc7a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a2a3884"; :>> judgedAt = "2026-08-22"; :>> judgedBy = "claudeFable5"; }
     #Dispositions dependency from issue226Disp1 to issue226;
+    verification issue229Disp1 : Test { :>> id = "b2bdaaa8-b6a7-4866-ad95-048bb1603d96"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation. fixed in sprint 427 - land warns on held items, guard 47 bounds claim dates."; }
+    part issue229Disp1R1 : TestResult { :>> id = "e610a526-12a6-466b-ad0d-f03a04656ab5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue229Disp1 to issue229;
+    verification issue231Disp1 : Test { :>> id = "b536522c-e46a-40b2-a470-9aa6d543d544"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation. fixed in sprint 428 - the parser ratchet is live and negative-probed."; }
+    part issue231Disp1R1 : TestResult { :>> id = "451ba096-05ac-4311-b88e-ac9176f31f36"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue231Disp1 to issue231;
+    verification issue230Disp1 : Test { :>> id = "955618b0-2eb2-461e-b811-a56afa73e8a0"; :>> method = VerificationMethod::confirmation; :>> disposition = DispositionKind::act; :>> procedureText = "AI-dispositioned under the D0165 delegation: resolver dcAdvisoryInstrumentation is chartered on the frontier; the design touches the frozen D0193 ledger contract and will carry its own decision when executed."; }
+    part issue230Disp1R1 : TestResult { :>> id = "e94e742f-f839-4fa1-8504-bc02f798db65"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "71f6453"; :>> judgedAt = "2026-08-23"; :>> judgedBy = "claudeFable5"; }
+    #Dispositions dependency from issue230Disp1 to issue230;
 }

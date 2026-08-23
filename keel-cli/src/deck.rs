@@ -45,6 +45,21 @@ struct Item {
     options: Vec<(String, String)>,
 }
 
+/// A Decision's own deciding context for the card (their feedback, 2026-08-23: "there is not
+/// sufficient context to make these decisions generally"). Returns `(context, decision)` text
+/// pulled from the decision file — the card renders them in a collapsible panel so a signature
+/// can be a judgment, not a trust gesture.
+fn decision_digest(root: &Path, rel_file: &str) -> Option<(String, String)> {
+    let text = std::fs::read_to_string(root.join(rel_file)).ok()?;
+    let field = |name: &str| -> Option<String> {
+        let key = format!("{name} = \"");
+        let i = text.find(&key)? + key.len();
+        let j = text[i..].find('"')? + i;
+        Some(text[i..j].to_string())
+    };
+    Some((field("context").unwrap_or_default(), field("decision").unwrap_or_default()))
+}
+
 /// Extract `OPTION X (short label)` enumerations from a Decision file's text. Two or more make the
 /// decision a FORK; fewer yield an empty list and the ordinary single Sign button.
 fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
@@ -225,6 +240,64 @@ fn collect(root: &Path) -> Vec<Item> {
     items
 }
 
+/// One card's HTML. Extracted from [`html`]'s section loop (clippy line budget) — behavior identical.
+fn render_card(root: &Path, i: &Item, cls: &str) -> String {
+    let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
+    let accept_buttons = if i.options.is_empty() {
+        format!("<button data-v=accept>{verb}</button>")
+    } else {
+        let mut b = String::new();
+        for (tok, label) in &i.options {
+            let _ = write!(
+                b,
+                "<button data-v=accept data-opt=\"OPTION {tok}\">{verb} {tok} - {l}</button>",
+                l = esc(label)
+            );
+        }
+        b
+    };
+    // The deciding-context panel (their 2026-08-23 feedback): a decision card must carry enough of
+    // its own WHY and WHAT to be judged from the card. Collapsed by default so the deck stays
+    // scannable; the full text is one tap away, never a repo dig.
+    let why = if cls == "acceptance" {
+        decision_digest(root, &i.file).map_or_else(String::new, |(ctx, dec)| {
+            format!(
+                "<details class=why><summary>what this decides, and why</summary><div><p><b>Why it came up:</b> {}</p><p><b>What is being decided:</b> {}</p></div></details>",
+                esc(&ctx),
+                esc(&dec)
+            )
+        })
+    } else {
+        String::new()
+    };
+    let mut out = String::new();
+    let _ = write!(
+        out,
+        "<article class=card data-id=\"{u}\" data-name=\"{n}\" data-cls=\"{c}\" data-file=\"{f}\" data-verdict=\"\">         <header><code>{n}</code><span class=vd></span><span class=sv></span></header>         <h3>{t}</h3><p class=meta>{m}</p>{why}         <div class=verdicts>{accept_buttons}         <button data-v=maybe>Needs work</button><button data-v=reject>Reject</button></div>         <input class=note type=text data-id=\"{u}-note\" placeholder=\"why, or what to change\" aria-label=\"note\">         </article>",
+        u = esc(&i.uid),
+        n = esc(&i.name),
+        c = cls,
+        f = esc(&i.file),
+        t = esc(&i.title),
+        m = esc(&i.meta),
+    );
+    out
+}
+
+/// HTML-escape for card text (also used by [`render_card`] outside [`html`]'s local closure).
+fn esc(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '&' => "&amp;".to_string(),
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            '"' => "&quot;".to_string(),
+            c if (c as u32) > 126 => format!("&#{};", c as u32),
+            c => c.to_string(),
+        })
+        .collect()
+}
+
 /// The page. One self-contained HTML fragment (the artifact runtime supplies the head; a browser is
 /// lenient about the same shape, so ONE output serves both transports).
 ///
@@ -241,18 +314,6 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
         .ok()
         .filter(|o| o.status.success())
         .map_or_else(|| "?".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-    let esc = |s: &str| -> String {
-        s.chars()
-            .map(|c| match c {
-                '&' => "&amp;".to_string(),
-                '<' => "&lt;".to_string(),
-                '>' => "&gt;".to_string(),
-                '"' => "&quot;".to_string(),
-                c if (c as u32) > 126 => format!("&#{};", c as u32),
-                c => c.to_string(),
-            })
-            .collect()
-    };
     let classes: [(&str, &str, &str); 3] = [
         ("acceptance", "Decisions awaiting your signature", "#4c5fd7"),
         ("finding", "Findings awaiting disposition", "#b5651d"),
@@ -263,36 +324,7 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
         let rows: Vec<&Item> = items.iter().filter(|i| i.cls == cls).collect();
         let mut cards = String::new();
         for i in &rows {
-            let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
-            let accept_buttons = if i.options.is_empty() {
-                format!("<button data-v=accept>{verb}</button>")
-            } else {
-                let mut b = String::new();
-                for (tok, label) in &i.options {
-                    let _ = write!(
-                        b,
-                        "<button data-v=accept data-opt=\"OPTION {tok}\">{verb} {tok} - {l}</button>",
-                        l = esc(label)
-                    );
-                }
-                b
-            };
-            let _ = write!(
-                cards,
-                "<article class=card data-id=\"{u}\" data-name=\"{n}\" data-cls=\"{c}\" data-file=\"{f}\" data-verdict=\"\">\
-                 <header><code>{n}</code><span class=vd></span><span class=sv></span></header>\
-                 <h3>{t}</h3><p class=meta>{m}</p>\
-                 <div class=verdicts>{accept_buttons}\
-                 <button data-v=maybe>Needs work</button><button data-v=reject>Reject</button></div>\
-                 <input class=note type=text data-id=\"{u}-note\" placeholder=\"why, or what to change\" aria-label=\"note\">\
-                 </article>",
-                u = esc(&i.uid),
-                n = esc(&i.name),
-                c = cls,
-                f = esc(&i.file),
-                t = esc(&i.title),
-                m = esc(&i.meta),
-            );
+            cards.push_str(&render_card(root, i, cls));
         }
         if cards.is_empty() {
             cards = "<p class=empty>Nothing outstanding in this class.</p>".to_string();
@@ -373,7 +405,12 @@ border:0;border-left:4px solid var(--h);color:var(--ink);font:650 15px var(--san
 .verdicts button[data-opt]{flex:1 1 100%}
 .verdicts button{flex:1;min-height:44px;border:1px solid var(--line);border-radius:9px;background:transparent;
 color:var(--ink2);font:600 13px var(--sans);cursor:pointer}
-.card[data-verdict=accept] button[data-v=accept]{background:var(--accept);border-color:var(--accept);color:#fff}
+.card[data-verdict=accept] button[data-v=accept]:not([data-opt]){background:var(--accept);border-color:var(--accept);color:#fff}
+.card[data-verdict=accept] button[data-opt][data-sel]{background:var(--accept);border-color:var(--accept);color:#fff}
+details.why{margin:9px 0 0;border:1px solid var(--line);border-radius:9px}
+details.why summary{cursor:pointer;padding:8px 12px;font:600 12px var(--sans);color:var(--ink2)}
+details.why div{padding:0 12px 10px;font:13px/1.55 var(--sans);color:var(--ink2);max-height:16em;overflow-y:auto}
+details.why b{color:var(--ink)}
 .card[data-verdict=maybe] button[data-v=maybe]{background:var(--maybe);border-color:var(--maybe);color:#1a1200}
 .card[data-verdict=reject] button[data-v=reject]{background:var(--reject);border-color:var(--reject);color:#fff}
 .note{width:100%;min-height:44px;margin:8px 0 0;padding:10px;border:1px solid var(--line);border-radius:9px;
@@ -494,6 +531,9 @@ document.addEventListener('click',function(e){
   var next=same?'':b.getAttribute('data-v');
   card.setAttribute('data-verdict',next);
   card.setAttribute('data-opt-chosen',next?opt:'');
+  var sib=card.querySelectorAll('.verdicts button[data-opt]');
+  for(var si=0;si<sib.length;si++){sib[si].removeAttribute('data-sel');}
+  if(next&&opt){b.setAttribute('data-sel','1');}
   if(!next){say(card,'cleared (nothing recorded)');return;}
   if(MODE==='local'){saveLocal(card,next,opt);}else{saveInbox(card,next,opt);}
 });
