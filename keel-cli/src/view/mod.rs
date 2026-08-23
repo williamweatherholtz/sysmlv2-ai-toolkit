@@ -2513,12 +2513,37 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
             Json::Obj(vec![("review".to_string(), Json::s((*r).clone())), ("covers".to_string(), Json::Arr(covers.into_iter().map(Json::s).collect()))])
         })
         .collect();
+    // D0200 OPTION A clause 1: coverage is TWO numbers, never one. A review is BATCH-ACKNOWLEDGED
+    // when its own text says so - the machine token going forward, the word "batch" for the two
+    // historical batch signatures (the panel's 62%-in-two-utterances finding; the heuristic and its
+    // basis are stated here rather than laundering history into "read"). Everything else is a READ
+    // review. Sprint-level: a sprint counts read-reviewed if ANY covering review is a read review.
+    let is_batch_review = |r: &str| -> bool {
+        model.items.get(r).and_then(|i| i.attrs.get("procedureText")).is_some_and(|p| {
+            p.contains("BATCH-ACKNOWLEDGED") || p.to_lowercase().contains("batch")
+        })
+    };
+    let mut read_covered: HashSet<&str> = HashSet::new();
+    let mut batch_covered: HashSet<&str> = HashSet::new();
+    for e in model.edges.iter().filter(|e| e.kind == "covers") {
+        if is_batch_review(&e.from) {
+            batch_covered.insert(e.to.as_str());
+        } else {
+            read_covered.insert(e.to.as_str());
+        }
+    }
+    let read_n = sprints.iter().filter(|s| read_covered.contains(s.as_str())).count();
+    let batch_only_n =
+        sprints.iter().filter(|s| batch_covered.contains(s.as_str()) && !read_covered.contains(s.as_str())).count();
     let total = sprints.len();
     let uncovered_n = uncovered.len();
     let due_n = due.len();
     let out = Json::Obj(vec![
         ("sprints".to_string(), Json::Int(i64::try_from(total).unwrap_or(i64::MAX))),
         ("covered".to_string(), Json::Int(i64::try_from(total - uncovered_n).unwrap_or(i64::MAX))),
+        ("readReviewed".to_string(), Json::Int(i64::try_from(read_n).unwrap_or(i64::MAX))),
+        ("batchAcknowledgedOnly".to_string(), Json::Int(i64::try_from(batch_only_n).unwrap_or(i64::MAX))),
+        ("splitBasis".to_string(), Json::s("covered = readReviewed + batchAcknowledgedOnly (D0200: acknowledgment is not examination and is never counted as it; batch = the machine token, or 'batch' in the review's own text for the pre-D0200 history)".to_string())),
         ("uncovered".to_string(), Json::Int(i64::try_from(uncovered_n).unwrap_or(i64::MAX))),
         ("due".to_string(), Json::Int(i64::try_from(due_n).unwrap_or(i64::MAX))),
         ("grandfathered_unreviewed".to_string(), Json::Int(i64::try_from(gf_n).unwrap_or(i64::MAX))),
@@ -2528,6 +2553,37 @@ pub fn sitting_coverage(root: &Path) -> Result<String, ViewError> {
         ("uncovered_sprints".to_string(), Json::Arr(uncovered)),
     ]);
     Ok(out.dump())
+}
+
+/// D0200 clause 5 (escalation with teeth): the oversight debt, for the throttle.
+///
+/// Returns `Some((due_count, oldest_age_days))` when at least one DUE (not grandfathered) sitting
+/// exists; the CALLER decides what age escalates. One computation, shared with authority-queue.
+///
+/// # Errors
+/// Returns [`ViewError`] if the model cannot be read.
+pub fn oversight_debt(root: &Path) -> Result<Option<(usize, i64)>, ViewError> {
+    let model = Model::build(root)?;
+    let covered = covered_sprints(&model);
+    let gf = crate::govern::grandfathered_under(root, SITTING_DECISION);
+    let is_gf = |s: &str| gf.as_ref().is_some_and(|g| g.contains(s));
+    let today = repo_today_pub(root);
+    let mut due = 0usize;
+    let mut oldest_age = 0i64;
+    for (name, info) in &model.items {
+        if info.type_name != "Story" || covered.contains(name.as_str()) || is_gf(name) {
+            continue;
+        }
+        let since = info.attrs.get("createdAt").map_or("", String::as_str);
+        if since.is_empty() {
+            continue;
+        }
+        due += 1;
+        if !today.is_empty() {
+            oldest_age = oldest_age.max(days_between_pub(since, &today));
+        }
+    }
+    Ok(if due == 0 { None } else { Some((due, oldest_age)) })
 }
 
 /// True if an action name looks like it produces a permanent automated GUARD/check (D0047/issue039).

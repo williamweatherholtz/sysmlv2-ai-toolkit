@@ -175,4 +175,19 @@ package ProjectIndicators {
         :>> method = MeasurementMethod::computed;
         :>> collectionRef = "keel audit -> estimation_discipline.actualHours_pct";
     }
+
+    // D0200 clause 4 (review sampling): the human's override rate over READ sitting reviews.
+    // Sustained 0% is the ALARM, not the goal - a reviewer who never rejects is not reviewing
+    // (the HITL rubber-stamp threshold the process-value panel cited). An INDICATOR, never a gate:
+    // gating a rate whose healthy value is a judgment would be the Goodhart move D0088 forbids.
+    part sittingOverrideRateIndicator : Indicator {
+        :>> id = "180ee903-0a30-4c10-a596-08c9fd9ebe97";
+        :>> title = "override rate: rejected/needs-work share of READ sitting reviews";
+        :>> createdAt = "2026-08-23";
+        :>> createdBy = "claudeFable5";
+        :>> measures = "Of sitting reviews that are actual reads (batch acknowledgments excluded), the percentage recording a fail verdict. 0 of 43 at declaration - the panel's finding, now on the dashboard.";
+        :>> goal = IndicatorGoal::observe;
+        :>> unit = "%";
+        :>> method = MeasurementMethod::computed; :>> collectionRef = "sitting_override_rate_pct";
+    }
 }

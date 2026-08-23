@@ -572,14 +572,23 @@ async fn api_deck_sitting(
             .into_response();
     }
     let severity = match b.verdict.as_str() {
-        "accept" => None,
+        "accept" | "batch-ack" => None,
         "maybe" | "reject" => Some("Medium"),
         other => {
             return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"unknown verdict {other}\"}}"))
                 .into_response()
         }
     };
-    let rationale = if b.note.is_empty() {
+    // D0200 OPTION A: a batch acknowledgment is a DISTINCT verdict carrying its machine token, so
+    // sitting-coverage can count read-reviews and batch-acks as two numbers (never one). The token
+    // is the same convention family the ceremony guard keys on.
+    let rationale = if b.verdict == "batch-ack" {
+        format!(
+            "BATCH-ACKNOWLEDGED: trust-the-process attestation, not an examined review (D0200){}{}",
+            if b.note.is_empty() { "" } else { " - " },
+            b.note
+        )
+    } else if b.note.is_empty() {
         format!("sitting review via deck: {}", b.verdict)
     } else {
         format!("sitting review via deck: {} - {}", b.verdict, b.note)
@@ -601,7 +610,7 @@ async fn api_deck_sitting(
         critiqued_by: "human",
         severity,
         rationale: &rationale,
-        outcome: if b.verdict == "accept" { "pass" } else { "fail" },
+        outcome: if b.verdict == "accept" || b.verdict == "batch-ack" { "pass" } else { "fail" },
         sha: &sha,
         judged_at: &b.judged_at,
         judged_by: &b.by,

@@ -294,6 +294,29 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
             Some(f64::from(pct(total - missing.len(), total)))
         }
         "volatility" => Some(cnt(model.edges.iter().filter(|e| e.kind == "supersede").count())),
+        // D0200 clause 4: the human's override rate over READ sitting reviews (batch-acks excluded -
+        // an acknowledgment cannot override). Sustained 0% is the ALARM, not the goal (the HITL
+        // rubber-stamp threshold the panel cited): a reviewer who never rejects is not reviewing.
+        "sitting_override_rate_pct" => {
+            let mut reviews = 0usize;
+            let mut overrides = 0usize;
+            let mut seen: HashSet<&String> = HashSet::new();
+            for e in model.edges.iter().filter(|e| e.kind == "covers") {
+                if !seen.insert(&e.from) {
+                    continue;
+                }
+                let Some(info) = model.items.get(&e.from) else { continue };
+                let text = info.attrs.get("procedureText").map_or("", String::as_str);
+                if text.contains("BATCH-ACKNOWLEDGED") || text.to_lowercase().contains("batch") {
+                    continue;
+                }
+                reviews += 1;
+                if crate::view::latest_result(&model, &e.from).is_some_and(|(o, _)| o == "fail") {
+                    overrides += 1;
+                }
+            }
+            Some(f64::from(pct(overrides, reviews.max(1))))
+        }
         "accepted_decisions" => Some(cnt(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count())),
         "open_findings" => {
             let done = crate::orient::done_names(root);
