@@ -1697,6 +1697,65 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
     out
 }
 
+// ── doc-guard-count guard (issue246: a count typed into prose beside a computable one) ──────────
+
+/// Guard: the doc surface must not hardcode the TOTAL guard count.
+///
+/// issue246. `CLAUDE.md` said "all 45 forward guards" and `.engine/docs/guards.md` said "runs **45**
+/// forward guards" while 48 ran — and guards.md's very next sentence said `keel version` reports the
+/// split "so the number has one home". A number typed into prose beside a number the engine can
+/// compute is the highest-frequency drift mechanism in this repository, and the 2026-08-24 panel found
+/// the brief that DIAGNOSED report-vs-truth drift committing it twice itself.
+///
+/// The rule is DELETION, not reconciliation: D0105 gives every fact one canonical home, and the home
+/// of this one is `keel version`. Syncing 45 to 48 would drift again on guard 49; forbidding the
+/// literal cannot. Narrow by construction — it fires only on a digit immediately preceding
+/// "forward guards" or on "all N guards", so a SUBSET count ("5 guards are rule-sourced") and an
+/// ordinal reference ("Guard 37 checks...") are untouched.
+#[must_use]
+pub fn doc_guard_count(root: &Path) -> GuardReport {
+    let mut files: Vec<PathBuf> = vec![root.join("CLAUDE.md")];
+    if let Ok(rd) = std::fs::read_dir(root.join(".engine").join("docs")) {
+        files.extend(rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "md")));
+    }
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let actual = GUARD_NAMES.len();
+    for f in files {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        scanned += 1;
+        let rel = f.strip_prefix(root).unwrap_or(&f).to_string_lossy().replace('\\', "/");
+        for (n, line) in text.lines().enumerate() {
+            if let Some(claim) = total_guard_count_claim(line) {
+                violations.push(format!(
+                    "{rel}:{}: states a TOTAL guard count (`{claim}`) while {actual} guards are enforced - the count has ONE home, `keel version` (D0105/issue246). Delete the number; point at the computed source.",
+                    n + 1
+                ));
+            }
+        }
+    }
+    GuardReport { name: "doc-guard-count", scanned, warnings: Vec::new(), violations }
+}
+
+/// The hardcoded TOTAL-count phrase in a line, if any. `None` for subset counts and ordinals.
+fn total_guard_count_claim(line: &str) -> Option<String> {
+    // "<digits>[**] forward guards" — the digits may be wrapped in markdown emphasis.
+    for pat in ["forward guards", "guards, kernel-free"] {
+        if let Some(i) = line.find(pat) {
+            let before: String = line[..i].chars().rev().take(12).collect::<String>().chars().rev().collect();
+            let stripped: String = before.chars().filter(|c| *c != '*' && *c != '_').collect();
+            if stripped.trim_end().chars().last().is_some_and(|c| c.is_ascii_digit()) {
+                return Some(format!("{}{pat}", before.trim_start()));
+            }
+        }
+    }
+    // The "all <N> guards" branch was REMOVED after a probe against the real corpus: guards.md
+    // legitimately narrates history ("passed validate and all 37 guards"), a TRUE statement about the
+    // past that must not be forbidden. Only the canonical CURRENT-total phrasing is checked, which is
+    // what both drifted sites actually used. A guard that fires on true prose gets bypassed.
+    None
+}
+
 /// The ENFORCED forward guards, in CLI/runner order.
 ///
 /// `issues` joined the enforced set at IRL-d (D0077). HONEST-STATE doctrine (D0098): the enforced set
@@ -1707,8 +1766,8 @@ fn duplicate_sequence(root: &Path, dir: &Path, prefix: &str, width: usize) -> Ve
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 48] =
-    ["actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
+pub const GUARD_NAMES: [&str; 49] =
+    ["doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2862,6 +2921,7 @@ fn hook_config_integrity(root: &Path) -> GuardReport {
 #[must_use]
 pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
     match name {
+        "doc-guard-count" => Some(doc_guard_count(root)),
         "actors" => Some(actors(root)),
         "acceptance-events" => Some(acceptance_events(root)),
         "sprint-coverage" => Some(sprint_coverage(root)),

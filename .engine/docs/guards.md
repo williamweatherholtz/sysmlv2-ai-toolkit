@@ -1,6 +1,6 @@
 # Guard reference
 
-`keel guard` runs **45** forward guards, kernel-free — hard-blocking (exit ≠ 0 on any violation)
+`keel guard` runs the enforced forward guards, kernel-free — hard-blocking (exit ≠ 0 on any violation)
 and warning-only (visible every commit, never blocking). `keel version` reports the exact split
 computed from the enforced set — read it there rather than here, so the number has one home.
 
@@ -10,6 +10,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 
 | Guard | What it enforces |
 |---|---|
+| `doc-guard-count` | The doc surface must not hardcode the TOTAL guard count (issue246/D0105). CLAUDE.md said 45 and this file said **45** while 48 ran, and this file's own next sentence says the count has one home — `keel version`. The rule is DELETION, not reconciliation: syncing the number drifts again on the next guard, forbidding the literal cannot. Narrow by construction — only the canonical current-total phrasing is checked, so historical narration ("passed validate and all 37 guards") and ordinal references ("Guard 37 checks…") are untouched; that branch was removed after a probe against the real corpus produced a false positive on true prose |
 | `actors` | `createdBy`/`judgedBy` reference a registered `ProjectActors` entry (D0037) |
 | `acceptance-events` | An accepted Decision carries a passing acceptance event (D0066) |
 | `judgment-request-quality` | A PROPOSED fork Decision carries everything a human needs to judge it: short-name-led title, rationale >= 200 chars, a RESEARCH statement, a COST per OPTION (D0207: forks earn the ask; non-forks auto-accept and are not scanned). Unit-owned by `decision-channel` |

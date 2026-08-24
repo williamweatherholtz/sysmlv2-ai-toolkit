@@ -1,7 +1,7 @@
 # Process activation (D0138) — which processes THIS project has adopted.
 #
 # What activating a process does: turns on its whole unit (skill + declared rules + guards), as defined
-# by the engine in `.engine/contracts/process-units.toml`. Deactivating one stops its guards running,
+# by the engine from each process's own `assert constraint` declarations. Deactivating one stops its guards running,
 # and `keel guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
 #
 # DELETE THIS FILE to return to "everything is active", which is also the behaviour when no file
