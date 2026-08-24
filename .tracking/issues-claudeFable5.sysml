@@ -370,4 +370,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcDocCountsReconciled to issue246;
 
+
+    part issue247 : Issue {
+        :>> id = "3d89e4ae-6ec5-4484-8f58-b485c0dabef9";
+        :>> title = "The frontier WIDENED on a model-read error, and the code did the opposite of what its own comment promised";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found while building dcHonestSurfaceEverywhere (issue239). orient's ready computation filtered out SUPERSEDED tasks (issue100) and tasks BLOCKED on a proposed Decision (issue112), and both call sites read `.unwrap_or_default()`. On an Err that yields an EMPTY filter set, so NOTHING is filtered and every retired task and every human-blocked task RETURNS TO THE FRONTIER. The comment immediately above the superseded line said, verbatim, 'Conservative on error: failing to read the model must not silently make everything ready again' - so the code did precisely what its own comment forbade, and the second site carried the same promise. This is the worst instance of the class because the frontier is AUTO-FOLLOWED (D0052): a transient parse error could schedule work a Decision has explicitly retired. It is also the honest-surface invariant (N-C2) violated on the authority substrate rather than the console - a computation that could not run rendering as a confident, and wider, answer. Compounding it, `keel whats-next` printed nothing and exited 0 whether the frontier was genuinely empty or a filter had failed, so COMPUTED-EMPTY and COULD-NOT-COMPUTE were byte-identical on the one answer the AI follows. FIX: the narrowing filters are extracted into one place that RECORDS failures; a failure empties `ready` (fail closed - an empty frontier plus a stated reason is honest, a superset presented as the answer is not); orient emits an explicit answerStatus of COMPUTED or COULD-NOT-COMPUTE with reasons; whats-next REFUSES with exit 1 on a failure and says COMPUTED-EMPTY out loud when the answer is genuinely empty.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHonestSurfaceEverywhere to issue247;
+
 }

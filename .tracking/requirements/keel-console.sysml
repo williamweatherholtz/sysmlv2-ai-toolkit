@@ -88,9 +88,29 @@ package ProjectConsoleRequirements {
         :>> verificationMethod = VerificationMethod::test;
     }
 
+    // ── N-C2 on the AUTHORITY substrate (issue239) ───────────────────────────────────────────────
+    // srConsoleViewStatusExplicit scopes the honest-surface property to "every view the surface
+    // renders" -- the HTML console. But CLAUDE.md section 1.8/D0093 make CLI/JSON the AUTHORITY and
+    // the automation substrate, and every violation the 2026-08-24 panel found was on THAT side: a
+    // catalogue denying 12 processes that exist (issue241), a wiredness proxy reporting an
+    // unreachable hook as armed (issue240), a frontier that WIDENED on a model-read error while its
+    // own comment promised conservatism (issue247). The Need is owned by another actor, so a
+    // non-owner ADDS a requirement and a satisfy edge rather than editing its statement (D0108).
+    requirement srAuthorityAnswerStatesItsBasis : SystemRequirement {
+        :>> id = "b24ef2d6-1bb6-4f93-8a1f-3bce79fbb20a";
+        :>> title = "Every computed answer names its state and the population it was computed over";
+        :>> createdAt = "2026-08-24"; :>> createdBy = "claudeFable5";
+        :>> statement = "Every computed answer keel emits, on ANY surface including CLI and JSON, shall state which of COMPUTED-WITH-CONTENT, COMPUTED-EMPTY, COULD-NOT-COMPUTE (with a reason) or TRUE-AS-OF (with the moment) it is, and shall state the population it was computed over. No answer shall present a partial or failed computation as a complete one, and where a filter that NARROWS a result cannot be computed the answer shall fail closed and say so rather than returning the wider set.";
+        :>> rationale = "N-C2, widened from the human lens to the substrate that automation and the AI itself consume. The console requirement is correct and unchanged; it simply does not bind the surface that the response contract calls the authority. The failure mode is identical and the consequence is worse: a human re-reads a suspicious screen, whereas the AI auto-follows the frontier (D0052), so a confidently wrong CLI answer becomes ACTION rather than confusion. The fail-closed clause is the part with teeth - issue247 was not a missing label but a real widening, where a transient parse error would have scheduled work a Decision had retired.";
+        :>> kind = RequirementKind::functional;
+        :>> priority = Priority::must;
+        :>> verificationMethod = VerificationMethod::test;
+    }
+
     // ── satisfy: SR -> Need ─────────────────────────────────────────────────────────────────────
     satisfy nConsoleObligationDiscoverable by srConsoleObligationsOnArrival;
     satisfy nConsoleNeverMisleads by srConsoleViewStatusExplicit;
+    satisfy nConsoleNeverMisleads by srAuthorityAnswerStatesItsBasis;
     satisfy nConsoleContextCertain by srConsoleModelScopeResolved;
     satisfy nConsoleMultiProject by srConsoleProjectRebind;
     satisfy nConsoleFitsIntermittentAttention by srConsoleNavigationDerived;

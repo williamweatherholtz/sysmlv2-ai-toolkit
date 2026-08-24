@@ -2086,7 +2086,23 @@ fn cmd_whats_next(args: &[String]) -> i32 {
         Ok(r) => r,
         Err(code) => return code,
     };
-    for task in orient::compute(&root).ready {
+    // issue239/issue247: whats-next used to print nothing and exit 0 whether the frontier was
+    // genuinely empty or a filter had failed to compute — identical output for COMPUTED-EMPTY and
+    // COULD-NOT-COMPUTE, on the one answer the AI auto-follows (D0052). Now the two are distinct:
+    // a failed computation REFUSES rather than answering with silence.
+    let out = orient::compute(&root);
+    if !out.compute_failures.is_empty() {
+        eprintln!("whats-next: COULD-NOT-COMPUTE — refusing to print a frontier that may be wrong:");
+        for r in &out.compute_failures {
+            eprintln!("  {r}");
+        }
+        eprintln!("  This is NOT an empty frontier. Fix the model read, then re-run.");
+        return 1;
+    }
+    if out.ready.is_empty() {
+        eprintln!("whats-next: COMPUTED-EMPTY — no task is ready (computed over {} outstanding item(s)). This is an answer, not a failure.", out.outstanding);
+    }
+    for task in out.ready {
         println!("{task}");
     }
     0

@@ -55,6 +55,10 @@ pub struct Output {
     /// Compact non-blocking BURNDOWN summary (D0098) — a raw JSON-object fragment (tier-satisfaction
     /// pcts + rootedness counts), always visible so incompleteness can't be silently ignored.
     pub burndown: String,
+    /// Why a filter that NARROWS the frontier could not be computed (issue247/issue239). Empty means
+    /// every filter ran. Non-empty means `ready` was deliberately emptied and this answer is
+    /// COULD-NOT-COMPUTE, not COMPUTED-EMPTY — the two must never look alike (N-C2).
+    pub compute_failures: Vec<String>,
     /// Processes this project has NOT activated (D0138). Emitted so orientation states what is NOT
     /// being enforced: a computed view that showed only findings would read as "all controls checked"
     /// on a project running a deliberate subset.
@@ -93,7 +97,7 @@ impl Output {
         };
         let burndown = if self.burndown.is_empty() { "{}" } else { self.burndown.as_str() };
         format!(
-            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"unsynchronizedEvidence\": {},\n  \"open_issues\": {},\n  \"pendingAcceptances\": {},\n  \"sync\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {}\n}}",
+            "{{\n  \"in_progress_sprints\": {},\n  \"ready\": {},\n  \"suspect\": {},\n  \"invalidEvidence\": {},\n  \"unsynchronizedEvidence\": {},\n  \"open_issues\": {},\n  \"pendingAcceptances\": {},\n  \"sync\": {},\n  \"counts\": {{\"done\": {}, \"outstanding\": {}}},\n  \"burndown\": {},\n  \"inactive_processes\": {},\n  \"answerStatus\": {}\n}}",
             in_progress_block,
             str_array(&self.ready),
             str_array(&self.suspect),
@@ -106,6 +110,16 @@ impl Output {
             self.outstanding,
             burndown,
             str_array(&self.inactive_processes),
+            // issue239/issue247: EVERY computed answer names which of the four states it is, so a
+            // COULD-NOT-COMPUTE can never be mistaken for a COMPUTED-EMPTY.
+            if self.compute_failures.is_empty() {
+                "\"COMPUTED\"".to_owned()
+            } else {
+                format!(
+                    "{{\"state\": \"COULD-NOT-COMPUTE\", \"readyEmptiedDeliberately\": true, \"reasons\": {}}}",
+                    str_array(&self.compute_failures)
+                )
+            },
         )
     }
 }
@@ -367,6 +381,55 @@ fn criterion_suspects(
     out
 }
 
+/// The three filters that NARROW the frontier, and any failure to compute them (issue247/issue239).
+///
+/// Extracted so the fail-closed property is testable and so `compute_after_fetch` stays readable.
+/// The distinction that matters: `superseded` and `blocked` REMOVE work that must not be scheduled,
+/// so failing to compute them yields a frontier that is a SUPERSET of the truth — the caller must
+/// refuse rather than publish it. `claimed_by_others` is different and its empty-on-error is
+/// deliberate: a claim must never make work INVISIBLE to someone who cannot be told it is theirs.
+struct Narrowing {
+    superseded: HashSet<String>,
+    blocked: HashSet<String>,
+    claimed_by_others: HashSet<String>,
+    compute_failures: Vec<String>,
+}
+
+fn narrowing_filters(repo: &Path) -> Narrowing {
+    let mut compute_failures: Vec<String> = Vec::new();
+    // A SUPERSEDED task is never ready (issue100): a `#Supersede` edge is the authored statement that
+    // the work is deliberately retired (§1.4), and the frontier is auto-followed (D0052).
+    //
+    // issue247: this was `.unwrap_or_default()`, the exact opposite of the conservatism its own
+    // comment promised — an Err yielded an EMPTY set, nothing was filtered, and every retired task
+    // returned to the frontier. Record the failure instead; the caller empties `ready` and says so.
+    let superseded = crate::view::superseded_names(repo).unwrap_or_else(|e| {
+        compute_failures.push(format!(
+            "superseded set could not be computed ({e}) - retired work would re-enter the frontier"
+        ));
+        HashSet::new()
+    });
+    // Nor is a task that `#DependsOn` a still-PROPOSED Decision (issue112) — superseded means
+    // RETIRED, this means WAITING ON A HUMAN, and it returns by itself once the Decision resolves.
+    let blocked = crate::view::blocked_on_acceptance(repo).unwrap_or_else(|e| {
+        compute_failures.push(format!(
+            "blocked-on-acceptance set could not be computed ({e}) - work awaiting a human would read as ready"
+        ));
+        HashSet::new()
+    });
+    // Nor is an item another contributor holds a LIVE claim on (D0147/srDcWorkClaim). Empty on error
+    // AND on an unresolved actor is DELIBERATE here, and is not a compute failure: if this machine has
+    // no bound identity nothing is hidden, because a claim must never make work invisible to someone
+    // who cannot be told it is theirs.
+    let me = crate::actor::resolve(repo, None).unwrap_or_default();
+    let claimed_by_others: HashSet<String> = if me.is_empty() {
+        HashSet::new()
+    } else {
+        crate::claim::held_by_others(repo, &me).unwrap_or_default().into_iter().map(|(item, _)| item).collect()
+    };
+    Narrowing { superseded, blocked, claimed_by_others, compute_failures }
+}
+
 // ── classification ────────────────────────────────────────────────────────────
 
 /// Canonical ceremony gate order (mirrors `query.py` `read_sprint_ceremony_status` + D0047).
@@ -601,23 +664,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     // authored statement that the work is deliberately retired (§1.4), and the frontier is auto-followed
     // (D0052), so leaving it ready schedules work a Decision has forbidden. Conservative on error:
     // failing to read the model must not silently make everything ready again.
-    let superseded = crate::view::superseded_names(repo).unwrap_or_default();
-    // Nor is a task that `#DependsOn` a still-PROPOSED Decision (issue112). Distinct from superseded,
-    // and the distinction matters: superseded means retired, this means WAITING ON A HUMAN, and the
-    // item returns to the frontier by itself the moment the Decision is accepted or rejected. Same
-    // conservative-on-error stance — a failed model read must not silently make everything ready.
-    let blocked = crate::view::blocked_on_acceptance(repo).unwrap_or_default();
-    // Nor is an item another contributor holds a LIVE claim on (D0147/srDcWorkClaim). The frontier
-    // is one global list and is auto-followed, so without this two contributors rationally select
-    // the same top item and the duplication surfaces only at integration. Conservative on error and
-    // on an UNRESOLVED ACTOR: if this machine has no bound identity, `held` is empty and nothing is
-    // hidden — a claim must never make work invisible to someone who cannot be told it is theirs.
-    let me = crate::actor::resolve(repo, None).unwrap_or_default();
-    let claimed_by_others: HashSet<String> = if me.is_empty() {
-        HashSet::new()
-    } else {
-        crate::claim::held_by_others(repo, &me).unwrap_or_default().into_iter().map(|(item, _)| item).collect()
-    };
+    let Narrowing { superseded, blocked, claimed_by_others, compute_failures } = narrowing_filters(repo);
     let mut ready: Vec<String> = Vec::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
@@ -628,6 +675,13 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
                 ready.push(name.clone());
             }
         }
+    }
+    // FAIL CLOSED (issue247). If a filter that REMOVES items from the frontier could not be computed,
+    // the frontier we just built is a SUPERSET of the true one — it may contain retired work or work
+    // awaiting a human. Publishing it would schedule exactly what a Decision forbade. An empty
+    // frontier plus a stated failure is honest; a wide frontier presented as the answer is not.
+    if !compute_failures.is_empty() {
+        ready.clear();
     }
 
     // Step 3: compute suspect (criterion text changed since verified). Capture WHY per task.
@@ -674,6 +728,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
         outstanding,
         // Compact non-blocking burndown (D0098); empty -> "{}" on render if it can't be computed.
         burndown: crate::view::burndown_summary_json(repo).unwrap_or_default(),
+        compute_failures,
         // D0138: state what is NOT enforced, so a subset-activated project cannot read as fully checked.
         inactive_processes: crate::activation::Activation::load(repo).inactive_processes(),
         // Conservative on error, and deliberately the OPPOSITE default from `superseded_names`:
@@ -756,5 +811,61 @@ mod evidence_class_tests {
             assert!(o.unsynchronized_evidence.is_empty(), "fetched={fetched}");
         }
         std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    /// THE CONTROL for issue247: a failure to compute a NARROWING filter must empty the frontier and
+    /// be stated, never widen it. The old code used `.unwrap_or_default()` under a comment promising
+    /// the opposite, so an Err returned every retired and human-blocked task to a frontier the AI
+    /// auto-follows (D0052).
+    #[test]
+    fn a_compute_failure_empties_the_frontier_and_is_stated() {
+        let out = super::Output {
+            in_progress_sprints: Vec::new(),
+            ready: vec!["shouldNotSurvive".to_string()],
+            suspect: Vec::new(),
+            invalid_evidence: Vec::new(),
+            unsynchronized_evidence: Vec::new(),
+            open_issues: Vec::new(),
+            suspect_reasons: std::collections::HashMap::new(),
+            done: 0,
+            outstanding: 1,
+            burndown: String::new(),
+            compute_failures: vec!["superseded set could not be computed".to_string()],
+            inactive_processes: Vec::new(),
+            pending_acceptances: Vec::new(),
+            sync: String::new(),
+        };
+        let json = out.to_json();
+        assert!(json.contains("COULD-NOT-COMPUTE"), "a failed computation must SAY so: {json}");
+        assert!(json.contains("readyEmptiedDeliberately"), "and must say the frontier was emptied on purpose");
+        assert!(json.contains("superseded set could not be computed"), "and must carry the reason");
+    }
+
+    /// The other side: a clean computation says COMPUTED, so the two states are never byte-identical.
+    #[test]
+    fn a_clean_computation_states_computed() {
+        let out = super::Output {
+            in_progress_sprints: Vec::new(),
+            ready: Vec::new(),
+            suspect: Vec::new(),
+            invalid_evidence: Vec::new(),
+            unsynchronized_evidence: Vec::new(),
+            open_issues: Vec::new(),
+            suspect_reasons: std::collections::HashMap::new(),
+            done: 0,
+            outstanding: 0,
+            burndown: String::new(),
+            compute_failures: Vec::new(),
+            inactive_processes: Vec::new(),
+            pending_acceptances: Vec::new(),
+            sync: String::new(),
+        };
+        let json = out.to_json();
+        assert!(json.contains("\"answerStatus\": \"COMPUTED\""), "{json}");
+        assert!(!json.contains("COULD-NOT-COMPUTE"));
     }
 }
