@@ -281,4 +281,93 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcOverrideThreadEveryAccept to issue238;
 
+
+    part issue239 : Issue {
+        :>> id = "3c604c51-a958-4827-a79b-c9d1a9c22830";
+        :>> title = "The honest-surface invariant is bound to the console and unbound on the CLI/JSON authority";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Adversarial panel (9 lenses, 2026-08-24) on the adoption/portability/elicitation brief. The panel's most valuable reframing: three of the four drift mechanisms the brief named are not independent - they are three violations of ONE already-accepted invariant. nConsoleNeverMisleads (N-C2, human-accepted 2026-08-16, 'looks great, proceed') requires that the absence of information always be distinguishable from information ABOUT absence, that a view which could not be computed never render as a negative result, and that stale content never be shown as current. Its ONLY satisfying requirement, srConsoleViewStatusExplicit, is scoped to 'every view the surface renders' - the HTML console. But CLAUDE.md section 1.8/D0093 make CLI/JSON the authority and the automation substrate, and every violation found this session was on that side: a catalogue that denies 12 processes which exist, a wiredness proxy reporting an unreachable hook as armed, a ratio published without its denominator or its own floor caveat. The answer to 'why are reports out of sync with truth' is therefore not 'add a drift control' but 'an invariant you already signed is scoped to the wrong surface'.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHonestSurfaceEverywhere to issue239;
+
+    part issue240 : Issue {
+        :>> id = "7f2e6774-4daf-4656-b80b-eca4076211dd";
+        :>> title = "The commit gate was disarmed while three shipped surfaces reported it armed - the predicate is a proxy, not the control";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by the panel's mechanisms lens and confirmed directly: core.hooksPath was set to `nul` in .git/config, so git resolved hooks to a nonexistent directory and .githooks/pre-commit, pre-push and pre-merge-commit could not run at all - for an unknown period covering this entire session, during which I repeatedly told the human 'the hook passed'. The substance was in fact checked, because I ran keel validate/guard/gate by hand and CI re-derives on push, but the mechanism I NAMED was dead. Three shipped surfaces asserted otherwise: keel hardening reports the pre-commit point present=true failMode=fail-closed, keel orient printed no hook warning, and keel controls reported uncoveredHazards=[] against ctlCommitGate. Root cause: wiredness is computed as 'git config core.hooksPath returned a non-empty value' - a proxy for reachability rather than reachability. issue116's bypass vector is blocked in the action space and wide open in the detector. hooksPath restored to .githooks; the detector defect is what this issue tracks.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcArmedNotDeclared to issue240;
+
+    part issue241 : Issue {
+        :>> id = "d5671140-539e-4605-ace0-aa92b967c79f";
+        :>> title = "12 of 23 processes cannot be listed, shown or exported - a must-requirement violation that three critiques passed as green";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human asked whether processes are transferable. Measured: 23 process definition files, 11 in the exportable palette; `keel process show intake` and `keel process export intake --out DIR` both exit 2 with 'error: no process intake' while .engine/processes/intake.sysml exists, and `keel process search intake` returns 0 matches. Cause: process_cmd.rs rows() iterates activation::unit_names(), and a unit is formed only when a process declares a guard (activation.rs `if !guards.is_empty()`), so the 12 guard-less processes - intake, definition-of-done, definition-of-ready, adversarial-panel-review, architectural-critique, review-critique, migration, report, indicator, diagram, introduction, obligation-review - are structurally invisible to the portability layer. Those 12 are guard-less by ACCEPTED reasoning (process-enforcement.toml declares them checkable=false with stated reasons), so the exclusion is permanent, not pending. This violates srPortModularProcessUnit, an accepted MUST requirement that a unit carry its definition, deploying skill and rules/guards so it can be moved between projects whole - and it is the un-swept half of issue149, whose disclosure remedy reached activation/activate/deactivate but not the process catalogue. Aggravating: three critiques dated 2026-08-21 passed srPortModularProcessUnit with zero findings, two of them citing a live run of the very command, and tier-satisfaction reports 103/103 verified - a false green inside the verification substrate.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPaletteIsDeclared to issue241;
+
+    part issue242 : Issue {
+        :>> id = "9e95436c-79e7-4194-990c-4b2cb91716e0";
+        :>> title = "A core guard can be demoted to inactive by one line in a guard-less process, and the D0209 adherence gate cannot see it";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by the panel's operations lens, which reproduced it live: adding `assert constraint probe : staleGateProse;` to the guard-less .engine/processes/report.sysml removed stale-gate-prose from the core (never-deactivatable) guard set, made report [INACTIVE] with 1 guard, and turned the guard's run into 'PASS - 0 scanned, 1 warning' with `keel guard stale-gate-prose` reporting 'NOT ACTIVE ... do NOT block'. The mechanism is guard_state: it returns Core only when NO unit claims the guard, so a process claiming a core guard converts it into that process's switchable property - and the CLI's own remediation text ADVISES the edit ('or give it an `assert constraint` so it becomes switchable'). The same class applies to narrowing activation.toml's active list, which disarms every guard the removed process owns. Both are covered by the commit keystone, but D0209 clause 1 exists precisely because a bypassed hook leaves no trace at commit time - and the hook was in fact bypassed (issue240) - while audit-adherence's signature() reads only .engine/rules/ trees. So the control built this session for the issue236 self-modification class has a hole the class walks straight through.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAdherenceCoversActivation to issue242;
+
+    part issue243 : Issue {
+        :>> id = "e930b3da-2faa-437f-a814-24645f807ba4";
+        :>> title = "Every new project inherits this repo's adoption declaration and exchange identities from keel init";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human asked whether a new project is guided to pick its processes. Worse than un-guided: it inherits someone else's choices. keel init scaffolds the embedded .engine verbatim, so a freshly inited tree's .engine/contracts/activation.toml is BYTE-IDENTICAL to the self-build's (verified by diff) - 11 named active processes plus all 32 viewpoints - and `keel activation` in the new tree reports 'declared manifest: yes' for a declaration that project never made. That falsifies CLAUDE.md's own adoption guarantee, that an absent file or section means everything is active so a project that never adopted a control has not violated it: the file is not absent, it is another project's. The new tree also inherits unit-ids.toml, the self-build's EXCHANGE identity for units it never exported. init already special-cases deliverable-manifest.txt to a starter for exactly this reason, so the shape of the fix exists.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcInitContractReset to issue243;
+
+    part issue244 : Issue {
+        :>> id = "fb9cf296-1df6-4486-8bfb-cc98621377ab";
+        :>> title = "80 warnings ride under [guard] ALL PASS unread, including a live recorded-release contradiction";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The panel's reducer named this the drift mechanism with the most evidence, and it is the sharpest answer to the human's question about reports being out of sync with truth. Measured: `keel guard` prints '[guard] ALL PASS' while emitting 80 warnings across 10 guards (actors, ceremony, viewpoint-renderer, manifest-coverage, attestation-substance, decision-requirement-link, sequence-multiplicity, parser-coverage, decision-scaffolding, release-recorded). One of them is itself a shipped, detected, unacted-on report-vs-truth contradiction: 'tag v0.2.0 points at e2c812f but its Release item records commit 425145d - the recorded release and the shipped tag disagree (D0191)'. I read ALL PASS and moved past those warnings repeatedly this session. This is why the panel refused a new drift detector: the engine already detects more than it triages, so another detector makes the felt problem worse. The fix is subtractive - surface the warning population where it is read.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcWarningsAreRead to issue244;
+
+    part issue245 : Issue {
+        :>> id = "d5d642d4-9b74-4094-825a-770ecb104925";
+        :>> title = "keel's elicitation skill is in no catalogue, transferable by nothing, and authors Needs from unrecorded utterances";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human asked whether input is recorded as statements then translated to stories, and said pulling latent needs out of a user is critical for the average user. Two findings, converged on by three lenses. First, the elicitation machinery already EXISTS and is in use: the business-architecture skill runs a design/scoping dialogue Brief->Personas->Needs->UseCases and has produced 11 Briefs, 15 Personas, 69 UseCases and 75 Needs - so a new interview process would be a fourth overlapping surface, not a missing capability. Second, that skill has NO process definition, so it appears in no catalogue (process list, activation, hardening all miss it), is enforced by nothing, and can be exported by nothing - and the process-skill guard is one-directional, requiring every process to have a skill but never every skill to have a process, so no control notices. Compounding: it authors Needs straight out of a conversation whose utterances are never recorded as Statements, which is the mechanical cause of the unsourced population and exactly the D0157 defect (a Need written wider than the demand cannot be checked against what the human actually said). Separately measured: intake has recorded nothing since 2026-08-21 - all 17 Statements are dated 08-20/21 - across four days containing four panels, and the human's own six questions in this session were never intaken.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcElicitationThroughIntake to issue245;
+
+    part issue246 : Issue {
+        :>> id = "2ab1381b-ef8b-45ce-b114-96c47ade67ea";
+        :>> title = "Counts typed into prose drift from the counts the engine computes, with no control between them";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Named independently by four panel lenses as a distinct drift mechanism, and the brief under review committed it twice itself. Live instances: CLAUDE.md and .engine/docs/guards.md both state '45 forward guards' while keel guard runs 48; the shipped activation.toml header still directs readers to .engine/contracts/process-units.toml, a file D0141 deleted with no tombstone, and keel init copies that ghost into every new project; my own brief said 30 skills where there are 37 and cited GitHub issues #1-#6 where the channel threads are #2-#7. This is distinct from two views disagreeing and from an unverifiable prose assertion: it is a number a reader will trust sitting next to a number the engine can compute, with nothing comparing them. hardening.helpCoverage already does exactly this reconciliation for commands (88/88), so the counter-measure is proven and cheap.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcDocCountsReconciled to issue246;
+
 }
