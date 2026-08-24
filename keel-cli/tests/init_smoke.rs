@@ -89,7 +89,16 @@ fn init_scaffolds_a_working_project() {
     );
     assert!(dir.join(".claude").join("output-styles").join("keel.md").is_file(), "output style not scaffolded");
     let skill_dirs = std::fs::read_dir(dir.join(".claude").join("skills")).expect(".claude/skills missing").count();
-    let registry = std::fs::read_to_string(dir.join(".engine").join("skills").join("skills-registry.sysml")).expect("registry");
+    // D0222: a skill declares itself BESIDE itself now, so the registry is every `.sysml` under
+    // `.engine/skills/` rather than the central file alone. This was the FIFTH reader of that one
+    // fact and the last to be found - the four before it were fixed as each broke, which is why the
+    // D0067 migration process should require enumerating a shared fact's readers in the dry run.
+    let mut registry = String::new();
+    for e in walkdir(&dir.join(".engine").join("skills")) {
+        if e.extension().and_then(|x| x.to_str()) == Some("sysml") {
+            registry.push_str(&std::fs::read_to_string(&e).unwrap_or_default());
+        }
+    }
     assert_eq!(skill_dirs, registry.matches(":>> location = ").count(), "skills scaffolded != registry count (P0.1)");
     let profile = std::fs::read_to_string(dir.join(".engine").join("contracts").join("adoption-profile.toml"))
         .expect("adoption profile fact not recorded");
@@ -122,4 +131,20 @@ fn init_scaffolds_a_working_project() {
     // 5. re-init refuses to overwrite (exit 2, non-success) — never clobbers existing work.
     let out = keel().args(["init", proj]).output().expect("run keel init again");
     assert!(!out.status.success(), "re-init should refuse to overwrite an existing .engine/");
+}
+
+/// Every file under `dir`, recursively. The registry is a DIRECTORY since D0222, so the count this
+/// test asserts has to walk it rather than read one path.
+fn walkdir(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(walkdir(&p));
+        } else {
+            out.push(p);
+        }
+    }
+    out
 }

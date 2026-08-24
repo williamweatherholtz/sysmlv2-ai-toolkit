@@ -837,10 +837,14 @@ fn audit(root: &Path) -> i32 {
         //    per-skill registry files cited the migration transform that produced them.
         for f in unit_files(root, r) {
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
-            // A DIRECTORY convention ("write a codemod under .engine/tools/migrations/") is not a
-            // dead reference - the adopter creates it. Only a named FILE is. This check over-flagged
-            // migration.sysml on its first run and was narrowed against the real corpus, the same
-            // way the doc-count guard was: a check that fires on true prose gets bypassed.
+            // Narrowed THREE times, each against the real corpus - and the third correction came
+            // from a test rather than from me. (1) A DIRECTORY convention ("write a codemod under
+            // .engine/tools/migrations/") is not a dead reference; the adopter creates it. (2) A
+            // PLACEHOLDER ("<script>.py") documents a convention. (3) Two tools under .engine/tools/
+            // ARE deliberately shipped (D0171), so the ship rule is `migrate::is_engine_dev_only`
+            // and NOT "anything under tools/" - my first premise was simply wrong, and asking the
+            // authority instead of restating it is the fix. A check that fires on a path that WOULD
+            // resolve is a check that gets bypassed.
             let cites_a_tool_file = text
                 .split(".engine/tools/")
                 .skip(1)
@@ -850,7 +854,13 @@ fn audit(root: &Path) -> i32 {
                     // A PLACEHOLDER (`<script>.py`) documents a convention; it is not a reference to
                     // a file that must exist. Narrowed twice now against the real corpus - first for
                     // directory conventions, then for placeholders.
-                    !p.contains('<') && !p.contains('>') && std::path::Path::new(p).extension().is_some()
+                    if p.contains('<') || p.contains('>') {
+                        return false;
+                    }
+                    let path = std::path::Path::new(p);
+                    // Ask the ship rule, never guess it.
+                    path.extension().is_some()
+                        && crate::migrate::is_engine_dev_only(std::path::Path::new(&format!("tools/{p}")))
                 });
             if cites_a_tool_file {
                 let rel = f.strip_prefix(root).unwrap_or(&f).to_string_lossy().replace('\\', "/");
