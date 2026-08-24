@@ -3237,6 +3237,7 @@ const CATALOGUE: &[&str] = &[
     "  ls [ROOT]                    list .tracking/ .sysml files",
     "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
     "  whats-next [ROOT]            print ready task names (one per line)",
+    "  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass (D0209 clause 3)",
     "  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)",
     "  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)",
     "  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)",
