@@ -13,6 +13,7 @@ awaiting the human's letter.
 """
 import json
 import os
+import re
 import subprocess
 
 
@@ -23,6 +24,53 @@ def gh(args, check=False):
 def queue_auto(name: str, number: str, url: str) -> None:
     with open("auto_queue.txt", "a", encoding="utf-8") as f:
         f.write(name + "\t" + number + "\t" + url + "\n")
+
+
+# D0205's number: decisions from here on are governed by the GitHub channel and must each have an
+# override-thread issue, however they were accepted (issue238: a local-console/API accept bypassed
+# the channel and left D0207/D0209 with no override surface). The guarantee is enforced here.
+CHANNEL_FROM = 205
+
+
+def ensure_override_threads() -> None:
+    """issue238 control: every ACCEPTED decision numbered >= CHANNEL_FROM has a GitHub override
+    thread, regardless of acceptance path. A local/API accept that skipped the channel gets its
+    thread opened-and-closed here, so the override surface always exists (D0205/D0207)."""
+    allcards = json.loads(_all_cards() or '{"cards":[]}').get("cards", [])
+    for c in allcards:
+        # A TRUE decision card is named d + exactly four digits (d0205); acceptance/defer record
+        # cards carry a suffix (d0205AcceptR1) and are NOT decisions - skip them.
+        m = re.fullmatch(r"d(\d{4})", c["name"])
+        if not m:
+            continue
+        num = int(m.group(1))
+        if c["status"] != "accepted" or num < CHANNEL_FROM:
+            continue
+        search = f"keel-decision-{c['name']} in:body"
+        if json.loads(gh(["issue", "list", "--state", "all", "--label", "decision",
+                          "--search", search, "--json", "number"]).stdout or "[]"):
+            continue  # already has a thread (open or closed)
+        body = (
+            f"<!-- keel-decision: {c['name']} -->\n\n"
+            f"**Why it came up:** {c['context']}\n\n"
+            f"**What is being decided:** {c['decision']}\n\n---\n"
+            "**Status: ACCEPTED** before this override thread existed (a channel-bypass, issue238). "
+            "This issue is your override surface: reply `reject <why>` here anytime to reverse."
+        )
+        with open("body.md", "w", encoding="utf-8") as f:
+            f.write(body)
+        created = gh(["issue", "create", "--title", c["title"], "--body-file", "body.md",
+                      "--label", "decision", "--assignee", os.environ["REPO_OWNER"]], check=True)
+        url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
+        if url.startswith("http"):
+            gh(["issue", "close", url, "--reason", "completed",
+                "--comment", "Accepted before this thread existed (issue238); open as your override surface."])
+            print(f"{c['name']} override thread opened (bypass backfill): {url}")
+
+
+def _all_cards() -> str:
+    return subprocess.run(["./target/release/keel", "decision-card"],
+                          capture_output=True, text=True, check=False).stdout
 
 
 def main() -> None:
@@ -71,6 +119,7 @@ def main() -> None:
         if not c["options"] and number:
             queue_auto(c["name"], number, url)
             print(f"{c['name']} queued for auto-accept (new issue)")
+    ensure_override_threads()  # issue238: guarantee an override thread for every post-channel accepted decision
 
 
 if __name__ == "__main__":

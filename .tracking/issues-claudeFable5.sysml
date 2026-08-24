@@ -269,4 +269,16 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcDanglingResultAtGate to issue237;
+
+    part issue238 : Issue {
+        :>> id = "c1263af4-f7ed-4c81-b28b-9ce399d88a90";
+        :>> title = "A decision accepted before its push bypasses the githubChannel - the human loses the override surface";
+        :>> createdAt = "2026-08-23";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Caught by the human: I told them D0209 was overridable 'on its GitHub issue' but no issue existed. D0205's githubChannel (open_decision_issues.py) opens an override-thread issue only for PROPOSED decisions. When a decision is accepted locally (serve API / keel accept) before it is pushed, it is already 'accepted' the moment the workflow runs, so the proposed-only opener skips it and never creates the override thread. Confirmed: d0205=1 issue, d0206=1, d0207=0, d0208=1, d0209=0 - the two I had accepted locally were exactly the two with no override surface. The channel D0205 built to give the human a standing override could be silently bypassed by my own acceptance path. Manually opened #4 (D0207) and #5 (D0209) as the immediate remediation; the durable control is dcOverrideThreadEveryAccept.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcOverrideThreadEveryAccept to issue238;
+
 }
