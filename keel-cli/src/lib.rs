@@ -32,6 +32,7 @@ pub mod verification;
 pub mod schema;
 pub mod history;
 pub mod adherence;
+pub mod cursor;
 pub mod claim;
 pub mod deck;
 pub mod launcher;

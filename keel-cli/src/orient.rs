@@ -370,7 +370,9 @@ fn criterion_suspects(
 // ── classification ────────────────────────────────────────────────────────────
 
 /// Canonical ceremony gate order (mirrors `query.py` `read_sprint_ceremony_status` + D0047).
-const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+/// `pub(crate)` so the process-cursor (`keel advance`, D0209 clause 3) reads the SAME sequence —
+/// one source of the step order, never a third copy.
+pub(crate) const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
 
 /// Compute in-progress sprint ceremony status from `.tracking/delivery/*.sysml`
 /// (D0045: replaces the `StateCursor`). A sprint is in-progress if at least one gate

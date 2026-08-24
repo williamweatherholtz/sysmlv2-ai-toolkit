@@ -5,6 +5,8 @@
 //!   `check FILE...`           — parse-check one or more `.sysml` files
 //!   `orient [ROOT]`           — print orient state (cursor + ready/done/outstanding) as JSON
 //!   `whats-next [ROOT]`       — print ready task names, one per line
+//!   `advance <sprint> [--to G]` — process cursor: the sprint's current ceremony step; `--to` is
+//!                               refused until every earlier step's verify-Test passes (D0209 clause 3)
 //!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
 //!   `append-gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
 //!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
@@ -3470,6 +3472,7 @@ fn main() {
         Some("verification") => keel_cli::verification::cmd(rest, &repo_arg(rest)),
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("decisions") => cmd_decisions(rest),

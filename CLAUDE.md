@@ -53,6 +53,8 @@ Don't restate those rules here: one canonical home per fact (D0105).
 ```
 keel orient [ROOT]        # in-progress sprints + ready/suspect frontier + non-blocking burndown
 keel whats-next [ROOT]    # the ready list, in PRIORITY order (declaration order IS priority, D0052)
+keel advance <sprint>     # the process cursor: the sprint's current ceremony step (D0209 clause 3)
+keel advance <sprint> --to <Gate>   # forward gate: refused until every earlier step's verify-Test passes
 ```
 
 The AI **auto-follows** the ranked frontier (D0052). Do not ask which ready item to work. Pause only for
