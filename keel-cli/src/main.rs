@@ -2620,6 +2620,46 @@ fn cmd_apply_review(args: &[String]) -> i32 {
 // project would differ from a freshly inited one. One definition, both callers.
 use keel_cli::migrate::{is_engine_dev_only, remap_engine_path};
 
+/// The `.engine/contracts/` files that are THIS project's instance data rather than engine definition
+/// (issue243). `keel init` must reset these, not copy them: an adoption declaration and a set of
+/// exchange identities belong to the project that made them.
+fn is_instance_contract(rel: &Path) -> bool {
+    matches!(
+        rel.to_string_lossy().replace('\\', "/").as_str(),
+        "contracts/activation.toml" | "contracts/unit-ids.toml" | "contracts/installed-units.toml"
+    )
+}
+
+/// The starter content for a reset instance contract. `activation.toml` gets a commented-out template
+/// so the honest default (absent section = everything active, D0138) is what a fresh project HAS,
+/// while still showing how to declare a subset. The id registries start genuinely empty: an identity
+/// is minted on first export, never inherited.
+fn starter_for(rel: &Path) -> &'static str {
+    if rel.to_string_lossy().replace('\\', "/") == "contracts/activation.toml" {
+        return "# Process activation (D0138) - which processes THIS project has adopted.
+#
+# NO SECTION BELOW MEANS EVERYTHING IS ACTIVE, which is the honest default for a new project: a
+# project that never adopted a control has not violated it (issue090). Declare a subset only when
+# you have actually chosen one - `keel activate <process>` / `keel deactivate <process>` write it
+# for you, and `keel process list` shows what there is to choose from.
+#
+# CORE guards (identity, provenance, vocabulary, well-formedness) are in no unit and CANNOT be
+# deactivated. Activation stops enforcing procedures you have not adopted; it does not make
+# truthfulness optional.
+#
+# [processes]
+# active = [\"agile-workflow\"]
+#
+# [viewpoints]
+# active = [\"orientVP\"]
+";
+    }
+    "# Process-unit identity registry (D0183): a unit's id is its EXCHANGE identity - stable across
+# exports, matched by `import --update`. Minted on THIS project's first export; never inherited,
+# because an inherited id claims a lineage this project does not have (issue243).
+"
+}
+
 fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
     let rel = f.path();
     if is_engine_dev_only(rel) {
@@ -2633,6 +2673,16 @@ fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) 
     // to a starter so a fresh project passes manifest-coverage (D0093 engine/instance boundary).
     if rel == Path::new("deliverable-manifest.txt") {
         std::fs::write(&dst, STARTER_MANIFEST)?;
+    } else if is_instance_contract(rel) {
+        // issue243: these three contracts are THIS project's instance data, not engine definition, and
+        // shipping them verbatim made every new project inherit the self-build's choices. A fresh tree
+        // reported `declared manifest: yes` for an adoption declaration it never made — falsifying
+        // CLAUDE.md's own guarantee that an absent file means everything is active, so a project that
+        // never adopted a control has not violated it. The file was not absent; it was someone else's.
+        // unit-ids/installed-units are worse than misleading: they are the self-build's EXCHANGE
+        // IDENTITIES for units the new project never exported, so an `import --update` could match
+        // against a lineage that is not its own. Reset to a starter, exactly as the manifest already is.
+        std::fs::write(&dst, starter_for(rel))?;
     } else {
         std::fs::write(&dst, f.contents())?;
     }
@@ -3705,5 +3755,36 @@ mod tests {
         assert!(super::CLAUDE_MD.contains("tracked by keel"), "init CLAUDE.md must frame the project as tracked BY keel");
         assert!(!super::CLAUDE_MD.contains("is a work-tracking engine"), "init must NOT ship the self-build CLAUDE.md");
         assert!(super::CLAUDE_MD.contains("Parsed:"), "downstream CLAUDE.md must carry the D0106 parse-first discipline");
+    }
+
+    /// THE CONTROL for issue243: `keel init` must not ship THIS project's instance data as if it were
+    /// engine definition. A fresh tree inherited a byte-identical activation.toml, so it reported
+    /// `declared manifest: yes` for an adoption declaration it never made - falsifying the guarantee
+    /// that an absent manifest means everything is active - and inherited the self-build's EXCHANGE
+    /// IDENTITIES for units it never exported.
+    #[test]
+    fn init_resets_instance_contracts_and_keeps_engine_definition() {
+        use std::path::Path;
+        for p in ["contracts/activation.toml", "contracts/unit-ids.toml", "contracts/installed-units.toml"] {
+            assert!(super::is_instance_contract(Path::new(p)), "{p} is instance data and must be reset");
+        }
+        // Engine DEFINITION must still be copied verbatim.
+        for p in ["contracts/process-enforcement.toml", "processes/intake.sysml", "rules/rules.sysml"] {
+            assert!(!super::is_instance_contract(Path::new(p)), "{p} is engine definition and must be shipped as-is");
+        }
+        // The activation starter must leave the honest default IN FORCE, i.e. no live [processes]
+        // section - a commented template is guidance, an uncommented one is a declaration.
+        let starter = super::starter_for(Path::new("contracts/activation.toml"));
+        for line in starter.lines() {
+            let l = line.trim();
+            assert!(
+                l.is_empty() || l.starts_with('#'),
+                "the activation starter must declare NOTHING; found a live line: {l}"
+            );
+        }
+        // The id registries start genuinely empty: no `name = "uuid"` entry may be inherited.
+        let ids = super::starter_for(Path::new("contracts/unit-ids.toml"));
+        assert!(!ids.lines().any(|l| !l.trim_start().starts_with('#') && l.contains('=')),
+            "an inherited unit id claims a lineage this project does not have");
     }
 }
