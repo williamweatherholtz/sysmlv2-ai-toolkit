@@ -418,4 +418,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcNoFalseCleanRange to issue250;
 
+
+    part issue251 : Issue {
+        :>> id = "401a8361-8e26-444c-84da-3b3933da5553";
+        :>> title = "The decision channel could not be adopted: it left its mechanism behind and welded one project identity into it";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Raised by the human asking to activate the GitHub decision channel on asirobots/penumbra, with the constraint: do not force me to be owner of every new project, be modular and careful. FOUR defects, three of which would have broken or misfired on the FIRST adoption rather than degrading. (1) TRANSFER: keel process export decision-channel produced three files - definition, skill, unit.toml - while the five that ARE the channel (two workflows, two scripts, the decider table) stayed home; the guard travelled BY NAME and the machinery not at all. That violates srPortModularProcessUnit, an accepted MUST that a unit move without leaving its enforcement behind, and is the same class as issue241 and issue245. (2) OWNER-AS-PERSON: the issue opener assigned to github.repository_owner, which is not a person - for asirobots/penumbra it is an ORG and gh issue create --assignee <org> fails outright. (3) IDENTITY IN SOURCE: the decider login was a literal in decision-record.yml in three places, so every adopting project had to edit the workflow, forking the mechanism and touching its own frozen enforcement surface. (4) WORST, found only by a round-trip test: keel init shipped this project github-actors.toml verbatim, so every new project silently inherited MY login as its authorized decider and would have recorded acceptances in my name - the issue243 class landing on the single most consequential instance fact in the tree. TWO FURTHER BUGS surfaced by the round trip, both of which had been REPORTING SUCCESS: export derived destinations by stripping .engine, and for a file outside .engine the strip failed so the absolute-path fallback made join discard the base, making it copy the file onto itself; and the --update loop had its own .engine-join, writing .github/workflows/x.yml into .engine/.github/workflows/x.yml - inert, in the wrong place - while printing 6 file(s) from upstream.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcChannelUnitTravels to issue251;
+
 }
