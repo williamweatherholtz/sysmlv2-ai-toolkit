@@ -1310,7 +1310,24 @@ fn cmd_guard(args: &[String]) -> i32 {
             r.print();
             all_ok &= r.ok();
         }
-        println!("[guard] {}", if all_ok { "ALL PASS" } else { "FAILED" });
+        // issue244: the verdict used to be the bare word ALL PASS while 80 warnings scrolled above
+        // it, including a live recorded-release contradiction that had shipped unread. Detected-but-
+        // unread is this repo's highest-frequency drift mechanism, and it grows with every control
+        // added — so the SUBTRACTIVE fix is to state the warning population where the verdict is
+        // read, rather than build another detector for what was already detected.
+        let warned: Vec<&str> =
+            reports.iter().filter(|r| !r.warnings.is_empty()).map(|r| r.name).collect();
+        let total: usize = reports.iter().map(|r| r.warnings.len()).sum();
+        let tail = if total == 0 {
+            String::new()
+        } else {
+            format!(
+                " — {total} warning(s) across {} guard(s), NOT violations and NOT blocking, but UNREAD until someone reads them: {}",
+                warned.len(),
+                warned.join(", ")
+            )
+        };
+        println!("[guard] {}{tail}", if all_ok { "ALL PASS" } else { "FAILED" });
         return i32::from(!all_ok);
     };
     let Some(report) = keel_cli::guards::run_one(name, &root) else {

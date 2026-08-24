@@ -2349,10 +2349,28 @@ pub fn release_recorded(root: &Path) -> GuardReport {
         .filter(|l| l.starts_with('v') && l[1..].starts_with(|c: char| c.is_ascii_digit()))
         .map(str::to_string)
         .collect();
-    // Every authored Release block: (declaring file, title, commit).
-    let mut releases: Vec<(String, String)> = Vec::new(); // (title, commit)
+    // issue244/D0214: a Release carrying an inbound `#Supersede` edge is RETIRED, exactly as the
+    // sibling views already treat superseded Needs (issue088), requirements (issue127) and tasks
+    // (issue100). Without this, a correction made through the engine's OWN sanctioned mechanism -
+    // and the only one available to a non-owner (D0108) - could never clear the warning, so the
+    // warning was unresolvable by construction and therefore permanent noise.
+    let mut superseded: std::collections::HashSet<String> = std::collections::HashSet::new();
     for f in crate::collect_sysml(&root.join(".tracking")) {
         let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        for line in text.lines() {
+            let l = line.trim_start();
+            if let Some(rest) = l.strip_prefix("#Supersede dependency from ") {
+                if let Some((_, to)) = rest.split_once(" to ") {
+                    superseded.insert(to.trim().trim_end_matches(';').trim().to_string());
+                }
+            }
+        }
+    }
+    // Every authored Release block: (name, title, commit).
+    let mut releases: Vec<(String, String, String)> = Vec::new(); // (name, title, commit)
+    for f in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let mut name = String::new();
         let mut title = String::new();
         let mut commit = String::new();
         let mut in_release = false;
@@ -2360,6 +2378,7 @@ pub fn release_recorded(root: &Path) -> GuardReport {
             let l = line.trim_start();
             if l.starts_with("part ") && l.contains(": Release {") {
                 in_release = true;
+                name = l.trim_start_matches("part ").split_whitespace().next().unwrap_or("").to_string();
                 title.clear();
                 commit.clear();
             }
@@ -2372,14 +2391,16 @@ pub fn release_recorded(root: &Path) -> GuardReport {
                 }
                 if l.trim_end() == "}" {
                     in_release = false;
-                    releases.push((title.clone(), commit.clone()));
+                    releases.push((name.clone(), title.clone(), commit.clone()));
                 }
             }
         }
     }
     let mut warnings = Vec::new();
     for tag in &tags {
-        let Some((_, recorded)) = releases.iter().find(|(title, _)| title.contains(tag.as_str())) else {
+        let Some((_, _, recorded)) =
+            releases.iter().filter(|(n, _, _)| !superseded.contains(n)).find(|(_, title, _)| title.contains(tag.as_str()))
+        else {
             warnings.push(format!(
                 "tag `{tag}` has NO Release item naming it — what shipped is not an authored fact (D0191; record it in .tracking/baselines.sysml)"
             ));

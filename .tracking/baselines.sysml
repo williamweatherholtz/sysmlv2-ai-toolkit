@@ -23,6 +23,23 @@ package ProjectBaselines {
         :>> purpose = "First release since v0.1.0 (six weeks stale) and the first real run of the DEFINED-but-never-run Deploy workflow. Adds: the D0129 distributed-collaboration model (ancestry-preserving integration, per-machine actor identity that REFUSES rather than defaulting, CSPRNG ids, a portable gate); in-loop governance (the response contract in the system prompt, plus turn-boundary and per-edit gates in the binary, D0130/D0134); and the guard set 17 -> 23 (18 hard, 5 warning-only) including duplicate-identity, marker-vocabulary, attestation-substance, verification-trace, priority-inversion and retro-backlog. BREAKING for callers: write paths now refuse when the acting actor is unstated (D0129) — bind with `keel actor set`, KEEL_ACTOR, or an explicit flag. NOT included: process import/export/activation (nProcessPortability unbuilt — `keel init` remains all-or-nothing).";
     }
 
+    // issue244 TRIAGE: release020 records commit 425145d, but tag `v0.2.0` points at e2c812f - the
+    // release-recorded guard has WARNED about this disagreement, shipped and unread, for days. The
+    // facts, established from git: 425145d IS an ancestor of the tag, two commits back, so the record
+    // was TRUE WHEN WRITTEN and the tag was cut later. The tag is what shipped and is published, so it
+    // must not move (D0129: never rewrite history). release020 is owned by another actor, so a
+    // non-owner corrects it by SUPERSEDING rather than editing its fields (D0108/D0129). This records
+    // the SHIPPED commit; release020 stays readable as what was intended at authoring time.
+    part release020Shipped : Release {
+        :>> id = "bc938157-77ef-40c3-9aa8-37561b0e31a6";
+        :>> title = "v0.2.0 (as shipped) — the commit the published tag actually points at";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> commit = "e2c812f";
+        :>> purpose = "Supersedes release020's commit field ONLY. Same release, same contents; the recorded commit was authored two commits before the tag was cut, so it named the intended commit rather than the shipped one. Recorded because the release-recorded guard correctly flagged the disagreement and a warning that is merely true is not resolved - it is unread. NOTE for a reader who follows the tag: e2c812f carries a garbage commit MESSAGE (a captured pre-commit hook log was used as the message), which is a separate cosmetic defect in history that must not be rewritten.";
+    }
+    #Supersede dependency from release020Shipped to release020;
+
     // v0.2.1 — patch: unblock downstream projects blocked by the D0133 regression (issue089/D0136).
     part release021 : Release {
         :>> id = "0d790001-0814-5901-9b3e-000000290001";
