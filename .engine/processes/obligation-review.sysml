@@ -9,7 +9,7 @@ package ProcessObligationReview {
     action obligationReview : Process {
         :>> id = "8f21c4d0-6b53-4e97-a018-53ca27be9f16";
         :>> title = "Obligation Review";
-        :>> purpose = "Put what is waiting on the human in front of them where they actually are, and take their judgment back as recorded facts with no copy step. Deploys `keel deck` (keel-cli/src/deck.rs), .engine/tools/test_deck_e2e.py, and .engine/tools/deck_inbox_record.py.";
+        :>> purpose = "Put what is waiting on the human in front of them where they actually are, and take their judgment back as recorded facts with no copy step. Deploys `keel deck` (keel-cli/src/deck.rs). The Smartsheet tap-inbox tooling it used to name was RETIRED by D0206, and engine-dev-only tools never ship to an adopting project (init excludes .engine/tools/), so naming them here left a dead reference in every adopter (D0222).";
         :>> cadence = Cadence::eventDriven;  // a sitting opening, or the turn-boundary hook noticing a queue
     }
 
@@ -44,7 +44,7 @@ package ProcessObligationReview {
         :>> id = "8f21c4d0-6b53-4e97-a018-000000000o04";
         :>> title = "Turn each judgment into a recorded fact through the write API";
         :>> triggerCondition = "The human has judged one or more items.";
-        :>> actionText = "Local taps record themselves. Inbox rows are pulled by the SESSION (only it holds connector access): get_sheet_summary with Processed=false, then .engine/tools/deck_inbox_record.py, which records each row through the write API and VERIFIES it from the computed view; only verified rows are marked Processed, and duplicate deliveries dedup by latest-At per (uid, kind). Their note is recorded verbatim, never paraphrased. NEVER infer a verdict from silence, and never record a signature the deck did not carry - an untouched card is an untouched card.";
+        :>> actionText = "Local taps record themselves. Inbox rows are pulled by the SESSION (only it holds connector access): get_sheet_summary with Processed=false, then recorded through the write API (the Smartsheet tap-inbox was RETIRED by D0206; the GitHub decision-channel carries this now) and VERIFIES it from the computed view; only verified rows are marked Processed, and duplicate deliveries dedup by latest-At per (uid, kind). Their note is recorded verbatim, never paraphrased. NEVER infer a verdict from silence, and never record a signature the deck did not carry - an untouched card is an untouched card.";
         :>> producedArtifact = "Recorded facts with provenance, and a queue that shrinks.";
         :>> owner = Owner::ai;
     }

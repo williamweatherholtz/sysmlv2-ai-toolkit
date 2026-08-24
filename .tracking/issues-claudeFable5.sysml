@@ -442,4 +442,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcSkillRegistersBesideItself to issue252;
 
+
+    part issue253 : Issue {
+        :>> id = "8735fd75-aae9-4d2d-9f0e-211ef3b07a70";
+        :>> title = "23 of 24 units would have landed RED in any project adopting them - and nothing computed that";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Raised by the human asking for a final transferability pass BEFORE migrating to penumbra: fix keel first, I want a good transition. Twice in the preceding hours a unit had been DECLARED transferable and was not - the decision-channel left its whole mechanism behind (issue251), then left behind the declaration binding skill to process (issue252) - and both were found by ACTUALLY ADOPTING, never by reading the export. Computing the answer rather than reading it showed 23 of 24 units would land RED: each carried its process definition and its SKILL.md while the entry BINDING them stayed in the single shared skills-registry, which cannot travel with one unit, so any adoption into a project lacking that process failed process-skill on arrival. Two further hazards surfaced only by adopting into a simulated older project: an incoming per-skill declaration DUPLICATES a central one still present there, failing duplicate-identity - which is penumbra exactly - and a carried file citing .engine/tools/ leaves a dead reference because init never ships engine-dev-only tooling, including one process still naming the Smartsheet tap-inbox that D0206 RETIRED. FIX (D0222): keel process audit makes transferability a computation any project can reproduce; a committed transform moves all 36 declarations beside their skills; import retires a superseded central declaration and says so; the stale references are swept.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcTransferabilityIsComputed to issue253;
+
 }

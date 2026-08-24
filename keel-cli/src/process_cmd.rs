@@ -112,6 +112,85 @@ fn extract_rule_block(root: &Path, rule: &str) -> Option<String> {
     None
 }
 
+/// Retire a central skills-registry declaration that an incoming per-skill file SUPERSEDES (D0222).
+///
+/// FOUND BY ADOPTING, not by reading. A project inited before the per-skill migration still declares
+/// the skill in the shared `.engine/skills/skills-registry.sysml`. Importing a unit that carries its
+/// own `registry.sysml` then puts the SAME id in two files and `duplicate-identity` fails in the
+/// receiving project — so the unit travelled whole and still landed red, for a different reason than
+/// issue252. Every project on an older engine, penumbra included, would have hit this.
+///
+/// The resolution is a REMOVAL of an exact-id duplicate, which is deterministic: there is no question
+/// what to delete or how to merge. That is why this writes to a shared file where `import` otherwise
+/// refuses to — appending content could conflict, but retiring a superseded duplicate cannot. It is
+/// announced on stdout rather than done silently, because an import that edits a file the importer
+/// did not name must say so.
+///
+/// Returns the names it retired.
+fn retire_superseded_central(root: &Path, incoming_ids: &[String]) -> Vec<String> {
+    let central_path = root.join(".engine/skills/skills-registry.sysml");
+    let Ok(mut text) = std::fs::read_to_string(&central_path) else { return Vec::new() };
+    let mut retired = Vec::new();
+    for id in incoming_ids {
+        // The block declaring this id, brace-matched from its `part` head.
+        let Some(idpos) = text.find(&format!("\"{id}\"")) else { continue };
+        let Some(head) = text[..idpos].rfind("    part ") else { continue };
+        let Some(open_rel) = text[head..].find('{') else { continue };
+        let open = head + open_rel;
+        let mut depth = 0usize;
+        let mut end = None;
+        for (i, c) in text[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = Some(open + i + 1);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(end) = end else { continue };
+        let name = text[head..open]
+            .trim_start()
+            .trim_start_matches("part ")
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string();
+        text = format!("{}{}", &text[..head], &text[end..]);
+        retired.push(name);
+    }
+    if !retired.is_empty() {
+        let _ = std::fs::write(&central_path, text);
+    }
+    retired
+}
+
+/// The element ids a bundle's per-skill registry files declare — what might already be declared
+/// centrally in the receiving project.
+fn incoming_registry_ids(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for entry in walk(dir) {
+        if entry.file_name().and_then(|n| n.to_str()) != Some("registry.sysml") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&entry) else { continue };
+        for line in text.lines() {
+            if let Some(rest) = line.trim().strip_prefix(":>> id = \"") {
+                if let Some(id) = rest.split('"').next() {
+                    if !id.is_empty() {
+                        out.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Where a bundle entry is RESTORED in the receiving project (D0219) — the inverse of `bundle_rel`.
 ///
 /// A first component starting with `.` is a REPO-relative extra (`.github/workflows/...`) and lands
@@ -599,6 +678,11 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
                 hashes.push((rel.to_string_lossy().replace('\\', "/"), file_hash(&dst)));
             }
         }
+        // D0222: an incoming per-skill registry file SUPERSEDES a central declaration of the same
+        // id. Retire it, or duplicate-identity fails in this project and the unit lands red.
+        for n in retire_superseded_central(root, &incoming_registry_ids(&dir)) {
+            println!("  retired the superseded central skills-registry declaration for `{n}` (D0222)");
+        }
         if unit_id.is_empty() {
             eprintln!("note: pre-D0183 unit (no unitId) — no install record; a future --update will need --assume-local-base");
         } else if let Err(e) = write_install_record(root, &unit_id, &name, version, &hashes) {
@@ -679,6 +763,9 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
         }
         return 1;
     }
+    for n in retire_superseded_central(root, &incoming_registry_ids(&dir)) {
+        println!("  retired the superseded central skills-registry declaration for `{n}` (D0222)");
+    }
     if let Err(e) = write_install_record(root, &unit_id, &name, version, &hashes) {
         eprintln!("warning: install record not refreshed: {e}");
     }
@@ -691,8 +778,117 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
 
 /// `keel process <list|search|show|export|import>`.
 #[must_use]
+/// `keel process audit` — would each unit land GREEN in a project that does not already have it?
+/// (D0222, after issue252.)
+///
+/// WHY THIS IS COMPUTED RATHER THAN INSPECTED. Twice in one session a unit was declared
+/// transferable and was not: the decision-channel unit left its whole mechanism behind (issue251),
+/// and then left behind the registry entry binding skill to process, so `process-skill` FAILED in
+/// the receiving project on its first run (issue252). Both were found by ACTUALLY adopting, not by
+/// reading the export. A portability claim nobody can re-derive is exactly the class this engine
+/// exists to kill, so the claim is now a computation any project can run before it promises
+/// anything.
+///
+/// The audit answers ONE question per unit: if a project that lacks this process imports it, does
+/// its gate stay green? It reports the reason when the answer is no, and never guesses — every
+/// check reads the tree.
+fn audit(root: &Path) -> i32 {
+    let rows = rows(root);
+    let central =
+        std::fs::read_to_string(root.join(".engine/skills/skills-registry.sysml")).unwrap_or_default();
+    let mut red = 0u32;
+    println!("process audit: would each unit land GREEN in a project that lacks it? (D0222)");
+    println!("  a unit TRAVELS WHOLE when it carries its definition, its deploying skill, and the");
+    println!("  declaration binding them - plus every extra it declares. Anything else lands red.");
+    println!();
+    for r in &rows {
+        let mut problems: Vec<String> = Vec::new();
+        // 1. A deploying skill at all: a process nothing deploys is inert (D0059), and the receiving
+        //    project's process-skill fails on arrival.
+        if r.skills.is_empty() {
+            problems.push("no deploying skill - process-skill fails on arrival (D0059)".to_string());
+        }
+        // 2. The declaration BINDING skill to process must travel. issue252: by default it lives in
+        //    the shared central registry, and a shared file cannot travel with one unit.
+        for s in &r.skills {
+            if root.join(".engine/skills").join(s).join("registry.sysml").exists() {
+                continue;
+            }
+            if central.contains(&format!(".engine/processes/{}.sysml", r.name)) {
+                problems.push(format!(
+                    "skill `{s}` is declared ONLY in the central skills-registry, which cannot travel - the receiving project's process-skill goes RED (issue252). Move the entry to .engine/skills/{s}/registry.sysml"
+                ));
+            } else {
+                problems.push(format!("skill `{s}` has no registry declaration anywhere"));
+            }
+        }
+        // 3. A declared extra that is absent on disk would travel silently missing.
+        let (extras, requires) = unit_extras(root, &r.name);
+        for x in &extras {
+            if !root.join(x).exists() {
+                problems.push(format!(
+                    "declared extra `{x}` is absent on disk - it would travel silently missing"
+                ));
+            }
+        }
+        // 4. A carried file must not cite a path the adopter will not have. `.engine/tools/` is
+        //    engine-dev-only and `init` never ships it, so a travelling file referencing it is a dead
+        //    reference in THEIR tree - tool-reference then fails on arrival. Found the hard way: the
+        //    per-skill registry files cited the migration transform that produced them.
+        for f in unit_files(root, r) {
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            // A DIRECTORY convention ("write a codemod under .engine/tools/migrations/") is not a
+            // dead reference - the adopter creates it. Only a named FILE is. This check over-flagged
+            // migration.sysml on its first run and was narrowed against the real corpus, the same
+            // way the doc-count guard was: a check that fires on true prose gets bypassed.
+            let cites_a_tool_file = text
+                .split(".engine/tools/")
+                .skip(1)
+                .filter_map(|rest| rest.split_whitespace().next())
+                .any(|p| {
+                    let p = p.trim_end_matches([',', '.', ')', '`', '"', ';']);
+                    // A PLACEHOLDER (`<script>.py`) documents a convention; it is not a reference to
+                    // a file that must exist. Narrowed twice now against the real corpus - first for
+                    // directory conventions, then for placeholders.
+                    !p.contains('<') && !p.contains('>') && std::path::Path::new(p).extension().is_some()
+                });
+            if cites_a_tool_file {
+                let rel = f.strip_prefix(root).unwrap_or(&f).to_string_lossy().replace('\\', "/");
+                problems.push(format!(
+                    "carried file `{rel}` cites `.engine/tools/`, which init never ships - a dead reference in the adopter's tree (tool-reference fails on arrival)"
+                ));
+            }
+        }
+        let verdict = if problems.is_empty() { "TRAVELS-WHOLE" } else { "LANDS-RED" };
+        if !problems.is_empty() {
+            red += 1;
+        }
+        let prereq = if requires.is_empty() {
+            String::new()
+        } else {
+            format!(", {} stated prerequisite(s)", requires.len())
+        };
+        println!("  [{verdict}] {}  ({} file(s){prereq})", r.name, unit_files(root, r).len());
+        for p in &problems {
+            println!("      - {p}");
+        }
+    }
+    println!();
+    if red == 0 {
+        println!("process audit: every unit travels whole.");
+    } else {
+        println!(
+            "process audit: {red} of {} unit(s) would land RED in a project that lacks them.",
+            rows.len()
+        );
+        println!("  A REPORT, not a gate: a project may legitimately hold units it never exports.");
+    }
+    0
+}
+
 pub fn cmd(args: &[String], root: &Path) -> i32 {
     match args.first().map(String::as_str) {
+        Some("audit") => audit(root),
         Some("list") | None => {
             let all = rows(root);
             // State the population and its split (issue241/issue239): a bare total invited the
@@ -760,7 +956,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         Some("export") => cmd_export(args, root),
         Some("import") => cmd_import(args, root),
         Some(other) => {
-            eprintln!("unknown: keel process {other} (expected list | search <term> | show <name> | export <name> --out <dir> | import <dir>)");
+            eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir>)");
             2
         }
     }
