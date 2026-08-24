@@ -236,4 +236,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDeckJudgeableCards to issue234;
+
+    part issue235 : Issue {
+        :>> id = "d3ea8a30-3790-4151-92ca-85f0c455bb43";
+        :>> title = "The substance guard rejects a one-letter fork answer - the channel's own gesture wasn't recognized";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "D0208 redTeamScope was answered 'A' on GitHub issue #3; the recorder ran keel accept (note: OPTION A - their words verbatim 'A' (GitHub comment <url>...)) but confirmation-authenticity FAILED: 'A' is no >=10-char quoted span and the scanner's gesture keywords were only deck/console. A GitHub comment is 2FA-authenticated, timestamped, immutably logged - the D0205/D0201-B conclusion that it subsumes the device HMAC - so a cited GitHub comment IS a valid channel gesture. The guard was refusing the very channel this project just built. Fix: quotes_conversational_words recognizes a github comment / github.com citation as a gesture; nothing pushed, the human's answer is safe in the thread and re-records via the sweeper once the fix lands.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGithubGestureSubstance to issue235;
 }

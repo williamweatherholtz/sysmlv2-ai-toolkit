@@ -251,7 +251,12 @@ fn latest_result_full(model: &Model, v: &str) -> Option<(String, String, String)
 /// surface gesture (deck/console).
 fn quotes_conversational_words(text: &str) -> bool {
     let lower = text.to_lowercase();
-    if lower.contains("deck") || lower.contains("console") {
+    // Named human-surface gestures that ARE the channel evidence: the localhost deck/console, and a
+    // GitHub comment citation (issue235). A GitHub comment is 2FA-authenticated, server-timestamped,
+    // and immutably event-logged — the D0205/D0201-B conclusion that it subsumes the device HMAC — so
+    // citing one is a STRONGER gesture than the quoted words, and a one-letter fork answer ("A") is a
+    // deliberate authenticated choice even though it is no 10-char span.
+    if lower.contains("deck") || lower.contains("console") || lower.contains("github comment") || lower.contains("github.com/") {
         return true;
     }
     // A quote span closes at an apostrophe NOT followed by a letter — otherwise every contraction
@@ -565,6 +570,8 @@ mod tests {
         // A deck tap is a human gesture — no quote needed.
         assert!(quotes_conversational_words("signed via deck"));
         assert!(quotes_conversational_words("accepted at the console review queue"));
+        // issue235: a GitHub comment citation is the authenticated gesture — a bare option letter is enough.
+        assert!(quotes_conversational_words("OPTION A - their words, verbatim: 'A' (GitHub comment https://github.com/o/r/issues/3#issuecomment-1, authenticated login williamweatherholtz)"));
         // A bare assertion carries no channel evidence.
         assert!(!quotes_conversational_words("the human approved this decision in chat"));
         // Contractions inside the quote must not terminate the span (the 'yep let's go' incident).
