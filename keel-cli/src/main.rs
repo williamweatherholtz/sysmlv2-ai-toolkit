@@ -1210,15 +1210,11 @@ fn cmd_orient(args: &[String]) -> i32 {
     }
     // K2 visibility (D0174/P0.3): a scaffolded commit gate that git is not wired to run is a
     // silently-open enforcement point. Warn LOUDLY on stderr — the JSON on stdout stays pure.
-    if root.join(".githooks").join("pre-commit").exists() {
-        let wired = keel_cli::gitx::git()
-            .arg("-C")
-            .arg(&root)
-            .args(["config", "core.hooksPath"])
-            .output()
-            .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty());
-        if !wired {
-            eprintln!("[keel] WARNING: .githooks/pre-commit exists but core.hooksPath is UNSET — the commit gate never runs. Fix: git config core.hooksPath .githooks (D0174/K2).");
+    // issue240: ARMED means git can REACH the hook, not that a setting points somewhere. The old
+    // check passed on `core.hooksPath = nul`, so the gate was silently dead while this warned nothing.
+    if let Err(why) = keel_cli::gitx::commit_gate_armed(&root) {
+        if root.join(".githooks").join("pre-commit").exists() {
+            eprintln!("[keel] WARNING: the commit gate is NOT ARMED — {why}. Fix: git config core.hooksPath .githooks (D0174/K2).");
         }
     }
     println!("{}", orient::compute(&root).to_json());

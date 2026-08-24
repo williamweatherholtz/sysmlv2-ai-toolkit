@@ -483,13 +483,10 @@ fn enforcement_points(root: &Path) -> Json {
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or(serde_json::Value::Null);
     let has_event = |ev: &str| settings.pointer(&format!("/hooks/{ev}")).is_some();
-    let hooks_wired = root.join(".githooks").join("pre-commit").exists()
-        && crate::gitx::git()
-            .arg("-C")
-            .arg(root)
-            .args(["config", "core.hooksPath"])
-            .output()
-            .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty());
+    // issue240: report ARMED (git can reach the hook), never merely DECLARED (a setting names it).
+    let armed = crate::gitx::commit_gate_armed(root);
+    let hooks_wired = armed.is_ok();
+    let hooks_note = armed.as_ref().err().cloned();
     let ci = root.join(".github").join("workflows").exists()
         && std::fs::read_dir(root.join(".github").join("workflows")).is_ok_and(|rd| {
             rd.flatten().any(|e| {
@@ -527,7 +524,13 @@ fn enforcement_points(root: &Path) -> Json {
         row("hook PreToolUse pre-write (protected paths)", has_event("PreToolUse"), "PURE-SHELL fallback DENIES without the binary, loudly (P0.3)", "deny message malformed -> harness asks", HOOK_TIMEOUT),
         row("hook SubagentStop (subagent tree gate)", has_event("SubagentStop"), "subagent writes reach the turn gate instead", "loud warning, allows", HOOK_TIMEOUT),
         row("pre-push .githooks (behind check)", root.join(".githooks").join("pre-push").exists(), "raw pushes land isolation-gated; CI still re-derives post-hoc (issue209's pre-fix state)", "fetch failure REFUSES the push (fail-loud, K2)", "n/a - synchronous, no harness deadline"),
-        row("pre-commit .githooks (commit gate)", hooks_wired, "UNSET hooksPath = never runs - orient warns loudly; binary absent = exit 1 with the install path (K2, fail-loud)", "exit 1, commit blocked", "n/a - synchronous, no harness deadline"),
+        row("pre-commit .githooks (commit gate)", hooks_wired,
+            // issue240: the absent-path text now carries the MEASURED reason when the gate is not
+            // armed, rather than describing only the one failure mode (UNSET) that was checked.
+            &hooks_note.map_or_else(
+                || "unreachable hooksPath = never runs - orient warns loudly; binary absent = exit 1 with the install path (K2, fail-loud)".to_string(),
+                |why| format!("NOT ARMED: {why} - orient warns loudly (K2, fail-loud)")),
+            "exit 1, commit blocked", "n/a - synchronous, no harness deadline"),
         row("CI keel gate (layer 3, hook-independent)", ci, "no remote verification; audit-history still re-derives locally (K15)", "CI red", "CI runner timeout -> red, visible"),
         // issue203 (critique pass 1): this point existed since the parser crate's birth and was
         // never in this inventory - which is how its all-zeros sentinel stayed dead for its whole

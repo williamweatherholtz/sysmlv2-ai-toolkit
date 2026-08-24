@@ -28,6 +28,52 @@ pub fn git() -> std::process::Command {
     std::process::Command::new("git")
 }
 
+/// Is the local commit gate ARMED — i.e. can git actually reach `.githooks/pre-commit`?
+///
+/// issue240: wiredness used to be "`git config core.hooksPath` returned a non-empty value", a PROXY
+/// for reachability rather than reachability. With `core.hooksPath = nul` that proxy answers TRUE
+/// while git resolves hooks to a directory that does not exist, so no hook runs at all — and three
+/// shipped surfaces (`orient`, `hardening`, `controls`) reported the gate armed and fail-closed for
+/// an unknown period, during which the AI told the human "the hook passed" on commits no hook saw.
+/// A control reported as present must be reported on its REACHABILITY, never on the presence of a
+/// setting that points at it.
+///
+/// Returns `Ok(dir)` with the effective hooks directory when armed, or `Err(reason)` naming why not,
+/// so callers can say WHICH of "not configured", "configured but missing" or "no pre-commit in it"
+/// holds instead of collapsing three states into one boolean (the N-C2 honest-surface invariant).
+///
+/// # Errors
+/// Returns the reason the gate is not armed: no `pre-commit` in the tree, git unrunnable, an
+/// unresolvable or empty hooks path, a hooks path that is not a directory, or a hooks directory
+/// with no `pre-commit` in it.
+pub fn commit_gate_armed(root: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    if !root.join(".githooks").join("pre-commit").exists() {
+        return Err("no .githooks/pre-commit in this tree - nothing to arm".to_string());
+    }
+    // `rev-parse --git-path hooks` is the effective path git itself will use: it honours
+    // core.hooksPath when set and falls back to .git/hooks when not. Asking git beats re-deriving
+    // the precedence rules here and getting them subtly wrong.
+    let out = git().arg("-C").arg(root).args(["rev-parse", "--git-path", "hooks"]).output();
+    let Ok(out) = out else { return Err("git could not be run to resolve the hooks path".to_string()) };
+    if !out.status.success() {
+        return Err("git could not resolve the hooks path".to_string());
+    }
+    let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if raw.is_empty() {
+        return Err("git resolved an empty hooks path".to_string());
+    }
+    // The path git reports may be relative to the repo root.
+    let p = std::path::Path::new(&raw);
+    let dir = if p.is_absolute() { p.to_path_buf() } else { root.join(p) };
+    if !dir.is_dir() {
+        return Err(format!("core.hooksPath resolves to `{raw}`, which is not a directory - the gate CANNOT run"));
+    }
+    if !dir.join("pre-commit").exists() {
+        return Err(format!("hooks path `{raw}` has no pre-commit - the gate CANNOT run"));
+    }
+    Ok(dir)
+}
+
 #[cfg(test)]
 mod tests {
     /// THE CONTROL: no file but this one may construct a git Command directly. The defect was not any
@@ -59,5 +105,38 @@ mod tests {
             offenders.is_empty(),
             "raw git spawn(s) outside gitx::git() - the count will understate again: {offenders:?}"
         );
+    }
+
+    /// THE CONTROL for issue240: an unreachable hooks path must read NOT ARMED. The old predicate
+    /// ("core.hooksPath is non-empty") answered ARMED for `core.hooksPath = nul`, so the commit gate
+    /// was dead while orient/hardening/controls all reported it fail-closed.
+    #[test]
+    fn an_unreachable_hooks_path_is_not_armed() {
+        let tmp = std::env::temp_dir().join(format!("keel-gitx-armed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join(".githooks")).expect("tmp tree");
+        std::fs::write(tmp.join(".githooks").join("pre-commit"), "#!/bin/sh
+exit 0
+").expect("hook");
+        // Not a git repo at all -> git cannot resolve a hooks path -> NOT armed, with a reason.
+        let err = super::commit_gate_armed(&tmp).expect_err("a non-repo cannot have an armed gate");
+        assert!(!err.is_empty(), "the refusal must name a reason");
+
+        // A tree with no pre-commit at all is also not armed, and says so distinctly.
+        let bare = tmp.join("bare");
+        std::fs::create_dir_all(&bare).expect("bare");
+        let err2 = super::commit_gate_armed(&bare).expect_err("no hook -> not armed");
+        assert!(err2.contains("nothing to arm"), "{err2}");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// This repository's own gate must be ARMED — the regression that let issue240 happen silently.
+    #[test]
+    fn this_repos_commit_gate_is_armed() {
+        let root = std::path::Path::new("..");
+        match super::commit_gate_armed(root) {
+            Ok(dir) => assert!(dir.join("pre-commit").exists(), "armed must mean the hook is there"),
+            Err(why) => panic!("this repo's commit gate is NOT ARMED: {why} - run: git config core.hooksPath .githooks"),
+        }
     }
 }
