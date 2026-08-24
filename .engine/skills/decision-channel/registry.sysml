@@ -11,6 +11,11 @@
 // layer already applies by carrying rules BY NAME instead of copying a shared file.
 package SkillsRegistryDecisionChannel {
     private import EngineElement::*;
+    // AISkill lives in EngineSkills. This import was MISSING when the file was hand-written, and
+    // nothing caught it because `is_engine_instance_file` did not yet recognise a per-skill
+    // registry — so check-engine reported clean over a file it was not reading (D0222). The 36
+    // transform-generated files carried the import from the start; the hand-written one did not.
+    private import EngineSkills::*;
 
     part decisionChannelSkill : AISkill {
         :>> id = "2f82837a-bdd6-4c9b-9b2a-0e21af075f62";

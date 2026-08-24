@@ -195,8 +195,17 @@ pub struct SyncReport {
 /// Registry entries: `(title, location)` from `skills-registry.sysml` — the count the scaffold must
 /// match (P0.1 "counts asserted equal").
 fn registry_skills(root: &Path) -> Vec<(String, String)> {
-    let text = std::fs::read_to_string(root.join(".engine").join("skills").join("skills-registry.sysml"))
-        .unwrap_or_default();
+    // D0222: a skill may declare itself BESIDE itself, so every `.sysml` under `.engine/skills/` is
+    // a registry — not just the central file. Reading only the central one made `sync-claude` report
+    // "0/0 skill(s)" the moment the declarations moved, and `claude-surface-drift` then passed
+    // VACUOUSLY on a population of zero: a false green, which is worse than the failure it hid.
+    let mut text = String::new();
+    for f in crate::collect_sysml(&root.join(".engine").join("skills")) {
+        if let Ok(s) = std::fs::read_to_string(&f) {
+            text.push('\n');
+            text.push_str(&s);
+        }
+    }
     let mut out = Vec::new();
     let mut title = None;
     for line in text.lines() {

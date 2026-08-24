@@ -461,6 +461,11 @@ fn is_engine_instance_file(path: &Path) -> bool {
         || s.contains("/processes/")
         || s.contains("/views/")
         || s.ends_with("skills-registry.sysml")
+        // D0222: a skill's own declaration lives beside it now (`.engine/skills/<s>/registry.sysml`),
+        // so those 36 files are instances too. Missed on the first pass, which meant 36 newly
+        // authored files were NOT being validated by `check-engine` while it reported clean — a
+        // coverage gap that reads exactly like coverage.
+        || (s.contains("/skills/") && s.ends_with("registry.sysml"))
         || s.ends_with("tracking-template.sysml")
 }
 
