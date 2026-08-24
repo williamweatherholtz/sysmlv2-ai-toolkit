@@ -19,7 +19,7 @@ use std::path::Path;
 
 fn git(repo: &Path, args: &[&str]) -> Option<String> {
     let out = crate::gitx::git().arg("-C").arg(repo).args(args).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    if out.status.success() { Some(String::from_utf8_lossy(&out.stdout).into_owned()) } else { None }
 }
 
 /// Severity rank: higher binds harder. A DROP between commits is a weakening.
@@ -39,7 +39,7 @@ fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
     let mut sig = BTreeMap::new();
     // rule files: `part <name> : ElementRule|EdgeRule { ... :>> severity = RuleSeverity::<sev>; }`
     let files = git(repo, &["ls-tree", "-r", "--name-only", sha, ".engine/rules/"]).unwrap_or_default();
-    for f in files.lines().filter(|f| f.ends_with(".sysml")) {
+    for f in files.lines().filter(|f| std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
         let Some(text) = git(repo, &["show", &format!("{sha}:{f}")]) else { continue };
         let mut current: Option<String> = None;
         for line in text.lines() {
@@ -55,7 +55,7 @@ fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
                 if let Some(i) = line.find("RuleSeverity::") {
                     let sev: String = line[i + "RuleSeverity::".len()..]
                         .chars()
-                        .take_while(|c| c.is_ascii_alphabetic())
+                        .take_while(char::is_ascii_alphabetic)
                         .collect();
                     sig.insert(format!("rule:{name}"), rank(&sev));
                     current = None;
@@ -78,7 +78,7 @@ fn commit_is_signed_change(repo: &Path, sha: &str) -> bool {
     let touched = git(repo, &["show", "--name-only", "--format=", sha]).unwrap_or_default();
     touched
         .lines()
-        .filter(|f| f.starts_with(".engine/decisions/") && f.ends_with(".sysml"))
+        .filter(|f| f.starts_with(".engine/decisions/") && std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
         .any(|f| {
             git(repo, &["show", &format!("{sha}:{f}")])
                 .is_some_and(|t| t.lines().any(|l| {
@@ -115,10 +115,11 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     }
     println!("audit-adherence: re-deriving the enforcement signature across {} commit(s) from the tree", shas.len());
     println!("  (guard-set + rule severities; a weakening needs a co-committed signed Decision — D0209).");
-    let mut prev = signature(repo, &shas[0]);
+    let Some(first) = shas.first() else { return 0 };
+    let mut prev = signature(repo, first);
     let mut violations = 0u32;
     for w in shas.windows(2) {
-        let (a, b) = (&w[0], &w[1]);
+        let [a, b] = w else { continue };
         let cur = signature(repo, b);
         let mut weakened: Vec<String> = Vec::new();
         for (name, &old_rank) in &prev {
@@ -133,8 +134,8 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
         }
         if !weakened.is_empty() && !commit_is_signed_change(repo, b) {
             violations += 1;
-            let short = &b[..b.len().min(7)];
-            println!("  UNSIGNED WEAKENING at {short} (parent {}):", &a[..a.len().min(7)]);
+            let short = b.get(..7).unwrap_or(b.as_str());
+            println!("  UNSIGNED WEAKENING at {short} (parent {}):", a.get(..7).unwrap_or(a.as_str()));
             for wk in &weakened {
                 println!("      {wk}");
             }
@@ -151,7 +152,7 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     }
 }
 
-fn rank_name(r: u8) -> &'static str {
+const fn rank_name(r: u8) -> &'static str {
     match r {
         3 => "blocking/bound",
         2 => "warning",
