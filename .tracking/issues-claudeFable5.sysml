@@ -382,4 +382,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcHonestSurfaceEverywhere to issue247;
 
+
+    part issue248 : Issue {
+        :>> id = "55eebc17-dbe3-440a-98fe-a0d1934d5c3a";
+        :>> title = "A unit test asserted a MACHINE property and turned main red for six commits";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The regression test added in sprint447 for issue240, this_repos_commit_gate_is_armed, asserted that this repository has an ARMED local git hook. That is a property of a MACHINE, not of the repository: a CI checkout configures no core.hooksPath and correctly does not need one, because CI is the hook-INDEPENDENT layer (K15/D0179) that exists precisely so nothing has to assume a hook ran. Every ci run from the issue243 commit onward failed on it - six commits red - while the paired decision-issue workflow kept succeeding, which is why the failures were easy to skim past in a run list showing both. WHAT MAKES THIS WORTH RECORDING RATHER THAN JUST FIXING: my own sprint447 review gate had already named the risk in almost these words - it couples a unit test to machine-local git config, and will fail for a contributor who has not run the setup step - and I wrote that I judged it acceptable and deliberate. The review pass found the defect and the author overrode the reviewer, which is a failure of the review process rather than of the analysis. FIX: assert the CONDITIONAL invariant - if core.hooksPath is configured at all, it must resolve to a directory holding pre-commit - which still catches the exact issue240 state (configured to a null device, unreachable) while an unconfigured checkout is not a violation.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcTestsAssertRepoNotMachine to issue248;
+
 }
