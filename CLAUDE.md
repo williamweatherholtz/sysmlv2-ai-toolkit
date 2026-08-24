@@ -150,7 +150,7 @@ frozen (modify it only by out-of-band Decision).
 - **Decisions auto-accept under standing consent (D0207).** A NON-FORK proposed Decision is accepted
   when its GitHub issue is raised (decision-channel process): the note carries the AUTO-ACCEPTED token
   and the issue stays the override thread forever. A FORK still reaches out - and must first pass
-  judgment-request-quality (short name, rationale, per-option COST, a RESEARCH statement; guard 48).
+  judgment-request-quality (short name, rationale, per-option COST, a `--research` statement; guard 48).
 - **Confirmation results need explicit human sign-off.** A `method=confirmation` verification *is* a human
   attestation — record it only on their explicit confirmation of that specific claim, never inferred from
   an instruction or from the work being done. A confirmation FLIP recorded on the human's chat words

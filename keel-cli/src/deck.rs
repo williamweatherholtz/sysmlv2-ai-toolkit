@@ -116,6 +116,11 @@ pub fn decision_cards(root: &Path, name: Option<&str>, proposed_only: bool) -> R
             continue;
         }
         let (ctx, dec) = decision_digest(root, file).unwrap_or_default();
+        let research = text
+            .lines()
+            .find_map(|l| l.trim_start().strip_prefix("// RESEARCH:"))
+            .map(|r| r.trim().to_string())
+            .unwrap_or_default();
         let opts: Vec<Json> = fork_options(root, file)
             .into_iter()
             .map(|(tok, label)| {
@@ -130,6 +135,7 @@ pub fn decision_cards(root: &Path, name: Option<&str>, proposed_only: bool) -> R
             ("file".to_string(), Json::s(file.clone())),
             ("context".to_string(), Json::s(ctx)),
             ("decision".to_string(), Json::s(dec)),
+            ("research".to_string(), Json::s(research)),
             ("options".to_string(), Json::Arr(opts)),
         ]));
     }

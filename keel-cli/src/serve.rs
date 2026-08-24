@@ -695,7 +695,7 @@ async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<Decis
     if b.slug.is_empty() || b.title.is_empty() || b.decision.is_empty() {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"slug, title, and decision are required\"}".to_string()).into_response();
     }
-    match crate::write::record_decision(&s.rootpath(), &b.slug, &b.title, &b.date, &author, &b.context, &b.decision, &b.rationale, &b.consequences, None) {
+    match crate::write::record_decision(&s.rootpath(), &b.slug, &b.title, &b.date, &author, &b.context, &b.decision, &b.rationale, &b.consequences, None, None) {
         Ok((nnnn, path)) => ok_json(format!("{{\"ok\":true,\"decision\":\"D{nnnn}\",\"path\":\"{path}\",\"status\":\"proposed\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

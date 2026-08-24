@@ -41,10 +41,13 @@ def main() -> None:
             queue_auto(c["name"], str(row["number"]), row["url"])
             print(f"{c['name']} queued for auto-accept (existing issue #{row['number']})")
             continue
+        research = c.get("research", "").strip()
         body = (
             f"<!-- keel-decision: {c['name']} -->\n\n"
             f"**Why it came up:** {c['context']}\n\n"
-            f"**What is being decided:** {c['decision']}\n\n---\n"
+            f"**What is being decided:** {c['decision']}\n\n"
+            + (f"**Research:** {research}\n\n" if research else "")
+            + "---\n"
         )
         if c["options"]:
             body += (

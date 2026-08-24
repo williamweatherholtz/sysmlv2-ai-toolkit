@@ -2464,9 +2464,13 @@ pub fn judgment_request_quality(root: &Path) -> GuardReport {
                 "{rel}: fork decision's rationale is under 200 chars — a request for judgment must carry its why (D0207)"
             ));
         }
-        if !text.contains("RESEARCH") {
+        let research = text
+            .lines()
+            .find_map(|l| l.trim_start().strip_prefix("// RESEARCH:"))
+            .map_or("", str::trim);
+        if research.chars().count() < 40 {
             violations.push(format!(
-                "{rel}: fork decision carries no RESEARCH statement — what was looked at before asking (panel precedent, literature, prior art, or 'none found, and here is where I looked') (D0207)"
+                "{rel}: fork decision carries no substantive RESEARCH statement (a `// RESEARCH:` line, >= 40 chars) — what was looked at before asking: panel precedent, literature, prior art, or 'none found, and here is where I looked' (D0207; `keel record decision --research \"...\"`)"
             ));
         }
         let costs = text.matches("COST").count();

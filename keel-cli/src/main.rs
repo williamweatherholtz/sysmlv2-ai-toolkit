@@ -2208,7 +2208,8 @@ fn cmd_record(args: &[String]) -> i32 {
     } else {
         None
     };
-    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker) {
+    let research = flag(args, "research");
+    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref()) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
             println!("accept later via an explicit human sign-off (flip status + add the d{nnnn}Accept event).");

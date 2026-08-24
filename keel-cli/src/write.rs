@@ -1273,12 +1273,20 @@ pub fn record_decision(
     rationale: &str,
     consequences: &str,
     marker: Option<&str>,
+    research: Option<&str>,
 ) -> Result<(String, String), WriteError> {
     let dir = root.join(".engine").join("decisions");
     let num = next_decision_number(&dir);
     let nnnn = format!("{num:04}");
     let uuid = gen_uuid();
     let s = sanitize_field;
+    // D0207: a RESEARCH statement is a first-class part of reaching out for judgment. Emitted as a
+    // structured comment (not a frozen-schema field, invariant 5) that BOTH judgment-request-quality
+    // (guard 48) and `keel decision-card` read — so the "what did you look at before asking" reaches
+    // the human's issue. A fork without one cannot pass the guard.
+    let research_line = research
+        .filter(|r| !r.trim().is_empty())
+        .map_or_else(String::new, |r| format!("    // RESEARCH: {}\n", s(r)));
     // issue213 (D0193 family): the D0070 marker is emitted BY the recorder when the author states
     // the decision governs a process/schema change - two landing commits were refused because the
     // marker was a forgettable hand-edit. The governs-comment names the convention's source.
@@ -1295,7 +1303,7 @@ pub fn record_decision(
          \x20   private import EngineWork::*;\n\
          \x20   private import EngineVerification::*;\n\
          \x20   private import EngineRelationships::*;\n\n\
-         {marker_lines}{plain_indent}part d{nnnn} : Decision {{\n\
+         {research_line}{marker_lines}{plain_indent}part d{nnnn} : Decision {{\n\
          \x20       :>> id = \"{uuid}\";\n\
          \x20       :>> title = \"{title_c}\";\n\
          \x20       :>> createdAt = \"{date_c}\";\n\
@@ -1316,6 +1324,7 @@ pub fn record_decision(
         decision_c = s(decision),
         rationale_c = s(rationale),
         consequences_c = s(consequences),
+        research_line = research_line,
     );
     let filename = format!("{nnnn}-{slug}.sysml");
     write_atomic(&dir.join(&filename), file_text)?;
