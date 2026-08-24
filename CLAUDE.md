@@ -110,7 +110,8 @@ frozen (modify it only by out-of-band Decision).
   four concurrent `record issue` calls used to land two issues with all four exiting 0. A writer that
   cannot acquire the lock **fails loudly** — a refused write is recoverable, a lost one is not.
 - **The write API is the sanctioned write path.** `keel append-result`, `append-gate-result`, `add-task`,
-  `record decision`, `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
+  `record decision` (prose via `--from FILE` — never as double-quoted shell arguments, D0224/issue256),
+  `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
   Commit messages and memory are **not** decision records. The keystone lock also covers the

@@ -454,4 +454,38 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcTransferabilityIsComputed to issue253;
 
+
+    part issue254 : Issue {
+        :>> id = "fa98990d-ef7e-458d-91cb-b5cfb105e36d";
+        :>> title = "The guard that stops a FABRICATED human acceptance could be switched off with one command";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found while checking a premise rather than accepting it. The human said they were fine with the process for defining and cementing processes being undisable-able and shipped, and asked if that was what we were discussing - it was not: process-change has been a CORE never-deactivatable guard all along and change-request is a workflow outside activation, so both halves were already true, while what I had reported was a packaging defect. Checking turned up the real gap. decision-authoring CLAIMED five guards, and activation::guard_state returns Core exactly when NO unit claims a guard - so claiming made them switchable, and `keel deactivate decision-authoring` switched off decisionRationale, acceptanceEvents, decisionRequirementLink, attestationSubstance and confirmationAuthenticity together. confirmationAuthenticity is the guard that stops an AI recording a human acceptance THAT NEVER HAPPENED. A single command therefore disarmed the check standing between the engine and a fabricated human judgment, which CLAUDE.md section 4 says must never be possible - the monitor-modifiable-by-monitored class (issue236/D0208) sitting on the most attestation-sensitive path there is. FIX (D0223): the process asserts no guard, so all five are CORE; the definition says why and warns against re-adding an assert; the link is recorded as core = [...] in process-enforcement.toml so a core-enforced process no longer reports guards 0 and read as unenforced.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDecisionAuthoringIsCore to issue254;
+
+
+    part issue255 : Issue {
+        :>> id = "378acb24-2421-4891-981c-f9da177e5738";
+        :>> title = "A shell backtick injected 2000 characters of tool output into a Decision, and only an invalid escape caught it";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Recording D0223 through a shell script, a BACKTICK inside a double-quoted argument was command substitution. The decision text mentioned a keel command in backticks; sh executed it and substituted roughly 2000 characters of hardening JSON into the decision field of a governance record. THE PART THAT MATTERS: it was caught only INCIDENTALLY, because the injected JSON happened to carry a unicode escape the SysML parser rejects. Tool output without an invalid escape would have parsed clean and landed, and the committed record would then assert something no human or AI ever wrote - the same class as a fabricated attestation, and worse than a typo because nothing would ever have flagged it. This is the shell-escaping class that has recurred seven times in this session, but every previous instance broke a BUILD; this one silently corrupted a RECORD. The durable authoring rule (record-decision text goes through a file, never through shell interpolation) is a lesson, and a lesson is not a control - so the resolver adds a write-time refusal of a decision field carrying obvious tool output.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoShellInjectionIntoRecords to issue255;
+
+    part issue256 : Issue {
+        :>> id = "cde95a59-0c56-4651-a006-80e89c035209";
+        :>> title = "An accepted Decision had already shipped with 13,136 characters of tool output injected into its context";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Investigating the D0223 injection (issue255), keel rules flagged D0214 - and its context field held 13,136 characters of console transcript, substituted mid-sentence exactly where a backticked command name stood. The sentence read 'the sharpest answer, measured: <transcript> printed the bare words ALL PASS', with the subject of 'printed' missing: the shell had replaced the command name with what the command printed. So the injection this control was written for had ALREADY happened, in an earlier session, and had been recorded, auto-accepted under standing consent, committed and pushed - undetected, because that output carried no invalid escape and no key-colon pairs. The only reason it ever surfaced is that the pasted text contained verdict words, which tripped a warning-severity rule nobody had read. That makes this the second confirmed instance and the first LANDED one, and it moves the failure from hypothetical to observed: a governance record in this repo asserted 13,000 characters that no author wrote. FIXED HERE: the dump is excised and the sentence restored to name the command it originally named; the acceptance receipt is untouched, since what was agreed did not change. The detector now also refuses the console-transcript shape, calibrated against the whole corpus - no authored field carries more than one guard marker, the landed transcript carried dozens.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoShellInjectionIntoRecords to issue256;
 }

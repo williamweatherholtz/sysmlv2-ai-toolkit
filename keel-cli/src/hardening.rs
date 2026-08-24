@@ -199,9 +199,15 @@ fn process_enforcement(root: &Path) -> Json {
     for f in crate::collect_sysml(&root.join(".engine/processes")) {
         let Ok(text) = std::fs::read_to_string(&f) else { continue };
         let unit = f.file_stem().unwrap_or_default().to_string_lossy().to_string();
-        let n = act.unit(&unit).map_or(0, |u| u.guards.len());
+        let unit_guards = act.unit(&unit).map_or(0, |u| u.guards.len());
         for name in top_level_processes(&text) {
             let entry = declared.get(&name);
+            // D0223: guards that are CORE enforce unconditionally - stronger than a switchable
+            // claim, so they must not read as ZERO enforcement. Removing decision-authoring's five
+            // `assert constraint` lines is what made them core, and without this the process fell
+            // into UNDECLARED reading as "not enforced" when the truth is the opposite.
+            let core_guards = entry.map_or(0, |(_, _, c)| c.len());
+            let n = unit_guards + core_guards;
             let mut row = vec![
                 ("process".to_string(), Json::s(name.clone())),
                 ("unit".to_string(), Json::s(unit.clone())),
@@ -213,13 +219,13 @@ fn process_enforcement(root: &Path) -> Json {
             }
             match entry {
                 // `checkable = false` - a judgment, and no guard can exist for it. Correct, permanent.
-                Some((false, reason)) => {
+                Some((false, reason, _)) => {
                     row.push(("reason".to_string(), Json::s(reason.clone())));
                     unenforceable.push(Json::Obj(row));
                 }
                 // `checkable = true` with no guard - an ADMITTED gap. Worse than undeclared, because
                 // someone looked at it and agreed a guard could exist.
-                Some((true, reason)) => {
+                Some((true, reason, _)) => {
                     row.push(("admittedGap".to_string(), Json::Bool(true)));
                     row.push(("reason".to_string(), Json::s(reason.clone())));
                     undeclared.push(Json::Obj(row));
@@ -254,7 +260,14 @@ fn process_enforcement(root: &Path) -> Json {
 ///
 /// An absent file yields an empty map, so every unguarded process reports as undeclared - the
 /// pre-issue173 behaviour, and strictly less informative rather than wrong.
-fn enforcement_contract(root: &Path) -> std::collections::BTreeMap<String, (bool, String)> {
+/// The declared enforcement stance per process. `(checkable, reason, coreGuards)`.
+///
+/// D0223 adds `core = [...]`: the guards that enforce this process and CANNOT be switched off,
+/// because no unit claims them. Without it a core-enforced process reported `guards: 0` and fell
+/// into UNDECLARED - reading as "not enforced" when the truth is "enforced unconditionally", which
+/// is the honest-surface failure this engine keeps paying for. The process -> guard link still has
+/// to be recorded; it just is not an activation claim any more.
+fn enforcement_contract(root: &Path) -> std::collections::BTreeMap<String, (bool, String, Vec<String>)> {
     let mut out = std::collections::BTreeMap::new();
     let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/process-enforcement.toml"))
     else {
@@ -263,6 +276,7 @@ fn enforcement_contract(root: &Path) -> std::collections::BTreeMap<String, (bool
     let mut current = String::new();
     let mut checkable = false;
     let mut reason = String::new();
+    let mut core: Vec<String> = Vec::new();
     for raw in text.lines() {
         let line = raw.trim();
         if line.starts_with('#') || line.is_empty() {
@@ -270,7 +284,7 @@ fn enforcement_contract(root: &Path) -> std::collections::BTreeMap<String, (bool
         }
         if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
             if !current.is_empty() {
-                out.insert(current.clone(), (checkable, reason.clone()));
+                out.insert(current.clone(), (checkable, reason.clone(), std::mem::take(&mut core)));
             }
             current = name.to_string();
             checkable = false;
@@ -280,12 +294,22 @@ fn enforcement_contract(root: &Path) -> std::collections::BTreeMap<String, (bool
         let Some((k, v)) = line.split_once('=') else { continue };
         match k.trim() {
             "checkable" => checkable = v.trim() == "true",
+            "core" => {
+                core = v
+                    .trim()
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .split(',')
+                    .map(|s| s.trim().trim_matches('"').to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
             "reason" => reason = v.trim().trim_matches('"').to_string(),
             _ => {}
         }
     }
     if !current.is_empty() {
-        out.insert(current, (checkable, reason));
+        out.insert(current, (checkable, reason, core));
     }
     out
 }

@@ -32,6 +32,9 @@ pub enum WriteError {
     InsertionPointNotFound(String),
     /// Named ceremony gate (`verification`) not found in the file.
     GateNotFound(String),
+    /// A prose field carries what looks like captured tool output rather than authored text
+    /// (issue255): `(field, excerpt)`.
+    InjectedToolOutput(String, String),
 }
 
 impl std::fmt::Display for WriteError {
@@ -46,6 +49,9 @@ impl std::fmt::Display for WriteError {
             Self::ActionDefNotFound(n) => write!(f, "action def not found: {n}"),
             Self::InsertionPointNotFound(n) => write!(f, "cannot find insertion point for task: {n}"),
             Self::GateNotFound(n) => write!(f, "gate not found: {n}"),
+            Self::InjectedToolOutput(field, excerpt) => {
+                write!(f, "refusing to write: --{field} carries what looks like captured TOOL OUTPUT, not authored text.\n  near: {excerpt}\n  A governance record must state what someone actually wrote. This is how it gets in: a BACKTICK\n  inside a double-quoted shell argument is command substitution, so sh RUNS the command named in\n  your prose and substitutes its output into the field (issue255/D0223). Pass the text through a\n  file or a single-quoted heredoc rather than an interpolated shell argument.")
+            }
         }
     }
 }
@@ -1164,6 +1170,93 @@ fn sanitize_field(v: &str) -> String {
     v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Does this prose field carry captured TOOL OUTPUT rather than authored text? (issue255/D0223)
+///
+/// Recording D0223, a backtick inside a double-quoted shell argument was command substitution: the
+/// decision text NAMED a `keel` command, sh ran it, and ~2000 characters of JSON landed in the
+/// `decision` field of a governance record. It was caught only incidentally — the injected JSON
+/// happened to carry a unicode escape the `SysML` parser rejects. Output without one would have
+/// parsed clean and landed, and the committed record would then assert something nobody wrote:
+/// the same class as a fabricated attestation, and worse than a typo because nothing flags it.
+/// The authoring rule ("text goes through a file, never an interpolated shell argument") is a
+/// lesson, and a lesson is not a control (D0047) — so the write path refuses.
+///
+/// Deliberately narrow: a run of **key-colon-value pairs** (the shape of JSON and of a Python dict
+/// repr, which is what tool output looks like), not any mention of a brace or a quoted word.
+/// Verified against every Decision, Issue and `TestResult` already in this repo — zero flags.
+fn looks_like_tool_output(v: &str) -> Option<String> {
+    let b = v.as_bytes();
+    // Count `<quote>word<quote> :` pairs — the JSON/dict-repr signature. Authored prose quotes
+    // words, but essentially never as a run of quoted keys each followed by a colon.
+    let mut pairs = 0usize;
+    let mut first = None;
+    let mut i = 0usize;
+    while i < b.len() {
+        let Some(&q) = b.get(i) else { break };
+        if q == 0x22 || q == 0x27 {
+            // 0x22 = double quote, 0x27 = single quote
+            if let Some(close) = b.get(i + 1..).and_then(|r| r.iter().position(|&c| c == q)) {
+                let key_end = i + 1 + close;
+                // a key is short and unspaced; the delimiter is `:` (allowing one space)
+                let key = &v[i + 1..key_end];
+                let rest = b.get(key_end + 1..).unwrap_or_default();
+                let colon = matches!(rest.first(), Some(b':'))
+                    || (matches!(rest.first(), Some(b' ')) && matches!(rest.get(1), Some(b':')));
+                if colon && !key.is_empty() && key.len() <= 40 && !key.contains(' ') {
+                    pairs += 1;
+                    if first.is_none() {
+                        first = Some(i);
+                    }
+                }
+                i = key_end + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    // The SECOND shape, and the one that had already landed: a console transcript. D0214's `context`
+    // held 13,136 characters of `keel guard` output, substituted mid-sentence exactly where the
+    // backticked command name stood - so the injection this control was written for had happened in
+    // an EARLIER session and been accepted, undetected, because it carried no invalid escape.
+    // Key-colon pairs do not appear in that output, so the JSON signature alone would have missed it.
+    if pairs < 3 {
+        // Strong markers only, and four of them. Authored prose QUOTES a guard line as evidence all
+        // the time - D0213's context does, and an earlier draft of this detector refused it. Measured
+        // over the whole corpus, no authored field carries more than ONE of these; the landed D0214
+        // transcript carried dozens. The gap between 1 and dozens is where the threshold belongs.
+        let transcript: usize = ["WARN ", "[guard:", "FAIL: "].iter().map(|m| v.matches(m).count()).sum();
+        if transcript >= 4 {
+            let at = ["WARN ", "[guard:", "FAIL: "].iter().filter_map(|m| v.find(m)).min().unwrap_or(0);
+            return Some(excerpt_at(v, at));
+        }
+        return None;
+    }
+    Some(excerpt_at(v, first.unwrap_or(0)))
+}
+
+/// A short quote of the offending region, landed on a char boundary — a field can hold multi-byte text.
+fn excerpt_at(v: &str, at: usize) -> String {
+    let mut e = v.len().min(at + 90);
+    while e > at && !v.is_char_boundary(e) {
+        e -= 1;
+    }
+    let mut s = at;
+    while s < e && !v.is_char_boundary(s) {
+        s += 1;
+    }
+    format!("...{}...", &v[s..e])
+}
+
+/// Refuse every prose field that carries captured tool output (issue255).
+fn reject_injected_output(fields: &[(&str, &str)]) -> Result<(), WriteError> {
+    for (name, val) in fields {
+        if let Some(excerpt) = looks_like_tool_output(val) {
+            return Err(WriteError::InjectedToolOutput((*name).to_string(), excerpt));
+        }
+    }
+    Ok(())
+}
+
 /// A request to create a new item (D0126, `viewerAuthoringEndpoints`).
 pub struct NewItem<'a> {
     /// `SysML` declaration keyword matching the type's meta-kind: part, requirement, use-case, etc.
@@ -1275,6 +1368,14 @@ pub fn record_decision(
     marker: Option<&str>,
     research: Option<&str>,
 ) -> Result<(String, String), WriteError> {
+    // issue255: a governance record must state what someone actually WROTE.
+    reject_injected_output(&[
+        ("title", title),
+        ("context", context),
+        ("decision", decision),
+        ("rationale", rationale),
+        ("consequences", consequences),
+    ])?;
     let dir = root.join(".engine").join("decisions");
     let num = next_decision_number(&dir);
     let nnnn = format!("{num:04}");
@@ -1541,7 +1642,7 @@ mod atomic_write_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::{gen_uuid, sanitize_field};
+    use super::{gen_uuid, looks_like_tool_output, reject_injected_output, sanitize_field, WriteError};
     use std::collections::HashSet;
 
     fn k6_root(tag: &str) -> std::path::PathBuf {
@@ -1610,6 +1711,80 @@ mod tests {
         assert_eq!(sanitize_field("has \"quotes\""), "has 'quotes'");
         assert_eq!(sanitize_field("multi\n  line\t text"), "multi line text");
         assert_eq!(sanitize_field("  trimmed  "), "trimmed");
+    }
+
+    #[test]
+    fn captured_tool_output_is_refused_in_a_governance_record() {
+        // issue255/D0223. A backtick inside a double-quoted shell argument is command substitution:
+        // recording D0223, the decision text named a `keel` command, sh RAN it, and the tool's JSON
+        // landed in the `decision` field. Caught only because that JSON carried an escape the parser
+        // rejects — output without one parses clean and the record then asserts what nobody wrote.
+        let injected = "decision-authoring asserts NO guard. { 'coveragePct': 100, 'available': true,                         'processEnforcement': { 'note': 'Three buckets', 'reason': 'a judgment' } }";
+        let flagged = looks_like_tool_output(injected).expect("a dict-repr dump must be refused");
+        assert!(flagged.starts_with("..."), "the refusal quotes where it starts: {flagged}");
+        assert!(matches!(
+            reject_injected_output(&[("decision", injected)]),
+            Err(WriteError::InjectedToolOutput(ref f, _)) if f == "decision"
+        ));
+        // ...and it names the mechanism, because the lesson is the fix.
+        let msg = WriteError::InjectedToolOutput("decision".into(), "...x...".into()).to_string();
+        assert!(msg.contains("BACKTICK") && msg.contains("TOOL OUTPUT"), "{msg}");
+    }
+
+    #[test]
+    fn a_console_transcript_is_refused_too_because_one_already_landed() {
+        // The real D0214 text, shortened: a `keel guard` transcript substituted mid-sentence where
+        // the backticked command name stood. It was ACCEPTED and committed; nothing flagged it,
+        // because it carries no invalid escape and no key-colon pairs. This is the instance the
+        // control exists for, so it is the instance the control is tested against.
+        let landed = "the panel's reducer gave the sharpest answer, measured: WARN .tracking/backlog.sysml:52:                       legacy actor 'user' (pre-convention) WARN .tracking/backlog.sysml:54: legacy actor 'user'                       (pre-convention) [guard:actors] PASS - 498 scanned, 52 warning(s), 0 violation(s)                       [guard:ceremony] PASS - 449 scanned, 1 warning(s), 0 violation(s)";
+        assert!(looks_like_tool_output(landed).is_some(), "the transcript shape must be refused");
+    }
+
+    #[test]
+    fn authored_prose_that_quotes_things_is_not_refused() {
+        // The detector must not fire on the way decisions in this repo actually READ — they quote
+        // guard names, field names and human speech constantly. Narrow beats clever: three
+        // quoted-key-then-colon pairs, which authored prose does not produce.
+        for ok in [
+            "decision-authoring asserts NO guard, so 'decisionRationale' and 'acceptanceEvents' become CORE.",
+            "The human said: 'fix keel, then we will migrate to penumbra'. That ordering was right.",
+            "Ratio: 3:1. The field `:>> status` is authored; everything else derivable is a #View.",
+            "Two options were weighed: a) claim the guards, b) leave them unclaimed. (b) won.",
+            "A WARN is not a violation, and the guard scanned every file, so no violation(s) remain.",
+            "The operations lens reproduced it live: [guard:stale-gate-prose] PASS - 216 scanned, 0 violation(s).",
+        ] {
+            assert!(looks_like_tool_output(ok).is_none(), "false positive on authored prose: {ok}");
+        }
+    }
+
+    #[test]
+    fn the_detector_flags_nothing_in_the_decisions_this_repo_already_recorded() {
+        // A detector that fires on real authored prose is worse than no detector — it teaches the
+        // author to route around the write path, which is where every other check lives. So run it
+        // over the whole existing corpus: 223 Decisions written across nine months, quoting guard
+        // names, field syntax and human speech throughout. Zero flags is the bar.
+        //
+        // The population is ASSERTED non-empty. A check that passes over zero items is the false
+        // green this session already hit twice (issue250, and claude-surface-drift on zero skills).
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(".engine").join("decisions");
+        let mut checked = 0usize;
+        for e in std::fs::read_dir(&dir).expect("the decisions corpus must be readable").flatten() {
+            let text = std::fs::read_to_string(e.path()).unwrap_or_default();
+            for field in ["context = ", "decision = ", "rationale = ", "consequences = "] {
+                for (i, _) in text.match_indices(field) {
+                    let rest = &text[i + field.len()..];
+                    let Some(body) = rest.strip_prefix('"').and_then(|r| r.split('"').next()) else { continue };
+                    checked += 1;
+                    assert!(
+                        looks_like_tool_output(body).is_none(),
+                        "false positive in {}: {field}",
+                        e.path().display()
+                    );
+                }
+            }
+        }
+        assert!(checked > 800, "expected the full corpus of decision prose fields, saw {checked}");
     }
 
     #[test]
@@ -1748,6 +1923,8 @@ fn next_issue_number(text: &str) -> u32 {
 /// `WriteError::Io` on filesystem errors; `WriteError::TaskNotFound` if the issues file has no
 /// package close to insert before.
 pub fn record_issue(root: &Path, n: &NewIssue) -> Result<(String, String), WriteError> {
+    // issue255: same refusal as record_decision — an Issue is a governance record too.
+    reject_injected_output(&[("title", n.title), ("description", n.description)])?;
     // issue185 + issue210: the legacy issues.sysml serves as the ALLOCATION mutex (it always exists)
     // even though the new record lands in the author's per-actor file - two same-machine writers
     // must not race the number scan.

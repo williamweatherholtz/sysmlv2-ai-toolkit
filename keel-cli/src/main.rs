@@ -2219,12 +2219,58 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
 /// records a Decision: `keel record decision --slug S --title T --context C --decision D --rationale R
 /// --consequences Q --date YYYY-MM-DD --author A [--root ROOT]` → writes a proposed Decision file
 /// (auto NNNN + UUID), killing point-of-decision friction (D0054). Acceptance stays a separate human gate.
+/// Parse a `--from FILE` decision draft (issue255): `key: value` headers, then `--- key` sections
+/// whose body runs to the next `---` marker. Deliberately NOT TOML/JSON — a Decision's fields are
+/// paragraphs, and a format that needs the author to escape quotes reintroduces the very problem
+/// the file is here to remove.
+///
+/// ```text
+/// slug: decision-authoring-is-core
+/// date: 2026-08-24
+/// marker: process-change
+/// --- title
+/// One line or many; every field takes prose verbatim.
+/// --- context
+/// Quotes, "double quotes", backticks and $VARIABLES are all literal here.
+/// ```
+fn decision_fields_from_file(path: &str) -> Result<std::collections::BTreeMap<String, String>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("cannot read --from {path}: {e}"))?;
+    let mut out: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let mut key: Option<String> = None;
+    let mut body: Vec<&str> = Vec::new();
+    let flush = |out: &mut std::collections::BTreeMap<String, String>, key: &Option<String>, body: &[&str]| {
+        if let Some(k) = key {
+            out.insert(k.clone(), body.join(" ").split_whitespace().collect::<Vec<_>>().join(" "));
+        }
+    };
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("--- ") {
+            flush(&mut out, &key, &body);
+            body.clear();
+            key = Some(rest.trim().to_string());
+        } else if key.is_some() {
+            body.push(line);
+        } else if let Some((k, v)) = line.split_once(':') {
+            let (k, v) = (k.trim(), v.trim());
+            if !k.is_empty() && !v.is_empty() && !k.starts_with('#') {
+                out.insert(k.to_string(), v.to_string());
+            }
+        }
+    }
+    flush(&mut out, &key, &body);
+    if out.is_empty() {
+        return Err(format!("--from {path} declared no fields (expected `key: value` lines and `--- key` sections)"));
+    }
+    Ok(out)
+}
+
 fn cmd_record(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("issue") {
         return cmd_record_issue(args);
     }
     if args.first().map(String::as_str) != Some("decision") {
         eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
+        eprintln!("       keel record decision --from DRAFT.md   (prose in a file - the sanctioned path, issue255; flags override)");
         eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
         return 2;
     }
@@ -2232,16 +2278,29 @@ fn cmd_record(args: &[String]) -> i32 {
         || find_repo_root().unwrap_or_else(|| PathBuf::from(".")),
         PathBuf::from,
     );
-    let req = |name: &str| flag(args, name);
+    // issue255: `--from FILE` is the SANCTIONED authoring path for a Decision's prose. Passing five
+    // paragraphs as double-quoted shell arguments is how ~2000 characters of `keel hardening` output
+    // ended up inside D0223's `decision` field: a backtick inside double quotes is command
+    // substitution, so the shell RAN the command the prose merely named. A file has no such layer.
+    // The write path refuses tool-output-shaped prose either way (`reject_injected_output`); this is
+    // the road that makes the refusal easy to obey rather than a rule to remember (D0054).
+    let from_file = match flag(args, "from").map(|f| decision_fields_from_file(&f)) {
+        Some(Ok(fields)) => Some(fields),
+        Some(Err(msg)) => { eprintln!("error: {msg}"); return 2; }
+        None => None,
+    };
+    let req = |name: &str| {
+        flag(args, name).or_else(|| from_file.as_ref().and_then(|m| m.get(name).cloned()))
+    };
     let (Some(slug), Some(title), Some(context), Some(decision), Some(rationale), Some(consequences)) =
         (req("slug"), req("title"), req("context"), req("decision"), req("rationale"), req("consequences"))
     else {
         eprintln!("error: --slug --title --context --decision --rationale --consequences are all required (a substantive why — D0103)");
         return 2;
     };
-    let date = flag(args, "date").unwrap_or_default();
+    let date = req("date").unwrap_or_default();
     // NEVER default to a named human (D0129/issue072): that silently forges a human attestation.
-    let author = match keel_cli::actor::resolve(&root, flag(args, "author").as_deref()) {
+    let author = match keel_cli::actor::resolve(&root, req("author").as_deref()) {
         Ok(a) => a,
         Err(msg) => { eprintln!("{msg}"); return 2; }
     };
@@ -2250,14 +2309,15 @@ fn cmd_record(args: &[String]) -> i32 {
         return 2;
     }
     // issue213: the D0070 marker as a first-class flag - forgetting it cost two landing commits.
-    let marker = if args.iter().any(|a| a == "--process-change") {
+    let from_marker = from_file.as_ref().and_then(|m| m.get("marker")).map(String::as_str);
+    let marker = if args.iter().any(|a| a == "--process-change") || from_marker == Some("process-change") {
         Some("ProspectiveChange")
-    } else if args.iter().any(|a| a == "--safety-change") {
+    } else if args.iter().any(|a| a == "--safety-change") || from_marker == Some("safety-change") {
         Some("SafetyChange")
     } else {
         None
     };
-    let research = flag(args, "research");
+    let research = req("research");
     match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref()) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");

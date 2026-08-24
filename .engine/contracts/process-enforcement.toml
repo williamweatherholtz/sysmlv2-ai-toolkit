@@ -67,3 +67,17 @@ reason = "A critique round is a judgment by construction, same shape as [critiqu
 [businessElicitation]
 checkable = false
 reason = "The value is in what gets ASKED and whether the answer was recorded before it was interpreted, and neither is readable from text. A guard could check that a Need carries a #DerivedFrom edge to a UserStory - and that check is worth having - but it belongs to the requirement layer, not here, and passing it says nothing about whether the elicited need is the stakeholder's real one or a paraphrase that survived because nobody contested it. The one thing a predicate CAN see is the ordering claim (Statement before Need), and even that is only visible when both exist: an elicitation that produced no Statement at all looks identical to a conversation that never happened. Declared unenforceable rather than given a guard that would make the practice look enforced while enforcing nothing (the [intake] reasoning, applied to the active case)."
+
+[decisionAuthoring]
+# D0223, human-directed: these five enforce Decision authoring and are CORE - no unit claims them,
+# so `keel deactivate` cannot reach them and every adopting project gets them enforced with no
+# activation step. They were switchable until 2026-08-24, which meant `keel deactivate
+# decision-authoring` also switched off `confirmation-authenticity` - the guard that stops an AI
+# recording a human acceptance THAT NEVER HAPPENED. That is the monitor-modifiable-by-monitored gap
+# (issue236/D0208) sitting on the most attestation-sensitive path in the engine, and §4 says a
+# fabricated human judgment must never be possible.
+#
+# Declared here rather than left silent because a core-enforced process otherwise reports `guards: 0`
+# and falls into UNDECLARED - reading as "not enforced" when the truth is "enforced unconditionally".
+# The process -> guard link still has to be recorded; it just is not an activation claim any more.
+core = ["decision-rationale", "acceptance-events", "decision-requirement-link", "attestation-substance", "confirmation-authenticity"]

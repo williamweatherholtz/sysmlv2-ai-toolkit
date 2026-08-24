@@ -17,11 +17,29 @@ package EngineDecisionAuthoring {
         :>> title = "Decision Authoring (one source of truth)";
         :>> purpose = "Author every Decision so each fact has ONE canonical home — the why in its own fields, the verdict/acceptance in a discrete TestResult, status/state COMPUTED — never restated as prose in another field or a comment.";
         :>> cadence = Cadence::perItem;
-        assert constraint enforcesDecisionRationale : decisionRationale;
-        assert constraint enforcesAcceptanceEvents : acceptanceEvents;
-        assert constraint enforcesDecisionRequirementLink : decisionRequirementLink;
-        assert constraint enforcesAttestationSubstance : attestationSubstance;
-        assert constraint enforcesConfirmationAuthenticity : confirmationAuthenticity;
+        // NO `assert constraint` HERE, DELIBERATELY (D0223, human-directed).
+        //
+        // A guard is CORE — never deactivatable — precisely when NO unit claims it
+        // (`activation::guard_state`: an unclaimed guard returns Core). Claiming a guard converts it
+        // into that process's switchable property, which is the issue242 capture mechanism read
+        // forwards. This process used to claim five:
+        //
+        //   decisionRationale · acceptanceEvents · decisionRequirementLink ·
+        //   attestationSubstance · confirmationAuthenticity
+        //
+        // so `keel deactivate decision-authoring` switched all five off — including
+        // confirmationAuthenticity, the guard that stops an AI recording a human acceptance THAT
+        // NEVER HAPPENED. That put the monitor-modifiable-by-monitored gap (issue236/D0208) on the
+        // most attestation-sensitive path in the engine: the one where the failure mode is a
+        // fabricated human judgment, which §4 says must never be possible.
+        //
+        // Removing the claims makes all five CORE, and core is also more PORTABLE than switchable:
+        // an adopting project gets them enforced with no activation step, because nothing there
+        // claims them either. Defining and cementing a Decision is not an opt-in discipline — it is
+        // how this engine records that a human agreed to something.
+        //
+        // Consequence, stated: a downstream project can no longer opt out of Decision-authoring
+        // discipline even if it wants a lighter process. That is the intended trade.
     }
 
     action daFields : ProcessStep {

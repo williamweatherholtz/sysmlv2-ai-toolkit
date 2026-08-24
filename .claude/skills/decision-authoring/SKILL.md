@@ -28,6 +28,13 @@ process** so it is *carried out*, not just hoped (D0059). Bound by D0058 (ADR fi
 1. **Own facts in their fields.** context/decision/rationale/consequences carry only the decision's own
    what/why/impact (substantive, ≥20 chars). Use `keel record decision` (auto UUID + NNNN). Do not put
    another item's verdict, another decision's governance, or any computed/status fact in these fields.
+   **Prose goes through a file: `keel record decision --from DRAFT.md`** (D0224). A Decision's fields are
+   paragraphs, and passing paragraphs as double-quoted shell arguments is how tool output gets into a
+   governance record — a backtick inside double quotes is command substitution, so the shell RUNS the
+   command your prose merely names. It has happened twice here (issue255, and issue256 where 13,136
+   characters had already landed in an accepted Decision). The draft file is `key: value` headers plus
+   `--- key` sections taken verbatim; explicit flags still override. The write path refuses prose that
+   looks like captured tool output either way, and names the mechanism when it does.
 2. **Verdict is a discrete TestResult — never prose.** Acceptance = a `method=confirmation` verification +
    a passing TestResult (who/when/commit), **judged by a human `Person`** (guard:confirmation-authenticity).
    Never write an `(ACCEPTED <date> by <who>)` comment or field sentence — the TestResult is the sole source.
