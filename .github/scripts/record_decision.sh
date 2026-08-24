@@ -42,37 +42,36 @@ Co-Authored-By: keel githubChannel recorder <keel-recorder@users.noreply.github.
   exit 1
 fi
 
-# ── who ────────────────────────────────────────────────────────────────────────────────────────
-actor=$(grep -E "^${COMMENT_USER} *= *\"" .engine/contracts/github-actors.toml | sed 's/.*= *"\(.*\)"/\1/' || true)
+# -- who / which decision / what they said / already done? ALL FROM THE BINARY (D0221) ----------
+# This block used to be four sections of shell: a re-grep of the login table the binary already
+# owns (two implementations of one rule - how the gate and the recorder drifted apart, D0219), a
+# `grep -oE` for the decision marker, a `case` with a locale-dependent `tr` parsing the gesture, and
+# a receipt scan. All of it is deterministic text work, so it belongs where it can be unit-tested.
+# The comment body still arrives ONLY by env and is never interpolated into a shell command.
+actor=$("$KEEL" github-decider "$COMMENT_USER" 2>/dev/null || true)
 if [ -z "$actor" ]; then
-  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not in .engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted)."
+  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not a declared decider in .engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted)."
   exit 0
 fi
 
-# ── which decision ─────────────────────────────────────────────────────────────────────────────
-decision=$(gh issue view "$ISSUE_NUMBER" --json body --jq .body | grep -oE 'keel-decision: d[0-9]+' | head -1 | cut -d' ' -f2 || true)
+issue_body=$(gh issue view "$ISSUE_NUMBER" --json body --jq .body)
+comment_bodies=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body')
+gesture=$(COMMENT_BODY="$COMMENT_BODY" ISSUE_BODY="$issue_body" COMMENT_ID="$COMMENT_ID"           COMMENT_BODIES="$comment_bodies" "$KEEL" github-gesture) || {
+  first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
+  gh issue comment "$ISSUE_NUMBER" --body "Didn't parse \`$first_line\` - reply with just the option letter (e.g. \`B\`), or \`accept\`, or \`reject <why>\`."
+  exit 0
+}
+decision=$(printf '%s' "$gesture" | jq -r .decision)
+verdict=$(printf '%s' "$gesture" | jq -r .verdict)
+option=$(printf '%s' "$gesture" | jq -r .option)
+reason=$(printf '%s' "$gesture" | jq -r .reason)
+first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
+
 if [ -z "$decision" ]; then
   gh issue comment "$ISSUE_NUMBER" --body "This issue carries no keel-decision marker - nothing recorded."
   exit 0
 fi
-
-# ── what they said (strict parse; first line only) ─────────────────────────────────────────────
-first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '\r' | sed 's/^ *//;s/ *$//')
-verdict=""
-option=""
-case "$first_line" in
-  [A-Za-z])                    verdict=accept; option=$(printf '%s' "$first_line" | tr '[:lower:]' '[:upper:]');;
-  accept|/accept|Accept)       verdict=accept;;
-  accept\ [A-Za-z]|/accept\ [A-Za-z]|Accept\ [A-Za-z])
-                               verdict=accept; option=$(printf '%s' "$first_line" | awk '{print toupper($2)}');;
-  reject*|/reject*|Reject*)    verdict=reject;;
-  *)
-    gh issue comment "$ISSUE_NUMBER" --body "Didn't parse \`$first_line\` - reply with just the option letter (e.g. \`B\`), or \`accept\`, or \`reject <why>\`."
-    exit 0;;
-esac
-
-# ── already recorded? (idempotency: the receipt names the comment id) ──────────────────────────
-if gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body' | grep -q "receipt-for-comment: $COMMENT_ID"; then
+if [ "$(printf '%s' "$gesture" | jq -r .alreadyReceipted)" = "true" ]; then
   echo "comment $COMMENT_ID already has a receipt"
   exit 0
 fi

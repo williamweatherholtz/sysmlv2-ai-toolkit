@@ -130,3 +130,218 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }
+
+// ── the channel's deterministic text logic (D0221) ─────────────────────────────────────────────
+//
+// WHY IT IS HERE AND NOT IN A SCRIPT. `.github/scripts/record_decision.sh` parsed the human's
+// gesture with a shell `case` and a locale-dependent `tr`, re-grepped the login table the binary
+// already owns (two implementations of one rule - exactly how the workflow gate and the recorder
+// drifted apart, D0219), and was unit-tested by production. A bespoke script is also invisible to
+// every keel surface: no guard reads it and its behaviour cannot be re-derived from the tree.
+//
+// The split is by KIND: deterministic text logic here, `gh` effects in a thin workflow step, and
+// what a gesture MEANS in the process definition. The binary performs NO network I/O.
+
+/// What the human's comment asked for.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Verdict {
+    /// Accept, optionally choosing an option letter on a fork.
+    Accept(Option<char>),
+    /// Reject, carrying their reason verbatim.
+    Reject(String),
+    /// Nothing recognisable — the caller must say so on the thread and record NOTHING.
+    Unparsed,
+}
+
+/// THE GESTURE VOCABULARY, in one place (D0221).
+///
+/// Reads only the FIRST line, trimmed, and is deliberately small:
+///   * a single letter        -> accept, choosing that option (`B`)
+///   * `accept` / `/accept`   -> accept with no option
+///   * `accept B`             -> accept, choosing B
+///   * `reject <why>`         -> reject, carrying the reason
+///
+/// Case-insensitive on the keyword, ASCII-only on the option letter. Anything else is `Unparsed`:
+/// the channel records NOTHING it did not understand, because a misread gesture becomes a
+/// fabricated human attestation (§4/D0106), which is the one failure this path must never have.
+#[must_use]
+pub fn parse_gesture(body: &str) -> Verdict {
+    let first = body.lines().next().unwrap_or("").trim_end_matches('\r').trim();
+    if first.is_empty() {
+        return Verdict::Unparsed;
+    }
+    // A bare single ASCII letter is an option choice.
+    let mut chars = first.chars();
+    if let (Some(c), None) = (chars.next(), chars.next()) {
+        if c.is_ascii_alphabetic() {
+            return Verdict::Accept(Some(c.to_ascii_uppercase()));
+        }
+    }
+    let lower = first.to_ascii_lowercase();
+    let word = lower.trim_start_matches('/');
+    if let Some(rest) = word.strip_prefix("reject") {
+        // `reject` alone is still a reject; the reason may be empty and that is the human's choice.
+        let reason = first
+            .trim_start_matches('/')
+            .get("reject".len()..)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if rest.is_empty() || rest.starts_with(|c: char| c.is_whitespace() || c == ':') {
+            return Verdict::Reject(reason);
+        }
+    }
+    if let Some(rest) = word.strip_prefix("accept") {
+        let rest = rest.trim();
+        if rest.is_empty() {
+            return Verdict::Accept(None);
+        }
+        let mut rc = rest.chars();
+        if let (Some(c), None) = (rc.next(), rc.next()) {
+            if c.is_ascii_alphabetic() {
+                return Verdict::Accept(Some(c.to_ascii_uppercase()));
+            }
+        }
+    }
+    Verdict::Unparsed
+}
+
+/// Which decision an issue is about, from the `keel-decision: <name>` marker its body embeds.
+///
+/// The marker is what makes the thread addressable, and it is written by the opener — so reading it
+/// back is the inverse of one authored fact, not a guess about the title.
+#[must_use]
+pub fn decision_of(issue_body: &str) -> Option<String> {
+    for tok in issue_body.split_whitespace() {
+        if let Some(rest) = tok.strip_prefix("keel-decision:") {
+            if !rest.is_empty() {
+                return Some(rest.trim_end_matches("-->").trim().to_string());
+            }
+        }
+    }
+    // `keel-decision: dNNNN` with a space after the colon.
+    let mut it = issue_body.split_whitespace().peekable();
+    while let Some(tok) = it.next() {
+        if tok == "keel-decision:" {
+            if let Some(next) = it.peek() {
+                let v = next.trim_end_matches("-->").trim();
+                if !v.is_empty() {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Has this comment id already been receipted? Idempotency, decided from the comment bodies the
+/// caller already fetched — so the check is deterministic here and the fetch stays in the workflow.
+#[must_use]
+pub fn already_receipted(comment_bodies: &str, comment_id: &str) -> bool {
+    comment_bodies.contains(&format!("receipt-for-comment: {comment_id}"))
+}
+
+/// Escape a string for embedding in the JSON this command prints. The human's reason is arbitrary
+/// text, so it is escaped rather than trusted — a quote in a rejection reason must not produce
+/// malformed JSON that a workflow then mis-parses.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// `keel github-gesture` — parse the channel's inputs and print what they MEAN, as JSON.
+///
+/// Inputs arrive by ENV, never argv: `COMMENT_BODY`, and optionally `ISSUE_BODY` and `COMMENT_ID`
+/// plus `COMMENT_BODIES`. The comment body is attacker-influenced text, so it is never interpolated
+/// into a shell command anywhere in this path.
+///
+/// # Returns
+/// 0 when the gesture parsed; 1 when it did not (the caller says so on the thread and records
+/// nothing); 2 on a usage error.
+#[must_use]
+pub fn gesture_cmd() -> i32 {
+    let Ok(body) = std::env::var("COMMENT_BODY") else {
+        eprintln!("usage: COMMENT_BODY=<text> keel github-gesture [ISSUE_BODY=.. COMMENT_ID=.. COMMENT_BODIES=..]");
+        eprintln!("  Inputs arrive by ENV, never argv: a comment body is attacker-influenced text.");
+        return 2;
+    };
+    let issue_body = std::env::var("ISSUE_BODY").unwrap_or_default();
+    let comment_id = std::env::var("COMMENT_ID").unwrap_or_default();
+    let bodies = std::env::var("COMMENT_BODIES").unwrap_or_default();
+    let decision = decision_of(&issue_body).unwrap_or_default();
+    let receipted = !comment_id.is_empty() && already_receipted(&bodies, &comment_id);
+    let (verdict, option, reason) = match parse_gesture(&body) {
+        Verdict::Accept(opt) => ("accept", opt.map(String::from).unwrap_or_default(), String::new()),
+        Verdict::Reject(why) => ("reject", String::new(), why),
+        Verdict::Unparsed => ("unparsed", String::new(), String::new()),
+    };
+    println!(
+        "{{\"verdict\": \"{verdict}\", \"option\": \"{option}\", \"reason\": \"{}\", \"decision\": \"{decision}\", \"alreadyReceipted\": {receipted}}}",
+        json_escape(&reason)
+    );
+    i32::from(verdict == "unparsed")
+}
+
+#[cfg(test)]
+mod gesture_tests {
+    use super::{already_receipted, decision_of, parse_gesture, Verdict};
+
+    #[test]
+    fn the_documented_vocabulary_parses() {
+        assert_eq!(parse_gesture("B"), Verdict::Accept(Some('B')));
+        assert_eq!(parse_gesture("b"), Verdict::Accept(Some('B')), "case-insensitive on the letter");
+        assert_eq!(parse_gesture("accept"), Verdict::Accept(None));
+        assert_eq!(parse_gesture("/accept"), Verdict::Accept(None));
+        assert_eq!(parse_gesture("Accept C"), Verdict::Accept(Some('C')));
+        assert_eq!(parse_gesture("reject too wide"), Verdict::Reject("too wide".to_string()));
+        assert_eq!(parse_gesture("reject"), Verdict::Reject(String::new()));
+        // Only the FIRST line counts, so a signature or quoted mail trailer cannot change the verdict.
+        assert_eq!(parse_gesture("A\n\nsent from my phone"), Verdict::Accept(Some('A')));
+        assert_eq!(parse_gesture("accept\r\ntrailing"), Verdict::Accept(None));
+    }
+
+    /// THE CONTROL: anything unrecognised records NOTHING. A misread gesture becomes a fabricated
+    /// human attestation (D0106), which is the one failure this path must never have.
+    #[test]
+    fn anything_unrecognised_is_unparsed_and_never_an_accept() {
+        for body in [
+            "",
+            "   ",
+            "looks good to me",
+            "yes",
+            "lgtm",
+            "acceptable",         // not `accept`
+            "rejecting this",     // not `reject`
+            "12",
+            "?",
+            "accept BB",          // an option is ONE letter
+            "thanks!",
+        ] {
+            assert_eq!(parse_gesture(body), Verdict::Unparsed, "must not read a verdict from {body:?}");
+        }
+    }
+
+    #[test]
+    fn the_decision_marker_is_read_back_from_the_issue_body() {
+        let body = "<!-- keel-decision: d0219 -->\n\n**Why it came up:** ...";
+        assert_eq!(decision_of(body).as_deref(), Some("d0219"));
+        assert_eq!(decision_of("no marker here"), None);
+    }
+
+    #[test]
+    fn idempotency_is_decided_from_the_comment_bodies() {
+        let bodies = "recorded\nreceipt-for-comment: 12345\nthanks";
+        assert!(already_receipted(bodies, "12345"));
+        assert!(!already_receipted(bodies, "999"));
+    }
+}
