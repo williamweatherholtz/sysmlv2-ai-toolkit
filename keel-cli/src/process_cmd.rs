@@ -129,12 +129,6 @@ fn restore_dst(root: &Path, rel: &Path) -> PathBuf {
     if repo_relative { root.join(rel) } else { root.join(".engine").join(rel) }
 }
 
-/// The declared EXTRA files a unit needs to run, and the prerequisites an importer must satisfy
-/// (D0219), from `.engine/contracts/unit-extras.toml`. Returns `(files, requires)`.
-///
-/// srPortModularProcessUnit says a unit travels "without leaving its enforcement behind", and the
-/// decision-channel unit was leaving five files behind - two workflows and two scripts that ARE the
-/// mechanism. Declared as data rather than Rust so a project adds its own units without a fork.
 /// Where a unit file lands INSIDE the bundle (D0219).
 ///
 /// An engine file stays engine-relative, so a bundle keeps its familiar `processes/` and `skills/`
@@ -147,6 +141,12 @@ fn bundle_rel(root: &Path, f: &Path) -> PathBuf {
         .map_or_else(|_| f.strip_prefix(root).unwrap_or(f).to_path_buf(), Path::to_path_buf)
 }
 
+/// The declared EXTRA files a unit needs to run, and the prerequisites an importer must satisfy
+/// (D0219), from `.engine/contracts/unit-extras.toml`. Returns `(files, requires)`.
+///
+/// srPortModularProcessUnit says a unit travels "without leaving its enforcement behind", and the
+/// decision-channel unit was leaving five files behind - two workflows and two scripts that ARE the
+/// mechanism. Declared as data rather than Rust so a project adds its own units without a fork.
 fn unit_extras(root: &Path, unit: &str) -> (Vec<String>, Vec<String>) {
     let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/unit-extras.toml")) else {
         return (Vec::new(), Vec::new());
@@ -194,6 +194,8 @@ fn unit_files(root: &Path, r: &Row) -> Vec<PathBuf> {
     let mut files = vec![e.join("processes").join(format!("{}.sysml", r.name))];
     for s in &r.skills {
         files.push(e.join("skills").join(s).join("SKILL.md"));
+        // D0220: the skill's own registry declaration, so the unit carries what binds skill->process.
+        files.push(e.join("skills").join(s).join("registry.sysml"));
     }
     // Rules live in shared files, so a rule is carried by NAME in the manifest rather than by
     // copying a file that also holds other processes' rules. Splitting them per process would be a

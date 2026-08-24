@@ -1480,9 +1480,26 @@ pub fn process_skill(root: &Path) -> GuardReport {
         .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(str::to_string))
         .collect();
     let reg_path = root.join(".engine").join("skills").join("skills-registry.sysml");
-    let Ok(reg) = std::fs::read_to_string(&reg_path) else {
+    let Ok(central) = std::fs::read_to_string(&reg_path) else {
         return GuardReport { name: "process-skill", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &reg_path))] };
     };
+    // D0220: a skill may declare its deployment BESIDE ITSELF, in any `.sysml` under
+    // `.engine/skills/`, not only in the central registry. Adopting decision-channel on penumbra
+    // proved why: the unit carried the SKILL.md but the registry ENTRY that binds skill->process
+    // stayed home, so `process-skill` failed in the receiving project on the very first run - a new
+    // project's first experience of an adopted unit was a red gate. Reading the whole directory lets
+    // a unit ship its own registration as a file, so nothing has to be text-merged into a shared
+    // registry (the hazard the rules layer already avoids by carrying rules BY NAME).
+    let mut reg = central;
+    for f in crate::collect_sysml(&root.join(".engine").join("skills")) {
+        if f == reg_path {
+            continue;
+        }
+        if let Ok(extra) = std::fs::read_to_string(&f) {
+            reg.push('\n');
+            reg.push_str(&extra);
+        }
+    }
     let violations = process_skill_violations(&processes, &reg);
     GuardReport { name: "process-skill", scanned: processes.len(), warnings: Vec::new(), violations }
 }

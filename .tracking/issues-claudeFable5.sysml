@@ -430,4 +430,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcChannelUnitTravels to issue251;
 
+
+    part issue252 : Issue {
+        :>> id = "509efa73-6b5f-4084-8340-fdbabc80da83";
+        :>> title = "An adopted unit landed with a RED gate: the entry binding skill to process could not travel";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by actually adopting the decision-channel unit on asirobots/penumbra instead of testing the export in this repository. The bundle carried the process definition, the SKILL.md and the mechanism, but the entry that binds skill to process lives in .engine/skills/skills-registry.sysml - one shared file holding all 37 skills - and stayed home. process-skill therefore FAILED in penumbra on the very first run: process .engine/processes/decision-channel.sysml has NO deploying skill (inert process). A new project's first experience of an adopted unit was a red gate clearable only by hand-editing a shared engine file, which is a fork of the mechanism and exactly the adoption friction D0054 calls the top risk. The rules layer had already met this and solved it by carrying rules BY NAME rather than copying a shared file; skills had no equivalent. FIX (D0220): a skill may declare its deployment beside itself in any .sysml under .engine/skills/, and both readers scan the directory. TWO further defects surfaced in the doing: duplicate-identity refused the copy on the first edit, forcing a MOVE rather than a duplicate; and moving the entry silently dropped the export from 6 files to 5, losing the skill entirely, because activation::deploying_skills also read only the central file - caught by re-checking the export rather than trusting the count.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSkillRegistersBesideItself to issue252;
+
 }

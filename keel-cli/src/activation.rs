@@ -117,8 +117,22 @@ fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
 /// otherwise `export` writes a bundle missing the skill, which is srPortModularProcessUnit's
 /// "without leaving its enforcement behind" failing on the other leg.
 pub(crate) fn deploying_skills(root: &Path, process: &str) -> Vec<String> {
-    let reg = root.join(".engine").join("skills").join("skills-registry.sysml");
-    let Ok(text) = std::fs::read_to_string(reg) else { return Vec::new() };
+    // D0220: a skill may declare its deployment BESIDE ITSELF so a unit carries its own
+    // registration, so every `.sysml` under `.engine/skills/` is a registry — not just the central
+    // file. Moving decision-channel's entry out of the central registry made its skill vanish from
+    // the unit and the export silently dropped from 6 files to 5, which is why this reads the
+    // directory rather than one path.
+    let skills_dir = root.join(".engine").join("skills");
+    let mut text = String::new();
+    for f in crate::collect_sysml(&skills_dir) {
+        if let Ok(s) = std::fs::read_to_string(&f) {
+            text.push('\n');
+            text.push_str(&s);
+        }
+    }
+    if text.is_empty() {
+        return Vec::new();
+    }
     let needle = format!(".engine/processes/{process}.sysml");
     let mut out = Vec::new();
     // Each skill is a `part <name> : AISkill { ... }` block; the one whose purpose names this
