@@ -31,12 +31,110 @@ fn rank(sev: &str) -> u8 {
     }
 }
 
+/// `camelCase` -> `kebab-case`, matching `activation::camel_to_kebab`: a process asserts a guard by
+/// its constraint name (`staleGateProse`) and the guard is named `stale-gate-prose`.
+fn camel_to_kebab(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('-');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The `[processes] active = [...]` list from a commit's `activation.toml`, plus whether the section
+/// was declared at all. An ABSENT file means everything is active (D0138/issue090), so the two cases
+/// must stay distinguishable — treating absent as "nothing active" would report every guard as
+/// disarmed on any project that never adopted a manifest.
+fn active_processes(repo: &Path, sha: &str) -> (Vec<String>, bool) {
+    let Some(text) = git(repo, &["show", &format!("{sha}:.engine/contracts/activation.toml")]) else {
+        return (Vec::new(), false);
+    };
+    let mut in_processes = false;
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_processes = t == "[processes]";
+            continue;
+        }
+        if in_processes && t.starts_with("active") {
+            if let Some(list) = t.split_once('[').and_then(|(_, r)| r.rsplit_once(']')).map(|(l, _)| l) {
+                let names = list
+                    .split(',')
+                    .map(|s| s.trim().trim_matches('"').to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                return (names, true);
+            }
+        }
+    }
+    (Vec::new(), false)
+}
+
+/// Which guard each process CLAIMS at this commit: `assert constraint <x> : <guardName>;` inside a
+/// `.engine/processes/*.sysml` part/action. Claiming is what converts a guard from CORE
+/// (never-deactivatable) into that process's switchable property — the issue242 capture.
+fn guard_claims(repo: &Path, sha: &str) -> BTreeMap<String, String> {
+    let mut claims = BTreeMap::new();
+    let files = git(repo, &["ls-tree", "-r", "--name-only", sha, ".engine/processes/"]).unwrap_or_default();
+    for f in files.lines().filter(|f| Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
+        let Some(text) = git(repo, &["show", &format!("{sha}:{f}")]) else { continue };
+        let proc_name = Path::new(f).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        for line in text.lines() {
+            let t = line.trim();
+            if !t.starts_with("assert constraint") {
+                continue;
+            }
+            // `assert constraint <local> : <GuardName>;`
+            if let Some((_, tail)) = t.split_once(':') {
+                let g = tail.trim().trim_end_matches(';').trim();
+                if !g.is_empty() && g.chars().all(|c| c.is_ascii_alphanumeric()) {
+                    claims.insert(camel_to_kebab(g), proc_name.clone());
+                }
+            }
+        }
+    }
+    claims
+}
+
+/// Effective guard state rank at a commit (issue242). CORE binds hardest because it cannot be
+/// switched off at all; ACTIVE enforces but is switchable; INACTIVE does not enforce.
+///
+/// This is the dimension `audit-adherence` was missing. The D0208 control evaluation proved a rule
+/// severity could be flipped, which clause 1 closed — but two other routes disarm a control without
+/// touching `.engine/rules/` at all: (a) adding one `assert constraint` line to a guard-less process
+/// CAPTURES a core guard and makes it that process's switchable property (verified live: core
+/// `stale-gate-prose` became `[INACTIVE] report` and stopped running), and (b) narrowing
+/// `activation.toml`'s active list disarms every guard the removed process owns. Both are covered by
+/// the commit keystone, but clause 1 exists precisely because a bypassed hook leaves no trace at
+/// commit time — and the hook WAS bypassed here (issue240).
+const fn state_rank(state: &GuardEffective) -> u8 {
+    match state {
+        GuardEffective::Core => 3,
+        GuardEffective::Active => 2,
+        GuardEffective::Inactive => 1,
+    }
+}
+
+enum GuardEffective {
+    Core,
+    Active,
+    Inactive,
+}
+
 /// The enforcement SIGNATURE at one commit: rule/constraint name -> severity rank. Reads the rule
 /// files and the guard-constraint declarations from THAT commit's tree via `git show` (no checkout —
 /// cheap enough to gate on). A `constraint def` with no severity is a guard binding: present = rank 3
 /// (its removal is a weakening exactly as a severity drop is).
 fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
     let mut sig = BTreeMap::new();
+    let mut declared_guards: Vec<String> = Vec::new();
     // rule files: `part <name> : ElementRule|EdgeRule { ... :>> severity = RuleSeverity::<sev>; }`
     let files = git(repo, &["ls-tree", "-r", "--name-only", sha, ".engine/rules/"]).unwrap_or_default();
     for f in files.lines().filter(|f| std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
@@ -66,9 +164,30 @@ fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
                 let name = rest.split([';', ' ', '/']).next().unwrap_or("").trim();
                 if !name.is_empty() {
                     sig.insert(format!("guard:{name}"), 3);
+                    declared_guards.push(name.to_string());
                 }
             }
         }
+    }
+    // issue242: the EFFECTIVE state of each declared guard, so a capture (Core -> Active) or a
+    // deactivation (Active -> Inactive) ranks as a weakening. Without this the signature saw only
+    // `.engine/rules/`, and both routes to disarming a control were invisible to the gate built for
+    // exactly that class.
+    let (active, declared_manifest) = active_processes(repo, sha);
+    let claims = guard_claims(repo, sha);
+    for g in declared_guards {
+        let kebab = camel_to_kebab(&g);
+        // Unclaimed by any process => CORE: no activation switch reaches it. Claimed => Active
+        // unless a DECLARED manifest omits the claiming process; with no manifest everything is
+        // active (D0138), so absent must never read as off.
+        let state = claims.get(&kebab).map_or(GuardEffective::Core, |p| {
+            if !declared_manifest || active.iter().any(|a| a == p) {
+                GuardEffective::Active
+            } else {
+                GuardEffective::Inactive
+            }
+        });
+        sig.insert(format!("guardstate:{kebab}"), state_rank(&state));
     }
     sig
 }
@@ -154,10 +273,10 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
 
 const fn rank_name(r: u8) -> &'static str {
     match r {
-        3 => "blocking/bound",
-        2 => "warning",
+        3 => "blocking/bound/core",
+        2 => "warning/active",
         0 => "absent",
-        _ => "present",
+        _ => "present/inactive",
     }
 }
 
@@ -177,5 +296,21 @@ mod tests {
         // The exact issue236 shape: blocking(3) -> warning(2) is a weakening; vanished(0) is worse.
         assert!(rank("warning") < rank("blocking"));
         assert!(0 < rank("warning"));
+    }
+
+    #[test]
+    fn core_binds_harder_than_active_which_binds_harder_than_inactive() {
+        // issue242: the two disarm routes are Core -> Active/Inactive (a process CAPTURES a core
+        // guard) and Active -> Inactive (activation.toml narrows). Both must rank as weakenings.
+        assert!(state_rank(&GuardEffective::Core) > state_rank(&GuardEffective::Active));
+        assert!(state_rank(&GuardEffective::Active) > state_rank(&GuardEffective::Inactive));
+        assert!(state_rank(&GuardEffective::Inactive) > 0, "inactive is still DECLARED - absence is worse");
+    }
+
+    #[test]
+    fn camel_to_kebab_matches_the_activation_convention() {
+        assert_eq!(camel_to_kebab("staleGateProse"), "stale-gate-prose");
+        assert_eq!(camel_to_kebab("docSync"), "doc-sync");
+        assert_eq!(camel_to_kebab("actors"), "actors");
     }
 }

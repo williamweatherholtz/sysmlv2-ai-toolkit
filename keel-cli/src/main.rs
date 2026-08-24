@@ -2975,7 +2975,12 @@ viewpoints ({} declared):", vps.len());
         // read as "no such process", which is a different and wrong answer.
         if keel_cli::activation::declared_processes(&root).iter().any(|p| p == target) {
             eprintln!(
-                "error: `{target}` is a declared process but asserts no guard, so there is nothing for {mode} to switch. Activation governs GUARDS (D0138). To stop running this process, remove the facts it authors -- a process whose inputs are absent produces nothing -- or give it an `assert constraint` so it becomes switchable."
+                // issue242: this text used to end "or give it an `assert constraint` so it becomes
+                // switchable" -- advising the exact edit that CAPTURES a core guard and disarms it.
+                // Adding an assert is a process-definition change under the keystone and is now
+                // caught by audit-adherence as a Core -> Active/Inactive weakening; the CLI must not
+                // recommend it as a convenience.
+                "error: `{target}` is a declared process but asserts no guard, so there is nothing for {mode} to switch. Activation governs GUARDS (D0138). To stop running this process, remove the facts it authors -- a process whose inputs are absent produces nothing. Do NOT add an `assert constraint` to make it switchable: claiming a guard converts it from CORE to that process's switchable property, which DISARMS it (issue242), and audit-adherence gates that transition."
             );
         } else {
             eprintln!(
