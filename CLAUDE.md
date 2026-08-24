@@ -202,7 +202,9 @@ constructs the kernel rejects, and never blocks. Its number is tracked as `confo
 ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 
 In-loop gating (D0128/D0130/D0134/D0174): `keel hook post-edit` runs the fast tier after each `.sysml`
-edit; `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is
+edit, and when that tier is clean it adds a **non-blocking** proactive advisory (D0209 clause 4) naming
+what the edit broke downstream — a typed edge whose endpoint no longer resolves, or a verified criterion
+the edit changed while its pass result stands; `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is
 dishonest; `keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) —
 **advisory, never blocking**, and silent unless it has something to say; `keel hook pre-write` guards
 the protected fact surfaces (deny in strict-profile projects, advisory here until P1 lands the tiered

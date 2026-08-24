@@ -824,7 +824,25 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
         }
     }
     if problems.is_empty() {
-        return 0; // clean -> silent, so a passing gate costs nothing
+        // Fast tier clean -> the model is not BROKEN, but the edit may have broken something
+        // DOWNSTREAM. D0209 clause 4 (dcProactivePostEdit): surface it as NON-BLOCKING guidance so
+        // the author fixes it at the point of edit, not at commit. Silent when there is nothing.
+        let rel = std::path::Path::new(path)
+            .strip_prefix(root)
+            .unwrap_or_else(|_| std::path::Path::new(path))
+            .to_string_lossy()
+            .replace('\\', "/");
+        let advisories = keel_cli::proactive::post_edit_advisories(root, &rel);
+        if advisories.is_empty() {
+            return 0; // clean -> silent, so a passing gate costs nothing
+        }
+        let mut body = advisories.join("\n");
+        body.truncate(2000);
+        return hook_emit(&serde_json::json!({
+            "systemMessage": format!(
+                "[proactive — non-blocking] That edit may have broken something downstream (D0209 clause 4):\n\n{body}\n\nThe model still parses, so this does NOT block — but fix it now, at the point of the edit, before it reaches a commit gate."
+            )
+        }));
     }
     let mut body = problems.join("\n");
     body.truncate(2000);
