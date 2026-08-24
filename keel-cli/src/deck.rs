@@ -293,6 +293,22 @@ fn collect(root: &Path) -> Vec<Item> {
 }
 
 
+/// The GitHub repo slug (owner/repo) from the origin remote, if it is a GitHub URL — the deck's
+/// decision cards link to their issue board (D0206: GitHub is the decision surface; the deck is a
+/// read view). `None` for non-GitHub remotes: no link beats a wrong link.
+fn github_slug(root: &Path) -> Option<String> {
+    let url = crate::gitx::git()
+        .arg("-C")
+        .arg(root)
+        .args(["config", "--get", "remote.origin.url"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
+    let rest = url.strip_prefix("https://github.com/").or_else(|| url.strip_prefix("git@github.com:"))?;
+    Some(rest.trim_end_matches(".git").trim_end_matches('/').to_string())
+}
+
 /// One card's HTML. Extracted from [`html`]'s section loop (clippy line budget) — behavior identical.
 fn render_card(root: &Path, i: &Item, cls: &str) -> String {
     let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
@@ -315,9 +331,13 @@ fn render_card(root: &Path, i: &Item, cls: &str) -> String {
     let why = if cls == "acceptance" {
         decision_digest(root, &i.file).map_or_else(String::new, |(ctx, dec)| {
             format!(
-                "<details class=why><summary>what this decides, and why</summary><div><p><b>Why it came up:</b> {}</p><p><b>What is being decided:</b> {}</p></div></details>",
+                "<details class=why><summary>what this decides, and why</summary><div><p><b>Why it came up:</b> {}</p><p><b>What is being decided:</b> {}</p></div></details>{}",
                 esc(&ctx),
-                esc(&dec)
+                esc(&dec),
+                github_slug(root).map_or_else(String::new, |slug| format!(
+                    "<p class=meta><a href=\"https://github.com/{slug}/issues?q=keel-decision-{n}\">decide on GitHub</a> - the recorded channel (D0205)</p>",
+                    n = esc(&i.name)
+                ))
             )
         })
     } else {

@@ -7,7 +7,10 @@ package Decision0206 {
     private import EngineVerification::*;
     private import EngineRelationships::*;
 
-    part d0206 : Decision {
+// #ProspectiveChange (D0070): governs the inbox retirement - the deck-inbox.toml deletion and the
+    // obligation-review skill re-point (sprint 437). Marker added at APPLICATION time; the signed
+    // acceptance below is untouched.
+    #ProspectiveChange part d0206 : Decision {
         :>> id = "6f87e488-a41c-4e30-8c77-81d30dc9b4b1";
         :>> title = "retireInbox: switch off the Smartsheet tap inbox once the GitHub channel has proven itself on this very decision";
         :>> createdAt = "2026-08-23";
