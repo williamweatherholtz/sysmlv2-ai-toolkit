@@ -111,7 +111,10 @@ frozen (modify it only by out-of-band Decision).
   `record decision`, `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
-  Commit messages and memory are **not** decision records.
+  Commit messages and memory are **not** decision records. The keystone lock also covers the
+  **enforcement surface** (D0209 clause 2): guard source (`keel-cli/src/guards.rs`, `adherence.rs`),
+  hook config (`.githooks/`), and CI workflows (`.github/workflows/*.yml`) change only with a
+  co-committed `#ProspectiveChange`/`#SafetyChange` Decision — a control is not silently self-modifiable.
 - **Commit convention:** prefix process/schema commits `CR: <rationale>`.
 - **Doc-sync rides every change.** Change an item type, schema, workflow, process, skill, tool, or
   convention → grep the doc surface and fix every claim it invalidates **in the same commit**.

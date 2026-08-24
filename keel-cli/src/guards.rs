@@ -508,6 +508,36 @@ fn is_process_def(p: &str) -> bool {
             || p.starts_with(".engine/rules/"))
 }
 
+/// The files that DEFINE the enforcement LOGIC (every `-> GuardReport` guard plus the audit-adherence
+/// gate). Kept identical to the real set by `enforcement_surface_covers_every_guard_source` — that
+/// test fails CI if a new guard-defining file appears outside this list, which is the D0209-clause-2
+/// "diff `is_process_def` against the actual guard-definition paths" audit made executable.
+const GUARD_SOURCE_FILES: &[&str] = &["keel-cli/src/guards.rs", "keel-cli/src/adherence.rs"];
+
+/// The ENFORCEMENT SURFACE (D0209 clause 2, dcFreezeEnforcementSurface): the paths a guard reads its
+/// own DEFINITION or CONFIG from. issue236 proved a control could be silently disarmed by editing its
+/// definition; `.engine/rules/` (in `is_process_def`) closed the DECLARED-rule leg, and this closes
+/// the rest — the guard SOURCE, the local hook CONFIG, and the CI WORKFLOW files that run the gates on
+/// infra the agent cannot touch. A change to any of them needs a co-committed human-signed marked
+/// Decision, exactly like a process definition. Kept SEPARATE from `is_process_def` so the two intents
+/// stay legible and the coverage audit can diff this set against the real guard sources.
+fn is_enforcement_surface(p: &str) -> bool {
+    // CI workflow files — where audit-adherence / audit-history / the keel gates actually run.
+    if p.starts_with(".github/workflows/")
+        && std::path::Path::new(p)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("yml") || e.eq_ignore_ascii_case("yaml"))
+    {
+        return true;
+    }
+    // Local git hooks — the per-commit / per-merge / per-push gate wiring.
+    if p.starts_with(".githooks/") {
+        return true;
+    }
+    // Guard SOURCE — the enforcement logic itself.
+    GUARD_SOURCE_FILES.contains(&p)
+}
+
 fn is_decision_file(p: &str) -> bool {
     is_sysml(p) && p.starts_with(".engine/decisions/")
 }
@@ -525,18 +555,24 @@ fn has_process_marker(text: &str) -> bool {
 
 /// Pure core: a staged process-def change must be co-committed with a marked Decision.
 fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) -> Vec<String> {
-    let mut procdefs: Vec<&str> = changed.iter().map(String::as_str).filter(|p| is_process_def(p)).collect();
-    procdefs.sort_unstable();
-    if procdefs.is_empty() {
-        return Vec::new(); // no process-def changed — guard is silent
+    // The keystone covers process DEFINITION (D0070) AND the ENFORCEMENT SURFACE (D0209 clause 2):
+    // guard source, hook config, CI workflows. A change to either needs a co-committed marked Decision.
+    let mut locked: Vec<&str> = changed
+        .iter()
+        .map(String::as_str)
+        .filter(|p| is_process_def(p) || is_enforcement_surface(p))
+        .collect();
+    locked.sort_unstable();
+    if locked.is_empty() {
+        return Vec::new(); // nothing under the lock changed — guard is silent
     }
     let marked = decision_texts.iter().any(|(p, t)| is_decision_file(p) && has_process_marker(t));
     if marked {
         return Vec::new();
     }
     vec![format!(
-        "process-def file(s) changed ({}) with NO co-committed process-change Decision (a #ProspectiveChange/#SafetyChange-marked .engine/decisions/*.sysml). D0070 hard lock: every process-def change — typos included — must record a process-change Decision. Record one with `keel record decision --process-change ...` (the flag emits the marker; issue213).",
-        procdefs.join(", ")
+        "locked file(s) changed ({}) with NO co-committed process-change Decision (a #ProspectiveChange/#SafetyChange-marked .engine/decisions/*.sysml). HARD LOCK: process definitions (D0070) AND the enforcement surface — guard source, hook config, CI workflows (D0209 clause 2) — may change only with a human-signed Decision, because a silently self-modified control is the issue236 self-modification class. Record one with `keel record decision --process-change ...` (the flag emits the marker; issue213).",
+        locked.join(", ")
     )]
 }
 
@@ -562,7 +598,7 @@ pub fn process_change(root: &Path) -> GuardReport {
         .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
         .collect();
     let violations = keystone_violations(&changed, &decision_texts);
-    let scanned = changed.iter().filter(|p| is_process_def(p)).count();
+    let scanned = changed.iter().filter(|p| is_process_def(p) || is_enforcement_surface(p)).count();
     // D0204 (pullOversight): the short-lived D0200 clause-5 throttle - refusing process-def commits
     // while the human's review queue aged - is deliberately ABSENT. Nothing gates the AI's work on
     // the human's attention cadence; the records stay auditable, the ask is gone.
@@ -3393,6 +3429,56 @@ mod identity_form_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// D0209 clause 2 coverage audit, made executable: every file that DEFINES a guard (`-> GuardReport`)
+    /// must sit inside the enforcement-surface lock, so a new guard file cannot be added OUTSIDE it and
+    /// thereby be editable without a signed Decision. Scans the real `src/` tree rather than trusting the
+    /// hand-list in `GUARD_SOURCE_FILES` -- if the two diverge, this fails CI, which is the point.
+    #[test]
+    fn enforcement_surface_covers_every_guard_source() {
+        fn collect(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(dir) else { return };
+            for e in entries.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    collect(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        collect(&src, &mut files);
+        let mut uncovered = Vec::new();
+        for f in files {
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            if !text.contains("-> GuardReport") {
+                continue;
+            }
+            let rel = f.strip_prefix(&src).unwrap().to_string_lossy().replace('\\', "/");
+            let repo_rel = format!("keel-cli/src/{rel}");
+            if !is_enforcement_surface(&repo_rel) {
+                uncovered.push(repo_rel);
+            }
+        }
+        assert!(
+            uncovered.is_empty(),
+            "guard-defining file(s) OUTSIDE the enforcement-surface lock (add to GUARD_SOURCE_FILES): {uncovered:?}"
+        );
+    }
+
+    #[test]
+    fn enforcement_surface_locks_workflows_hooks_and_guard_source() {
+        assert!(is_enforcement_surface(".github/workflows/ci.yml"));
+        assert!(is_enforcement_surface(".githooks/pre-commit"));
+        assert!(is_enforcement_surface("keel-cli/src/guards.rs"));
+        assert!(is_enforcement_surface("keel-cli/src/adherence.rs"));
+        // NOT locked: ordinary source, docs, a workflow-shaped path outside the dir.
+        assert!(!is_enforcement_surface("keel-cli/src/main.rs"));
+        assert!(!is_enforcement_surface(".engine/docs/guards.md"));
+        assert!(!is_enforcement_surface("README.md"));
+    }
 
     /// Every enforced guard must actually DISPATCH. `run_one` is a hand-written match, so a name can sit
     /// in `GUARD_NAMES` -- counted in the control inventory, listed in `--help`, documented in guards.md --

@@ -20,7 +20,7 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 | `sprint-coverage` | Substantive work went through a sprint (D0064/issue020) |
 | `ceremony` | Sprint gates passed in order (D0047/issue010+011) |
 | `charter` | Work traces to a chartering item (D0068) |
-| `process-change` | A process-def change co-commits a `#ProspectiveChange` Decision — the D0070 keystone |
+| `process-change` | A change to a process-def OR the enforcement surface co-commits a `#ProspectiveChange`/`#SafetyChange` Decision — the D0070 keystone, extended by D0209 clause 2 to guard source (`keel-cli/src/guards.rs`, `adherence.rs`), hook config (`.githooks/`), and CI workflows (`.github/workflows/*.yml`); a unit test re-derives the guard-source set so a new guard file cannot escape the lock |
 | `issues` | Every Issue is triaged with a `#Resolves` resolver (D0077/D0078). Rule-sourced |
 | `viewpoint-renderer` | Every declared viewpoint names a real `keel` command (D0056/issue034) |
 | `manifest-coverage` | The deliverable-suspicion manifest has no dead entries (D0050/issue033) |
