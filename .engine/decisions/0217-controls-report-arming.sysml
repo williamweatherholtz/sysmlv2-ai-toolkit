@@ -1,0 +1,23 @@
+// D0217 (PROPOSED — NOT YET ACCEPTED) — controlsReportArming: DECLARED is not ARMED - the control inventory says whether each control can actually fire
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0217Accept event on sign-off.
+package Decision0217 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0217 : Decision {
+        :>> id = "48a06c1c-a3cc-4da3-aa72-570e9a3d17bb";
+        :>> title = "controlsReportArming: DECLARED is not ARMED - the control inventory says whether each control can actually fire";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "Follow-on from issue240, stated as a residual at the time rather than silently claimed closed. keel controls (D0195) computes the two-way hazard/control diff from typed EDGES, so it answers whether a control is DECLARED against a hazard and structurally cannot answer whether that control can FIRE. During issue240 core.hooksPath was set to a null device, the pre-commit gate could not run at all, and controls reported uncoveredHazards as empty - truthful on the question it was asking, misleading on the question a reader has. That is the third of the three surfaces that reported an unreachable control as healthy; the other two (orient, hardening) were fixed by dcArmedNotDeclared, and this one was deferred because it needed a modeling decision rather than a predicate swap: which controls have machine-checkable bindings, and what does the view say about the ones that do not.";
+        :>> decision = "Arming is DECLARED PER CONTROL in a new contract, .engine/contracts/control-arming.toml, and keel controls reports it beside declaration. Each control declares checkable = true with a named probe the binary implements, or checkable = false with a stated reason; a control with NO entry reads UNDECLARED, so silence is a gap rather than consent (the process-enforcement.toml convention). The view emits a controlArming row per control with one of ARMED, NOT-ARMED (carrying the probe's reason), not-machine-checkable (carrying the declared reason), UNDECLARED, or PROBE-MISSING when a declared probe name is not implemented - which is reported rather than treated as armed. One new gap class is added and it is deliberately the only decidable one: hazardsWithADisarmedControl, the hazards relying on a control that IS checkable and whose probe says it cannot fire. Controls that are not machine-checkable are never counted as armed and never counted as gaps; counting them either way would be a claim the model cannot support. The association is DATA a project edits rather than Rust (the D0184 rule-owners precedent), so a downstream project declares its own controls and probes without a fork.";
+        :>> rationale = "The alternative - a boolean armed field on every control - would have required editing frozen schema/core and would have put a runtime fact in an authored one, which is exactly the dual-truth the engine forbids. Declaring the BINDING as data and computing the STATE keeps the authored layer irreducible. Reporting not-machine-checkable with a reason rather than omitting those controls is the N-C2 discipline applied here: the absence of a check must be distinguishable from a passing check, and eight of the nine controls are honestly in that category - a CI job's arming and a remote's branch protection are not observable from a working tree, and saying so is the honest answer rather than a probe that fails open.";
+        :>> consequences = "keel controls gains controlArming and hazardsWithADisarmedControl. On this tree ctlCommitGate reads ARMED and the new gap class is empty. VERIFIED by probe in a throwaway worktree reproducing the exact issue240 state (core.hooksPath = nul with the contract present): ctlCommitGate reads NOT-ARMED carrying the reason, uncoveredHazards remains empty - correctly, since declaration did not change - and hazardsWithADisarmedControl names ehz2 and ehz4, the two hazards whose covering control could not fire. With the contract absent every control reads UNDECLARED, which is the intended gap-not-consent reading. Resolves the dcControlsReportArming residual and closes the third surface from issue240.";
+    }
+}

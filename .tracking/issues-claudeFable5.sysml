@@ -394,4 +394,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcTestsAssertRepoNotMachine to issue248;
 
+
+    part issue249 : Issue {
+        :>> id = "bb2266b1-9fc8-4096-bcb6-095872fdc97c";
+        :>> title = "A git config set inside a probe WORKTREE disarms the parent repo - this is how issue240 happened";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reproduced ACCIDENTALLY while probing the controls-arming work, which settles issue240's origin. A linked worktree SHARES the common .git/config, so `git -C <worktree> config core.hooksPath nul` does not scope to the worktree - it rewrites the parent repository's config and disarms the real commit gate. That is almost certainly the exact mechanism by which issue240 arose: an earlier red-team probe set hooksPath to a null device to simulate a bypass, and the setting outlived the worktree. The correct probe form is the PER-COMMAND override `git -c core.hooksPath=/dev/null <cmd>`, which the audit-adherence probes used and this one did not. WHAT MATTERS MORE THAN THE MECHANISM: the detection control already existed and worked. The conditional test added for issue248 failed within a minute of the probe, naming the state, so the disarmed gate was caught by a check rather than by luck - the second time that control has fired on a real disarming, both times self-inflicted. This is the D0047 shape working as intended: rather than trying to prevent a probe-methodology mistake by vigilance, DETECT the resulting state regardless of cause. Recorded so the mechanism is written down once instead of being rediscovered a third time.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcArmedNotDeclared to issue249;
+
 }

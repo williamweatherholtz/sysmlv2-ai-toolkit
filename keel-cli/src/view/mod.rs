@@ -2955,6 +2955,68 @@ struct TierStat {
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
+/// Per-control ARMING declared in `.engine/contracts/control-arming.toml` (issue240 follow-on/D0217).
+///
+/// Returns `(control, (checkable, probe_or_reason))`. DECLARED is not ARMED: `keel controls` computes
+/// declared coverage from typed edges and, during issue240, truthfully reported no uncovered hazard
+/// while the pre-commit gate could not run at all. The association is data a project edits rather than
+/// Rust, so a downstream project declares its own probes without a fork (the D0184 precedent).
+fn control_arming(root: &Path) -> std::collections::BTreeMap<String, (bool, String)> {
+    let mut out = std::collections::BTreeMap::new();
+    let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/control-arming.toml")) else {
+        return out;
+    };
+    let mut current: Option<String> = None;
+    let (mut checkable, mut detail) = (false, String::new());
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            if let Some(c) = current.take() {
+                out.insert(c, (checkable, std::mem::take(&mut detail)));
+            }
+            current = Some(name.to_string());
+            checkable = false;
+            continue;
+        }
+        if l.starts_with("checkable") {
+            checkable = l.contains("true");
+        } else if let Some(v) = l.strip_prefix("probe").or_else(|| l.strip_prefix("reason")) {
+            detail = v.trim_start_matches([' ', '=']).trim().trim_matches('"').to_string();
+        }
+    }
+    if let Some(c) = current {
+        out.insert(c, (checkable, detail));
+    }
+    out
+}
+
+/// Is a checkable control ACTUALLY armed right now? `None` when no probe of that name exists, which is
+/// itself reported rather than silently treated as armed.
+///
+/// # Errors
+/// The inner `Err` carries the probe's reason the control cannot fire.
+fn probe_armed(root: &Path, probe: &str) -> Option<Result<(), String>> {
+    match probe {
+        "commit-gate-armed" => Some(crate::gitx::commit_gate_armed(root).map(|_| ())),
+        _ => None,
+    }
+}
+
+/// `keel controls` (D0195, panel R1 aerospace flip 2) — the two-way hazard/control diff.
+///
+/// Computes over `.tracking/architecture/engine-safety.sysml` (Hazard instances) and
+/// `control-map.sysml` (`SystemSafetyConstraint` instances with plain dependency edges to the
+/// hazards they discharge): hazards NO constraint reaches (the uncovered failure conditions — the
+/// question ARP4754A asks that could not previously be asked of this model), and constraints
+/// anchored to NO hazard (process-quality controls — reported, never warned away). Clause 7 rides
+/// along: a High/Critical Issue created after D0195's acceptance that references no hazard is the
+/// loss/hazard list going stale by the very EHZ8 mechanism it documents, and is listed.
+///
+/// Since D0217 it also reports ARMING per control, because DECLARED is not ARMED: during issue240
+/// this view truthfully reported no uncovered hazard while the commit gate could not fire at all.
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn controls(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let hazards: Vec<&String> = {
@@ -3006,10 +3068,45 @@ pub fn controls(root: &Path) -> Result<String, ViewError> {
         }
     }
     unlinked_incidents.sort_by_key(Json::dump);
+    // issue240 follow-on: report ARMING beside declaration, and name the one gap class that is
+    // decidable - a control declared CHECKABLE whose probe says it cannot fire. Controls that are not
+    // machine-checkable are reported as such with their reason, never counted as armed.
+    let arming_decl = control_arming(root);
+    let mut arming_rows: Vec<Json> = Vec::new();
+    let mut disarmed: Vec<String> = Vec::new();
+    for c in &constraints {
+        if !c.starts_with("ctl") {
+            continue; // guard-mirroring constraints (gXxx) are covered by `keel guard` itself
+        }
+        let (state, detail) = match arming_decl.get(c.as_str()) {
+            None => ("UNDECLARED".to_string(), "no entry in control-arming.toml - silence is a gap, not consent".to_string()),
+            Some((false, reason)) => ("not-machine-checkable".to_string(), reason.clone()),
+            Some((true, probe)) => match probe_armed(root, probe) {
+                None => ("PROBE-MISSING".to_string(), format!("declared checkable by probe `{probe}` which this binary does not implement")),
+                Some(Ok(())) => ("ARMED".to_string(), format!("probe `{probe}` passes")),
+                Some(Err(why)) => {
+                    disarmed.push((*c).clone());
+                    ("NOT-ARMED".to_string(), why)
+                }
+            },
+        };
+        arming_rows.push(Json::Obj(vec![
+            ("control".to_string(), Json::s((*c).clone())),
+            ("arming".to_string(), Json::s(state)),
+            ("detail".to_string(), Json::s(detail)),
+        ]));
+    }
+    let hazards_with_disarmed: Vec<Json> = hazards
+        .iter()
+        .filter(|h| disarmed.iter().any(|c| reaches(c, h)))
+        .map(|h| Json::s((*h).clone()))
+        .collect();
     Ok(Json::Obj(vec![
-        ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side".to_string())),
+        ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side. DECLARED is not ARMED: `controlArming` reports whether each control can actually fire, because during issue240 this view truthfully reported no uncovered hazard while the commit gate could not run at all (D0217).".to_string())),
         ("hazards".to_string(), Json::Arr(rows)),
         ("uncoveredHazards".to_string(), Json::Arr(uncovered.into_iter().map(Json::s).collect())),
+        ("controlArming".to_string(), Json::Arr(arming_rows)),
+        ("hazardsWithADisarmedControl".to_string(), Json::Arr(hazards_with_disarmed)),
         ("unanchoredConstraints".to_string(), Json::Arr(unanchored)),
         ("unlinkedHighIncidentsSinceD0195".to_string(), Json::Arr(unlinked_incidents)),
     ])

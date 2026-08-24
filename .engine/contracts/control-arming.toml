@@ -1,0 +1,54 @@
+# Control ARMING (issue240 follow-on, D0217) — for each declared control, whether the fact that it can
+# actually FIRE is machine-checkable, and by which probe.
+#
+# WHY THIS FILE EXISTS. `keel controls` (D0195) computes the two-way hazard/control diff from typed
+# EDGES, so it answers "is a control DECLARED against this hazard" and cannot answer "can that control
+# fire". During issue240 `core.hooksPath` was set to a null device, the pre-commit gate could not run at
+# all, and `controls` reported `uncoveredHazards: []` — truthfully, on the question it was asking, and
+# misleadingly on the question a reader has. DECLARED is not ARMED, and the surface must say which one
+# it means (N-C2 / srAuthorityAnswerStatesItsBasis).
+#
+# The association is DATA a project edits, not Rust (the D0184 rule-owners precedent): a downstream
+# project has different controls and must be able to declare its own probes without a fork.
+#
+# `probe` names a check the binary implements. Only these exist today:
+#   commit-gate-armed  — git can reach `.githooks/pre-commit` (gitx::commit_gate_armed)
+#
+# A control with NO entry is UNDECLARED — deliberately, so silence reads as a gap rather than as
+# consent (the process-enforcement.toml convention).
+
+[ctlCommitGate]
+checkable = true
+probe = "commit-gate-armed"
+
+[ctlPrePushBehind]
+checkable = false
+reason = "Same .githooks directory as the commit gate, so reachability is the same fact; what a pre-push hook DOES on a non-fast-forward can only be established by attempting a push, which a read-only view must not do. Covered indirectly by the commit-gate probe and directly by the sprint-401 probe record."
+
+[ctlBranchProtection]
+checkable = false
+reason = "A remote configuration, readable only by an authenticated API call to GitHub. A view that silently performs network I/O is a view you stop running (the orient sync precedent), and an unauthenticated read would fail open. Established by probe and recorded at sprint 401 instead."
+
+[ctlAuditHistory]
+checkable = false
+reason = "Runs in CI over pushed ranges. Its arming is a workflow file naming it, which the enforcement-surface keystone now locks (D0209 clause 2), and its FIRING leaves a run record on infra this binary cannot read. Checking that a local checkout contains a workflow file would assert reachability it cannot observe."
+
+[ctlReleaseGateJob]
+checkable = false
+reason = "Same as ctlAuditHistory: a CI job, proven both ways at sprint 409, whose arming is not observable from a working tree."
+
+[ctlWriteLock]
+checkable = false
+reason = "In-process and unconditional (write.rs takes the lock or refuses loudly). There is no configuration that could disarm it, so there is nothing to probe: absence of a switch is stronger than a passing check."
+
+[ctlPreWriteTiers]
+checkable = false
+reason = "Harness-boundary hook whose wiring lives in .claude/settings.json, already reconciled by the claude-surface-drift guard. Whether the HARNESS honours the hook is a property of the harness, not of this repository - the issue248 lesson: a check may assert a repo property, never a machine or host property."
+
+[ctlFireLedger]
+checkable = false
+reason = "Machine-local by design (.keel/metrics/hooks.jsonl, D0180). An empty ledger on a fresh clone is correct and indistinguishable from a broken one, so a probe would report a gap that is not one."
+
+[ctlReverify]
+checkable = false
+reason = "An on-demand command, not a standing control: it is armed whenever the binary exists. Nothing to switch, so nothing to check."
