@@ -406,4 +406,16 @@ package IssuesClaudeFable5 {
     }
     #Resolves dependency from dcArmedNotDeclared to issue249;
 
+
+    part issue250 : Issue {
+        :>> id = "34fb807f-efe4-4d99-893f-781dd5c10231";
+        :>> title = "audit-adherence never checked the FIRST commit of a push, so a single-commit push was never checked at all";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found while building the chartered dcNoFalseCleanRange, and the charter was WRONG about the fix. The visible symptom was that audit-adherence printed 'fewer than 2 commits in range - nothing to compare. Clean.' and exited 0, a false clean inside the gate built to prevent false cleans; the chartered remedy was to make that a usage error. That would have been a serious mistake: CI invokes --since github.event.before, so a SINGLE-COMMIT PUSH lists exactly one commit, and erroring would have failed CI on the most common push there is - the issue089/issue090 trap of a new hard check breaking every normal case on day one. THE REAL DEFECT, one layer down: the comparison seeded its baseline from shas[0] and then compared windows of two, so shas[0] was only ever a BASELINE and was NEVER ITSELF CHECKED. The first commit of every push therefore escaped the gate, and a single-commit push escaped entirely. A weakening introduced in the first commit of a push was invisible to the one control built to catch exactly that class (D0209 clause 1), which had been true since the day it shipped. FIX: seed the baseline from the PARENT of the range's first commit, so every commit in the range including the first is compared; a root commit (no parent) is stated as its own baseline rather than guessed at; and only a genuinely EMPTY range is reported as nothing to do. VERIFIED: a weakening committed as a single commit with the hook bypassed now returns exit 1 naming the rule, where the same probe previously reported Clean; real history passes at both --since HEAD~1 and --since HEAD~20.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoFalseCleanRange to issue250;
+
 }

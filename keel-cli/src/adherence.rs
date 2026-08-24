@@ -229,16 +229,55 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     };
     let shas: Vec<String> = list.lines().map(str::to_owned).filter(|s| !s.is_empty()).collect();
     if shas.len() < 2 {
-        println!("audit-adherence: fewer than 2 commits in range — nothing to compare. Clean.");
-        return 0;
+        // issue250: this used to print "nothing to compare. Clean." and exit 0 — a FALSE CLEAN inside
+        // the gate built to prevent false cleans. It fired on the most common CI case of all: a
+        // single-commit push, where `github.event.before..HEAD` lists exactly one commit. A range
+        // with no commits at all is genuinely nothing to do; a range with one is now fully checked,
+        // because the baseline comes from that commit's PARENT rather than from the range itself.
+        if shas.is_empty() {
+            println!("audit-adherence: the range contains no commits — nothing happened, nothing to check.");
+            return 0;
+        }
     }
     println!("audit-adherence: re-deriving the enforcement signature across {} commit(s) from the tree", shas.len());
     println!("  (guard-set + rule severities; a weakening needs a co-committed signed Decision — D0209).");
+    // issue250: the baseline is the PARENT of the range's first commit, not the first commit itself.
+    // Seeding from `shas[0]` meant shas[0] was only ever a baseline and NEVER CHECKED, so the first
+    // commit of every push escaped the gate — and a single-commit push escaped entirely. A weakening
+    // introduced in the first commit of a push was therefore invisible to the one control built to
+    // catch exactly that (D0209 clause 1).
     let Some(first) = shas.first() else { return 0 };
-    let mut prev = signature(repo, first);
+    // Resolve the parent to a real SHA rather than carrying the `X^` revision string: the report
+    // shortens SHAs to 7 chars, which silently ate the caret and printed a commit as its own parent.
+    let parent = git(repo, &["rev-parse", &format!("{first}^")]).map(|s| s.trim().to_string());
+    // A root commit has no parent: then the range's own first commit is the only possible baseline,
+    // and there is nothing before it to weaken FROM. Say which case we are in rather than guessing.
+    let (mut prev, mut pairs): (BTreeMap<String, u8>, Vec<(String, String)>) = parent.map_or_else(
+        || {
+            println!("  (the range starts at a ROOT commit, which has no parent to weaken from — it is the baseline.)");
+            (
+                signature(repo, first),
+                shas.windows(2)
+                    .filter_map(|w| match w {
+                        [a, b] => Some((a.clone(), b.clone())),
+                        _ => None,
+                    })
+                    .collect(),
+            )
+        },
+        |baseline| {
+            let mut pairs: Vec<(String, String)> = Vec::new();
+            let mut left = baseline.clone();
+            for s in &shas {
+                pairs.push((std::mem::replace(&mut left, s.clone()), s.clone()));
+            }
+            (signature(repo, &baseline), pairs)
+        },
+    );
     let mut violations = 0u32;
-    for w in shas.windows(2) {
-        let [a, b] = w else { continue };
+    for (a, b) in std::mem::take(&mut pairs) {
+        let a = &a;
+        let b = &b;
         let cur = signature(repo, b);
         let mut weakened: Vec<String> = Vec::new();
         for (name, &old_rank) in &prev {
