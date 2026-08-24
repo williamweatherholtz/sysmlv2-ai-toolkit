@@ -128,7 +128,7 @@ frozen (modify it only by out-of-band Decision).
   leaves the surfaces and its renderer stops being gated) but `concern-coverage` still reports the
   concern — otherwise coverage could be raised by switching off what it was failing.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
-- **`keel sync` / `keel land` are the integration path (D0129).** `sync` fetches, reports divergence,
+- **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook.** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` pushes and, on rejection, merges and **gates the
   MERGED tree** before retrying — two contributions that pass alone can fail together. `orient` reports
   its own `sync` position, so every computed answer states the tree it was computed against.

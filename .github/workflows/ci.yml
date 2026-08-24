@@ -37,3 +37,8 @@ jobs:
       # tree alone — the issue116 control, now remote. No hook having run is assumed.
       - name: keel audit-history (tree-derived verdicts over the pushed range)
         run: ./target/release/keel audit-history --since "${{ github.event.before || 'HEAD~1' }}" || ./target/release/keel audit-history --max 20
+      - name: keel audit-adherence (guard-set monotonicity — a control cannot be disarmed unsigned, D0209)
+        # A GATE, not a report: unlike audit-history this fails the build. Re-derives from the tree,
+        # on infra the agent cannot touch, that no rule severity weakened / guard vanished across the
+        # pushed range without a co-committed signed Decision (the issue236 self-modification class).
+        run: ./target/release/keel audit-adherence --since "${{ github.event.before || 'HEAD~50' }}"

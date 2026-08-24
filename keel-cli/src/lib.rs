@@ -31,6 +31,7 @@ pub mod arch;
 pub mod verification;
 pub mod schema;
 pub mod history;
+pub mod adherence;
 pub mod claim;
 pub mod deck;
 pub mod launcher;
