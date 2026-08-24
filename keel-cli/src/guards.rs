@@ -496,7 +496,16 @@ fn is_process_def(p: &str) -> bool {
     {
         return true;
     }
-    is_sysml(p) && (p.starts_with(".engine/processes/") || p.starts_with(".engine/workflows/"))
+    // issue236 (D0208 control evaluation, HIGH): `.engine/rules/` holds the DECLARED ElementRule/
+    // EdgeRule instances the guards enforce — downgrading a rule's severity from blocking to warning
+    // silently disarms a control, and the evaluation proved that edit passed with no guard firing
+    // (the monitor was modifiable by the monitored). Rules are enforcement DEFINITION, so the
+    // keystone lock covers them: any `.engine/rules/*.sysml` edit needs a co-committed marked
+    // Decision, i.e. a human-signed act — the panel's self-modification gap, closed.
+    is_sysml(p)
+        && (p.starts_with(".engine/processes/")
+            || p.starts_with(".engine/workflows/")
+            || p.starts_with(".engine/rules/"))
 }
 
 fn is_decision_file(p: &str) -> bool {

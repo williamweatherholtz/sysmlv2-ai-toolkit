@@ -247,4 +247,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcGithubGestureSubstance to issue235;
+
+    part issue236 : Issue {
+        :>> id = "3862f78b-2c11-46e2-868a-69454d6792fe";
+        :>> title = "An agent can disarm a blocking guard rule with no signed decision - the monitor was modifiable by the monitored";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "D0208 control evaluation (OPTION A, scripted probes in a throwaway worktree), the panel-predicted finding made concrete: committing a flip of confirmationAuthenticityRule from RuleSeverity::blocking to warning in .engine/rules/rules.sysml passed process-change (scanned 0 - the rules dir was outside is_process_def), engine-lint, and the whole gate. An agent could silently downgrade any control it enforces. The AI-safety lens named exactly this ('the agent builds its own guards... the monitor is modifiable by the monitored'); the evaluation the human authorized found it on the first pass. Control: .engine/rules/ joins the process-change keystone (dcRulesUnderKeystone), so weakening a rule needs a human-signed marked Decision.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRulesUnderKeystone to issue236;
+
+    part issue237 : Issue {
+        :>> id = "61c9980c-962e-4ff3-8159-9ca65d652c1f";
+        :>> title = "A dangling judgedAgainst SHA passes the commit gate when the result is unreferenced";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "D0208 control eval: a TestResult with judgedAgainst = 000...0 (a SHA that never resolves) passed validate+guard. The tracked case is caught elsewhere - orient invalidEvidence flags a done task whose evidence SHA dangles, and CI audit-history re-derives per commit - but the commit gate itself does not check SHA resolvability, so an orphan garbage-SHA result lands green. LOW because an unreferenced result computes nothing; recorded so the gap is visible rather than assumed covered.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcDanglingResultAtGate to issue237;
 }
