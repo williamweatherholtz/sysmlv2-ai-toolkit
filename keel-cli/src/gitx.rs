@@ -130,13 +130,40 @@ exit 0
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
-    /// This repository's own gate must be ARMED — the regression that let issue240 happen silently.
+    /// A CONFIGURED `core.hooksPath` must be REACHABLE — the regression that let issue240 run silently.
+    ///
+    /// The first version of this test asserted that THIS repo's gate is armed, and my own sprint447
+    /// review gate flagged the risk ("it couples a unit test to machine-local git config") and I
+    /// overrode it. It was wrong and CI proved it within the hour: a CI checkout configures no
+    /// hooksPath and correctly does not need one — CI is the hook-INDEPENDENT layer (K15/D0179) — so
+    /// the test failed on every push. Local hook arming is a property of a MACHINE, not of the
+    /// repository, and a test can only assert the latter.
+    ///
+    /// The real invariant is conditional and still catches issue240 exactly: if a hooksPath is
+    /// configured at all, it must resolve to a directory holding `pre-commit`. `core.hooksPath = nul`
+    /// is configured-but-unreachable and fails; an unconfigured CI checkout is not a violation.
     #[test]
-    fn this_repos_commit_gate_is_armed() {
+    fn a_configured_hooks_path_must_be_reachable() {
         let root = std::path::Path::new("..");
+        let configured = super::git()
+            .arg("-C")
+            .arg(root)
+            .args(["config", "--get", "core.hooksPath"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty());
+        let Some(path) = configured else {
+            // No hooksPath: nothing claims a local gate, so nothing is broken. CI lands here.
+            return;
+        };
         match super::commit_gate_armed(root) {
             Ok(dir) => assert!(dir.join("pre-commit").exists(), "armed must mean the hook is there"),
-            Err(why) => panic!("this repo's commit gate is NOT ARMED: {why} - run: git config core.hooksPath .githooks"),
+            Err(why) => panic!(
+                "core.hooksPath is set to `{path}` but the gate is NOT ARMED: {why} - fix it or unset it; \
+                 a configured-but-unreachable hooks path is the issue240 state"
+            ),
         }
     }
 }
