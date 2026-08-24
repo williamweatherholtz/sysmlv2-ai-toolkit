@@ -28,7 +28,6 @@ jobs:
       - name: open an issue per proposed decision
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           gh label create blocks-work --force --color B60205 --description "a decision gating work - your call" || true

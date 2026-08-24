@@ -19,11 +19,14 @@ concurrency:
 
 jobs:
   record:
+    # D0219: the job-level condition is STRUCTURAL only — a decision-labelled issue, commented by a
+    # human rather than a bot. WHO MAY DECIDE is not a fact about this workflow and must not be a
+    # literal in it: it lives in the committed `.engine/contracts/github-actors.toml`, is checked
+    # below by `keel github-decider`, and is therefore per-project without forking the mechanism.
     if: >
       github.event_name != 'issue_comment' ||
       (
         contains(github.event.issue.labels.*.name, 'decision') &&
-        github.event.comment.user.login == 'williamweatherholtz' &&
         github.event.comment.user.type == 'User'
       )
     runs-on: ubuntu-latest
@@ -44,8 +47,26 @@ jobs:
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
       - name: build keel
         run: cargo build --release -p keel-cli --bin keel
-      - name: record from the triggering comment
+      # D0219: authorization is read from the committed table, not from this file. An outsider's
+      # comment is NOT a failure — it is a comment from someone who may not decide here, so the run
+      # stays green and says so on the thread rather than going red for a bystander.
+      - name: is the commenter a declared decider?
+        id: auth
         if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOGIN: ${{ github.event.comment.user.login }}
+        run: |
+          set -uo pipefail
+          if ./target/release/keel github-decider "$LOGIN" > /dev/null 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            gh issue comment "${{ github.event.issue.number }}" --body \
+              "\`$LOGIN\` is not a declared decider on this project, so nothing was recorded. Deciders are declared in \`.engine/contracts/github-actors.toml\` — provenance is never defaulted (issue182)." || true
+          fi
+      - name: record from the triggering comment
+        if: github.event_name == 'issue_comment' && steps.auth.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -60,13 +81,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # D0219: sweep comments from ANY declared decider, read from the committed table - no login
+          # literal in this file. With no decider declared there is nothing to sweep, and saying so
+          # beats iterating over an empty allowlist silently.
+          deciders=$(./target/release/keel github-decider | cut -f1 | jq -R . | jq -sc .)
+          if [ "$deciders" = "[]" ]; then
+            echo "sweep: no decider declared in .engine/contracts/github-actors.toml - nothing to sweep."
+            exit 0
+          fi
+          echo "sweep: deciders $deciders"
           for n in $(gh issue list --state open --label decision --json number --jq '.[].number'); do
-            # latest comment by the allowlisted human that has no receipt yet
-            gh issue view "$n" --json comments \
-              --jq '[.comments[] | select(.author.login == "williamweatherholtz")] | last | {id: .id, body: .body, url: .url}' > c.json || continue
+            # latest comment by ANY declared decider that has no receipt yet
+            gh issue view "$n" --json comments > all.json || continue
+            jq --argjson L "$deciders" \
+              '[.comments[] | select(.author.login as $a | $L | index($a))] | last | {id: .id, body: .body, url: .url, login: .author.login}' \
+              all.json > c.json || continue
             cid=$(jq -r '.id // empty' c.json)
             [ -z "$cid" ] && continue
-            if gh issue view "$n" --json comments --jq '.comments[].body' | grep -q "receipt-for-comment: $cid"; then
+            if jq -r '.comments[].body' all.json | grep -q "receipt-for-comment: $cid"; then
               continue
             fi
             echo "sweeping issue $n comment $cid"
@@ -74,6 +106,6 @@ jobs:
             COMMENT_BODY="$(jq -r .body c.json)" \
             COMMENT_ID="$cid" \
             COMMENT_URL="$(jq -r .url c.json)" \
-            COMMENT_USER="williamweatherholtz" \
+            COMMENT_USER="$(jq -r .login c.json)" \
             bash .github/scripts/record_decision.sh
           done

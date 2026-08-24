@@ -112,6 +112,83 @@ fn extract_rule_block(root: &Path, rule: &str) -> Option<String> {
     None
 }
 
+/// Where a bundle entry is RESTORED in the receiving project (D0219) — the inverse of `bundle_rel`.
+///
+/// A first component starting with `.` is a REPO-relative extra (`.github/workflows/...`) and lands
+/// at the project root; anything else is engine-relative and lands under `.engine/`.
+///
+/// Shared by the fresh-import and `--update` loops, which each had their own `.engine`-join. The
+/// update path therefore wrote `.github/workflows/x.yml` to `.engine/.github/workflows/x.yml` —
+/// inert, in the wrong place, while reporting "6 file(s) from upstream". Two loops with one rule
+/// between them is how that happened, so there is now one function and no second opinion.
+fn restore_dst(root: &Path, rel: &Path) -> PathBuf {
+    let repo_relative = rel
+        .components()
+        .next()
+        .is_some_and(|c| c.as_os_str().to_string_lossy().starts_with('.'));
+    if repo_relative { root.join(rel) } else { root.join(".engine").join(rel) }
+}
+
+/// The declared EXTRA files a unit needs to run, and the prerequisites an importer must satisfy
+/// (D0219), from `.engine/contracts/unit-extras.toml`. Returns `(files, requires)`.
+///
+/// srPortModularProcessUnit says a unit travels "without leaving its enforcement behind", and the
+/// decision-channel unit was leaving five files behind - two workflows and two scripts that ARE the
+/// mechanism. Declared as data rather than Rust so a project adds its own units without a fork.
+/// Where a unit file lands INSIDE the bundle (D0219).
+///
+/// An engine file stays engine-relative, so a bundle keeps its familiar `processes/` and `skills/`
+/// layout. An EXTRA lives outside `.engine` (a workflow, a script), for which `strip_prefix(.engine)`
+/// fails - and the old `unwrap_or(f)` fell back to the ABSOLUTE path, which `join` discards the base
+/// for, so the copy target became the source file and export died copying a file onto itself. An
+/// extra therefore keeps its REPO-relative path and round-trips to the same place on import.
+fn bundle_rel(root: &Path, f: &Path) -> PathBuf {
+    f.strip_prefix(root.join(".engine"))
+        .map_or_else(|_| f.strip_prefix(root).unwrap_or(f).to_path_buf(), Path::to_path_buf)
+}
+
+fn unit_extras(root: &Path, unit: &str) -> (Vec<String>, Vec<String>) {
+    let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/unit-extras.toml")) else {
+        return (Vec::new(), Vec::new());
+    };
+    let (mut files, mut requires) = (Vec::new(), Vec::new());
+    let mut in_unit = false;
+    let mut list: Option<&mut Vec<String>> = None;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('#') {
+            continue;
+        }
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            in_unit = name == unit;
+            list = None;
+            continue;
+        }
+        if !in_unit {
+            continue;
+        }
+        if l.starts_with("files") {
+            list = Some(&mut files);
+            continue;
+        }
+        if l.starts_with("requires") {
+            list = Some(&mut requires);
+            continue;
+        }
+        if l == "]" {
+            list = None;
+            continue;
+        }
+        if let Some(target) = list.as_deref_mut() {
+            let v = l.trim_end_matches(',').trim().trim_matches('"');
+            if !v.is_empty() {
+                target.push(v.to_string());
+            }
+        }
+    }
+    (files, requires)
+}
+
 fn unit_files(root: &Path, r: &Row) -> Vec<PathBuf> {
     let e = root.join(".engine");
     let mut files = vec![e.join("processes").join(format!("{}.sysml", r.name))];
@@ -121,6 +198,13 @@ fn unit_files(root: &Path, r: &Row) -> Vec<PathBuf> {
     // Rules live in shared files, so a rule is carried by NAME in the manifest rather than by
     // copying a file that also holds other processes' rules. Splitting them per process would be a
     // schema-shaped change, not an export detail — recorded rather than done silently.
+    //
+    // D0219: plus the declared EXTRAS — the files the unit needs to RUN. Without these the
+    // decision-channel unit exported its definition and skill while both workflows and both scripts
+    // stayed home, so the receiving project got a described process and no mechanism.
+    for extra in unit_extras(root, &r.name).0 {
+        files.push(root.join(&extra));
+    }
     files.into_iter().filter(|p| p.exists()).collect()
 }
 
@@ -341,7 +425,14 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                 return 1;
             }
             for f in &files {
-                let rel = f.strip_prefix(root.join(".engine")).unwrap_or(f);
+                // D0219: an extra lives OUTSIDE .engine (a workflow, a script). strip_prefix then
+                // FAILS, and the old `unwrap_or(f)` fell back to the ABSOLUTE path - which
+                // `dst.join(..)` discards the base for, so the copy target became the SOURCE and the
+                // export died with "used by another process" copying a file onto itself. Engine
+                // files stay engine-relative (bundle keeps processes/, skills/); everything else
+                // keeps its REPO-relative path, so `.github/...` round-trips to the same place.
+                let rel_owned = bundle_rel(root, f);
+                let rel = rel_owned.as_path();
                 let target = dst.join(rel);
                 if let Some(p) = target.parent() {
                     if let Err(e) = std::fs::create_dir_all(p) {
@@ -497,7 +588,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
             if rel == Path::new("unit.toml") {
                 continue;
             }
-            let dst = root.join(".engine").join(rel);
+            let dst = restore_dst(root, rel);
             if let Some(p) = dst.parent() {
                 let _ = std::fs::create_dir_all(p);
             }
@@ -511,7 +602,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
         } else if let Err(e) = write_install_record(root, &unit_id, &name, version, &hashes) {
             eprintln!("warning: install record not written ({e}) — the next --update will need --assume-local-base");
         }
-        println!("imported '{name}' v{version}: {copied} file(s) into .engine/ (install record written)");
+        println!("imported '{name}' v{version}: {copied} file(s) (engine files under .engine/, declared extras at the project root; install record written)");
         println!("  NOT YET ENFORCED. Run `keel activate {name}` to turn its guards on, then `keel validate . && keel guard .`.");
         return 0;
     }
@@ -545,7 +636,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
             continue;
         }
         let rel_s = rel.to_string_lossy().replace('\\', "/");
-        let dst = root.join(".engine").join(rel);
+        let dst = restore_dst(root, rel);
         let upstream = file_hash(&entry);
         let local = dst.exists().then(|| file_hash(&dst));
         let base_h = base_hash(&rel_s).or_else(|| local.clone()); // assume-local-base fallback
@@ -649,6 +740,15 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
                 return 2;
             };
             print_row(r, true);
+            // D0219: an importer must be TOLD what the unit needs beyond its files, or it lands
+            // inert and the first symptom is silence.
+            let (_, requires) = unit_extras(root, &r.name);
+            if !requires.is_empty() {
+                println!("             the RECEIVING project must also:");
+                for q in &requires {
+                    println!("               - {q}");
+                }
+            }
             println!("             files that MOVE with it:");
             for f in unit_files(root, r) {
                 println!("               {}", f.strip_prefix(root).unwrap_or(&f).display().to_string().replace('\\', "/"));

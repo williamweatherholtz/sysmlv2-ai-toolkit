@@ -12,13 +12,29 @@ sweeps into the same queue (the standing consent arriving after the issue did). 
 awaiting the human's letter.
 """
 import json
-import os
 import re
 import subprocess
 
 
 def gh(args, check=False):
     return subprocess.run(["gh", *args], capture_output=True, text=True, check=check)
+
+
+def decider_logins():
+    """The declared deciders, from the committed table via the binary (D0219).
+
+    REPO_OWNER was WRONG, not merely inflexible: `github.repository_owner` is not a person. For an
+    org-owned repo like asirobots/penumbra it is the ORG, and `gh issue create --assignee <org>`
+    fails outright - the mechanism would break on the first adoption rather than degrade. Assignment
+    is a convenience; the `decision` label is what makes an issue findable, so with no declared
+    decider we assign nobody and still open the issue.
+    """
+    out = subprocess.run(["./target/release/keel", "github-decider"], capture_output=True, text=True, check=False)
+    return [l.split("	")[0] for l in out.stdout.splitlines() if l.strip()]
+
+
+def assignee_args():
+    return [a for login in decider_logins() for a in ("--assignee", login)]
 
 
 def queue_auto(name: str, number: str, url: str) -> None:
@@ -60,7 +76,7 @@ def ensure_override_threads() -> None:
         with open("body.md", "w", encoding="utf-8") as f:
             f.write(body)
         created = gh(["issue", "create", "--title", c["title"], "--body-file", "body.md",
-                      "--label", "decision", "--assignee", os.environ["REPO_OWNER"]], check=True)
+                      "--label", "decision", *assignee_args()], check=True)
         url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
         if url.startswith("http"):
             gh(["issue", "close", url, "--reason", "completed",
@@ -112,7 +128,7 @@ def main() -> None:
             f.write(body)
         created = gh(["issue", "create", "--title", c["title"], "--body-file", "body.md",
                       "--label", "blocks-work", "--label", "decision",
-                      "--assignee", os.environ["REPO_OWNER"]], check=True)
+                      *assignee_args()], check=True)
         url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
         number = url.rsplit("/", 1)[-1] if url else ""
         print(f"opened issue for {c['name']}: {url}")

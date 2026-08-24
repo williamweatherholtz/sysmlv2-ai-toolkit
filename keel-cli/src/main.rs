@@ -2626,7 +2626,13 @@ use keel_cli::migrate::{is_engine_dev_only, remap_engine_path};
 fn is_instance_contract(rel: &Path) -> bool {
     matches!(
         rel.to_string_lossy().replace('\\', "/").as_str(),
-        "contracts/activation.toml" | "contracts/unit-ids.toml" | "contracts/installed-units.toml"
+        "contracts/activation.toml"
+            | "contracts/unit-ids.toml"
+            | "contracts/installed-units.toml"
+            // D0219: WHO MAY DECIDE is the most consequential instance fact in the tree, and init
+            // was shipping it verbatim — so every new project silently inherited THIS project's
+            // decider and would have recorded acceptances in their name. Reset to an empty template.
+            | "contracts/github-actors.toml"
     )
 }
 
@@ -2635,6 +2641,24 @@ fn is_instance_contract(rel: &Path) -> bool {
 /// while still showing how to declare a subset. The id registries start genuinely empty: an identity
 /// is minted on first export, never inherited.
 fn starter_for(rel: &Path) -> &'static str {
+    if rel.to_string_lossy().replace('\\', "/") == "contracts/github-actors.toml" {
+        return "# github-actors - GitHub login -> keel actor mapping (D0205 githubChannel).\n\
+#\n\
+# THIS TABLE IS WHO MAY DECIDE ON THIS PROJECT, and it starts EMPTY on purpose (D0219): inheriting\n\
+# another project's decider would let their login record acceptances in your tree. An unmapped login\n\
+# is REFUSED, never defaulted (issue182: provenance is never defaulted).\n\
+#\n\
+# Add one line per human who may decide here. Logins are matched exactly and case-sensitively as\n\
+# GitHub reports them. Only HUMANS belong here: this table exists to attribute human judgment, and\n\
+# mapping a bot login would recreate the AI-recorded-as-human class (issue072/073) at the channel\n\
+# layer. The repo OWNER is not automatically a decider, and an ORG can never be one - an org is not\n\
+# a person and cannot hold judgment.\n\
+#\n\
+# Check yours with `keel github-decider <login>`.\n\
+\n\
+[logins]\n\
+# yourGithubLogin = \"yourKeelActor\"\n";
+    }
     if rel.to_string_lossy().replace('\\', "/") == "contracts/activation.toml" {
         return "# Process activation (D0138) - which processes THIS project has adopted.
 #
@@ -3321,6 +3345,7 @@ const CATALOGUE: &[&str] = &[
     "  ls [ROOT]                    list .tracking/ .sysml files",
     "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
     "  whats-next [ROOT]            print ready task names (one per line)",
+    "  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them (D0219). An unmapped login is refused, never defaulted",
     "  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass (D0209 clause 3)",
     "  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)",
     "  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)",
@@ -3575,6 +3600,7 @@ fn main() {
         Some("verification") => keel_cli::verification::cmd(rest, &repo_arg(rest)),
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some("github-decider") => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
@@ -3765,7 +3791,8 @@ mod tests {
     #[test]
     fn init_resets_instance_contracts_and_keeps_engine_definition() {
         use std::path::Path;
-        for p in ["contracts/activation.toml", "contracts/unit-ids.toml", "contracts/installed-units.toml"] {
+        for p in ["contracts/activation.toml", "contracts/unit-ids.toml", "contracts/installed-units.toml",
+                  "contracts/github-actors.toml"] {
             assert!(super::is_instance_contract(Path::new(p)), "{p} is instance data and must be reset");
         }
         // Engine DEFINITION must still be copied verbatim.
@@ -3786,5 +3813,11 @@ mod tests {
         let ids = super::starter_for(Path::new("contracts/unit-ids.toml"));
         assert!(!ids.lines().any(|l| !l.trim_start().starts_with('#') && l.contains('=')),
             "an inherited unit id claims a lineage this project does not have");
+        // D0219: the decider table must start EMPTY - an inherited decider could record
+        // acceptances in another project's tree under someone else's name.
+        let gh = super::starter_for(Path::new("contracts/github-actors.toml"));
+        assert!(gh.contains("[logins]"), "the starter must still show the section shape");
+        assert!(!gh.lines().any(|l| !l.trim_start().starts_with('#') && l.contains('=')),
+            "no login may be inherited: who may decide is per-project");
     }
 }

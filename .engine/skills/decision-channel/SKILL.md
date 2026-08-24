@@ -26,14 +26,26 @@ inspectable workflow run; the gesture surface and the done-signal are one thread
 
 ## Adopting this in another project (inherit right away)
 
-1. `keel activate decision-channel` (the unit brings the `judgment-request-quality` guard).
-2. Copy from this repo, unchanged unless noted:
-   - `.github/workflows/decision-issue.yml`
-   - `.github/workflows/decision-record.yml` — **edit the allowlist login** in the job `if`
-   - `.github/scripts/open_decision_issues.py`
-   - `.github/scripts/record_decision.sh`
-3. Author `.engine/contracts/github-actors.toml` mapping each GitHub login to its keel Person.
-   Unmapped logins are refused, never defaulted.
+Since D0219 the unit **moves whole** — no hand-copying, and **no file needs editing**, because
+nothing in the mechanism names a person or an owner.
+
+1. In the SOURCE project: `keel process export decision-channel --out <dir>`. The bundle carries the
+   definition, the skill, both workflows and both scripts (6 files + `unit.toml`).
+2. In the TARGET project: `keel process import <dir>/decision-channel --update --assume-local-base`
+   (`--update` because any `keel init` project already holds the definition; `--assume-local-base`
+   bootstraps the three-way base for a pre-D0183 install). Engine files land under `.engine/`,
+   the workflows and scripts at the project root. Then `keel activate decision-channel` for the
+   `judgment-request-quality` guard.
+3. Declare **YOUR** deciders in `.engine/contracts/github-actors.toml` under `[logins]` as
+   `<githubLogin> = "<keelActor>"`. This table IS the authorization set — a mapped login may decide,
+   an unmapped one is refused and never defaulted (issue182). It starts EMPTY in a fresh project on
+   purpose (D0219): inheriting another project's decider would let their login record acceptances in
+   your tree. Check with `keel github-decider <login>`.
+   **The repo owner is not automatically a decider, and an ORG can never be one** — an org is not a
+   person and cannot hold judgment. Assignment goes to the declared deciders, or to nobody; the
+   `decision` label is what makes an issue findable.
+   `keel process show decision-channel` lists the files that move AND the prerequisites, so the
+   receiving project is told rather than discovering it when nothing records.
 4. Ensure the repo's Actions token can push to the default branch (no required status checks /
    push restrictions blocking `GITHUB_TOKEN`; otherwise install a fine-grained GitHub App token on
    the bypass list and swap it into both workflows' checkout).

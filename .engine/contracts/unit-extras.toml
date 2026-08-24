@@ -1,0 +1,37 @@
+# Unit EXTRAS (D0219) — the files a process unit needs to RUN that are not its definition, its
+# deploying skill, or a declared rule.
+#
+# WHY THIS FILE EXISTS. srPortModularProcessUnit is an accepted `must`: a unit carries enough "to be
+# moved between projects whole, without carrying the rest of the engine and WITHOUT LEAVING ITS
+# ENFORCEMENT BEHIND". `keel process export decision-channel` produced three files — the process
+# definition, the skill, and unit.toml — while the five files that ARE the channel (two GitHub
+# workflows, two scripts, and the actor/decider table) stayed home. The guard travelled BY NAME and
+# the machinery travelled not at all, so adopting the channel meant hand-copying and re-deriving,
+# which is exactly how process knowledge leaks out of the engine (D0040).
+#
+# This is the same class as issue241 (the catalogue denied 12 processes that existed) and issue245
+# (the elicitation skill was in no catalogue): a unit whose teeth stay behind.
+#
+# Paths are repo-relative and travel VERBATIM. A path that does not exist is skipped silently — a
+# unit may legitimately declare an optional file — but `keel process show <unit>` lists what it will
+# actually carry, so a typo is visible before an export rather than after an import.
+#
+# INSTANCE DATA IS NOT AN EXTRA. `.engine/contracts/github-actors.toml` is deliberately ABSENT from
+# the list below: it names WHO MAY DECIDE on a specific project, and shipping this project's deciders
+# into another one is precisely the defect D0219 exists to fix. The importing project declares its
+# own — `keel process show decision-channel` says so, and the channel refuses an unmapped login
+# rather than defaulting (issue182).
+
+[decision-channel]
+files = [
+  ".github/workflows/decision-issue.yml",
+  ".github/workflows/decision-record.yml",
+  ".github/scripts/open_decision_issues.py",
+  ".github/scripts/record_decision.sh",
+]
+# Declared so an importer is TOLD, rather than discovering it when nothing records.
+requires = [
+  ".engine/contracts/github-actors.toml — declare YOUR deciders: `<githubLogin> = <keelActor>` (quoted) under [logins]. An unmapped login is refused, never defaulted.",
+  "GitHub Actions enabled on the repo; the workflows use the built-in github.token and need no secret.",
+  "A `keel actor` bound in the target project whose name matches the actor you map above.",
+]

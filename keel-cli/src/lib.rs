@@ -33,6 +33,7 @@ pub mod schema;
 pub mod history;
 pub mod adherence;
 pub mod cursor;
+pub mod github;
 pub mod proactive;
 pub mod claim;
 pub mod deck;
