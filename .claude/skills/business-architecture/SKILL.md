@@ -38,12 +38,29 @@ Business -> Architecture. Recording architecture-before-needs is the issue054 de
 
 ### Phase 1 — Business (`.engine/workflows/business.sysml`: `brief -> personas -> needs -> useCases`)
 
+0. **Record their words FIRST** — deploy `.engine/processes/business-elicitation.sysml`. Before any
+   Brief or Need exists, author a `Statement` per substantive answer with `text` verbatim (the same
+   artifact intake authors, deliberately — an elicited utterance and a volunteered one are one kind of
+   fact), then a `UserStory` per implication with `#DerivedFrom` to its Statement. **Why this is step
+   0 and not a nicety (issue245):** this skill has authored 75 Needs from conversations whose
+   utterances were never recorded, so nobody can check a Need against what the stakeholder actually
+   said. Once the Need is written the justifying wording is gone and every later reader is comparing
+   my paraphrase to my conclusion. Ask about **pain, not features** — never offer a menu and ask
+   which they want; a chosen option is evidence about the menu, not about the need.
 1. **Brief** — capture the problem/opportunity as a `Brief` (the what/why + constraints). One item.
 2. **Personas** — the stakeholders/actors, as `Persona`/actor items.
 3. **Needs** — solution-free, *measurable* outcomes as `Need` items (MoSCoW), each traced to the
-   Brief. A Need like "it's slow" is not verifiable; "cold load < 1s for a 2,500-item set" is.
+   Brief AND carrying `#DerivedFrom` to the UserStory that implicated it. A Need like "it's slow" is
+   not verifiable; "cold load < 1s for a 2,500-item set" is. A Need with no `#DerivedFrom` to a
+   UserStory is **my judgment**, legitimate under D0064 but never to be dressed as elicited — say so
+   in the Need. Where the stakeholder did not state the threshold, record that too rather than
+   picking a number that will later be read as theirs.
 4. **UseCases** — the concrete usage, as `UseCase` items traced to Needs.
    **Gate:** the human **accepts the Needs** (an explicit `method=confirmation` sign-off) before Phase 2.
+   Ask specifically **what is WIDER than they meant**, not whether the set is good — the second
+   question invites assent. D0157 records the failure this prevents: N-8 was not wrong, it was written
+   wider than the demand, and a later reader decomposed the wide half. A Need the stakeholder narrows
+   is the process working; a Need nobody narrowed is *unconfirmed*, not confirmed.
 
 ### Phase 2 — Architecture (`.engine/workflows/architecture.sysml`: data/app/tech -> allocation)
 

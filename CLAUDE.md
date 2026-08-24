@@ -165,6 +165,13 @@ frozen (modify it only by out-of-band Decision).
   only inherent gates are direction decisions that block work and confirmations they choose to give;
   sitting review is an OPTIONAL pull-audit, never scheduled or owed (D0204) - coverage keeps computing
   as a record, and no surface presents it as the human's debt.
+- **Eliciting a need records their words FIRST (D0216).** For a stakeholder who cannot author a `Need`
+  but can answer a question about their pain, deploy `business-elicitation` (the `business-architecture`
+  skill): ask about **pain, not features** — never offer a menu, since a chosen option is evidence about
+  the menu — author a `Statement` verbatim per answer BEFORE any Brief or Need, then `UserStory`s via the
+  same intake triage, then `Need`s carrying `#DerivedFrom` to the story that implicated them. A Need with
+  no such edge is **my judgment** and must say so. Read the set back asking what is *wider* than they
+  meant, never whether it is good (D0157: N-8 was wider than the demand, not wrong).
 - **There is no prose state document (D0018).** Where things stand is computed; what's next is the ranked
   frontier; how to work here is this file. Never author a status, worklist, or handoff doc — if resuming
   requires knowledge, it belongs in the model.

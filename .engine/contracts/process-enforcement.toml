@@ -63,3 +63,7 @@ reason = "Same as `diagramView`: computing and presenting a scorecard. `render` 
 [adversarialPanelReview]
 checkable = false
 reason = "A critique round is a judgment by construction, same shape as [critique]: whether a panelist's finding is real, whether a resolution is substantive rather than a renaming, and whether unanimity was uncompelled are all judgments about argument quality that no text predicate can read. The checkable residue is tiny and indirect (the recorded outputs - Decisions, Issues, tasks - are gated like any other facts). A guard could only count findings, which would make rigor look enforced while enforcing nothing."
+
+[businessElicitation]
+checkable = false
+reason = "The value is in what gets ASKED and whether the answer was recorded before it was interpreted, and neither is readable from text. A guard could check that a Need carries a #DerivedFrom edge to a UserStory - and that check is worth having - but it belongs to the requirement layer, not here, and passing it says nothing about whether the elicited need is the stakeholder's real one or a paraphrase that survived because nobody contested it. The one thing a predicate CAN see is the ordering claim (Statement before Need), and even that is only visible when both exist: an elicitation that produced no Statement at all looks identical to a conversation that never happened. Declared unenforceable rather than given a guard that would make the practice look enforced while enforcing nothing (the [intake] reasoning, applied to the active case)."
