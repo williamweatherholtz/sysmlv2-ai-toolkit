@@ -3142,7 +3142,10 @@ fn sequence_multiplicity(root: &Path) -> GuardReport {
 /// is NOT a violation (the issue090 lesson: a project that never adopted a control has not violated it).
 fn activation_manifest(root: &Path) -> GuardReport {
     let act = crate::activation::Activation::load(root);
-    let scanned = act.unit_names().len();
+    // issue241: scanned counted only the guard-bearing units, so the guard reported "11 scanned"
+    // against a project declaring 23 processes — a scan count that understates its own population is
+    // the same class of misreport as the catalogue that denied those 12 existed.
+    let scanned = crate::activation::declared_processes(root).len().max(act.unit_names().len());
     let mut warnings = Vec::new();
     if act.is_declared() {
         let inactive = act.inactive_processes();

@@ -112,7 +112,11 @@ fn units_from_model(root: &Path) -> BTreeMap<String, Unit> {
 /// already machine-checked: the `process-skill` guard requires a deploying skill's `purpose` to name
 /// the `.engine/processes/<name>.sysml` it deploys, so this reads the same registry by the same
 /// convention rather than inventing a second mapping that could disagree with the guard.
-fn deploying_skills(root: &Path, process: &str) -> Vec<String> {
+/// `pub(crate)` since issue241: a process's deploying skill is a fact about the PROCESS, independent
+/// of whether it asserts a guard, so the catalogue must resolve it for guard-less processes too —
+/// otherwise `export` writes a bundle missing the skill, which is srPortModularProcessUnit's
+/// "without leaving its enforcement behind" failing on the other leg.
+pub(crate) fn deploying_skills(root: &Path, process: &str) -> Vec<String> {
     let reg = root.join(".engine").join("skills").join("skills-registry.sysml");
     let Ok(text) = std::fs::read_to_string(reg) else { return Vec::new() };
     let needle = format!(".engine/processes/{process}.sysml");
@@ -339,9 +343,17 @@ mod tests {
         for u in &units {
             assert!(all.contains(u), "every guard-bearing unit `{u}` must also be a declared process");
         }
+        // Re-pointed at `intake` (issue241): `knowledge-graph-memory` gained an
+        // `assert constraint enforcesQuestionCoverage : questionCoverage`, so asserting on it no
+        // longer exercised the guard-LESS case and passed vacuously. Pin a process that asserts
+        // none, and pin that it really asserts none, so the next capture cannot re-hollow this.
         assert!(
-            all.iter().any(|p| p == "knowledge-graph-memory"),
+            all.iter().any(|p| p == "intake"),
             "a process with no asserted guard must still be reported as declared"
+        );
+        assert!(
+            act.unit("intake").is_none_or(|u| u.guards.is_empty()),
+            "this test only exercises the guard-less case while `intake` asserts no guard - re-point it"
         );
     }
 

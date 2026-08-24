@@ -28,21 +28,41 @@ use std::path::{Path, PathBuf};
 struct Row {
     name: String,
     active: bool,
+    /// False for a process that asserts no guard: it is DECLARED and enactable, but activation
+    /// switches guards, so there is nothing about it to switch. Kept distinct from `active` because
+    /// reporting a guard-less process as INACTIVE would assert this project had turned it off
+    /// (issue241/issue149) — a false claim about the control inventory.
+    switchable: bool,
     purpose: String,
     skills: Vec<String>,
     rules: Vec<String>,
     guards: Vec<String>,
 }
 
+/// Every DECLARED process, not only the guard-bearing subset (issue241).
+///
+/// `rows()` used to iterate `unit_names()`, which is the set of processes asserting at least one
+/// guard. That made `keel process list|search|show|export` deny the 12 guard-less processes this
+/// repository declares — `keel process show intake` answered "no process 'intake'" while
+/// `.engine/processes/intake.sysml` sat on disk — and it broke `srPortModularProcessUnit`, the
+/// accepted `must` that a unit travel whole between projects. Carrying enforcement is not a
+/// precondition of travelling. This is the un-swept half of issue149: that fix taught `activation`
+/// and `activate`/`deactivate` to report the whole set, and never reached this catalogue.
 fn rows(root: &Path) -> Vec<Row> {
     let act = crate::activation::Activation::load(root);
     let mut out = Vec::new();
-    for name in act.unit_names() {
+    for name in crate::activation::declared_processes(root) {
         let u = act.unit(&name);
+        let switchable = u.is_some_and(|u| !u.guards.is_empty());
         out.push(Row {
             purpose: process_purpose(root, &name),
-            active: act.is_process_active(&name),
-            skills: u.map(|u| u.skills.clone()).unwrap_or_default(),
+            // A guard-less process is never "inactive": there is no guard to switch off.
+            active: !switchable || act.is_process_active(&name),
+            switchable,
+            // Resolve the deploying skill from the registry when no unit exists, so a guard-less
+            // process still EXPORTS WHOLE (definition + skill) — issue241/srPortModularProcessUnit.
+            skills: u.map(|u| u.skills.clone()).filter(|s| !s.is_empty())
+                .unwrap_or_else(|| crate::activation::deploying_skills(root, &name)),
             rules: u.map(|u| u.rules.clone()).unwrap_or_default(),
             guards: u.map(|u| u.guards.clone()).unwrap_or_default(),
             name,
@@ -105,8 +125,20 @@ fn unit_files(root: &Path, r: &Row) -> Vec<PathBuf> {
 }
 
 fn print_row(r: &Row, verbose: bool) {
-    let mark = if r.active { "active  " } else { "INACTIVE" };
+    // Three states, never two: a guard-bearing process is active or INACTIVE; a guard-less one is
+    // `always` — declared and enactable, with no guard to switch (issue241). Mirrors the wording
+    // `keel activation` already uses, so the two catalogues read the same.
+    let mark = if !r.switchable {
+        "always  "
+    } else if r.active {
+        "active  "
+    } else {
+        "INACTIVE"
+    };
     println!("  [{mark}] {}", r.name);
+    if !r.switchable {
+        println!("             (asserts no guard — nothing to switch off; transferable as a unit)");
+    }
     if !r.purpose.is_empty() {
         println!("             {}", r.purpose);
     }
@@ -570,7 +602,14 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
     match args.first().map(String::as_str) {
         Some("list") | None => {
             let all = rows(root);
-            println!("processes ({} in this project's palette):", all.len());
+            // State the population and its split (issue241/issue239): a bare total invited the
+            // reader to think the switchable subset WAS the process set.
+            let switchable = all.iter().filter(|r| r.switchable).count();
+            println!(
+                "processes ({} declared; {switchable} assert guards and are switchable, {} assert none):",
+                all.len(),
+                all.len() - switchable
+            );
             for r in &all {
                 print_row(r, args.iter().any(|a| a == "--verbose"));
             }
@@ -637,4 +676,50 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// THE CONTROL for issue241: the catalogue reports every DECLARED process, not the
+    /// guard-bearing subset. `rows()` once iterated `unit_names()`, so `keel process show intake`
+    /// answered "no process 'intake'" while the file existed — denying 12 of 23 and breaking
+    /// `srPortModularProcessUnit` (a unit must travel whole; carrying enforcement is not a
+    /// precondition of travelling).
+    #[test]
+    fn catalogue_reports_every_declared_process_not_only_guard_bearing_units() {
+        let root = Path::new("..");
+        let all = super::rows(root);
+        let declared = crate::activation::declared_processes(root);
+        assert_eq!(all.len(), declared.len(), "the catalogue must cover every declared process");
+        for d in &declared {
+            assert!(all.iter().any(|r| &r.name == d), "declared process `{d}` missing from the catalogue");
+        }
+        // And the guard-less ones are present AND not reported as switched-off.
+        let guardless: Vec<&super::Row> = all.iter().filter(|r| !r.switchable).collect();
+        assert!(!guardless.is_empty(), "this repo declares guard-less processes - the split must be observable");
+        for r in &guardless {
+            assert!(r.active, "a guard-less process has no guard to switch, so it must never read INACTIVE ({})", r.name);
+        }
+    }
+
+    /// A guard-less process must export WHOLE — definition AND deploying skill. `skills` came only
+    /// from the unit, which is `None` without a guard, so `export intake` wrote a bundle with the
+    /// process file and no SKILL.md: srPortModularProcessUnit half-met in the other direction.
+    #[test]
+    fn a_guardless_process_still_carries_its_deploying_skill() {
+        let root = Path::new("..");
+        let all = super::rows(root);
+        let intake = all.iter().find(|r| r.name == "intake").expect("intake is declared");
+        assert!(!intake.switchable, "intake asserts no guard - re-point this test if that changed");
+        assert!(
+            !intake.skills.is_empty(),
+            "a guard-less process must still resolve its deploying skill, or its export leaves the skill behind"
+        );
+        assert!(
+            super::unit_files(root, intake).iter().any(|p| p.ends_with("SKILL.md")),
+            "the files that MOVE with a guard-less unit must include its SKILL.md"
+        );
+    }
 }
