@@ -63,7 +63,8 @@ a content gate (frozen schema, a direction Decision) or an empty frontier.
 Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
 gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
-`governing-version`, `open-issues`, `indicators`, `intake`, `controls` (D0195: the two-way hazard/control diff), `why <term>` +
+`governing-version`, `open-issues`, `indicators`, `intake`, `attestation` (D0232: is a `pass` a receipt or a
+testimony — results by judge kind, and how many EXERCISED claims record what produced them), `controls` (D0195: the two-way hazard/control diff), `why <term>` +
 `knowledge question-coverage` (D0161: the model as a graph - seed on names/aliases, traverse, answer with provenance), `hardening` (D0169: the
 critique process's own questions - help coverage, process enforceability, decision follow-through) (D0166: what was said, what it
 became, and what nobody acted on - unparsed / unrouted / unsourced). Human-facing scorecards: `keel report
@@ -109,7 +110,9 @@ frozen (modify it only by out-of-band Decision).
   a temp-file-then-rename, and all writers serialise on one `.keel-write-lock` beside the model root:
   four concurrent `record issue` calls used to land two issues with all four exiting 0. A writer that
   cannot acquire the lock **fails loudly** — a refused write is recoverable, a lost one is not.
-- **The write API is the sanctioned write path.** `keel append-result`, `append-gate-result`, `add-task`,
+- **The write API is the sanctioned write path.** `keel append-result` / `append-gate-result`
+  (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
+  refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
   `record decision` (prose via `--from FILE` — never as double-quoted shell arguments, D0224/issue256),
   `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,

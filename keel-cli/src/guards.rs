@@ -250,6 +250,19 @@ Err(e) => GuardReport {
 // ── sprint-coverage guard (done work is covered by a sprint) ────────────────────────────────────
 
 /// Done tasks predating the sprint discipline (D0064); accepted as historical (never extend).
+/// D0232's cutover. Both attestation guards bind FORWARD only: 983 `method=test` results and 38
+/// coverage claims predate the convention, and retro-fitting evidence nobody captured would mean
+/// inventing it — which is the very failure these guards exist to prevent. Same shape as D0198's
+/// quote-receipt cutover.
+const EVIDENCE_ENFORCED_FROM: &str = "2026-08-25";
+
+/// Read a quoted `:>> <name> = "value"` off a single declaration line.
+fn field(line: &str, name: &str) -> Option<String> {
+    let needle = format!(":>> {name} = \"");
+    let rest = line.split(&needle).nth(1)?;
+    Some(rest.split('"').next()?.to_string())
+}
+
 const GRANDFATHERED: &[&str] = &["ceremonyGateGuard", "rustS8runtimeParser", "rustS9writeApi", "trackedMetadataReplan"];
 
 /// `<task>` from a `part <task>DoDR<n> : TestResult { ...pass }` part name.
@@ -1783,8 +1796,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 51] =
-    ["gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
+pub const GUARD_NAMES: [&str; 52] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2253,6 +2266,80 @@ pub fn tool_reference(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "tool-reference", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 52: an AI-judged `method=test` result records WHAT WAS RUN (D0232/issue266).
+///
+/// MEASURED before it was built: of 5,135 recorded `TestResult`s, exactly ONE recorded what produced
+/// it. A result carries outcome, judgedBy, judgedAt and judgedAgainst — so every `pass` in this model
+/// is a TESTIMONY, and nothing in the record lets a third party re-derive it. That is the mechanism
+/// behind a 3.9% fail rate over 5,120 results: the actor doing the work also authors the verdict.
+///
+/// AI-JUDGED ONLY, and that is the design rather than an exemption. Governance binds the AI; a
+/// HUMAN's word IS the evidence, and demanding a receipt from them would point the control at the
+/// wrong party. `method=confirmation` is human by construction (D0106) and never in scope here.
+///
+/// FORWARD-ONLY from [`EVIDENCE_ENFORCED_FROM`], on the D0198 precedent: 983 `method=test` results
+/// predate the convention, and retro-fitting evidence nobody captured would mean inventing it.
+fn evidence_cited(root: &Path) -> GuardReport {
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    // The Test declares the METHOD, the result declares the JUDGE — both are needed, so map first.
+    let files = crate::collect_sysml(&root.join(".tracking"));
+    let mut method_of: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for f in &files {
+        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        for cap in text.split("verification ").skip(1) {
+            let Some(name) = cap.split([' ', ':']).next() else { continue };
+            if let Some(m) = cap.split(":>> method = VerificationMethod::").nth(1) {
+                if let Some(kind) = m.split([';', ' ']).next() {
+                    method_of.insert(name.to_string(), kind.to_string());
+                }
+            }
+        }
+    }
+    for f in &files {
+        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        let lines: Vec<&str> = text.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if !line.contains(" : TestResult {") {
+                continue;
+            }
+            let Some(judged_at) = field(line, "judgedAt") else { continue };
+            if judged_at.as_str() < EVIDENCE_ENFORCED_FROM {
+                continue;
+            }
+            let Some(judged_by) = field(line, "judgedBy") else { continue };
+            // A human's attestation needs no receipt.
+            if crate::actor::kind_of(root, &judged_by).as_deref() == Some("human") {
+                continue;
+            }
+            let Some(part) =
+                line.split(" : TestResult").next().and_then(|s| s.split("part ").nth(1))
+            else {
+                continue;
+            };
+            let base = part.trim().rsplit_once('R').map_or_else(|| part.trim(), |(b, _)| b);
+            if method_of.get(base).map(String::as_str) != Some("test") {
+                continue; // only an EXERCISED claim owes a re-runnable receipt
+            }
+            scanned += 1;
+            // The receipt is a `// RAN:` comment on the result line or immediately above it.
+            let has = line.contains("// RAN:")
+                || i.checked_sub(1)
+                    .and_then(|j| lines.get(j))
+                    .is_some_and(|p| p.trim_start().starts_with("// RAN:"));
+            if !has {
+                violations.push(format!(
+                    "{}:{}: {} is an AI-judged method=test result with no `// RAN:` receipt - a pass nobody else can re-derive is a testimony, not a test. Pass --evidence to append-result (D0232)",
+                    relpath(root, f),
+                    i + 1,
+                    part.trim()
+                ));
+            }
+        }
+    }
+    GuardReport { name: "evidence-cited", scanned, warnings: Vec::new(), violations }
 }
 
 /// Guard 51: a workflow that RUNS the gate must check out full history (D0229/issue260).
@@ -3056,6 +3143,9 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         // claim "this project chose its processes" is false if a process was invisible to the choice.
         // D0229: a workflow that RUNS the gate but checks out shallow silently disables every
         // history-derived guard in it. Found by the release gate being red since guard 48 landed.
+        // D0232, both AI-ONLY: governance binds the AI, never the human. A human's word IS the
+        // evidence; demanding a receipt from them would point the control at the wrong party.
+        "evidence-cited" => Some(evidence_cited(root)),
         "gating-workflow-history" => Some(gating_workflow_history(root)),
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
@@ -3642,6 +3732,63 @@ mod identity_form_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_receipt_is_demanded_of_the_ai_and_never_of_the_human() {
+        // D0232. The exemption is the DESIGN, not a courtesy: governance binds the AI, and a human's
+        // word IS the evidence. Tested in four directions, because a guard that only ever passes is
+        // indistinguishable from one aimed at nothing, and one that fires on the human would point
+        // the whole control at the wrong party.
+        let root = std::env::temp_dir().join("keel-evidence-cited-test");
+        let _ = std::fs::remove_dir_all(&root);
+        let tr = root.join(".tracking");
+        std::fs::create_dir_all(&tr).unwrap();
+        std::fs::write(
+            tr.join("actors.sysml"),
+            "package A {\n    part wweatherholtz : Person { :>> name = \"W\"; }\n    part bot : Actor { :>> kind = ActorKind::ai; }\n}\n",
+        )
+        .unwrap();
+
+        let res = |name: &str, by: &str, at: &str, ran: bool| {
+            let receipt = if ran { "        // RAN: cargo test -> 3 passed\n" } else { "" };
+            format!("{receipt}        part {name}R1 : TestResult {{ :>> id = \"x\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc\"; :>> judgedAt = \"{at}\"; :>> judgedBy = \"{by}\"; }}\n")
+        };
+        let write = |body: &str| {
+            std::fs::write(
+                tr.join("s.sysml"),
+                format!(
+                    "package S {{\n    action def R {{\n        action t;\n        verification tDoD : Test {{ :>> id = \"y\"; :>> method = VerificationMethod::test; }}\n{body}    }}\n}}\n"
+                ),
+            )
+            .unwrap();
+        };
+
+        // 1. AI, method=test, NO receipt -> refused.
+        write(&res("tDoD", "bot", "2026-08-25", false));
+        let r = process_and_report(&root);
+        assert_eq!((r.scanned, r.violations.len()), (1, 1), "an AI test-claim with no receipt must be refused");
+
+        // 2. AI, WITH a receipt -> clean.
+        write(&res("tDoD", "bot", "2026-08-25", true));
+        let r = process_and_report(&root);
+        assert_eq!((r.scanned, r.violations.len()), (1, 0), "a receipt satisfies it");
+
+        // 3. HUMAN, no receipt -> NOT EVEN SCANNED. Their word is the evidence.
+        write(&res("tDoD", "wweatherholtz", "2026-08-25", false));
+        let r = process_and_report(&root);
+        assert_eq!((r.scanned, r.violations.len()), (0, 0), "a human's attestation is out of scope entirely");
+
+        // 4. AI, but dated BEFORE the cutover -> out of scope; retro-fitting evidence nobody
+        //    captured would mean inventing it, which is the failure this guard exists to prevent.
+        write(&res("tDoD", "bot", "2026-08-01", false));
+        let r = process_and_report(&root);
+        assert_eq!((r.scanned, r.violations.len()), (0, 0), "the guard binds forward only");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn process_and_report(root: &std::path::Path) -> GuardReport {
+        super::evidence_cited(root)
+    }
 
     #[test]
     fn a_process_that_cannot_say_when_it_applies_is_refused() {

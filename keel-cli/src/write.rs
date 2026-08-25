@@ -579,11 +579,15 @@ pub fn append_result(
     verdict: &str,
     judged_at: &str,
     judged_by: &str,
+    evidence: Option<&str>,
 ) -> Result<String, WriteError> {
     // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
-    with_file_lock(path, || append_result_locked(path, task_name, sha, verdict, judged_at, judged_by))
+    with_file_lock(path, || {
+        append_result_locked(path, task_name, sha, verdict, judged_at, judged_by, evidence)
+    })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_result_locked(
     path: &Path,
     task_name: &str,
@@ -591,6 +595,7 @@ fn append_result_locked(
     verdict: &str,
     judged_at: &str,
     judged_by: &str,
+    evidence: Option<&str>,
 ) -> Result<String, WriteError> {
     if verdict != "pass" && verdict != "fail" {
         return Err(WriteError::InvalidVerdict(verdict.to_owned()));
@@ -619,8 +624,19 @@ fn append_result_locked(
         " ".repeat(line.len() - line.trim_start().len())
     });
 
+    // D0232: WHAT WAS RUN, as a structured comment rather than a schema field - `schema/core` is
+    // frozen (invariant 5), and this follows the D0207 `// RESEARCH:` precedent. Measured before
+    // building it: of 5,135 recorded results, exactly ONE recorded what produced it, so every
+    // `pass` in this model is a TESTIMONY that nobody else can re-derive. The guard requires this
+    // on an AI-judged `method=test` result and never on a human's - a human's word IS the evidence,
+    // and demanding a receipt from them would make governance bind the wrong party.
+    let ran = evidence
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .map_or_else(String::new, |e| format!("{indent}// RAN: {}
+", sanitize_field(e)));
     let new_line = format!(
-        "{indent}part {task_name}DoDR{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
+        "{ran}{indent}part {task_name}DoDR{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}"
     );
 
     let mut new_content = String::with_capacity(content.len() + new_line.len() + 1);
@@ -1684,11 +1700,11 @@ mod tests {
         let f = root.join(".tracking").join("delivery").join("x.sysml");
         let body = "package X {\n    action def Run {\n        action tconf;\n        verification tconfDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000c001\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"human attests\"; }\n        action ttest;\n        verification ttestDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000c002\"; :>> method = VerificationMethod::test; :>> procedureText = \"machine verifies\"; }\n    }\n}\n";
         std::fs::write(&f, body).expect("write");
-        let ai_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "bot");
+        let ai_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "bot", None);
         assert!(ai_conf.is_err(), "an AI judging a confirmation must be refused");
-        let hum_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "hum");
+        let hum_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "hum", None);
         assert!(hum_conf.is_ok(), "a Person judging a confirmation passes: {hum_conf:?}");
-        let ai_test = super::append_result(&f, "ttest", "abc1234", "pass", "2026-08-21", "bot");
+        let ai_test = super::append_result(&f, "ttest", "abc1234", "pass", "2026-08-21", "bot", None);
         assert!(ai_test.is_ok(), "an AI judging a method=test result is the normal case: {ai_test:?}");
     }
 

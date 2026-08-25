@@ -120,7 +120,9 @@ pub fn run(root: &Path, task_filter: Option<&str>, by: &str) -> i32 {
     let mut stamped = 0;
     for task in &drift {
         match find_task_file(root, task) {
-            Some(file) => match crate::write::append_result(&file, task, &head, "pass", &date, by) {
+            Some(file) => // reverify RE-RAN the declared gate, so unlike a hand-stamped result it can say exactly
+                // what produced the verdict (D0232).
+                match crate::write::append_result(&file, task, &head, "pass", &date, by, Some("keel reverify --all-drift (re-ran the declared gate at HEAD)")) {
                 Ok(id) => {
                     stamped += 1;
                     println!("reverify: {task} re-verified pass @ {head} ({id})");

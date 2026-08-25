@@ -587,4 +587,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcVintageFixture to issue265;
+
+    part issue266 : Issue {
+        :>> id = "4802fda8-76c4-461b-a112-46adcbaf3ae4";
+        :>> title = "Every pass in this model is a testimony: of 5135 results, one recorded what produced it";
+        :>> createdAt = "2026-08-25";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Raised by the human, who named it plainly: I very often over-claim - one test for one scenario, reported as though the thing were now perfect - and asked how to improve attestation systemically rather than case by case. Measured: a TestResult carries outcome, judgedBy, judgedAt and judgedAgainst, and nothing else. Of 5135 recorded results, exactly ONE recorded what produced it. So no third party can re-derive any verdict in this model, and the actor doing the work authors the evidence, the verdict, and the sentence describing it. The 3.9 percent fail rate over 5120 results is not a quality signal, it is the signature of a system recording that work happened rather than testing whether it worked. Compounding it: I choose the METHOD myself, and I choose method=test when the evidence was one manual observation, which means the engine's best honesty instrument - the EXAMINED versus EXERCISED split, reporting 99 and 91 percent - is fed by my own self-classification. The human also corrected the aim of any fix: governance is here to constrain and check the AI and other work, never them, so a control demanding a receipt from a human judgment would point at the wrong party.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcEvidenceCited to issue266;
 }

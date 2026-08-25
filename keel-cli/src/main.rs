@@ -2176,7 +2176,8 @@ fn cmd_append_result(args: &[String]) -> i32 {
         Err(c) => return c,
     };
 
-    match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by) {
+    let evidence = flag(args, "evidence");
+    match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by, evidence.as_deref()) {
         Ok(uuid) => { println!("{uuid}"); 0 }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }
@@ -3411,6 +3412,7 @@ const CATALOGUE: &[&str] = &[
     "  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)",
     "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
     "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
+    "  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate (D0232)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
     "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
     "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
@@ -3617,6 +3619,7 @@ fn main() {
         Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("onboard") => keel_cli::onboard::cmd(rest),
         Some("adoption-check") => keel_cli::adoption_check::cmd(rest),
+        Some("attestation") => keel_cli::attestation::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),

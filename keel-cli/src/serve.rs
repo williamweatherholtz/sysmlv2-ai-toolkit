@@ -2459,6 +2459,11 @@ struct TrReq {
     verdict: Option<String>,
     judged_at: String,
     judged_by: Option<String>,
+    /// What produced the verdict (D0232). OPTIONAL here on purpose: the console is where the HUMAN
+    /// records judgment, and a human's word IS the evidence - the guard demands a receipt only from
+    /// an AI-judged result. Governance binds the AI, never the human.
+    #[serde(default)]
+    evidence: Option<String>,
 }
 
 /// POST /api/testresult (D0094 serveItemActions) — append a `TestResult` downstream of an action task via
@@ -2478,7 +2483,7 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
     let sha = git_head(&s.rootpath());
-    match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by) {
+    match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by, b.evidence.as_deref()) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

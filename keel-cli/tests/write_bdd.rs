@@ -156,7 +156,7 @@ fn given_gate(world: &mut WriteWorld, gate: String) {
 #[when(regex = r#"^I append a passing result for "([^"]+)" at SHA "([^"]+)"$"#)]
 fn when_append_pass(world: &mut WriteWorld, task: String, sha: String) {
     let path = world.file.clone().unwrap();
-    let res = append_result(&path, &task, &sha, "pass", "2026-06-15", "test");
+    let res = append_result(&path, &task, &sha, "pass", "2026-06-15", "test", None);
     world.last_content = std::fs::read_to_string(&path).ok();
     world.result = Some(res.map_err(|e| e.to_string()));
 }
@@ -164,14 +164,14 @@ fn when_append_pass(world: &mut WriteWorld, task: String, sha: String) {
 #[when(regex = r#"^I append a result for unknown task "([^"]+)" at SHA "([^"]+)"$"#)]
 fn when_append_unknown_task(world: &mut WriteWorld, task: String, sha: String) {
     let path = world.file.clone().unwrap();
-    let res = append_result(&path, &task, &sha, "pass", "2026-06-15", "test");
+    let res = append_result(&path, &task, &sha, "pass", "2026-06-15", "test", None);
     world.result = Some(res.map_err(|e| e.to_string()));
 }
 
 #[when(regex = r#"^I append a "([^"]+)" result for "([^"]+)" at SHA "([^"]+)"$"#)]
 fn when_append_bad_verdict(world: &mut WriteWorld, verdict: String, task: String, sha: String) {
     let path = world.file.clone().unwrap();
-    let res = append_result(&path, &task, &sha, &verdict, "2026-06-15", "test");
+    let res = append_result(&path, &task, &sha, &verdict, "2026-06-15", "test", None);
     world.result = Some(res.map_err(|e| e.to_string()));
 }
 
