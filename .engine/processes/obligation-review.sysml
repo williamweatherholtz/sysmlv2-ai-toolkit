@@ -11,6 +11,7 @@ package ProcessObligationReview {
         :>> title = "Obligation Review";
         :>> purpose = "Put what is waiting on the human in front of them where they actually are, and take their judgment back as recorded facts with no copy step. Deploys `keel deck` (keel-cli/src/deck.rs). The Smartsheet tap-inbox tooling it used to name was RETIRED by D0206, and engine-dev-only tools never ship to an adopting project (init excludes .engine/tools/), so naming them here left a dead reference in every adopter (D0222).";
         :>> cadence = Cadence::eventDriven;  // a sitting opening, or the turn-boundary hook noticing a queue
+        // APPLIES-WHEN: things wait on a human who is not watching the tool, and today they only find out by being asked
     }
 
     action orCompute : ProcessStep {

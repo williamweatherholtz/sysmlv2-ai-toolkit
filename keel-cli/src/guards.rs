@@ -1783,8 +1783,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 49] =
-    ["doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
+pub const GUARD_NAMES: [&str; 50] =
+    ["process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2253,6 +2253,47 @@ pub fn tool_reference(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "tool-reference", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 50: every declared process states the SITUATION in which a project needs it (D0225).
+///
+/// Onboarding recommends a process set by matching a project's elicited facts against each process's
+/// `// APPLIES-WHEN:` condition. A process that declares none is invisible to that match — it can be
+/// recommended neither for nor against — so the author's chartered set silently omits it and nobody
+/// can tell the omission from a decision. That is the honest-state class (D0098): the guard does not
+/// require the set to be COMPLETE, only that a process which exists can be reasoned about.
+///
+/// Beside the process rather than in a central table, because a central table cannot travel with one
+/// unit — the defect that made 23 of 24 units land red on adoption (issue253/D0222).
+fn process_applicability(root: &Path) -> GuardReport {
+    let dir = root.join(".engine").join("processes");
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        // No processes directory at all is not a violation: a project may hold no process definitions.
+        return GuardReport { name: "process-applicability", scanned, warnings: Vec::new(), violations };
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("sysml"))
+        .collect();
+    files.sort();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        // Only files that actually DECLARE a process are in scope - a helper or an include is not.
+        if !text.contains(": Process {") {
+            continue;
+        }
+        scanned += 1;
+        if !text.lines().any(|l| l.trim().starts_with("// APPLIES-WHEN:")) {
+            violations.push(format!(
+                "{}: declares a Process but no `// APPLIES-WHEN:` condition - onboarding cannot recommend it for OR against, so a chartered set would omit it silently (D0225)",
+                relpath(root, path)
+            ));
+        }
+    }
+    GuardReport { name: "process-applicability", scanned, warnings: Vec::new(), violations }
 }
 
 /// Guard 40: no `.sysml` in the model carries the scaffold's FILL-ME token (dcSprintScaffold).
@@ -2951,6 +2992,10 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "impossible-evidence-date" => Some(impossible_evidence_dates(root)),
         "identity-present" => Some(identity_present(root)),
         "identity-well-formed" => Some(identity_well_formed(root)),
+        // D0225: a process that cannot say WHEN it applies cannot be recommended for or against,
+        // so onboarding silently stops seeing it. Honest-state, not completeness (D0098): the
+        // claim "this project chose its processes" is false if a process was invisible to the choice.
+        "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
         "claude-surface-drift" => Some(claude_surface_drift(root)), // hard (D0174/K7) — a mutated hook command is a silently weakened control
@@ -3530,6 +3575,44 @@ mod identity_form_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_process_that_cannot_say_when_it_applies_is_refused() {
+        // D0225. Both directions, because a guard that only ever passes is indistinguishable from a
+        // guard that does nothing - and this codebase has already shipped two checks that passed on
+        // an empty population (issue250, claude-surface-drift on zero skills).
+        let root = std::env::temp_dir().join("keel-guard-applicability");
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = root.join(".engine").join("processes");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let declares = "package P {
+    action p : Process {
+        :>> id = \"x\";
+";
+        std::fs::write(dir.join("with.sysml"), format!("{declares}        // APPLIES-WHEN: a stated situation
+    }}
+}}
+")).unwrap();
+        let r = process_applicability(&root);
+        assert_eq!((r.scanned, r.violations.len()), (1, 0), "a declared condition passes");
+
+        std::fs::write(dir.join("without.sysml"), format!("{declares}    }}
+}}
+")).unwrap();
+        let r = process_applicability(&root);
+        assert_eq!(r.scanned, 2, "both process files are in scope");
+        assert_eq!(r.violations.len(), 1, "the one lacking a condition is refused");
+        assert!(r.violations[0].contains("without.sysml"), "{:?}", r.violations);
+
+        // A file that declares no Process at all is out of scope, not a violation.
+        std::fs::write(dir.join("helper.sysml"), "package H {
+    private import X::*;
+}
+").unwrap();
+        assert_eq!(process_applicability(&root).scanned, 2, "a non-Process file is not scanned");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// D0209 clause 2 coverage audit, made executable: every file that DEFINES a guard (`-> GuardReport`)
     /// must sit inside the enforcement-surface lock, so a new guard file cannot be added OUTSIDE it and

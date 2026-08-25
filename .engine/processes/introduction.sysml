@@ -15,6 +15,7 @@ package EngineIntroduction {
         :>> title = "Guided project-based onboarding (spin-up first value)";
         :>> purpose = "Take a newcomer on a freshly-scaffolded project from zero to FIRST VALUE in one guided session: a 1-minute mental model, then capture the project's first business Need, derive a first requirement + work item, run the first sprint to a real tracked artifact, and show `orient`. Project-based (learn by doing the first real item), NOT a doc dump — combat the MBSE adoption cliff (D0054) by demonstrating the loop + the friction win fast. Dual-surface (D0093): the AI drives the CLI; the human supervises (provides the need, accepts content).";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: someone new will arrive and has to reach first value without a person sitting beside them
     }
 
     action inOrient : ProcessStep {

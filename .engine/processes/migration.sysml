@@ -15,6 +15,7 @@ package EngineMigration {
         :>> title = "Safe Bulk Migration";
         :>> purpose = "Migrate authored model data + schema at scale (rename/split/drop/add a field across many sites) so the tree is green at every step, the transform is reviewed + reconciled, and recorded data is never fabricated or destroyed.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: authored data will need to change shape at scale, and losing or fabricating history while doing it is unacceptable
     }
 
     action mig0Justify : ProcessStep {

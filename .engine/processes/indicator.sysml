@@ -13,6 +13,7 @@ package EngineIndicatorMonitoring {
         :>> title = "Indicator Monitoring (computed / pulled / manual)";
         :>> purpose = "Declare monitored measures (Indicators) that inform needs/decisions by direction, and collect their data by the right method — computed (repo-derived), pulled (external programmatic), or manual (subjective) — so the engine can show each measure's value + direction-aware trend without committing to a premature threshold (D0088).";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: there are measures worth watching where no defensible threshold exists, and gating on them would corrupt them (Goodhart)
     }
 
     action imDeclare : ProcessStep {

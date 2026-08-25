@@ -12,6 +12,7 @@ package EngineDiagramView {
         :>> title = "Traceability Diagram (computed view)";
         :>> purpose = "Render the whole tracked model (every element + typed edge + metadata) as a regenerated interactive HTML view for part-at-a-time traceability analysis; never author or commit a diagram — regenerate it from authored facts.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: the model has grown past what one person can hold in their head, and its SHAPE - what connects to what - is now the thing people need to see
     }
 
     action dgRegenerate : ProcessStep {

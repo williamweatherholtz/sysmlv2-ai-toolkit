@@ -18,6 +18,7 @@ package EngineDocSync {
         :>> title = "Documentation Sync";
         :>> purpose = "On every model/tool change, sweep the documentation set for claims the change invalidates; fix them in the same commit.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: the project has documentation, drawings, or specifications that make claims about the thing, and those claims go stale silently when the thing changes
         assert constraint enforcesDocSync : docSync;
     }
 

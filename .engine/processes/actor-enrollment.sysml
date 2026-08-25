@@ -23,6 +23,7 @@ package EngineActorEnrollment {
         :>> title = "Actor enrollment (identity, kind, role, binding, gate)";
         :>> purpose = "Take an uninitiated contributor — human or AI, on a machine that has never run the engine — to the point of being able to author truthfully: acting identity established, kind and role recorded, the actor registered, the machine bound to that identity so later facts are attributed correctly, and the local gate proven to run. Self-service by design (supervisors are asynchronous, D0129), and REFUSING rather than enrolling into indeterminate identity or a silently-dead gate. This is the process that makes provenance true (nProvenanceTrue) and authority checkable (nAuthorityFollowsRecordedKind); every other guarantee depends on it.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: more than one person or AI will author facts, or any contributor works from a second machine - anything recorded then needs an identity that is bound rather than assumed
         // D0191: the machine binding resolves to a registered actor with a kind - guarded, unit-owned.
         assert constraint enforcesEnrollmentBinding : enrollmentBinding;
     }

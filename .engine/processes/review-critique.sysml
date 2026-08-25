@@ -11,6 +11,7 @@ package ProcessReviewCritique {
         :>> title = "Review Critique";
         :>> purpose = "Make the sprint review an adversarial act and the retro a producer of tracked work: three critique passes per review, and every recurring retro finding becomes a backlog item or carries a recorded reason it should not.";
         :>> cadence = Cadence::perSprint;
+        // APPLIES-WHEN: reviews pass by default and retro findings evaporate into prose instead of becoming tracked work
     }
 
     action rcPasses : ProcessStep {

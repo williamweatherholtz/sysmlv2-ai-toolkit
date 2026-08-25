@@ -17,6 +17,7 @@ package EngineIssueResolution {
         :>> title = "Issue Resolution";
         :>> purpose = "Link every Issue to the work or Decision that resolves it (#Resolves), compute its open/resolved state, and record decision-moots-item as a typed edge — never prose.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: defects, findings and snags accumulate, and whether one is still open is currently asserted by a human rather than computed from what resolves it
         assert constraint enforcesIssues : issues;
     }
 

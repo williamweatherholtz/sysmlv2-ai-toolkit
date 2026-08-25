@@ -13,6 +13,7 @@ package EngineReportView {
         :>> title = "Computed Report / Scorecard (computed view)";
         :>> purpose = "Roll up the per-element computed views into human-digestible aggregate scorecards (verification coverage %, critique %, attestation %, findings, suspect load, traceability completeness, debt, flow/velocity) — a HEALTH read (is it sound now?) and an OPPORTUNITY read (where to improve / leading signals) — regenerated on demand from authored facts; never author or commit a report or a metric snapshot.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: someone outside the work asks how it is going, and the answer should be computed from the record rather than composed by whoever was asked
     }
 
     action rpCompute : ProcessStep {

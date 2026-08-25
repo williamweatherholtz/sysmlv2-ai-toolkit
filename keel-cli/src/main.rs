@@ -2855,6 +2855,30 @@ declaredAt = \"{}\"
     Ok(())
 }
 
+/// The scaffold's closing narration: what was written, and the two onboarding steps in order.
+///
+/// Lifted out of `cmd_init` when adding the D0225 step pushed it past the line limit - it is
+/// narration, not logic, and it is the FIRST thing a newcomer reads.
+fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
+    println!("Scaffolded the engine into {} ({count} engine file(s)). Adoption profile: {profile} (declared).", dir.display());
+    println!();
+    println!("Next:");
+    println!("  1. cd {}", dir.display());
+    println!("  2. git init && git config core.hooksPath .githooks   (enable the keel pre-commit gate)");
+    println!("  3. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
+    // D0225: the two are sequenced, not alternatives. `project-onboarding` decides WHICH disciplines
+    // this project runs; `introduction` walks the author through running one. Naming only the second
+    // is how a project ends up with 25 active processes nobody chose (D0054 - friction is the top risk).
+    println!("  4. Run the `project-onboarding` skill — it asks what you are building and charters the");
+    println!("     process set on that basis. `keel onboard` reports NOT CHARTERED until you do.");
+    println!("  5. Then the `introduction` skill — capture your first need + run your first sprint.");
+    println!("     Or: keel orient .   (where things stand)");
+    println!();
+    println!("The .githooks/pre-commit gate runs `keel validate` + `keel guard` (Rust-only, no kernel).");
+    println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
+    println!("your project authors its OWN decisions fresh in .engine/decisions/.");
+}
+
 fn cmd_init(args: &[String]) -> i32 {
     const USAGE: &str = "keel init DIR [--profile strict|guided]";
     let target = match positional_arg(args, USAGE, "a directory") {
@@ -2961,18 +2985,7 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error writing engine-version.toml: {e}");
         return 1;
     }
-    println!("Scaffolded the engine into {} ({count} engine file(s)). Adoption profile: {profile} (declared).", dir.display());
-    println!();
-    println!("Next:");
-    println!("  1. cd {}", dir.display());
-    println!("  2. git init && git config core.hooksPath .githooks   (enable the keel pre-commit gate)");
-    println!("  3. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
-    println!("  4. Run the `introduction` skill (guided onboarding) — capture your first need + run your first sprint.");
-    println!("     Or: keel orient .   (where things stand)");
-    println!();
-    println!("The .githooks/pre-commit gate runs `keel validate` + `keel guard` (Rust-only, no kernel).");
-    println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
-    println!("your project authors its OWN decisions fresh in .engine/decisions/.");
+    print_init_next_steps(&dir, count, &profile);
     0
 }
 
@@ -3396,6 +3409,7 @@ const CATALOGUE: &[&str] = &[
     "  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)",
     "  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
     "  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)",
+    "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
     "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
     "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
@@ -3600,6 +3614,7 @@ fn main() {
         Some("migrate") => cmd_migrate(rest),
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
         Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        Some("onboard") => keel_cli::onboard::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),

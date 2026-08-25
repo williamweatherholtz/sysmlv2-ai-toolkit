@@ -16,6 +16,7 @@ package EngineDoD {
         :>> title = "Definition of Done";
         :>> purpose = "Gate before setting a Story to a terminal state: every check below passes.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: finished is currently declared by judgment rather than by a check anyone else can re-run and get the same answer from
     }
 
     action dodMerged : ProcessStep {

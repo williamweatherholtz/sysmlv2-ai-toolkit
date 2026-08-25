@@ -17,6 +17,7 @@ package EngineDecisionAuthoring {
         :>> title = "Decision Authoring (one source of truth)";
         :>> purpose = "Author every Decision so each fact has ONE canonical home — the why in its own fields, the verdict/acceptance in a discrete TestResult, status/state COMPUTED — never restated as prose in another field or a comment.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: always - it is how this engine records that someone agreed to something, and its guards are CORE rather than switchable (D0223)
         // NO `assert constraint` HERE, DELIBERATELY (D0223, human-directed).
         //
         // A guard is CORE — never deactivatable — precisely when NO unit claims it

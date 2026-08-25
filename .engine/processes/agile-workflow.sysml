@@ -45,6 +45,7 @@ package EngineAgileProcess {
         :>> purpose = "Move items backlog -> ready: acceptance criteria "
                     + "(as atomic Tests), sizing, dependency links.";
         :>> cadence = Cadence::continuous;
+        // APPLIES-WHEN: work arrives faster than it is finished, so what to do next has to be computed from a ranked frontier instead of chosen from a pile
     }
     action refineCriteria : ProcessStep {
         :>> id = "c9bef132-83ef-44df-a312-24211035a191";

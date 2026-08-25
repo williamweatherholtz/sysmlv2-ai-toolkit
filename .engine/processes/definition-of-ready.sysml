@@ -15,6 +15,7 @@ package EngineDoR {
         :>> title = "Definition of Ready";
         :>> purpose = "Standup gate, before starting a ~5-point batch: each check below passes.";
         :>> cadence = Cadence::eventDriven;
+        // APPLIES-WHEN: work gets started before it is understood, and the cost of that shows up mid-build rather than at the start
     }
 
     // -- Universal checks (all work items) --

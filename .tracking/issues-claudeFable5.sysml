@@ -488,4 +488,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcNoShellInjectionIntoRecords to issue256;
+
+    part issue257 : Issue {
+        :>> id = "b580c481-4f43-4aa3-8215-541282dbd105";
+        :>> title = "A scaffolded project gets 25 active processes and is never asked what it is building";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel init lays down a working project with every process active, and nothing ever asks the author what they are building or what must not go wrong with it. The author then faces 25 processes with no basis to judge them and has two bad options: keep all of them and meet friction they never chose - D0054 names adoption friction as the dominant failure mode, above bad architecture - or switch off the ones whose names they do not recognise, which is the worst available selection rule, because the least familiar names are doing the least obvious work. The self-build could never feel this, since keel wants every process on; it surfaced only when adopting onto a second repository. The author raised it directly and made it a precondition on that migration, and named the range it has to serve: hardware, software, both, business processes, safety-related, art, video games, construction plans, whatever. The word whatever is part of the requirement - a closed table of domains cannot serve a domain nobody listed.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcProjectOnboarding to issue257;
 }

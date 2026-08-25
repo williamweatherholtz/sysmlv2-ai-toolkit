@@ -13,6 +13,7 @@ package EngineDeploy {
         :>> title = "Release (cut, publish, record)";
         :>> purpose = "Turn a green trunk into an obtainable, recorded release: a reconciled version, a full gate, a tag that CI builds and publishes for every platform, and a `Release` item so what shipped is an AUTHORED FACT whose contents are computed rather than remembered. Cadence is per-milestone, not per-sprint — a release marks a coherent capability step, and cutting one per sprint would make the tag meaningless.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: the thing is obtained by someone else - shipped, released, installed, handed over, submitted - so there is a moment when a version becomes real and has to be recorded as such
         // D0191: the release claims (a version recorded, reconciled with its tag) are guarded, unit-owned.
         assert constraint enforcesReleaseRecorded : releaseRecorded;
     }

@@ -24,6 +24,7 @@ package ProcessBusinessElicitation {
         :>> title = "Business elicitation";
         :>> purpose = "Draw out what a stakeholder needs but has not stated, recording their words verbatim before any Need is authored, so every Need can be checked against something they actually said.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: the people who will live with the result cannot write requirements but can tell you what hurts; ALMOST ALWAYS TRUE, and the exception is a project with no stakeholder but its author
     }
 
     action beScope : ProcessStep {

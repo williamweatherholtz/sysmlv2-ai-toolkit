@@ -10,6 +10,7 @@ package ProcessAdversarialPanelReview {
         :>> title = "Adversarial Panel Review";
         :>> purpose = "Harden a design artifact by convening independent critic personas whose ACCEPT verdicts are conditional on named, verifiable changes, iterating artifact revisions until every panelist independently accepts - uncompelled unanimity. The panel is a rigor framing, never a claim of critic independence (same-model subagents record critiquedBy = aiModel and pass nothing by themselves).";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: a choice is expensive to reverse - an architecture, a schema, a public interface, a material commitment - and you would rather it were attacked before you are committed than after
     }
 
     action aprConvene : ProcessStep {

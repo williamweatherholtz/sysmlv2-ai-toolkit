@@ -35,6 +35,7 @@ package EngineKnowledgeGraphMemory {
         :>> title = "Knowledge-Graph Memory";
         :>> purpose = "Give an AI (or a human at the CLI) deterministic, constant-cost recall over a CORPUS by treating it as a typed graph and answering from traversal, not conversation. v2 (D0161): THE CORPUS IS A DECLARED PARAMETER with two cases - (a) a DOCUMENT corpus, extracted against the closed vocabulary with identity computed from type plus normalised name; (b) an ALREADY-TYPED MODEL, where nothing is extracted: entities are the existing items, relations the existing typed edges, identity the minted UUID they already carry. For keel's own corpus the model IS the graph, and the only authored inputs are human-owned Questions and Aliases under .knowledge/.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: there is a body of material someone must answer questions from with provenance - regulations, a standard, a spec set, a codebase, a case history - and re-reading it every time does not scale
         // D0161 part 3ii: unit-owned well-formedness guard - makes this process a deactivatable UNIT
         // (keel deactivate knowledge-graph-memory), which is the difference between a process that
         // happens to be unused and one the project has DECLARED it does not run (D0138).

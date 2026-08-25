@@ -12,6 +12,7 @@ package EngineDecisionChannel {
         :>> title = "Decision channel (issue, auto-accept or ask, receipt, override)";
         :>> purpose = "Carry every proposed Decision to the human with zero self-hosted components and receipts at every step, while conscripting none of their attention (D0204): a non-fork decision auto-accepts under their standing consent (D0207) with the issue as notification and a forever-open override thread; a fork - where accepting means choosing - reaches out for one letter, and must first pass the judgment-request-quality bar (strong short name, rationale, alternatives with implications, a RESEARCH statement). The gesture surface and the done-signal are one thread; silence within budget is itself reported.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: the person who decides is not the person doing the work, or is not present when the decisions are made, so a choice would otherwise wait on catching them
         // D0207 clause 3: the unit owns the guard that prices the ask.
         assert constraint enforcesJudgmentRequestQuality : judgmentRequestQuality;
     }

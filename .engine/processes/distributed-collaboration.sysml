@@ -25,6 +25,7 @@ package EngineDistributedCollaboration {
         :>> title = "Distributed collaboration session loop (sync, claim, work, land, escalate, close)";
         :>> purpose = "Let several contributors — nearly all AI, on separate machines, supervised asynchronously across timezones — work one model concurrently without duplicating each other's work, silently overwriting each other's facts, invalidating each other's evidence, or needing anyone to be awake. Coordination uses only what a git remote provides: an atomic ref update (a compare-and-swap) and an ancestry-preserving history. Every state it depends on is COMPUTED from authored facts plus git; the only things authored are irreducible facts, including the claim.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: several contributors work the same model concurrently, on separate machines, without a live channel between them
         // sprint 423 (issue226): D0108's ownership rule HAS been guarded since sprint 293 - staged
         // diff vs HEAD, item-level field comparison, owner vs bound actor, migration keystone
         // exemption - but no unit asserted it, so the enforcement map read 'nothing checks it'.

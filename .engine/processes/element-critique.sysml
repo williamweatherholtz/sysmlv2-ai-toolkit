@@ -20,6 +20,7 @@ package EngineElementCritique {
         :>> title = "Antagonistic Element Critique";
         :>> purpose = "Adversarially verify each tracked Need / SystemRequirement / Decision / Architecture element through required adversarial lenses, by an independent critic, recording each critique as a method=critique verification + result (#Verify-linked to the target); raise findings as severity-carrying Issues (#Resolves loop); let critique coverage + staleness COMPUTE from the assurance substrate.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: an individual element being wrong is expensive - an unchecked requirement, an unattacked decision, a hazard nobody argued with - so each one needs an independent adversary rather than a review of the whole
         assert constraint enforcesCriticIndependence : criticIndependence;
     }
 

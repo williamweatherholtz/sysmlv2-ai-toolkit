@@ -8,6 +8,7 @@ package ProcessIntake {
         :>> title = "Intake";
         :>> purpose = "Turn what a human said into tracked items, keeping their words and my reading as separate, separately auditable facts.";
         :>> cadence = Cadence::perItem;
+        // APPLIES-WHEN: requests arrive as human speech - chat, meetings, tickets, site walks, playtests - and get acted on without their words ever being recorded, so the reading cannot later be checked against what was said
     }
 
     action inRecord : ProcessStep {

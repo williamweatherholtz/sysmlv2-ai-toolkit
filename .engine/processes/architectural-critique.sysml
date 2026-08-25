@@ -21,6 +21,7 @@ package EngineCritiqueProcess {
         :>> title = "Antagonistic Architectural Critique";
         :>> purpose = "Adversarially audit the engine + its processes using the CAE+GQM+ATAM framework (D0046); record findings as tracked Issue/Decision items (not prose). Operationalized by the architectural-critique skill.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: the thing being built makes claims about itself that someone will rely on - a platform, a tool, a standard, a safety argument - and those claims need auditing against refuting evidence
     }
 
     action criScope : ProcessStep {

@@ -14,6 +14,7 @@ package EngineRenderView {
         :>> title = "Modular Render + Review Round-trip (computed view)";
         :>> purpose = "Render any declared view (D0056/D0057) as a self-contained interactive artifact — graph, table, or review — regenerated on demand from authored facts; and round-trip a human review (an independent critique, D0080) back into the model as new linked critique items that attest state and induce suspicion. Never author or commit a rendered artifact.";
         :>> cadence = Cadence::adHoc;
+        // APPLIES-WHEN: a stakeholder needs to see the model without learning the CLI, and a screenshot or an exported document would immediately be a second copy of the truth
         assert constraint enforcesViewpointRenderer : viewpointRenderer;
     }
 
