@@ -8,7 +8,10 @@ package Decision0227 {
     private import EngineRelationships::*;
 
     // RESEARCH: Measured this repo rather than reasoning about it. 22 GitHub issues exist and 20 were opened in a single day, one per proposed Decision, each ASSIGNED to the decider by the opener. 94 workflow runs landed the same day; 148 CI runs across the sampled window, 28 of them failing, and GitHub emails the pusher on each failure. The decision-record sweeper fires on a 30-minute cron (29 runs sampled). Read the opener and the channel's own docs: the skill states 'One issue per decision - the human's own requirement, to keep the gesture unambiguous', which is why this is a fork rather than a fix - the change reverses something you asked for. Also checked what the decider table actually controls: it governs who may DECIDE and who gets ASSIGNED, not who gets notified; anyone watching the repo receives new-issue notifications regardless, which is why 'leave me as the only decider' does not by itself protect a colleague on another repository. No external research: this is a property of this repo's own configuration.
-    part d0227 : Decision {
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock. Added when the human chose OPTION A and
+    // the change became real; the fork was recorded before it was known that anything would change.
+    #ProspectiveChange part d0227 : Decision {
         :>> id = "4602f247-337a-450d-83c1-d930fc0c1066";
         :>> title = "notificationCost: how should the channel stop spending your attention on decisions that need nobody?";
         :>> createdAt = "2026-08-24";

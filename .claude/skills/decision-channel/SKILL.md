@@ -6,16 +6,22 @@ inspectable workflow run; the gesture surface and the done-signal are one thread
 
 ## The contract
 
-1. **Non-fork decisions auto-accept** under the human's standing consent the moment their issue is
-   raised. The issue is a notification and a forever-open override thread — it closes immediately
-   with a receipt that says plainly *not individually reviewed*. The acceptance note carries the
+1. **Non-fork decisions auto-accept** under the human's standing consent the moment they are posted.
+   They are a COMMENT on ONE standing override thread that assigns nobody (D0227) — a decision that
+   needs no human must not spend anyone's attention to exist — with a receipt that says plainly
+   *not individually reviewed*. That thread is the override surface for all of them, forever. The acceptance note carries the
    `AUTO-ACCEPTED` machine token so views can always split auto from judged (never one number).
 2. **Forks earn the ask.** A decision enumerating `OPTION X (label)` choices cannot auto-accept.
    Before it may even be proposed, the `judgment-request-quality` guard requires: a strong short
    name leading the title (one word before the colon, ≤ 28 chars); rationale ≥ 200 chars; a
    `RESEARCH` statement (what was looked at before asking — or "none found, and here is where I
    looked"); and a `COST` per option. If you can't fill those, you're not ready to ask.
-3. **One issue per decision** — the human's own requirement, to keep the gesture unambiguous.
+3. **Split by attention, not by decision** (D0227). A fork gets its own assigned issue; a non-fork
+   gets a comment. This REVERSED the human's earlier "one issue per decision" requirement, and only
+   after asking them on a fork — it had opened 20 assigned issues in one day for decisions that
+   needed nobody (issue258). The cost they accepted: a gesture must NAME the decision it reverses,
+   `reject dNNNN <why>`, because one thread now carries many. A gesture on a fork's own issue still
+   inherits the decision from the issue body.
 4. **The gesture** is one letter (`B`), `accept`, or `reject <why>` as an issue comment (GitHub app
    or reply-to-notification-email). Latest comment wins; supersessions are announced.
 5. **Receipts always**: 👀 on pickup, a receipt comment quoting exactly what entered git with the

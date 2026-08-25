@@ -10,6 +10,14 @@ D0207 standing consent: a NON-FORK decision auto-accepts — new issues are queu
 (name<TAB>number<TAB>url) for the workflow's recorder step, and an already-open non-fork issue
 sweeps into the same queue (the standing consent arriving after the issue did). Forks stay open
 awaiting the human's letter.
+
+D0227 (issue258), OPTION A, chosen by the human on a fork: the split is by ATTENTION, not by
+decision. A NON-FORK is a COMMENT on ONE standing override thread that assigns nobody — it needs no
+human by definition, so it must not spend anyone's attention to exist. A FORK opens its own issue and
+is assigned, because it genuinely needs them, and assignment notifies through a mute of the standing
+thread. Measured cause: 20 issues opened in a single day, each assigned, none of which needed anyone.
+This reverses the earlier "one issue per decision" requirement, which is why it was asked rather than
+fixed — and the cost is that a gesture must now NAME the decision it reverses (`reject dNNNN why`).
 """
 import json
 import re
@@ -62,26 +70,83 @@ def ensure_override_threads() -> None:
         num = int(m.group(1))
         if c["status"] != "accepted" or num < CHANNEL_FROM:
             continue
-        search = f"keel-decision-{c['name']} in:body"
-        if json.loads(gh(["issue", "list", "--state", "all", "--label", "decision",
-                          "--search", search, "--json", "number"]).stdout or "[]"):
-            continue  # already has a thread (open or closed)
+        if has_override_surface(c["name"]):
+            continue  # already has a surface: its own issue, or a comment on the standing thread
         body = (
+            f"### {c['title']}\n\n"
             f"<!-- keel-decision: {c['name']} -->\n\n"
             f"**Why it came up:** {c['context']}\n\n"
             f"**What is being decided:** {c['decision']}\n\n---\n"
             "**Status: ACCEPTED** before this override thread existed (a channel-bypass, issue238). "
             "This issue is your override surface: reply `reject <why>` here anytime to reverse."
         )
-        with open("body.md", "w", encoding="utf-8") as f:
-            f.write(body)
-        created = gh(["issue", "create", "--title", c["title"], "--body-file", "body.md",
-                      "--label", "decision", *assignee_args()], check=True)
-        url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
-        if url.startswith("http"):
-            gh(["issue", "close", url, "--reason", "completed",
-                "--comment", "Accepted before this thread existed (issue238); open as your override surface."])
-            print(f"{c['name']} override thread opened (bypass backfill): {url}")
+        # D0227: the backfill posts to the standing thread too. It used to OPEN AND CLOSE one issue
+        # per bypassed decision - two notifications each, for a surface nobody had asked for.
+        if post_to_standing(c, body):
+            print(f"{c['name']} override surface backfilled onto the standing thread")
+
+
+STANDING_MARK = "<!-- keel-standing-thread -->"
+STANDING_TITLE = "keel: decisions auto-accepted under standing consent"
+
+
+def repo_url() -> str:
+    return gh(["repo", "view", "--json", "url", "-q", ".url"]).stdout.strip()
+
+
+def standing_thread() -> str:
+    """The one open standing thread's number, creating it if this repo has none yet."""
+    found = json.loads(gh(["issue", "list", "--state", "open", "--label", "decision",
+                           "--search", "keel-standing-thread in:body",
+                           "--json", "number"]).stdout or "[]")
+    if found:
+        return str(found[0]["number"])
+    body = (
+        STANDING_MARK + "\n\n"
+        "Every Decision auto-accepted under your standing consent (D0207) is posted here as a comment "
+        "rather than as its own issue, so this thread is the override surface for all of them and "
+        "**nothing here needs you**.\n\n"
+        "To reverse one, reply `reject dNNNN <why>` naming the decision.\n\n"
+        "Nobody is assigned, so you can mute this thread. A decision that genuinely needs you is a "
+        "FORK: it opens its own issue and assigns you, which notifies through a mute."
+    )
+    with open("body.md", "w", encoding="utf-8") as f:
+        f.write(body)
+    created = gh(["issue", "create", "--title", STANDING_TITLE, "--body-file", "body.md",
+                  "--label", "decision"], check=True)
+    url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
+    print("opened the standing override thread: " + url)
+    return url.rsplit("/", 1)[-1] if url else ""
+
+
+def standing_has(name: str) -> bool:
+    """Is this decision already on the standing thread? Idempotency for a re-run or the sweeper."""
+    number = standing_thread()
+    if not number:
+        return False
+    bodies = gh(["issue", "view", number, "--json", "comments", "-q", ".comments[].body"]).stdout
+    return ("keel-decision: " + name) in bodies
+
+
+def post_to_standing(card, body: str) -> str:
+    """Append one auto-accepted decision to the standing thread. Returns its issue number."""
+    number = standing_thread()
+    if not number:
+        return ""
+    with open("body.md", "w", encoding="utf-8") as f:
+        f.write(body)
+    gh(["issue", "comment", number, "--body-file", "body.md"], check=True)
+    print("posted " + card["name"] + " to the standing thread #" + number)
+    return number
+
+
+def has_override_surface(name: str) -> bool:
+    """Does this decision have an override surface anywhere — its own issue, or the standing thread?"""
+    if json.loads(gh(["issue", "list", "--state", "all", "--label", "decision",
+                      "--search", "keel-decision-" + name + " in:body",
+                      "--json", "number"]).stdout or "[]"):
+        return True
+    return standing_has(name)
 
 
 def _all_cards() -> str:
@@ -97,6 +162,9 @@ def main() -> None:
         q = gh(["issue", "list", "--state", "open", "--label", "decision",
                 "--search", search, "--json", "number,url"])
         existing = json.loads(q.stdout or "[]")
+        if not c["options"] and standing_has(c["name"]):
+            print(f"{c['name']} already on the standing thread")
+            continue
         if existing and c["options"]:
             print(f"{c['name']} already has an open issue (fork - awaiting their letter)")
             continue
@@ -120,21 +188,26 @@ def main() -> None:
                 + "\n\nOr reply `reject <why>`."
             )
         else:
-            body += (
+            body = f"### {c['title']}\n\n" + body + (
                 "**Auto-accepted under your standing consent (D0207)** - nothing needs you. "
-                "Reply `reject <why>` here anytime to reverse; this thread stays the override surface."
+                f"Reply `reject {c['name']} <why>` on this thread anytime to reverse it. "
+                "Naming the decision is what lets one thread carry them all (D0227)."
             )
+        if not c["options"]:
+            # D0227 OPTION A: a comment on the shared standing thread, assigning NOBODY. The title
+            # rides in the comment body because a comment has none of its own.
+            number = post_to_standing(c, body)
+            if number:
+                queue_auto(c["name"], number, f"{repo_url()}/issues/{number}")
+                print(f"{c['name']} queued for auto-accept (standing thread #{number})")
+            continue
         with open("body.md", "w", encoding="utf-8") as f:
             f.write(body)
         created = gh(["issue", "create", "--title", c["title"], "--body-file", "body.md",
                       "--label", "blocks-work", "--label", "decision",
                       *assignee_args()], check=True)
         url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
-        number = url.rsplit("/", 1)[-1] if url else ""
-        print(f"opened issue for {c['name']}: {url}")
-        if not c["options"] and number:
-            queue_auto(c["name"], number, url)
-            print(f"{c['name']} queued for auto-accept (new issue)")
+        print(f"opened FORK issue for {c['name']}: {url}")
     ensure_override_threads()  # issue238: guarantee an override thread for every post-channel accepted decision
 
 

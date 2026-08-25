@@ -10,7 +10,7 @@ package EngineDecisionChannel {
     action decisionChannel : Process {
         :>> id = "c7c8c5c3-6598-4160-a479-9cc5ecfd28f9";
         :>> title = "Decision channel (issue, auto-accept or ask, receipt, override)";
-        :>> purpose = "Carry every proposed Decision to the human with zero self-hosted components and receipts at every step, while conscripting none of their attention (D0204): a non-fork decision auto-accepts under their standing consent (D0207) with the issue as notification and a forever-open override thread; a fork - where accepting means choosing - reaches out for one letter, and must first pass the judgment-request-quality bar (strong short name, rationale, alternatives with implications, a RESEARCH statement). The gesture surface and the done-signal are one thread; silence within budget is itself reported.";
+        :>> purpose = "Carry every proposed Decision to the human with zero self-hosted components and receipts at every step, while conscripting none of their attention (D0204): a non-fork decision auto-accepts under their standing consent (D0207) as a comment on ONE standing override thread that assigns nobody (D0227); a fork - where accepting means choosing - reaches out for one letter, and must first pass the judgment-request-quality bar (strong short name, rationale, alternatives with implications, a RESEARCH statement). The gesture surface and the done-signal are one thread; silence within budget is itself reported.";
         :>> cadence = Cadence::perItem;
         // APPLIES-WHEN: the person who decides is not the person doing the work, or is not present when the decisions are made, so a choice would otherwise wait on catching them
         // D0207 clause 3: the unit owns the guard that prices the ask.
@@ -27,10 +27,10 @@ package EngineDecisionChannel {
     }
     action dchPublish : ProcessStep {
         :>> id = "f64a38b8-cf9f-4e8a-ace1-593e80664970";
-        :>> title = "Publish - one issue per decision, carrying its own why";
+        :>> title = "Publish - split by ATTENTION: a comment for the plain, an issue for the fork";
         :>> triggerCondition = "The proposed Decision lands on the default branch.";
-        :>> actionText = "The decision-issue workflow opens ONE GitHub issue per proposed decision (idempotent on the embedded keel-decision marker): short-name title, body rendered from the decision's own context/decision/options via `keel decision-card` (one parser, two consumers), blocks-work label (the board IS the filtered issues list - never a regenerated copy), assigned so mobile push fires. One issue per decision keeps the gesture unambiguous and the human focused - their own requirement.";
-        :>> producedArtifact = "An open GitHub issue per proposed decision.";
+        :>> actionText = "The decision-issue workflow splits by ATTENTION rather than by decision (D0227). A NON-FORK becomes a COMMENT on ONE standing override thread that assigns NOBODY - it needs no human by definition, so it must not spend anyone attention to exist - and the comment carries the decision title and its keel-decision marker, so the thread is the override surface for all of them. A FORK opens its OWN issue, labelled blocks-work and ASSIGNED, because it genuinely needs them and assignment notifies through a mute of the standing thread. Bodies are rendered from the decision own context/decision/options via keel decision-card (one parser, two consumers). Idempotent on the embedded keel-decision marker, whether that marker sits in an issue body or in a standing-thread comment. The previous shape - one issue per decision, each assigned - was the human own earlier requirement and was REVERSED by them on a fork after it opened 20 assigned issues in a single day for decisions that needed nobody (issue258).";
+        :>> producedArtifact = "A comment on the standing thread per non-fork, and an open assigned issue per fork.";
         :>> owner = Owner::ai;
     }
     action dchResolve : ProcessStep {

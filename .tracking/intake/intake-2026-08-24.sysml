@@ -58,4 +58,27 @@ if these are in place, then yes let's proceed with #1";
     #DerivedFrom dependency from us021 to st018;
     #DerivedFrom dependency from us022 to st018;
     #DerivedFrom dependency from us023 to st018;
+
+    part st019 : Statement {
+        :>> id = "965468c5-648d-4470-a493-e5a580150b3c";
+        :>> title = "25 approved";
+        :>> createdAt = "2026-08-24"; :>> createdBy = "claudeFable5";
+        :>> text = "25 approved";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-24"; :>> channel = StatementChannel::chat;
+    }
+
+    part us024 : UserStory {
+        :>> id = "81270338-18f1-49b6-a0df-4b8f88e859ac";
+        :>> title = "the fork is approved, but the approval names no option";
+        :>> createdAt = "2026-08-24"; :>> createdBy = "claudeFable5";
+        :>> asA = "project owner deciding on a fork";
+        :>> iWant = "issue 25 approved";
+        :>> soThat = "the channel stops spending my attention on decisions that need nobody";
+        :>> implication = ImplicationKind::question;
+        :>> triageNote = "QUESTION rather than attestation, and the distinction is the point. d0227 enumerated three options with materially different costs, and 'approved' names none of them - the reply vocabulary I had given them was A, B, C or reject. Reading it as agreement with my recommendation would have been exactly the inference I stopped to avoid one turn earlier, so it was put back to them and they chose OPTION A: one standing thread. Their choice is recorded here as the source of the change; the method=confirmation ACCEPTANCE is not recorded by me, because keel accept refuses from an agent session by design (D0178/K6) - it is theirs to make, by replying A on the issue or from their own terminal.";
+    }
+
+    #DerivedFrom dependency from us024 to st019;
+    #Implicates dependency from us024 to dcChannelNotificationCost;
+
 }
