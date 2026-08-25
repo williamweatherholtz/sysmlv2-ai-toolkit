@@ -2269,6 +2269,15 @@ fn process_applicability(root: &Path) -> GuardReport {
     let dir = root.join(".engine").join("processes");
     let mut scanned = 0usize;
     let mut violations = Vec::new();
+    // SCOPED TO ADOPTION (issue259, D0164). The APPLIES-WHEN fact exists to serve `project-onboarding`;
+    // a project that has not adopted that process has not violated anything by lacking it, and gating
+    // it anyway is the failure D0164 names - a control a project never adopted, enforced against it.
+    // Found the hard way: this guard, hours after landing, failed all 22 processes of the first
+    // project keel was adopted onto. Reported as 0 scanned rather than silently skipped, so an
+    // out-of-scope guard is visible rather than a vacuous pass.
+    if !dir.join("project-onboarding.sysml").exists() {
+        return GuardReport { name: "process-applicability", scanned, warnings: Vec::new(), violations };
+    }
     let Ok(entries) = std::fs::read_dir(&dir) else {
         // No processes directory at all is not a violation: a project may hold no process definitions.
         return GuardReport { name: "process-applicability", scanned, warnings: Vec::new(), violations };
@@ -3586,6 +3595,24 @@ mod tests {
         let dir = root.join(".engine").join("processes");
         std::fs::create_dir_all(&dir).unwrap();
 
+        // Out of scope until the project adopts project-onboarding (issue259): the fact serves that
+        // process, and a project that never adopted it has violated nothing (D0164).
+        std::fs::write(dir.join("other.sysml"), "package O {
+    action o : Process {
+        :>> id = \"y\";
+    }
+}
+").unwrap();
+        assert_eq!(process_applicability(&root).scanned, 0, "not adopted -> out of scope, and it says 0 scanned");
+        std::fs::write(dir.join("project-onboarding.sysml"), "package PO {
+    action po : Process {
+        :>> id = \"z\";
+        // APPLIES-WHEN: adopted
+    }
+}
+").unwrap();
+        std::fs::remove_file(dir.join("other.sysml")).unwrap();
+
         let declares = "package P {
     action p : Process {
         :>> id = \"x\";
@@ -3595,13 +3622,13 @@ mod tests {
 }}
 ")).unwrap();
         let r = process_applicability(&root);
-        assert_eq!((r.scanned, r.violations.len()), (1, 0), "a declared condition passes");
+        assert_eq!((r.scanned, r.violations.len()), (2, 0), "both declared conditions pass");
 
         std::fs::write(dir.join("without.sysml"), format!("{declares}    }}
 }}
 ")).unwrap();
         let r = process_applicability(&root);
-        assert_eq!(r.scanned, 2, "both process files are in scope");
+        assert_eq!(r.scanned, 3, "every process file is in scope once adopted");
         assert_eq!(r.violations.len(), 1, "the one lacking a condition is refused");
         assert!(r.violations[0].contains("without.sysml"), "{:?}", r.violations);
 
@@ -3610,7 +3637,7 @@ mod tests {
     private import X::*;
 }
 ").unwrap();
-        assert_eq!(process_applicability(&root).scanned, 2, "a non-Process file is not scanned");
+        assert_eq!(process_applicability(&root).scanned, 3, "a non-Process file is not scanned");
         let _ = std::fs::remove_dir_all(&root);
     }
 

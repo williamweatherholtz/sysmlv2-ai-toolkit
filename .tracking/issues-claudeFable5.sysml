@@ -510,4 +510,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcChannelNotificationCost to issue258;
+
+    part issue259 : Issue {
+        :>> id = "1940c642-88a5-4c9a-a02b-a432da5025a3";
+        :>> title = "A guard landed today broke the commit gate of the first project keel was adopted onto";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Guard 50 requires every declared Process to carry an APPLIES-WHEN condition. Run against penumbra - a real project on a 20-August engine snapshot that has never adopted project-onboarding - it failed 22 times out of 22 and would have broken that project's commit gate on arrival, for a convention it never chose. This is the failure D0164 exists to prevent, and I wrote the guard the same day while citing D0164 in a different context, which is the part worth recording: knowing the rule did not prevent breaking it, because nothing in the self-build could feel the consequence. It is the third time in four sprints that a defect was invisible to keel and obvious to a second project. The measurement was only available because the adoption was actually attempted rather than reasoned about.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGuardScopedToAdoption to issue259;
 }
