@@ -1783,8 +1783,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 50] =
-    ["process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
+pub const GUARD_NAMES: [&str; 51] =
+    ["gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
 
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
@@ -2253,6 +2253,56 @@ pub fn tool_reference(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "tool-reference", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 51: a workflow that RUNS the gate must check out full history (D0229/issue260).
+///
+/// `claim-ancestry` and `audit-history` derive their verdicts from git history and SKIP LOUDLY on a
+/// shallow clone - correctly, because a depth-dependent verdict is the machine-dependence K15
+/// forbids. The consequence is that a gating workflow which forgets `fetch-depth: 0` silently runs
+/// with those guards disabled. That is exactly what happened: `ci.yml` carried the fix (issue229),
+/// `release.yml` never got it, and the release gate had been RED since guard 48 landed - undetected
+/// for weeks because releases are rare enough that nobody ran it.
+///
+/// The same-fix-in-N-places class, which is the most-repeated finding in this project's retros. The
+/// control is cheap: the fix is a literal, so its absence is decidable.
+///
+/// STATED LIMITATION: the check is per-FILE, not per-JOB, because there is no YAML parser here. A
+/// workflow with two jobs where only the non-gating one sets `fetch-depth: 0` would pass - which is
+/// the shape `release.yml` itself has (its build job checks out shallow, legitimately). It catches
+/// the real failure class, a gating workflow with no full-history checkout anywhere, and nothing
+/// finer. Recorded rather than left for someone to discover.
+fn gating_workflow_history(root: &Path) -> GuardReport {
+    let dir = root.join(".github").join("workflows");
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations };
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|x| x.to_str()).is_some_and(|e| e == "yml" || e == "yaml"))
+        .collect();
+    files.sort();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        // "Runs the gate" is judged by what the workflow actually invokes, not by its name.
+        let gates = ["cargo test", "keel guard", "keel validate", "audit-history", "audit-adherence"]
+            .iter()
+            .any(|needle| text.contains(needle));
+        if !gates || !text.contains("actions/checkout") {
+            continue;
+        }
+        scanned += 1;
+        if !text.contains("fetch-depth: 0") {
+            violations.push(format!(
+                "{}: runs the gate but checks out SHALLOW - every history-derived guard (claim-ancestry, audit-history) silently skips, so this workflow reports a pass it did not verify. Add `fetch-depth: 0` to the checkout (issue229/issue260)",
+                relpath(root, path)
+            ));
+        }
+    }
+    GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
 }
 
 /// Guard 50: every declared process states the SITUATION in which a project needs it (D0225).
@@ -3004,6 +3054,9 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         // D0225: a process that cannot say WHEN it applies cannot be recommended for or against,
         // so onboarding silently stops seeing it. Honest-state, not completeness (D0098): the
         // claim "this project chose its processes" is false if a process was invisible to the choice.
+        // D0229: a workflow that RUNS the gate but checks out shallow silently disables every
+        // history-derived guard in it. Found by the release gate being red since guard 48 landed.
+        "gating-workflow-history" => Some(gating_workflow_history(root)),
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
@@ -3473,11 +3526,16 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 11] = [
+        const LEGITIMATELY_EMPTY: [&str; 12] = [
             // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
             // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
             // The population returns the moment the backlog holds ranked work again.
             "priority-inversion",
+            // SHALLOW-CLONE dependent: claim-ancestry skips loudly when history is unavailable, which
+            // is correct (a depth-dependent verdict is the K15 machine-dependence it exists to
+            // prevent) but means its population is zero in any job that checks out shallow. Guard 51
+            // now refuses a GATING workflow that does so; this test runs in jobs that may not be one.
+            "claim-ancestry",
             // both D0191 guards scan ENVIRONMENT-DEPENDENT populations: release-recorded scans git
             // tags (absent in CI's tag-less clone) and enrollment-binding scans the machine-local
             // .keel/actor binding (gitignored, absent on CI) - locally both scan real populations.

@@ -521,4 +521,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcGuardScopedToAdoption to issue259;
+
+    part issue260 : Issue {
+        :>> id = "9d9f973c-6f4f-4d9c-88db-b3472dbdabe9";
+        :>> title = "The release gate had been red since guard 48 landed, and only cutting a release could reveal it";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Tagging v0.3.0, the release workflow failed - not on anything in the release, but on the test asserting that no guard reports a zero population. The guard reporting zero was claim-ancestry, which skips loudly on a shallow clone because a depth-dependent verdict is the machine dependence K15 forbids, and actions/checkout defaults to depth 1. ci.yml carries fetch-depth 0 with a comment naming issue229 - the exact fix, for the exact reason, already written down in this repo. release.yml never received it. Three of four workflows had it. So the release gate has been red since guard 48 landed weeks ago, undetected because v0.2.3 was tagged on 2026-08-14, before that guard existed, and nothing has cut a release since. Two things make this worse than an ordinary miss: the release path is the one gate where no other run would notice, and the fix had ALREADY SUCCEEDED once in this repo and still did not generalise - so this is not vigilance failing, it is vigilance having worked and not transferred, which is the strongest possible case for D0047.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGatingWorkflowHistory to issue260;
 }

@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # claim-ancestry + audit-history derive verdicts from history; a shallow
+                          # clone cannot (issue229). ci.yml got this fix; THIS workflow did not, so
+                          # the release gate had been red since guard 48 landed - undetected because
+                          # releases are rare (issue260). Guard 51 now checks every gating workflow.
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: clippy (deny warnings)
