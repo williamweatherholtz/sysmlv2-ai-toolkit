@@ -234,6 +234,30 @@ pub fn decision_of(issue_body: &str) -> Option<String> {
     None
 }
 
+/// The decision a GESTURE names, when the gesture is left on a shared thread (D0227/issue258).
+///
+/// The channel used to open one issue per Decision, so the decision was always the issue's. That
+/// barraged the repo owner — 20 issues in a day, one per auto-accepted non-fork — and would have
+/// barraged a colleague on any project that adopted the channel, which is exactly what the author
+/// prohibited. Non-forks now share ONE standing override thread, so a reject has to say WHICH
+/// decision it reverses: `reject d0225 too wide`.
+///
+/// Deliberately strict: `d` followed by exactly four digits, and nothing else attached. A loose
+/// match would let a reason containing a version or an id silently retarget the reject to another
+/// Decision — reversing something the human never mentioned, which is worse than not parsing.
+#[must_use]
+pub fn decision_in_gesture(comment_body: &str) -> Option<String> {
+    let first = comment_body.lines().next().unwrap_or("");
+    first
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .find(|tok| {
+            tok.len() == 5
+                && tok.starts_with('d')
+                && tok[1..].chars().all(|c| c.is_ascii_digit())
+        })
+        .map(str::to_string)
+}
+
 /// Has this comment id already been receipted? Idempotency, decided from the comment bodies the
 /// caller already fetched — so the check is deterministic here and the fetch stays in the workflow.
 #[must_use]
@@ -278,7 +302,12 @@ pub fn gesture_cmd() -> i32 {
     let issue_body = std::env::var("ISSUE_BODY").unwrap_or_default();
     let comment_id = std::env::var("COMMENT_ID").unwrap_or_default();
     let bodies = std::env::var("COMMENT_BODIES").unwrap_or_default();
-    let decision = decision_of(&issue_body).unwrap_or_default();
+    // A gesture on the SHARED standing thread names its own decision; one on a fork's own issue
+    // inherits it from the issue body. The comment wins when it names one, because it is the more
+    // specific statement of intent - and on the standing thread the issue body names none at all.
+    let decision = decision_in_gesture(&body)
+        .or_else(|| decision_of(&issue_body))
+        .unwrap_or_default();
     let receipted = !comment_id.is_empty() && already_receipted(&bodies, &comment_id);
     let (verdict, option, reason) = match parse_gesture(&body) {
         Verdict::Accept(opt) => ("accept", opt.map(String::from).unwrap_or_default(), String::new()),
@@ -294,7 +323,25 @@ pub fn gesture_cmd() -> i32 {
 
 #[cfg(test)]
 mod gesture_tests {
-    use super::{already_receipted, decision_of, parse_gesture, Verdict};
+    use super::{already_receipted, decision_in_gesture, decision_of, parse_gesture, Verdict};
+
+    #[test]
+    fn a_gesture_on_the_shared_thread_names_its_own_decision() {
+        // D0227: non-forks share one standing override thread, so a reject must say which decision
+        // it reverses. The issue body names none, so the comment is the only source.
+        assert_eq!(decision_in_gesture("reject d0225 too wide"), Some("d0225".to_string()));
+        assert_eq!(decision_in_gesture("d0225 reject"), Some("d0225".to_string()));
+        assert_eq!(decision_in_gesture("reject D0225 too wide"), None, "the token is lower-case `d`");
+        // Only the first line, same as the verdict - a quoted mail trailer cannot retarget a reject.
+        assert_eq!(decision_in_gesture("reject too wide
+
+see d0225"), None);
+        // STRICT: anything that is not exactly d + four digits must not match, or a reason mentioning
+        // a version or an id would silently reverse a Decision the human never named.
+        for miss in ["reject too wide", "reject d022 typo", "reject d02255", "reject xd0225", "reject d0225x"] {
+            assert_eq!(decision_in_gesture(miss), None, "must not match: {miss}");
+        }
+    }
 
     #[test]
     fn the_documented_vocabulary_parses() {

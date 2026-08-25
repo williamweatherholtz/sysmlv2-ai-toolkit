@@ -53,6 +53,7 @@ if these are in place, then yes let's proceed with #1";
 
     // The routing: us021 needed no work (the constraint was already met), us022 became the
     // notification-volume bug, us023 became issue257 and the project-onboarding process.
+    #Implicates dependency from us022 to dcChannelNotificationCost;
     #Implicates dependency from us023 to dcProjectOnboarding;
     #DerivedFrom dependency from us021 to st018;
     #DerivedFrom dependency from us022 to st018;

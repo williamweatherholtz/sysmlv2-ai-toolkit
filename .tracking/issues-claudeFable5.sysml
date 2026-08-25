@@ -499,4 +499,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcProjectOnboarding to issue257;
+
+    part issue258 : Issue {
+        :>> id = "71ad8e6e-2840-4c1f-b6f8-84c8134d0011";
+        :>> title = "The decision channel opens one GitHub issue per Decision and is barraging its own owner";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Volunteered by the author while answering a different question: they do not want a second decider on another project enrolled, because of the notification volume they are getting now. Measured rather than assumed: 22 issues exist and 20 were opened in one day, one per proposed Decision, because D0207 gives every non-fork a forever-open override thread of its own; 94 workflow runs landed the same day, 28 CI failures among them, and each failure emails the pusher; the sweeper fires every 30 minutes. This is the D0054 adoption-friction class turned on its author - a control I built imposing a cost its design never counted - and it is the first friction report about one of these controls. It matters beyond this repo: adopting the channel onto a second project would replicate the barrage there, which is precisely the outcome the author said they wanted to avoid for a colleague. The override thread itself is not the problem and must not be weakened: it is the human only route to reverse a Decision that was auto-accepted under standing consent.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcChannelNotificationCost to issue258;
 }
