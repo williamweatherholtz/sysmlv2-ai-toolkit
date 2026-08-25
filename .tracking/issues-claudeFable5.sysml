@@ -554,4 +554,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcChannelNotificationCost to issue262;
+
+    part issue263 : Issue {
+        :>> id = "b37f60c1-9e28-4ce4-82b7-368ba3a917a5";
+        :>> title = "process audit said the unit travels whole; the adoption proved it does not";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel process audit - built two sprints ago precisely to answer whether a unit would land green in a project that lacks it - reported decision-channel TRAVELS WHOLE at 7 files. Imported into penumbra it left check-engine with an unresolved type reference: the process asserts constraint judgmentRequestQuality, which is defined in the SOURCE project's schema and is not part of the unit, so the claim arrived pointing at nothing. The audit checks that a deploying skill exists, that the skill-to-process binding travels, that declared extras are present on disk, and that no carried file cites a path the adopter will not have. It does not check that the TYPE and CONSTRAINT names the carried files reference are ones the unit brings with it. This is the THIRD distinct way a unit has failed to travel whole - the mechanism stayed home (issue251), the binding declaration stayed home (issue252), and now a schema symbol stays home - and each was found by attempting a real adoption rather than by any check. The audit's verdict was not merely incomplete, it was CONFIDENT: it printed every unit travels whole, which is worse than printing nothing, because it is the surface someone would trust instead of adopting. The penumbra adoption worked around it by dropping the claim, which is a better outcome anyway - an unclaimed guard is CORE, so the bar applies unconditionally with no activation step.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAuditSeesSchemaReferences to issue263;
 }
