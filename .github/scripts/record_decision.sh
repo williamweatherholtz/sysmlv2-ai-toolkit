@@ -32,8 +32,16 @@ Co-Authored-By: keel githubChannel recorder <keel-recorder@users.noreply.github.
   for attempt in 1 2 3; do
     if git push origin main; then
       sha=$(git rev-parse --short HEAD)
-      gh issue comment "$ISSUE_NUMBER" --body "**Auto-accepted** under your standing consent (D0207) - not individually reviewed. Commit ${sha}. Reply \`reject <why>\` here anytime to reverse; this thread stays the override surface."
-      gh issue close "$ISSUE_NUMBER" --reason completed --comment "In the tree. Nothing needs you unless you disagree."
+      gh issue comment "$ISSUE_NUMBER" --body "**Auto-accepted** under your standing consent (D0207) - not individually reviewed. Commit ${sha}. Reply \`reject ${AUTO_DECISION} <why>\` here anytime to reverse; this thread stays the override surface."
+      # NEVER CLOSE THE STANDING THREAD (issue262). Under D0227 a non-fork's receipt lands on the ONE
+      # shared thread, and closing it destroyed the forever-open override surface for every decision
+      # at once - which the first live run did, to the thread it had just created. A per-decision
+      # issue is still closed, because that issue is about that decision and nothing else.
+      if gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name' | grep -qx 'keel-standing'; then
+        echo "standing thread #$ISSUE_NUMBER left OPEN - it is the override surface for every auto-accepted decision"
+      else
+        gh issue close "$ISSUE_NUMBER" --reason completed --comment "In the tree. Nothing needs you unless you disagree."
+      fi
       exit 0
     fi
     git fetch origin main && git merge --no-edit origin/main && "$KEEL" validate . && "$KEEL" guard

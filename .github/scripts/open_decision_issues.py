@@ -88,6 +88,8 @@ def ensure_override_threads() -> None:
 
 STANDING_MARK = "<!-- keel-standing-thread -->"
 STANDING_TITLE = "keel: decisions auto-accepted under standing consent"
+STANDING_LABEL = "keel-standing"
+_STANDING_CACHE = {}
 
 
 def repo_url() -> str:
@@ -95,12 +97,23 @@ def repo_url() -> str:
 
 
 def standing_thread() -> str:
-    """The one open standing thread's number, creating it if this repo has none yet."""
-    found = json.loads(gh(["issue", "list", "--state", "open", "--label", "decision",
-                           "--search", "keel-standing-thread in:body",
+    """The one open standing thread's number, creating it if this repo has none yet.
+
+    FOUND BY LABEL, NOT BY SEARCH (issue262). The first live run of D0227 opened the thread TWICE,
+    #28 and #29, because two lookups in one run each missed the other's creation: `--search` reads
+    the GitHub SEARCH INDEX, which lags creation by seconds. A label filter is served from the API
+    directly and is immediate. The in-process cache closes the same race for the remaining window.
+    A stubbed dry run could not have caught this - it returned an existing thread instantly, so the
+    create-then-look-again path never ran. Live verification is what found it.
+    """
+    if "n" in _STANDING_CACHE:
+        return _STANDING_CACHE["n"]
+    found = json.loads(gh(["issue", "list", "--state", "open", "--label", STANDING_LABEL,
                            "--json", "number"]).stdout or "[]")
     if found:
-        return str(found[0]["number"])
+        n = str(min(int(i["number"]) for i in found))  # oldest wins if a race ever leaves two
+        _STANDING_CACHE["n"] = n
+        return n
     body = (
         STANDING_MARK + "\n\n"
         "Every Decision auto-accepted under your standing consent (D0207) is posted here as a comment "
@@ -113,10 +126,13 @@ def standing_thread() -> str:
     with open("body.md", "w", encoding="utf-8") as f:
         f.write(body)
     created = gh(["issue", "create", "--title", STANDING_TITLE, "--body-file", "body.md",
-                  "--label", "decision"], check=True)
+                  "--label", "decision", "--label", STANDING_LABEL], check=True)
     url = created.stdout.strip().splitlines()[-1] if created.stdout.strip() else ""
     print("opened the standing override thread: " + url)
-    return url.rsplit("/", 1)[-1] if url else ""
+    number = url.rsplit("/", 1)[-1] if url else ""
+    if number:
+        _STANDING_CACHE["n"] = number
+    return number
 
 
 def standing_has(name: str) -> bool:

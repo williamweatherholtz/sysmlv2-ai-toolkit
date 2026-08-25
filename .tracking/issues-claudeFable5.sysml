@@ -543,4 +543,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcPinnedFirstBinary to issue261;
+
+    part issue262 : Issue {
+        :>> id = "86900de4-62a8-483c-af2a-e61adc064ed0";
+        :>> title = "The first live run of the standing thread created it twice and then closed it";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Two defects, both invisible to the stubbed dry run and both found in the first live run of D0227 OPTION A. FIRST: the thread was created TWICE, issues 28 and 29, seconds apart by the same run - two lookups each missed the other's creation because the lookup used gh --search, which reads the GitHub SEARCH INDEX and lags creation by seconds. The dry run could not have caught it: the stub returned an existing thread instantly, so the create-then-look-again path never executed. FIXED by finding the thread by LABEL, which the API serves directly, plus an in-process cache, plus taking the lowest number if a race ever leaves two. SECOND, and worse: the recorder CLOSED the standing thread after posting the auto-accept receipt, because that step had always closed the per-decision issue it was working on. Under D0227 that one thread is the override surface for EVERY auto-accepted decision, so closing it destroyed the reversal route for all of them at once - the exact property the fork was approved to protect. FIXED by never closing a thread carrying the keel-standing label, while a per-decision fork issue still closes because it is about that decision alone. Both threads reconciled live: 29 reopened and labelled as canonical, 28 closed as the duplicate.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcChannelNotificationCost to issue262;
 }
