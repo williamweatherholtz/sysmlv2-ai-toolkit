@@ -1020,6 +1020,7 @@ fn append_measurement_locked(path: &Path, indicator: &str, value: &str, measured
 /// Returns `WriteError::GateNotFound` if `gate_name` is not a `verification` in the file.
 /// Returns `WriteError::Parse` if the file cannot be lexed or parsed.
 /// Returns `WriteError::Io` on filesystem errors.
+#[allow(clippy::too_many_arguments)]
 pub fn append_gate_result(
     path: &Path,
     gate_name: &str,
@@ -1028,11 +1029,15 @@ pub fn append_gate_result(
     judged_at: &str,
     judged_by: &str,
     notes: Option<&str>,
+    evidence: Option<&str>,
 ) -> Result<String, WriteError> {
     // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
-    with_file_lock(path, || append_gate_result_locked(path, gate_name, sha, verdict, judged_at, judged_by, notes))
+    with_file_lock(path, || {
+        append_gate_result_locked(path, gate_name, sha, verdict, judged_at, judged_by, notes, evidence)
+    })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_gate_result_locked(
     path: &Path,
     gate_name: &str,
@@ -1041,6 +1046,7 @@ fn append_gate_result_locked(
     judged_at: &str,
     judged_by: &str,
     notes: Option<&str>,
+    evidence: Option<&str>,
 ) -> Result<String, WriteError> {
     if verdict != "pass" && verdict != "fail" {
         return Err(WriteError::InvalidVerdict(verdict.to_owned()));
@@ -1067,8 +1073,16 @@ fn append_gate_result_locked(
     let notes_attr = notes
         .map(|t| format!(" :>> notes = \"{}\";", sanitize_field(t)))
         .unwrap_or_default();
+    // D0232: a ceremony gate whose Test declares method=test owes the same receipt as any other
+    // exercised claim - the Implement gate is exactly that, and it is the gate that most often
+    // carries the sentence a reader will trust.
+    let ran = evidence
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .map_or_else(String::new, |e| format!("{indent}// RAN: {}
+", sanitize_field(e)));
     let new_line = format!(
-        "{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\";{notes_attr} }}"
+        "{ran}{indent}part {gate_name}R{n} : TestResult {{ :>> id = \"{uuid}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\";{notes_attr} }}"
     );
 
     let mut new_content = String::with_capacity(content.len() + new_line.len() + 1);

@@ -2210,7 +2210,8 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     };
 
     let notes = flag(args, "notes");
-    match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref()) {
+    let evidence = flag(args, "evidence");
+    match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref(), evidence.as_deref()) {
         Ok(uuid) => { println!("{uuid}"); 0 }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }

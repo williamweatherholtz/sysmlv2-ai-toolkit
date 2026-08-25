@@ -790,7 +790,7 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
         Some("fail") => "fail",
         _ => "pass",
     };
-    match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note) {
+    match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note, None) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

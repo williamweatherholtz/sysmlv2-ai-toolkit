@@ -598,4 +598,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcEvidenceCited to issue266;
+
+    part issue267 : Issue {
+        :>> id = "f6ff57c3-9986-4a3b-84fc-c8d6084c5864";
+        :>> title = "Sprint ceremony records were filled by a scratchpad script that bypasses the write API and double-stamps every verdict";
+        :>> createdAt = "2026-08-25";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by guard 52 on its first real use: it flagged a TestResult that the write API never wrote. Sprint ceremony records have been filled all session by a python script in the scratchpad which emits TestResult lines directly into the model, so it bypasses every check the write path carries - actor validation, the write lock, the method=confirmation AI refusal, and now the evidence receipt - and its R1 result DOUBLE-STAMPS the R2 that append-result writes for the same test. Seven duplicate results in sprint467 alone; sprints 461 through 466 carry the same shape. Two consequences beyond the duplication: the result population that every attestation number is computed over is inflated by roughly half for recent sprints, and a script with no provenance checks has been the de facto write path for the most judgment-bearing records in the model. The author had already given the rule that covers this - if we need something consistently, build it into keel rather than a bespoke script - and I kept using the script because it was there. The new guard is what surfaced it, which is the argument for the guard.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSprintFillIsAWritePath to issue267;
 }
