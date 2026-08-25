@@ -532,4 +532,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcGatingWorkflowHistory to issue260;
+
+    part issue261 : Issue {
+        :>> id = "21d59181-8670-4b5e-945c-b0caa093038b";
+        :>> title = "A second project's commit gate was running this repository's uncommitted working build";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel on PATH resolved to target/release/keel in a sibling working directory, reporting version 0.3.0+dirty, and penumbra's scaffolded pre-commit used it. Three consequences, all silent: a broken or half-finished build here would break that project's gate; every guard added here applied immediately to their commits without them adopting anything, which is exactly how a guard landed this session failed 22 of their process definitions on contact (issue259); and their gate's verdicts were reproducible only on this machine, which is the machine-dependence K15 forbids. The scaffolded hook already honoured a KEEL_BIN environment variable, but an environment variable is not a pin - it must be set correctly in every shell by every contributor forever, which is the manual-vigilance shape D0047 rules out. Raised while executing the author's chosen option, pin penumbra to a release, which is what made the coupling visible.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPinnedFirstBinary to issue261;
 }
