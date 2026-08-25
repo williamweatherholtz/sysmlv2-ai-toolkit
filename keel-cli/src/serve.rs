@@ -264,6 +264,8 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     // surface could not say which project was active (N-C4 requires it always be named) and sibling
     // discovery found nothing. "." is a path, not an identity.
     let root = root.canonicalize().unwrap_or(root);
+    // Captured before `root` moves into the shared state, so the banner can name the tree.
+    let served = display_path(&root);
     let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), asks: Arc::new(Mutex::new(AskQueue::new())), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())) };
     spawn_watcher(&state);
 
@@ -365,6 +367,9 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
             return 1;
         }
     };
+    // Name the PROJECT first (issue268). The banner listed the port and every endpoint and never
+    // said which tree it was serving, so two consoles on one machine were told apart by nothing.
+    println!("Keel console for {served}");
     println!("Keel console (D0094 m1+m2+m3) on http://{addr}  \u{2014} Ctrl-C to stop");
     println!("  api:   /api/version (committed read API v{KEEL_API_VERSION}, viewerKeelApi/D0114 shape B)");
     println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
@@ -388,13 +393,27 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
 /// bust a cache with, so the only reliable answer is to never let it cache: the page is a few tens of KB
 /// from localhost, and correctness is worth more than that request. The API responses keep their own
 /// per-fingerprint caching, which is unaffected.
-async fn index() -> Response {
+async fn index(State(s): State<AppState>) -> Response {
+    // WHICH PROJECT (D0233/issue268). The page title is what a browser TAB shows, and it was the
+    // constant "Keel console" for every project - so two consoles on one machine were
+    // indistinguishable in the tab bar, which is how a judgment gets recorded into the wrong tree.
+    // Substituted SERVER-SIDE rather than fetched: the tab must be right on first paint, and right
+    // even if the page's JavaScript never runs.
+    let root = s.rootpath();
+    let name = root
+        .file_name()
+        .map_or_else(|| display_path(&root), |n| n.to_string_lossy().to_string());
     (
         [
             (axum::http::header::CACHE_CONTROL, "no-store, must-revalidate"),
             (axum::http::header::PRAGMA, "no-cache"),
         ],
-        Html(CONSOLE_HTML.replace("__KEEL_BUILD__", console_build())),
+        Html(
+            CONSOLE_HTML
+                .replace("__KEEL_BUILD__", console_build())
+                .replace("__KEEL_PROJECT__", &name)
+                .replace("__KEEL_PROJECT_ROOT__", &display_path(&root)),
+        ),
     )
         .into_response()
 }
@@ -1864,7 +1883,7 @@ async fn api_projects(State(s): State<AppState>) -> Response {
         .iter()
         .map(|p| {
             crate::json::Json::Obj(vec![
-                ("root".to_string(), crate::json::Json::s(p.display().to_string())),
+                ("root".to_string(), crate::json::Json::s(display_path(p))),
                 (
                     "name".to_string(),
                     crate::json::Json::s(
@@ -1877,7 +1896,7 @@ async fn api_projects(State(s): State<AppState>) -> Response {
         .collect();
     ok_json(with_status(
         &crate::json::Json::Obj(vec![
-            ("activeProject".to_string(), crate::json::Json::s(active.display().to_string())),
+            ("activeProject".to_string(), crate::json::Json::s(display_path(&active))),
             ("projects".to_string(), crate::json::Json::Arr(rows)),
         ])
         .dump(),
@@ -1897,7 +1916,7 @@ async fn api_project_switch(State(s): State<AppState>, body: String) -> Response
     }
     match s.rebind(Path::new(&target)) {
         Ok(p) => ok_json(with_status(
-            &format!("{{\"activeProject\":\"{}\"}}", p.display().to_string().replace('\\', "/")),
+                        &format!("{{\"activeProject\":\"{}\"}}", display_path(&p).replace('\\', "/")),
             "computed",
             "",
         )),
@@ -2552,6 +2571,14 @@ fn processes_json(root: &Path) -> String {
 
 /// Claude Code encodes the launch cwd into the projects-dir name by mapping every non-alphanumeric
 /// character to `-` (e.g. `C:\Users\...\keel-ai-toolkit` -> `C--Users-...-keel-ai-toolkit`).
+/// A path as a HUMAN should read it: Windows `canonicalize` returns a verbatim path prefixed
+/// `\\?\`, which is correct and unreadable. Stripping it is display-only - every
+/// comparison keeps using the real path. Third site that needed this, so it is a function now.
+fn display_path(p: &Path) -> String {
+    let raw = p.display().to_string();
+    raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_string()
+}
+
 fn encoded_project_dir(root: &Path) -> Option<PathBuf> {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
     let abs = std::fs::canonicalize(root).ok()?;

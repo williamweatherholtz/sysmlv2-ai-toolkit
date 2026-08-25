@@ -609,4 +609,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSprintFillIsAWritePath to issue267;
+
+    part issue268 : Issue {
+        :>> id = "787db3bf-21d3-4846-91c1-4acc515911dd";
+        :>> title = "The console never said which project it served, and two consoles were indistinguishable in the browser tab bar";
+        :>> createdAt = "2026-08-25";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reported by the author while using it: keel serve does not indicate what project it is serving. Three places said nothing - the startup banner printed the port and every endpoint but never the root; the page title was the constant Keel console; the header was the constant Keel dot console. The title is the one that matters most, because a browser TAB shows the page title, so two consoles open on one machine were told apart by nothing at all. That is not cosmetic: the console WRITES, so two identical tabs means a Decision accepted into the wrong project - an attested fact in the wrong tree, with no way to notice. WHAT MAKES THIS WORSE THAN A MISSING LABEL: the capability the author suggested as a better feature was ALREADY BUILT server-side. /api/projects discovers every sibling keel project and names the active one, and its own doc comment says it is the half of N-C4 that stops a supervisor wondering which project they are looking at; POST /api/project switches and refuses a non-project rather than falling back. Nothing in the console rendered either endpoint. So this is the accepted-Decision-with-artifact-unbuilt class: a surface was specified, the server half shipped, and the half the human actually sees never did.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcWhichProject to issue268;
 }

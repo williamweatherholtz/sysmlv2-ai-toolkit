@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Keel console</title>
+<html lang="en"><head><meta charset="utf-8"><title>__KEEL_PROJECT__ · keel</title>
 <meta name="generator" content="keel serve (D0094) — computed live; the model is the only truth">
 <style>
  :root{--bg:#f7f7f7;--bd:#ddd;--mut:#666;--good:#3d7a34;--warn:#b07a00;--bad:#b03a3c;--ac:#4e79a7}
@@ -37,7 +37,7 @@
  #modal td{border-top:1px solid #eee;padding:3px 5px;vertical-align:top} #modal td.k{color:var(--mut);width:135px;white-space:nowrap}
  #status{font-size:11px;color:var(--mut);padding:4px 16px}
 </style></head><body>
-<header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span></h1>
+<header><h1>Keel <span class="muted" style="color:#7d8a97;font-weight:400">· console</span><span id="proj" title="__KEEL_PROJECT_ROOT__" style="margin-left:12px;font-size:13px;font-weight:600;padding:2px 8px;border:1px solid #7d8a97;border-radius:10px">__KEEL_PROJECT__</span><select id="projsel" title="switch the ACTIVE project - every write goes to the one shown" style="margin-left:8px;font-size:11px;background:transparent;color:inherit;border:1px solid #7d8a97;border-radius:8px"></select></h1>
  <div class="sub">Technical smooth sailing · <b>build __KEEL_BUILD__</b><span id="build" class="muted" style="color:#7d8a97"></span></div></header>
 <nav id="nav"></nav>
 <div id="status">loading…</div>
@@ -565,6 +565,25 @@ function goToVp(name){
 // runs older logic against a newer API and nothing server-side can see the mismatch (issue143).
 fetch('/api/version').then(r=>r.json()).then(v=>{
   document.getElementById('build').textContent=' · api '+v.apiVersion+' · page loaded '+new Date().toLocaleTimeString();
+}).catch(()=>{});
+// WHICH PROJECT, and switch it (issue268). /api/projects and POST /api/project have existed since
+// N-C4 and NOTHING rendered them — a capability with no surface. The badge is substituted
+// server-side so it is right on first paint; this only fills the switcher, and if the fetch fails
+// the badge still names the project rather than the console going quiet about it.
+fetch('/api/projects').then(r=>r.json()).then(p=>{
+  var sel=document.getElementById('projsel'); if(!sel||!p.projects) return;
+  if(p.projects.length<2){ sel.style.display='none'; return; }   // nothing to switch between
+  sel.innerHTML=p.projects.map(function(x){
+    return '<option value="'+x.root.replace(/"/g,'&quot;')+'"'+(x.active?' selected':'')+'>'+x.name+'</option>';
+  }).join('');
+  sel.onchange=function(){
+    // A rebind changes where every WRITE lands, so it reloads rather than repainting: a stale view
+    // beside a switched root is exactly the confusion this whole change exists to remove.
+    fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({root:sel.value})})
+      .then(function(r){ if(!r.ok) return r.text().then(function(t){throw new Error(t)}); location.reload(); })
+      .catch(function(e){ status.textContent='project switch REFUSED: '+e.message+' — still serving '+document.getElementById('proj').textContent; });
+  };
 }).catch(()=>{});
 fetch('/api/settings').then(r=>r.json()).then(s=>{aiBridge=!!s.agentBridge}).catch(()=>{})
  .then(()=>buildNav())

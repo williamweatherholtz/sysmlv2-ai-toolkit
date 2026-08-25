@@ -81,4 +81,26 @@ if these are in place, then yes let's proceed with #1";
     #DerivedFrom dependency from us024 to st019;
     #Implicates dependency from us024 to dcChannelNotificationCost;
 
+
+    part st020 : Statement {
+        :>> id = "5c65ecf2-5aec-4b94-a63b-6a4f06bd8d54";
+        :>> title = "keel serve does not say which project it is serving";
+        :>> createdAt = "2026-08-25"; :>> createdBy = "claudeFable5";
+        :>> text = "when you keel serve, you need to indicate what project it is.  at least until multiple local keel projects can serve on the same server (tabs?).  maybe this is a better feature";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-25"; :>> channel = StatementChannel::chat;
+    }
+
+    part us025 : UserStory {
+        :>> id = "b4946c33-6f03-40b8-8678-a3203993d541";
+        :>> title = "a supervisor with two consoles open cannot tell which project each one writes to";
+        :>> createdAt = "2026-08-25"; :>> createdBy = "claudeFable5";
+        :>> asA = "supervisor running keel on more than one local project";
+        :>> iWant = "the console to say which project it is serving";
+        :>> soThat = "I know which project a judgment I record lands in";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "bug, not need, and volunteered while they were using the thing - the highest-value channel. INVESTIGATED BEFORE INTERPRETING, and the finding changes the answer: the server side of their 'better feature' ALREADY EXISTS. /api/projects discovers sibling keel projects and names the active one - its own doc comment says it is the half of N-C4 that stops a supervisor wondering which project they are looking at - and POST /api/project switches. NOTHING RENDERS EITHER. So the console has been shipping a capability with no surface, which is the accepted-Decision-with-artifact-unbuilt class (issue174). Three concrete gaps: serve startup prints the port and every endpoint but never the ROOT; the page title is the constant 'Keel console'; the header is the constant 'Keel . console'. The title one matters most and answers their tabs question directly - a browser TAB shows the title, so two consoles are indistinguishable in the tab bar for exactly that reason. Their instinct that the multi-project version is the better feature is RIGHT and cheaper than they think: with one console the active project is unmistakable at the moment of writing, which is the real hazard here - two identical consoles means a Decision accepted in the wrong project, an attested fact in the wrong tree.";
+    }
+
+    #DerivedFrom dependency from us025 to st020;
+
 }
