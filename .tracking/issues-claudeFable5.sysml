@@ -565,4 +565,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcAuditSeesSchemaReferences to issue263;
+
+    part issue264 : Issue {
+        :>> id = "51f523c3-5799-41eb-b752-e9614c4db1c4";
+        :>> title = "Verification is strong and points inward; every recent defect arrived at a boundary nothing measures";
+        :>> createdAt = "2026-08-25";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human asked which of three things is failing: verification not strong enough, the wrong measures, or the reporting from verification being inaccurate. MEASURED. NOT the first: 51 guards with 42 hard-blocking, 99 percent of live requirements EXAMINED and 91 percent EXERCISED, and no recent defect traces to a lax threshold - when a guard is aimed at something it catches it, including refusing its own author. THE SECOND, in one precise place: 39 of 51 guards read only the authored model, 11 cross a boundary, and ZERO read another project's tree, while 11 of the last 20 issues were discoveredInField and cluster at exactly the boundaries nothing measures - another project's tree, an external service, a shell layer, a different binary, the human's attention. THE THIRD, and dominant: 21 Decisions record a verdict overstating what it verified, 9 of them in the last 18, and the instances are the loudest surfaces in the engine - guard ALL PASS printed over 80 unread warnings, process audit printing every unit travels whole when a schema symbol did not travel, validate green never meaning valid SysML, a stubbed dry run reported as verification. A second form of the same failure: a correct signal nobody consumes - decisionNoVerdictProseRule flagged the 13136-character injection in D0214 for weeks at warning level, and D0214 is itself the Decision recorded to fix unread warnings. THE NUMBER THAT SETTLES IT: 5120 recorded TestResults at a 3.9 percent fail rate, 907 of them stamped by one actor in five days at roughly 2 percent. The actor doing the work also authors the verdict AND the sentence describing it, and no step anywhere converts evidence into a claim under any independent check. So verification is not the weak link - ATTESTATION IS UNAUDITED. This diagnosis carries the same structural weakness it describes: I computed it with measures I built.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcForeignTreeIsTheTest to issue264;
+
+    part issue265 : Issue {
+        :>> id = "ad126e7f-5b26-43df-9af0-6ac836f6247f";
+        :>> title = "The foreign-tree fixture is keel adopting keel, so it cannot see the two defects that actually happened";
+        :>> createdAt = "2026-08-25";
+        :>> createdBy = "claudeFable5";
+        :>> description = "adoption-check gates a fresh scaffold, which is the right shape but the wrong foreign-ness: the fixture is a CURRENT keel scaffold, so it represents keel adopting keel rather than a real adopter. Two defects from this session are invisible to it, and both were verified invisible rather than reasoned about. issue263 - a unit asserting a constraint it does not carry - passes, because keel init ships .engine/rules/guard-constraints.sysml, so the symbol resolves in the fixture; penumbra could not resolve it only because penumbra runs an older engine snapshot. issue259 - a control firing on a project that never adopted it - passes for the same reason: every process in the fixture already carries the current APPLIES-WHEN convention, so a convention-based guard has nothing to fire on. This matters more than the two specific misses: it means the new gate's PASS is bounded in a way that is invisible from its output, which is the same verdict-overstates-scope class the gate was built in response to. I first claimed the check would have caught five of the recent defects; testing the claim showed two, and the difference is exactly this. The fix is a second fixture pinned to a prior RELEASE, obtained from the release channel so the vintage is real rather than synthesised.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVintageFixture to issue265;
 }

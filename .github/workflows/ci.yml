@@ -37,6 +37,13 @@ jobs:
       # tree alone — the issue116 control, now remote. No hook having run is assumed.
       - name: keel audit-history (tree-derived verdicts over the pushed range)
         run: ./target/release/keel audit-history --since "${{ github.event.before || 'HEAD~1' }}" || ./target/release/keel audit-history --max 20
+      # Layer 4 (issue264/D0231): gate a FOREIGN tree. Measured over this project's own defect
+      # record, 39 of 51 guards read only the authored model and ZERO read another project's tree,
+      # while 11 of the last 20 issues were found in the field at exactly that boundary. This is the
+      # manual act that found five of them, run every push instead of when someone remembers.
+      # A GATE: a unit that cannot land in a project which lacks it is not transferable.
+      - name: keel adoption-check (a unit must land in a project that lacks it)
+        run: ./target/release/keel adoption-check .
       - name: keel audit-adherence (guard-set monotonicity — a control cannot be disarmed unsigned, D0209)
         # A GATE, not a report: unlike audit-history this fails the build. Re-derives from the tree,
         # on infra the agent cannot touch, that no rule severity weakened / guard vanished across the

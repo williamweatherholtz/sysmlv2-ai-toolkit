@@ -3410,6 +3410,7 @@ const CATALOGUE: &[&str] = &[
     "  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
     "  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)",
     "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
+    "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
     "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
     "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
@@ -3615,6 +3616,7 @@ fn main() {
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
         Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("onboard") => keel_cli::onboard::cmd(rest),
+        Some("adoption-check") => keel_cli::adoption_check::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),

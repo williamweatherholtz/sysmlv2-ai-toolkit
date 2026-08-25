@@ -200,7 +200,14 @@ fn incoming_registry_ids(dir: &Path) -> Vec<String> {
 /// update path therefore wrote `.github/workflows/x.yml` to `.engine/.github/workflows/x.yml` —
 /// inert, in the wrong place, while reporting "6 file(s) from upstream". Two loops with one rule
 /// between them is how that happened, so there is now one function and no second opinion.
-fn restore_dst(root: &Path, rel: &Path) -> PathBuf {
+/// Where a bundle-relative unit file lands in a RECEIVING project.
+///
+/// Public so `adoption-check` maps a bundle onto its fixture through the SAME function `import`
+/// uses. Two copies of this mapping would be the same-fact-in-two-places defect that has cost
+/// this project more than any other (issue253, issue260) - and a fixture that resolved paths
+/// differently from the real importer would be testing something no adopter ever runs.
+#[must_use]
+pub fn restore_dst(root: &Path, rel: &Path) -> PathBuf {
     let repo_relative = rel
         .components()
         .next()

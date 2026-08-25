@@ -1,8 +1,46 @@
 # Installed process units (D0183): the versioned identity + per-file content hashes an
 # import records - the three-way base `import --update` merges against. Committed (a tracked fact).
+[aec6f856-abcc-47be-9806-0d28bbf461e8]
+process = "actor-enrollment"
+version = 3
+file.processes__SL__actor-enrollment.sysml = "4ef11a27f5d1c4a2"
+file.skills__SL__actor-enrollment__SL__SKILL.md = "784c5c4e009c66ff"
+file.skills__SL__actor-enrollment__SL__registry.sysml = "721fc849cefd0693"
+[87ed7c53-5894-4917-ab6c-3f6c864ea8d2]
+process = "adversarial-panel-review"
+version = 3
+file.processes__SL__adversarial-panel-review.sysml = "af2f416ca61cb340"
+file.skills__SL__adversarial-panel-review__SL__SKILL.md = "3701a86f25365ba6"
+file.skills__SL__adversarial-panel-review__SL__registry.sysml = "3918772c38918183"
+[41e6457a-b7d8-4653-a65a-c6291e2e6ebf]
+process = "agile-workflow"
+version = 3
+file.processes__SL__agile-workflow.sysml = "3b29a5acfffa3c3e"
+file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
+file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
+file.skills__SL__sprint-standup__SL__SKILL.md = "8d81d13b7405d2d4"
+file.skills__SL__sprint-standup__SL__registry.sysml = "e2ca9e5ddd6b9d29"
+[b4ea2aaf-f046-4828-91e4-21bb781e1bdb]
+process = "architectural-critique"
+version = 3
+file.processes__SL__architectural-critique.sysml = "5fe1ce2918a57923"
+file.skills__SL__architectural-critique__SL__SKILL.md = "0214c75139f3249c"
+file.skills__SL__architectural-critique__SL__registry.sysml = "4784971e274908e6"
+[b951ffe0-0a3f-44c9-be7e-17a1a0df10f4]
+process = "business-elicitation"
+version = 3
+file.processes__SL__business-elicitation.sysml = "ffb97dd2e8d505b4"
+file.skills__SL__business-architecture__SL__SKILL.md = "7f2f1d5609876e9f"
+file.skills__SL__business-architecture__SL__registry.sysml = "978b629e158f4f45"
+[ee8778a7-d0f8-4d4f-aa43-dd4820d43a43]
+process = "decision-authoring"
+version = 3
+file.processes__SL__decision-authoring.sysml = "ffbc77879dffa3cf"
+file.skills__SL__decision-authoring__SL__SKILL.md = "57bec36d9b1a02ac"
+file.skills__SL__decision-authoring__SL__registry.sysml = "18cad3f36c76f4d9"
 [20cd43e6-1d23-4f2f-aadd-2b4a52fcab81]
 process = "decision-channel"
-version = 1
+version = 4
 file.processes__SL__decision-channel.sysml = "edc6bd1f5283fef7"
 file.skills__SL__decision-channel__SL__SKILL.md = "3f13a3b3d8f774a1"
 file.skills__SL__decision-channel__SL__registry.sysml = "de6c91c76a09c330"
@@ -10,3 +48,113 @@ file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-too
 file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
 file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__scripts__SL__open_decision_issues.py = "93ac67c40f512cc4"
 file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__scripts__SL__record_decision.sh = "70a9f1921e9645b2"
+[8f5bd2a4-5852-48ff-939c-557a64b22299]
+process = "definition-of-done"
+version = 3
+file.processes__SL__definition-of-done.sysml = "53ebbfbee9a94d02"
+file.skills__SL__sprint-closeout__SL__SKILL.md = "0f69753792b36723"
+file.skills__SL__sprint-closeout__SL__registry.sysml = "5cbcd9fef6c26e66"
+[61b4ac5e-6f6c-4522-b176-596704e3cfbb]
+process = "definition-of-ready"
+version = 3
+file.processes__SL__definition-of-ready.sysml = "876547c0da90f9fc"
+file.skills__SL__sprint-planning__SL__SKILL.md = "b103b488ccab4f02"
+file.skills__SL__sprint-planning__SL__registry.sysml = "9d3e6798e2b24c0e"
+[4ad11865-caa6-428d-83a9-fe2b42114003]
+process = "deploy"
+version = 3
+file.processes__SL__deploy.sysml = "0b97bbd26f92e952"
+file.skills__SL__release__SL__SKILL.md = "3aed7bc283205002"
+file.skills__SL__release__SL__registry.sysml = "439ed4185826b242"
+[79c2529d-63c0-4f43-b796-491f3ecf29ba]
+process = "diagram"
+version = 3
+file.processes__SL__diagram.sysml = "fa83ba186c072710"
+file.skills__SL__diagram__SL__SKILL.md = "f8ed425e43338e09"
+file.skills__SL__diagram__SL__registry.sysml = "092bd62f7aca3df7"
+[4e1b4c19-70e6-493e-aadc-90f78b776166]
+process = "distributed-collaboration"
+version = 3
+file.processes__SL__distributed-collaboration.sysml = "703a3aaddf47e6c6"
+file.skills__SL__distributed-collaboration__SL__SKILL.md = "5293a35c9e1a4954"
+file.skills__SL__distributed-collaboration__SL__registry.sysml = "8a11eaee55c557c3"
+[d5a2803c-d29c-4c1a-b754-c9961ff1b029]
+process = "doc-sync"
+version = 3
+file.processes__SL__doc-sync.sysml = "a5092bcfc5d97060"
+file.skills__SL__doc-sync__SL__SKILL.md = "fea54abda9e73367"
+file.skills__SL__doc-sync__SL__registry.sysml = "4f66c09feb5ba512"
+[ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
+process = "element-critique"
+version = 3
+file.processes__SL__element-critique.sysml = "39ab4fc4a0bfae2b"
+file.skills__SL__element-critique__SL__SKILL.md = "78205a3820e65fcb"
+file.skills__SL__element-critique__SL__registry.sysml = "8eae8b1352df5261"
+[dc4b3507-7a33-4b58-b2fc-77f439b8421a]
+process = "indicator"
+version = 3
+file.processes__SL__indicator.sysml = "a23edb9f27af0ef6"
+file.skills__SL__indicator__SL__SKILL.md = "e502965ab6d6a916"
+file.skills__SL__indicator__SL__registry.sysml = "eee9fa32a0363b2c"
+[79f2d321-7c55-41fb-86fa-7d549202caf7]
+process = "intake"
+version = 7
+file.processes__SL__intake.sysml = "8b880475eaab49ad"
+file.skills__SL__intake__SL__SKILL.md = "9a6aefa4c9668c8f"
+file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
+[e93dfbda-8844-49c4-a4b6-a874c6774eab]
+process = "introduction"
+version = 3
+file.processes__SL__introduction.sysml = "a416337d33a0a1d2"
+file.skills__SL__introduction__SL__SKILL.md = "0d4538a3429878ad"
+file.skills__SL__introduction__SL__registry.sysml = "33dd76f65dd2a415"
+[560d74d4-9184-46e6-afcc-83226b891dd4]
+process = "issue-resolution"
+version = 3
+file.processes__SL__issue-resolution.sysml = "3d7fe3c1710e592f"
+file.skills__SL__issue-resolution__SL__SKILL.md = "785bb4ed9d68bb28"
+file.skills__SL__issue-resolution__SL__registry.sysml = "de888f7fe2805679"
+[8477f7e8-becf-40fb-a7f3-9bd521a258d7]
+process = "knowledge-graph-memory"
+version = 3
+file.processes__SL__knowledge-graph-memory.sysml = "0f47b303369e71ac"
+file.skills__SL__knowledge-graph-memory__SL__SKILL.md = "8cdcf49d23d0cdf4"
+file.skills__SL__knowledge-graph-memory__SL__registry.sysml = "79e26852ad7b7e70"
+[bddaf6f6-0d40-4348-884d-9d0d7e8b6d12]
+process = "migration"
+version = 3
+file.processes__SL__migration.sysml = "24df1093d5d42e51"
+file.skills__SL__migration__SL__SKILL.md = "8826725b361e05ac"
+file.skills__SL__migration__SL__registry.sysml = "f3bee6c72fb33648"
+[57918a53-b596-4313-bffe-226da7e371b4]
+process = "obligation-review"
+version = 3
+file.processes__SL__obligation-review.sysml = "ec64cc7450d65990"
+file.skills__SL__obligation-review__SL__SKILL.md = "d79e40f31bd6215b"
+file.skills__SL__obligation-review__SL__registry.sysml = "f4d394143a9f6fef"
+[810f1982-b0bf-4486-98ce-530265b132e2]
+process = "project-onboarding"
+version = 3
+file.processes__SL__project-onboarding.sysml = "d05ea1f572d17698"
+file.skills__SL__project-onboarding__SL__SKILL.md = "8d890aa201ffb817"
+file.skills__SL__project-onboarding__SL__registry.sysml = "bcfdc1daaade0498"
+[ac8fb70e-91dd-4765-b832-a41e45267c44]
+process = "render"
+version = 3
+file.processes__SL__render.sysml = "cf05272365cb0ad0"
+file.skills__SL__render__SL__SKILL.md = "fd21c5114db3dcc8"
+file.skills__SL__render__SL__registry.sysml = "f842d5bdbaccf7ef"
+[f5756101-8c80-4afe-ae52-7b33cd653d99]
+process = "report"
+version = 3
+file.processes__SL__report.sysml = "2b53827c6e734fb9"
+file.skills__SL__report__SL__SKILL.md = "f4ebb32fc5e0f00b"
+file.skills__SL__report__SL__registry.sysml = "87099885e2fa8b6c"
+[a8186835-5d23-4642-b905-3ade20437499]
+process = "review-critique"
+version = 3
+file.processes__SL__review-critique.sysml = "f94188a9ff7cfa67"
+file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
+file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
+file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
+file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
