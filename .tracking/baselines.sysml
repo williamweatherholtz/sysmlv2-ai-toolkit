@@ -110,4 +110,19 @@ package ProjectBaselines {
         :>> purpose = "The first tagged release, tagged 2026-06 at the v0.1.0 release-prep commit. Recorded retroactively on guard 43 (release-recorded) catching that the tag had no authored Release item.";
     }
 
+    // v0.3.0: the release penumbra pins to. Cut because the author chose to decouple that project's
+    // commit gate from this repo's working tree, and v0.2.3 (2026-08-14) predates everything that
+    // makes the engine adoptable at all. The tag was CUT TWICE: the first attempt's release gate
+    // FAILED (issue260 - release.yml checked out shallow, so claim-ancestry silently skipped and the
+    // scan-count test caught it), and a release is the one artifact whose gate must actually have
+    // run, so the tag was deleted and re-cut against a commit that passes.
+    part release030 : Release {
+        :>> id = "e4f1d340-f0e9-4cb6-b434-6b88c6623e11";
+        :>> title = "v0.3.0 - the first release a second project can pin to";
+        :>> createdAt = "2026-08-24";
+        :>> createdBy = "claudeFable5";
+        :>> commit = "c444ca5";
+        :>> purpose = "Makes the engine adoptable by a project other than its author. Units travel whole - a skill declares itself beside itself, and `keel process audit` computes whether a unit would land green in a project that lacks it (D0220/D0222). A governance record cannot silently carry captured tool output, and `record decision --from FILE` is the safe authoring path (D0224). The five Decision-authoring guards are CORE rather than switchable (D0223). A project chooses its process set by being asked about its work, each process declares the situation it applies to, and the guard enforcing that is scoped to projects which adopted it (D0225/D0228). 51 guards, up from 44 at v0.2.3. Three platform binaries attached, gate green on the tagged commit.";
+    }
+
 }
