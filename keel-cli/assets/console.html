@@ -188,6 +188,55 @@ function statusBanner(d){
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
 function itemLink(name){return name?`<span class=il data-i="${esc(name)}">${esc(name)}</span>`:'<span class=muted>—</span>'}
 function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';n=n||12;const sh=arr.slice(0,n).map(itemLink).join(' · ');return sh+(arr.length>n?` <span class=muted>…+${arr.length-n} more</span>`:'')}
+
+// GENERIC COMPUTED-VIEW RENDERER (issue286). Every viewpoint without a bespoke panel used to render as
+// `<pre>JSON.stringify(d)</pre>` — a vanilla payload the reader has to parse by eye, with item names as
+// dead text even though `itemLink`/`openItem`/`/api/item/:name` have existed all along. So the console
+// had a working navigation mechanism and the generic panel simply did not use it.
+//
+// Item names are LINKED DYNAMICALLY: anything shaped like a keel item name becomes clickable, and
+// `openItem` resolves it against the live model at click time — so a view gains working links with no
+// per-view code, and a name that is not an item simply opens a panel saying so.
+const ITEM_RE=/^(issue\d{3,}|d\d{4}|sprint\d+|us\d{3,}|st\d{3,}|obligation[0-9a-f]+|[a-z][A-Za-z0-9]*(Story|Gate|DoD|Accept|R\d+)|dc[A-Z][A-Za-z0-9]*|sr[A-Z][A-Za-z0-9]*)$/;
+function looksLikeItem(v){return typeof v==='string'&&v.length<64&&ITEM_RE.test(v)}
+function cell(v){
+ if(v===null||v===undefined||v==='')return '<span class=muted>—</span>';
+ if(Array.isArray(v))return v.length?v.map(cell).join(' · '):'<span class=muted>—</span>';
+ if(typeof v==='object')return '<code style="font-size:10px">'+esc(JSON.stringify(v))+'</code>';
+ if(looksLikeItem(v))return itemLink(v);
+ if(typeof v==='boolean')return v?'yes':'no';
+ const s=String(v);
+ // Long prose stays readable rather than blowing the column out; the full text is in the title.
+ return s.length>240?'<span title="'+esc(s)+'">'+esc(s.slice(0,240))+'…</span>':esc(s);
+}
+function renderRows(rows){
+ const cols=[];rows.forEach(r=>Object.keys(r||{}).forEach(k=>{if(!cols.includes(k))cols.push(k)}));
+ if(!cols.length)return '<p class=muted>— empty —</p>';
+ return '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">'
+  +'<thead><tr>'+cols.map(c=>'<th style="text-align:left;padding:3px 8px 3px 0;border-bottom:1px solid #2a3542;color:var(--mut);text-transform:uppercase;font-size:10px">'+esc(c)+'</th>').join('')+'</tr></thead>'
+  +'<tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td style="padding:3px 8px 3px 0;border-bottom:1px solid #1b2530;vertical-align:top">'+cell(r&&r[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+}
+function renderComputed(d){
+ if(d===null||d===undefined)return '<p class=muted>— nothing computed —</p>';
+ if(Array.isArray(d))return d.length&&typeof d[0]==='object'?renderRows(d):'<p>'+cell(d)+'</p>';
+ if(typeof d!=='object')return '<p>'+cell(d)+'</p>';
+ let out='',scalars=[];
+ Object.keys(d).forEach(k=>{
+  if(k==='viewStatus')return;                       // already shown by statusBanner
+  const v=d[k];
+  if(Array.isArray(v)&&v.length&&typeof v[0]==='object'){
+   out+='<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:12px 0 4px">'+esc(k)+' ('+v.length+')</h3>'+renderRows(v);
+  } else if(Array.isArray(v)){
+   out+='<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:12px 0 4px">'+esc(k)+' ('+v.length+')</h3>'
+     +'<p style="font-size:11px;line-height:1.7">'+(v.length?v.map(cell).join(' · '):'<span class=muted>—</span>')+'</p>';
+  } else if(v&&typeof v==='object'){
+   out+='<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;margin:12px 0 4px">'+esc(k)+'</h3>'+renderRows([v]);
+  } else scalars.push([k,v]);
+ });
+ // Scalars first: they are the headline numbers a supervisor reads before any table.
+ const head=scalars.length?renderRows([Object.fromEntries(scalars)]):'';
+ return head+out||'<p class=muted>— empty —</p>';
+}
 let mes=null;
 function stopModalAgent(){if(mes){mes.close();mes=null}}
 function closeItem(){stopModalAgent();document.getElementById('modal').classList.remove('on')}
@@ -519,7 +568,11 @@ async function render(){
     (failed
       ? '<p class=muted style="border-left:3px solid #c33;padding-left:8px">this view could not be computed: '+esc(failed)+' — it is NOT empty. Run <code>keel '+esc(cmd)+'</code> on the CLI.</p>'
       : statusBanner(d)+actBridge(acceptanceItems(d))+readOnlyNote(cmd)
-        +'<pre class=j>'+esc(JSON.stringify(d,null,1))+'</pre>');
+        +renderComputed(d)
+        // The payload stays available, collapsed: a rendered table is a READING of the data, and the
+        // reader must be able to check it against what the server actually sent (issue286).
+        +'<details style="margin-top:14px"><summary class=muted style="cursor:pointer;font-size:11px">raw payload</summary>'
+        +'<pre class=j>'+esc(JSON.stringify(d,null,1))+'</pre></details>');
    status.textContent=(activeVp.title||cmd)+(failed?' — failed':'');return;
   }
   status.textContent='live · updated '+new Date().toLocaleTimeString();

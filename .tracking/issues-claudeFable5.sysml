@@ -796,4 +796,37 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcOwnerOfMatchesOnWindows to issue284;
+
+    part issue285 : Issue {
+        :>> id = "45d82ef0-ff7b-454a-a146-e821a4e19d29";
+        :>> title = "The console advertised six computed views it could not serve, and the human found the first by clicking it";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reported by the human from the console: clicking attestation-coverage returned no computed view is bound to the command, while the same command works on the CLI. Diffing the viewpoint registry's renderer prose against the server's binding table found SIX unbound - attestation-coverage, critique-policy, decisions, reprocess-candidates, verification and whats-next - so the human happened to click the first of six dead panels. This is the accepted-Decision-with-artifact-unbuilt class (issue174) landing on the human's own oversight surface: a viewpoint that names a renderer is a promise the console can serve it, and the model kept declaring surfaces the server did not implement. whats-next is among them, which is the ranked frontier - the single most load-bearing view in the engine. Found from USE, again: nothing internal compared the two sets, and both were readable from source the whole time.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcEveryAdvertisedViewIsBound to issue285;
+
+    part issue286 : Issue {
+        :>> id = "b3b12e28-d029-4044-83ab-fda17243dcc5";
+        :>> title = "Every generic viewpoint panel dumped raw JSON while the console's own item-linking sat unused";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reported by the human: tools give a vanilla json payload, needs to be displayed properly and link to items properly and dynamically. The generic viewpoint panel rendered its payload as pre JSON.stringify with one-space indentation - a blob the reader has to parse by eye - and every item name in it was dead text. The console already had itemLink, an openItem panel and an /api/item/:name endpoint, used by the bespoke panels and by orient; the generic path simply never called them. So this was not a missing capability but an unused one, which is why it survived: each new viewpoint got a reachable panel and nobody asked whether the panel was readable. The consequence compounds with issue285 - as more viewpoints get bound, more of the human's oversight surface becomes JSON blobs unless the generic renderer is the one that improves.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcComputedViewsRenderAndLink to issue286;
+
+    part issue287 : Issue {
+        :>> id = "c2133e83-c201-4ca0-a261-e9f352ae266f";
+        :>> title = "A guard demanded that the human quote themselves, because nothing records who recorded an acceptance";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human accepted d0235 through a human surface while the AI was working, noting agreed with panel's decisions. delegatedAcceptanceSubstanceRule then failed the commit gate, requiring a verbatim quoted span or a cited surface gesture - which for a record the human wrote themselves means demanding that they quote themselves. That is governance aimed at the one party it must never bind, and the human had already stated the principle: the AI is here to constrain and check other work, not them. The rule's intent is correct and load-bearing: an acceptance an AI records ON THE HUMAN'S BEHALF must quote their words, because that quote is the only thing between a real sign-off and a fabricated one. The defect is a missing fact - a TestResult records who JUDGED it but nothing records who RECORDED it, so the rule cannot distinguish a delegated record from a self-recorded one and applies the delegated demand to both. Two further notes on handling: the AI must NOT edit the human's note to satisfy the guard, because altering an attestation to pass a check is the exact failure the check exists to prevent; and it must not widen the rule to unblock itself, because that is weakening a control for convenience. Both were declined; the forward fix stamps the channel at the console write path, and the past record is left for the human.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRecorderIsDistinctFromJudge to issue287;
 }

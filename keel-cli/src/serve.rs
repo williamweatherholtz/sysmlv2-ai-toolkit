@@ -732,6 +732,9 @@ struct DecisionAcceptReq {
 /// POST /api/decision/accept (D0121 review queue) — ACCEPT a proposed Decision: flip status + append
 /// the `{decision}Accept` event via `write::accept_decision`. The human's note IS the attestation
 /// (D0106 — `judged_by` is a Person, never AI-fabricated); never auto-commits.
+/// The console's own channel citation, appended to a human-recorded acceptance (issue287).
+const CONSOLE_GESTURE: &str = " [recorded by the human in the keel console]";
+
 async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionAcceptReq>) -> Response {
     let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
@@ -743,7 +746,19 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let sha = git_head(&s.rootpath());
-    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &b.note) {
+    // STAMP THE CHANNEL (issue287). `delegatedAcceptanceSubstanceRule` exists to stop an AI fabricating
+    // consent: a DELEGATED acceptance must quote the human's words. Nothing recorded WHO RECORDED an
+    // acceptance, so the rule could not tell a delegated record from one the human typed here
+    // themselves — and it demanded that the human quote themselves, which points governance at the one
+    // party it must never bind. The rule already accepts a cited human surface gesture, so the console
+    // now says so in the record. Appended, never substituted: the human's own words are left exactly
+    // as they wrote them, and this is a factual statement about the channel, not a paraphrase of them.
+    let note = if b.note.contains(CONSOLE_GESTURE.trim()) {
+        b.note.clone()
+    } else {
+        format!("{}{CONSOLE_GESTURE}", b.note)
+    };
+    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -2001,6 +2016,47 @@ type ComputedFn = fn(&Path) -> Result<String, crate::view::ViewError>;
 fn computed_binding(cmd: &str) -> Option<ComputedFn> {
     Some(match cmd {
         "orient" => |root: &Path| Ok(crate::orient::compute(root).to_json()),
+        // SIX VIEWPOINTS ADVERTISED A COMMAND THIS TABLE DID NOT BIND (issue285). The human clicked
+        // `attestation-coverage` in the console and got "no computed view is bound"; five more —
+        // critique-policy, decisions, reprocess-candidates, verification, whats-next — would have
+        // failed identically. Each works on the CLI, so the model declared a surface the server could
+        // not serve: the accepted-Decision-with-artifact-unbuilt class (issue174), on the console.
+        // A test now derives the advertised set from the viewpoint renderers and fails on any gap.
+        "attestation-coverage" => crate::view::attestation_coverage,
+        "critique-policy" => crate::view::critique_policy,
+        "decisions" => crate::view::decisions_report,
+        "reprocess-candidates" => |root: &Path| Ok(crate::govern::reprocess_candidates(root)),
+        "whats-next" => |root: &Path| {
+            let ready = crate::whats_next_root(root);
+            let items: Vec<String> =
+                ready.iter().map(|n| format!("\"{}\"", n.replace('"', "'"))).collect();
+            Ok(format!(
+                "{{\"viewStatus\":\"computed\",\"ready\":[{}],\"count\":{}}}",
+                items.join(","),
+                ready.len()
+            ))
+        },
+        "verification" => |root: &Path| {
+            crate::verification::rows(root).map(|rows| {
+                let items: Vec<String> = rows
+                    .iter()
+                    .map(|r| {
+                        let m: Vec<String> =
+                            r.methods.iter().map(|x| format!("\"{x}\"")).collect();
+                        format!(
+                            "{{\"requirement\":\"{}\",\"methods\":[{}]}}",
+                            r.name.replace('"', "'"),
+                            m.join(",")
+                        )
+                    })
+                    .collect();
+                format!(
+                    "{{\"viewStatus\":\"computed\",\"requirements\":[{}],\"count\":{}}}",
+                    items.join(","),
+                    rows.len()
+                )
+            })
+        },
         "dispositions" => crate::view::dispositions,
         "decision-follow-through" => crate::view::decision_follow_through,
         "enforcement-report" => crate::pm::enforcement_report,
@@ -2699,6 +2755,73 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     const SERVE_RS: &str = include_str!("serve.rs");
     use super::{CONSOLE_HTML, build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
+
+    /// issue285: every computed view a declared VIEWPOINT advertises must be bound in this server.
+    ///
+    /// The human clicked `attestation-coverage` in the console and got "no computed view is bound to
+    /// the command" — while the same command works on the CLI. Five more were unbound the same way.
+    /// A viewpoint that names a renderer is a PROMISE the console can serve it; an unbound command
+    /// turns that promise into a dead panel, which is the accepted-Decision-with-artifact-unbuilt
+    /// class (issue174) landing on the human's own oversight surface.
+    ///
+    /// Derived from the SOURCE of both sides rather than from a hand-kept list, so the test cannot
+    /// drift from either: the advertised set is scraped from `.engine/viewpoints`' renderer prose,
+    /// the bound set from this table.
+    #[test]
+    fn every_advertised_computed_view_is_bound() {
+        // A renderer names a command as `keel <cmd>`. These are WRITE or RENDER verbs, not computed
+        // views — they take arguments and produce artifacts, so the console reaches them elsewhere.
+        const NOT_A_COMPUTED_VIEW: [&str; 9] = [
+            "apply-review", "record-measurement", "render", "view", "diagram", "report", "arch",
+            "governing-version",
+            // A renderer that says "keel command" generically, not naming one.
+            "command",
+        ];
+        let bound: std::collections::BTreeSet<String> = SERVE_RS
+            .split("fn computed_binding")
+            .nth(1)
+            .unwrap_or_default()
+            .lines()
+            .take_while(|l| !l.starts_with('}'))
+            .filter_map(|l| {
+                let t = l.trim();
+                t.strip_prefix('"').and_then(|r| r.split('"').next()).filter(|_| t.contains("=>"))
+            })
+            .map(str::to_string)
+            .collect();
+        assert!(bound.len() > 10, "the binding table should be substantial, saw {bound:?}");
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        // The registry, not a directory of files: `.engine/views/viewpoint-registry.sysml`.
+        let dir = root.join(".engine").join("views");
+        let mut advertised: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut files = 0usize;
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for e in rd.flatten() {
+                let text = std::fs::read_to_string(e.path()).unwrap_or_default();
+                if !text.contains(":>> renderer = ") {
+                    continue;
+                }
+                files += 1;
+                for (i, _) in text.match_indices("keel ") {
+                    let tail = &text[i + 5..];
+                    let cmd: String =
+                        tail.chars().take_while(|c| c.is_ascii_lowercase() || *c == '-').collect();
+                    if cmd.len() > 3 && !NOT_A_COMPUTED_VIEW.contains(&cmd.as_str()) {
+                        advertised.insert(cmd);
+                    }
+                }
+            }
+        }
+        assert!(files > 0, "no viewpoint files read — this test would pass vacuously");
+        assert!(!advertised.is_empty(), "no advertised commands found — the scrape broke");
+
+        let missing: Vec<&String> = advertised.difference(&bound).collect();
+        assert!(
+            missing.is_empty(),
+            "declared viewpoints advertise computed views the console cannot serve: {missing:?}              (each returns 'no computed view is bound' in the console while working on the CLI)"
+        );
+    }
 
     /// issue141: the console must bind a card's target BY IDENTITY, never by its position in a rendered
     /// list. `CONSOLE_HTML` is `include_str!`-embedded, so this costs no toolchain and fails at
