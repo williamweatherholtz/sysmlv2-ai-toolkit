@@ -56,9 +56,17 @@ fi
 # `grep -oE` for the decision marker, a `case` with a locale-dependent `tr` parsing the gesture, and
 # a receipt scan. All of it is deterministic text work, so it belongs where it can be unit-tested.
 # The comment body still arrives ONLY by env and is never interpolated into a shell command.
+#
+# gesture region (issue269): EVERY reply below stamps `receipt-for-comment: $COMMENT_ID`. The
+# sweeper's ONLY dedup signal is that marker in some comment body, so a terminal reply that
+# answers a decider's comment without stamping it makes the sweep re-drive the same comment on
+# every schedule - the loop that filled standing thread #29 with one identical "Didn't parse"
+# nag per run. The lone exception is the push-failure reply, which stamps `receipt-pending-…`
+# ON PURPOSE so the sweeper retries the recording. Enforced by
+# keel-cli github.rs::every_reply_in_the_gesture_region_stamps_its_receipt.
 actor=$("$KEEL" github-decider "$COMMENT_USER" 2>/dev/null || true)
 if [ -z "$actor" ]; then
-  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not a declared decider in .engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted)."
+  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not a declared decider in .engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted). (receipt-for-comment: $COMMENT_ID)"
   exit 0
 fi
 
@@ -66,7 +74,7 @@ issue_body=$(gh issue view "$ISSUE_NUMBER" --json body --jq .body)
 comment_bodies=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body')
 gesture=$(COMMENT_BODY="$COMMENT_BODY" ISSUE_BODY="$issue_body" COMMENT_ID="$COMMENT_ID"           COMMENT_BODIES="$comment_bodies" "$KEEL" github-gesture) || {
   first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
-  gh issue comment "$ISSUE_NUMBER" --body "Didn't parse \`$first_line\` - reply with just the option letter (e.g. \`B\`), or \`accept\`, or \`reject <why>\`."
+  gh issue comment "$ISSUE_NUMBER" --body "Didn't parse \`$first_line\` - reply with just the option letter (e.g. \`B\`), or \`accept\`, or \`reject <why>\`. (receipt-for-comment: $COMMENT_ID)"
   exit 0
 }
 decision=$(printf '%s' "$gesture" | jq -r .decision)
@@ -76,7 +84,7 @@ reason=$(printf '%s' "$gesture" | jq -r .reason)
 first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
 
 if [ -z "$decision" ]; then
-  gh issue comment "$ISSUE_NUMBER" --body "This issue carries no keel-decision marker - nothing recorded."
+  gh issue comment "$ISSUE_NUMBER" --body "This issue carries no keel-decision marker - nothing recorded. (receipt-for-comment: $COMMENT_ID)"
   exit 0
 fi
 if [ "$(printf '%s' "$gesture" | jq -r .alreadyReceipted)" = "true" ]; then

@@ -11,6 +11,13 @@ on:
 
 permissions: {}
 
+# issue262's residual window: the label lookup + in-process cache close the WITHIN-run race, but
+# two runs triggered by near-simultaneous pushes could still both list-then-create the standing
+# thread. Serialising the workflow is the repo-level mirror of decision-record's group.
+concurrency:
+  group: decision-issue
+  cancel-in-progress: false
+
 jobs:
   open-issues:
     runs-on: ubuntu-latest

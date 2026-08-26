@@ -45,7 +45,7 @@ package EngineDecisionChannel {
         :>> id = "2b023f1c-93fd-471b-b7d4-7c2ded409a64";
         :>> title = "Receipt - the done-signal in the same thread as the gesture";
         :>> triggerCondition = "The recording commit pushed (or failed).";
-        :>> actionText = "The recorder posts a receipt comment quoting EXACTLY what entered git (decision, option, judged_by, date, commit link, receipt-for-comment idempotency key) and closes the issue - the push-notified done-signal. Every failure speaks in-thread (parse miss, gate refusal, push contention); a scheduled sweeper re-drives missed gestures. Silence within budget is a reported failure, never ambiguity.";
+        :>> actionText = "The recorder posts a receipt comment quoting EXACTLY what entered git (decision, option, judged_by, date, commit link, receipt-for-comment idempotency key) and closes the issue - the push-notified done-signal. Every failure speaks in-thread (parse miss, gate refusal, push contention) and every terminal reply carries the same idempotency key, so a failure speaks ONCE, not once per sweep (issue269); only push contention stays unreceipted (receipt-pending) so the sweeper re-drives it. A scheduled sweeper re-drives missed gestures. Silence within budget is a reported failure, never ambiguity.";
         :>> producedArtifact = "A receipt comment + closed issue; or an in-thread failure report.";
         :>> owner = Owner::ai;
     }

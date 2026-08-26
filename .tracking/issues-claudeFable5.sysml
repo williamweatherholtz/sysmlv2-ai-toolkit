@@ -620,4 +620,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcWhichProject to issue268;
+
+    part issue269 : Issue {
+        :>> id = "dbbfe118-85d0-4217-b212-e12c7a261e00";
+        :>> title = "An unparseable decider comment is re-swept forever: terminal channel replies never stamped their receipt";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reported by the human as CI email spam every sweep. The decision-record sweeper's only dedup signal is receipt-for-comment: <id> appearing in some comment body, but three terminal replies in record_decision.sh (didn't-parse, not-a-declared-decider, no-decision-marker) answered a decider's comment WITHOUT stamping it - so any decider comment that parses to nothing is re-driven on every scheduled run, forever. Measured live: standing thread #29 carried 20+ IDENTICAL didn't-parse nags, one per run, all quoting the same comment - the human's own reopen note after the recorder wrongly closed the thread (issue262), so the repair for one defect fuelled the next. Each nag emailed the repo owner, which is attention burn on the exact surface D0227 built to spend none. A residual from issue262 surfaced in the same investigation: decision-issue has no concurrency group, so two runs from near-simultaneous pushes could still both list-then-create the standing thread - the label lookup and in-process cache close only the within-run race. Class: a reply that terminates handling of a swept item must carry the idempotency marker the sweep deduplicates on, and the invariant must be enforced where CI can run it, not remembered.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from d0234 to issue269;
 }

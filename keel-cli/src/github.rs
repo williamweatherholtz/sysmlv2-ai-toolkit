@@ -391,4 +391,41 @@ see d0225"), None);
         assert!(already_receipted(bodies, "12345"));
         assert!(!already_receipted(bodies, "999"));
     }
+
+    /// THE CONTROL for issue269: the sweeper's only dedup signal is `receipt-for-comment: <id>`
+    /// appearing in some comment body, so a reply that terminates handling of a decider's comment
+    /// WITHOUT stamping it makes the sweep re-drive the same comment on every schedule — the loop
+    /// that filled the standing thread with one identical "Didn't parse" nag per run. Every reply
+    /// in record_decision.sh's gesture region must therefore stamp `receipt-for-comment:
+    /// $COMMENT_ID` (or `receipt-pending-for-comment: $COMMENT_ID`, the push-failure reply's
+    /// deliberate retry signal).
+    #[test]
+    fn every_reply_in_the_gesture_region_stamps_its_receipt() {
+        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".github/scripts/record_decision.sh");
+        let text = std::fs::read_to_string(&script).expect("record_decision.sh must exist");
+        // The sentinel marks where AUTO mode (replies about a DECISION, no comment to receipt)
+        // ends and comment handling begins. Deleting the sentinel fails the control loudly
+        // rather than silently shrinking its scope to nothing.
+        let region = text
+            .split_once("gesture region (issue269)")
+            .map(|(_, rest)| rest)
+            .expect("record_decision.sh must keep the `gesture region (issue269)` sentinel");
+        let lines: Vec<&str> = region.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if !line.contains("gh issue comment") {
+                continue;
+            }
+            // A reply body may continue onto following lines; the receipt must appear near the
+            // command, not merely somewhere later in the file.
+            let window = lines[i..lines.len().min(i + 3)].join("\n");
+            assert!(
+                window.contains("receipt-for-comment: $COMMENT_ID")
+                    || window.contains("receipt-pending-for-comment: $COMMENT_ID"),
+                "unreceipted reply in the gesture region — the sweeper will re-drive its \
+                 comment forever (issue269): {line}"
+            );
+        }
+    }
 }
