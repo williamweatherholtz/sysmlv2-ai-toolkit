@@ -829,4 +829,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRecorderIsDistinctFromJudge to issue287;
+
+    part issue288 : Issue {
+        :>> id = "8179e3e8-20ec-4114-9508-f91bbb691eab";
+        :>> title = "The console tab counted viewpoints instead of flagging what waits on the human";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Reported by the human: putting the number of views in the tab heading is bad, each tab should have actionable items in the heading, because when they open the console they are trying to resolve items. The tab rendered the surface's VIEWPOINT count - assurance (11), act (4) - so the most-read navigation in the engine showed how many lenses a surface holds, which is never the question a supervisor arrives with. What makes this the unused-capability class rather than a missing feature: /api/obligations already computed what awaits the human per viewpoint, derived from viewpoints declaring surface=act, complete with a countable flag and its own note that a class with no bound counter must never be reported as zero. The console had the number and rendered a different one. Two honesty properties had to be preserved while changing it: a class with no counter must render as unknown rather than zero, and a FAILED obligations fetch must render unknown on every tab rather than showing no badge - because an absent badge means nothing is waiting, and that would be a false all-clear on the surface whose entire purpose is telling the human what they owe.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTabsFlagWhatNeedsTheHuman to issue288;
+
+    part issue289 : Issue {
+        :>> id = "3615d275-41bd-46e7-861e-6a9556b4a65f";
+        :>> title = "Intake had no write API, so every recorded human utterance was hand-edited into a file";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The human asked whether the claim was accurate: is there really no write api surface for statements or user stories. It was. keel record covered decision and issue only. That is the record type where the gap matters most, because D0216 makes the verbatim Statement the precondition for every Need - a Need with no cited utterance cannot be checked against what the human actually said, which is exactly how one comes to be written wider than the demand. So the record with the strictest rule had the weakest path: hand-edited into a file with no actor validation, no write lock, no refusal on a defaulted date, and nothing stopping a paraphrase typed from memory being stored in a field labelled VERBATIM. Every Statement in this repository was written that way, including five from this session. A second-order defect the fix had to avoid: the existing field sanitiser collapses runs of whitespace, which is correct for a title and destroys a quote, so reusing it for text would have silently altered what the human said while appearing to store it faithfully.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcIntakeHasAWritePath to issue289;
 }

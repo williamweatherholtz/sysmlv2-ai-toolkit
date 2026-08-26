@@ -2300,10 +2300,22 @@ fn cmd_record(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("issue") {
         return cmd_record_issue(args);
     }
+    // D0236: intake had NO write path. Every Statement in this repo was hand-edited into a file,
+    // which is the one record type where that matters most - D0216 requires the human's words
+    // VERBATIM before any Need exists, and a hand-typed "verbatim" field is a paraphrase waiting
+    // to happen.
+    if args.first().map(String::as_str) == Some("statement") {
+        return cmd_record_statement(args);
+    }
+    if args.first().map(String::as_str) == Some("story") {
+        return cmd_record_story(args);
+    }
     if args.first().map(String::as_str) != Some("decision") {
         eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
         eprintln!("       keel record decision --from DRAFT.md   (prose in a file - the sanctioned path, issue255; flags override)");
         eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
+        eprintln!("       keel record statement --text \"<their exact words>\" | --from FILE --said-by A --said-at D --title T [--channel C]   (VERBATIM, D0216/D0236)");
+        eprintln!("       keel record story --from-statement stNNN --title T --as-a R --i-want C --implication K [--so-that O] [--triage-note W] --at D");
         return 2;
     }
     let root = flag(args, "root").map_or_else(
@@ -2354,6 +2366,131 @@ fn cmd_record(args: &[String]) -> i32 {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
             println!("accept later via an explicit human sign-off (flip status + add the d{nnnn}Accept event).");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
+/// `keel record statement --text "<their exact words>" --said-by A --said-at D --channel C --title T`
+///
+/// `--text` is passed through VERBATIM (escaped for the literal, otherwise untouched), so it must be
+/// their words and not a summary; `--title` is the AI's label and is sanitised like any other field.
+/// `--from FILE` reads the text from a file, which is the sanctioned path for anything containing
+/// quotes, newlines or backticks - the same reason `record decision --from` exists (D0224/issue255).
+fn cmd_record_statement(args: &[String]) -> i32 {
+    let root = flag(args, "root").map_or_else(
+        || find_repo_root().unwrap_or_else(|| PathBuf::from(".")),
+        PathBuf::from,
+    );
+    let from_file = flag(args, "from").map(std::fs::read_to_string);
+    let text = match from_file {
+        Some(Ok(t)) => Some(t.trim_end_matches(['\n', '\r']).to_string()),
+        Some(Err(e)) => {
+            eprintln!("error: cannot read --from: {e}");
+            return 2;
+        }
+        None => flag(args, "text"),
+    };
+    let (Some(text), Some(said_by), Some(said_at), Some(title)) =
+        (text, flag(args, "said-by"), flag(args, "said-at"), flag(args, "title"))
+    else {
+        eprintln!("usage: keel record statement --text \"<their exact words>\" | --from FILE");
+        eprintln!("       --said-by ACTOR --said-at YYYY-MM-DD --title T [--channel chat|console|deck|commitReview|other]");
+        eprintln!("       [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
+        eprintln!("  --text is VERBATIM (D0216): their words, not a summary. --title is your label for it.");
+        return 2;
+    };
+    let channel = flag(args, "channel").unwrap_or_else(|| "chat".to_string());
+    let author = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
+    // Provenance is never defaulted (D0129/issue182): the RECORD's date is its own fact, separate
+    // from when they said it.
+    let created_at = flag(args, "at").unwrap_or_else(|| said_at.clone());
+    match keel_cli::intake_write::record_statement(
+        &root,
+        &keel_cli::intake_write::NewStatement {
+            text: &text,
+            said_by: &said_by,
+            said_at: &said_at,
+            channel: &channel,
+            title: &title,
+            author: &author,
+            created_at: &created_at,
+        },
+    ) {
+        Ok((name, path)) => {
+            println!("recorded {name} -> {path}");
+            println!("  their words are stored VERBATIM. Next: `keel record story --from-statement {name} ...`");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
+/// `keel record story --from-statement stNNN --title T --as-a R --i-want C --implication K`
+///
+/// The `#DerivedFrom` edge to the cited `Statement` is authored WITH the story, and a story citing a
+/// `Statement` that does not exist is REFUSED with nothing written: a `UserStory` with no source is an
+/// invention wearing a story's clothes (D0216).
+fn cmd_record_story(args: &[String]) -> i32 {
+    let root = flag(args, "root").map_or_else(
+        || find_repo_root().unwrap_or_else(|| PathBuf::from(".")),
+        PathBuf::from,
+    );
+    let (Some(from), Some(title), Some(as_a), Some(i_want), Some(implication)) = (
+        flag(args, "from-statement"),
+        flag(args, "title"),
+        flag(args, "as-a"),
+        flag(args, "i-want"),
+        flag(args, "implication"),
+    ) else {
+        eprintln!("usage: keel record story --from-statement stNNN --title T --as-a ROLE --i-want CAPABILITY");
+        eprintln!("       --implication need|useCase|scopeConstraint|bug|process|architecture|attestation|question|priority|convention|correction|none");
+        eprintln!("       [--so-that OUTCOME] [--triage-note WHY] [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
+        eprintln!("  --from-statement is REQUIRED: a UserStory with no cited source is an invention (D0216).");
+        return 2;
+    };
+    let author = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
+    let Some(created_at) = flag(args, "at") else {
+        eprintln!("error: --at YYYY-MM-DD required (the record's date is its own irreducible fact, issue182)");
+        return 2;
+    };
+    let so_that = flag(args, "so-that");
+    let triage = flag(args, "triage-note");
+    match keel_cli::intake_write::record_story(
+        &root,
+        &keel_cli::intake_write::NewStory {
+            from_statement: &from,
+            title: &title,
+            as_a: &as_a,
+            i_want: &i_want,
+            so_that: so_that.as_deref(),
+            implication: &implication,
+            triage_note: triage.as_deref(),
+            author: &author,
+            created_at: &created_at,
+        },
+    ) {
+        Ok((name, path)) => {
+            println!("recorded {name} -> {path}  (#DerivedFrom {from} authored with it)");
             0
         }
         Err(e) => {
@@ -3444,6 +3581,7 @@ const CATALOGUE: &[&str] = &[
     "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
     "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
     "  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate (D0232)",
+    "  record statement|story        intake's write path: a human's words VERBATIM, then the story that translates them with its #DerivedFrom edge authored alongside (D0236)",
     "  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace (D0234)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
     "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",

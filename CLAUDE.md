@@ -114,7 +114,9 @@ frozen (modify it only by out-of-band Decision).
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
   refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
   `record decision` (prose via `--from FILE` — never as double-quoted shell arguments, D0224/issue256),
-  `record issue`, `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
+  `record issue`, `record statement` / `record story` (intake's write path — a human's words VERBATIM,
+  then the story that translates them with its `#DerivedFrom` edge authored alongside; D0236/issue289),
+  `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
   Commit messages and memory are **not** decision records. The keystone lock also covers the

@@ -31,6 +31,9 @@
  .turn .who{font-size:10px;text-transform:uppercase;color:var(--mut);letter-spacing:.04em;margin-bottom:3px}
  .muted{color:var(--mut)} button.rb{border:1px solid var(--bd);background:#fff;border-radius:5px;padding:4px 9px;margin:0 5px 8px 0;cursor:pointer;font:12px system-ui}
  .il{color:var(--ac);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+ .oblflag{display:inline-block;min-width:16px;padding:0 5px;margin-left:2px;border-radius:9px;background:#b4531a;color:#fff;font-weight:700;font-size:10px;line-height:15px;text-align:center;vertical-align:1px}
+ .oblunk{display:inline-block;padding:0 4px;margin-left:2px;border-radius:9px;border:1px solid #7d8a97;color:#c9d4de;font-size:10px;line-height:14px;vertical-align:1px}
+ .c.hasobl{border-left:3px solid #b4531a}
  #modal{position:fixed;right:0;top:0;bottom:0;width:min(580px,48vw);background:#fff;border-left:1px solid var(--bd);box-shadow:-4px 0 16px rgba(0,0,0,.10);padding:14px 18px;overflow:auto;display:none;z-index:30}
  #modal.on{display:block} #modal .x{float:right;cursor:pointer;color:var(--mut);font-size:20px;line-height:1}
  #modal h2{margin:2px 0 8px;font-size:15px} #modal table{width:100%;border-collapse:collapse;font-size:11px;margin-top:4px}
@@ -114,17 +117,45 @@ function readOnlyNote(cmd){
   +'the item is acceptance-bearing, or run <code>keel '+esc(cmd)+'</code> and record the result.</p>';
 }
 function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+/,'').split(/[\s(]/)[0]}
+// WHAT AWAITS THE HUMAN, per viewpoint (issue288). Filled by buildNav from /api/obligations, which
+// derives its classes from viewpoints declaring surface="act" — so declaring one adds a class with no
+// console change. `countable:false` means the class has NO bound counter and must NEVER render as 0.
+let OBL={};
+function oblOf(vp){return OBL[vp]||null}
+/// The flag a surface or viewpoint carries: how many items are waiting on the HUMAN there.
+function oblFlag(vps){
+ let n=0,unknown=0;
+ (vps||[]).forEach(v=>{const o=oblOf(v.viewpoint||v);if(!o)return;if(o.countable)n+=o.count||0;else unknown++});
+ if(n>0)return '<span class=oblflag title="items waiting on YOU here">'+n+'</span>'
+   +(unknown?'<span class=oblunk title="'+unknown+' class(es) here have no bound counter — NOT zero, unknown">+?</span>':'');
+ if(unknown)return '<span class=oblunk title="'+unknown+' class(es) here have no bound counter — NOT zero, unknown">?</span>';
+ return '';
+}
 async function buildNav(){
  const d=await get('/api/surfaces');
  SURFACES=d.surfaces||[]; UNSURFACED=d.unsurfaced||[];
+ // A FAILED obligations fetch must not read as "nothing waiting": the flags say `?` instead of
+ // vanishing, because an absent flag means zero and that would be a false all-clear.
+ OBL={};let oblFailed=false;
+ try{const o=await get('/api/obligations');(o.classes||[]).forEach(c=>{OBL[c.viewpoint]={count:c.count,countable:c.countable!==false}})}
+ catch(e){oblFailed=true}
  nav.innerHTML='';
  SURFACES.forEach(s=>{const b=document.createElement('button');
-  b.textContent=s.surface+' ('+s.count+')';b.dataset.k=s.surface;
+  // THE TAB SAYS WHAT NEEDS YOU, not how many viewpoints exist (issue288). The viewpoint count was
+  // the wrong number on the most-read surface in the engine: a supervisor opens this console to
+  // RESOLVE things, and "(11)" told them how many lenses assurance has, which is never the question.
+  // The lens count moves to the tooltip; it is not lost, it is demoted.
+  const flag=oblFailed?'<span class=oblunk title="obligations could not be computed — this is NOT an all-clear">?</span>':oblFlag(s.viewpoints);
+  b.innerHTML=esc(s.surface)+(flag?' '+flag:'');
+  b.title=s.surface+' — '+(s.count||0)+' viewpoint(s)'+(flag?'; the badge counts items waiting on YOU':'; nothing here is waiting on you');
+  b.dataset.k=s.surface;
   b.onclick=()=>{activeSurface=s.surface;activeVp=null;active=null;location.hash=s.surface;draw();render()};
   nav.appendChild(b)});
  if(UNSURFACED.length){const b=document.createElement('button');
-  b.textContent='unsurfaced ('+UNSURFACED.length+')';b.dataset.k='__unsurfaced';
-  b.title='viewpoints declaring no surface — shown, never silently filed under a default';
+  const uflag=oblFlag(UNSURFACED);
+  b.innerHTML='unsurfaced'+(uflag?' '+uflag:'');b.dataset.k='__unsurfaced';
+  b.title='viewpoints declaring no surface ('+UNSURFACED.length+') — shown, never silently filed under a default'
+   +(uflag?'; the badge counts items waiting on YOU':'');
   b.onclick=()=>{activeSurface='__unsurfaced';activeVp=null;active=null;draw();render()};
   nav.appendChild(b)}
  const g=document.createElement('button');g.textContent='⚙';g.dataset.k='settings';
@@ -393,7 +424,10 @@ async function rejectGate(name,file){
  }catch(e){status.textContent='reject error: '+e.message}
 }
 function vpCard(vp){
- return '<div class="c" data-vp="'+esc(vp.viewpoint||vp.title)+'"><div class=l>'+esc(vp.title)+'</div>'+
+ // The tab flags the surface; the card flags WHICH viewpoint holds the work, so a supervisor who
+ // opened the console to resolve things is never left scanning for it (issue288).
+ const f=oblFlag([vp]);
+ return '<div class="c'+(f?' hasobl':'')+'" data-vp="'+esc(vp.viewpoint||vp.title)+'"><div class=l>'+esc(vp.title)+(f?' '+f:'')+'</div>'+
   '<div class=d>'+esc(vp.concern)+'</div>'+
   '<div class=d style="margin-top:6px"><code>'+esc(vp.renderer)+'</code></div></div>'
 }

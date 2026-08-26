@@ -1203,6 +1203,16 @@ fn add_task_locked(
 // ── record verb (D0105/D0106 RMWX axis; issue054 C1) ────────────────────────────
 
 /// Sanitize a field value for a one-line `SysML` string literal (double-quote → single, whitespace collapsed).
+/// Public alias for the one-line-literal sanitiser.
+///
+/// So intake's writer uses the SAME escaping for a TITLE while applying its own verbatim escaping to a
+/// Statement's `text` (D0236). Two callers, one definition — a second copy of quote-escaping is how a
+/// field silently stops being safe.
+#[must_use]
+pub fn sanitize_public(v: &str) -> String {
+    sanitize_field(v)
+}
+
 fn sanitize_field(v: &str) -> String {
     v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
 }
