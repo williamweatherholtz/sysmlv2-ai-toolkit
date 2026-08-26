@@ -65,7 +65,7 @@ const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry
 /// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
 /// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
 /// path (D0175's fence). POSIX sh.
-const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel rules --enforce'\n\"$KEEL\" rules --enforce || { echo 'pre-commit: DECLARED RULES FAILED — commit aborted'; exit 1; }\n";
+const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\n# WORKSPACE (D0234). git allows ONE core.hooksPath per repository, so in a repo holding several keel\n# projects a per-project hook can only ever gate one of them. When this hook's directory is NOT\n# itself a project, it is a workspace root: gate every project the commit touches, in one call.\n# A single-project repo falls through to the branch below, identical to before this existed.\nif [ ! -d .engine ]; then\n  echo 'pre-commit: workspace root - gating every project this commit touches'\n  \"$KEEL\" gate --workspace . || { echo 'pre-commit: WORKSPACE gate FAILED - commit aborted'; exit 1; }\n  exit 0\nfi\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel rules --enforce'\n\"$KEEL\" rules --enforce || { echo 'pre-commit: DECLARED RULES FAILED — commit aborted'; exit 1; }\n";
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -164,6 +164,29 @@ fn cmd_validate(args: &[String]) -> i32 {
         Err(code) => return code,
     };
 
+    // REFUSE A NON-PROJECT (issue269/D0234). Pointed at a directory with no `.engine/`, validate used
+    // to print "0 tracking file(s) validated clean" and exit 0 — a vacuous pass on the FIRST line of
+    // every gate. A hook placed at a repo root holding several projects would therefore gate NOTHING
+    // while reporting success. `keel guard` already fails in that position; the two halves of the gate
+    // disagreed about whether an absent project is a clean tree or a usage error. It is a usage error.
+    //
+    // A real project holding zero tracking files still exits 0: that is a true statement about a
+    // project that exists.
+    if !keel_cli::workspace::is_project(&root) {
+        eprintln!("error: {} is not a keel project — it has no .engine/ (and .tracking/) directory.", root.display());
+        let ws = keel_cli::workspace::discover(&root);
+        if ws.is_multi() {
+            eprintln!("  This repository holds {} projects. validate takes ONE project root:", ws.projects.len());
+            for p in &ws.projects {
+                eprintln!("    keel validate {}", ws.label(p));
+            }
+            eprintln!("  To gate the whole workspace at once, use `keel hook pre-commit` (D0234).");
+        } else {
+            eprintln!("  Validating a directory that is not a project would report a clean tree over zero");
+            eprintln!("  files, which is how a gate passes while checking nothing (issue269).");
+        }
+        return 2;
+    }
     if let Some(w) = engine_version_skew(&root) {
         eprintln!("{w}");
     }
@@ -1039,6 +1062,12 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
 /// heuristic would block work mid-thought and train the actor to disable it — the issue076/issue081
 /// dynamic that cost eight bypassed commits this sitting.
 fn cmd_gate(args: &[String]) -> i32 {
+    // D0234: `--workspace` is a SCOPE (every project in this git repo), `--fast` is a TIER (the
+    // per-edit subset). A repo holding several projects can only have one core.hooksPath, so its
+    // pre-commit hook calls this rather than a per-project gate that could cover just one of them.
+    if args.iter().any(|a| a == "--workspace") {
+        return keel_cli::workspace::gate_cmd(args);
+    }
     let fast = args.iter().any(|a| a == "--fast");
     let root = args
         .iter()
@@ -1048,6 +1077,7 @@ fn cmd_gate(args: &[String]) -> i32 {
         .unwrap_or_else(|| PathBuf::from("."));
     if !fast {
         eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder)");
+        eprintln!("       keel gate --workspace [ROOT]   (the COMMIT gate for a repo holding several projects: every project the commit touches, D0234)");
         return 2;
     }
 
@@ -3414,6 +3444,7 @@ const CATALOGUE: &[&str] = &[
     "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
     "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
     "  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate (D0232)",
+    "  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace (D0234)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
     "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
     "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
@@ -3425,6 +3456,7 @@ const CATALOGUE: &[&str] = &[
     "  whats-next [ROOT]            print ready task names (one per line)",
     "  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed (D0221)",
     "  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them (D0219). An unmapped login is refused, never defaulted",
+    "  github-decision-id <id>      split a channel decision id into project<TAB>name - `alpha/d0001` in a workspace, `d0001` alone (D0234)",
     "  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass (D0209 clause 3)",
     "  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)",
     "  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)",
@@ -3605,6 +3637,8 @@ fn cmd_version(args: &[String]) -> i32 {
 const WARNING_ONLY_GUARDS: [&str; 9] =
     ["decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "doc-sync", "hook-config-integrity", "sequence-multiplicity", "parser-coverage", "base-first-justification"];
 
+#[allow(clippy::too_many_lines)] // one dispatch table = one place a subcommand can be reached from;
+// splitting it by arbitrary length would hide half the surface from anyone reading for what exists
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
@@ -3621,6 +3655,7 @@ fn main() {
         Some("onboard") => keel_cli::onboard::cmd(rest),
         Some("adoption-check") => keel_cli::adoption_check::cmd(rest),
         Some("attestation") => keel_cli::attestation::cmd(rest),
+        Some("projects") => keel_cli::workspace::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
         Some("validate") => cmd_validate(rest),
@@ -3683,6 +3718,7 @@ fn main() {
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
+        Some("github-decision-id") => keel_cli::github::decision_id_cmd(rest),
         Some("github-decider") => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),

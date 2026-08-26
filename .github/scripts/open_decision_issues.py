@@ -60,8 +60,30 @@ def ensure_override_threads() -> None:
     """issue238 control: every ACCEPTED decision numbered >= CHANNEL_FROM has a GitHub override
     thread, regardless of acceptance path. A local/API accept that skipped the channel gets its
     thread opened-and-closed here, so the override surface always exists (D0205/D0207)."""
-    allcards = json.loads(_all_cards() or '{"cards":[]}').get("cards", [])
+    # WORKSPACE (D0234): the backfill covers EVERY project, not just the one the workflow ran in.
+    # Scoped to the root only, a second project's accepted decisions would silently have no override
+    # surface at all - which is precisely the issue238 hole this function exists to close, reopened
+    # one directory over.
+    ws = workspace()
+    multi = bool(ws.get("multiProject"))
+    allcards = []
+    for c in json.loads(_all_cards() or '{"cards":[]}').get("cards", []):
+        c["project"] = "."
+        allcards.append(c)
+    if multi:
+        for p in ws.get("projects", []):
+            if p.get("label") in (".", "", None):
+                continue
+            out = subprocess.run(["./target/release/keel", "decision-card", p["root"]],
+                                 capture_output=True, text=True, check=False).stdout
+            try:
+                for c in json.loads(out or '{"cards":[]}').get("cards", []):
+                    c["project"] = p["label"]
+                    allcards.append(c)
+            except Exception:
+                pass
     for c in allcards:
+        c["cid"] = qualify(c.get("project", "."), c["name"], multi)
         # A TRUE decision card is named d + exactly four digits (d0205); acceptance/defer record
         # cards carry a suffix (d0205AcceptR1) and are NOT decisions - skip them.
         m = re.fullmatch(r"d(\d{4})", c["name"])
@@ -70,11 +92,11 @@ def ensure_override_threads() -> None:
         num = int(m.group(1))
         if c["status"] != "accepted" or num < CHANNEL_FROM:
             continue
-        if has_override_surface(c["name"]):
+        if has_override_surface(c["cid"]):
             continue  # already has a surface: its own issue, or a comment on the standing thread
         body = (
             f"### {c['title']}\n\n"
-            f"<!-- keel-decision: {c['name']} -->\n\n"
+            f"<!-- keel-decision: {c['cid']} -->\n\n"
             f"**Why it came up:** {c['context']}\n\n"
             f"**What is being decided:** {c['decision']}\n\n---\n"
             "**Status: ACCEPTED** before this override thread existed (a channel-bypass, issue238). "
@@ -83,7 +105,7 @@ def ensure_override_threads() -> None:
         # D0227: the backfill posts to the standing thread too. It used to OPEN AND CLOSE one issue
         # per bypassed decision - two notifications each, for a surface nobody had asked for.
         if post_to_standing(c, body):
-            print(f"{c['name']} override surface backfilled onto the standing thread")
+            print(f"{c['cid']} override surface backfilled onto the standing thread")
 
 
 STANDING_MARK = "<!-- keel-standing-thread -->"
@@ -152,7 +174,7 @@ def post_to_standing(card, body: str) -> str:
     with open("body.md", "w", encoding="utf-8") as f:
         f.write(body)
     gh(["issue", "comment", number, "--body-file", "body.md"], check=True)
-    print("posted " + card["name"] + " to the standing thread #" + number)
+    print("posted " + card.get("cid", card["name"]) + " to the standing thread #" + number)
     return number
 
 
@@ -170,23 +192,71 @@ def _all_cards() -> str:
                           capture_output=True, text=True, check=False).stdout
 
 
+# ---- WORKSPACE (D0234/issue270): several keel projects may share this repository ----------------
+#
+# `dNNNN` is unique WITHIN a project, and the channel's marker plus its GitHub search are repo-scoped.
+# So in a two-project repo alpha/d0001 and beta/d0001 were indistinguishable: the second project's
+# issue never opened (the search found the first) and `reject d0001` was ambiguous. The marker is
+# therefore QUALIFIED with the project label in a multi-project repo.
+#
+# A single-project repo keeps the exact former format. That is not politeness - changing the marker
+# there would make every existing issue unfindable, so the opener would re-open one for every past
+# decision. Backward compatibility here IS the correctness requirement.
+def workspace() -> dict:
+    out = subprocess.run(["./target/release/keel", "projects", "--json"],
+                         capture_output=True, text=True, check=False).stdout
+    try:
+        return json.loads(out)
+    except Exception:
+        return {"multiProject": False, "projects": [{"label": ".", "root": "."}]}
+
+
+def qualify(label: str, name: str, multi: bool) -> str:
+    """The channel's id for a decision: `alpha/d0001` in a workspace, `d0001` when alone."""
+    return (label.rstrip("/") + "/" + name) if (multi and label not in (".", "")) else name
+
+
 def main() -> None:
+    ws = workspace()
+    multi = bool(ws.get("multiProject"))
+    # cards.json holds the ROOT project's proposed decisions (the workflow's existing step). In a
+    # workspace every other project is asked directly, so no project's decisions go unpublished
+    # merely because it is not the one the workflow happened to run in.
     cards = json.load(open("cards.json", encoding="utf-8"))["cards"]
+    for c in cards:
+        c.setdefault("project", ".")
+    if multi:
+        for p in ws.get("projects", []):
+            if p.get("label") in (".", "", None):
+                continue
+            out = subprocess.run(["./target/release/keel", "decision-card", "--proposed", p["root"]],
+                                 capture_output=True, text=True, check=False).stdout
+            try:
+                extra = json.loads(out or '{"cards":[]}').get("cards", [])
+            except Exception:
+                extra = []
+            for c in extra:
+                c["project"] = p["label"]
+            cards.extend(extra)
+        print(f"workspace: {len(ws.get('projects', []))} project(s)")
     print(f"proposed decisions: {len(cards)}")
     for c in cards:
-        search = f"keel-decision-{c['name']} in:body"
+        # The channel's id. Qualified in a workspace so two projects' d0001 cannot collide; identical
+        # to the old format when this repo holds one project, or every existing issue goes unfindable.
+        c["cid"] = qualify(c.get("project", "."), c["name"], multi)
+        search = f"keel-decision-{c['cid']} in:body"
         q = gh(["issue", "list", "--state", "open", "--label", "decision",
                 "--search", search, "--json", "number,url"])
         existing = json.loads(q.stdout or "[]")
-        if not c["options"] and standing_has(c["name"]):
-            print(f"{c['name']} already on the standing thread")
+        if not c["options"] and standing_has(c["cid"]):
+            print(f"{c['cid']} already on the standing thread")
             continue
         if existing and c["options"]:
             print(f"{c['name']} already has an open issue (fork - awaiting their letter)")
             continue
         if existing:
             row = existing[0]
-            queue_auto(c["name"], str(row["number"]), row["url"])
+            queue_auto(c["cid"], str(row["number"]), row["url"])
             print(f"{c['name']} queued for auto-accept (existing issue #{row['number']})")
             continue
         research = c.get("research", "").strip()
@@ -206,7 +276,7 @@ def main() -> None:
         else:
             body = f"### {c['title']}\n\n" + body + (
                 "**Auto-accepted under your standing consent (D0207)** - nothing needs you. "
-                f"Reply `reject {c['name']} <why>` on this thread anytime to reverse it. "
+                f"Reply `reject {c['cid']} <why>` on this thread anytime to reverse it. "
                 "Naming the decision is what lets one thread carry them all (D0227)."
             )
         if not c["options"]:
@@ -214,7 +284,7 @@ def main() -> None:
             # rides in the comment body because a comment has none of its own.
             number = post_to_standing(c, body)
             if number:
-                queue_auto(c["name"], number, f"{repo_url()}/issues/{number}")
+                queue_auto(c["cid"], number, f"{repo_url()}/issues/{number}")
                 print(f"{c['name']} queued for auto-accept (standing thread #{number})")
             continue
         with open("body.md", "w", encoding="utf-8") as f:

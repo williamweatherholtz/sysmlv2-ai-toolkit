@@ -258,6 +258,41 @@ pub fn decision_in_gesture(comment_body: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Split a channel decision id into `(project label, decision name)` (D0234/issue270).
+///
+/// `dNNNN` is unique only WITHIN a project, and the channel's marker and GitHub search are repo-scoped
+/// — so in a repo holding several projects the channel qualifies the id as `alpha/d0001`. An
+/// unqualified id means the root project, which is what every existing issue in every existing repo
+/// carries; that form must keep working untouched or the opener would re-open an issue for every past
+/// decision.
+///
+/// The recorder needs BOTH halves: the project to `cd` into (so `keel accept` resolves the right
+/// tree) and the bare name to accept.
+#[must_use]
+pub fn split_decision_id(id: &str) -> (Option<String>, String) {
+    match id.rsplit_once('/') {
+        Some((project, name)) if !project.is_empty() && !name.is_empty() => {
+            (Some(project.to_string()), name.to_string())
+        }
+        _ => (None, id.to_string()),
+    }
+}
+
+/// `keel github-decision-id <id>` — print `project<TAB>name` for the channel's shell to consume.
+///
+/// In the binary rather than parsed in bash: the split decides which TREE a human's acceptance is
+/// written into, and getting it wrong records their judgment against the wrong project.
+#[must_use]
+pub fn decision_id_cmd(args: &[String]) -> i32 {
+    let Some(id) = args.first() else {
+        eprintln!("usage: keel github-decision-id <id>    (prints `project<TAB>name`; project is `.` when unqualified)");
+        return 2;
+    };
+    let (project, name) = split_decision_id(id);
+    println!("{}\t{}", project.unwrap_or_else(|| ".".to_string()), name);
+    0
+}
+
 /// Has this comment id already been receipted? Idempotency, decided from the comment bodies the
 /// caller already fetched — so the check is deterministic here and the fetch stays in the workflow.
 #[must_use]
@@ -323,7 +358,20 @@ pub fn gesture_cmd() -> i32 {
 
 #[cfg(test)]
 mod gesture_tests {
-    use super::{already_receipted, decision_in_gesture, decision_of, parse_gesture, Verdict};
+    use super::{already_receipted, decision_in_gesture, decision_of, parse_gesture, split_decision_id, Verdict};
+
+    #[test]
+    fn a_qualified_decision_id_names_its_project_and_an_unqualified_one_means_the_root() {
+        // D0234. The split decides which TREE a human's acceptance is written into, so both
+        // directions matter and the legacy form must be untouched: every issue in every existing
+        // repo carries the bare `dNNNN`.
+        assert_eq!(split_decision_id("alpha/d0001"), (Some("alpha".into()), "d0001".into()));
+        assert_eq!(split_decision_id("nested/beta/d0042"), (Some("nested/beta".into()), "d0042".into()));
+        assert_eq!(split_decision_id("d0231"), (None, "d0231".into()), "legacy form still means the root");
+        // Degenerate input must not silently produce a project of "" and send a write somewhere odd.
+        assert_eq!(split_decision_id("/d0001"), (None, "/d0001".into()));
+        assert_eq!(split_decision_id("alpha/"), (None, "alpha/".into()));
+    }
 
     #[test]
     fn a_gesture_on_the_shared_thread_names_its_own_decision() {

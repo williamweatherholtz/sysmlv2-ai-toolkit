@@ -590,10 +590,33 @@ fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) 
 }
 
 fn staged_files(root: &Path) -> Vec<String> {
-    git_stdout(root, &["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+    staged_changes(root, "ACMR")
+}
+
+/// Staged paths for a given `--diff-filter`, scoped to this project (see below).
+fn staged_changes(root: &Path, filter: &str) -> Vec<String> {
+    // SCOPED TO THIS PROJECT (D0234/issue271). `git diff --cached` answers for the whole REPOSITORY
+    // no matter which subdirectory you ask from, so in a repo holding several keel projects every
+    // project's guards saw every other project's staged files — and the workspace-level ones too.
+    // Found live: a two-project workspace failed BOTH projects' process-change guard over
+    // `.githooks/pre-commit`, a file belonging to neither. Paths are returned repo-relative, so they
+    // are re-based onto the project and anything outside it is dropped.
+    let flag = format!("--diff-filter={filter}");
+    let repo_relative = git_stdout(root, &["diff", "--cached", "--name-only", &flag]);
+    let prefix = git_stdout(root, &["rev-parse", "--show-prefix"]).trim().replace('\\', "/");
+    repo_relative
         .lines()
         .map(|l| l.trim().replace('\\', "/"))
         .filter(|l| !l.is_empty())
+        .filter_map(|l| {
+            if prefix.is_empty() {
+                // The project IS the repo root: every staged file is its own, as it always was.
+                Some(l)
+            } else {
+                // Keep only what lives under this project, re-based to project-relative.
+                l.strip_prefix(&prefix).map(str::to_string)
+            }
+        })
         .collect()
 }
 
@@ -604,8 +627,24 @@ fn staged_files(root: &Path) -> Vec<String> {
 /// `validate_process_change.py`.
 #[must_use]
 pub fn process_change(root: &Path) -> GuardReport {
-    let changed = staged_files(root);
-    let decision_texts: Vec<(String, String)> = changed
+    // MODIFIED or DELETED, never merely ADDED (issue272). The keystone lock exists so a control
+    // cannot be weakened without a signed Decision. An ADDED locked file is a control ARRIVING, and
+    // treating that as a weakening made a freshly scaffolded project unable to make its FIRST
+    // commit: `keel init` stages every `.engine/processes/*` file, so the guard demanded a
+    // process-change Decision for a scaffold the author did not write. That is the first thing a new
+    // user does, and it failed.
+    //
+    // STATED RESIDUAL: an added process CAN weaken, by asserting a constraint that claims a CORE
+    // guard and so makes it switchable (the issue242 capture). That transition is caught by
+    // `audit-adherence`'s guard-state monotonicity, which ranks CORE above ACTIVE and fails the
+    // build on a downgrade (D0209 clause 1) — so the hole is covered, by the check built for it.
+    let changed = staged_changes(root, "MD");
+    // TWO LISTS, and conflating them was a regression this very guard caught on its author within
+    // the minute: what TRIGGERS the lock is a locked file being modified or deleted, but the
+    // co-committed Decision that AUTHORISES it is almost always a NEW file — so searching for it in
+    // the modify-only list found nothing and refused a properly signed change. The Decision is
+    // looked for among all staged additions and modifications.
+    let decision_texts: Vec<(String, String)> = staged_files(root)
         .iter()
         .filter(|p| is_decision_file(p))
         .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))

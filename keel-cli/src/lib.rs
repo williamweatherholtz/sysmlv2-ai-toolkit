@@ -36,6 +36,7 @@ pub mod cursor;
 pub mod github;
 pub mod adoption_check;
 pub mod attestation;
+pub mod workspace;
 pub mod onboard;
 pub mod proactive;
 pub mod claim;

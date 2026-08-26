@@ -136,6 +136,14 @@ frozen (modify it only by out-of-band Decision).
   `keel deactivate` take a process or a viewpoint name. Deactivating a viewpoint removes the LENS (it
   leaves the surfaces and its renderer stops being gated) but `concern-coverage` still reports the
   concern — otherwise coverage could be raised by switching off what it was failing.
+- **A repo may hold SEVERAL projects (D0234).** A *workspace* is one git repo containing one or more
+  keel projects, discovered as any directory with both `.engine/` and `.tracking/`; `keel projects`
+  lists them. Four things are repo-scoped because git makes them so: git allows one
+  `core.hooksPath`, so the hook sits at the repo root and runs `keel gate --workspace` (gating every
+  project the commit touches, naming those it skipped); `sync`/`land` gate EVERY project before a
+  push, since a push carries the whole repo; `validate` REFUSES a non-project rather than reporting
+  a clean tree over nothing (issue269); and the decision channel qualifies an id as `alpha/d0001`,
+  because `dNNNN` is unique only per project. A single-project repo is unaffected throughout.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
 - **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook.** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` pushes and, on rejection, merges and **gates the
@@ -189,6 +197,7 @@ keel validate .        # .tracking semantic validation — the AUTHORITY (no ker
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
 keel guard             # every enforced forward guard (count: `keel version`) — see .engine/docs/guards.md
 keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder (~0.35s)
+keel gate --workspace  # the COMMIT tier for a repo holding several projects: every project the commit touches (D0234)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
 

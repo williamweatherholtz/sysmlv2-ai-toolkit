@@ -17,6 +17,18 @@ KEEL=./target/release/keel
 # that nothing was individually reviewed. Inputs: AUTO_DECISION, ISSUE_NUMBER, ISSUE_URL, GH_TOKEN.
 if [ -n "${AUTO_DECISION:-}" ]; then
   today=$(date -u +%F)
+  # WORKSPACE (D0234): the channel id may be QUALIFIED - `alpha/d0001` - because `dNNNN` is unique
+  # only within a project and this repo may hold several. Split it in the BINARY, not in shell: the
+  # project half decides which TREE the human's acceptance is written into, and getting that wrong
+  # records their judgment against the wrong project.
+  split=$("$KEEL" github-decision-id "$AUTO_DECISION")
+  proj=$(printf '%s' "$split" | cut -f1)
+  AUTO_DECISION=$(printf '%s' "$split" | cut -f2)
+  if [ "$proj" != "." ] && [ -d "$proj" ]; then
+    echo "recorder: decision belongs to project '$proj' — recording there"
+    cd "$proj" || { echo "recorder: cannot enter '$proj'"; exit 1; }
+    KEEL="$(cd "$OLDPWD" && pwd)/${KEEL#./}"
+  fi
   note="AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on ${ISSUE_URL}."
   "$KEEL" accept "$AUTO_DECISION" --note "$note" --by wweatherholtz --date "$today"
   "$KEEL" validate .

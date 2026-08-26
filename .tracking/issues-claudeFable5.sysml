@@ -631,4 +631,37 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcValidateRefusesANonProject to issue269;
+
+    part issue270 : Issue {
+        :>> id = "c3c58b60-dd6d-4827-8841-ccd41b8df713";
+        :>> title = "Several keel projects cannot share one git repository: numbering collides, the channel confuses them, and one hooksPath cannot gate them";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The author wants one repo for a handful of small short-term projects and expects the layout to recur. Built and RAN it rather than reasoning about it. Three things already work: root resolution walks up to .engine, drift is file-scoped through each project's own deliverable-manifest, and the write lock sits beside each model root. Four break. DECISION NUMBERING COLLIDES: two fresh projects both get d0001. THE CHANNEL CANNOT TELL THEM APART: its marker is keel-decision d0001 and its GitHub lookup is repo-scoped, so the second project's issue never opens because the search finds the first, and a reject gesture is ambiguous. THE GATE CANNOT COVER THEM: git allows exactly one core.hooksPath per repository, so a per-project hook gates at most one project, and keel validate at the parent printed 0 tracking file(s) validated clean and exited 0 - a hook there would gate nothing while reporting success. AND LAND GATES ONE ROOT WHILE PUSHING THE WHOLE REPO, so the other projects' changes ride out covered by no gate. Each of the four is a property of git or of the channel being repo-scoped, not a preference, so the engine has to know the difference between a project and the repository holding it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcWorkspace to issue270;
+
+    part issue271 : Issue {
+        :>> id = "4bc157a7-44a8-49bf-8052-4c5bb95c6619";
+        :>> title = "Every project's guards saw every other project's staged files";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "git diff --cached answers for the whole REPOSITORY no matter which subdirectory asks it, and the guards that read staged files did not re-scope the answer. In a repo holding several keel projects that means each project's guards judge the other projects' changes, and the workspace-level files too. Found live and immediately: a two-project workspace failed BOTH projects' process-change guard over .githooks/pre-commit, a file belonging to neither project. The failure is not merely noisy - it is wrong in the direction that matters, because a project's gate reported a violation about a file it does not own, which is a verdict no reader could act on. Invisible in a single-project repo, where the project IS the repo root and the unscoped answer happens to be correct - so nothing before now could have surfaced it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcStagedFilesAreProjectScoped to issue271;
+
+    part issue272 : Issue {
+        :>> id = "a762e9c6-0cfc-4690-b322-ab00baaa5be3";
+        :>> title = "A freshly scaffolded project could not make its first commit";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel init lays down a working project and tells the author to commit. That commit FAILED. init stages every .engine/processes and .engine/workflows file, the keystone lock read those as locked surfaces changing without a co-committed signed Decision, and the guard blocked - telling a brand-new user to record a process-change Decision for a scaffold they did not write and had no opinion about. Reproduced on a plain single-project keel init, so this has nothing to do with workspaces and has been true for every new project. It is the worst adoption defect found so far, because it is the FIRST thing anyone does after scaffolding and the message sends them somewhere useless. The distinction the lock was missing: it exists so a control cannot be WEAKENED unsigned, and a locked file being ADDED is a control arriving, not one being weakened. Found only because a workspace experiment made me commit a fresh scaffold - adoption-check runs validate, guard and check-engine but never a COMMIT, so nothing staged means process-change sees nothing and the whole class was outside every existing check.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcKeystoneLockIsAboutChangeNotArrival to issue272;
 }

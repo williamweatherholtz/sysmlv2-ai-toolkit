@@ -154,7 +154,7 @@ file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
 file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
 [79f2d321-7c55-41fb-86fa-7d549202caf7]
 process = "intake"
-version = 10
+version = 12
 file.processes__SL__intake.sysml = "8b880475eaab49ad"
 file.skills__SL__intake__SL__SKILL.md = "9a6aefa4c9668c8f"
 file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"

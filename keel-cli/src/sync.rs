@@ -102,17 +102,34 @@ pub fn divergence(repo: &Path) -> Divergence {
 /// point of gating the merged tree is that it is held to the identical standard, and two gate
 /// definitions that can drift apart would quietly reintroduce the problem.
 fn gate_passes(repo: &Path) -> Result<(), Vec<String>> {
+    // WORKSPACE-WIDE (D0234). A push carries the WHOLE repository, so gating one project and pushing
+    // is how another project's changes ride out ungated — and in a repo whose root is not itself a
+    // project, gating `repo` used to validate nothing at all and pass (issue269). Every project in
+    // the workspace is gated before anything leaves the machine.
+    let ws = crate::workspace::discover(repo);
     let mut problems = Vec::new();
-    let report = crate::validate_root(repo);
-    for (p, d) in &report.diagnostics {
-        problems.push(format!("{}:{} — {}", p.display(), d.line, d.message));
+    if ws.projects.is_empty() {
+        // K2: a gate that cannot run must not pass.
+        problems.push(format!(
+            "no keel project found in {} — refusing to push a tree no gate covers",
+            ws.root.display()
+        ));
+        return Err(problems);
     }
-    for e in &report.errors {
-        problems.push(format!("{} — {}", e.file.display(), e.message));
-    }
-    for g in crate::guards::run_all(repo) {
-        for v in &g.violations {
-            problems.push(format!("[{}] {v}", g.name));
+    for project in &ws.projects {
+        // Label every problem with its project, or a failure in a three-project repo is a mystery.
+        let tag = if ws.is_multi() { format!("{}: ", ws.label(project)) } else { String::new() };
+        let report = crate::validate_root(project);
+        for (p, d) in &report.diagnostics {
+            problems.push(format!("{tag}{}:{} — {}", p.display(), d.line, d.message));
+        }
+        for e in &report.errors {
+            problems.push(format!("{tag}{} — {}", e.file.display(), e.message));
+        }
+        for g in crate::guards::run_all(project) {
+            for v in &g.violations {
+                problems.push(format!("{tag}[{}] {v}", g.name));
+            }
         }
     }
     if problems.is_empty() {
