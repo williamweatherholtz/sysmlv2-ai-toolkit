@@ -851,4 +851,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcIntakeHasAWritePath to issue289;
+
+    part issue290 : Issue {
+        :>> id = "9241ce15-f106-4223-947b-3eb88fbe715e";
+        :>> title = "The adopted channel's mechanism never landed downstream, and nothing checks that a process's mechanism exists";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Adopting the decision channel onto penumbra, the merged PR carried the process definition, the skill, its registry entry and two contracts - and NOT the mechanism. Both workflows and both scripts were missing, so that project held a process definition and a skill referencing scripts that do not exist. The cause was mine and it was hand-staging: to avoid committing that repo's untracked logs and screenshots I staged explicit paths rather than add-all, omitted .github from the list, and then deleted .github from the working tree so a later add-all could not land it out of band - which destroyed the only copy. This is issue251 verbatim, the channel leaving its mechanism behind, reproduced by hand downstream AFTER being fixed in the export. Two checks that should have caught it did not. adoption-check gates a fresh scaffolded fixture, so it verifies what EXPORT produces and never what a TARGET actually received - the gap named in its own stated limits, now with a concrete instance. And no guard flags a process whose declared mechanism files are absent, even though the tool-reference guard already performs exactly that check for .engine/tools paths. Fixed downstream by a follow-up import, which also correctly preserved that project's two documented local divergences.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcMechanismMustBePresent to issue290;
 }
