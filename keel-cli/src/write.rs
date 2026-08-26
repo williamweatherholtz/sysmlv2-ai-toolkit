@@ -469,11 +469,18 @@ pub fn record_obligation(root: &Path, slug: &str, title: &str, description: &str
     let path = dir.join(format!("{slug}-{short}.sysml"));
     let esc = |s: &str| sanitize_field(s);
     let text = format!(
+        // `Issue` lives in EngineWork and `#Resolves` in EngineRelationships. Omitting those
+        // imports meant RECORDING an obligation made the tree INVALID (unresolved type reference
+        // `Issue`) - self-defeating for a record whose purpose is to say the tree needs a
+        // correction pass, and it put the recorder in the one position it must never be in:
+        // unable to record without breaking the very thing it is reporting on (issue274).
         "// OBLIGATION (auto-recorded, D0176/K7): a control was overridden or yielded; a human review\n\
          // discharges it (triage with a #Resolves edge). One file per fact so recording never deadlocks\n\
          // on the file being repaired.\n\
          package Obligation{short} {{\n\
-         \x20   private import EngineElement::*;\n\n\
+         \x20   private import EngineElement::*;\n\
+         \x20   private import EngineWork::*;\n\
+         \x20   private import EngineRelationships::*;\n\n\
          \x20   part obligation{short} : Issue {{\n\
          \x20       :>> id = \"{id}\";\n\
          \x20       :>> title = \"{}\";\n\

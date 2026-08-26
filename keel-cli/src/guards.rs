@@ -593,7 +593,23 @@ fn staged_files(root: &Path) -> Vec<String> {
     staged_changes(root, "ACMR")
 }
 
-/// Staged paths for a given `--diff-filter`, scoped to this project (see below).
+/// Staged paths for a given `--diff-filter`, scoped to this project, with BOTH sides of a rename
+/// and no C-quoting.
+///
+/// TWO CORRECTIONS AN ADVERSARIAL PANEL FOUND, both of which let a locked file change unsigned:
+///
+/// 1. **Renames.** `--name-only` prints only a rename's DESTINATION, and the keystone filter had been
+///    narrowed to `MD`, which excludes `R` entirely. So `sed 's/blocking/warning/' rules.sysml >
+///    rules2.sysml; rm rules.sysml; git add -A` presented git with `R096` — and the guard saw NOTHING.
+///    Every blocking rule in a project could be downgraded to a warning by `git mv`, in a
+///    single-project repo, with no Decision. `--name-status -M` is read instead, and BOTH paths of an
+///    `R` are returned: the source matters (a locked file left its path) and so does the destination
+///    (a locked file arrived carrying modified content).
+/// 2. **Non-ASCII paths.** git C-QUOTES a path containing a non-ASCII byte in this output
+///    (`"pr\303\264j/..."`) while `rev-parse --show-prefix` does NOT, so the prefix comparison below
+///    stripped nothing and a project named `prôj` was invisible to the workspace gate AND to its own
+///    guards — a full rules downgrade there passed. `core.quotePath=false` with `-z` records makes
+///    both sides of that comparison the same bytes.
 fn staged_changes(root: &Path, filter: &str) -> Vec<String> {
     // SCOPED TO THIS PROJECT (D0234/issue271). `git diff --cached` answers for the whole REPOSITORY
     // no matter which subdirectory you ask from, so in a repo holding several keel projects every
@@ -602,10 +618,28 @@ fn staged_changes(root: &Path, filter: &str) -> Vec<String> {
     // `.githooks/pre-commit`, a file belonging to neither. Paths are returned repo-relative, so they
     // are re-based onto the project and anything outside it is dropped.
     let flag = format!("--diff-filter={filter}");
-    let repo_relative = git_stdout(root, &["diff", "--cached", "--name-only", &flag]);
+    // `-c core.quotePath=false` with `-z`: see (2) above. `--name-status -M` so a rename yields BOTH
+    // of its paths: see (1). Records are NUL-separated; an `R`/`C` status is followed by TWO paths.
+    let raw = git_stdout(
+        root,
+        &["-c", "core.quotePath=false", "diff", "--cached", "--name-status", "-M", "-z", &flag],
+    );
+    let mut fields = raw.split('\0').filter(|f| !f.is_empty());
+    let mut repo_relative: Vec<String> = Vec::new();
+    while let Some(status) = fields.next() {
+        let renamed = status.starts_with('R') || status.starts_with('C');
+        let Some(first) = fields.next() else { break };
+        repo_relative.push(first.to_string());
+        if renamed {
+            // BOTH sides. Dropping the source is what let a locked file be edited-and-moved unsigned.
+            if let Some(second) = fields.next() {
+                repo_relative.push(second.to_string());
+            }
+        }
+    }
     let prefix = git_stdout(root, &["rev-parse", "--show-prefix"]).trim().replace('\\', "/");
     repo_relative
-        .lines()
+        .into_iter()
         .map(|l| l.trim().replace('\\', "/"))
         .filter(|l| !l.is_empty())
         .filter_map(|l| {
@@ -638,7 +672,7 @@ pub fn process_change(root: &Path) -> GuardReport {
     // guard and so makes it switchable (the issue242 capture). That transition is caught by
     // `audit-adherence`'s guard-state monotonicity, which ranks CORE above ACTIVE and fails the
     // build on a downgrade (D0209 clause 1) — so the hole is covered, by the check built for it.
-    let changed = staged_changes(root, "MD");
+    let changed = staged_changes(root, "MDR");
     // TWO LISTS, and conflating them was a regression this very guard caught on its author within
     // the minute: what TRIGGERS the lock is a locked file being modified or deleted, but the
     // co-committed Decision that AUTHORISES it is almost always a NEW file — so searching for it in

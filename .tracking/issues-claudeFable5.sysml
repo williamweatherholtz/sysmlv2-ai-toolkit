@@ -664,4 +664,136 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Critical;
     }
     #Resolves dependency from dcKeystoneLockIsAboutChangeNotArrival to issue272;
+
+    part issue273 : Issue {
+        :>> id = "d50fbb2f-4791-4b46-9ba6-24c963180b0c";
+        :>> title = "A git mv bypassed the keystone lock in every repository, opened by my own fix to it the day before";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found by an adversarial panel convened on D0234, by PEDANT-3, within the hour. Yesterday I narrowed the keystone lock from --diff-filter=ACMR to MD so that a freshly scaffolded project could make its first commit (issue272). ACMR had included R. MD does not. So a locked file could be edited and MOVED in one staged change and the guard saw nothing: sed blocking to warning into a new filename, remove the original, git add -A, and git records R096 while the MD filter matches nothing. keel guard process-change reports PASS - 0 scanned. Every blocking rule in a project downgraded to a warning with no signed Decision. REPRODUCED ON A PLAIN SINGLE-PROJECT REPO, so this was live in this repository and in penumbra, not confined to the workspace path I had just built - and I had told the human there was no live exposure, which was wrong. The deeper error was reading --name-only, a projection that prints only a rename's destination, so a filter over it hides one half of the very operation being policed. The same function carried a second blindness the same panelist found: git C-quotes a path containing a non-ASCII byte in this output while rev-parse --show-prefix does not, so a project named with a circumflex was invisible to the workspace gate and to its own guards, and a full rules downgrade there passed. The general lesson is narrower than it looks: I weakened a control and never tested the weakening against the class of change it was supposed to keep catching.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcRenameIsAChange to issue273;
+
+    part issue274 : Issue {
+        :>> id = "1992d2ac-cd65-4bca-8219-589927dbd1d1";
+        :>> title = "Recording an obligation made the tree invalid: the recorder's own file does not validate";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The Stop hook recorded a red-yield obligation and the file it wrote imports only EngineElement, while Issue is defined in EngineWork and the Resolves edge in EngineRelationships. So validate reported a semantic diagnostic - unresolved type reference Issue - the moment the obligation was staged. That is self-defeating twice over: the record exists to say the tree needs a correction pass, and it is itself the thing making the tree incorrect; and it puts the recorder in the one position a recorder must never occupy, unable to record without breaking what it is reporting on. Found while triaging a genuine obligation, so the defect had shipped and had never been exercised - no obligation had been recorded since the template was written.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcObligationRecorderValidates to issue274;
+
+    part issue275 : Issue {
+        :>> id = "06fdbb25-8072-4156-94b1-a004c58c599c";
+        :>> title = "Workspace discovery stops at the first project, so nested and deep projects are invisible and ride out ungated";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Three panelists found this independently. The walk returns the moment a directory is a project and is bounded at depth three, and init refuses neither position, so a project nested inside another or deeper than three is invisible to every workspace-scoped mechanism. Verified: keel init dot then keel init sub in one repo reports a single project; a commit adding an unparseable tracking file plus a downgrade of every blocking rule in the invisible project exits 0 while the gate prints clean, and validate inside that project then fails. Same at depth four. This is the most likely layout for the stated goal - an author whose repo already has a project at the root adding small ones beside it - and it silently collapses all four workspace fixes back to one project. Aggravating: my own unit test asserted exactly this shape as correct, so it pinned the bug as intended behaviour and would have blocked anyone from fixing it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcWorkspaceDiscoveryIsComplete to issue275;
+
+    part issue276 : Issue {
+        :>> id = "eb297eac-6d5a-4cb8-aae4-241e3fdd65c2";
+        :>> title = "The one hook that gates every project in a workspace can be replaced with exit 0, unsigned, and the gate passes";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Two panelists found this independently and I reproduced it. In a workspace the repo-root enforcement surface belongs to no project, and the keystone lock matches project-relative paths, so the root hook and the root workflows directory are covered by no guard at all. Verified: the single pre-commit hook that gates every project replaced with a two-line exit 0, staged alone with no Decision - gate --workspace printed a line NAMING the unowned file and then reported 2 projects gated clean, exit 0. The identical edit in a single-project repo is BLOCKED. The tell is my own output: a gate that reports what it is not checking and passes anyway is the false-green class this session spent its length closing. Also verified: staging the deletion of an entire project, 445 paths including every process definition and its guards, passes the gate silently.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcWorkspaceSurfaceIsOwned to issue276;
+
+    part issue277 : Issue {
+        :>> id = "436d289f-80ea-4a7d-aa77-e51cf29f9022";
+        :>> title = "The compensating control cited for relaxing the keystone lock is blind in the arrangement the same Decision introduced";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "issue272 relaxed the keystone lock to exempt ADDED locked files, and D0234 justified the residual by naming audit-adherence's guard-state monotonicity as the check that catches an added process weakening a core guard. audit-adherence derives its enforcement signature from repo-root-relative pathspecs, which match nothing when projects live one directory down. Verified by two panelists with an identical unsigned rule weakening: single-project repo FAIL exit 1, naming the blocking-to-warning transition; two-project workspace PASS exit 0, both from the repo root and from inside the project. So the relaxation is unconditional while its stated compensation exists only in the single-project case. I weakened one control and justified it by pointing at another without checking that the second worked in the new case - which is the same reasoning error as citing a stub dry run as verification.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcAdherenceIsWorkspaceAware to issue277;
+
+    part issue278 : Issue {
+        :>> id = "c43e2eee-88fc-41f7-b30e-47e9df4904c8";
+        :>> title = "A freshly created workspace is completely ungated, and the remediation message installs a gate that checks nothing";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Three panelists found this. init writes a hook per project and sets core.hooksPath only when its target itself holds a git directory, so git init followed by two keel inits leaves no repo-root hook and no hooksPath - verified, the subsequent commit ran with zero pre-commit lines. init then prints instructions which, followed literally, create a nested repository and destroy the workspace. Worse, the refusal message I added to fix the issue269 vacuous pass advises keel hook pre-commit: that is not a hook event, and at a workspace root it prints nothing and exits 0. Anyone who wires it into a hook installs a gate that passes while checking nothing - issue269 reintroduced inside its own fix, by its own remediation text.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcWorkspaceIsWireable to issue278;
+
+    part issue279 : Issue {
+        :>> id = "6890b896-6150-4179-b4dd-73131e5fb4de";
+        :>> title = "The decision qualifier does not round-trip, so a human's judgment still lands in the wrong project";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Four verified gaps, found across three panelists. The DURABLE marker written into an issue body uses the bare name while every lookup uses the qualified id, so in a workspace no lookup can match what the opener wrote: the standing thread re-posts on every run, the backfill posts a duplicate, and two projects write byte-identical markers - the collision D0234 claims to have removed. The gesture parser drops the qualifier, so a reject naming a qualified id resolves to the bare name and retargets the human's rejection to the ROOT project, while the opener instructs them to type exactly that form. The human-gesture branch of the recorder never calls the splitter, so a fork acceptance - the one decision class that genuinely needs a human - is recorded against the wrong tree or refused outright. And the decider table is read from the repo root, absent in a workspace, so every gesture is answered not-a-declared-decider. My verification tested the join function in isolation and never checked what actually gets written into an issue body.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcChannelQualifierRoundTrips to issue279;
+
+    part issue280 : Issue {
+        :>> id = "9ded8084-48f6-48b9-8f66-9c03df6ce809";
+        :>> title = "keel land gates nothing before the first push, so a broken project leaves the machine";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "D0234's fourth clause claims land gates every project before a push. It does not: land pushes first and only reaches the gate after a REJECTION and merge, so on the success path nothing is gated at all. Verified against a bare remote - a project carrying an unparseable tracking file, committed with the skip flag as any contributor without a configured hook would, then land run from a different project in the same workspace: pushed, exit 0, and the broken file is present in the remote. sync does gate the whole workspace unconditionally; only land is holed. So the Decision asserts a property the code does not have, and the clause I wrote to fix the original complaint about push reconciliation is the one clause that was never implemented on the path that matters.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcLandGatesBeforeThePush to issue280;
+
+    part issue281 : Issue {
+        :>> id = "d02d8a2d-a5ce-44ab-b2ea-bf38d6b71ec5";
+        :>> title = "orient reports an all-green empty state at a workspace root, and validate can answer for another repository";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The issue269 refusal was applied to validate alone; the project predicate has exactly one non-test call site. So at a workspace root orient exits 0 with an empty ready list, zero done, zero outstanding, 100 percent decomposed and answerStatus COMPUTED - and orient is the surface CLAUDE.md makes the AI's only legitimate state read, explicitly forbidding prose substitutes. whats-next prints COMPUTED-EMPTY over zero items, calling it an answer rather than a failure. check-engine prints validated clean over zero files and is a blocking step in this repo's own commit gate. A separate finding on the same theme: find_repo_root has no git boundary while workspace discovery does, so standing in a directory nested under an unrelated keel project, validate with no argument validated the OUTER repository's project and reported it clean.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoCommandReportsGreenOverNothing to issue281;
+
+    part issue282 : Issue {
+        :>> id = "63a56a6e-4ae4-413d-97ab-6f19be9d7d16";
+        :>> title = "Three bodies of the gate with three different bars, and the push gate is the weakest";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The workspace per-project gate runs validate plus guards plus declared rules; the scaffolded pre-commit hook runs validate plus guard plus rules enforce; the sync and land gate runs validate plus guards and no rules at all - that file contains zero occurrences of the word. The declared-rule layer is precisely the one a downstream project uses to add a blocking control without writing Rust, so such a project has its only control enforced at commit and unenforced on the merged tree, which is the class the merged-tree gate exists to catch since a merge can violate an edge rule neither side violated. The sync gate's own doc comment still reads deliberately the SAME entry point the commit hook uses, rather than a parallel definition, and D0234 edited the body underneath that comment while writing a third, fuller definition four hundred lines away.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcOneGateDefinition to issue282;
+
+    part issue283 : Issue {
+        :>> id = "7f257082-8fe5-47f3-813e-6eaacf3d145a";
+        :>> title = "Six claims in the workspace record are wrong, including evidence references that do not resolve";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The facts pedant verified most of D0234 and refuted six claims. byte-identical for a single-project repo is an over-claim: the multi-project predicate gates only message wording, and three changes alter single-project behaviour - the keystone filter, validate's refusal, and staged-path re-basing for a project nested in a larger git repo. verified against both real repositories undercounts by six; there are eight keel repos here. no nested false positives was VACUOUS, because the walk short-circuits at a root project and therefore examined no subdirectory in any of them - the check could not have found a false positive if one existed. The two headline RAN evidence references in the sprint record do not resolve, being commits in scratch repos I deleted, which violates D0129 inside the very receipt mechanism built one day earlier to make a pass re-derivable by someone else. The refusal message names the wrong missing directory. And an unexplained installed-units counter bump rode the commit.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcPanelRecordCorrections to issue283;
+
+    part issue284 : Issue {
+        :>> id = "1cb2a9ed-f269-4102-bb0e-e6b55023caf1";
+        :>> title = "keel projects cannot tell you which project you are in on this platform";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Two panelists found this independently. The command canonicalizes the working directory, which on Windows returns the extended-length prefix with backslashes, while discovery takes the repository root from git in forward-slash form, so the prefix comparison never matches. Verified: run from inside a project, no you-are-here marker is printed and the JSON reports current false for every project - including in all eight real keel repos on this machine. The unit test passes only because it constructs the structure by hand from POSIX literals and never goes through discovery, which is the same hollow-verification shape as the vacuous nested-false-positive check in the same module.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcOwnerOfMatchesOnWindows to issue284;
 }
