@@ -620,4 +620,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcWhichProject to issue268;
+
+    part issue269 : Issue {
+        :>> id = "c8f0d8db-2b83-42d7-8083-14b6f175f156";
+        :>> title = "keel validate reports a clean tree for a directory that is not a keel project at all";
+        :>> createdAt = "2026-08-26";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found while testing whether several keel projects can share one git repo. Pointed at a directory with no .engine, keel validate prints 0 tracking file(s) validated clean and exits 0. That is a vacuous pass on the loudest surface in the engine - validate is the first line of every gate, including the scaffolded pre-commit hook - so a hook placed at a parent directory would gate NOTHING while reporting success, and both projects underneath it would commit unguarded. The two halves of the gate also disagree in that position: guard all correctly FAILS at the same path, so one half treats an absent project as a usage error and the other treats it as a clean tree. This is the same class as the guard-passing-on-an-empty-population defects already recorded (issue250, and claude-surface-drift over zero skills), except it is reachable by a single command with no unusual setup, and the layout that triggers it - a parent repo holding several small keel projects - is one a user would reasonably try.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcValidateRefusesANonProject to issue269;
 }
