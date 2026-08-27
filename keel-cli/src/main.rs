@@ -3055,6 +3055,26 @@ fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
     println!("your project authors its OWN decisions fresh in .engine/decisions/.");
 }
 
+/// The nearest ANCESTOR of `dir` that is already a keel project, if any (issue275).
+///
+/// Strictly an ancestor: `dir` itself is handled by the `.engine/` refusal above, which reports the
+/// overwrite case with its own message. Walks up rather than consulting `workspace::discover`,
+/// because the target may not exist yet and may sit outside any git repository — neither of which
+/// stops it from being inside a project.
+fn enclosing_project(dir: &Path) -> Option<PathBuf> {
+    // `workspace::canon` rather than a bare canonicalize: the raw form carries the `\?\` extended-length
+    // prefix on Windows, and this path is printed to the author.
+    let start = keel_cli::workspace::canon(dir);
+    let mut cur = start.parent();
+    while let Some(p) = cur {
+        if keel_cli::workspace::is_project(p) {
+            return Some(p.to_path_buf());
+        }
+        cur = p.parent();
+    }
+    None
+}
+
 fn cmd_init(args: &[String]) -> i32 {
     const USAGE: &str = "keel init DIR [--profile strict|guided]";
     let target = match positional_arg(args, USAGE, "a directory") {
@@ -3065,6 +3085,20 @@ fn cmd_init(args: &[String]) -> i32 {
     let engine_dst = dir.join(".engine");
     if engine_dst.exists() {
         eprintln!("error: {} already contains a .engine/ — refusing to overwrite", dir.display());
+        return 2;
+    }
+    // issue275: refuse a target INSIDE an existing project. `keel init sub` under a project used to
+    // succeed, and the resulting nested project was invisible to workspace discovery, so it rode out
+    // ungated — discovery now finds it, but the layout still has no owner for the overlapping paths
+    // and nothing about it is what the author meant. Peers, not tenants.
+    if let Some(host) = enclosing_project(&dir) {
+        eprintln!(
+            "error: {} is inside the keel project at {} — refusing to nest one project inside another.",
+            dir.display(),
+            host.display()
+        );
+        eprintln!("  A workspace holds projects as PEERS: create the directory beside the existing");
+        eprintln!("  project, not under it. `keel projects` lists what this repository already holds.");
         return 2;
     }
     // Adoption profile: DECLARED, never inferred (D0174/P0.4 — the issue089/129 lockout class died
