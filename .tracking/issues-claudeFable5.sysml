@@ -862,4 +862,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcMechanismMustBePresent to issue290;
+
+    part issue291 : Issue {
+        :>> id = "2daf9a76-7dd0-4154-b540-bb90e4d3eb1f";
+        :>> title = "record decision in a fresh downstream project allocates D0001 and collides with the shipped reference namespace";
+        :>> createdAt = "2026-08-27";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Observed 2026-08-26 in a fresh downstream project (pdp-gate-review-3q26, keel init vintage of ~2026-08-25): .engine/decisions/ was empty, so 'keel record decision' allocated 0001 -> package Decision0001 / part d0001, which collides with the shipped read-only reference history .engine/reference/decisions/0001-text-files-are-truth.sysml (same package name, same part name). The registry silently merges same-named packages; only guard:duplicate-identity caught it, at commit time (2 violations). Every fresh downstream project's first recorded decision hits this. Downstream workaround applied there: project decisions renumbered into a 1xxx series - which re-collides if the reference history ever reaches 1001. Root fix: allocate past the highest number across BOTH .engine/decisions/ and .engine/reference/decisions/, or give project decisions a distinct package/name scheme; either way, prove it with a test that records the first decision in a scaffolded project and runs guard:duplicate-identity.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from fixDownstreamDecisionNumbering to issue291;
 }

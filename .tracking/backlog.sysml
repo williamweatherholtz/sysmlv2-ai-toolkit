@@ -274,6 +274,8 @@ package EngineBacklog {
         action p4bRulesTravel;
         verification p4bRulesTravelDoD : Test { :>> id = "96a720a3-3520-4f7d-ab85-9d5df533a68d"; :>> method = VerificationMethod::test; :>> procedureText = "DONE MEANS: declared rules export and import with their process unit and the version handshake verifies the destination can evaluate them; a unit that cannot land its rules refuses or loudly degrades with a recorded Issue. Executes under d0183 jointly with d0184."; }
         part p4bRulesTravelDoDR1 : TestResult { :>> id = "fa3a394d-cd0c-4a23-9541-e6a73a21d393"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e2571f8"; :>> judgedAt = "2026-08-21"; :>> judgedBy = "claudeFable5"; }
+        action fixDownstreamDecisionNumbering;
+        verification fixDownstreamDecisionNumberingDoD : Test { :>> id = "d58139a1-a53e-41c4-b0aa-a16cae584869"; :>> method = VerificationMethod::test; :>> procedureText = "In a fresh downstream project (keel init + reference decisions present), keel record decision allocates a number/package that CANNOT collide with the shipped read-only reference namespace (Decision0001../d0001..): either numbering continues past the highest reference decision, or project decisions get a distinct package/name scheme; guard:duplicate-identity stays green on the first recorded decision, demonstrated by a test."; }
     }
 // =================================================================
     // NextWork — the post-bootstrap queue (2026-06-11 handoff). EngineBuild
