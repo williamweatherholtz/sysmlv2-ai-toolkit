@@ -68,8 +68,24 @@ pub fn deciders(root: &Path) -> BTreeMap<String, String> {
 /// Exit code as described. Never panics: an unreadable contract authorises nobody.
 #[must_use]
 pub fn decider_cmd(args: &[String], root: &Path) -> i32 {
+    // `--root PATH` (issue279): the table lives in a PROJECT's `.engine/contracts/`, and in a
+    // workspace the channel runs at the repository root where there IS no project and therefore no
+    // table — so this returned nothing and the channel authorised NOBODY on any project in the repo.
+    // The caller has to be able to ask per project.
+    let override_root = args.iter().position(|a| a == "--root").and_then(|i| args.get(i + 1));
+    let owned = override_root.map(std::path::PathBuf::from);
+    let root: &Path = owned.as_deref().unwrap_or(root);
     let map = deciders(root);
-    let Some(login) = args.iter().find(|a| !a.starts_with("--")) else {
+    // The login is the first bare token that is not `--root`'s VALUE.
+    let Some(login) = args
+        .iter()
+        .enumerate()
+        .filter(|(i, a)| {
+            !a.starts_with("--") && i.checked_sub(1).and_then(|p| args.get(p)).is_none_or(|prev| prev != "--root")
+        })
+        .map(|(_, a)| a)
+        .next()
+    else {
         for (l, a) in &map {
             println!("{l}\t{a}");
         }
@@ -96,6 +112,29 @@ pub fn decider_cmd(args: &[String], root: &Path) -> i32 {
 mod tests {
     use std::path::Path;
 
+    /// issue279: `--root` must override, because the channel runs at a repository root where there is
+    /// no project and therefore no table — and it authorised NOBODY there.
+    #[test]
+    fn the_decider_table_is_resolved_from_the_root_flag_when_given() {
+        let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let repo_s = repo.to_string_lossy().to_string();
+        let declared: Vec<String> = super::deciders(&repo).keys().cloned().collect();
+        let Some(login) = declared.first() else { return }; // no table, nothing to assert
+        // A nonexistent default root MUST NOT be what decides: --root wins.
+        let args = vec!["--root".to_string(), repo_s, login.clone()];
+        assert_eq!(
+            super::decider_cmd(&args, Path::new("/nonexistent-root-that-has-no-table")),
+            0,
+            "--root must override the default root, or a workspace run authorises nobody"
+        );
+        // Without the override, the same login against the same nonexistent root is REFUSED — which
+        // is the safe direction, and is exactly what the workspace root was doing to everyone.
+        assert_eq!(
+            super::decider_cmd(std::slice::from_ref(login), Path::new("/nonexistent-root-that-has-no-table")),
+            1,
+            "no table authorises nobody, never anyone"
+        );
+    }
     #[test]
     fn this_project_declares_its_decider_and_refuses_others() {
         let root = Path::new("..");
@@ -248,14 +287,66 @@ pub fn decision_of(issue_body: &str) -> Option<String> {
 #[must_use]
 pub fn decision_in_gesture(comment_body: &str) -> Option<String> {
     let first = comment_body.lines().next().unwrap_or("");
-    first
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .find(|tok| {
-            tok.len() == 5
-                && tok.starts_with('d')
-                && tok[1..].chars().all(|c| c.is_ascii_digit())
+    for raw in first.split_whitespace() {
+        // Trim surrounding punctuation only. `/`, `-`, `_` and `.` are kept because a project LABEL
+        // is a path relative to the repo root and may contain all four.
+        let tok = raw.trim_matches(|c: char| {
+            !c.is_ascii_alphanumeric() && c != '/' && c != '-' && c != '_' && c != '.'
+        });
+        let (label, tail) = match tok.rsplit_once('/') {
+            Some((l, t)) => (Some(l), t),
+            None => (None, tok),
+        };
+        if !is_decision_name(tail) {
+            continue;
+        }
+        match label {
+            // Unqualified: the root project, which is what every existing issue carries.
+            None => return Some(tail.to_string()),
+            // A loose prefix is not a label: fall through to the next token rather than accept it.
+            Some(l) if is_project_label(l) => return Some(format!("{l}/{tail}")),
+            Some(_) => {}
+        }
+    }
+    None
+}
+
+/// `dNNNN` exactly — `d` then four digits and nothing else attached.
+fn is_decision_name(s: &str) -> bool {
+    s.len() == 5 && s.starts_with('d') && s[1..].chars().all(|c| c.is_ascii_digit())
+}
+
+/// A project label: one or more non-empty path segments of `[A-Za-z0-9._-]`.
+///
+/// Deliberately NOT "anything before the last slash": a loose label would let a reason containing a
+/// path retarget the gesture, and this parser's whole reason for being strict is that a mis-parse
+/// reverses or accepts something the human never named.
+fn is_project_label(s: &str) -> bool {
+    !s.is_empty()
+        && s.split('/').all(|seg| {
+            !seg.is_empty()
+                && seg.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
         })
-        .map(str::to_string)
+}
+
+/// Join a project label and a decision name into the channel id — the INVERSE of
+/// [`split_decision_id`] (D0234/issue279).
+///
+/// Lives here rather than in the channel's Python because it was in the Python, and the two halves
+/// disagreed: the opener wrote the marker BARE while every lookup was QUALIFIED, so in a workspace no
+/// lookup could match what the opener had just written — the standing thread re-posted on every run,
+/// the backfill posted a duplicate, and two projects wrote byte-identical markers, which is the exact
+/// collision the qualifier was added to remove. One implementation, one pair of inverses, one test
+/// (`join_and_split_are_inverses`).
+///
+/// `multi` is false for a single-project repository, where the id stays unqualified so every issue
+/// already open in every existing repo keeps resolving.
+#[must_use]
+pub fn join_decision_id(label: &str, name: &str, multi: bool) -> String {
+    if !multi || label.is_empty() || label == "." {
+        return name.to_string();
+    }
+    format!("{label}/{name}")
 }
 
 /// Split a channel decision id into `(project label, decision name)` (D0234/issue270).
@@ -284,8 +375,20 @@ pub fn split_decision_id(id: &str) -> (Option<String>, String) {
 /// written into, and getting it wrong records their judgment against the wrong project.
 #[must_use]
 pub fn decision_id_cmd(args: &[String]) -> i32 {
+    // `--join LABEL NAME [--multi]` is the other direction, for the channel opener: one
+    // implementation of the pair, because two disagreed (issue279).
+    if args.first().map(String::as_str) == Some("--join") {
+        let (Some(label), Some(name)) = (args.get(1), args.get(2)) else {
+            eprintln!("usage: keel github-decision-id --join <projectLabel> <dNNNN> [--multi]");
+            return 2;
+        };
+        let multi = args.iter().any(|a| a == "--multi");
+        println!("{}", join_decision_id(label, name, multi));
+        return 0;
+    }
     let Some(id) = args.first() else {
         eprintln!("usage: keel github-decision-id <id>    (prints `project<TAB>name`; project is `.` when unqualified)");
+        eprintln!("       keel github-decision-id --join <projectLabel> <dNNNN> [--multi]");
         return 2;
     };
     let (project, name) = split_decision_id(id);
@@ -358,8 +461,43 @@ pub fn gesture_cmd() -> i32 {
 
 #[cfg(test)]
 mod gesture_tests {
-    use super::{already_receipted, decision_in_gesture, decision_of, parse_gesture, split_decision_id, Verdict};
+    use super::{already_receipted, decision_in_gesture, decision_of, join_decision_id, parse_gesture, split_decision_id, Verdict};
 
+    /// issue279: the parser must KEEP the qualifier. It split on every non-alphanumeric character, so
+    /// `alpha/d0001` yielded the bare `d0001` — silently retargeting a human's rejection to the ROOT
+    /// project, while the opener instructed them to type exactly that qualified form.
+    #[test]
+    fn a_gesture_naming_a_qualified_decision_keeps_its_project() {
+        assert_eq!(decision_in_gesture("reject alpha/d0001 too wide"), Some("alpha/d0001".into()));
+        assert_eq!(decision_in_gesture("reject nested/beta/d0042 no"), Some("nested/beta/d0042".into()));
+        // The legacy bare form is untouched: every issue in every existing repo carries it.
+        assert_eq!(decision_in_gesture("reject d0225 too wide"), Some("d0225".into()));
+        // Surrounding punctuation is still trimmed, as it was when this split on non-alphanumerics.
+        assert_eq!(decision_in_gesture("reject (alpha/d0001) nope"), Some("alpha/d0001".into()));
+        // Still strict: nothing else attached, and a loose prefix is not a label.
+        assert_eq!(decision_in_gesture("reject v1d0225x"), None);
+        assert_eq!(decision_in_gesture("see https://x.test/d0001"), None, "a URL is not a project label");
+        assert_eq!(decision_in_gesture("reject //d0001 x"), None, "empty label segments are not a label");
+    }
+
+    /// The pair the channel depends on. Join wrote bare while split read qualified, and nothing
+    /// compared them — so this is the test whose absence let the two writers disagree.
+    #[test]
+    fn join_and_split_are_inverses() {
+        for (label, name) in [("alpha", "d0001"), ("nested/beta", "d0042"), ("a.b-c_d", "d9999")] {
+            let id = join_decision_id(label, name, true);
+            assert_eq!(split_decision_id(&id), (Some(label.to_string()), name.to_string()), "id was {id}");
+            // And what join produces, the gesture parser reads back unchanged.
+            assert_eq!(decision_in_gesture(&format!("reject {id} why")), Some(id.clone()));
+        }
+        // Single-project: unqualified in, unqualified out, root project.
+        let id = join_decision_id(".", "d0231", false);
+        assert_eq!(id, "d0231");
+        assert_eq!(split_decision_id(&id), (None, "d0231".into()));
+        // A root label in a MULTI repo is still unqualified — the root project's ids never gain a
+        // prefix, or every issue it already opened would go unfindable.
+        assert_eq!(join_decision_id(".", "d0007", true), "d0007");
+    }
     #[test]
     fn a_qualified_decision_id_names_its_project_and_an_unqualified_one_means_the_root() {
         // D0234. The split decides which TREE a human's acceptance is written into, so both
@@ -438,5 +576,78 @@ see d0225"), None);
         let bodies = "recorded\nreceipt-for-comment: 12345\nthanks";
         assert!(already_receipted(bodies, "12345"));
         assert!(!already_receipted(bodies, "999"));
+    }
+}
+/// The channel's two SCRIPTS, checked from here (issue279).
+///
+/// Nothing read these files before, and that is precisely how the writer and the reader came to
+/// disagree: the opener wrote the marker BARE while every lookup in the same file used the QUALIFIED
+/// id, and the recorder's human branch never called the splitter its own AUTO branch calls six lines
+/// earlier. Both are one-line facts about a text file, so both are checkable — and a defect that
+/// nothing checks is a defect that ships.
+#[cfg(test)]
+mod channel_script_tests {
+    fn read(rel: &str) -> String {
+        let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join(rel);
+        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("cannot read {}: {e}", p.display()))
+    }
+
+    /// GAP 1, the blocker: what the opener WRITES must be what every lookup READS.
+    #[test]
+    fn the_channel_writes_the_qualified_marker() {
+        let src = read(".github/scripts/open_decision_issues.py");
+        assert!(
+            src.contains("keel-decision: {c['cid']}"),
+            "the opener must write the QUALIFIED channel id into the marker"
+        );
+        assert!(
+            !src.contains("keel-decision: {c['name']}"),
+            "the BARE name in the marker is issue279: no qualified lookup can ever match it, so the \
+             standing thread re-posts every run and two projects write byte-identical markers"
+        );
+    }
+
+    /// GAP 3: the human branch — the one decision class that genuinely needs a human — must split the
+    /// id before accepting, or a fork acceptance lands in the wrong project's tree.
+    #[test]
+    fn the_recorders_human_branch_splits_the_channel_id() {
+        let src = read(".github/scripts/record_decision.sh");
+        assert!(
+            src.contains("github-decision-id \"$AUTO_DECISION\""),
+            "the auto branch splits (it always did)"
+        );
+        assert!(
+            src.contains("github-decision-id \"$decision\""),
+            "the HUMAN branch must split too — it called `keel accept` with the raw channel id"
+        );
+        // And the decider must be resolved AFTER the split, in the project the decision belongs to.
+        let split_at = src.find("github-decision-id \"$decision\"").unwrap_or(0);
+        let decider_at = src.rfind("github-decider \"$COMMENT_USER\"").unwrap_or(0);
+        assert!(
+            decider_at > split_at,
+            "the decider lookup must follow the split: which table authorises this login depends on \
+             which project the decision belongs to"
+        );
+    }
+
+    /// GAP 4: the deciders are read per project, because at a workspace root there is no table.
+    #[test]
+    fn the_channel_reads_deciders_per_project() {
+        let src = read(".github/scripts/open_decision_issues.py");
+        assert!(
+            src.contains("\"github-decider\", \"--root\", root"),
+            "deciders must be read from each project's own table, not from the repository root"
+        );
+    }
+
+    /// GAP 2's other half: the opener does not carry its own copy of the join any more, so it cannot
+    /// drift from the split again.
+    #[test]
+    fn the_channel_delegates_the_join_to_the_binary() {
+        let src = read(".github/scripts/open_decision_issues.py");
+        assert!(
+            src.contains("github-decision-id\", \"--join\""),
+            "the join belongs to the binary, beside the split it must invert"
+        );
     }
 }

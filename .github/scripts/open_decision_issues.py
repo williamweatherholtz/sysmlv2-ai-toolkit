@@ -31,14 +31,26 @@ def gh(args, check=False):
 def decider_logins():
     """The declared deciders, from the committed table via the binary (D0219).
 
-    REPO_OWNER was WRONG, not merely inflexible: `github.repository_owner` is not a person. For an
-    org-owned repo like asirobots/penumbra it is the ORG, and `gh issue create --assignee <org>`
-    fails outright - the mechanism would break on the first adoption rather than degrade. Assignment
-    is a convenience; the `decision` label is what makes an issue findable, so with no declared
-    decider we assign nobody and still open the issue.
+    Read from EVERY project in the repository (issue279). The table lives in a project's
+    `.engine/contracts/github-actors.toml`, and at a workspace root there is no project and therefore
+    no table - so this returned nothing and the channel assigned NOBODY, authorising no one to decide
+    on any project in the repo. A decider declared by any project in this repository may be assigned
+    a fork issue raised from it; who may RECORD against a given project is re-checked, per project, by
+    the recorder.
+
+    If the table is absent everywhere we assign nobody and still open the issue - never "anyone", and
+    never the repo owner (provenance is never defaulted, issue182).
     """
-    out = subprocess.run(["./target/release/keel", "github-decider"], capture_output=True, text=True, check=False)
-    return [l.split("	")[0] for l in out.stdout.splitlines() if l.strip()]
+    logins = []
+    for root in [p.get("root", ".") for p in workspace().get("projects", [])] or ["."]:
+        out = subprocess.run(["./target/release/keel", "github-decider", "--root", root],
+                             capture_output=True, text=True, check=False)
+        for line in out.stdout.splitlines():
+            if line.strip():
+                login = line.split("\t")[0]
+                if login not in logins:
+                    logins.append(login)
+    return logins
 
 
 def assignee_args():
@@ -212,8 +224,21 @@ def workspace() -> dict:
 
 
 def qualify(label: str, name: str, multi: bool) -> str:
-    """The channel's id for a decision: `alpha/d0001` in a workspace, `d0001` when alone."""
-    return (label.rstrip("/") + "/" + name) if (multi and label not in (".", "")) else name
+    """The channel id for a decision, from the BINARY (issue279).
+
+    This used to be arithmetic here while `split_decision_id` lived in Rust, and the pair disagreed.
+    One implementation, one pair of inverses, pinned by `join_and_split_are_inverses` in github.rs.
+    """
+    args = ["./target/release/keel", "github-decision-id", "--join", label or ".", name]
+    if multi:
+        args.append("--multi")
+    out = subprocess.run(args, capture_output=True, text=True, check=False)
+    joined = out.stdout.strip()
+    # Fail LOUD rather than silently falling back to the bare name: a bare id in a workspace is the
+    # collision this whole change is about, so a broken binary must stop the run, not degrade it.
+    if not joined:
+        raise SystemExit(f"qualify: `keel github-decision-id --join` produced nothing for {label}/{name}")
+    return joined
 
 
 def main() -> None:
@@ -261,7 +286,13 @@ def main() -> None:
             continue
         research = c.get("research", "").strip()
         body = (
-            f"<!-- keel-decision: {c['name']} -->\n\n"
+            # QUALIFIED (issue279). This wrote `c['name']` - the BARE id - while every lookup in
+            # this file uses `c['cid']`, so in a workspace no lookup could match what this had just
+            # written: the standing thread re-posted on every run, the backfill posted a duplicate,
+            # and two projects wrote byte-identical markers, which is the exact collision the
+            # qualifier exists to remove. `ensure_override_threads` already wrote the qualified form,
+            # so the two writers in this one file also disagreed with each other.
+            f"<!-- keel-decision: {c['cid']} -->\n\n"
             f"**Why it came up:** {c['context']}\n\n"
             f"**What is being decided:** {c['decision']}\n\n"
             + (f"**Research:** {research}\n\n" if research else "")

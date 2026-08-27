@@ -68,16 +68,15 @@ fi
 # `grep -oE` for the decision marker, a `case` with a locale-dependent `tr` parsing the gesture, and
 # a receipt scan. All of it is deterministic text work, so it belongs where it can be unit-tested.
 # The comment body still arrives ONLY by env and is never interpolated into a shell command.
-actor=$("$KEEL" github-decider "$COMMENT_USER" 2>/dev/null || true)
-if [ -z "$actor" ]; then
-  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not a declared decider in .engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted)."
-  exit 0
-fi
+# The decider is resolved AFTER the decision is known (issue279) - see below. It cannot be resolved
+# here, because which table authorises this login depends on which PROJECT the decision belongs to,
+# and that is not known until the gesture is parsed and its id split.
 
 issue_body=$(gh issue view "$ISSUE_NUMBER" --json body --jq .body)
 comment_bodies=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body')
 gesture=$(COMMENT_BODY="$COMMENT_BODY" ISSUE_BODY="$issue_body" COMMENT_ID="$COMMENT_ID"           COMMENT_BODIES="$comment_bodies" "$KEEL" github-gesture) || {
-  first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
+  first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '
+')
   gh issue comment "$ISSUE_NUMBER" --body "Didn't parse \`$first_line\` - reply with just the option letter (e.g. \`B\`), or \`accept\`, or \`reject <why>\`."
   exit 0
 }
@@ -85,10 +84,35 @@ decision=$(printf '%s' "$gesture" | jq -r .decision)
 verdict=$(printf '%s' "$gesture" | jq -r .verdict)
 option=$(printf '%s' "$gesture" | jq -r .option)
 reason=$(printf '%s' "$gesture" | jq -r .reason)
-first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '')
+first_line=$(printf '%s' "$COMMENT_BODY" | head -1 | tr -d '
+')
 
 if [ -z "$decision" ]; then
   gh issue comment "$ISSUE_NUMBER" --body "This issue carries no keel-decision marker - nothing recorded."
+  exit 0
+fi
+
+# WORKSPACE (D0234/issue279): split the channel id EXACTLY as the AUTO branch does. This branch did
+# not, so a qualified id reached `keel accept` whole and was refused - or, once the gesture parser
+# dropped the qualifier, was recorded against the ROOT project's tree instead. That is a HUMAN's
+# judgment written against the wrong project, which is the one outcome this whole split exists to
+# prevent, and it was the fork branch - the single decision class that genuinely needs a human.
+split=$("$KEEL" github-decision-id "$decision")
+proj=$(printf '%s' "$split" | cut -f1)
+decision=$(printf '%s' "$split" | cut -f2)
+if [ "$proj" != "." ]; then
+  echo "recorder: decision belongs to project '$proj' - recording there"
+  cd "$proj" || { echo "recorder: cannot enter '$proj'"; exit 1; }
+  KEEL="$(cd "$OLDPWD" && pwd)/${KEEL#./}"
+fi
+
+# -- who may decide, resolved IN THE PROJECT the decision belongs to (issue279) -----------------
+# The table lives in that project's .engine/contracts/github-actors.toml. Asking at the repository
+# root in a workspace found no table and therefore authorised nobody; asking the ROOT project's table
+# about another project's decision would be the mirror error - authorising against the wrong tree.
+actor=$("$KEEL" github-decider "$COMMENT_USER" 2>/dev/null || true)
+if [ -z "$actor" ]; then
+  gh issue comment "$ISSUE_NUMBER" --body "GitHub login \`$COMMENT_USER\` is not a declared decider in ${proj}/.engine/contracts/github-actors.toml - nothing recorded (provenance is never defaulted)."
   exit 0
 fi
 if [ "$(printf '%s' "$gesture" | jq -r .alreadyReceipted)" = "true" ]; then
