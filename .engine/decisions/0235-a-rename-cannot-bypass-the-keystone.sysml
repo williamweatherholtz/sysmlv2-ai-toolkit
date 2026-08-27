@@ -24,4 +24,10 @@ package Decision0235 {
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0235Accept : Test { :>> id = "eb0416ec-16ec-4f05-b9a2-d8ae76ec37ca"; :>> method = VerificationMethod::confirmation; :>> procedureText = "agreed with panel's decisions [recorded by the human in the keel console, stated by them on 2026-08-26 when asked which surface they used - their words above are unaltered; this bracket is the CHANNEL citation delegatedAcceptanceSubstanceRule requires, and the console now appends it automatically (issue287)]"; }
     part d0235AcceptR1 : TestResult { :>> id = "0bcf922e-48b4-47c9-a006-919dad1a16e2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ddba1cd"; :>> judgedAt = "2026-08-26"; :>> judgedBy = "wweatherholtz"; }
+    // MERGE 2026-08-27 (keel sync keep-both rule): the same acceptance also fired through the GitHub
+    // standing-consent channel (D0207) before the console record above was pushed. Same verdict, same
+    // judge, same day, different channel - both facts kept; the standing-consent pair renamed so names
+    // do not collide. The console record above is the individually-reviewed acceptance.
+    verification d0235AcceptStanding : Test { :>> id = "fe95dae1-c332-40e7-a55e-83bb8bcd0f16"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/29."; }
+    part d0235AcceptStandingR1 : TestResult { :>> id = "25851b03-1ea5-45e6-8615-479971cd31d5"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ddba1cd"; :>> judgedAt = "2026-08-26"; :>> judgedBy = "wweatherholtz"; }
 }
