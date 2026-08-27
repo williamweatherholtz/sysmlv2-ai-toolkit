@@ -65,7 +65,7 @@ const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry
 /// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
 /// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
 /// path (D0175's fence). POSIX sh.
-const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\n# WORKSPACE (D0234). git allows ONE core.hooksPath per repository, so in a repo holding several keel\n# projects a per-project hook can only ever gate one of them. When this hook's directory is NOT\n# itself a project, it is a workspace root: gate every project the commit touches, in one call.\n# A single-project repo falls through to the branch below, identical to before this existed.\nif [ ! -d .engine ]; then\n  echo 'pre-commit: workspace root - gating every project this commit touches'\n  \"$KEEL\" gate --workspace . || { echo 'pre-commit: WORKSPACE gate FAILED - commit aborted'; exit 1; }\n  exit 0\nfi\necho 'pre-commit: keel validate .'\n\"$KEEL\" validate . || { echo 'pre-commit: keel validate FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel guard'\n\"$KEEL\" guard || { echo 'pre-commit: keel guard FAILED — commit aborted'; exit 1; }\necho 'pre-commit: keel rules --enforce'\n\"$KEEL\" rules --enforce || { echo 'pre-commit: DECLARED RULES FAILED — commit aborted'; exit 1; }\n";
+const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\n# THE GATE IS WORKSPACE-SCOPED, ALWAYS (D0234/issue278). git allows ONE core.hooksPath per\n# repository, so a hook inside a project directory can never gate a sibling project - which is\n# why this hook is installed at the REPOSITORY ROOT. It used to branch on `[ ! -d .engine ]` to\n# decide whether it was at a workspace root; that test is wrong for the commonest layout, a repo\n# whose root is itself a project with peers beside it, where .engine exists and every peer\n# therefore rode out UNGATED. `keel gate --workspace` gates every project the commit touches and\n# is identical to the old single-project path when the repo holds exactly one project.\necho 'pre-commit: keel gate --workspace (every project this commit touches)'\n\"$KEEL\" gate --workspace . || { echo 'pre-commit: keel gate FAILED — commit aborted'; exit 1; }\n";
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -180,7 +180,11 @@ fn cmd_validate(args: &[String]) -> i32 {
             for p in &ws.projects {
                 eprintln!("    keel validate {}", ws.label(p));
             }
-            eprintln!("  To gate the whole workspace at once, use `keel hook pre-commit` (D0234).");
+            // issue278: this used to advise `keel hook pre-commit`, which is not a hook event -
+            // at a workspace root it prints nothing and exits 0, so anyone who wired it in
+            // installed a gate that passes while checking nothing. Name the real command.
+            eprintln!("  To gate every project in this repository, run `keel gate --workspace .`");
+            eprintln!("  (that is what the scaffolded .githooks/pre-commit at the REPO ROOT runs).");
         } else {
             eprintln!("  Validating a directory that is not a project would report a clean tree over zero");
             eprintln!("  files, which is how a gate passes while checking nothing (issue269).");
@@ -2989,6 +2993,65 @@ fn positional_arg<'a>(args: &'a [String], usage: &str, what: &str) -> Result<&'a
     Ok(first)
 }
 
+/// Write the scaffolded pre-commit gate at `repo_root` and arm `core.hooksPath` there (issue278).
+///
+/// `repo_root` is the git repository root, which is the only place a hook can be invoked from, and
+/// `project` is the project just scaffolded — used only to say which one armed the gate.
+///
+/// An EXISTING hook is never overwritten. In a workspace the repo-root hook is shared, so a second
+/// `keel init` would be silently replacing a file the first project (or a human) owns — D0108: a
+/// non-owner may add, never overwrite in place. The scaffolded body is workspace-scoped and needs no
+/// per-project edit, so an existing keel hook already covers the new project; anything else is the
+/// author's own gate and is reported rather than clobbered.
+fn install_commit_gate(repo_root: &Path, project: &Path) -> Result<(), i32> {
+    let hooks = repo_root.join(".githooks");
+    if let Err(e) = std::fs::create_dir_all(&hooks) {
+        eprintln!("error creating {}: {e}", hooks.display());
+        return Err(1);
+    }
+    let hook_path = hooks.join("pre-commit");
+    let existed = hook_path.exists();
+    if existed {
+        let body = std::fs::read_to_string(&hook_path).unwrap_or_default();
+        if body.contains("gate --workspace") {
+            println!("commit gate already installed at {} — it is workspace-scoped and covers this project too.", hook_path.display());
+        } else {
+            println!("NOTE: {} exists and is not the scaffolded keel gate — left untouched.", hook_path.display());
+            println!("  Add `keel gate --workspace .` to it, or this project is not gated at commit.");
+        }
+    } else {
+        if let Err(e) = std::fs::write(&hook_path, PRECOMMIT_HOOK) {
+            eprintln!("error writing {}: {e}", hook_path.display());
+            return Err(1);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let _ = std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o755));
+        }
+        println!("commit gate written to {} (workspace-scoped).", hook_path.display());
+    }
+    // Arm it. Without this the hook is a file nothing runs — the K2 failure the drift warning exists
+    // for. Armed HERE rather than left to the printed next-steps, because the step a newcomer is most
+    // likely to skip is the one that turns the gate on.
+    if repo_root.join(".git").exists() {
+        let _ = keel_cli::gitx::git()
+            .arg("-C")
+            .arg(repo_root)
+            .args(["config", "core.hooksPath", ".githooks"])
+            .status();
+        println!("core.hooksPath set to .githooks in {} (the gate is live).", repo_root.display());
+    } else {
+        println!("NOTE: {} is not a git repository yet — the gate is written but NOT ARMED.", repo_root.display());
+        println!("  Run `git init` HERE (not inside the project) and then:");
+        println!("    git -C {} config core.hooksPath .githooks", repo_root.display());
+    }
+    if project != repo_root {
+        println!("  (the gate lives at the repository root because git allows one hooks path per repo)");
+    }
+    Ok(())
+}
+
 /// The D0174/P0 slice of `init`: the declared adoption-profile fact, the `.claude/` enforcement
 /// surface (five hook events, output style, per-registry skills), the optional CI template, and
 /// wiring `core.hooksPath` when a `.git` exists.
@@ -3024,10 +3087,9 @@ declaredAt = \"{}\"
         eprintln!("error writing CI template: {e}");
         return Err(1);
     }
-    if dir.join(".git").exists() {
-        let _ = keel_cli::gitx::git().arg("-C").arg(dir).args(["config", "core.hooksPath", ".githooks"]).status();
-        println!("core.hooksPath set to .githooks (the commit gate is live).");
-    }
+    // `core.hooksPath` is armed by `install_commit_gate` against the REPOSITORY root (issue278).
+    // It used to be armed here against the project directory, which is the wrong repository whenever
+    // the project is a workspace peer.
     Ok(())
 }
 
@@ -3040,7 +3102,18 @@ fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
     println!();
     println!("Next:");
     println!("  1. cd {}", dir.display());
-    println!("  2. git init && git config core.hooksPath .githooks   (enable the keel pre-commit gate)");
+    // issue278: this step used to read `git init && git config core.hooksPath .githooks`. Followed
+    // literally from inside a workspace peer — which step 1 has just put the reader in — `git init`
+    // creates a NESTED repository and destroys the workspace: the peer stops being part of the repo
+    // whose hook and push cover it. `install_commit_gate` now arms the gate against the repository
+    // root at init time, so the step is a check rather than an instruction to run blind.
+    if std::path::Path::new(".git").exists() || dir.join(".git").exists() {
+        println!("  2. The commit gate is already armed (see above). Confirm: git config core.hooksPath");
+    } else {
+        println!("  2. `git init` AT THE REPOSITORY ROOT — not inside this project if it is one of");
+        println!("     several in a shared repo, where a nested repo would take it out of the workspace.");
+        println!("     Then re-run `keel init` here, or arm it by hand: git config core.hooksPath .githooks");
+    }
     println!("  3. Read CLAUDE.md — how to work here (text is truth; the AI drives the CLI, you supervise).");
     // D0225: the two are sequenced, not alternatives. `project-onboarding` decides WHICH disciplines
     // this project runs; `introduction` walks the author through running one. Naming only the second
@@ -3050,9 +3123,38 @@ fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
     println!("  5. Then the `introduction` skill — capture your first need + run your first sprint.");
     println!("     Or: keel orient .   (where things stand)");
     println!();
-    println!("The .githooks/pre-commit gate runs `keel validate` + `keel guard` (Rust-only, no kernel).");
+    println!("The pre-commit gate at the REPOSITORY ROOT runs `keel gate --workspace` — validate + guard +");
+    println!("declared rules, for every project the commit touches (Rust-only, no kernel).");
     println!("Engine design rationale is read-only reference in .engine/reference/decisions/;");
     println!("your project authors its OWN decisions fresh in .engine/decisions/.");
+}
+
+/// Refuse an `init` target INSIDE an existing project, reporting why (issue275). `true` = refused.
+///
+/// `keel init sub` under a project used to succeed, and the resulting nested project was invisible to
+/// workspace discovery, so it rode out UNGATED. Discovery now finds it, but the layout still leaves
+/// overlapping paths with two claimants and is not what any author means. Peers, not tenants.
+fn refuse_nested_target(dir: &Path) -> bool {
+    let Some(host) = enclosing_project(dir) else { return false };
+    eprintln!(
+        "error: {} is inside the keel project at {} — refusing to nest one project inside another.",
+        dir.display(),
+        host.display()
+    );
+    eprintln!("  A workspace holds projects as PEERS: create the directory beside the existing");
+    eprintln!("  project, not under it. `keel projects` lists what this repository already holds.");
+    // The host may BE the repository root, in which case there is no "beside" inside this repo at
+    // all. Say so rather than leaving the author to discover it by trying: a workspace is peers in
+    // subdirectories with no project at the root, which is the layout the request behind D0234
+    // described — "a parent folder repo, then separate keel projects in subfolders".
+    if host.join(".git").exists() {
+        eprintln!();
+        eprintln!("  {} is the REPOSITORY ROOT, so this repo has no room for a peer:", host.display());
+        eprintln!("  a workspace is projects in subdirectories with none at the root. Either");
+        eprintln!("    - give this project its own repository (usually the right answer), or");
+        eprintln!("    - move the existing project into a subdirectory first, then init peers beside it.");
+    }
+    true
 }
 
 /// The nearest ANCESTOR of `dir` that is already a keel project, if any (issue275).
@@ -3062,9 +3164,20 @@ fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
 /// because the target may not exist yet and may sit outside any git repository — neither of which
 /// stops it from being inside a project.
 fn enclosing_project(dir: &Path) -> Option<PathBuf> {
-    // `workspace::canon` rather than a bare canonicalize: the raw form carries the `\?\` extended-length
-    // prefix on Windows, and this path is printed to the author.
-    let start = keel_cli::workspace::canon(dir);
+    // ABSOLUTISE FIRST. `init`'s target normally does not exist yet — that is the point of init — so
+    // `canonicalize` fails and returns the argument unchanged. For a relative target like `sub`, its
+    // parent is then the EMPTY path, and `is_project("")` silently tests the PROCESS's current
+    // directory rather than the target's parent: the refusal printed the host project as an empty
+    // string, and from another cwd it would have answered about a different directory entirely.
+    //
+    // `workspace::canon` rather than a bare canonicalize because the raw form carries the `\?\`
+    // extended-length prefix on Windows, and this path is printed to the author.
+    let abs = if dir.is_absolute() {
+        dir.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(dir)
+    };
+    let start = keel_cli::workspace::canon(&abs);
     let mut cur = start.parent();
     while let Some(p) = cur {
         if keel_cli::workspace::is_project(p) {
@@ -3087,18 +3200,7 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error: {} already contains a .engine/ — refusing to overwrite", dir.display());
         return 2;
     }
-    // issue275: refuse a target INSIDE an existing project. `keel init sub` under a project used to
-    // succeed, and the resulting nested project was invisible to workspace discovery, so it rode out
-    // ungated — discovery now finds it, but the layout still has no owner for the overlapping paths
-    // and nothing about it is what the author meant. Peers, not tenants.
-    if let Some(host) = enclosing_project(&dir) {
-        eprintln!(
-            "error: {} is inside the keel project at {} — refusing to nest one project inside another.",
-            dir.display(),
-            host.display()
-        );
-        eprintln!("  A workspace holds projects as PEERS: create the directory beside the existing");
-        eprintln!("  project, not under it. `keel projects` lists what this repository already holds.");
+    if refuse_nested_target(&dir) {
         return 2;
     }
     // Adoption profile: DECLARED, never inferred (D0174/P0.4 — the issue089/129 lockout class died
@@ -3164,23 +3266,26 @@ fn cmd_init(args: &[String]) -> i32 {
         eprintln!("error writing .tracking/actors.sysml: {e}");
         return 1;
     }
-    // Scaffold a RUST-ONLY commit gate (.githooks/pre-commit) so the project has an automated
-    // keel validate/guard gate from day one — no conda/kernel (D0048). The user enables it with
-    // `git config core.hooksPath .githooks` (printed below).
-    let hooks = dir.join(".githooks");
-    if let Err(e) = std::fs::create_dir_all(&hooks) {
-        eprintln!("error creating .githooks: {e}");
-        return 1;
-    }
-    let hook_path = hooks.join("pre-commit");
-    if let Err(e) = std::fs::write(&hook_path, PRECOMMIT_HOOK) {
-        eprintln!("error writing .githooks/pre-commit: {e}");
-        return 1;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        let _ = std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o755));
+    // Scaffold a RUST-ONLY commit gate so the project has an automated gate from day one — no
+    // conda/kernel (D0048).
+    //
+    // The hook belongs to the REPOSITORY, not the project (issue278). git allows one
+    // `core.hooksPath` per repository, so a hook written inside a project directory can never be
+    // invoked for a sibling — and `git init` followed by two `keel init`s left no repo-root hook and
+    // no hooksPath at all, so the whole workspace was UNGATED and the subsequent commit ran with zero
+    // pre-commit lines. Verified before the fix.
+    let repo_root = keel_cli::gitx::git()
+        .arg("-C")
+        .arg(&dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
+        .filter(|p| p.is_dir())
+        .map_or_else(|| dir.clone(), |p| keel_cli::workspace::canon(&p));
+    if let Err(code) = install_commit_gate(&repo_root, &dir) {
+        return code;
     }
     if let Err(code) = init_enforcement_surface(&dir, &engine_dst, &profile) {
         return code;

@@ -107,7 +107,19 @@ fn init_scaffolds_a_working_project() {
 
     // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel validate/guard; NO conda/kernel).
     let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
-    assert!(hook.contains("keel") && hook.contains("validate") && hook.contains("guard"), "pre-commit gate missing keel validate/guard");
+    // issue278: the body is now ONE workspace-scoped call. `gate --workspace` runs validate + guard +
+    // declared rules per project it gates, so naming the sub-steps here would pin an implementation
+    // detail of the gate rather than the property — that the hook invokes keel's gate at all.
+    assert!(
+        hook.contains("keel") && hook.contains("gate --workspace"),
+        "pre-commit gate must invoke keel gate --workspace: {hook}"
+    );
+    // The CONSTRUCT, not the phrase: the hook's comment explains what it used to branch on, so
+    // matching the bare test would fail on the explanation of its own removal.
+    assert!(
+        !hook.contains("if [ ! -d .engine ]; then"),
+        "the workspace-root test was wrong for a repo whose root is itself a project (issue278)"
+    );
     assert!(!hook.contains("conda") && !hook.contains("python") && !hook.contains(".py"), "pre-commit gate must be kernel-free (no conda/python)");
     // introductionDryRun: a starter actor registry must ship so the newcomer's first recorded fact passes the actors guard.
     assert!(dir.join(".tracking").join("actors.sysml").is_file(), ".tracking/actors.sysml not scaffolded (newcomer can't record facts)");
