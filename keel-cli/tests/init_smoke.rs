@@ -131,6 +131,57 @@ fn init_scaffolds_a_working_project() {
     // 5. re-init refuses to overwrite (exit 2, non-success) — never clobbers existing work.
     let out = keel().args(["init", proj]).output().expect("run keel init again");
     assert!(!out.status.success(), "re-init should refuse to overwrite an existing .engine/");
+
+    // 6. issue291/issue292: the scaffold survives the project RECORDING A FACT.
+    //
+    // Steps 1-5 assert init-then-read, which is the one state in which an entire defect class is
+    // invisible: a collision between the shipped scaffold and a fact the project authors cannot
+    // appear until a fact is authored. It shipped, and a field project hit it on its FIRST recorded
+    // decision — `.engine/decisions/` starts empty, `next_decision_number` scans only that directory,
+    // so the project allocated `package Decision0001`/`part d0001` against the 236 reference decisions
+    // remapped in by init. `validate` and `check-engine` both reported clean; only duplicate-identity
+    // caught it, naming the read-only reference file as the offender.
+    //
+    // Sprint 104's own retro NAMED this control ("an init smoke-test in CI that scaffolds + guards a
+    // temp project") and declined to track it, judging the risk low. That is the D0047 failure mode
+    // exactly: a lesson logged instead of a control built. So the control is the recording itself —
+    // not an assertion about decision numbering, which would only catch the one symptom.
+    let out = keel()
+        .args([
+            "record", "decision", "--root", proj,
+            "--slug", "how-we-will-track-work",
+            "--title", "how this project will track its work",
+            "--date", "2026-01-02",
+            "--context", "A new project has to choose where its record of decisions lives.",
+            "--decision", "Decisions are authored as text files in this repository.",
+            "--rationale", "Text diffs, reviews, and survives a change of tooling.",
+            "--consequences", "Every decision is a file, and the gate reads it.",
+        ])
+        .env("KEEL_ACTOR", "smokeTestActor")
+        .output()
+        .expect("run keel record decision");
+    assert!(
+        out.status.success(),
+        "a fresh project could not record its first decision: {}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // The gate must still be green with that fact in the tree — this is the assertion that fails on
+    // the issue291 shape, and would fail on any future scaffold artifact that collides with an
+    // authored one.
+    let out = keel().args(["guard", "all", proj]).output().expect("run keel guard after recording");
+    assert!(
+        out.status.success(),
+        "the gate went red once the fresh project recorded a decision: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let out = keel().args(["validate", proj]).output().expect("run keel validate after recording");
+    assert!(
+        out.status.success(),
+        "validate went red once the fresh project recorded a decision: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
 }
 
 /// Every file under `dir`, recursively. The registry is a DIRECTORY since D0222, so the count this
