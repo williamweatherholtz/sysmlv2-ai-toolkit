@@ -220,6 +220,29 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     // worse than a contention), but the actor must SEE the contention at the moment it becomes real
     // and record the Issue for human adjudication (D0108) rather than discover it at integration.
     warn_if_landing_on_held_items(repo, &branch);
+    // GATE BEFORE THE FIRST PUSH (issue280). This loop used to push FIRST and only reach the gate
+    // after a REJECTION, so on the success path — the common path — NOTHING was gated and a broken
+    // project left the machine. D0234 clause 4 asserted that `land` gates every project before a
+    // push; it was the one clause never implemented, on the path that matters. Verified against a
+    // bare remote before this existed: a project carrying an unparseable tracking file, committed
+    // with the skip flag as any contributor without a configured hook would, then `land` run from a
+    // DIFFERENT project in the same workspace — pushed, exit 0, and the broken file present in the
+    // remote.
+    //
+    // `gate_passes` is workspace-wide because a push carries the WHOLE repository, so gating the
+    // project you happen to stand in and pushing the rest is exactly the hole (D0234).
+    if let Err(problems) = gate_passes(repo) {
+        eprintln!("keel land: the tree does not pass the gate ({} problem(s)) — REFUSING to push:", problems.len());
+        for p in problems.iter().take(10) {
+            eprintln!("    {p}");
+        }
+        if problems.len() > 10 {
+            eprintln!("    ... and {} more", problems.len() - 10);
+        }
+        eprintln!("  A push carries the whole repository, so this covers EVERY project in it — not just");
+        eprintln!("  the one you are standing in. Fix the tree, commit, and re-run. Nothing was pushed.");
+        return 1;
+    }
     for attempt in 1..=max_attempts {
         println!("keel land: pushing {branch} -> origin (attempt {attempt}/{max_attempts})");
         if git(repo, &["push", "origin", &branch]).is_ok() {

@@ -148,8 +148,9 @@ frozen (modify it only by out-of-band Decision).
   because `dNNNN` is unique only per project. A single-project repo is unaffected throughout.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
 - **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook.** `sync` fetches, reports divergence,
-  integrates by **merge**, and gates the result; `land` pushes and, on rejection, merges and **gates the
-  MERGED tree** before retrying — two contributions that pass alone can fail together. `orient` reports
+  integrates by **merge**, and gates the result; `land` **gates before the first push** (workspace-wide —
+  a push carries the whole repository, issue280) and, on rejection, merges and **gates the MERGED tree**
+  before retrying — two contributions that pass alone can fail together. `orient` reports
   its own `sync` position, so every computed answer states the tree it was computed against.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
