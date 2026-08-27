@@ -3,8 +3,11 @@
 // scaffolds a NEW project from a binary-EMBEDDED engine tree (include_dir!, the cytoscape-vendoring
 // precedent): .engine/ + CLAUDE.md + a starter .tracking/ + a printed getting-started. RESOLVES the
 // engine/instance boundary CONCRETELY (the d0093 critique's delegated concern): the engine's
-// architecture decisions remap to read-only .engine/reference/decisions/ (NOT scanned as instance —
-// the rust views scan .engine/decisions), .engine/decisions/ ships EMPTY for the new project's own,
+// architecture decisions remap to read-only .engine/reference/decisions/ — a PATH boundary only:
+// this sprint claimed they are "NOT scanned as instance" and that was never true (collect_sysml has
+// no exclusions), which is the root of issue291 and issue292; D0237 renamed the reference PACKAGE so
+// the two namespaces cannot collide, and scoping the copy out of the model is still open —
+// .engine/decisions/ ships EMPTY for the new project's own,
 // and the instance-specific deliverable-manifest.txt is reset to a starter. Verified live: a fresh
 // `init` project validates clean + guards ALL PASS + shows 0 instance decisions.
 // Total: 5 pts  Ceremony: AUTONOMOUS (D0049).

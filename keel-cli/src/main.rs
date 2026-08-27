@@ -2847,7 +2847,7 @@ fn cmd_apply_review(args: &[String]) -> i32 {
 // The scaffold path rules live in `migrate` — `keel migrate` resyncs a downstream `.engine/` from
 // this same embedded tree, so it must map and exclude paths identically to `keel init` or a migrated
 // project would differ from a freshly inited one. One definition, both callers.
-use keel_cli::migrate::{is_engine_dev_only, remap_engine_path};
+use keel_cli::migrate::{is_engine_dev_only, remap_engine_content, remap_engine_path};
 
 /// The `.engine/contracts/` files that are THIS project's instance data rather than engine definition
 /// (issue243). `keel init` must reset these, not copy them: an adoption declaration and a set of
@@ -2936,6 +2936,13 @@ fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) 
         // IDENTITIES for units the new project never exported, so an `import --update` could match
         // against a lineage that is not its own. Reset to a starter, exactly as the manifest already is.
         std::fs::write(&dst, starter_for(rel))?;
+    } else if let Some(text) = std::str::from_utf8(f.contents())
+        .ok()
+        .and_then(|s| remap_engine_content(rel, s))
+    {
+        // issue291: the reference copy's package is renamed so the project's own first decision
+        // cannot collide with it. See `remap_engine_content`.
+        std::fs::write(&dst, text)?;
     } else {
         std::fs::write(&dst, f.contents())?;
     }
@@ -3891,7 +3898,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{bash_classify, bash_tokens, classify_guard_args, remap_engine_path, root_arg, BashVerdict, Path};
+    use super::{bash_classify, bash_tokens, classify_guard_args, remap_engine_content, remap_engine_path, root_arg, BashVerdict, Path};
 
     /// D0176/P1.2: argv-level matching — operators as tokens, never substrings of prose. A commit
     /// message DESCRIBING --no-verify does not match; the real flag does; the keel carve-out
@@ -4007,9 +4014,50 @@ mod tests {
     fn engine_path_remap_isolates_decisions() {
         // D0093 boundary: decisions ship as read-only reference, never as the new project's instance.
         assert_eq!(remap_engine_path(Path::new("decisions/0001-x.sysml")), Path::new("reference/decisions/0001-x.sysml"));
+
         // Everything else is scaffolded unchanged.
         assert_eq!(remap_engine_path(Path::new("schema/core/element.sysml")), Path::new("schema/core/element.sysml"));
         assert_eq!(remap_engine_path(Path::new("processes/introduction.sysml")), Path::new("processes/introduction.sysml"));
+    }
+
+    /// issue291: the reference copy's package must be renamed, or the project's own first recorded
+    /// decision collides with it. Exercises the real corpus shape - a `// D0001` prose comment above
+    /// the declaration, and a `procedureText` mentioning `d0001` - because the rename must touch the
+    /// declaration ONLY (189 of 514 `dNNNN` occurrences downstream sit inside prose strings).
+    #[test]
+    fn reference_decision_package_is_renamed_declaration_only() {
+        let src = concat!(
+            "// D0001 - text files are truth\n",
+            "package Decision0001 {\n",
+            "    part d0001 : Decision {\n",
+            "        :>> procedureText = \"ww confirmed d0001 on the call\";\n",
+            "    }\n",
+            "}\n",
+        );
+        // `unwrap_or_default` rather than `expect`: the fail-loud lints deny panic/expect/unwrap
+        // even here, and an empty string fails every assert below with the content in the message.
+        let out = remap_engine_content(Path::new("decisions/0001-text-files-are-truth.sysml"), src)
+            .unwrap_or_default();
+        assert!(out.contains("package ReferenceDecision0001 {"), "package renamed: {out}");
+        assert!(out.contains("part d0001 : Decision"), "part name untouched (global resolution): {out}");
+        assert!(out.contains("confirmed d0001 on the call"), "prose untouched: {out}");
+        assert!(out.contains("// D0001 - text files are truth"), "comment untouched: {out}");
+        // Idempotent: the transform's own output declares no `package DecisionNNNN` to rename, which
+        // is what keeps `step_engine_resync` from planning an edit every run.
+        assert!(remap_engine_content(Path::new("decisions/0001-x.sysml"), &out).is_none());
+    }
+
+    /// Only files remapped INTO `reference/decisions/` are transformed - a schema or process file
+    /// that happens to mention a decision is copied byte-for-byte.
+    #[test]
+    fn non_decision_engine_files_are_never_content_transformed() {
+        let src = concat!(
+            "package EngineRules {\n",
+            "    #JustifiedBy dependency from r to d0099;\n",
+            "}\n",
+        );
+        assert!(remap_engine_content(Path::new("rules/rules.sysml"), src).is_none());
+        assert!(remap_engine_content(Path::new("schema/core/element.sysml"), src).is_none());
     }
 
     #[test]

@@ -40,6 +40,63 @@ pub fn remap_engine_path(rel: &Path) -> PathBuf {
         .map_or_else(|_| rel.to_path_buf(), |rest| Path::new("reference").join("decisions").join(rest))
 }
 
+/// Content transform paired with [`remap_engine_path`] (issue291): a decision file copied into
+/// `reference/decisions/` gets its PACKAGE renamed `DecisionNNNN` -> `ReferenceDecisionNNNN`.
+///
+/// # Why the copy must be renamed
+///
+/// The reference copy is the ENGINE's governance history, shipped read-only so a downstream reader
+/// can see why the engine is the way it is. It is still PARSED (`collect_sysml` has no exclusions),
+/// so without this rename a fresh project ships 236 `package DecisionNNNN` declarations while its own
+/// `.engine/decisions/` is empty — and `next_decision_number` scans only the project's directory. So
+/// the project's FIRST recorded decision allocates `Decision0001`/`d0001` and collides with
+/// `reference/decisions/0001-text-files-are-truth.sysml`: the registry silently merges same-named
+/// packages, `validate` and `check-engine` both report clean, and only `duplicate-identity` catches
+/// it — naming the read-only reference file as the offender, which is the one file the author must
+/// not edit. Hit live in a field project (issue291), where the workaround was to renumber the
+/// project's decisions into a 1xxx series.
+///
+/// # Why the PACKAGE and not the number
+///
+/// Numbering past the highest reference decision (the other option the `DoD` allowed) fixes the first
+/// allocation and reopens the hole at the next `keel migrate`: the project takes 0237, the engine
+/// later reaches 0237, resync copies it in, and the two collide again. Renaming the package makes the
+/// two namespaces DISJOINT BY PREFIX, so number overlap stops mattering permanently — verified with
+/// a project `Decision0001` and a `ReferenceDecision0001` coexisting green.
+///
+/// The rename is one line per file, always at identifier position, so it cannot touch prose: 189 of
+/// the 514 `dNNNN` occurrences in the decision corpus sit inside `procedureText` strings, which is
+/// why the part names are left alone. `dNNNN` stays resolvable because name resolution is global —
+/// the 10 `#JustifiedBy` edges in `.engine/rules/rules.sysml` still resolve after the rename.
+///
+/// Returns `None` when the file is not a remapped decision or declares no such package, so
+/// `step_engine_resync` compares TRANSFORMED content against disk and stays idempotent: a project
+/// already holding `ReferenceDecisionNNNN` plans zero edits, and an older one plans exactly the
+/// rename.
+#[must_use]
+pub fn remap_engine_content(rel: &Path, contents: &str) -> Option<String> {
+    if !rel.starts_with("decisions") {
+        return None;
+    }
+    let mut out = String::with_capacity(contents.len() + 9);
+    let mut renamed = false;
+    for line in contents.split_inclusive('\n') {
+        if !renamed {
+            if let Some(rest) = line.strip_prefix("package Decision") {
+                let digits = rest.chars().take_while(char::is_ascii_digit).count();
+                if digits == 4 {
+                    out.push_str("package ReferenceDecision");
+                    out.push_str(rest);
+                    renamed = true;
+                    continue;
+                }
+            }
+        }
+        out.push_str(line);
+    }
+    renamed.then_some(out)
+}
+
 /// Engine-DEV-only embedded paths EXCLUDED from the scaffold (D0093 boundary): the kernel/Python
 /// toolchain and any compiled-Python cache. Downstream projects use the Rust path (D0048).
 ///
@@ -389,7 +446,11 @@ fn step_engine_resync(root: &Path, engine: &Dir) -> StepPlan {
             return; // instance-specific — a project's own manifest is never overwritten
         }
         let dst = dst_engine.join(&mapped);
-        let Ok(new_content) = std::str::from_utf8(f.contents()) else { return };
+        let Ok(shipped_text) = std::str::from_utf8(f.contents()) else { return };
+        // issue291: compare the TRANSFORMED content, so this step IS the migration for a project
+        // inited before the rename existed - and a no-op for one inited after it.
+        let new_content: &str = &remap_engine_content(rel, shipped_text)
+            .unwrap_or_else(|| shipped_text.to_owned());
         let current = std::fs::read_to_string(&dst).ok();
         if current.as_deref() == Some(new_content) {
             return;
