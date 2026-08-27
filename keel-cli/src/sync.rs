@@ -98,9 +98,11 @@ pub fn divergence(repo: &Path) -> Divergence {
 
 /// Does the full enforced gate pass against the tree as it stands right now?
 ///
-/// Deliberately the SAME entry point the commit hook uses, rather than a parallel definition: the
-/// point of gating the merged tree is that it is held to the identical standard, and two gate
-/// definitions that can drift apart would quietly reintroduce the problem.
+/// Held to the identical bar as the commit gate because it calls the SAME body —
+/// `workspace::gate_problems` (issue282). This doc comment previously claimed exactly that while the
+/// function ran a parallel definition that omitted the DECLARED rules entirely, so a downstream
+/// project whose only blocking control is a declared rule had it enforced at commit and unenforced on
+/// the merged tree. The comment was true of the intent and false of the code.
 fn gate_passes(repo: &Path) -> Result<(), Vec<String>> {
     // WORKSPACE-WIDE (D0234). A push carries the WHOLE repository, so gating one project and pushing
     // is how another project's changes ride out ungated — and in a repo whose root is not itself a
@@ -119,18 +121,7 @@ fn gate_passes(repo: &Path) -> Result<(), Vec<String>> {
     for project in &ws.projects {
         // Label every problem with its project, or a failure in a three-project repo is a mystery.
         let tag = if ws.is_multi() { format!("{}: ", ws.label(project)) } else { String::new() };
-        let report = crate::validate_root(project);
-        for (p, d) in &report.diagnostics {
-            problems.push(format!("{tag}{}:{} — {}", p.display(), d.line, d.message));
-        }
-        for e in &report.errors {
-            problems.push(format!("{tag}{} — {}", e.file.display(), e.message));
-        }
-        for g in crate::guards::run_all(project) {
-            for v in &g.violations {
-                problems.push(format!("{tag}[{}] {v}", g.name));
-            }
-        }
+        problems.extend(crate::workspace::gate_problems(project, &tag));
     }
     if problems.is_empty() {
         Ok(())

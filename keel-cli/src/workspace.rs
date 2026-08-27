@@ -362,65 +362,97 @@ pub fn cmd(args: &[String]) -> i32 {
     0
 }
 
-/// The full gate for ONE project. Split out so `gate_cmd` stays readable and so the per-project
-/// standard has a single definition — a workspace gate that checked less than the per-project one
-/// would make adopting a workspace a quiet downgrade.
-fn gate_one(p: &Path, label: &str) -> Result<(), String> {
-    println!("gate [{label}] validate + guard + rules");
-    let report = crate::validate_root(p);
-    if !report.diagnostics.is_empty() || !report.errors.is_empty() {
-        for (path, d) in &report.diagnostics {
-            println!("  ERROR {}:{} — {}", path.display(), d.line, d.message);
-        }
-        for e in &report.errors {
-            println!("  PARSE {} — {}", e.file.display(), e.message);
-        }
-        return Err(format!("{label} (validate)"));
+/// The enforced gate for ONE project: validate, every guard, and the DECLARED rules — returned as a
+/// problem list rather than printed, so every caller holds it to the identical bar (issue282).
+///
+/// # Why this is the only body
+///
+/// There were THREE, with three different bars. This one ran validate + guards + declared rules; the
+/// scaffolded pre-commit hook ran validate + guard + `rules --enforce`; and the `sync`/`land` gate ran
+/// validate + guards and NO rules at all — that file contained zero occurrences of the word, while its
+/// own doc comment claimed it was "deliberately the SAME entry point the commit hook uses".
+///
+/// The declared-rule layer is precisely the one a downstream project uses to add a BLOCKING control
+/// without writing Rust. So such a project had its only control enforced at commit and unenforced on
+/// the merged tree — which is the exact class the merged-tree gate exists to catch, since a merge can
+/// violate an edge rule neither side violated alone.
+///
+/// Returning the list instead of printing is what makes one body serve both callers: the commit gate
+/// wants it printed per project as it goes, and `sync`/`land` want it aggregated across the workspace
+/// with a project tag. Formatting is the caller's; the BAR is not.
+#[must_use]
+pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    let report = crate::validate_root(project);
+    for (path, d) in &report.diagnostics {
+        problems.push(format!("{tag}ERROR {}:{} — {}", path.display(), d.line, d.message));
     }
-    let violations: Vec<String> = crate::guards::run_all(p)
-        .into_iter()
-        .flat_map(|g| g.violations.into_iter().map(move |v| format!("{}: {v}", g.name)))
-        .collect();
-    if !violations.is_empty() {
-        for v in violations.iter().take(8) {
-            println!("  VIOLATION {v}");
-        }
-        return Err(format!("{label} (guard)"));
+    for e in &report.errors {
+        problems.push(format!("{tag}PARSE {} — {}", e.file.display(), e.message));
     }
-    let rule_violations: Vec<String> = crate::view::check(p)
+    // Guards and rules are still evaluated when validate failed, because a caller aggregating across
+    // a workspace wants the whole picture in one run rather than one layer per invocation.
+    for g in crate::guards::run_all(project) {
+        for v in &g.violations {
+            problems.push(format!("{tag}VIOLATION {}: {v}", g.name));
+        }
+    }
+    for v in declared_rule_violations(project) {
+        problems.push(format!("{tag}RULE {v}"));
+    }
+    problems
+}
+
+/// Blocking violations of this project's DECLARED rules (`.engine/rules/`), warnings excluded.
+fn declared_rule_violations(project: &Path) -> Vec<String> {
+    crate::view::check(project)
         .ok()
         .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
-        .map(|v| {
-            v.get("rules")
-                .and_then(|r| r.as_array())
-                .map(|rules| {
-                    rules
-                        .iter()
-                        .filter(|r| r.get("severity").and_then(|s| s.as_str()) != Some("warning"))
-                        .flat_map(|r| {
-                            let name =
-                                r.get("rule").and_then(|n| n.as_str()).unwrap_or("rule").to_string();
-                            r.get("violations")
-                                .and_then(|x| x.as_array())
-                                .cloned()
-                                .unwrap_or_default()
-                                .into_iter()
-                                .map(move |v| format!("{name}: {v}"))
-                        })
-                        .collect::<Vec<String>>()
-                })
-                .unwrap_or_default()
+        .and_then(|v| {
+            v.get("rules").and_then(|r| r.as_array()).map(|rules| {
+                rules
+                    .iter()
+                    .filter(|r| r.get("severity").and_then(|s| s.as_str()) != Some("warning"))
+                    .flat_map(|r| {
+                        let name = r.get("rule").and_then(|n| n.as_str()).unwrap_or("rule").to_string();
+                        r.get("violations")
+                            .and_then(|x| x.as_array())
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(move |v| format!("{name}: {v}"))
+                    })
+                    .collect::<Vec<String>>()
+            })
         })
-        .unwrap_or_default();
-    if rule_violations.is_empty() {
-        println!("  clean ({} file(s))", report.validated);
-        Ok(())
-    } else {
-        for v in rule_violations.iter().take(8) {
-            println!("  RULE {v}");
-        }
-        Err(format!("{label} (rules)"))
+        .unwrap_or_default()
+}
+
+/// The commit gate's per-project step: run [`gate_problems`], print what it found, and name the layer
+/// that failed. One body, printed here.
+fn gate_one(p: &Path, label: &str) -> Result<(), String> {
+    println!("gate [{label}] validate + guard + rules");
+    let problems = gate_problems(p, "");
+    if problems.is_empty() {
+        println!("  clean ({} file(s))", crate::validate_root(p).validated);
+        return Ok(());
     }
+    for v in problems.iter().take(10) {
+        println!("  {v}");
+    }
+    if problems.len() > 10 {
+        println!("  ... and {} more", problems.len() - 10);
+    }
+    // Name the FIRST layer that failed, in the order the gate applies them — that is what the caller
+    // reports, and it tells the reader which tool to reach for.
+    let layer = if problems.iter().any(|p| p.contains("ERROR ") || p.contains("PARSE ")) {
+        "validate"
+    } else if problems.iter().any(|p| p.contains("VIOLATION ")) {
+        "guard"
+    } else {
+        "rules"
+    };
+    Err(format!("{label} ({layer})"))
 }
 
 /// `keel gate --workspace [ROOT]` — the COMMIT gate for a repo holding several projects.
