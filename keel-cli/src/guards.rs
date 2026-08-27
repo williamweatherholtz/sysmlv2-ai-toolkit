@@ -551,6 +551,40 @@ fn is_enforcement_surface(p: &str) -> bool {
     GUARD_SOURCE_FILES.contains(&p)
 }
 
+/// Is this repo-relative path under the KEYSTONE LOCK — process definition or enforcement surface?
+///
+/// Public because the workspace gate has to ask the same question about paths that belong to no
+/// project (issue276). One predicate, one answer: a second copy in `workspace.rs` would be a second
+/// place for the locked set to be true, and it would drift the first time a path class is added here.
+#[must_use]
+pub fn is_locked_path(p: &str) -> bool {
+    is_process_def(p) || is_enforcement_surface(p)
+}
+
+/// Does this commit carry a staged Decision bearing a `#ProspectiveChange`/`#SafetyChange` marker?
+///
+/// The authorisation half of the keystone lock, exposed for the workspace gate. Additions AND
+/// modifications, because the authorising Decision is almost always a NEW file — conflating the two
+/// lists is the regression `process_change` documents catching on its own author.
+/// A Decision at ANY depth, because in a workspace there is no project at the repository root and so
+/// no `.engine/decisions/` there. Requiring the root-relative form would make the shared root hook
+/// permanently unchangeable: no Decision could ever authorise a change to it, which is a different
+/// failure from the one being fixed but just as wrong. A marked Decision recorded in ANY project in
+/// the repository authorises the repository's own locked surface — the human signing it is the same
+/// human either way, and the alternative is a surface with no legitimate path to change.
+fn is_decision_file_at_any_depth(p: &str) -> bool {
+    let s = p.replace('\\', "/");
+    is_sysml(p) && (s.starts_with(".engine/decisions/") || s.contains("/.engine/decisions/"))
+}
+
+#[must_use]
+pub fn staged_marked_decision(root: &Path) -> bool {
+    staged_files(root)
+        .iter()
+        .filter(|p| is_decision_file_at_any_depth(p))
+        .any(|p| has_process_marker(&git_stdout(root, &["show", &format!(":{p}")])))
+}
+
 fn is_decision_file(p: &str) -> bool {
     is_sysml(p) && p.starts_with(".engine/decisions/")
 }

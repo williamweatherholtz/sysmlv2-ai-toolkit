@@ -52,8 +52,8 @@ fn camel_to_kebab(s: &str) -> String {
 /// was declared at all. An ABSENT file means everything is active (D0138/issue090), so the two cases
 /// must stay distinguishable — treating absent as "nothing active" would report every guard as
 /// disarmed on any project that never adopted a manifest.
-fn active_processes(repo: &Path, sha: &str) -> (Vec<String>, bool) {
-    let Some(text) = git(repo, &["show", &format!("{sha}:.engine/contracts/activation.toml")]) else {
+fn active_processes(repo: &Path, sha: &str, prefix: &str) -> (Vec<String>, bool) {
+    let Some(text) = git(repo, &["show", &format!("{sha}:{prefix}.engine/contracts/activation.toml")]) else {
         return (Vec::new(), false);
     };
     let mut in_processes = false;
@@ -80,9 +80,9 @@ fn active_processes(repo: &Path, sha: &str) -> (Vec<String>, bool) {
 /// Which guard each process CLAIMS at this commit: `assert constraint <x> : <guardName>;` inside a
 /// `.engine/processes/*.sysml` part/action. Claiming is what converts a guard from CORE
 /// (never-deactivatable) into that process's switchable property — the issue242 capture.
-fn guard_claims(repo: &Path, sha: &str) -> BTreeMap<String, String> {
+fn guard_claims(repo: &Path, sha: &str, prefix: &str) -> BTreeMap<String, String> {
     let mut claims = BTreeMap::new();
-    let files = git(repo, &["ls-tree", "-r", "--name-only", sha, ".engine/processes/"]).unwrap_or_default();
+    let files = git(repo, &["ls-tree", "-r", "--name-only", sha, &format!("{prefix}.engine/processes/")]).unwrap_or_default();
     for f in files.lines().filter(|f| Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
         let Some(text) = git(repo, &["show", &format!("{sha}:{f}")]) else { continue };
         let proc_name = Path::new(f).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
@@ -128,15 +128,71 @@ enum GuardEffective {
     Inactive,
 }
 
-/// The enforcement SIGNATURE at one commit: rule/constraint name -> severity rank. Reads the rule
-/// files and the guard-constraint declarations from THAT commit's tree via `git show` (no checkout —
-/// cheap enough to gate on). A `constraint def` with no severity is a guard binding: present = rank 3
-/// (its removal is a weakening exactly as a severity drop is).
+/// The repository's enforcement signature: every project's, with project-qualified keys (issue277).
+///
+/// # Why this was blind
+///
+/// `issue272` relaxed the keystone lock to exempt ADDED locked files, and D0234 justified the residual
+/// by naming THIS check — guard-state monotonicity — as what catches an added process weakening a core
+/// guard. But every pathspec here was repo-root-relative (`.engine/rules/`, `.engine/processes/`,
+/// `.engine/contracts/activation.toml`), and those match nothing when projects live one directory
+/// down. Verified with an identical unsigned rule weakening: single-project repo FAIL exit 1, naming
+/// the blocking-to-warning transition; two-project workspace PASS exit 0, both from the repo root and
+/// from inside the project. So one control was weakened while citing another that did not work in the
+/// arrangement the same Decision introduced.
+///
+/// Keys are qualified with the project label, which makes monotonicity PER PROJECT — alpha's guard set
+/// is compared against alpha's, never against beta's. A project appearing in the range is a
+/// strengthening (absent ranks lowest, so absent-to-present never trips), and a project disappearing
+/// is a drop, which is correct: removing a control is a weakening whoever removes it.
+///
+/// A project at the repository ROOT keeps an EMPTY prefix and unqualified keys, so a single-project
+/// repository's signature is unchanged, byte for byte — verified, not assumed, by the unit test below.
 fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
+    let mut out = BTreeMap::new();
+    for prefix in project_prefixes(repo) {
+        for (guard, rank) in project_signature(repo, sha, &prefix) {
+            out.insert(qualify(&prefix, &guard), rank);
+        }
+    }
+    out
+}
+
+/// Path prefixes for every project in this repository: `[""]`  for a single project at the root.
+fn project_prefixes(repo: &Path) -> Vec<String> {
+    let ws = crate::workspace::discover(repo);
+    let mut out: Vec<String> = ws
+        .projects
+        .iter()
+        .map(|p| {
+            let label = ws.label(p);
+            if label == "." { String::new() } else { format!("{label}/") }
+        })
+        .collect();
+    if out.is_empty() {
+        out.push(String::new()); // not a keel project (or not a repo): behave exactly as before
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// A signature key, qualified by project so monotonicity cannot compare one project against another.
+fn qualify(prefix: &str, guard: &str) -> String {
+    if prefix.is_empty() { guard.to_string() } else { format!("{prefix}{guard}") }
+}
+
+/// The enforcement SIGNATURE at one commit for ONE project: rule/constraint name -> severity rank.
+/// `prefix` is `""` for a project at the repository root and `"label/"` otherwise.
+///
+/// Reads the rule files and the guard-constraint declarations from THAT commit's tree via `git show`
+/// (no checkout — cheap enough to gate on). A `constraint def` with no severity is a guard binding:
+/// present = rank 3, and its removal is a weakening exactly as a severity drop is.
+fn project_signature(repo: &Path, sha: &str, prefix: &str) -> BTreeMap<String, u8> {
     let mut sig = BTreeMap::new();
     let mut declared_guards: Vec<String> = Vec::new();
     // rule files: `part <name> : ElementRule|EdgeRule { ... :>> severity = RuleSeverity::<sev>; }`
-    let files = git(repo, &["ls-tree", "-r", "--name-only", sha, ".engine/rules/"]).unwrap_or_default();
+    let files = git(repo, &["ls-tree", "-r", "--name-only", sha, &format!("{prefix}.engine/rules/")]).unwrap_or_default();
     for f in files.lines().filter(|f| std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))) {
         let Some(text) = git(repo, &["show", &format!("{sha}:{f}")]) else { continue };
         let mut current: Option<String> = None;
@@ -173,8 +229,8 @@ fn signature(repo: &Path, sha: &str) -> BTreeMap<String, u8> {
     // deactivation (Active -> Inactive) ranks as a weakening. Without this the signature saw only
     // `.engine/rules/`, and both routes to disarming a control were invisible to the gate built for
     // exactly that class.
-    let (active, declared_manifest) = active_processes(repo, sha);
-    let claims = guard_claims(repo, sha);
+    let (active, declared_manifest) = active_processes(repo, sha, prefix);
+    let claims = guard_claims(repo, sha, prefix);
     for g in declared_guards {
         let kebab = camel_to_kebab(&g);
         // Unclaimed by any process => CORE: no activation switch reaches it. Claimed => Active
@@ -197,7 +253,14 @@ fn commit_is_signed_change(repo: &Path, sha: &str) -> bool {
     let touched = git(repo, &["show", "--name-only", "--format=", sha]).unwrap_or_default();
     touched
         .lines()
-        .filter(|f| f.starts_with(".engine/decisions/") && std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
+        // Any depth: in a workspace the Decision lives in a PROJECT's `.engine/decisions/`, and the
+        // repo root has none - so the root-relative form could never find the signature that
+        // authorises a change (the same gap the workspace keystone had to close).
+        .filter(|f| {
+            let s = f.replace('\\', "/");
+            (s.starts_with(".engine/decisions/") || s.contains("/.engine/decisions/"))
+                && std::path::Path::new(f).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"))
+        })
         .any(|f| {
             git(repo, &["show", &format!("{sha}:{f}")])
                 .is_some_and(|t| t.lines().any(|l| {
@@ -213,6 +276,14 @@ fn commit_is_signed_change(repo: &Path, sha: &str) -> bool {
 /// Exit code: 0 if the enforcement signature never weakened unsigned across the range; 1 on any
 /// unsigned weakening (this is a GATE, not a report — that is the D0209 difference from audit-history).
 pub fn cmd(args: &[String], repo: &Path) -> i32 {
+    // ANCHOR TO THE REPOSITORY ROOT (issue277). Every path-scoped read below - `ls-tree` pathspecs,
+    // `show --name-only` - resolves relative to the CWD git was invoked in, not the repo root. Run
+    // from inside a project in a workspace, the project prefix was applied on top of git's own
+    // implicit prefix (`alpha/alpha/.engine/rules/`), matched nothing, and the audit reported PASS on
+    // a tree carrying eight unsigned rule downgrades. Verified before this line existed: FAIL from
+    // the repo root, PASS from one directory down, same commit.
+    let anchored = crate::workspace::discover(repo).root;
+    let repo: &Path = &anchored;
     let since = args.iter().position(|a| a == "--since").and_then(|i| args.get(i + 1)).cloned();
     let max: usize = args
         .iter()
@@ -351,5 +422,24 @@ mod tests {
         assert_eq!(camel_to_kebab("staleGateProse"), "stale-gate-prose");
         assert_eq!(camel_to_kebab("docSync"), "doc-sync");
         assert_eq!(camel_to_kebab("actors"), "actors");
+    }
+    /// issue277: a project at the repository ROOT keeps unqualified keys, so a single-project repo's
+    /// signature is unchanged. This is the clause the `DoD` calls "single-project behaviour unchanged",
+    /// and it is the one an author would break first when adding a project dimension.
+    #[test]
+    fn root_project_keys_are_unqualified_so_single_project_repos_are_unchanged() {
+        assert_eq!(super::qualify("", "rule:acceptanceEventRule"), "rule:acceptanceEventRule");
+        assert_eq!(super::qualify("alpha/", "rule:acceptanceEventRule"), "alpha/rule:acceptanceEventRule");
+        // Qualification is per PROJECT, which is what stops alpha's guard set being compared against
+        // beta's: two projects with the same guard name occupy two keys, never one.
+        assert_ne!(super::qualify("alpha/", "guard:x"), super::qualify("beta/", "guard:x"));
+    }
+
+    /// This repository holds exactly one project, at the root, so its prefix set is `[""]` — the
+    /// empty-prefix path that keeps every existing pathspec byte-identical.
+    #[test]
+    fn this_repo_yields_the_empty_prefix() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        assert_eq!(super::project_prefixes(&root), vec![String::new()]);
     }
 }

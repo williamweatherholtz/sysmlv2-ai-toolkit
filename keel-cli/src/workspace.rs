@@ -212,6 +212,46 @@ pub fn discover(from: &Path) -> Workspace {
     Workspace { root, projects }
 }
 
+/// Staged paths that are KEYSTONE events and that no project gate covers (issue276).
+///
+/// # The hole this closes
+///
+/// In a workspace the repo-root enforcement surface — the ONE `.githooks/pre-commit` that gates every
+/// project, and `.github/workflows/` — belongs to no project, and the keystone lock matches
+/// project-relative paths. So the lock could never fire on it. Verified: the single hook that gates
+/// every project, replaced with a two-line `exit 0` and staged alone with no Decision, and
+/// `gate --workspace` reported 2 projects gated clean, exit 0 — after PRINTING a line that named the
+/// unowned file. A gate that reports what it is not checking and passes anyway is the false-green
+/// class, stated out loud.
+///
+/// Two rules, because the second is not a special case of the first:
+///
+/// 1. An unowned staged path that `guards::is_locked_path` claims is a keystone event. At a workspace
+///    root the staged paths are repo-relative, so `.githooks/**` and `.github/workflows/**` match the
+///    same predicate the per-project lock uses.
+/// 2. Any staged DELETION of a path under an `.engine/` directory, at any depth, owned or not. This
+///    is not covered by rule 1: deleting a whole project makes its directory stop satisfying
+///    `is_project`, so every one of its paths becomes UNOWNED — which is how staging the deletion of
+///    an entire project, 445 paths including every process definition and its guards, passed the gate
+///    silently. A project's engine files are owned while the project exists and unowned at exactly
+///    the moment that matters.
+fn unowned_keystone_events(unowned: &[String], deleted: &[String]) -> Vec<String> {
+    let mut events: Vec<String> = unowned
+        .iter()
+        .filter(|p| crate::guards::is_locked_path(p))
+        .map(|p| format!("{p} (repo-root enforcement surface — owned by no project)"))
+        .collect();
+    for d in deleted {
+        let slashed = d.replace('\\', "/");
+        if slashed.starts_with(".engine/") || slashed.contains("/.engine/") {
+            events.push(format!("{d} (DELETED engine path — removing a control is a keystone event)"));
+        }
+    }
+    events.sort();
+    events.dedup();
+    events
+}
+
 /// `keel projects [ROOT] [--json]` — every project in this workspace, and which one you are in.
 #[must_use]
 pub fn cmd(args: &[String]) -> i32 {
@@ -397,6 +437,29 @@ pub fn gate_cmd(args: &[String]) -> i32 {
             workspace_level.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
         );
     }
+    // issue276: the keystone lock, applied to what no project gate covers. Printing the unowned files
+    // and then exiting 0 was the whole defect — this is the line that makes the report a verdict.
+    let deleted: Vec<String> = crate::gitx::git()
+        .arg("-C")
+        .arg(&ws.root)
+        .args(["-c", "core.quotePath=false", "diff", "--cached", "--name-only", "--diff-filter=D"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(str::to_owned).collect())
+        .unwrap_or_default();
+    let events = unowned_keystone_events(&workspace_level, &deleted);
+    if !events.is_empty() && !crate::guards::staged_marked_decision(&ws.root) {
+        eprintln!("gate: KEYSTONE — {} staged change(s) to the locked surface carry no co-committed", events.len());
+        eprintln!("  Decision bearing #ProspectiveChange or #SafetyChange (D0070/D0209 clause 2):");
+        for e in events.iter().take(10) {
+            eprintln!("    {e}");
+        }
+        if events.len() > 10 {
+            eprintln!("    ... and {} more", events.len() - 10);
+        }
+        failed.push("workspace keystone".to_string());
+    }
     if failed.is_empty() {
         println!("gate: {} project(s) gated clean.", gated.len());
         0
@@ -408,7 +471,7 @@ pub fn gate_cmd(args: &[String]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{discover, is_project, Workspace};
+    use super::{discover, is_project, unowned_keystone_events, Workspace};
     use std::path::PathBuf;
 
     #[test]
@@ -492,5 +555,36 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+    /// issue276: the two rules that make the unowned surface a verdict rather than a printed note.
+    #[test]
+    fn the_unowned_surface_is_under_the_keystone_lock() {
+        // Rule 1: the ONE repo-root hook that gates every project, and the root workflows dir.
+        let unowned = vec![
+            ".githooks/pre-commit".to_string(),
+            ".github/workflows/keel-gate.yml".to_string(),
+            "README.md".to_string(),          // workspace-level but NOT locked
+            "scripts/build.sh".to_string(),   // ditto
+        ];
+        let events = unowned_keystone_events(&unowned, &[]);
+        assert_eq!(events.len(), 2, "exactly the locked pair, got {events:?}");
+        assert!(events.iter().any(|e| e.contains(".githooks/pre-commit")), "{events:?}");
+        assert!(events.iter().any(|e| e.contains("keel-gate.yml")), "{events:?}");
+
+        // Rule 2 is NOT a special case of rule 1: deleting a project makes its directory stop being a
+        // project, so its engine paths become unowned at exactly the moment they are removed. They do
+        // not match the root-relative locked predicate, which is how 445 staged deletions passed.
+        let deleted = vec![
+            "beta/.engine/processes/delivery.sysml".to_string(),
+            ".engine/guards/x.sysml".to_string(),
+            "beta/.tracking/backlog.sysml".to_string(), // tracking is instance data, not a control
+            "docs/readme.md".to_string(),
+        ];
+        let events = unowned_keystone_events(&[], &deleted);
+        assert_eq!(events.len(), 2, "both engine deletions, at either depth: {events:?}");
+        assert!(events.iter().all(|e| e.contains("DELETED engine path")), "{events:?}");
+
+        // A commit touching neither is not a keystone event, or every commit would need a signature.
+        assert!(unowned_keystone_events(&["README.md".to_string()], &["docs/x.md".to_string()]).is_empty());
     }
 }
