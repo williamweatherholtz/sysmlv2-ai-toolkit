@@ -91,25 +91,20 @@ fn find_repo_root() -> Option<PathBuf> {
         if dir.join(".engine").is_dir() {
             return Some(dir);
         }
+        // STOP AT THE REPOSITORY BOUNDARY (issue281). This walk had none while workspace discovery
+        // did, so standing in a directory nested under an unrelated keel project, `keel validate`
+        // with no argument walked OUT of the repository and validated the OUTER repo's project —
+        // reporting it clean. A command that answers about a repository the caller is not in is worse
+        // than one that refuses: the answer looks right.
+        if dir.join(".git").exists() {
+            return None;
+        }
         if !dir.pop() {
             return None;
         }
     }
 }
 
-/// Resolve a subcommand's optional `[ROOT]` positional, REFUSING an unrecognised flag (issue133).
-///
-/// `positionals` is how many leading positional arguments the subcommand takes before ROOT (`keel view
-/// <name> [ROOT]` passes 1). `known` lists the flag names the subcommand accepts, without `--`.
-///
-/// THE DEFECT THIS EXISTS TO END: every parser used to take its first argument as ROOT, so `keel audit
-/// --explan` made the root the literal string `--explan`, and the command then failed somewhere
-/// downstream about a missing directory — or worse, succeeded against the wrong tree. The other half of
-/// the class SKIPPED anything starting with `--`, so an unknown flag was silently ignored and the command
-/// ran with the wrong behaviour and said nothing. Both turn a typo into a confident wrong answer instead
-/// of an error at the point of the mistake, which is the shape this whole class keeps taking.
-///
-/// `Err(2)` after printing the usage line; the caller returns that code unchanged.
 fn root_arg(args: &[String], usage: &str, known: &[&str], positionals: usize) -> Result<PathBuf, i32> {
     let mut positional: Vec<&String> = Vec::new();
     for a in args {
@@ -125,13 +120,18 @@ fn root_arg(args: &[String], usage: &str, known: &[&str], positionals: usize) ->
         }
     }
     if let Some(p) = positional.get(positionals) {
-        return Ok(PathBuf::from(p.as_str()));
+        let root = PathBuf::from(p.as_str());
+        keel_cli::workspace::require_project(&root, usage)?;
+        return Ok(root);
     }
-    find_repo_root().ok_or_else(|| {
-        eprintln!("error: no .engine/ directory found from the current directory upward.");
+    let root = find_repo_root().ok_or_else(|| {
+        eprintln!("error: no .engine/ directory found from the current directory upward");
+        eprintln!("  (the search stops at the repository boundary — it will not answer for another repo).");
         eprintln!("usage: {usage}");
         2
-    })
+    })?;
+    keel_cli::workspace::require_project(&root, usage)?;
+    Ok(root)
 }
 
 // ── subcommands ───────────────────────────────────────────────────────────────
@@ -2599,17 +2599,20 @@ fn cmd_report(args: &[String]) -> i32 {
 /// Computed indicators show current value (full series with `--trend`); pulled/manual show their
 /// recorded-Measurement series + status.
 fn cmd_indicators(args: &[String]) -> i32 {
-    let root = match flag(args, "root") {
-        Some(p) => PathBuf::from(p),
-        None => {
-            if let Some(r) = find_repo_root() {
-                r
-            } else {
-                eprintln!("error: no .engine/ found from cwd upward; pass --root ROOT");
-                return 2;
-            }
-        }
+    // issue281: this accepted `--root` ONLY, so a POSITIONAL root was silently ignored and the view
+    // was computed against `find_repo_root()` — whatever project the process happened to be standing
+    // in. `keel indicators <someWorkspace>` therefore reported on a DIFFERENT project and exited 0,
+    // which is worse than the zeroed-green this issue is about: the numbers are real, just about
+    // something else. Found by a test sweeping every model reader, not by reading the code. Going
+    // through `root_arg` gives it the positional, the unknown-flag refusal, and the project
+    // precondition that the other model readers already have.
+    let root = match root_arg(args, "keel indicators [ROOT] [--trend] [--root ROOT]", &["trend", "root"], 0) {
+        Ok(r) => flag(args, "root").map_or(r, PathBuf::from),
+        Err(code) => return code,
     };
+    if let Err(code) = keel_cli::workspace::require_project(&root, "keel indicators [ROOT] [--trend]") {
+        return code;
+    }
     let trend = args.iter().any(|a| a == "--trend");
     match keel_cli::view::indicators(&root, trend) {
         Ok(json) => {
@@ -3872,6 +3875,12 @@ fn cmd_view0(
         eprintln!("usage: keel {name} [ROOT]");
         return 2;
     };
+    // issue281: a zero-argument VIEW must not answer over nothing either. `cmd_view0` resolves
+    // its own root rather than going through `root_arg`, so the shared precondition missed it -
+    // found by sweeping every command at a workspace root, where `controls` still exited 0.
+    if let Err(code) = keel_cli::workspace::require_project(&root, &format!("keel {name} [ROOT]")) {
+        return code;
+    }
     println!("{}", f(&root).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")));
     0
 }
@@ -3998,7 +4007,16 @@ fn main() {
         // `repo_arg(rest)` would take the SUBCOMMAND as the path — `arch elements .` resolved the
         // root to `./elements`, whose empty model then printed "no CodeElement instances authored".
         Some("arch") => keel_cli::arch::cmd(rest, &repo_arg(rest.get(1..).unwrap_or(&[]))),
-        Some("verification") => keel_cli::verification::cmd(rest, &repo_arg(rest)),
+        // issue281: `verification` reads a MODEL, so it must not answer over nothing — but it takes
+        // its root via `repo_arg`, which is the repository-scoped resolver `sync`/`land` use and which
+        // therefore carries no project precondition. Found by sweeping every command at a workspace
+        // root rather than by trusting that one chokepoint covered them all: nine refused, this one
+        // still exited 0.
+        Some("verification") => {
+            let root = repo_arg(rest);
+            keel_cli::workspace::require_project(&root, "keel verification [ROOT] [--pending]")
+                .map_or_else(|code| code, |()| keel_cli::verification::cmd(rest, &root))
+        }
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
@@ -4126,13 +4144,25 @@ mod tests {
         let a = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
         assert_eq!(root_arg(&a(&["--explan"]), "u", &[], 0), Err(2));
         assert_eq!(root_arg(&a(&["--explan"]), "u", &["explain"], 0), Err(2), "a NEAR-MISS of a known flag is still unknown");
-        // a declared flag passes through, and the positional is still found around it
-        assert_eq!(root_arg(&a(&["--explain", "/r"]), "u", &["explain"], 0).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
-        assert_eq!(root_arg(&a(&["/r", "--explain"]), "u", &["explain"], 0).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
+        // A REAL project path, because `root_arg` now VALIDATES as well as parses (issue281): it
+        // refuses a root that is not a keel project, so a synthetic `/r` no longer reaches the caller.
+        // The assertions below still test what they always did — that the positional is FOUND around a
+        // declared flag — they just use a root that a caller could really pass.
+        let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let r = repo.to_string_lossy().to_string();
+        let found = |v: &[&str], pos: usize| {
+            root_arg(&a(v), "u", &["explain"], pos).ok().map(|p| p.to_string_lossy().to_string())
+        };
+        assert_eq!(found(&["--explain", &r], 0), Some(r.clone()));
+        assert_eq!(found(&[&r, "--explain"], 0), Some(r.clone()));
         // `positionals` skips the subcommand's own leading argument (`keel view <name> [ROOT]`)
-        assert_eq!(root_arg(&a(&["decisions", "/r"]), "u", &[], 1).ok().map(|p| p.to_string_lossy().to_string()), Some("/r".to_string()));
+        assert_eq!(found(&["decisions", &r], 1), Some(r.clone()));
         // and a leading positional alone leaves ROOT to repo discovery, not to the positional
         assert_ne!(root_arg(&a(&["decisions"]), "u", &[], 1).map(|p| p.to_string_lossy().to_string()), Ok("decisions".to_string()));
+        // The new half of the contract: a path that exists but is NOT a project is refused, never
+        // answered over. This is the false green issue281 closed.
+        let tmp = std::env::temp_dir();
+        assert_eq!(root_arg(&a(&[&tmp.to_string_lossy()]), "u", &[], 0), Err(2), "a non-project root is refused");
     }
 
     #[test]

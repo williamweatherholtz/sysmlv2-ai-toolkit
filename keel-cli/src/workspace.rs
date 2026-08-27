@@ -74,6 +74,59 @@ pub fn is_project(dir: &Path) -> bool {
     dir.join(".engine").is_dir() && dir.join(".tracking").is_dir()
 }
 
+/// Refuse to answer over nothing (issue281): the resolved `root` must actually be a keel project.
+///
+/// # The false green this ends
+///
+/// The issue269 refusal was applied to `validate` alone, so at a WORKSPACE ROOT — a repository holding
+/// projects with none at the root — every other model-reading command answered about an empty model
+/// and called it an answer. Measured, in a two-project workspace full of work: `orient` exited 0 with
+/// an empty ready list, zero outstanding and `answerStatus: COMPUTED`, and `orient` is the surface
+/// CLAUDE.md makes the AI's ONLY legitimate state read, explicitly forbidding prose substitutes;
+/// `whats-next` printed "COMPUTED-EMPTY — this is an answer, not a failure" over zero items; and
+/// `check-engine` printed "validated clean" over zero files while being a BLOCKING step in this
+/// repository's own commit gate.
+///
+/// Placed in `root_arg` rather than in each command, because `root_arg` is what every command that
+/// takes a `[ROOT]` already calls and it already has an error channel — one precondition, 40-odd call
+/// sites, no per-command edit to forget. `repo_arg` is deliberately NOT covered: `sync` and `land` are
+/// repository-scoped by design, and `projects`/`gate --workspace` parse their own arguments.
+/// # Errors
+/// `Err(2)` when `root` is not a keel project — the CLI exit code, having already explained on stderr
+/// which projects the repository does hold.
+pub fn require_project(root: &Path, usage: &str) -> Result<(), i32> {
+    if is_project(root) {
+        return Ok(());
+    }
+    eprintln!("error: {} is not a keel project — it has no .engine/ (and .tracking/) directory.", root.display());
+    let ws = discover(root);
+    if ws.projects.is_empty() {
+        eprintln!("  No keel project was found in {} either.", ws.root.display());
+        eprintln!("  An empty answer here would be a FALSE clean, not an answer (K2), so this refuses.");
+    } else {
+        eprintln!("  This repository holds {} project(s). Name one:", ws.projects.len());
+        for p in &ws.projects {
+            eprintln!("    {}", ws.label(p));
+        }
+        eprintln!("  Reporting zero-over-nothing as a computed answer is the false green this refuses.");
+    }
+    eprintln!("usage: {usage}");
+    Err(2)
+}
+
+/// Resolve a subcommand's optional `[ROOT]` positional, REFUSING an unrecognised flag (issue133).
+///
+/// `positionals` is how many leading positional arguments the subcommand takes before ROOT (`keel view
+/// <name> [ROOT]` passes 1). `known` lists the flag names the subcommand accepts, without `--`.
+///
+/// THE DEFECT THIS EXISTS TO END: every parser used to take its first argument as ROOT, so `keel audit
+/// --explan` made the root the literal string `--explan`, and the command then failed somewhere
+/// downstream about a missing directory — or worse, succeeded against the wrong tree. The other half of
+/// the class SKIPPED anything starting with `--`, so an unknown flag was silently ignored and the command
+/// ran with the wrong behaviour and said nothing. Both turn a typo into a confident wrong answer instead
+/// of an error at the point of the mistake, which is the shape this whole class keeps taking.
+///
+/// `Err(2)` after printing the usage line; the caller returns that code unchanged.
 /// One spelling for a path, so two that name the same directory compare equal.
 ///
 /// Every prefix comparison in this module has one side from git (`rev-parse --show-toplevel`, long

@@ -134,6 +134,12 @@ pub fn cmd(args: &[String]) -> i32 {
         .iter()
         .find(|a| !a.starts_with("--"))
         .map_or_else(|| std::path::PathBuf::from("."), std::path::PathBuf::from);
+    // issue281: refuse rather than answer over nothing. At a workspace root this printed a census of
+    // ZERO attestations and exited 0 - the same false green the issue269 refusal closed for
+    // `validate` alone.
+    if let Err(code) = crate::workspace::require_project(&root, "keel attestation [ROOT] [--json]") {
+        return code;
+    }
     let c = census(&root);
     let claims = uncited_coverage_claims(&root);
     let pct = |a: usize, b: usize| (a * 100).checked_div(b).unwrap_or(0);
