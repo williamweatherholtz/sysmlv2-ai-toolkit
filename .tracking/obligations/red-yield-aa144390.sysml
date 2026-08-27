@@ -3,10 +3,10 @@
 // on the file being repaired.
 package Obligationaa144390 {
     private import EngineElement::*;
-    // `Issue` is defined in EngineWork (schema/core/work.sysml:70), and the obligation recorder's
-    // template omits this import - so RECORDING an obligation made the tree INVALID, which is
-    // self-defeating for a record whose whole purpose is to say the tree needs a correction pass.
-    // Added by hand here; the template defect is tracked as its own issue.
+    // `Issue` is defined in EngineWork (schema/core/work.sysml:70). This import was added by hand
+    // here, because the recorder's template omitted it and RECORDING an obligation therefore made
+    // the tree INVALID (issue274). The template now carries it, and the property is held by
+    // `recording_an_obligation_keeps_the_tree_valid` rather than by this repair.
     private import EngineWork::*;
     private import EngineRelationships::*;
 

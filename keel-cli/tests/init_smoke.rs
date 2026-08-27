@@ -199,3 +199,48 @@ fn walkdir(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     }
     out
 }
+
+/// issue274: RECORDING an obligation must not invalidate the tree it reports on.
+///
+/// The recorder's template imported only `EngineElement`, while `Issue` is defined in `EngineWork`
+/// and the `Resolves` edge in `EngineRelationships` — so the first obligation ever recorded made
+/// `validate` report an unresolved type reference. That is self-defeating twice over: the record
+/// exists to say the tree needs a correction pass, and it is itself what makes the tree incorrect;
+/// and it puts the recorder in the one position a recorder must never occupy, unable to record
+/// without breaking the thing it is reporting on. It had shipped and had never been exercised —
+/// no obligation had been recorded since the template was written, so nothing had run this path.
+///
+/// The control is the RECORDING, driven through the real library entry point the hooks call, against
+/// a real scaffold. An assertion about which imports the template contains would pass just as well
+/// on a template whose imports are wrong for the next type the record grows.
+#[test]
+fn recording_an_obligation_keeps_the_tree_valid() {
+    let dir = unique_dir();
+    let _cleanup = TmpProject(dir.clone());
+    let proj = dir.to_str().unwrap();
+
+    let out = keel().args(["init", proj]).output().expect("run keel init");
+    assert!(out.status.success(), "init failed: {}", String::from_utf8_lossy(&out.stderr));
+
+    let out = keel().args(["validate", proj]).output().expect("run keel validate");
+    assert!(out.status.success(), "fresh scaffold failed validate before the obligation");
+
+    let written = keel_cli::write::record_obligation(
+        &dir,
+        "override",
+        "override used: direct write to .tracking/x.sysml",
+        "A recorded override unlocked a direct write (D0176 tier 3). Discharge: a human reviews the \
+         write and triages this obligation with a #Resolves edge.",
+        "smokeTestActor",
+    )
+    .expect("the recorder must be able to record");
+    assert!(written.is_file(), "recorder reported a path it did not write: {}", written.display());
+
+    let out = keel().args(["validate", proj]).output().expect("run keel validate after recording");
+    assert!(
+        out.status.success(),
+        "recording an obligation invalidated the tree: {}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
