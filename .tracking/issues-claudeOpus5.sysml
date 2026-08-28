@@ -38,4 +38,59 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from shortDomainWordsCanSeed to issue294;
+
+    part issue295 : Issue {
+        :>> id = "a97e2219-d1db-4a5e-b771-cc25bcecdd33";
+        :>> title = "recall never indexes body text, and its ranker is alphabetical in 43 of 50 cases";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by an adversarial panel (IR-fundamentals lens), confirmed against the code. seeds_for matches an item's name, its title and an Alias term - nothing else - so the five body fields the same module reads for DISPLAY (decision, description, rationale, actionText, consequences) are invisible to RETRIEVAL. Demonstrated: a prompt about provenance and defaulted dates contributed ZERO seeds for `provenance`, the most informative word in it, because it appears in dozens of bodies and in no name or title. Second defect, structural: agreement is the primary sort key but reaches max 1 in 43 of 50 bench cases, so the key is constant and ranking degenerates to (hops, name) - alphabetical - which is precisely the failure the agreement comment says it was introduced to fix. MAX_PROMPT_WORDS caps votes at three and the rarity ceiling removes the mid-frequency words most likely to co-occur, so the vote can rarely happen. BM25 measured on the SAME fields scores 37/50 (74%) hit@20 versus the shipped 24/50 (48%); the field ceiling is 44/50. SQLite FTS5 provides bm25() as its default ranking function, so rejecting BM25 while proposing SQLite was incoherent. The lexical layer is not exhausted, it is barely attempted.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from recallIndexesBodiesAndRanksProperly to issue295;
+
+    part issue296 : Issue {
+        :>> id = "a5088939-bd58-4cba-8321-462d35171f70";
+        :>> title = "the recall benchmark's control was a strawman, precision was never measured, and the 14-point gap is not significant";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found independently by two panel lenses and confirmed by re-running the harness. The control matches name and title only while queries are drawn from BODY_FIELDS, so it was structurally denied the field the queries came from; with bodies included the same rarest-word control scores 50/50 and real git grep 14/15 - both themselves leakage, since queries are verbatim body words. The harness cannot discriminate in either direction, so the 48%-vs-34% result carries no information and should not have been used to ship anything. Worse for a PUSH feature: precision was never measured at all, and sampling 17 realistic prompts put it near 9% - one of eleven pushes topical. The 2x2 is 13 both / 11 KG-only / 4 grep-only / 22 neither, giving McNemar exact p = 0.119 and a net advantage of 7 cases rather than 24. And the harness carries a dead statistic (`both`, always false, never printed), which is evidence it went unreviewed while being the sole evidence for a proposal to delete the subsystem.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from recallBenchmarkCanDiscriminate to issue296;
+
+    part issue297 : Issue {
+        :>> id = "99351a32-1e98-4479-8cdb-fb0e676ad5b9";
+        :>> title = "three surfaces still assert a confidence gate that has not existed since it was removed, including a passing DoD";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "confident() discards all four parameters and returns seed_count > 0, so the only silenced prompts are those with no informative token - already rejected upstream by prompt_tokens. The gate is gone; its prose is not. The main.rs doc comment still lists kill switch 3 as 'a LOW-confidence prompt is not injected at all'; the PASSING kgPromptPathInjects DoD still reads 'Injection is gated on a CONFIDENCE verdict - silence beats noise'; and the printed HIGH/LOW label is unreachable at LOW whenever any row is shown, so it carries no information while reading as though it does - the panel observed 'confidence HIGH' stamped on a payload 14 of whose 17 rows were off-topic. This is the fourth instance this session of prose asserting a property the code lacks, and the first where I wrote both the prose and the code within two commits. Same class, also in my own comments: the ceiling described as '~60' when it computes to 68, `gate` counted as 5,736 on one line and 5,806 on another, and the ceiling credited with dropping `gate` when the length rule drops it first.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from retireTheConfidenceProse to issue297;
+
+    part issue298 : Issue {
+        :>> id = "eaf25067-5cbe-4026-806d-7199dad74d6c";
+        :>> title = "D0243 changed an accepted process's meaning with no marker and without editing the process definition";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the source-fidelity panel lens and confirmed: D0243 carries ZERO #ProspectiveChange/#SafetyChange markers where its sibling D0242 carries two, and .engine/processes/knowledge-graph-memory.sysml mentions neither Decision. Yet D0243 declared '.knowledge/ an optional refinement rather than a prerequisite' and rejected 'require a curated subject vocabulary, AS THE SOURCE PROCESS'S STEPS 1-2 IMPLY' - i.e. it changed what two accepted, human-owned steps mean. The keystone lock did not fire because the guarded artifact was never edited: the amendment was made AROUND the control rather than through it. D0161 had already written the rule broken here - 'A design may amend a process; it may not quietly disagree with one.' The substance of D0243 is sound and measured; the governance is not, and a guard that only notices edits cannot notice a disagreement.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from processAmendmentsReachTheDefinition to issue298;
+
+    part issue299 : Issue {
+        :>> id = "4ed10cb4-e5ab-45ce-8cdd-3f4931ddb75a";
+        :>> title = "identifier seeding fails on three of six natural spellings, and it is the one path measured to work";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Confirmed by the panel and reconfirmed directly: `d0242`, `issue294` and `what does D0242 say` seed correctly, while `issue 294`, `D-0242` and `decision 242` push nothing at all - is_identifier_token requires the digit run to abut the prefix with no separator. Both the cost-benefit and IR lenses independently named identifier lookup as the feature's genuine value (`keel why d0133` returns the decision, its acceptance Test, its TestResult and file paths - precise and provenance-carrying, which grep does not give), and the cost-benefit lens recommends making it the ONLY injection trigger. Under that recommendation this brittleness becomes the system's whole failure rate rather than a corner case.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from identifierMatchingAcceptsNaturalSpellings to issue299;
 }
