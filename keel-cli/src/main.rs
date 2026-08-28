@@ -105,6 +105,37 @@ fn find_repo_root() -> Option<PathBuf> {
     }
 }
 
+/// Drop each named flag AND ITS VALUE, leaving only true positionals for [`root_arg`].
+///
+/// THE CLASS THIS ENDS, third instance in one session: `root_arg` takes the first bare token as ROOT
+/// and cannot know which flags consume the token after them, so every command that adds a
+/// value-taking flag re-creates the bug. `keel github-decider --root X` read X as a login,
+/// `keel recall --prompt -` read `-` as a root, and `keel why t --budget 1500` read 1500 as a root —
+/// each silently answering about the wrong thing until the issue281 project precondition started
+/// refusing outright, which is the only reason the last two were visible at all.
+///
+/// It is NOT fixed inside `root_arg` because a known flag's following positional is legitimately the
+/// root for existing callers (`--explain /r`), so the distinction has to be stated by the caller that
+/// knows it.
+fn without_flag_values(args: &[String], value_flags: &[&str]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut skip = false;
+    for a in args {
+        if skip {
+            skip = false;
+            continue;
+        }
+        if let Some(name) = a.strip_prefix("--") {
+            if value_flags.contains(&name) {
+                skip = true;
+                continue;
+            }
+        }
+        out.push(a.clone());
+    }
+    out
+}
+
 fn root_arg(args: &[String], usage: &str, known: &[&str], positionals: usize) -> Result<PathBuf, i32> {
     let mut positional: Vec<&String> = Vec::new();
     for a in args {
@@ -3730,6 +3761,7 @@ const CATALOGUE: &[&str] = &[
     "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
     "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
     "  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate (D0232)",
+    "  recall --prompt -             seed recall from a PROMPT on stdin and print a budgeted, content-bearing brief; zero model calls (D0242/D0243)",
     "  record statement|story        intake's write path: a human's words VERBATIM, then the story that translates them with its #DerivedFrom edge authored alongside (D0236)",
     "  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace (D0234)",
     "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
@@ -3833,15 +3865,76 @@ fn cmd_decision_card(rest: &[String]) -> i32 {
 }
 
 /// `keel why <term> [ROOT]` (D0161): seed on names/titles/aliases, traverse, answer with provenance.
+/// Default character budget for a recalled payload. Bounded on purpose: injected context costs the
+/// human tokens on every turn, so the cost has to be predictable rather than proportional to how
+/// connected the term happens to be (D0242 part 1).
+const RECALL_BUDGET: usize = 4000;
+
+fn budget_arg(args: &[String]) -> usize {
+    flag(args, "budget").and_then(|v| v.parse().ok()).unwrap_or(RECALL_BUDGET)
+}
+
+/// `keel recall --prompt - [--budget N] [ROOT]` — seed from a PROMPT and print a budgeted brief.
+///
+/// The prompt arrives on STDIN, never as an argument: it is free-form text that may contain quotes,
+/// newlines and backticks, and the one thing this path must never do is let that text reach a shell.
+fn cmd_recall(rest: &[String]) -> i32 {
+    let usage = "keel recall --prompt - [--budget N] [ROOT]   (the prompt arrives on STDIN)";
+    if flag(rest, "prompt").as_deref() != Some("-") {
+        eprintln!("usage: {usage}");
+        eprintln!("  `--prompt -` is required and means: read the prompt from stdin.");
+        return 2;
+    }
+    let positional = without_flag_values(rest, &["prompt", "budget"]);
+    let root = match root_arg(&positional, usage, &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    let mut prompt = String::new();
+    if std::io::Read::read_to_string(&mut std::io::stdin(), &mut prompt).is_err() {
+        eprintln!("recall: could not read the prompt from stdin");
+        return 2;
+    }
+    match keel_cli::view::recall_for_prompt(&root, &prompt, budget_arg(rest)) {
+        Ok(s) => {
+            print!("{s}");
+            0
+        }
+        Err(e) => {
+            eprintln!("recall error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_why(rest: &[String]) -> i32 {
-    let Some(term) = rest.first() else {
-        eprintln!("usage: keel why <term> [ROOT]");
+    // `--budget N` consumes N, so the positionals have to be taken from the STRIPPED list or the
+    // number becomes the root — measured: `keel why keystone --brief --budget 1500` recalled 0 seeds
+    // because it built a model at `./1500`.
+    let positional = without_flag_values(rest, &["budget"]);
+    let bare: Vec<&String> = positional.iter().filter(|a| !a.starts_with("--")).collect();
+    let Some(term) = bare.first() else {
+        eprintln!("usage: keel why <term> [ROOT] [--brief] [--budget N]");
         return 2;
     };
-    let Some(root) = rest.get(1).map(PathBuf::from).or_else(find_repo_root) else {
-        eprintln!("usage: keel why <term> [ROOT]");
+    let Some(root) = bare.get(1).map(|p| PathBuf::from(p.as_str())).or_else(find_repo_root) else {
+        eprintln!("usage: keel why <term> [ROOT] [--brief] [--budget N]");
         return 2;
     };
+    // `--brief` is the INJECTABLE form: budgeted, content-bearing text rather than JSON whose seeds
+    // are bare identifiers. The JSON form is unchanged for every existing caller.
+    if rest.iter().any(|a| a == "--brief") {
+        return match keel_cli::view::why_brief(&root, term, budget_arg(rest)) {
+            Ok(s) => {
+                print!("{s}");
+                0
+            }
+            Err(e) => {
+                eprintln!("why error: {e}");
+                1
+            }
+        };
+    }
     match keel_cli::view::why(&root, term) {
         Ok(s) => {
             println!("{s}");
@@ -3993,6 +4086,7 @@ fn main() {
         Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
         Some("decision-card") => cmd_decision_card(rest),
         Some("why") => cmd_why(rest),
+        Some("recall") => cmd_recall(rest),
         Some("knowledge") => cmd_knowledge(rest),
         Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
         Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),

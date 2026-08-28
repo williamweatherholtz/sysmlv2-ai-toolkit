@@ -5,6 +5,7 @@
 //! the gate staying green (data-level removability, D0161 part 3i).
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Write as _;
 use std::path::Path;
 
 use crate::json::Json;
@@ -26,9 +27,159 @@ const HUB_DEGREE_LIMIT: usize = 25;
 /// How many reached rows `keel why` prints. The full count is always reported beside it.
 const MAX_REPORTED_ROWS: usize = 40;
 
-/// Case-insensitive containment on names, titles and Alias terms — the seeding rule (D0161 part 2).
+/// How many WORD tokens from one prompt may seed. Identifiers are exempt and unlimited: a prompt
+/// naming three decisions means all three. Words are capped because each extra seed widens the walk,
+/// and the rarest few carry nearly all the information in a sentence.
+const MAX_PROMPT_WORDS: usize = 3;
+
+/// Characters held back for the always-appended `recall:` summary and any truncation note, so the
+/// declared budget is the WHOLE payload rather than the rows alone.
+const FOOTER_RESERVE: usize = 160;
+
+/// Split a name or title into lowercase WORD SEGMENTS: `dcWorkspaceDiscovery` -> dc, workspace,
+/// discovery; `keel-gate.yml` -> keel, gate, yml. camelCase boundaries count, as does any
+/// non-alphanumeric.
+///
+/// Substring matching is what made seeding explode (D0243): `gate` matched 5,806 of 6,625 items
+/// because it sits inside gated, gating, keel-gate and staleGateProse. A segment is a word the author
+/// actually wrote.
+fn segments(hay: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut prev_lower = false;
+    for c in hay.chars() {
+        if c.is_alphanumeric() {
+            // A lower->upper transition is a camelCase boundary.
+            if prev_lower && c.is_uppercase() && !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            cur.push(c.to_ascii_lowercase());
+            prev_lower = c.is_lowercase() || c.is_numeric();
+        } else {
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            prev_lower = false;
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// Does `hay` contain `needle` as a whole SEGMENT (or equal it outright)?
 fn matches_term(hay: &str, needle: &str) -> bool {
-    hay.to_lowercase().contains(&needle.to_lowercase())
+    let n = needle.trim().to_lowercase();
+    if n.is_empty() {
+        return false;
+    }
+    if hay.to_lowercase() == n {
+        return true;
+    }
+    // A multi-word needle ("write api") is matched as a phrase against the joined segments.
+    if n.contains(' ') {
+        let joined = segments(hay).join(" ");
+        let phrase = segments(&n).join(" ");
+        return joined.contains(&phrase);
+    }
+    segments(hay).contains(&n)
+}
+
+/// Is this token an IDENTIFIER the corpus mints — `d0242`, `issue293`, `sprint477`, or a camelCase
+/// element name? Identifier tokens are the strongest possible seed (D0243 rule 1): a prompt that
+/// contains one is asking about exactly that thing, so they bypass rarity weighting entirely.
+fn is_identifier_token(tok: &str) -> bool {
+    let t = tok.trim();
+    if t.len() < 3 {
+        return false;
+    }
+    let numeric_tail = |prefix: &str| {
+        t.strip_prefix(prefix)
+            .is_some_and(|r| !r.is_empty() && r.chars().all(|c| c.is_ascii_digit()))
+    };
+    if numeric_tail("d") || numeric_tail("issue") || numeric_tail("sprint") || numeric_tail("D") {
+        return true;
+    }
+    // camelCase / mixed case with an internal uppercase — how every element in this corpus is named.
+    t.chars().all(char::is_alphanumeric)
+        && t.chars().next().is_some_and(char::is_lowercase)
+        && t.chars().skip(1).any(char::is_uppercase)
+}
+
+/// English function and filler words. Language, NOT domain vocabulary — the distinction matters:
+/// domain stop-wording is DERIVED from the corpus (D0243 rule 3) because it differs per project and
+/// goes stale, while "would" is a filler word in every corpus and always will be.
+fn is_function_word(w: &str) -> bool {
+    const WORDS: [&str; 46] = [
+        "about", "above", "after", "again", "against", "already", "also", "although", "always",
+        "another", "because", "been", "before", "being", "below", "between", "both", "cannot",
+        "could", "does", "doing", "done", "during", "each", "either", "every", "from", "further",
+        "have", "having", "here", "into", "just", "made", "make", "making", "many", "more", "most",
+        "much", "must", "only", "other", "should", "some", "would",
+    ];
+    WORDS.contains(&w)
+}
+
+/// Tokens worth seeding on, drawn from a free-form PROMPT (D0242 part 2 / D0243).
+///
+/// Returns `(token, match count, kind)` for tokens that survive, and the dropped-as-common list so the
+/// caller can SAY what it ignored rather than silently narrowing. Order: identifiers first, then rare
+/// words by increasing frequency — the rarest token is the most informative seed.
+fn prompt_tokens(model: &Model, prompt: &str) -> (Vec<(String, usize, &'static str)>, Vec<String>) {
+    // A token matching more than this share of the corpus carries no information. DERIVED from the
+    // tree, not authored, so it re-weights itself as the corpus grows (D0243 rule 3).
+    // Tuned from the corpus, and reported beside the answer so the rule is auditable rather than a
+    // magic number: at ~12k items this lands near 60, which drops `gate` (5,736) and `decision` (236)
+    // while keeping `workspace` (65) and `keystone` (38). A payload can usefully show a dozen or two
+    // elements, so seeding on a token that matches hundreds cannot inform the ranking.
+    let ceiling = std::cmp::max(20, model.items.len() / 200);
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut kept: Vec<(String, usize, &'static str)> = Vec::new();
+    let mut dropped: Vec<String> = Vec::new();
+    for raw in prompt.split(|c: char| !c.is_alphanumeric() && c != '-') {
+        let tok = raw.trim_matches('-');
+        if tok.chars().count() < 3 || !seen.insert(tok.to_lowercase()) {
+            continue;
+        }
+        if is_identifier_token(tok) {
+            kept.push((tok.to_string(), 0, "identifier"));
+            continue;
+        }
+        if tok.chars().count() < 5 || is_function_word(&tok.to_lowercase()) {
+            // Measured: `made` matched 7 elements — rare, and semantically empty, so it seeded an
+            // unrelated Issue. Frequency alone cannot separate a rare DOMAIN term from a rare filler
+            // word, so language is filtered as language. This list is ENGLISH, not this corpus's
+            // vocabulary, so it stays true for any project and needs no maintenance (D0243 keeps
+            // domain stop-wording derived; this is a different thing).
+            continue;
+        }
+        let hits = model
+            .items
+            .iter()
+            .filter(|(n, i)| {
+                matches_term(n, tok) || i.attrs.get("title").is_some_and(|t| matches_term(t, tok))
+            })
+            .count();
+        if hits == 0 {
+            continue;
+        }
+        if hits > ceiling {
+            dropped.push(format!("{tok} ({hits} matches)"));
+        } else {
+            kept.push((tok.to_string(), hits, "word"));
+        }
+    }
+    kept.sort_by_key(|(tok, hits, _)| (*hits, tok.clone()));
+    // Identifiers are never dropped; among WORDS keep only the rarest few, because the fifth-rarest
+    // word in a sentence is close to noise and every extra seed widens the walk.
+    let mut ids: Vec<(String, usize, &'static str)> =
+        kept.iter().filter(|(_, _, k)| *k == "identifier").cloned().collect();
+    let words: Vec<(String, usize, &'static str)> =
+        kept.into_iter().filter(|(_, _, k)| *k != "identifier").take(MAX_PROMPT_WORDS).collect();
+    ids.extend(words);
+    dropped.sort();
+    (ids, dropped)
 }
 
 /// Seed the traversal: items whose NAME or TITLE contains `term`, plus every target of an Alias
@@ -268,9 +419,207 @@ pub fn knowledge_wellformedness(root: &Path) -> Result<(usize, Vec<String>), Vie
     Ok((scanned, violations))
 }
 
+/// One compact, budgeted, CONTENT-bearing recall payload — the form fit to place in front of a model
+/// (D0242 part 1).
+///
+/// `keel why` returns JSON whose `seeds` are bare identifiers; injecting that would push 40 names and
+/// no facts. This emits ranked lines carrying what a reader needs to act — type, name, title, how it
+/// was reached, and the source file — plus the substantive text of the nearest few elements, under a
+/// character budget so a turn's context cost is bounded and predictable.
+///
+/// THE BUDGET HAS EXACTLY ONE STATED EXCEPTION: the top row is always included, even when it alone
+/// exceeds the budget. Two rules here would otherwise contradict each other - "the payload fits the
+/// budget" and "a budget narrows the answer, never erases it" - and a budget small enough to erase the
+/// single most relevant fact is a budget set wrong, not an answer worth suppressing. Every row after
+/// the first is inside the budget, footer included.
+fn brief_from_seeds(
+    model: &Model,
+    header: &str,
+    seeds: &[(String, String)],
+    budget: usize,
+) -> String {
+    let seed_names: Vec<String> = seeds.iter().map(|(n, _)| n.clone()).collect();
+    // An element the prompt NAMED outranks everything. Measured: a prompt asking about `d0239` put
+    // d0219 first, because both sat at 0 hops and the tie broke alphabetically - so the one thing the
+    // reader explicitly asked about lost to a neighbour. Hops is the right measure BETWEEN reached
+    // elements and the wrong one for the element that was named outright.
+    let named: HashSet<&str> = seeds
+        .iter()
+        .filter(|(_, how)| how.starts_with("identifier"))
+        .map(|(n, _)| n.as_str())
+        .collect();
+    let (reached, hubs) = traverse(model, &seed_names);
+    let mut sorted: Vec<(&String, &(usize, String))> = reached.iter().collect();
+    sorted.sort_by(|a, b| {
+        let key = |n: &String, h: usize| (usize::from(!named.contains(n.as_str())), h, n.clone());
+        key(a.0, a.1 .0).cmp(&key(b.0, b.1 .0))
+    });
+    let mut out = String::with_capacity(budget.min(8192));
+    out.push_str(header);
+    out.push('\n');
+    let mut written = 0usize;
+    // The nearest elements get their substantive text; the rest get one line each. Nearest-first is
+    // the only defensible ranking here: hops is the graph's own measure of relevance to the seed.
+    //
+    // Substance is capped at 240 chars over the top TWO rows, not 400 over three: measured, three
+    // 400-char rows consumed a 1,200-char budget entirely and showed 2 of 408 reached elements, so
+    // the payload was all depth and no breadth.
+    for (rank, (name, (hops, via))) in sorted.iter().enumerate() {
+        let Some(info) = model.items.get(*name) else { continue };
+        let title = info.attrs.get("title").cloned().unwrap_or_default();
+        let mut line = format!(
+            "- {} {} ({} hop{}, via {}) — {}\n  {}\n",
+            info.type_name,
+            name,
+            hops,
+            if *hops == 1 { "" } else { "s" },
+            via,
+            title,
+            info.file
+        );
+        if rank < 2 {
+            for field in ["decision", "description", "rationale", "actionText"] {
+                if let Some(v) = info.attrs.get(field) {
+                    let text: String = v.chars().take(240).collect();
+                    let _ = writeln!(line, "  {field}: {text}");
+                    break;
+                }
+            }
+        }
+        // THE TOP ROW IS ALWAYS SHOWN. Measured: with a tight budget the first row's substance
+        // overflowed before anything was written, so the payload printed "41 more reached, not shown"
+        // AND "(nothing reached)" — two contradictory statements and zero facts. A budget should
+        // narrow the answer, never erase it.
+        // RESERVE the footer. The summary line is always appended, so counting only the rows made a
+        // 1,500-char budget produce 1,539 - a small overshoot, but the DoD says the payload FITS the
+        // budget and a claim is either true or it is not.
+        if out.len() + line.len() + FOOTER_RESERVE > budget && written > 0 {
+            let _ = writeln!(
+                out,
+                "  ... {} more reached, not shown (budget {budget} chars)",
+                sorted.len().saturating_sub(written)
+            );
+            break;
+        }
+        out.push_str(&line);
+        written += 1;
+    }
+    if written == 0 {
+        out.push_str("  (nothing reached)\n");
+    }
+    let _ = writeln!(
+        out,
+        "recall: {} seed(s), {} reached, {} shown, {} hub(s) not expanded",
+        seeds.len(),
+        reached.len(),
+        written,
+        hubs
+    );
+    out
+}
+
+/// `keel why <term> --brief` (D0242 part 1).
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn why_brief(root: &Path, term: &str, budget: usize) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let seeds = seeds_for(&model, term);
+    Ok(brief_from_seeds(&model, &format!("recalled for term `{term}`:"), &seeds, budget))
+}
+
+/// `keel recall --prompt -` : seed from a free-form PROMPT and return a budgeted brief (D0242 part 2,
+/// D0243 precision rules). ZERO model calls — this is code finding facts before the model is involved.
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<String, ViewError> {
+    let model = Model::build(root)?;
+    let (tokens, dropped) = prompt_tokens(&model, prompt);
+    if tokens.is_empty() {
+        // SAYING SO is the point: a silent empty recall is indistinguishable from a broken one.
+        let mut msg = String::from("recall: no informative term in this prompt — nothing pushed.\n");
+        if !dropped.is_empty() {
+            let _ = writeln!(msg, "  ignored as too common to inform: {}", dropped.join(", "));
+        }
+        return Ok(msg);
+    }
+    let mut seeds: Vec<(String, String)> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for (tok, _, kind) in &tokens {
+        for (n, how) in seeds_for(&model, tok) {
+            if seen.insert(n.clone()) {
+                seeds.push((n, format!("{kind} `{tok}` / {how}")));
+            }
+        }
+    }
+    let named: Vec<String> = tokens.iter().map(|(t, h, k)| {
+        if *k == "identifier" { t.clone() } else { format!("{t}({h})") }
+    }).collect();
+    let mut header = format!(
+        "recalled on {} [corpus {} items, common-token ceiling {}]:",
+        named.join(", "),
+        model.items.len(),
+        std::cmp::max(20, model.items.len() / 200)
+    );
+    if !dropped.is_empty() {
+        let _ = write!(header, " [ignored as too common: {}]", dropped.join(", "));
+    }
+    Ok(brief_from_seeds(&model, &header, &seeds, budget))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// D0243 rule 2: segments, not substrings. Every case here is measured from the real corpus.
+    #[test]
+    fn matching_is_on_word_segments_not_substrings() {
+        assert_eq!(segments("dcWorkspaceDiscoveryIsComplete"), ["dc", "workspace", "discovery", "is", "complete"]);
+        assert_eq!(segments("keel-gate.yml"), ["keel", "gate", "yml"]);
+        assert_eq!(segments("d0239"), ["d0239"]);
+
+        // The explosion this ends: `gate` matched 5,806 of the corpus by substring because it sits
+        // inside all of these. None of them is a `gate`.
+        assert!(!matches_term("propagated", "gate"));
+        assert!(!matches_term("investigate", "gate"));
+        // But a real segment still matches, in a name or a title, and camelCase counts.
+        assert!(matches_term("staleGateProse", "gate"));
+        assert!(matches_term("the commit gate belongs to the repository", "gate"));
+        // A multi-word needle is matched as a phrase over the segments.
+        assert!(matches_term("theWriteApiIsSanctioned", "write api"));
+        assert!(!matches_term("theWriteApiIsSanctioned", "api write"));
+    }
+
+    /// D0243 rule 1: an identifier is the strongest seed and bypasses rarity entirely.
+    #[test]
+    fn identifier_tokens_are_recognised_and_plain_words_are_not() {
+        for id in ["d0239", "issue293", "sprint477", "dcWorkspaceDiscoveryIsComplete", "kgPromptPathInjects"] {
+            assert!(is_identifier_token(id), "{id} is an identifier this corpus mints");
+        }
+        for word in ["gate", "decision", "workspace", "the", "d", "DECISION"] {
+            assert!(!is_identifier_token(word), "{word} is not an identifier");
+        }
+    }
+
+    /// A budget must NARROW an answer, never erase it. Measured defect: with a tight budget the first
+    /// row's substance overflowed before anything was written, so the payload printed "41 more
+    /// reached, not shown" AND "(nothing reached)" - two contradictory claims and zero facts.
+    #[test]
+    fn a_tight_budget_still_shows_the_top_row() {
+        let mut model = Model { items: HashMap::new(), edges: Vec::new() };
+        let mut attrs = HashMap::new();
+        attrs.insert("title".to_string(), "a title long enough to matter on its own".to_string());
+        attrs.insert("decision".to_string(), "x".repeat(2000));
+        model.items.insert(
+            "d0001".to_string(),
+            ItemInfo { type_name: "Decision".to_string(), attrs, marker: None, file: "f.sysml".to_string() },
+        );
+        let seeds = vec![("d0001".to_string(), "identifier `d0001`".to_string())];
+        let out = brief_from_seeds(&model, "header:", &seeds, 50);
+        assert!(out.contains("d0001"), "the top row must survive any budget: {out}");
+        assert!(!out.contains("(nothing reached)"), "must not claim nothing was reached: {out}");
+    }
 
     /// D0161's well-formedness boundary and its data-level removability, against a real temp model:
     /// a malformed Alias is a violation; an EMPTY store scans zero and violates nothing (the feature
