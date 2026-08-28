@@ -323,7 +323,7 @@ fn cmd_hook(args: &[String]) -> i32 {
     let code = match event {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
-        "user-prompt" => hook_user_prompt(&root),
+        "user-prompt" => hook_user_prompt(&root, &payload),
         "pre-bash" => hook_pre_bash(&payload, &root, &session),
         "pre-write" => hook_pre_write(&payload, &root),
         "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
@@ -788,7 +788,70 @@ fn ledger_advisory(root: &Path, session: &str, spoken: &str) {
 ///
 /// ASCII-only on purpose: this text is injected into the model's context via stdout, and a non-UTF-8
 /// Windows console turns non-ASCII into mojibake.
-fn hook_user_prompt(root: &Path) -> i32 {
+/// Recalled facts for this prompt, or `None` when nothing should be pushed (D0242 part 3).
+///
+/// # PUSH, not pull — and why this function is the whole point
+///
+/// The source process (`.engine/processes/knowledge-graph-memory.sysml`, step `kgInjection`) states it
+/// plainly: "THIS STEP IS WHAT MAKES IT PUSH RATHER THAN PULL — a graph the model must decide to query
+/// is still pull, and inherits every cost this process exists to remove." Seven of the eight spine
+/// steps were built in sprint 424; this is the eighth, and its absence is why the store existed for a
+/// week with no measurable effect.
+///
+/// # THREE WAYS TO TURN IT OFF, in the order a human would reach for them
+///
+/// 1. `keel deactivate knowledge-graph-memory` — the DECLARED off. The process is a deactivatable unit
+///    (D0138), so the switch is committed, auditable, and travels with the project. This is the one to
+///    use: a project that turned recall off has DECLARED it, rather than having it quietly not work.
+/// 2. `KEEL_RECALL=off` — the immediate, machine-local off, for "it is misbehaving right now" without a
+///    commit. Deliberately env-based so it cannot be mistaken for a project decision.
+/// 3. Doing nothing — a LOW-confidence prompt is not injected at all. Silence is the default whenever
+///    recall cannot show it has found the right thing.
+///
+/// Note what is NOT a kill switch any more: deleting `.knowledge/`. D0243 made seeding corpus-derived,
+/// so removing the store costs aliases and question-coverage, not recall. Saying so matters, because
+/// that used to be the removability story.
+///
+/// FAIL-OPEN, always. Any error, any timeout, any absent store returns `None` and the turn proceeds:
+/// injection is an advantage, never a dependency, and a broken index must never cost a turn.
+fn recalled_facts(root: &Path, payload: &serde_json::Value) -> Option<String> {
+    if std::env::var("KEEL_RECALL").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
+        return None;
+    }
+    if !keel_cli::activation::Activation::load(root).is_process_active("knowledge-graph-memory") {
+        return None;
+    }
+    let prompt = payload.get("prompt").and_then(serde_json::Value::as_str)?;
+    if prompt.trim().is_empty() {
+        return None;
+    }
+    let started = std::time::Instant::now();
+    // The confidence verdict and the payload are computed from the same model build, so the cost is
+    // paid once. `recall_for_prompt` returns its own "nothing pushed" text for an uninformative prompt,
+    // which is a PULL answer - useful at a CLI, noise in a prompt - so the verdict gates it here.
+    if !keel_cli::view::recall_confidence(root, prompt).unwrap_or(false) {
+        return None;
+    }
+    let facts = keel_cli::view::recall_for_prompt(root, prompt, RECALL_BUDGET).ok()?;
+    let ms = started.elapsed().as_millis();
+    // A LATENCY CAP that reports rather than hides: past the cap the facts are dropped for this turn
+    // and the reader is told, because a recall that silently doubles every turn's latency is the kind
+    // of cost that gets discovered months later.
+    if ms > RECALL_CAP_MS {
+        return Some(format!(
+            "[keel recall] SKIPPED — recall took {ms}ms (cap {RECALL_CAP_MS}ms). Facts not pushed this turn.\n"
+        ));
+    }
+    // The VISIBLE recall count and elapsed time the process names as this step's produced artifact.
+    Some(format!("[keel recall — pushed before the model, {ms}ms]\n{facts}"))
+}
+
+fn hook_user_prompt(root: &Path, payload: &serde_json::Value) -> i32 {
+    // PUSH FIRST, then the routing contract: the facts have to be in front of the model when it wakes,
+    // and the contract is what it should do with them.
+    if let Some(facts) = recalled_facts(root, payload) {
+        print!("{facts}");
+    }
     // D0064/D0106: routing is structural, fired every turn rather than left to vigilance.
     println!(
         "[engine-triage -- route FIRST (D0064)] Break the request into parts and route EACH before \
@@ -3865,6 +3928,11 @@ fn cmd_decision_card(rest: &[String]) -> i32 {
 }
 
 /// `keel why <term> [ROOT]` (D0161): seed on names/titles/aliases, traverse, answer with provenance.
+/// Hard latency cap for prompt-path recall. Measured at 641-863ms on this repo's 13.6k-item corpus, so
+/// the cap leaves headroom while bounding the worst case: a prompt-path cost that grows with the corpus
+/// is a tax that compounds silently, and the reader is TOLD when it is hit rather than left to wonder.
+const RECALL_CAP_MS: u128 = 2500;
+
 /// Default character budget for a recalled payload. Bounded on purpose: injected context costs the
 /// human tokens on every turn, so the cost has to be predictable rather than proportional to how
 /// connected the term happens to be (D0242 part 1).

@@ -436,13 +436,23 @@ fn brief_from_seeds(
     model: &Model,
     header: &str,
     seeds: &[(String, String)],
+    agreement: &HashMap<String, usize>,
     budget: usize,
 ) -> String {
     let seed_names: Vec<String> = seeds.iter().map(|(n, _)| n.clone()).collect();
-    // An element the prompt NAMED outranks everything. Measured: a prompt asking about `d0239` put
-    // d0219 first, because both sat at 0 hops and the tie broke alphabetically - so the one thing the
-    // reader explicitly asked about lost to a neighbour. Hops is the right measure BETWEEN reached
-    // elements and the wrong one for the element that was named outright.
+    // AGREEMENT IS THE PRIMARY RANK. Measured on a real prompt ("should we implement the knowledge
+    // graph item now? why didn't we earlier?"): 81 seeds all sat at 0 hops, so the tie broke
+    // ALPHABETICALLY and the payload led with a decision about the VIEWER's graph renderer plus two
+    // stale critiques matching "earlier", while d0161 - the actual answer - sat unshown among 366.
+    //
+    // The signal that fixes it needs no vocabulary: how many DISTINCT prompt tokens reach the same
+    // element. For that prompt, 46 elements matched `knowledge` alone and 23 matched `graph` alone,
+    // while exactly 9 matched BOTH - d0153, d0161, d0242, dcKnowledgeGraphStore and the process
+    // itself, which is the correct answer set. Two independent words agreeing on one element is
+    // evidence; one word matching it is a coincidence waiting to happen.
+    //
+    // An element the prompt NAMED outright (an identifier) is given the maximum score: `d0239` is not
+    // a guess about relevance.
     let named: HashSet<&str> = seeds
         .iter()
         .filter(|(_, how)| how.starts_with("identifier"))
@@ -451,7 +461,10 @@ fn brief_from_seeds(
     let (reached, hubs) = traverse(model, &seed_names);
     let mut sorted: Vec<(&String, &(usize, String))> = reached.iter().collect();
     sorted.sort_by(|a, b| {
-        let key = |n: &String, h: usize| (usize::from(!named.contains(n.as_str())), h, n.clone());
+        let key = |n: &String, h: usize| {
+            let score = if named.contains(n.as_str()) { usize::MAX } else { *agreement.get(n).unwrap_or(&0) };
+            (std::cmp::Reverse(score), h, n.clone())
+        };
         key(a.0, a.1 .0).cmp(&key(b.0, b.1 .0))
     });
     let mut out = String::with_capacity(budget.min(8192));
@@ -525,7 +538,10 @@ fn brief_from_seeds(
 pub fn why_brief(root: &Path, term: &str, budget: usize) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let seeds = seeds_for(&model, term);
-    Ok(brief_from_seeds(&model, &format!("recalled for term `{term}`:"), &seeds, budget))
+    // A single explicit term cannot produce agreement, so every seed scores 1 and hops decides - which
+    // is correct here: the caller named the subject, so there is nothing to disambiguate.
+    let agreement: HashMap<String, usize> = seeds.iter().map(|(n, _)| (n.clone(), 1)).collect();
+    Ok(brief_from_seeds(&model, &format!("recalled for term `{term}`:"), &seeds, &agreement, budget))
 }
 
 /// `keel recall --prompt -` : seed from a free-form PROMPT and return a budgeted brief (D0242 part 2,
@@ -546,31 +562,132 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
     }
     let mut seeds: Vec<(String, String)> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
+    // Count how many DISTINCT tokens reach each element - the agreement score.
+    let mut agreement: HashMap<String, usize> = HashMap::new();
     for (tok, _, kind) in &tokens {
         for (n, how) in seeds_for(&model, tok) {
+            *agreement.entry(n.clone()).or_insert(0) += 1;
             if seen.insert(n.clone()) {
                 seeds.push((n, format!("{kind} `{tok}` / {how}")));
             }
         }
     }
+    let best_agreement = agreement.values().copied().max().unwrap_or(0);
+    let has_identifier = tokens.iter().any(|(_, _, k)| *k == "identifier");
+    let has_name_match = seeds.iter().any(|(_, how)| how.contains("name match"));
     let named: Vec<String> = tokens.iter().map(|(t, h, k)| {
         if *k == "identifier" { t.clone() } else { format!("{t}({h})") }
     }).collect();
     let mut header = format!(
-        "recalled on {} [corpus {} items, common-token ceiling {}]:",
+        "recalled on {} [corpus {} items, agreement {}, confidence {}]:",
         named.join(", "),
         model.items.len(),
-        std::cmp::max(20, model.items.len() / 200)
+        best_agreement,
+        if confident(has_identifier, best_agreement, seeds.len(), has_name_match) { "HIGH" } else { "LOW" }
     );
     if !dropped.is_empty() {
         let _ = write!(header, " [ignored as too common: {}]", dropped.join(", "));
     }
-    Ok(brief_from_seeds(&model, &header, &seeds, budget))
+    Ok(brief_from_seeds(&model, &header, &seeds, &agreement, budget))
+}
+
+/// Is this recall confident enough to PUSH unasked?
+///
+/// Measured, and this is the whole reason the verdict exists: recall quality is bimodal. A prompt whose
+/// rare tokens agree on an element ("knowledge" + "graph" -> 9 of 78 candidates, all correct), or which
+/// NAMES one outright (`d0239`), or whose tokens are rare enough to yield only a handful of seeds at
+/// all, produces a precise payload. A prompt with one mid-frequency word and no agreement produces 81
+/// seeds ranked arbitrarily, which costs the reader tokens and points at the wrong files - strictly
+/// worse than silence.
+///
+/// THE THIRD CRITERION WAS A CORRECTION, not a design: with only the first two, the best payload of the
+/// three sampled prompts - "do we need to rely on diligence... were there pre-model hooks", which
+/// returned D0134 and the sprint that moved the hooks into the binary - scored LOW and would have been
+/// suppressed. Its quality came from having 9 seeds, not from agreement. A rule that rejects its own
+/// best example is wrong about what it is measuring.
+///
+/// Pulling is different: `keel why` and `keel recall` always print, because the caller asked. This
+/// verdict governs only unrequested INJECTION.
+/// A seed set this small is inherently focused: the payload can show most of what was found, so
+/// ranking barely matters and there is nothing for an arbitrary tie-break to get wrong.
+const FOCUSED_SEED_COUNT: usize = 12;
+
+#[must_use]
+pub const fn confident(
+    has_identifier: bool,
+    best_agreement: usize,
+    seed_count: usize,
+    has_name_match: bool,
+) -> bool {
+    // The focused-count criterion additionally requires a NAME match. Measured false positive: "what
+    // about the thing we discussed yesterday" scored HIGH because `thing` matched 2 elements - inside
+    // one Issue's TITLE PROSE ("the one thing a collision corrupts") - and 2 is a focused seed set.
+    // A word appearing in prose is weak evidence about the subject; a word appearing in an element's
+    // NAME is what an author chose to call it. Expanding the filler-word list instead would have been
+    // whack-a-mole, and it would not generalise to the next corpus.
+    has_identifier
+        || best_agreement >= 2
+        || (has_name_match && seed_count > 0 && seed_count <= FOCUSED_SEED_COUNT)
+}
+
+/// The confidence verdict for a prompt, without building the payload — for the injection path.
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn recall_confidence(root: &Path, prompt: &str) -> Result<bool, ViewError> {
+    let model = Model::build(root)?;
+    let (tokens, _) = prompt_tokens(&model, prompt);
+    if tokens.is_empty() {
+        return Ok(false);
+    }
+    let mut agreement: HashMap<String, usize> = HashMap::new();
+    let mut has_name_match = false;
+    for (tok, _, _) in &tokens {
+        for (n, how) in seeds_for(&model, tok) {
+            has_name_match |= how.contains("name match");
+            *agreement.entry(n).or_insert(0) += 1;
+        }
+    }
+    Ok(confident(
+        tokens.iter().any(|(_, _, k)| *k == "identifier"),
+        agreement.values().copied().max().unwrap_or(0),
+        agreement.len(),
+        has_name_match,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The confidence verdict, one case per MEASURED failure that produced each criterion. Every
+    /// clause here exists because a real prompt was classified wrongly without it.
+    #[test]
+    fn confidence_admits_the_precise_and_refuses_the_diffuse() {
+        // An identifier is never a guess: "why did we decide d0239 that way?"
+        assert!(confident(true, 1, 400, false), "a named element is always worth pushing");
+
+        // Agreement: "should we implement the knowledge graph item now?" - 81 seeds, but `knowledge`
+        // and `graph` agreed on 9 elements and those 9 were the correct answer set.
+        assert!(confident(false, 2, 81, true), "two independent tokens agreeing is evidence");
+
+        // A focused seed set: "do we need to rely on diligence... pre-model hooks" returned 9 seeds
+        // and the best payload of the three sampled prompts. WITHOUT this clause the rule rejected
+        // its own best example, which is how the criterion was found.
+        assert!(confident(false, 1, 9, true), "a handful of seeds needs no ranking to be right");
+
+        // The false positive that forced the name-match requirement: "what about the thing we
+        // discussed yesterday" - `thing` matched 2 elements inside one Issue's TITLE PROSE. Rare, and
+        // about nothing.
+        assert!(!confident(false, 1, 2, false), "prose-only matches are not evidence about the subject");
+
+        // Diffuse: one mid-frequency word, no agreement - "please tidy up the workspace" (65 seeds).
+        // Ranking would be arbitrary, so silence is strictly better than noise.
+        assert!(!confident(false, 1, 65, true), "one mid-frequency word ranked arbitrarily is noise");
+
+        // Nothing found at all is never confident.
+        assert!(!confident(false, 0, 0, false));
+    }
 
     /// D0243 rule 2: segments, not substrings. Every case here is measured from the real corpus.
     #[test]
@@ -616,7 +733,8 @@ mod tests {
             ItemInfo { type_name: "Decision".to_string(), attrs, marker: None, file: "f.sysml".to_string() },
         );
         let seeds = vec![("d0001".to_string(), "identifier `d0001`".to_string())];
-        let out = brief_from_seeds(&model, "header:", &seeds, 50);
+        let agreement: HashMap<String, usize> = seeds.iter().map(|(n, _)| (n.clone(), 1)).collect();
+        let out = brief_from_seeds(&model, "header:", &seeds, &agreement, 50);
         assert!(out.contains("d0001"), "the top row must survive any budget: {out}");
         assert!(!out.contains("(nothing reached)"), "must not claim nothing was reached: {out}");
     }
