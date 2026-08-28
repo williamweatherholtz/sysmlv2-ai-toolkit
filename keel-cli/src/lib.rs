@@ -57,6 +57,7 @@ pub mod pm;
 pub mod orient;
 pub mod process_cmd;
 pub mod claude_surface;
+pub mod console_registry;
 pub mod queries;
 pub mod reverify;
 pub mod scaffold;

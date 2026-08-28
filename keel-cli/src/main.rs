@@ -1311,11 +1311,58 @@ fn cmd_serve(args: &[String]) -> i32 {
             if let Some(r) = find_repo_root() {
                 r
             } else {
-                eprintln!("usage: keel serve [--port N] [ROOT]");
+                eprintln!("usage: keel serve [--port N] [ROOT] [--stop] [--forget]");
                 return 2;
             }
         }
     };
+    if !keel_cli::workspace::is_project(&root) {
+        eprintln!("serve: {} is not a keel project (needs .engine/ and .tracking/).", root.display());
+        return 2;
+    }
+
+    // `--forget`: stop listing this project in the console selector, without touching the project.
+    if args.iter().any(|a| a == "--forget") {
+        return match keel_cli::console_registry::deregister(&root) {
+            Ok(true) => {
+                println!("console: {} deregistered — it will no longer appear in the selector.", root.display());
+                0
+            }
+            Ok(false) => {
+                println!("console: {} was not registered; nothing to forget.", root.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("console: {e}");
+                1
+            }
+        };
+    }
+
+    // ATTACH, DO NOT SPAWN (D0245 clause 2). This is the whole fix for "too many keel serve windows":
+    // running the command in a second project used to start a second server, because binding was the
+    // first thing tried. Now the first thing asked is whether one of ours is already answering — and
+    // the check distinguishes OUR console from any program holding the socket, because those two
+    // situations need opposite responses: attach, or refuse loudly.
+    let today = keel_cli::scaffold::today();
+    if keel_cli::console_registry::console_on(port) {
+        if let Err(e) = keel_cli::console_registry::register(&root, Some(port), &today) {
+            eprintln!("console: registered nothing ({e}) — the console is running but this project");
+            eprintln!("  will not appear in its selector until the registry is writable.");
+            return 1;
+        }
+        println!("Keel console is ALREADY RUNNING on http://127.0.0.1:{port} — attached, did not start a second.");
+        println!("  registered: {}", keel_cli::workspace::canon(&root).display());
+        println!("  open:       http://127.0.0.1:{port}/  then pick it from the project selector");
+        println!("  forget it:  keel serve --forget {}", root.display());
+        return 0;
+    }
+    // No console of ours. Register BEFORE binding, so the project is in the selector the moment the
+    // surface comes up rather than one restart later.
+    if let Err(e) = keel_cli::console_registry::register(&root, Some(port), &today) {
+        eprintln!("console: could not record this project in the registry: {e}");
+        eprintln!("  starting anyway — the selector will show only the active project.");
+    }
     keel_cli::serve::run(root, port)
 }
 

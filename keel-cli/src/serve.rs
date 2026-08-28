@@ -1873,42 +1873,54 @@ async fn api_schema(State(s): State<AppState>) -> Response {
 /// GET /api/review-queue (D0121) — the human review queue: user-gated items awaiting judgment
 /// (proposed Decisions + pending confirmation gates). The read side of the human-oversight loop;
 /// the "Review" console tab renders it and records acceptance via the write endpoints.
-/// GET /api/projects — the projects this surface can reach, and which is ACTIVE (N-C4).
+/// GET /api/projects — the projects this surface can reach, and which is ACTIVE (N-C4, D0245).
 ///
-/// Discovered rather than configured: the active root plus any sibling directory that is itself a keel
-/// project. A config file would be a second place to keep the list true, and the filesystem already
-/// knows. The active project is always named, which is the half of N-C4 that stops a supervisor
-/// wondering which project they are looking at.
+/// REGISTERED, not scanned (D0245 clause 3). This used to be "the active root plus any SIBLING
+/// directory that is itself a keel project", justified as discovery over configuration — and the human
+/// named the consequence exactly: "it's not actually projects requesting to tap into keel serve, it
+/// seems to be based on directory structure." A project in another repository could never appear, and
+/// no project could ask to be listed or to stop being listed. It worked on the author's machine only
+/// because all eight projects happened to share a parent directory.
+///
+/// The registry it reads instead is still not a configuration to maintain: an entry exists because
+/// someone ran `keel serve` in that project, and `console_registry::load` drops any whose directory has
+/// gone. The ACTIVE project is always included even if it was never registered, because the surface
+/// must never fail to name the tree it is showing.
 async fn api_projects(State(s): State<AppState>) -> Response {
     let active = s.rootpath();
-    let mut found: Vec<PathBuf> = vec![active.clone()];
-    if let Some(parent) = active.parent() {
-        if let Ok(rd) = std::fs::read_dir(parent) {
-            for e in rd.flatten() {
-                let p = e.path();
-                if p != active && p.join(".engine").is_dir() && p.join(".tracking").is_dir() {
-                    found.push(p);
-                }
-            }
-        }
+    let reg = crate::console_registry::load();
+    let labels = crate::console_registry::display_labels(&reg.entries);
+    let mut rows: Vec<crate::json::Json> = Vec::new();
+    let mut seen: Vec<PathBuf> = Vec::new();
+    for (e, label) in reg.entries.iter().zip(labels) {
+        seen.push(e.root.clone());
+        rows.push(crate::json::Json::Obj(vec![
+            ("root".to_string(), crate::json::Json::s(display_path(&e.root))),
+            ("name".to_string(), crate::json::Json::s(label)),
+            ("repo".to_string(), crate::json::Json::s(e.repo.clone())),
+            ("lastServed".to_string(), crate::json::Json::s(e.last_served.clone())),
+            ("active".to_string(), crate::json::Json::Bool(e.root == active)),
+        ]));
     }
-    found.sort();
-    found.dedup();
-    let rows: Vec<crate::json::Json> = found
-        .iter()
-        .map(|p| {
+    if !seen.contains(&active) {
+        // Serving a project nobody registered — list it anyway and say so, rather than showing a
+        // selector that omits the very thing on screen.
+        rows.insert(
+            0,
             crate::json::Json::Obj(vec![
-                ("root".to_string(), crate::json::Json::s(display_path(p))),
+                ("root".to_string(), crate::json::Json::s(display_path(&active))),
                 (
                     "name".to_string(),
                     crate::json::Json::s(
-                        p.file_name().map_or_else(String::new, |n| n.to_string_lossy().to_string()),
+                        active.file_name().map_or_else(String::new, |n| n.to_string_lossy().to_string()),
                     ),
                 ),
-                ("active".to_string(), crate::json::Json::Bool(*p == active)),
-            ])
-        })
-        .collect();
+                ("repo".to_string(), crate::json::Json::s(String::new())),
+                ("lastServed".to_string(), crate::json::Json::s("unregistered".to_string())),
+                ("active".to_string(), crate::json::Json::Bool(true)),
+            ]),
+        );
+    }
     ok_json(with_status(
         &crate::json::Json::Obj(vec![
             ("activeProject".to_string(), crate::json::Json::s(display_path(&active))),
