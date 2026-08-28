@@ -129,6 +129,25 @@ fn is_function_word(w: &str) -> bool {
     WORDS.contains(&w)
 }
 
+/// IDF weight of a token: how much a match on it is worth (issue295).
+///
+/// REPLACES THE BINARY AGREEMENT VOTE, which the panel measured as inert. Agreement counted how many
+/// distinct prompt tokens reached an element, capped at three by `MAX_PROMPT_WORDS`, and reached max 1
+/// in 43 of 50 benchmark cases — so the primary sort key was CONSTANT and ranking degenerated to
+/// (hops, name), i.e. alphabetical. That is the exact failure agreement was introduced to fix.
+///
+/// The graded version of the same intuition is inverse document frequency, and it is the standard one:
+/// a token matching 5,000 elements says almost nothing about any of them, a token matching 6 says a
+/// great deal, and co-occurrence still accumulates because scores ADD. It also treats a hit on
+/// `keystone` as worth more than a hit on `paths`, which the vote could not.
+fn idf(corpus: usize, hits: usize) -> f64 {
+    // BM25's IDF, with the +0.5 smoothing that keeps a term matching most of the corpus from going
+    // negative. `hits == 0` cannot reach here (a token with no hits is never kept as a seed).
+    #[allow(clippy::cast_precision_loss)]
+    let (n, df) = (corpus as f64, hits.max(1) as f64);
+    ((n - df + 0.5) / (df + 0.5)).ln_1p()
+}
+
 /// Tokens worth seeding on, drawn from a free-form PROMPT (D0242 part 2 / D0243).
 ///
 /// Returns `(token, match count, kind)` for tokens that survive, and the dropped-as-common list so the
@@ -190,26 +209,83 @@ fn prompt_tokens(model: &Model, prompt: &str) -> (Vec<(String, usize, &'static s
     (ids, dropped)
 }
 
+/// The substantive fields a seed may match, beyond name and title (issue295).
+///
+/// These were ALREADY read by this module — to PRINT the top rows — and were invisible to RETRIEVAL.
+/// An adversarial panel measured the consequence: a prompt about provenance and defaulted dates
+/// contributed ZERO seeds for `provenance`, the most informative word in it, because the word appears
+/// in dozens of bodies and in no name or title.
+const BODY_FIELDS: [&str; 5] = ["decision", "description", "rationale", "actionText", "consequences"];
+
+/// Where a term matched, and how much that is worth. A name is what an author chose to call a thing; a
+/// title is how they summarised it; a body mention is evidence but weaker, and there is a lot more body
+/// text than title text, so an unweighted body match would swamp the ranking.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Field {
+    Name,
+    Title,
+    Body,
+    Alias,
+}
+
+impl Field {
+    /// Field weight, in the spirit of a fielded BM25: name > title > body.
+    const fn weight(self) -> f64 {
+        match self {
+            Self::Name | Self::Alias => 3.0,
+            Self::Title => 2.0,
+            Self::Body => 1.0,
+        }
+    }
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Name => "name match",
+            Self::Title => "title match",
+            Self::Body => "body match",
+            Self::Alias => "alias",
+        }
+    }
+}
+
 /// Seed the traversal: items whose NAME or TITLE contains `term`, plus every target of an Alias
 /// whose `term` matches. Returns `(seed name, how it was found)` pairs, sorted for determinism.
 fn seeds_for(model: &Model, term: &str) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = Vec::new();
+    seeds_scored(model, term).into_iter().map(|(n, f, _)| (n, f.label().to_string())).collect()
+}
+
+/// Seeds with the FIELD each matched in, so a caller can weight them (issue295).
+///
+/// Body fields are searched here where they were not before. Name is checked first and wins, then
+/// title, then bodies — one hit per element, strongest field, so an element mentioned in three bodies
+/// does not outrank one named for the term.
+fn seeds_scored(model: &Model, term: &str) -> Vec<(String, Field, f64)> {
+    let mut out: Vec<(String, Field, f64)> = Vec::new();
     for (name, info) in &model.items {
-        if matches_term(name, term) {
-            out.push((name.clone(), "name match".to_string()));
+        let field = if matches_term(name, term) {
+            Some(Field::Name)
         } else if info.attrs.get("title").is_some_and(|t| matches_term(t, term)) {
-            out.push((name.clone(), "title match".to_string()));
+            Some(Field::Title)
+        } else if BODY_FIELDS
+            .iter()
+            .any(|f| info.attrs.get(*f).is_some_and(|v| matches_term(v, term)))
+        {
+            Some(Field::Body)
+        } else {
+            None
+        };
+        if let Some(f) = field {
+            out.push((name.clone(), f, f.weight()));
         }
         if info.type_name == "Alias" && info.attrs.get("term").is_some_and(|t| matches_term(t, term)) {
             for e in model.edges.iter().filter(|e| e.kind == "dependency" && e.from == *name) {
                 if model.items.contains_key(&e.to) {
-                    out.push((e.to.clone(), format!("alias '{name}'")));
+                    out.push((e.to.clone(), Field::Alias, Field::Alias.weight()));
                 }
             }
         }
     }
-    out.sort();
-    out.dedup();
+    out.sort_by(|a, b| (&a.0, a.1.label()).cmp(&(&b.0, b.1.label())));
+    out.dedup_by(|a, b| a.0 == b.0);
     out
 }
 
@@ -444,7 +520,7 @@ fn brief_from_seeds(
     model: &Model,
     header: &str,
     seeds: &[(String, String)],
-    agreement: &HashMap<String, usize>,
+    score: &HashMap<String, f64>,
     budget: usize,
 ) -> String {
     let seed_names: Vec<String> = seeds.iter().map(|(n, _)| n.clone()).collect();
@@ -469,11 +545,18 @@ fn brief_from_seeds(
     let (reached, hubs) = traverse(model, &seed_names);
     let mut sorted: Vec<(&String, &(usize, String))> = reached.iter().collect();
     sorted.sort_by(|a, b| {
+        // Score DESC, then hops ASC, then name — and an element the prompt NAMED outright is pinned
+        // first, because `d0239` is not a guess about relevance. Alphabetical is now only the final
+        // tie-break between elements of equal score AND equal distance, where it is arbitrary but
+        // harmless; before, it was the primary order in 43 of 50 cases.
         let key = |n: &String, h: usize| {
-            let score = if named.contains(n.as_str()) { usize::MAX } else { *agreement.get(n).unwrap_or(&0) };
-            (std::cmp::Reverse(score), h, n.clone())
+            let s = if named.contains(n.as_str()) { f64::INFINITY } else { *score.get(n).unwrap_or(&0.0) };
+            (s, h, n.clone())
         };
-        key(a.0, a.1 .0).cmp(&key(b.0, b.1 .0))
+        let (ka, kb) = (key(a.0, a.1 .0), key(b.0, b.1 .0));
+        kb.0.partial_cmp(&ka.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| (ka.1, &ka.2).cmp(&(kb.1, &kb.2)))
     });
     let mut out = String::with_capacity(budget.min(8192));
     out.push_str(header);
@@ -548,8 +631,8 @@ pub fn why_brief(root: &Path, term: &str, budget: usize) -> Result<String, ViewE
     let seeds = seeds_for(&model, term);
     // A single explicit term cannot produce agreement, so every seed scores 1 and hops decides - which
     // is correct here: the caller named the subject, so there is nothing to disambiguate.
-    let agreement: HashMap<String, usize> = seeds.iter().map(|(n, _)| (n.clone(), 1)).collect();
-    Ok(brief_from_seeds(&model, &format!("recalled for term `{term}`:"), &seeds, &agreement, budget))
+    let score: HashMap<String, f64> = seeds.iter().map(|(n, _)| (n.clone(), 1.0)).collect();
+    Ok(brief_from_seeds(&model, &format!("recalled for term `{term}`:"), &seeds, &score, budget))
 }
 
 /// `keel recall --prompt -` : seed from a free-form PROMPT and return a budgeted brief (D0242 part 2,
@@ -570,33 +653,36 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
     }
     let mut seeds: Vec<(String, String)> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
-    // Count how many DISTINCT tokens reach each element - the agreement score.
-    let mut agreement: HashMap<String, usize> = HashMap::new();
-    for (tok, _, kind) in &tokens {
-        for (n, how) in seeds_for(&model, tok) {
-            *agreement.entry(n.clone()).or_insert(0) += 1;
+    // IDF-WEIGHTED SCORE per element, accumulated across tokens (issue295). Scores add, so two tokens
+    // agreeing on one element still beats one token — the signal agreement was reaching for — but a
+    // single RARE token now also outranks a single common one, which the vote could not express.
+    let mut score: HashMap<String, f64> = HashMap::new();
+    let corpus = model.items.len();
+    for (tok, hits, kind) in &tokens {
+        // An identifier is not a guess about relevance: weight it as the rarest possible term.
+        let w = if *kind == "identifier" { idf(corpus, 1) } else { idf(corpus, *hits) };
+        for (n, field, fw) in seeds_scored(&model, tok) {
+            *score.entry(n.clone()).or_insert(0.0) += w * fw;
             if seen.insert(n.clone()) {
-                seeds.push((n, format!("{kind} `{tok}` / {how}")));
+                seeds.push((n, format!("{kind} `{tok}` / {}", field.label())));
             }
         }
     }
-    let best_agreement = agreement.values().copied().max().unwrap_or(0);
+    let best = score.values().copied().fold(0.0_f64, f64::max);
     let has_identifier = tokens.iter().any(|(_, _, k)| *k == "identifier");
-    let has_name_match = seeds.iter().any(|(_, how)| how.contains("name match"));
     let named: Vec<String> = tokens.iter().map(|(t, h, k)| {
         if *k == "identifier" { t.clone() } else { format!("{t}({h})") }
     }).collect();
     let mut header = format!(
-        "recalled on {} [corpus {} items, agreement {}, confidence {}]:",
+        "recalled on {} [corpus {} items, top score {best:.1}{}]:",
         named.join(", "),
         model.items.len(),
-        best_agreement,
-        if confident(has_identifier, best_agreement, seeds.len(), has_name_match) { "HIGH" } else { "LOW" }
+        if has_identifier { ", named" } else { "" }
     );
     if !dropped.is_empty() {
         let _ = write!(header, " [ignored as too common: {}]", dropped.join(", "));
     }
-    Ok(brief_from_seeds(&model, &header, &seeds, &agreement, budget))
+    Ok(brief_from_seeds(&model, &header, &seeds, &score, budget))
 }
 
 /// Is this recall confident enough to PUSH unasked?
@@ -616,104 +702,36 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
 ///
 /// Pulling is different: `keel why` and `keel recall` always print, because the caller asked. This
 /// verdict governs only unrequested INJECTION.
-/// A seed set this small is inherently focused: the payload can show most of what was found, so
-/// ranking barely matters and there is nothing for an arbitrary tie-break to get wrong.
-const FOCUSED_SEED_COUNT: usize = 12;
-
-#[must_use]
-pub const fn confident(
-    has_identifier: bool,
-    best_agreement: usize,
-    seed_count: usize,
-    has_name_match: bool,
-) -> bool {
-    // The focused-count criterion additionally requires a NAME match. Measured false positive: "what
-    // about the thing we discussed yesterday" scored HIGH because `thing` matched 2 elements - inside
-    // one Issue's TITLE PROSE ("the one thing a collision corrupts") - and 2 is a focused seed set.
-    // A word appearing in prose is weak evidence about the subject; a word appearing in an element's
-    // NAME is what an author chose to call it. Expanding the filler-word list instead would have been
-    // whack-a-mole, and it would not generalise to the next corpus.
-    // MEASURED, and this reversed the design. On eight fresh questions with ground truth fixed in
-    // advance, the answering element appeared in the shown payload:
-    //
-    //   identifier | agreement>=2 | (<=12 seeds AND a name match)   ->  2/8   (4 prompts silenced)
-    //   no bar at all: inject whenever anything informative is found ->  5/8   (0 silenced)
-    //   identifier | agreement>=2 | <=12 seeds, no name-match req    ->  2/8   (3 silenced)
-    //
-    // The bar SUPPRESSED more right answers than wrong ones, and two attempts to tune it both landed
-    // at 2/8. The reason is visible in the data: the good-but-silenced prompts had 13 to 53 seeds
-    // (`frozen` 13, `github` 38, `obligation` 53), so any seed-count threshold low enough to exclude
-    // noise also excludes them. Seed count is not a proxy for relevance, and I had assumed it was.
-    //
-    // So the rule is: if any informative token survived, push. The genuinely uninformative prompt is
-    // already handled upstream - `prompt_tokens` returns nothing when every word is a function word or
-    // too common, and `recall_for_prompt` then says so and pushes nothing. That check is about whether
-    // there is anything to say; this one was about whether to trust it, and trusting it measures better.
-    //
-    // 4 of the 5 hits landed at position 1 or 2, so when recall is right it is right at the top. The 3
-    // misses push roughly 20 non-answering rows, which is the cost being accepted - and the reason the
-    // human has three kill switches.
-    let _ = (has_identifier, best_agreement, has_name_match, FOCUSED_SEED_COUNT);
-    seed_count > 0
-}
-
-/// The confidence verdict for a prompt, without building the payload — for the injection path.
+/// Is there anything worth PUSHING unasked?
 ///
+/// The honest answer turned out to be "did any informative token survive", which `prompt_tokens`
+/// already decides — so this is that check, named for what it does, and nothing more.
+///
+/// # A confidence gate lived here and was wrong twice
+///
+/// Measured on eight questions with ground truth fixed in advance: `identifier | agreement>=2 |
+/// (<=12 seeds AND a name match)` scored 2/8 while NO bar at all scored 5/8, and a second tuning
+/// attempt also landed at 2/8. The bar suppressed more right answers than wrong ones, because seed
+/// count is not a proxy for relevance — the prompts it wrongly silenced had 13 to 53 seeds, the same
+/// range as the ones it admitted.
+///
+/// It was removed, and then the REMOVAL was the defect: `confident()` kept its four parameters,
+/// discarded them all, and returned `seed_count > 0`, while three surfaces went on advertising a gate
+/// — a doc comment listing it as kill switch 3, a PASSING `DoD` asserting "injection is gated on a
+/// CONFIDENCE verdict", and a printed HIGH/LOW label whose LOW was unreachable whenever any row was
+/// shown. An adversarial panel found all three; the label was stamping "confidence HIGH" on a payload
+/// that was 14 of 17 rows off-topic. Dead code with live prose is worse than either alone, because the
+/// prose is what a reader believes.
 /// # Errors
-/// Propagates model-build failures.
-pub fn recall_confidence(root: &Path, prompt: &str) -> Result<bool, ViewError> {
+/// Propagates model-build failures; the caller treats an error as "push nothing" (fail-open).
+pub fn has_pushable_facts(root: &Path, prompt: &str) -> Result<bool, ViewError> {
     let model = Model::build(root)?;
-    let (tokens, _) = prompt_tokens(&model, prompt);
-    if tokens.is_empty() {
-        return Ok(false);
-    }
-    let mut agreement: HashMap<String, usize> = HashMap::new();
-    let mut has_name_match = false;
-    for (tok, _, _) in &tokens {
-        for (n, how) in seeds_for(&model, tok) {
-            has_name_match |= how.contains("name match");
-            *agreement.entry(n).or_insert(0) += 1;
-        }
-    }
-    Ok(confident(
-        tokens.iter().any(|(_, _, k)| *k == "identifier"),
-        agreement.values().copied().max().unwrap_or(0),
-        agreement.len(),
-        has_name_match,
-    ))
+    Ok(!prompt_tokens(&model, prompt).0.is_empty())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The confidence verdict AS MEASURED, not as designed.
-    ///
-    /// This test was rewritten after the eight-case comparison, and the history matters more than the
-    /// assertions: the original rule (identifier, or agreement >= 2, or a small seed set with a name
-    /// match) scored 2/8, and removing it entirely scored 5/8. Two tuning attempts both landed at 2/8.
-    /// A seed-count threshold cannot separate signal from noise here, because the prompts it wrongly
-    /// silenced had 13 to 53 seeds - `frozen`, `github`, `obligation` - which is the same range as the
-    /// prompts it rightly admitted.
-    ///
-    /// What survived is the check that asks whether there is anything to say at all, which lives
-    /// upstream in `prompt_tokens`: a prompt of only function words or only corpus-common words yields
-    /// no tokens, and nothing is pushed. That is a different question from "should I trust what I
-    /// found", and it is the one worth asking.
-    #[test]
-    fn confidence_pushes_whenever_an_informative_token_survived() {
-        // Anything found is pushed - the measured rule.
-        assert!(confident(false, 1, 1, false), "one informative token is enough");
-        assert!(confident(true, 1, 400, false), "a named element, however diffuse the rest");
-        assert!(confident(false, 2, 81, true), "agreement, which still ranks first inside the payload");
-        // These four are the cases the OLD rule silenced and the measurement says it should not have:
-        // rebase(2 seeds, title-only), frozen(13), github(38), obligation(53).
-        for seeds in [2usize, 13, 38, 53] {
-            assert!(confident(false, 1, seeds, false), "{seeds} seeds was wrongly silenced at 2/8");
-        }
-        // Nothing found is still nothing pushed.
-        assert!(!confident(false, 0, 0, false));
-    }
 
     /// The uninformative-prompt check that DID survive, and where it actually lives: a prompt made only
     /// of function words and corpus-common words produces no seeding tokens at all.
@@ -787,8 +805,8 @@ mod tests {
             ItemInfo { type_name: "Decision".to_string(), attrs, marker: None, file: "f.sysml".to_string() },
         );
         let seeds = vec![("d0001".to_string(), "identifier `d0001`".to_string())];
-        let agreement: HashMap<String, usize> = seeds.iter().map(|(n, _)| (n.clone(), 1)).collect();
-        let out = brief_from_seeds(&model, "header:", &seeds, &agreement, 50);
+        let score: HashMap<String, f64> = seeds.iter().map(|(n, _)| (n.clone(), 1.0)).collect();
+        let out = brief_from_seeds(&model, "header:", &seeds, &score, 50);
         assert!(out.contains("d0001"), "the top row must survive any budget: {out}");
         assert!(!out.contains("(nothing reached)"), "must not claim nothing was reached: {out}");
     }

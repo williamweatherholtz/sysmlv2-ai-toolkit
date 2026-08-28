@@ -805,8 +805,9 @@ fn ledger_advisory(root: &Path, session: &str, spoken: &str) {
 ///    use: a project that turned recall off has DECLARED it, rather than having it quietly not work.
 /// 2. `KEEL_RECALL=off` — the immediate, machine-local off, for "it is misbehaving right now" without a
 ///    commit. Deliberately env-based so it cannot be mistaken for a project decision.
-/// 3. Doing nothing — a LOW-confidence prompt is not injected at all. Silence is the default whenever
-///    recall cannot show it has found the right thing.
+/// 3. Doing nothing — a prompt with no informative token pushes nothing. This is NOT a confidence
+///    gate: one was built, measured at 2/8 against 5/8 for no gate at all, and removed (issue297). The
+///    surviving check asks only whether there is anything to say, never whether to trust it.
 ///
 /// Note what is NOT a kill switch any more: deleting `.knowledge/`. D0243 made seeding corpus-derived,
 /// so removing the store costs aliases and question-coverage, not recall. Saying so matters, because
@@ -829,7 +830,7 @@ fn recalled_facts(root: &Path, payload: &serde_json::Value) -> Option<String> {
     // The confidence verdict and the payload are computed from the same model build, so the cost is
     // paid once. `recall_for_prompt` returns its own "nothing pushed" text for an uninformative prompt,
     // which is a PULL answer - useful at a CLI, noise in a prompt - so the verdict gates it here.
-    if !keel_cli::view::recall_confidence(root, prompt).unwrap_or(false) {
+    if !keel_cli::view::has_pushable_facts(root, prompt).unwrap_or(false) {
         return None;
     }
     let facts = keel_cli::view::recall_for_prompt(root, prompt, RECALL_BUDGET).ok()?;
