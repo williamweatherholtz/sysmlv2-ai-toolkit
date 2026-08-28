@@ -111,12 +111,20 @@ fn is_identifier_token(tok: &str) -> bool {
 /// domain stop-wording is DERIVED from the corpus (D0243 rule 3) because it differs per project and
 /// goes stale, while "would" is a filler word in every corpus and always will be.
 fn is_function_word(w: &str) -> bool {
-    const WORDS: [&str; 46] = [
+    const WORDS: [&str; 55] = [
         "about", "above", "after", "again", "against", "already", "also", "although", "always",
         "another", "because", "been", "before", "being", "below", "between", "both", "cannot",
         "could", "does", "doing", "done", "during", "each", "either", "every", "from", "further",
         "have", "having", "here", "into", "just", "made", "make", "making", "many", "more", "most",
         "much", "must", "only", "other", "should", "some", "would",
+        // The filler class that forced, and then failed to justify, a structural name-match rule:
+        // rare in the corpus and empty about the subject. MEASURED: requiring a NAME match to catch
+        // these also rejected "rebase" and "frozen", which are domain terms that legitimately live in
+        // TITLES rather than in element names, and that cost 3 of 5 correct answers on an eight-case
+        // set. Naming them as LANGUAGE is both cheaper and more honest than a rule that cannot tell a
+        // rare filler word from a rare domain term.
+        "anything", "nothing", "something", "stuff", "thing", "things", "today", "tomorrow",
+        "yesterday",
     ];
     WORDS.contains(&w)
 }
@@ -625,9 +633,28 @@ pub const fn confident(
     // A word appearing in prose is weak evidence about the subject; a word appearing in an element's
     // NAME is what an author chose to call it. Expanding the filler-word list instead would have been
     // whack-a-mole, and it would not generalise to the next corpus.
-    has_identifier
-        || best_agreement >= 2
-        || (has_name_match && seed_count > 0 && seed_count <= FOCUSED_SEED_COUNT)
+    // MEASURED, and this reversed the design. On eight fresh questions with ground truth fixed in
+    // advance, the answering element appeared in the shown payload:
+    //
+    //   identifier | agreement>=2 | (<=12 seeds AND a name match)   ->  2/8   (4 prompts silenced)
+    //   no bar at all: inject whenever anything informative is found ->  5/8   (0 silenced)
+    //   identifier | agreement>=2 | <=12 seeds, no name-match req    ->  2/8   (3 silenced)
+    //
+    // The bar SUPPRESSED more right answers than wrong ones, and two attempts to tune it both landed
+    // at 2/8. The reason is visible in the data: the good-but-silenced prompts had 13 to 53 seeds
+    // (`frozen` 13, `github` 38, `obligation` 53), so any seed-count threshold low enough to exclude
+    // noise also excludes them. Seed count is not a proxy for relevance, and I had assumed it was.
+    //
+    // So the rule is: if any informative token survived, push. The genuinely uninformative prompt is
+    // already handled upstream - `prompt_tokens` returns nothing when every word is a function word or
+    // too common, and `recall_for_prompt` then says so and pushes nothing. That check is about whether
+    // there is anything to say; this one was about whether to trust it, and trusting it measures better.
+    //
+    // 4 of the 5 hits landed at position 1 or 2, so when recall is right it is right at the top. The 3
+    // misses push roughly 20 non-answering rows, which is the cost being accepted - and the reason the
+    // human has three kill switches.
+    let _ = (has_identifier, best_agreement, has_name_match, FOCUSED_SEED_COUNT);
+    seed_count > 0
 }
 
 /// The confidence verdict for a prompt, without building the payload — for the injection path.
@@ -660,33 +687,60 @@ pub fn recall_confidence(root: &Path, prompt: &str) -> Result<bool, ViewError> {
 mod tests {
     use super::*;
 
-    /// The confidence verdict, one case per MEASURED failure that produced each criterion. Every
-    /// clause here exists because a real prompt was classified wrongly without it.
+    /// The confidence verdict AS MEASURED, not as designed.
+    ///
+    /// This test was rewritten after the eight-case comparison, and the history matters more than the
+    /// assertions: the original rule (identifier, or agreement >= 2, or a small seed set with a name
+    /// match) scored 2/8, and removing it entirely scored 5/8. Two tuning attempts both landed at 2/8.
+    /// A seed-count threshold cannot separate signal from noise here, because the prompts it wrongly
+    /// silenced had 13 to 53 seeds - `frozen`, `github`, `obligation` - which is the same range as the
+    /// prompts it rightly admitted.
+    ///
+    /// What survived is the check that asks whether there is anything to say at all, which lives
+    /// upstream in `prompt_tokens`: a prompt of only function words or only corpus-common words yields
+    /// no tokens, and nothing is pushed. That is a different question from "should I trust what I
+    /// found", and it is the one worth asking.
     #[test]
-    fn confidence_admits_the_precise_and_refuses_the_diffuse() {
-        // An identifier is never a guess: "why did we decide d0239 that way?"
-        assert!(confident(true, 1, 400, false), "a named element is always worth pushing");
-
-        // Agreement: "should we implement the knowledge graph item now?" - 81 seeds, but `knowledge`
-        // and `graph` agreed on 9 elements and those 9 were the correct answer set.
-        assert!(confident(false, 2, 81, true), "two independent tokens agreeing is evidence");
-
-        // A focused seed set: "do we need to rely on diligence... pre-model hooks" returned 9 seeds
-        // and the best payload of the three sampled prompts. WITHOUT this clause the rule rejected
-        // its own best example, which is how the criterion was found.
-        assert!(confident(false, 1, 9, true), "a handful of seeds needs no ranking to be right");
-
-        // The false positive that forced the name-match requirement: "what about the thing we
-        // discussed yesterday" - `thing` matched 2 elements inside one Issue's TITLE PROSE. Rare, and
-        // about nothing.
-        assert!(!confident(false, 1, 2, false), "prose-only matches are not evidence about the subject");
-
-        // Diffuse: one mid-frequency word, no agreement - "please tidy up the workspace" (65 seeds).
-        // Ranking would be arbitrary, so silence is strictly better than noise.
-        assert!(!confident(false, 1, 65, true), "one mid-frequency word ranked arbitrarily is noise");
-
-        // Nothing found at all is never confident.
+    fn confidence_pushes_whenever_an_informative_token_survived() {
+        // Anything found is pushed - the measured rule.
+        assert!(confident(false, 1, 1, false), "one informative token is enough");
+        assert!(confident(true, 1, 400, false), "a named element, however diffuse the rest");
+        assert!(confident(false, 2, 81, true), "agreement, which still ranks first inside the payload");
+        // These four are the cases the OLD rule silenced and the measurement says it should not have:
+        // rebase(2 seeds, title-only), frozen(13), github(38), obligation(53).
+        for seeds in [2usize, 13, 38, 53] {
+            assert!(confident(false, 1, seeds, false), "{seeds} seeds was wrongly silenced at 2/8");
+        }
+        // Nothing found is still nothing pushed.
         assert!(!confident(false, 0, 0, false));
+    }
+
+    /// The uninformative-prompt check that DID survive, and where it actually lives: a prompt made only
+    /// of function words and corpus-common words produces no seeding tokens at all.
+    #[test]
+    fn a_prompt_of_filler_and_common_words_yields_no_tokens() {
+        let mut model = Model { items: HashMap::new(), edges: Vec::new() };
+        for i in 0..300u32 {
+            let mut attrs = HashMap::new();
+            attrs.insert("title".to_string(), "the ceremony ran".to_string());
+            model.items.insert(
+                format!("ceremonyThing{i}"),
+                ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() },
+            );
+        }
+        // "thing" is filler; "ceremony" matches all 300 and is dropped as too common — and SAID.
+        let (kept, dropped) = prompt_tokens(&model, "what about the thing at the ceremony");
+        assert!(kept.is_empty(), "nothing informative survives: {kept:?}");
+        assert!(dropped.iter().any(|d| d.starts_with("ceremony")), "it SAYS what it ignored: {dropped:?}");
+
+        // A LIMITATION, found by this test's first premise being wrong rather than by design review:
+        // a token under five characters is dropped for LENGTH before frequency is ever consulted, so
+        // four-letter domain words never seed at all — `gate`, `hook`, `land`, `push`. `hooks` seeds
+        // and `hook` does not, which is arbitrary from the reader's side. Recorded as issue294 rather
+        // than tuned here, because lowering the floor re-admits `been`, `does` and `made` unless the
+        // language list grows to compensate, and that trade needs measuring, not guessing.
+        let (kept, _) = prompt_tokens(&model, "what about the hook");
+        assert!(kept.is_empty(), "four-letter domain words do not seed today: {kept:?}");
     }
 
     /// D0243 rule 2: segments, not substrings. Every case here is measured from the real corpus.

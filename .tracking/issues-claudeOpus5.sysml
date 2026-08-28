@@ -27,4 +27,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from activateDoesNotLoseFacts to issue293;
+
+    part issue294 : Issue {
+        :>> id = "08e84944-fdf2-467b-8575-cd7456e119dc";
+        :>> title = "four-letter domain words never seed recall: they are dropped for length before frequency is consulted";
+        :>> createdAt = "2026-08-28";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A prompt token shorter than five characters is dropped for LENGTH before its corpus frequency is ever consulted (prompt_tokens), so four-letter DOMAIN words never seed recall: gate, hook, land, push, view. Five-letter hooks seeds and four-letter hook does not, which is arbitrary from the reader side and cannot be predicted by anyone using it. The five-character floor exists because a four-character floor admits been, does, made, that and this, and the English function-word list was sized against the longer floor. Found because a unit test asserted that gate would be dropped as TOO COMMON and it was instead dropped as TOO SHORT - the test premise was wrong, not the code, and nothing else would have surfaced it. Severity Medium rather than High: the identifier path and longer synonyms still work, so this narrows recall rather than breaking it, and the eight-case comparison gives a way to measure any fix instead of guessing.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from shortDomainWordsCanSeed to issue294;
 }
