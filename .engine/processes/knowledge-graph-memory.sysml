@@ -24,6 +24,23 @@
 // WHY THIS IS A PROCESS AND NOT A FEATURE: the vocabulary decisions are the human's and the
 // extraction is the AI's, in that order, and getting the order wrong produces a graph that answers
 // nothing. That sequencing is exactly what a process is for.
+//
+// v3 (D0244, recording what D0243 DECIDED and never wrote here): for an ALREADY-TYPED corpus, steps 1
+// (kgQuestions) and 2 (kgVocabulary) are OPTIONAL rather than prerequisite. Seeding is derived from the
+// corpus itself — its element names, titles and typed edges — so recall works with no authored
+// vocabulary at all. A project MAY declare Questions to have `question-coverage` measured, and Aliases
+// to map words its people use that its corpus does not; neither is required for recall to function.
+// Measured basis: this project's own store held four Aliases and three Questions after a week, and
+// deleting it changed recall's result set by nothing (7 of 13,704 items).
+//
+// THE RULE THAT PUTS THIS CLAUSE HERE RATHER THAN ONLY IN A DECISION (D0244, sharpening D0161):
+// **A DESIGN MAY PROPOSE AN AMENDMENT TO A PROCESS; IT MAY NOT QUIETLY DISAGREE WITH ONE.** D0161's
+// original wording said "may amend", which implied an authority a design does not have — amendment runs
+// through the Change Request route with human sign-off (CLAUDE.md §3a); a design proposes and the CR
+// disposes. D0243 changed what steps 1 and 2 mean, carried no process-change marker, and never edited
+// this file, so the keystone lock could not see it: the lock fires on EDITS to guarded files and cannot
+// notice a Decision that contradicts a file it never touches. An amendment therefore has to land HERE,
+// where the lock covers it. That is not bookkeeping; it is what returns the change to the control.
 // =====================================================================
 package EngineKnowledgeGraphMemory {
     private import EngineElement::*;     // Cadence / Owner enums
@@ -33,7 +50,7 @@ package EngineKnowledgeGraphMemory {
     action knowledgeGraphMemory : Process {
         :>> id = "a41d7e05-3b92-4c68-8f17-52e0d9a6c3b4";
         :>> title = "Knowledge-Graph Memory";
-        :>> purpose = "Give an AI (or a human at the CLI) deterministic, constant-cost recall over a CORPUS by treating it as a typed graph and answering from traversal, not conversation. v2 (D0161): THE CORPUS IS A DECLARED PARAMETER with two cases - (a) a DOCUMENT corpus, extracted against the closed vocabulary with identity computed from type plus normalised name; (b) an ALREADY-TYPED MODEL, where nothing is extracted: entities are the existing items, relations the existing typed edges, identity the minted UUID they already carry. For keel's own corpus the model IS the graph, and the only authored inputs are human-owned Questions and Aliases under .knowledge/.";
+        :>> purpose = "Give an AI (or a human at the CLI) deterministic, constant-cost recall over a CORPUS by treating it as a typed graph and answering from traversal, not conversation. v2 (D0161): THE CORPUS IS A DECLARED PARAMETER with two cases - (a) a DOCUMENT corpus, extracted against the closed vocabulary with identity computed from type plus normalised name; (b) an ALREADY-TYPED MODEL, where nothing is extracted: entities are the existing items, relations the existing typed edges, identity the minted UUID they already carry. For keel's own corpus the model IS the graph, and the only authored inputs are human-owned Questions and Aliases under .knowledge/ - both OPTIONAL as of v3 (D0244, recording D0243): seeding is derived from the corpus, so recall works with no authored vocabulary, Questions buy question-coverage measurement and Aliases buy word mapping.";
         :>> cadence = Cadence::perItem;
         // APPLIES-WHEN: there is a body of material someone must answer questions from with provenance - regulations, a standard, a spec set, a codebase, a case history - and re-reading it every time does not scale
         // D0161 part 3ii: unit-owned well-formedness guard - makes this process a deactivatable UNIT
@@ -48,6 +65,8 @@ package EngineKnowledgeGraphMemory {
         :>> triggerCondition = "An AI must answer questions over a corpus, and search is getting the answers wrong, slow, or expensive — typically where the answer spans documents that share no vocabulary.";
         :>> actionText = "Write down the actual questions the system must answer. Not topics, questions. These drive everything downstream: the entity types are the kinds of thing the questions mention, and the relationship types are the ways those things connect. A corpus surveyed without questions produces a vocabulary that describes the documents rather than answers anything.";
         :>> producedArtifact = "The question set, written down.";
+        // OPTIONAL for an already-typed corpus (v3, D0244/D0243): recall does not require this step;
+        // declaring it buys question-coverage measurement, not retrieval.
         :>> owner = Owner::human;
     }
 
@@ -57,6 +76,8 @@ package EngineKnowledgeGraphMemory {
         :>> triggerCondition = "The question set exists.";
         :>> actionText = "List the kinds of thing the questions mention: that list is the entity types. List the ways those things connect: that list is the relationship types. Keep both SMALL and CLOSED. Put conditions — amounts, dates, windows, thresholds — in entity DESCRIPTIONS rather than inventing types for them; a threshold is a property of a thing, not a kind of thing. The AI drafts, the human decides: the vocabulary is the one part of this a model should not choose alone, because every later step is measured against it.";
         :>> producedArtifact = "A closed list of entity types and relationship types.";
+        // OPTIONAL for an already-typed corpus (v3, D0244/D0243): recall does not require this step;
+        // declaring it buys word mapping for terms the corpus does not use, not retrieval.
         :>> owner = Owner::human;
     }
 
