@@ -166,4 +166,18 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyControlMapReconciled to issue305;
+
+    part issue306 : Issue {
+        :>> id = "b7c19dc5-be2c-4ab7-b8c1-c846ed18a4c0";
+        :>> title = "The pre-push hook refused every fresh project's bootstrap push of main";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 by the ctlPrePushBehind arming probe - a two-clone fixture attempting a REAL push through the REAL .githooks/pre-push - on its first run. The hook fetches origin main to verify behind-ness, and 'git fetch origin main' FAILS when the remote has no main yet; the fail-loud clause (K2) then refuses. So the BOOTSTRAP push - creating main on an empty remote, the first thing every keel init project does after git init and adding a remote - was refused, with a message directing the user to keel land, which would hit the same wall. The hook conflated 'cannot reach the remote' with 'the remote has no main YET'. THE ASYMMETRY THAT CAUSED IT: ref DELETION was already skipped (local_sha all zeros, one line above) while ref CREATION was not (remote_sha all zeros) - half of 'deleting or creating refs is not a behind-ness question' was implemented and the comment claimed both. IN-FIELD because every downstream project hits it: the self-build never did, since main existed on its remote before the hook was installed - the same reason it survived unnoticed. FIX (shipped with this issue, D0256 co-committed per the keystone lock): skip when remote_sha is all zeros, exactly as deletion is skipped. THE SECOND LESSON from the same probe: a PLAIN behind push never reaches this hook at all - git's own client-side fast-forward check refuses it first - so the hook's actual added value is the push git would ACCEPT: a FORCED one. The probe now pushes --force, testing what the control is FOR (the D0129 history-rewrite class) rather than a case git already catches. The arming contract's old claim that this 'can only be established by attempting a push, which a read-only view must not do' was true of the view and false of a test.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    // Re-pointed at filing time: the FIX ships with sprint 488, so the resolver is the story that
+    // completes now - not the long-running probe task, which would hold a fixed defect open (the
+    // inverse of the issue305 trap, where prose held a closed one open).
+    #Resolves dependency from storyFourMoreControlsProven to issue306;
 }

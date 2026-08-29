@@ -11,8 +11,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     refs/heads/main) ;;
     *) continue ;;
   esac
-  # deleting or creating refs is not a behind-ness question
+  # deleting or creating refs is not a behind-ness question. Deletion was always skipped
+  # (local_sha zeros); CREATION was not (remote_sha zeros), and that asymmetry was a field
+  # defect found by the arming probe (issue306/D0256): `git fetch $remote main` FAILS when the
+  # remote has no main YET, so the fail-loud clause below refused every fresh project's
+  # BOOTSTRAP push - conflating "cannot reach the remote" with "the remote has no main yet".
   case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  case "$remote_sha" in 0000000000000000000000000000000000000000) continue ;; esac
   if ! git fetch -q "$remote" main; then
     echo "[keel] pre-push REFUSED: cannot fetch $remote/main to verify the trunk (fail-loud, K2)." >&2
     echo "        Sanctioned path: keel land (fetch, integrate by merge, gate the merged tree, push)." >&2
