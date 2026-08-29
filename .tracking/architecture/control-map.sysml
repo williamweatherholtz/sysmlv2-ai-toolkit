@@ -60,6 +60,10 @@ package ControlMap {
     part ctlPreWriteTiers : SystemSafetyConstraint { :>> id = "b6498cdd-879b-4c90-a544-9a0d2cd825f4"; :>> title = "control: ctlPreWriteTiers"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Protected fact surfaces deny, ask, or record-override at the harness boundary (hook pre-write, D0176)"; }
     part ctlCommitGate : SystemSafetyConstraint { :>> id = "086aafdc-a753-45f7-a328-a9c71087a6c2"; :>> title = "control: ctlCommitGate"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "No commit lands with an invalid model or a failing guard (.githooks/pre-commit + CI)"; }
     part ctlReleaseGateJob : SystemSafetyConstraint { :>> id = "d5dd1e78-69a8-46d6-9be0-4a786727d140"; :>> title = "control: ctlReleaseGateJob"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "The publish job requires the full gate over the tagged commit (release.yml, proven both ways sprint 409)"; }
+    // D0254: IMPLEMENTED, load-bearing, PROVEN BY TEST - and until now absent from this map, which
+    // is the third failure class. A control the map does not know about cannot appear as a gap,
+    // and its omission makes the coverage view read CLEANER rather than worse.
+    part ctlLaunchDirtyRefusal : SystemSafetyConstraint { :>> id = "8d5d5bca-0acd-4ba8-9945-419e1ab3f46a"; :>> title = "control: ctlLaunchDirtyRefusal"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "A process launch onto a DIRTY tree is refused, so a run's diff is attributable to that run alone (launcher::prepare, D0182 single-writer). PROVEN BY TEST: keel-cli/tests/launcher_controls_actually_fire.rs."; }
     part ctlFireLedger : SystemSafetyConstraint { :>> id = "b8c675a6-c8f7-4227-b5dd-e88708d02235"; :>> title = "control: ctlFireLedger"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every enforcement fire leaves a counted machine-local line; the report computes over it (D0180)"; }
     part ctlReverify : SystemSafetyConstraint { :>> id = "e54d5849-5927-46f5-ba9a-b14aebf60c9b"; :>> title = "control: ctlReverify"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Drift-suspect reproducible evidence re-runs at HEAD and re-stamps honestly (keel reverify, D0101)"; }
 
@@ -109,6 +113,7 @@ package ControlMap {
     dependency from ctlAuditHistory to ehz1;
     dependency from ctlBranchProtection to ehz1;
     dependency from ctlPrePushBehind to ehz1;
+    dependency from ctlLaunchDirtyRefusal to ehz2;
     dependency from ctlWriteLock to ehz2;
     dependency from ctlPreWriteTiers to ehz2;
     dependency from ctlPreWriteTiers to ehz7;

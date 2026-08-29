@@ -137,4 +137,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyArmingIsProvenNotAssumed to issue303;
+
+    part issue304 : Issue {
+        :>> id = "a3f95a97-c977-483f-b288-fda52817697f";
+        :>> title = "The control map has never been reconciled against the enforcement the binary implements";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 (D0254 clause C). The control map declared NINE controls. The launcher's dirty-tree refusal - implemented in launcher::prepare, load-bearing for every Need about bounded process launching, and now proven by test - was not among them; a grep for launch, dirty or singleWriter across .tracking/architecture/control-map.sysml returned nothing. It was found by asking about one mechanism, not by any check. THE CLASS, distinct from the two already named: declared-but-never-fired (D0217) is visible to a reader who looks, and declared-and-unprobeable (D0253) is visible as a classification, but IMPLEMENTED-BUT-UNDECLARED is visible to nobody. keel controls computes the hazard/control diff over DECLARED controls and DECLARED hazards, so an undeclared control cannot appear as a gap, and neither can a hazard only that control covers. Worse, the measure improves as the map gets less complete: fewer declared controls with no gaps reads better than more declared controls with gaps. That is the issue088/issue240 shape again - truthful about the question asked, misleading about the question a reader has. NOT ESTIMATED HERE, deliberately: the map has ten entries and the binary has 53 guards, six hook events, a write lock, a launcher, a push gate and a release gate. Putting a guessed number of missing controls in the record would be the habit this whole line of work has been correcting. FIX: reconcile the map against the binary's actual enforcement surface, one mechanism at a time, and make the reconciliation itself a check so the map cannot silently fall behind the code again - the doc-sync shape applied to controls rather than prose.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyLauncherControlIsDeclared to issue304;
 }

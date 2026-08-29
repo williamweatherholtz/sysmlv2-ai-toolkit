@@ -53,3 +53,8 @@ reason = "Machine-local by design (.keel/metrics/hooks.jsonl, D0180). An empty l
 [ctlReverify]
 checkable = false
 reason = "An on-demand command, not a standing control: it is armed whenever the binary exists. Nothing to switch, so nothing to check."
+
+[ctlLaunchDirtyRefusal]
+checkable = false
+provenBy = "keel-cli/tests/launcher_controls_actually_fire.rs"
+reason = "Not establishable by this view - a read-only view must not spawn a launch. PROVEN BY TEST (D0253 clause A) and declared proven-at-birth rather than retrofitted (D0254). The probe builds a throwaway git repository, confirms a CLEAN tree prepares (a control that refuses everything is stuck, not armed), then dirties the tree and asserts the refusal fires naming the reason. Before D0254 this control was IMPLEMENTED, load-bearing and absent from the control map entirely, which is the third failure class: an undeclared control cannot appear as a gap, so its omission made the coverage view read cleaner rather than worse."
