@@ -1,5 +1,8 @@
 # keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies against
 # (D0251 clause B). NEVER trust-on-first-use: a version with no entry refuses to download; a machine
-# with a seeded or hand-installed cache needs no entry. Entries are added from the published release
-# assets after each tag's CI run completes.
+# with a seeded or hand-installed cache needs no entry. Entries are computed from the PUBLISHED
+# release assets after each tag's CI run completes.
 ["0.3.1"]
+"keel-linux-x86_64" = "77982fe2f22bb91b06f241fffaa8f9848f1c9bbafecb023dfa8df8591a991dd0"
+"keel-macos-aarch64" = "29a5571e84292770c31bedb8a9f1327825a939c0a9743c5ee3ae3a1c612d08f6"
+"keel-windows-x86_64.exe" = "767140470bcfc87365c2d403c9ed54bfa460b016c07926fdb164c8c9d5f97f39"

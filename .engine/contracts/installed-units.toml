@@ -144,14 +144,20 @@ file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
 file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
 [20cd43e6-1d23-4f2f-aadd-2b4a52fcab81]
 process = "decision-channel"
-version = 5
+version = 6
 file.processes__SL__decision-channel.sysml = "edc6bd1f5283fef7"
 file.skills__SL__decision-channel__SL__SKILL.md = "3f13a3b3d8f774a1"
 file.skills__SL__decision-channel__SL__registry.sysml = "de6c91c76a09c330"
 file..github__SL__workflows__SL__decision-issue.yml = "1bfbbb8f2f9823ea"
 file..github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
-file..github__SL__scripts__SL__open_decision_issues.py = "df3e1f1a422876a4"
-file..github__SL__scripts__SL__record_decision.sh = "f7e312c5d94e0b83"
+file..github__SL__scripts__SL__open_decision_issues.py = "1e391075a4dd7281"
+file..github__SL__scripts__SL__record_decision.sh = "82716418a23728d9"
+[4e625dfb-3276-499e-b032-795341335984]
+process = "control-propriety"
+version = 1
+file.processes__SL__control-propriety.sysml = "1db15420fdb572f1"
+file.skills__SL__control-propriety__SL__SKILL.md = "7c32e76b7c93ab9e"
+file.skills__SL__control-propriety__SL__registry.sysml = "01974da487a7b33e"
 [79f2d321-7c55-41fb-86fa-7d549202caf7]
 process = "intake"
 version = 43

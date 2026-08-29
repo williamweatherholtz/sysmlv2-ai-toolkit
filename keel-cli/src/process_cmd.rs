@@ -208,10 +208,28 @@ fn incoming_registry_ids(dir: &Path) -> Vec<String> {
 /// differently from the real importer would be testing something no adopter ever runs.
 #[must_use]
 pub fn restore_dst(root: &Path, rel: &Path) -> PathBuf {
-    let repo_relative = rel
-        .components()
-        .next()
-        .is_some_and(|c| c.as_os_str().to_string_lossy().starts_with('.'));
+    restore_dst_with(root, rel, &[])
+}
+
+/// [`restore_dst`], with the bundle's own DECLARED extras (from `unit.toml`'s `extras = [...]`).
+///
+/// # The dot heuristic was the pf02 class, and the kickoff demo caught it live
+///
+/// A declared extra is repo-relative by definition; the old rule inferred repo-residence from a
+/// LEADING DOT, which fit the specimen (`.github/workflows/...`, the decision-channel unit) and
+/// misplaced every dotless root extra — the exec-summary unit's `templates/` and `tests/` landed
+/// under the receiving project's `.engine/`. The bundle now CARRIES residence: a path listed in the
+/// unit's `extras` restores repo-relative; the dot rule stays as the fallback for pre-extras
+/// bundles, so old exports keep importing exactly as they did.
+#[must_use]
+pub fn restore_dst_with(root: &Path, rel: &Path, extras: &[String]) -> PathBuf {
+    let rel_str = rel.to_string_lossy().replace('\\', "/");
+    let declared_extra = extras.iter().any(|e| e == &rel_str);
+    let repo_relative = declared_extra
+        || rel
+            .components()
+            .next()
+            .is_some_and(|c| c.as_os_str().to_string_lossy().starts_with('.'));
     if repo_relative { root.join(rel) } else { root.join(".engine").join(rel) }
 }
 
@@ -722,10 +740,15 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                  #\n# The GUARDS below are the enforcement this process owns. A receiving project must have them\n\
                  # in its binary and activate this process for them to run — importing the files alone lands the\n\
                  # skill and leaves the teeth behind, which is the failure this manifest exists to prevent.\n\
-                 unitId = \"{unit_id}\"\nversion = {version}\nprocess = \"{name}\"\nskills = [{}]\nrules = [{}]\nguards = [{}]\n",
+                 unitId = \"{unit_id}\"\nversion = {version}\nprocess = \"{name}\"\nskills = [{}]\nrules = [{}]\nguards = [{}]\nextras = [{}]\n",
                 r.skills.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
                 r.rules.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
                 r.guards.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
+                // The extras' RESIDENCE travels with the bundle (repo-relative paths), so the
+                // importer restores them where they lived instead of guessing from a leading dot —
+                // the dot heuristic fit `.github/` (the specimen) and misplaced every dotless root
+                // extra into `.engine/`, found live by the kickoff demo importing exec-summary.
+                unit_extras(root, name).0.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
             );
             if let Err(e) = std::fs::write(dst.join("unit.toml"), manifest) {
                 eprintln!("error writing manifest: {e}");
@@ -786,6 +809,13 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
         eprintln!("  Export one with `keel process export <name> --out <dir>`.");
         return 2;
     };
+    // The bundle's declared extras (repo-relative), parsed once and threaded to BOTH restore loops —
+    // two loops with one rule between them is the recorded cause of the last placement defect.
+    let bundle_extras: Vec<String> = mtext
+        .lines()
+        .find_map(|l| l.strip_prefix("extras = ["))
+        .map(|r| r.trim_end_matches(']').split(',').map(|x| x.trim().trim_matches('"').to_string()).filter(|x| !x.is_empty()).collect())
+        .unwrap_or_default();
     let field = |key: &str| -> String {
         mtext
             .lines()
@@ -825,7 +855,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
             if rel == Path::new("unit.toml") {
                 continue;
             }
-            let dst = restore_dst(root, rel);
+            let dst = restore_dst_with(root, rel, &bundle_extras);
             if let Some(p) = dst.parent() {
                 let _ = std::fs::create_dir_all(p);
             }
@@ -878,7 +908,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
             continue;
         }
         let rel_s = rel.to_string_lossy().replace('\\', "/");
-        let dst = restore_dst(root, rel);
+        let dst = restore_dst_with(root, rel, &bundle_extras);
         let upstream = file_hash(&entry);
         let local = dst.exists().then(|| file_hash(&dst));
         let base_h = base_hash(&rel_s).or_else(|| local.clone()); // assume-local-base fallback
@@ -1185,6 +1215,35 @@ mod tests {
         assert!(
             super::unit_files(root, intake).iter().any(|p| p.ends_with("SKILL.md")),
             "the files that MOVE with a guard-less unit must include its SKILL.md"
+        );
+    }
+
+    /// Sprint 494 / the kickoff demo's live find: a DECLARED extra restores repo-relative even with
+    /// no leading dot, and the dot fallback still serves pre-extras bundles. The dot heuristic was
+    /// the pf02 class — fitted to `.github/` (the specimen), misplacing every dotless root extra.
+    #[test]
+    fn a_declared_extra_restores_at_the_root_and_the_dot_fallback_survives() {
+        let root = Path::new("/proj");
+        let extras = vec!["templates/exec-summary/exec-summary.html".to_string()];
+        assert_eq!(
+            super::restore_dst_with(root, Path::new("templates/exec-summary/exec-summary.html"), &extras),
+            root.join("templates/exec-summary/exec-summary.html"),
+            "a DECLARED extra lands where it lived — residence travels with the bundle, never guessed"
+        );
+        assert_eq!(
+            super::restore_dst_with(root, Path::new("processes/exec-summary.sysml"), &extras),
+            root.join(".engine/processes/exec-summary.sysml"),
+            "an engine file still lands under .engine/"
+        );
+        assert_eq!(
+            super::restore_dst_with(root, Path::new(".github/workflows/x.yml"), &[]),
+            root.join(".github/workflows/x.yml"),
+            "the dot fallback keeps pre-extras bundles importing exactly as before"
+        );
+        assert_eq!(
+            super::restore_dst(root, Path::new("templates/x.html")),
+            root.join(".engine/templates/x.html"),
+            "and WITHOUT a declaration the old behaviour stands — the fix is data-driven, not a guess swap"
         );
     }
 

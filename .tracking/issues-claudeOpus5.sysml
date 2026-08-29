@@ -202,4 +202,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyProprietyRound1 to issue308;
+
+    part issue309 : Issue {
+        :>> id = "fb3b9bcd-de99-463e-9205-92423dd4cad1";
+        :>> title = "Root extras imported into .engine: the dot heuristic fit the specimen and misplaced everything else";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 by the kickoff DEMO, live: importing the exec-summary unit landed templates/ and tests/ under the receiving project's .engine/ - inert, in the wrong place, while reporting '5 file(s) from upstream'. restore_dst inferred repo-residence from a LEADING DOT, which fit the only extras that existed when it was written (.github/workflows, the decision-channel unit) and misplaced every dotless root extra. The pf02 overfit class, verbatim: the rule killed the specimen and none of its variants. FIX: residence travels WITH the bundle - export writes the unit's declared extras (repo-relative) into unit.toml, and restore_dst_with restores a declared extra where it lived; the dot rule stays as the fallback so pre-extras bundles import exactly as before. Both import loops thread the same list (two loops with one rule between them being the recorded cause of the LAST placement defect). CONTROL: a unit test pins declared-extra-at-root, engine-file-under-.engine, dot-fallback, and no-declaration-old-behaviour. Proven live: re-published, re-imported, extras restored at the demo project's root.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyKickoffReady to issue309;
 }
