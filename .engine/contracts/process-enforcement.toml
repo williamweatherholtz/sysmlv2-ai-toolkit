@@ -81,3 +81,25 @@ reason = "The value is in what gets ASKED and whether the answer was recorded be
 # and falls into UNDECLARED - reading as "not enforced" when the truth is "enforced unconditionally".
 # The process -> guard link still has to be recorded; it just is not an activation claim any more.
 core = ["decision-rationale", "acceptance-events", "decision-requirement-link", "attestation-substance", "confirmation-authenticity"]
+
+# issue305 (D0255) — a DoD claiming it resolves an Issue "in part" while a #Resolves edge closes it
+# outright. DECLARED UNENFORCEABLE, with the reason, rather than left silent or gated badly.
+#
+# A wording gate WAS attempted and is not shipped. It flagged .tracking/backlog.sysml on its first run
+# against the real corpus - a false positive - and its design was wrong twice: file-scoped, while the
+# #Resolves edges and the DoD prose live in DIFFERENT files, and matching "in part." catches innocent
+# sentences. D0232 already records three attempts to gate verdict WORDING at 111, 35 and 1 false
+# positives, with the conclusion that language policing does not calibrate here. This was the fourth,
+# and it calibrated no better.
+#
+# There is no structural signal: pointing a #Resolves edge at a story that only partly addresses the
+# Issue produces a model identical to one where the story fully addresses it. The distinction lives
+# entirely in the author's intent.
+#
+# WHAT ACTUALLY CAUGHT IT, and the only thing that will: reading the computed view back after writing.
+# `keel open-issues` said CLOSED while the sprint's own closeOut gate said OPEN, and the disagreement
+# was visible the moment both were read together. That is the verify-don't-assert discipline doing the
+# work a guard cannot.
+[issue305PartialResolution]
+checkable = false
+reason = "No structural signal exists - a partly-addressing resolver is indistinguishable in the model from a fully-addressing one. A wording gate was attempted, produced a false positive on first contact with the corpus, and was removed rather than tuned (D0232: language policing does not calibrate here, now four times). Caught instead by reading the computed view back after the write."

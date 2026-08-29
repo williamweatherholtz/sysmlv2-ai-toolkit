@@ -136,7 +136,11 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from storyArmingIsProvenNotAssumed to issue303;
+    // RE-POINTED 2026-08-29 (D0255). It pointed at sprint 485, whose DoD said it resolved issue303
+    // 'in part' - and resolution is COMPUTED from resolver completion, which has no partial state, so
+    // a passing DoD closed an issue whose own closeOut gate said it stays open. The prose asserted a
+    // nuance the computation cannot see. The resolver is now the OPEN task that actually finishes it.
+    #Resolves dependency from dcProveTheRemainingControls to issue303;
 
     part issue304 : Issue {
         :>> id = "a3f95a97-c977-483f-b288-fda52817697f";
@@ -147,5 +151,19 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from storyLauncherControlIsDeclared to issue304;
+    // RE-POINTED 2026-08-29 (D0255), same cause as issue303 above: sprint 486 declared ONE control
+    // and said 'in part'. Sprint 487 reconciles the map against control-events.toml and lands the
+    // standing check, which is what actually resolves it.
+    #Resolves dependency from storyControlMapReconciled to issue304;
+
+    part issue305 : Issue {
+        :>> id = "86fb8720-b9d7-4720-ab17-e94e7d6fd7ed";
+        :>> title = "A DoD saying it resolves an issue IN PART closes it outright, because resolution has no partial state";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 by reading back the model after two sprints I authored myself. Resolution is COMPUTED from a resolver's completion (D0077): a #Resolves edge plus a passing resolver DoD closes the issue. There is no partial state. I wrote 'RESOLVES issue303 in part' and 'RESOLVES issue304 in part' into two sprint DoDs, and both issues computed as CLOSED the moment those DoDs passed - while each sprint's own closeOut gate said in plain words that the issue STAYS OPEN. Two surfaces of the same model, one computed and one prose, disagreeing, with the computed one winning silently and the prose one being the true statement. THE SHAPE, and it is the recurring one: prose asserting a nuance the computation cannot see. The engine's own rule is that resolution is computed and never a prose RESOLVED note - this is the mirror image, a prose NOT-YET-RESOLVED note that the computation cannot honour. It is also self-serving in the dangerous direction: the issue count went DOWN while the work did not get done, and nothing flagged it. FIX, two parts. (1) An issue's resolver must be an item whose completion actually resolves it; 'in part' is not expressible, so the honest options are to SPLIT the issue or to point the edge at the item that finishes it - both done here for issue303 and issue304. (2) A CONTROL, because this will recur every time a large issue is chipped at: flag a DoD whose text claims partial resolution ('resolves ... in part', 'partially resolves', 'in part') while carrying a #Resolves edge, since that combination is always either a mis-pointed edge or an issue that needs splitting.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyControlMapReconciled to issue305;
 }

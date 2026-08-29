@@ -64,6 +64,13 @@ package ControlMap {
     // is the third failure class. A control the map does not know about cannot appear as a gap,
     // and its omission makes the coverage view read CLEANER rather than worse.
     part ctlLaunchDirtyRefusal : SystemSafetyConstraint { :>> id = "8d5d5bca-0acd-4ba8-9945-419e1ab3f46a"; :>> title = "control: ctlLaunchDirtyRefusal"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "A process launch onto a DIRTY tree is refused, so a run's diff is attributable to that run alone (launcher::prepare, D0182 single-writer). PROVEN BY TEST: keel-cli/tests/launcher_controls_actually_fire.rs."; }
+    // D0255: found by RECONCILING control-events.toml against this map (issue304). Each of these was
+    // implemented and firing - two of them BLOCKING - while the map did not know they existed.
+    part ctlPostEditGate : SystemSafetyConstraint { :>> id = "3fdb523e-2fab-474e-9a60-67cdb5a77b4d"; :>> title = "control: ctlPostEditGate"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "An edit leaving the model unparseable or duplicate-identified is BLOCKED at the edit boundary, before the turn continues (hook post-edit, fast tier, D0134). Blocks in practice: it refused a WorkKind::doc parse error during sprint 483."; }
+    part ctlTurnBoundaryGate : SystemSafetyConstraint { :>> id = "9648f6dd-bf73-44ec-a231-8e467f3dc463"; :>> title = "control: ctlTurnBoundaryGate"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "A turn cannot END while the model is dishonest: validate plus every guard run at the turn boundary and BLOCK (hook stop, D0130). The subagent variant gates a subagent whose lifetime changed the tree (hook subagent-stop, D0174)."; }
+    part ctlAuditAdherence : SystemSafetyConstraint { :>> id = "b6fda262-04f4-48b0-9472-08356d7acea9"; :>> title = "control: ctlAuditAdherence"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "Guard-set and rule-severity MONOTONICITY is re-derived from the tree in CI and fails the build if any control was weakened without a signed Decision (keel audit-adherence, D0209 clause 1) - the issue236 self-modification class, caught independently of any hook."; }
+    part ctlAdoptionCheck : SystemSafetyConstraint { :>> id = "2628fcfd-f674-4a3a-91d5-7b9ab163d8db"; :>> title = "control: ctlAdoptionCheck"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "Every declared unit is gated in a FOREIGN scaffolded project in both directions - clean without the unit, clean with it freshly imported - on every push (keel adoption-check, D0231/issue264)."; }
+    part ctlOverrideObligation : SystemSafetyConstraint { :>> id = "8f6f8fc1-f27c-41d0-91f1-f203b74a3e43"; :>> title = "control: ctlOverrideObligation"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "A protected-surface write unlock is single-use, path-bound, and its consumption RECORDS a tracked obligation; a failed obligation write leaves a named recovery breadcrumb rather than passing silently (keel override, D0176/issue207)."; }
     part ctlFireLedger : SystemSafetyConstraint { :>> id = "b8c675a6-c8f7-4227-b5dd-e88708d02235"; :>> title = "control: ctlFireLedger"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every enforcement fire leaves a counted machine-local line; the report computes over it (D0180)"; }
     part ctlReverify : SystemSafetyConstraint { :>> id = "e54d5849-5927-46f5-ba9a-b14aebf60c9b"; :>> title = "control: ctlReverify"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Drift-suspect reproducible evidence re-runs at HEAD and re-stamps honestly (keel reverify, D0101)"; }
 
@@ -114,6 +121,11 @@ package ControlMap {
     dependency from ctlBranchProtection to ehz1;
     dependency from ctlPrePushBehind to ehz1;
     dependency from ctlLaunchDirtyRefusal to ehz2;
+    dependency from ctlPostEditGate to ehz2;
+    dependency from ctlTurnBoundaryGate to ehz2;
+    dependency from ctlOverrideObligation to ehz2;
+    dependency from ctlAuditAdherence to ehz3;
+    dependency from ctlAdoptionCheck to ehz3;
     dependency from ctlWriteLock to ehz2;
     dependency from ctlPreWriteTiers to ehz2;
     dependency from ctlPreWriteTiers to ehz7;

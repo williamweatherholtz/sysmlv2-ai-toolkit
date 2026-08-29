@@ -18,65 +18,89 @@
 #   - the hook events' `decision` is allow|block; blocks are the K14 promotion evidence.
 
 [post-edit]
+control = "ctlPostEditGate"
 record = "ledger"
 note = "per-edit fast tier (D0134)"
 
 [stop]
+control = "ctlTurnBoundaryGate"
 record = "ledger"
 note = "turn-boundary gate (D0130)"
 
 [user-prompt]
+control = "none"
+controlNote = "A routing REMINDER, not enforcement: it never blocks and never refuses, so binding it to a control would claim protection that does not exist."
 record = "ledger"
 note = "route-first reminder (D0064) - advisory, fires counted"
 
 [pre-bash]
+control = "none"
+controlNote = "Host/shell ADVISORY (issue094), explicitly never blocking. Counted so its heed rate is measurable; it guards nothing."
 record = "ledger"
 note = "shell advisory (issue094)"
 
 [pre-write]
+control = "ctlPreWriteTiers"
 record = "ledger"
 note = "protected-fact-surface tiers (D0176)"
 
 [subagent-stop]
+control = "ctlTurnBoundaryGate"
 record = "ledger"
 note = "subagent tree gate (D0174)"
 
 [launch-dirty-refusal]
+control = "ctlLaunchDirtyRefusal"
 record = "ledger"
 note = "P5 single-writer refusal (D0182) - the PESS-2 watch metric"
 
 [override-consumed]
+control = "ctlOverrideObligation"
 record = "ledger"
 note = "issue207: the NORMAL consumption path, counted; the tracked obligation is the evidence half"
 
 [override-obligation-UNSYNCED]
+control = "ctlOverrideObligation"
 record = "ledger"
 note = "override consumed but the tracked obligation write FAILED - the recovery breadcrumb"
 
 [red-yield-obligation-UNSYNCED]
+control = "none"
+controlNote = "A recovery breadcrumb for a failed obligation write in the loop-safety release path, same shape as the override UNSYNCED line but for a path with no standing control declared yet."
 record = "ledger"
 note = "loop-safety release recorded locally when the tracked obligation write failed"
 
 [actor-rebind]
+control = "none"
+controlNote = "A weakening-class OCCURRENCE that is recorded so it cannot happen unseen (issue205/srK07). Nothing refuses a rebind, so there is no control here - the record IS the whole mechanism, and saying otherwise would overstate it."
 record = "ledger"
 note = "issue205 (srK07): a rebind is a weakening class; the line names old->new in `decision`"
 
 [hook-watchdog-timeout]
+control = "none"
+controlNote = "The one fail-SILENT branch, made loud: a wedged hook writes its line before its mandated exit 0. It reports a control FAILING to run rather than being one."
 record = "ledger"
 note = "panel R1 robotics finding 4: a wedged hook used to vanish with no line - the one fail-SILENT branch in the instrumented layer; the watchdog now writes its own line before its mandated exit 0"
 
 [advisory-issued]
+control = "none"
+controlNote = "Instrumentation ABOUT controls, not a control: it records that some advisory tier spoke. Binding it would double-count the tier it observes."
 record = "ledger"
 note = "an advisory tier actually SPOKE (issue230/D0197): distinguishes silent fires from advice given - the denominator heed-rate needs"
 
 [advisory-repeated]
+control = "none"
+controlNote = "The mechanical ignore signal for the line above - a measurement of attention, not an enforcement point."
 record = "ledger"
 note = "the same advice hash spoken again in the same session - the mechanical ignore signal; heeded is computed as issued-without-repeat (approximate, stated in enforcement-report)"
 
 [pre-push-behind]
+control = "ctlPrePushBehind"
 record = "inventory"
 note = "issue209: the pre-push behind-check lives in the enforcementPoints inventory - a shell hook cannot reach the ledger, and its refusals surface in the pusher's own terminal"
 
 [spec-pin-check]
+control = "none"
+controlNote = "A BUILD-time point whose residual is warn-allow (issue203). It is in the enforcementPoints inventory rather than the control map precisely because it does not refuse; declaring it a control would claim a gate that warns."
 record = "inventory"
 note = "issue203: the build-time spec-pin point lives in the enforcementPoints inventory (its warn-allow residual stated there), not the ledger - builds happen off-tree"

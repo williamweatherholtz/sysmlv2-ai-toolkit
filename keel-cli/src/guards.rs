@@ -935,6 +935,7 @@ pub fn resolver_kind(root: &Path) -> GuardReport {
     }
 }
 
+
 /// Guard: the composite assurance-readiness gate (D0079 c).
 ///
 /// Reports the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
@@ -1903,9 +1904,100 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 53] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability"];
+pub const GUARD_NAMES: [&str; 54] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled"];
 
+
+// ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
+
+/// Every control event names a DECLARED control, or says why it is instrumentation instead.
+///
+/// # The third failure class, and why only a check closes it
+///
+/// D0217 named declared-but-never-fired. D0253 named declared-and-unprobeable. Both are visible to a
+/// reader who looks. This closes the one that is visible to NOBODY: a control that is IMPLEMENTED and
+/// FIRING while the control map does not know it exists. `keel controls` computes the hazard/control
+/// diff over DECLARED controls and DECLARED hazards, so an undeclared control cannot appear as a gap —
+/// and neither can a hazard only that control covers.
+///
+/// The perverse property is what makes a check mandatory rather than a habit: the coverage measure
+/// IMPROVES as the map gets less complete, because fewer declared controls with no gaps reads better
+/// than more declared controls with gaps. Reconciling by hand once would leave that incentive intact.
+///
+/// Found this way, not by reasoning: the map declared nine controls while `control-events.toml`
+/// declared fourteen events, two of which — the post-edit fast tier and the turn-boundary stop gate —
+/// BLOCK, and neither was in the map.
+///
+/// # Why events are the anchor
+///
+/// A control that can fire leaves a counted record, and `control-event-coverage` (D0193) already
+/// cross-checks that declaration against the event names the binary actually emits. Anchoring here
+/// chains binary → events → controls, so the map is reconciled against something already tied to the
+/// code rather than against a second hand-maintained list — which would be one more thing to drift.
+fn control_map_reconciled(root: &Path) -> GuardReport {
+    let path = root.join(".engine").join("contracts").join("control-events.toml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        // D0136: absence is a state, stated. A project that never adopted control events has nothing
+        // to reconcile, and reporting a violation would fire on a project that opted out.
+        return GuardReport { name: "control-map-reconciled", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    };
+    let declared: std::collections::HashSet<String> = crate::collect_sysml(&root.join(".tracking"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .flat_map(|t| {
+            t.match_indices("part ctl")
+                .filter_map(|(i, _)| {
+                    t.get(i + 5..).and_then(|rest| {
+                        rest.split_whitespace().next().map(std::string::ToString::to_string)
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    // SCOPED TO ADOPTION (D0231/issue090, caught by the adoption-check test on a fresh scaffold).
+    // `keel init` ships this contract because it is engine vocabulary, but the control MAP is a
+    // project's own instance data and is not shipped — so a fresh project inherits events naming
+    // controls it has never declared, and an unscoped check fires on every downstream tree for
+    // controls that are none of its business. A project with no control map has nothing to
+    // reconcile: report the zero rather than a violation, so out-of-scope reads as out-of-scope.
+    //
+    // RESIDUAL, stated because it is real: a downstream project that builds its OWN control map
+    // still inherits the shipped `control` bindings, which name this project's controls. Those
+    // bindings are instance knowledge riding in an engine file, and until they are separated the
+    // guard would mis-fire there too. Recorded rather than hidden behind a passing check.
+    if declared.is_empty() {
+        return GuardReport { name: "control-map-reconciled", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    }
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let mut event = String::new();
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            event = name.to_string();
+            scanned += 1;
+        } else if let Some(v) = l.strip_prefix("control = ") {
+            let ctl = v.trim().trim_matches('"');
+            if ctl != "none" && !declared.contains(ctl) {
+                violations.push(format!(
+                    "control-events.toml [{event}] names control `{ctl}`, which no .tracking/ file declares — an event that fires for an UNDECLARED control is the third failure class (D0254): `keel controls` computes over declared controls, so this one cannot appear as a gap and its absence makes coverage read cleaner rather than worse"
+                ));
+            }
+        }
+    }
+    // An event with NO control line at all is the silent case this guard exists for: it neither
+    // claims a control nor states that it is instrumentation.
+    for block in text.split('[').skip(1) {
+        let Some((name, body)) = block.split_once(']') else { continue };
+        if !body.contains("control = ") {
+            violations.push(format!(
+                "control-events.toml [{name}] declares no `control` — say which declared control it is the firing of, or `control = \"none\"` with a `controlNote` saying why it is instrumentation. Silence must read as a gap, never as consent (the process-enforcement.toml convention)"
+            ));
+        }
+    }
+    GuardReport { name: "control-map-reconciled", scanned, warnings: Vec::new(), violations }
+}
 
 // ── manifest-key-portability guard (issue301, chartered by D0250) ────────────────────────────────
 
@@ -3315,6 +3407,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "claim-ancestry" => Some(claim_ancestry(root)), // issue229: claimedAt bounded by the introducing commit (D0013 applied to claims)
         "judgment-request-quality" => Some(judgment_request_quality(root)), // D0207: a fork must earn the ask
         "manifest-key-portability" => Some(manifest_key_portability(root)), // issue301/D0250 — a unit manifest key naming one machine
+        "control-map-reconciled" => Some(control_map_reconciled(root)), // issue304/D0255 — a firing control absent from the map
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
