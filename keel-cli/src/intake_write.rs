@@ -44,8 +44,8 @@ pub struct NewStory<'a> {
     pub as_a: &'a str,
     pub i_want: &'a str,
     pub so_that: Option<&'a str>,
-    /// `need` | `useCase` | `scopeConstraint` | `bug` | `process` | `architecture` | `attestation`
-    /// | `question` | `priority` | `convention` | `correction` | `none`.
+    /// An `ImplicationKind` member. The accepted set is DERIVED from the schema (see `accepted`), so
+    /// it is not restated here — restating it is what issue300 was.
     pub implication: &'a str,
     /// Why THIS kind and not a neighbouring one.
     pub triage_note: Option<&'a str>,
@@ -53,11 +53,37 @@ pub struct NewStory<'a> {
     pub created_at: &'a str,
 }
 
-const CHANNELS: [&str; 5] = ["chat", "console", "deck", "commitReview", "other"];
-const IMPLICATIONS: [&str; 12] = [
-    "need", "useCase", "scopeConstraint", "bug", "process", "architecture", "attestation",
-    "question", "priority", "convention", "correction", "none",
-];
+/// The two intake vocabularies, DERIVED from `schema/core/intake.sysml` rather than restated here.
+///
+/// This module used to carry `CHANNELS` and a 12-element `IMPLICATIONS` beside a schema declaring 15
+/// members. `keel record story` therefore refused `verifiedRequirement`, `designChange` and
+/// `implementationChange` — the three the schema comments call out as deliberately renamed or added,
+/// and which `.engine/processes/intake.sysml` and both copies of the intake skill instruct the
+/// triager to use (issue300). The harm is the one the intake process exists to prevent: the process
+/// says a kind the vocabulary cannot express is a CHANGE to the vocabulary and never a forced fit, so
+/// a triager who follows the skill meets a refusal and the cheap way out is to force-fit into a
+/// neighbouring kind — a wrong triage, which routes real direction to the wrong place and looks
+/// handled.
+///
+/// `enum_members_union` is ENGINE ∪ PROJECT, so a project may EXTEND the taxonomy by editing its own
+/// schema and never has to wait for a binary release, while no project can remove a member the engine
+/// ships (issue090/issue129).
+fn accepted(root: &Path, enum_name: &str) -> Vec<String> {
+    crate::schema::enum_members_union(root, enum_name)
+}
+
+/// Refuse an unrecognised member, naming the accepted set — never default it (the channel and the
+/// triage verdict are both provenance, and a defaulted verdict is a fabricated one).
+fn check_member(root: &Path, enum_name: &str, field: &str, value: &str) -> Result<(), WriteError> {
+    let accepted = accepted(root, enum_name);
+    if accepted.iter().any(|m| m == value) {
+        return Ok(());
+    }
+    Err(WriteError::InvalidMethod(format!(
+        "{field} `{value}` — expected one of {}",
+        accepted.join(" | ")
+    )))
+}
 
 /// Escape a VERBATIM span for a one-line `SysML` string literal, altering nothing else.
 ///
@@ -123,13 +149,7 @@ fn insert_before_close(text: &str, block: &str) -> String {
 /// # Errors
 /// `WriteError::Io` on filesystem failure; `WriteError::InvalidMethod` on an unknown channel.
 pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String), WriteError> {
-    if !CHANNELS.contains(&s.channel) {
-        return Err(WriteError::InvalidMethod(format!(
-            "channel `{}` — expected one of {}",
-            s.channel,
-            CHANNELS.join(" | ")
-        )));
-    }
+    check_member(root, "StatementChannel", "channel", s.channel)?;
     if s.text.trim().is_empty() {
         return Err(WriteError::Parse("a Statement with empty text records nothing".into()));
     }
@@ -169,13 +189,7 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
 /// `WriteError::TaskNotFound` when the cited Statement does not exist — a story with no source is an
 /// invention, so the edge is authored with the story or nothing is written.
 pub fn record_story(root: &Path, s: &NewStory) -> Result<(String, String), WriteError> {
-    if !IMPLICATIONS.contains(&s.implication) {
-        return Err(WriteError::InvalidMethod(format!(
-            "implication `{}` — expected one of {}",
-            s.implication,
-            IMPLICATIONS.join(" | ")
-        )));
-    }
+    check_member(root, "ImplicationKind", "implication", s.implication)?;
     let all = all_tracking_text(root);
     if !all.contains(&format!("part {} : Statement", s.from_statement)) {
         return Err(WriteError::TaskNotFound(format!(
@@ -322,6 +336,46 @@ mod tests {
             text: "   ", said_by: "w", said_at: "2026-08-26", channel: "chat",
             title: "t", author: "a", created_at: "2026-08-26",
         }).is_err(), "empty text records nothing and must say so");
+        let _ = std::fs::remove_dir_all(&r);
+    }
+
+    /// The control for issue300 (D0047: a defect that can recur becomes an automated check).
+    ///
+    /// A hand-maintained list beside a schema enum drifts silently — this one sat at 12 against a
+    /// declared 15 and was found only when a real triage was refused. Asserting membership one by one
+    /// against the SCHEMA means the next member added to `schema/core/intake.sysml` either works or
+    /// turns this test red; it can no longer be declared and quietly unusable.
+    #[test]
+    fn every_schema_declared_member_of_both_intake_vocabularies_is_accepted() {
+        let r = root("vocab");
+        let implications = crate::schema::enum_members("ImplicationKind");
+        assert!(
+            implications.len() >= 15,
+            "schema/core/intake.sysml should declare at least the 15 known ImplicationKind members, \
+             found {}: {implications:?}",
+            implications.len()
+        );
+        for m in &implications {
+            let out = record_story(&r, &NewStory {
+                from_statement: "st999", title: "t", as_a: "a", i_want: "w", so_that: None,
+                implication: m, triage_note: None, author: "a", created_at: "2026-08-26",
+            });
+            // st999 does not exist, so every call fails — but the implication check runs FIRST, so a
+            // rejected member fails differently from an accepted one. Asserting on the message is what
+            // separates "this kind is not in the vocabulary" from "that Statement is not recorded".
+            let msg = format!("{:?}", out.expect_err("no Statement st999 exists in this fixture"));
+            assert!(
+                !msg.contains("expected one of"),
+                "ImplicationKind::{m} is declared in the schema but refused by the write path: {msg}"
+            );
+        }
+        for m in crate::schema::enum_members("StatementChannel") {
+            let out = record_statement(&r, &NewStatement {
+                text: "x", said_by: "w", said_at: "2026-08-26", channel: &m,
+                title: "t", author: "a", created_at: "2026-08-26",
+            });
+            assert!(out.is_ok(), "StatementChannel::{m} is declared but refused: {out:?}");
+        }
         let _ = std::fs::remove_dir_all(&r);
     }
 }

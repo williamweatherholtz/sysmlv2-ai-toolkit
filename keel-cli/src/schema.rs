@@ -295,6 +295,35 @@ pub fn project_enum_members(root: &std::path::Path, name: &str) -> Vec<String> {
     }
 }
 
+/// The members of an enum as the ENGINE guarantees them, UNIONED with the project's own.
+///
+/// # The same rule as `declared_attrs_in`, applied to a vocabulary a WRITE PATH validates against
+///
+/// `enum_members` alone lets a write path drift out of reach of an extended on-disk schema;
+/// `project_enum_members` alone lets a project REMOVE a member the engine ships, which is the
+/// issue090 lockout wearing new clothes. The marker and attribute guards both settled on
+/// ENGINE ∪ PROJECT for exactly this reason: the engine guarantees its own vocabulary and a project
+/// may declare MORE, never less.
+///
+/// Measured need (issue300): `intake_write` restated `ImplicationKind` as a 12-element array against
+/// a schema declaring 15, so `keel record story` refused three members that the process definition
+/// and both copies of the intake skill instruct the triager to use. Deriving makes that drift
+/// unrepresentable instead of merely detectable — the issue119/issue120 conclusion, reached a fourth
+/// time.
+///
+/// Engine members come first and in declaration order: that order is load-bearing elsewhere, and a
+/// caller printing the accepted set should print the canonical sequence before any local addition.
+#[must_use]
+pub fn enum_members_union(root: &std::path::Path, name: &str) -> Vec<String> {
+    let mut out = enum_members(name);
+    for m in project_enum_members(root, name) {
+        if !out.contains(&m) {
+            out.push(m);
+        }
+    }
+    out
+}
+
 /// Every attribute name declared for `type_name`, following `:>` supertypes.
 ///
 /// Returns `None` when the type is not in the engine schema at all — a PROJECT-DECLARED type, whose

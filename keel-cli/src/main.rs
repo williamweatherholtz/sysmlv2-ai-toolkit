@@ -2545,7 +2545,12 @@ fn cmd_record_statement(args: &[String]) -> i32 {
         (text, flag(args, "said-by"), flag(args, "said-at"), flag(args, "title"))
     else {
         eprintln!("usage: keel record statement --text \"<their exact words>\" | --from FILE");
-        eprintln!("       --said-by ACTOR --said-at YYYY-MM-DD --title T [--channel chat|console|deck|commitReview|other]");
+        // Derived, not restated (issue300): the usage line a user reads is the same vocabulary
+        // surface as the check, so it must come from the same source or it will drift from it.
+        eprintln!(
+            "       --said-by ACTOR --said-at YYYY-MM-DD --title T [--channel {}]",
+            keel_cli::schema::enum_members_union(&root, "StatementChannel").join("|")
+        );
         eprintln!("       [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
         eprintln!("  --text is VERBATIM (D0216): their words, not a summary. --title is your label for it.");
         return 2;
@@ -2603,7 +2608,11 @@ fn cmd_record_story(args: &[String]) -> i32 {
         flag(args, "implication"),
     ) else {
         eprintln!("usage: keel record story --from-statement stNNN --title T --as-a ROLE --i-want CAPABILITY");
-        eprintln!("       --implication need|useCase|scopeConstraint|bug|process|architecture|attestation|question|priority|convention|correction|none");
+        // Derived, not restated (issue300) — see the note at the `record statement` usage.
+        eprintln!(
+            "       --implication {}",
+            keel_cli::schema::enum_members_union(&root, "ImplicationKind").join("|")
+        );
         eprintln!("       [--so-that OUTCOME] [--triage-note WHY] [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
         eprintln!("  --from-statement is REQUIRED: a UserStory with no cited source is an invention (D0216).");
         return 2;
