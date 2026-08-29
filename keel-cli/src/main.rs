@@ -185,7 +185,7 @@ fn engine_version_skew(root: &Path) -> Option<String> {
         return None;
     }
     Some(format!(
-        "[keel] engine-version SKEW: this binary is {binary} but the on-disk engine declares {declared} (engine-version.toml).          The checks may not match the engine they gate (the issue089/issue090 class). Run `keel migrate` to bring the tree current          (it re-stamps the declaration); advisory only - nothing is blocked (D0190/D0098)."
+        "[keel] engine-version SKEW: this binary is {binary} but this project PINS {declared} (engine-version.toml).          The pin is BINDING (D0251): writes and gates REFUSE under skew; reads warn and proceed. Run the pinned          version, or `keel migrate` to bring the tree to this one (it re-stamps the pin)."
     ))
 }
 
@@ -3364,6 +3364,45 @@ fn enclosing_project(dir: &Path) -> Option<PathBuf> {
     None
 }
 
+/// D0251 clause B: ship the wrapper into a fresh project. `keelw` resolves the project's pin;
+/// `keel-wrapper.toml` is the committed checksum contract (entries come from the release page — the
+/// starter names the duty rather than inventing hashes). The cache is SEEDED with the running
+/// binary, so the fresh project's wrapper works immediately and offline: init itself just proved
+/// this binary runs.
+///
+/// # Errors
+/// The CLI exit code when either committed file cannot be written. A failed cache SEED is a note,
+/// not an error — the wrapper still works via a checksum entry or a manual install.
+fn init_wrapper(dir: &Path) -> Result<(), i32> {
+    if let Err(e) = std::fs::write(dir.join("keelw"), include_str!("../../keelw")) {
+        eprintln!("error writing keelw: {e}");
+        return Err(1);
+    }
+    let wrapper_toml = format!(
+        "# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies\n# against (D0251 clause B). NEVER trust-on-first-use: a version with no entry here refuses to\n# download. Entries come from the release page's published checksums; the seeded cache entry in\n# .keel/bin/ covers THIS machine until then.\n[\"{}\"]\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    if let Err(e) = std::fs::write(dir.join("keel-wrapper.toml"), wrapper_toml) {
+        eprintln!("error writing keel-wrapper.toml: {e}");
+        return Err(1);
+    }
+    if let Ok(me) = std::env::current_exe() {
+        let asset = if cfg!(windows) {
+            "keel-windows-x86_64.exe"
+        } else if cfg!(target_os = "macos") {
+            "keel-macos-aarch64"
+        } else {
+            "keel-linux-x86_64"
+        };
+        let cache = dir.join(".keel").join("bin").join(env!("CARGO_PKG_VERSION"));
+        let _ = std::fs::create_dir_all(&cache);
+        if let Err(e) = std::fs::copy(&me, cache.join(asset)) {
+            eprintln!("note: could not seed the wrapper cache ({e}) — keelw will need a checksum entry or a manual install");
+        }
+    }
+    Ok(())
+}
+
 fn cmd_init(args: &[String]) -> i32 {
     const USAGE: &str = "keel init DIR [--profile strict|guided]";
     let target = match positional_arg(args, USAGE, "a directory") {
@@ -3469,9 +3508,12 @@ fn cmd_init(args: &[String]) -> i32 {
     // D0190: stamp the declared engine version - which binary's checks this engine is defined
     // against. Re-stamped by `keel migrate`; read only by the parity warning, never by migrate.
     let version_toml = format!(
-        "# engine-version - the binary version this on-disk engine's checks are defined against (D0190).\n# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate\n# derives its vintage from the tree, never from this file.\nengine = \"{}\"\n",
+        "# engine-version - the BINDING engine pin: the version whose writes and gates this project accepts\n# (D0190 stamped it; D0251 made it bite). Written by `keel init`, re-stamped by `keel migrate`; a\n# mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin (D0251 B).\nengine = \"{}\"\n",
         env!("CARGO_PKG_VERSION")
     );
+    if let Err(code) = init_wrapper(&dir) {
+        return code;
+    }
     if let Err(e) = std::fs::write(engine_dst.join("contracts").join("engine-version.toml"), version_toml) {
         eprintln!("error writing engine-version.toml: {e}");
         return 1;

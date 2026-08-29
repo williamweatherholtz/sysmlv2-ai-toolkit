@@ -758,7 +758,7 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         env!("CARGO_PKG_VERSION")
     );
     let stamp = format!(
-        "# engine-version - the binary version this on-disk engine's checks are defined against (D0190).\n# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate\n# derives its vintage from the tree, never from this file.\nengine = \"{}\"\n",
+        "# engine-version - the BINDING engine pin: the version whose writes and gates this project accepts\n# (D0190 stamped it; D0251 made it bite). Written by `keel init`, re-stamped by `keel migrate`; a\n# mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin (D0251 B).\nengine = \"{}\"\n",
         env!("CARGO_PKG_VERSION")
     );
     let stamp_path = root.join(".engine").join("contracts").join("engine-version.toml");

@@ -1,0 +1,71 @@
+#!/bin/sh
+# keelw — the keel wrapper (D0251 clause B; the gradlew/mvnw pattern).
+#
+# Resolves the ENGINE PIN from .engine/contracts/engine-version.toml against a machine-local binary
+# cache (.keel/bin/<version>/). On a miss it downloads THAT VERSION AND NO OTHER from the release
+# origin, verifies the SHA-256 committed in keel-wrapper.toml, caches, and execs. Three refusals, all
+# loud: a checksum mismatch (a swapped asset must never run), a missing checksum entry (verification
+# is never trust-on-first-use), and an unreachable origin with an empty cache (instructions, never a
+# fallback to whatever keel is on PATH — the PATH fallback is exactly the defect the pin ends).
+#
+# KEELW_BASE_URL overrides the release origin — a mirror, an air-gapped file:// tree, or a test
+# serving a fake release. Fetching ONLY the pinned version is what makes this the opposite of
+# auto-update, which is how it coexists with D0175 (superseded in part by D0251, the typed edge).
+set -u
+
+die() { echo "keelw: $*" >&2; exit 1; }
+
+# ── the pin ────────────────────────────────────────────────────────────────────────────────────────
+PIN_FILE=".engine/contracts/engine-version.toml"
+[ -f "$PIN_FILE" ] || die "no $PIN_FILE here — keelw runs from a keel project root (the pin is the project's, not the machine's)"
+VERSION=$(sed -n 's/^engine *= *"\(.*\)"/\1/p' "$PIN_FILE" | head -n1)
+[ -n "$VERSION" ] || die "no engine pin declared in $PIN_FILE"
+
+# ── the platform asset, mirroring release.yml's names ─────────────────────────────────────────────
+case "$(uname -s)" in
+  Linux*)                 ASSET="keel-linux-x86_64" ;;
+  Darwin*)                ASSET="keel-macos-aarch64" ;;
+  MINGW*|MSYS*|CYGWIN*)   ASSET="keel-windows-x86_64.exe" ;;
+  *) die "unsupported platform $(uname -s) — no release asset name is defined for it" ;;
+esac
+
+CACHE_DIR=".keel/bin/$VERSION"
+CACHED="$CACHE_DIR/$ASSET"
+
+# ── cache hit: exec, touching nothing else ────────────────────────────────────────────────────────
+if [ -x "$CACHED" ] || [ -f "$CACHED" ]; then
+  exec sh -c 'exec "$0" "$@"' "$CACHED" "$@"
+fi
+
+# ── cache miss: fetch EXACTLY the pin, verify, cache, exec ────────────────────────────────────────
+BASE="${KEELW_BASE_URL:-https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases/download}"
+URL="$BASE/v$VERSION/$ASSET"
+
+# The committed checksum contract. Absent entry = refuse: trust-on-first-use would make the first
+# download the authority on what the binary should be, which is no verification at all.
+WANT=""
+if [ -f "keel-wrapper.toml" ]; then
+  WANT=$(awk -v ver="[\"$VERSION\"]" -v asset="\"$ASSET\"" '
+    $0 == ver { inv=1; next }
+    /^\[/ { inv=0 }
+    inv && index($0, asset) == 1 { gsub(/.*= *"/, ""); gsub(/".*/, ""); print; exit }
+  ' keel-wrapper.toml)
+fi
+[ -n "$WANT" ] || die "no committed checksum for keel $VERSION / $ASSET in keel-wrapper.toml — a download that nothing verifies must not run (never trust-on-first-use). Add the entry from the release page, or install the binary into $CACHED yourself."
+
+TMP="$CACHE_DIR/.download.$$"
+mkdir -p "$CACHE_DIR"
+if ! curl -fsSL "$URL" -o "$TMP" 2>/dev/null; then
+  rm -f "$TMP"
+  die "cannot fetch keel $VERSION from $URL and the cache is empty — this wrapper NEVER falls back to a binary on PATH (that is the defect the pin ends, D0251). Get $ASSET for v$VERSION from the releases page and place it at $CACHED."
+fi
+
+GOT=$( (sha256sum "$TMP" 2>/dev/null || shasum -a 256 "$TMP") | awk '{print $1}')
+if [ "$GOT" != "$WANT" ]; then
+  rm -f "$TMP"
+  die "SHA-256 checksum MISMATCH for $URL: expected $WANT, got $GOT — the asset is not the one this tree pinned, and an unverified binary never runs and is never cached."
+fi
+
+mv "$TMP" "$CACHED"
+chmod +x "$CACHED" 2>/dev/null || true
+exec sh -c 'exec "$0" "$@"' "$CACHED" "$@"
