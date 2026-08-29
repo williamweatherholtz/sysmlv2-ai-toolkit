@@ -317,4 +317,39 @@ package ProjectIntake20260828 {
     #DerivedFrom dependency from us045 to st029;
 
     #Implicates dependency from us045 to d0250;
+
+    part st030 : Statement {
+        :>> id = "8d7e4957-4e69-4129-b351-81f3401b028c";
+        :>> title = "Forks 2 and 3 answered: all five recommended options selected, no notes";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> text = "[x] An exact version, e.g. engine = 0.3.0 - RECOMMENDED\n[x] Fetch the pinned release asset, verify its checksum, exec - RECOMMENDED\n[x] Writes and gates refuse; read-only views warn and proceed - RECOMMENDED\n[x] Extend the existing capability handshake: a unit declares what it NEEDS - RECOMMENDED\n[x] Roll back entirely and report per file what could not migrate - RECOMMENDED\nMy notes:";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-28"; :>> channel = StatementChannel::chat;
+    }
+
+    part us046 : UserStory {
+        :>> id = "d299ee58-f599-4ccb-8c32-fce12ba15475";
+        :>> title = "The engine pin names an exact version, is fetched and verified, and refuses on writes";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project author";
+        :>> iWant = "an exact pinned engine that the wrapper fetches and verifies, refusing writes and gates on a skew";
+        :>> soThat = "the same tree produces the same verdict on every machine, and a new machine works on first clone";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture and not designChange: it fixes the DELIVERY structure of the engine and amends an accepted Decision (D0175 on the fetch), rather than reshaping an implementation. Three of their five selections belong to this one story because they are one mechanism - a pin that names nothing resolvable, or resolves and then never bites, is not a pin.";
+    }
+    #DerivedFrom dependency from us046 to st030;
+
+    part us047 : UserStory {
+        :>> id = "bce20c04-a347-4021-a3fa-af0272c2e8c5";
+        :>> title = "A unit declares capabilities, and a failed migration rolls back";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project author";
+        :>> iWant = "unit compatibility expressed as declared capabilities, and a migration that cannot finish to leave the unit untouched";
+        :>> soThat = "a unit refuses to install for a reason that names what is missing, and a half-migrated unit never exists";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture and not verifiedRequirement: the requirements srUnitDeclaresEngineRange and srUnitMigrationPath already exist and are accepted; this chooses the MECHANISM that discharges them. Kept separate from the pin story because the two forks are independent - the library could carry content under either compatibility scheme.";
+    }
+    #DerivedFrom dependency from us047 to st030;
+
+    #Implicates dependency from us046 to d0251;
+    #Implicates dependency from us047 to d0252;
 }
