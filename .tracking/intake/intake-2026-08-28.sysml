@@ -241,4 +241,27 @@ package ProjectIntake20260828 {
         :>> triageNote = "attestation and not correction: they are not retracting anything, they are agreeing to two recommendations. Their exact words were: agreed with your pushback do #5 and #6. Item 5 was the polling daemon, item 6 was implement-all; recorded so the deferral of the daemon has a cited source rather than resting on my summary of it.";
     }
     #DerivedFrom dependency from us044 to st026;
+
+    // ── Routing (intake step 5): what each triaged story became ──────────────────────────────────
+    // #Implicates points story -> downstream item and is what `keel intake` counts as ROUTED;
+    // #DerivedFrom points the other way, from the derived item back to the story, and is what D0216
+    // requires so a Need cannot pass as unsourced. Both exist and they are not redundant: one says
+    // this story produced that, the other says that item rests on this utterance.
+    // Stories still unrouted here are waiting on downstream items that do not exist yet, which is a
+    // stated debt rather than an omission - `keel intake` reports it either way.
+
+    #Implicates dependency from us028 to d0246;
+
+    #Implicates dependency from us029 to nIntakeBeforeInterpretation;
+    #Implicates dependency from us029 to nTurnStartRecall;
+    #Implicates dependency from us029 to nEnginePinAndEvolution;
+    #Implicates dependency from us029 to nRepoHoldsSeveralProjects;
+    #Implicates dependency from us029 to nForeignTreeVerification;
+    #Implicates dependency from us029 to nPassDisclosesItsSource;
+    #Implicates dependency from us029 to nMonitoredNotGated;
+    #Implicates dependency from us029 to nDecisionPromisesTracked;
+    #Implicates dependency from us029 to nAuthoringCostsLessThanTheAlternative;
+    #Implicates dependency from us029 to nParserIsTheTrustedBase;
+    #Implicates dependency from us029 to nDeclaredControlDistinguishableFromArmed;
+    #Implicates dependency from us029 to nDocSurfaceCannotOutliveTheChange;
 }
