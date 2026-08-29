@@ -223,7 +223,12 @@ fn cmd_validate(args: &[String]) -> i32 {
         return 2;
     }
     if let Some(w) = engine_version_skew(&root) {
+        // D0251: for a GATE surface the skew REFUSES rather than warns — a verdict from an engine
+        // the project did not declare is not the project's verdict. `orient` still answers (reads
+        // warn), and `migrate` is the repair path.
         eprintln!("{w}");
+        eprintln!("validate REFUSED under engine-version skew (D0251). Run the pinned version, or `keel migrate`.");
+        return 2;
     }
     let report = validate_root(&root);
 
@@ -1020,6 +1025,8 @@ Connection: close
 /// Turn-boundary gate: refuse to end the turn while the model is dishonest. Loop-safe.
 fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     if let Some(w) = engine_version_skew(root) {
+        // D0251: the turn boundary is a gate. The skew is reported as a blocking problem (with the
+        // repair named) rather than a warning nobody reads.
         eprintln!("{w}");
     }
     let already = payload.get("stop_hook_active").and_then(serde_json::Value::as_bool).unwrap_or(false);
@@ -1174,6 +1181,13 @@ fn cmd_gate(args: &[String]) -> i32 {
         .map(PathBuf::from)
         .or_else(find_repo_root)
         .unwrap_or_else(|| PathBuf::from("."));
+    // D0251: the fast tier is a gate too — a per-edit verdict from an undeclared engine misleads
+    // in-loop exactly as a commit verdict would at the boundary.
+    if let Some(w) = engine_version_skew(&root) {
+        eprintln!("{w}");
+        eprintln!("gate REFUSED under engine-version skew (D0251). Run the pinned version, or `keel migrate`.");
+        return 2;
+    }
     if !fast {
         eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder)");
         eprintln!("       keel gate --workspace [ROOT]   (the COMMIT gate for a repo holding several projects: every project the commit touches, D0234)");
@@ -1372,6 +1386,12 @@ fn cmd_orient(args: &[String]) -> i32 {
         Ok(r) => r,
         Err(code) => return code,
     };
+    // D0251 clause C: a READ view proceeds under skew — blocking orient would block the command
+    // that diagnoses the skew — but it warns LOUDLY, because what this view shows may not be what
+    // the pinned engine's gate would say. Stderr, so the JSON stays parseable.
+    if let Some(w) = engine_version_skew(&root) {
+        eprintln!("{w}");
+    }
     if html {
         return match keel_cli::view::orient_html(&root) {
             Ok(h) => {
@@ -1478,6 +1498,8 @@ fn cmd_guard(args: &[String]) -> i32 {
     };
     if let Some(w) = engine_version_skew(&root) {
         eprintln!("{w}");
+        eprintln!("guard REFUSED under engine-version skew (D0251). Run the pinned version, or `keel migrate`.");
+        return 2;
     }
     let Some(name) = name else {
         let reports = keel_cli::guards::run_all(&root);

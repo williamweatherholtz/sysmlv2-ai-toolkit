@@ -25,6 +25,32 @@ use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
 use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod activation;
+/// The declared-vs-binary version skew for the project owning `target`, if any (D0251).
+///
+/// Root discovery mirrors `write::model_lock_path`: walk up to the `.tracking`/`.engine` parent. Returns
+/// `None` when there is no declaration (D0136: absence is a state — a pre-D0190 tree keeps working),
+/// when the declaration matches, or when no project root is findable (a caller writing outside a
+/// model tree has no pin to honour).
+#[must_use]
+pub fn pin_skew(target: &Path) -> Option<(String, String)> {
+    // The target may BE the .tracking dir (set_attr locks on it directly), or live under it.
+    let mut cur = target;
+    let root = loop {
+        if matches!(cur.file_name().and_then(|n| n.to_str()), Some(".tracking" | ".engine")) {
+            break cur.parent()?;
+        }
+        cur = cur.parent()?;
+    };
+    let text = std::fs::read_to_string(root.join(".engine").join("contracts").join("engine-version.toml")).ok()?;
+    let declared = text
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("engine"))
+        .and_then(|r| r.split('"').nth(1))
+        .map(str::to_string)?;
+    let binary = env!("CARGO_PKG_VERSION");
+    (declared != binary).then(|| (declared, binary.to_string()))
+}
+
 pub mod actor;
 pub mod algo;
 pub mod arch;

@@ -383,6 +383,15 @@ pub fn cmd(args: &[String]) -> i32 {
 #[must_use]
 pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
     let mut problems = Vec::new();
+    // THE PIN BITES HERE for verdicts, as it does in `with_file_lock` for writes (D0251 clause C).
+    // One body means one check covers gate, sync, land and the pre-commit hook identically — and
+    // workspace coherence (srWorkspacePinIsCoherent) falls out: projects with DISAGREEING pins
+    // cannot both match one binary, so the mismatched one refuses under its own tag, naming it.
+    if let Some((declared, binary)) = crate::pin_skew(&project.join(".tracking").join("x")) {
+        problems.push(format!(
+            "{tag}PIN: this project declares engine {declared} and this binary is {binary} — a verdict from an undeclared engine is not this project's verdict (D0251/srProjectPinsItsEngine). Run the pinned version, or `keel migrate` to bring the tree to this one"
+        ));
+    }
     let report = crate::validate_root(project);
     for (path, d) in &report.diagnostics {
         problems.push(format!("{tag}ERROR {}:{} — {}", path.display(), d.line, d.message));

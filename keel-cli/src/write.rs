@@ -111,6 +111,7 @@ fn model_lock_path(target: &Path) -> std::path::PathBuf {
     target.with_extension("keel-lock")
 }
 
+
 /// Hold an exclusive lock on `path` for the duration of `f` (issue185).
 ///
 /// WHY. Every write here is a read-modify-write: read the file, splice an item in, write it all back.
@@ -136,6 +137,17 @@ pub fn with_file_lock<T, E: From<std::io::Error>>(
 ) -> Result<T, E> {
     const ATTEMPTS: u32 = 100;
     const WAIT_MS: u64 = 20;
+    // THE PIN BITES HERE, before the lock (D0251 clause C / srProjectPinsItsEngine). Every model
+    // write serialises through this function, so checking here covers all write paths BY
+    // CONSTRUCTION — the same argument that made the lock itself model-wide (and the answer to the
+    // propriety panel's pf12 class question, applied at design time this time: a future write path
+    // that skips this fn skips the LOCK too, which the write-lock probe would expose as lost writes).
+    // A fact recorded by an engine the project did not declare is provenance nobody can reconstruct.
+    if let Some((declared, binary)) = crate::pin_skew(path) {
+        return Err(E::from(std::io::Error::other(format!(
+            "write refused: this project pins engine {declared} and this binary is {binary} (engine-version.toml is BINDING for writes and gates, D0251). Run the pinned version — or `keel migrate` to bring the tree to this one. Reads still work; nothing was written."
+        ))));
+    }
     // ONE MODEL-WIDE LOCK, not one per file. Two entry points - `set_attr` and `create_item` - SEARCH
     // for the file they will modify, so the target is unknown until after the read and a per-file lock
     // cannot be taken up front. A single lock beside the model root makes every writer mutually

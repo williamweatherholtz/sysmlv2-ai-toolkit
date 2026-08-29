@@ -35,4 +35,26 @@ package ProjectIntake20260829 {
     #DerivedFrom dependency from us048 to st032;
 
     #Implicates dependency from us048 to d0257;
+
+    part st033 : Statement {
+        :>> id = "b27d1376-6b2e-4ca5-8dd7-55a9aef8ce6c";
+        :>> title = "Close the readiness gaps: a TDD implementation plan for the pin, the wrapper, the library and the exec-summary unit - then roll it out";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> text = "well, let's get there.  define a clear implementation plan with TDD, then let's roll it out";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-29"; :>> channel = StatementChannel::chat;
+    }
+
+    part us049 : UserStory {
+        :>> id = "872313a6-45e1-413a-b26f-eb5bf01e4ebf";
+        :>> title = "The readiness gaps close as five TDD increments, then the new project kicks off on the proven path";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "a clear TDD implementation plan for the pin, wrapper, library and exec-summary unit, rolled out increment by increment";
+        :>> soThat = "the new project starts on the improved workflow rather than the manual one";
+        :>> implication = ImplicationKind::priority;
+        :>> triageNote = "priority and not process: the processes and requirements all exist (D0250-D0252, the srs); this orders DELIVERY of already-chartered work. The plan is recorded as five ranked backlog tasks (declaration order IS priority, D0052) rather than a prose plan document (D0018), each DoD carrying its Gherkin so tests precede implementation per the established rigor (st027).";
+    }
+    #DerivedFrom dependency from us049 to st033;
+
+    #Implicates dependency from us049 to dcPinBites;
 }

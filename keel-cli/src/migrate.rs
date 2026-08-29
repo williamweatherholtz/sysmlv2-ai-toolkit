@@ -749,9 +749,14 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         eprintln!("  A step did not do what it reported. The tree is migrated but NOT verified — inspect `git diff` before committing.");
         return 1;
     }
-    // D0190: a completed migration re-stamps the declared engine version. The stamp is for the
-    // parity WARNING only - this command derives everything from the tree and never reads it, so
-    // the no-stamp rule in this module's header still holds for vintage detection.
+    // D0190: a completed migration re-stamps the declared engine version. D0251 ESCALATED what the
+    // stamp means: it is no longer a parity-warning input but a BINDING pin — a binary whose version
+    // differs from it now REFUSES writes and gates (reads warn; `version`/`migrate` never refuse).
+    // Migrate is the repair path, so migrate is where an existing project hears about the change.
+    println!(
+        "note (D0251): engine-version.toml is now BINDING — a binary that does not match the stamped {} will REFUSE writes and gates on this tree (reads warn; `keel migrate` re-stamps).",
+        env!("CARGO_PKG_VERSION")
+    );
     let stamp = format!(
         "# engine-version - the binary version this on-disk engine's checks are defined against (D0190).\n# Written by `keel init`, re-stamped by `keel migrate`. Read ONLY by the parity warning; migrate\n# derives its vintage from the tree, never from this file.\nengine = \"{}\"\n",
         env!("CARGO_PKG_VERSION")
