@@ -1,0 +1,5 @@
+# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies against
+# (D0251 clause B). NEVER trust-on-first-use: a version with no entry refuses to download; a machine
+# with a seeded or hand-installed cache needs no entry. Entries are added from the published release
+# assets after each tag's CI run completes.
+["0.3.1"]

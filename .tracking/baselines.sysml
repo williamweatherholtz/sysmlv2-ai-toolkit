@@ -125,4 +125,13 @@ package ProjectBaselines {
         :>> purpose = "Makes the engine adoptable by a project other than its author. Units travel whole - a skill declares itself beside itself, and `keel process audit` computes whether a unit would land green in a project that lacks it (D0220/D0222). A governance record cannot silently carry captured tool output, and `record decision --from FILE` is the safe authoring path (D0224). The five Decision-authoring guards are CORE rather than switchable (D0223). A project chooses its process set by being asked about its work, each process declares the situation it applies to, and the guard enforcing that is scoped to projects which adopted it (D0225/D0228). 51 guards, up from 44 at v0.2.3. Three platform binaries attached, gate green on the tagged commit.";
     }
 
+
+    part release031 : Release {
+        :>> id = "e308b21a-d376-4eb9-98c4-8f25b364be88";
+        :>> title = "v0.3.1 - the pin binds, the wrapper resolves it, the library carries the working material";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> commit = "TBD-AT-TAG";
+        :>> purpose = "The portability release (D0250/D0251/D0252; the st033 readiness plan, increments 1-4). The engine pin becomes BINDING: writes refuse at the write-lock choke point and gates in the one gate body, reads warn, version/migrate never refuse, absent declarations keep working. keelw resolves the pin against a seeded machine-local cache, downloads exactly the pinned version verified against committed SHA-256s, and never falls back to PATH. keel library init/sync/list + process publish/import --from-library carry the working material: fast-forward-only sync, stated staleness offline, publish as one loud commit that never pushes, and a byte-identical-gate differential holding availability-is-never-activation. Guards 53-54 and six arming probes land with it; the pre-push bootstrap-refusal field defect (issue306) is fixed. BREAKING: a pinned project refuses a mismatched binary - keel migrate re-stamps and announces.";
+    }
 }
