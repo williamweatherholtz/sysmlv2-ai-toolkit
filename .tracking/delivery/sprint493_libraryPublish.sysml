@@ -1,0 +1,29 @@
+// ProjectDeliveryS493 — Sprint 493: publish: the loud direction of the library. EXECUTE. 3 pts.
+package ProjectDeliveryS493 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from libraryPublishStory to d0250;
+
+    part libraryPublishStory : Story {
+        :>> id = "1b97ef0d-c793-4afd-8f27-47fd3a54af72";
+        :>> title = "Sprint 493: keel process publish - one commit naming unit and version, never a push, never a no-op (3 pts)";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS493 {
+        action storyLibraryPublish;
+        verification storyLibraryPublishDoD : Test { :>> id = "4c063405-82a5-47ea-bb5f-91d3100faafe"; :>> method = VerificationMethod::test; :>> procedureText = "Discharges dcLibraryPublish (increment 4, D0250 clause D). keel process publish <name> exports the unit INTO the library clone (delegating to the one exporter, which nests <out>/<name> itself) and commits with a message naming unit and version. NEVER pushes - the push is the human-visible act, and the message says exactly how. An unchanged unit is a STATED no-op with no commit (issue302 semantics at library scale: churn makes the library log useless as a review surface). An undeclared process refuses naming what was asked. VERIFY: three Gherkin scenarios RED first, now 3/3 - including remote-commit-count-unchanged (never pushes) and sync-quiet-after-publish (AHEAD is the sanctioned state).: DELIVERED BACKLOG ITEMS: <items>. <what done means, verified how>."; }
+        // RAN: // RAN: library_publish.rs RED 0/3 -> GREEN 3/3; clippy clean; 21 suites 0 FAILED
+        part storyLibraryPublishDoDR1 : TestResult { :>> id = "4ae0603d-01cb-4dd1-a984-c9c615c22cfa"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "34e40b4"; :>> judgedAt = "2026-08-29"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification libraryPublishRefineGate : Test { :>> id = "e93ada3c-b08c-439d-9d84-ec5f6c1f8a25"; :>> title = "Sprint 493 refine gate (DoR)"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: chartered by accepted D0250; the read side (sprint 492) deliberately shipped AHEAD-tolerance in sync ahead of this sprint, so publish lands into machinery already expecting it."; }
+    verification libraryPublishStandupGate : Test { :>> id = "66aa8aef-d4f9-441b-a533-70be8bf29592"; :>> title = "Sprint 493 standup gate"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "No blocker. One layout fact learned from the RED run rather than assumed: cmd_export nests <out>/<name> itself, so publish hands it the clone ROOT - one exporter, one layout."; }
+    verification libraryPublishImplementGate : Test { :>> id = "0bd2d079-7f0c-48bc-a90a-5ec101caca6a"; :>> title = "Sprint 493 implement gate"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: library_publish.rs RED 0/3 -> GREEN 3/3; clippy -D warnings clean; cargo test --workspace --release 21 suites 0 FAILED. The no-op check scopes git status --porcelain to the unit's own directory, so publishing unit A is never blocked or polluted by unrelated clone state."; }
+    verification libraryPublishReviewGate : Test { :>> id = "4de4e283-8a61-45cd-9b2d-ce802700304b"; :>> title = "Sprint 493 review gate — three passes per D0172"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) THE ASYMMETRY IS THE DESIGN: consume silent, publish loud - and the loudness is a git commit, the one artifact every keel discipline already knows how to review, revert and audit. (2) NEVER-PUSHES is asserted against the REMOTE's commit count, not against the command's own output - a publish that quietly pushed would fail the test even if it lied on stdout. (3) NO-OP-NO-COMMIT holds the library log's meaning: a reader asking what changed reads commits that each changed something."; }
+    verification libraryPublishCloseOutGate : Test { :>> id = "917ebc37-64bf-4cbb-ae66-b5d44f9ea3d8"; :>> title = "Sprint 493 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. Increment 4 of 5. RESIDUAL, named: publish commits to the clone's CURRENT branch and does not create one; a library repo with branch protection on its default branch will want keel land run in the clone instead of a bare git push - the message names the push as the operator's act, which covers both. Next: dcKickoffReady (increment 5) - the exec-summary process definition in se-templates, the release tag, and the throwaway end-to-end demo."; }
+    verification libraryPublishRetroGate : Test { :>> id = "fbf9033d-aad0-46fc-bca5-a4b031b1b584"; :>> title = "Sprint 493 retro gate (autonomous, D0049)"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "FINDING: the RED-first discipline caught a layout assumption (export nests <out>/<name>) that reasoning had gotten wrong in the first implementation line - the fourth time this roll-out that the failing test knew something the author did not. Cumulative score for the plan so far: every increment's first RED run corrected either the fixture, the implementation, or the author's model of existing code. None of the corrections would have happened from review alone."; }
+}

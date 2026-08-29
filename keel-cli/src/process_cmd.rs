@@ -565,6 +565,67 @@ fn handshake(root: &Path, manifest: &str, bundle_dir: Option<&Path>, degrade: bo
     Ok(())
 }
 
+/// `keel process publish <name>` — export the unit into the machine-local library clone and COMMIT
+/// (D0250 clause D). The LOUD direction: consuming the library is silent because its content governs
+/// nothing until activated; writing to it changes what every other machine will consume, so a publish
+/// is always one visible commit naming unit and version — and it NEVER pushes, because the push is
+/// the human-visible act (or `keel land` run in the library clone).
+///
+/// An unchanged unit publishes NOTHING, stated (the issue302 semantics at library scale): a commit
+/// that moves no content makes the library log useless as a review surface of what actually changed.
+fn cmd_publish(args: &[String], root: &Path) -> i32 {
+    let Some(name) = args.get(1) else {
+        eprintln!("usage: keel process publish <name>   (exports the unit into the library clone and commits; push separately)");
+        return 2;
+    };
+    let Some(clone) = crate::library::clone_dir().filter(|d| d.join(".git").exists()) else {
+        eprintln!("library: not initialised on this machine — `keel library init <remote>` first");
+        return 2;
+    };
+    let dst = clone.join(name);
+    // Export INTO the clone. The export path already refuses an undeclared process, writes the whole
+    // unit (definition + skill + rules + extras + unit.toml), and NESTS <out>/<name> itself — so it
+    // is handed the clone root, one exporter and one layout, not two.
+    let export_args = vec!["export".to_string(), (*name).clone(), "--out".to_string(), clone.to_string_lossy().to_string()];
+    let code = cmd_export(&export_args, root);
+    if code != 0 {
+        return code;
+    }
+    // Anything to commit? `git status --porcelain -- <unit dir>` scopes the question to this unit.
+    let status = crate::gitx::git()
+        .arg("-C")
+        .arg(&clone)
+        .args(["status", "--porcelain", "--"])
+        .arg(name)
+        .output();
+    let dirty = status.as_ref().is_ok_and(|o| !String::from_utf8_lossy(&o.stdout).trim().is_empty());
+    if !dirty {
+        println!("publish: `{name}` is UNCHANGED in the library — nothing to publish (a no-op version must not move, issue302).");
+        return 0;
+    }
+    let version = std::fs::read_to_string(dst.join("unit.toml"))
+        .ok()
+        .and_then(|t| t.lines().find_map(|l| l.trim().strip_prefix("version = ").map(str::to_string)))
+        .unwrap_or_else(|| "?".to_string());
+    for step in [vec!["add", "-A", "--", name.as_str()], vec!["-c", "commit.gpgsign=false", "commit", "-q", "-m", &format!("publish {name} v{version}")]] {
+        let out = crate::gitx::git().arg("-C").arg(&clone).args(&step).output();
+        match out {
+            Ok(o) if o.status.success() => {}
+            Ok(o) => {
+                eprintln!("publish: git {step:?} failed: {}", String::from_utf8_lossy(&o.stderr).trim());
+                return 1;
+            }
+            Err(e) => {
+                eprintln!("publish: git failed to run: {e}");
+                return 1;
+            }
+        }
+    }
+    println!("publish: `{name}` v{version} committed to the library clone at {} — NOT pushed.", clone.display());
+    println!("  Push when ready: git -C {} push   (the push is the human-visible act, D0250 clause D)", clone.display());
+    0
+}
+
 fn cmd_export(args: &[String], root: &Path) -> i32 {
 
             let Some(name) = args.get(1) else {
@@ -1059,6 +1120,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
             0
         }
         Some("export") => cmd_export(args, root),
+        Some("publish") => cmd_publish(args, root),
         Some("import") => cmd_import(args, root),
         Some(other) => {
             eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir>)");
