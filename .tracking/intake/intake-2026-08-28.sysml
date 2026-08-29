@@ -264,4 +264,27 @@ package ProjectIntake20260828 {
     #Implicates dependency from us029 to nParserIsTheTrustedBase;
     #Implicates dependency from us029 to nDeclaredControlDistinguishableFromArmed;
     #Implicates dependency from us029 to nDocSurfaceCannotOutliveTheChange;
+
+    part st027 : Statement {
+        :>> id = "d4633aa9-5173-461d-884e-0755817e54e6";
+        :>> title = "Design the remaining waves as sprints with full architecture and the project's BDD/TDD verification rigor";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> text = "sounds great. let's design this out carefully in sprints, with full architecture (and our verification rigor - BDD/tdd etc.)";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-28"; :>> channel = StatementChannel::chat;
+    }
+
+    #Implicates dependency from us030 to d0247;
+
+    // Six stories, two Needs. The consolidation is the human's own principle applied to their own
+    // words (st023: a use case for typing A and another for typing B consolidate into the need for a
+    // keyboard), and it is visible here as four stories pointing at ONE Need rather than four Needs.
+    #Implicates dependency from us034 to nWorkingMaterialTravels;
+    #Implicates dependency from us037 to nWorkingMaterialTravels;
+    #Implicates dependency from us041 to nWorkingMaterialTravels;
+    #Implicates dependency from us042 to nWorkingMaterialTravels;
+    #Implicates dependency from us038 to nPortableContentSurvivesEngineChange;
+
+    // us033 routes to an EXISTING Need rather than a new one: the outcome it asks for is already
+    // stated, so it corroborates that Need instead of duplicating it.
+    #Implicates dependency from us033 to nEnginePinAndEvolution;
 }
