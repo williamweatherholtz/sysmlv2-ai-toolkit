@@ -27,6 +27,7 @@ package EngineDerivedNeeds {
     private import EngineElement::*;
     private import EngineNeeds::*;
     private import EngineRelationships::*;
+    private import EngineVerification::*;
 
     // ── U1: the intake layer, which has a schema, a write path, a process and a view ─────────────
 
@@ -62,15 +63,18 @@ package EngineDerivedNeeds {
     }
 
     // ── U4: workspace.rs, `keel projects`, gate --workspace, the qualified decision id ───────────
-
-    requirement nRepoHoldsSeveralProjects : Need {
-        :>> id = "de354ce4-58dc-4019-b759-6cab2d923a64";
-        :>> title = "One repository may hold several projects";
-        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
-        :>> source = NeedSource::operator;
-        :>> statement = "Several tracked projects can live in one git repository without any of them losing gate coverage, identity or attribution. Where git forces a single answer for the whole repository — one hooks path, one push, one history — the engine gates every project the act touches and names the ones it skipped, rather than gating one and appearing to gate all. Where a name is unique only within a project, it is qualified by project wherever it crosses the repository boundary. A single-project repository is unaffected throughout.";
-        :>> priority = Priority::must;
-    }
+    //
+    // RECLASSIFIED BY THE HUMAN AT THE ACCEPTANCE GATE (2026-08-28, engineNeedsAccept): "Repo holds
+    // several projects is a use case, not a need." They are right, and the test is the one this
+    // project already uses: a Need is an OUTCOME a stakeholder wants, a UseCase is a concrete USAGE
+    // that exercises Needs. "Several projects in one repository" describes how the engine is used,
+    // not something anyone needs from it. Authored below as `ucRepoHoldsSeveralProjects`.
+    //
+    // ONE CLAUSE OF THE FORMER NEED HAS NO HOME AND IS NOT SILENTLY DROPPED: "the engine gates every
+    // project the act touches and NAMES THE ONES IT SKIPPED, rather than gating one and appearing to
+    // gate all." That is an honest-state property about coverage, not a usage. It is carried on the
+    // use case's `extensions` so it stays visible, and whether it deserves its own Need is raised in
+    // D0249 rather than decided here.
 
     // ── U5: adoption_check.rs — 0 of 51 guards read another tree; 11 of 20 issues found there ────
 
@@ -160,12 +164,24 @@ package EngineDerivedNeeds {
         :>> priority = Priority::should;
     }
 
+    // ── The use case the human reclassified out of the Need tier ─────────────────────────────────
+
+    use case ucRepoHoldsSeveralProjects : UseCase {
+        :>> id = "ae2c22c7-78cf-43a7-b27f-18c30ec40f15";
+        :>> title = "UC: run several keel projects from one git repository";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> description = "As a project author, I want several tracked projects to live in one git repository, so that related small projects share a repo without each needing its own. Exercises nEnginePinAndEvolution (one repository is one checkout and therefore one binary, so the projects' engine declarations must agree or the gate is incoherent) and nWorkingMaterialTravels (content reachable across the projects in the tree).";
+        :>> mainSuccess = "Every directory holding both an engine and a tracking tree is discovered as a project; a commit touching any of them is gated; a name unique only within one project is qualified by project wherever it crosses the repository boundary; a single-project repository behaves exactly as before.";
+        :>> extensions = "The gate covers only some of the projects a commit touched: it NAMES the ones it skipped rather than reporting a pass that reads as whole-repository coverage. This clause was the part of the former Need that is an honest-state property rather than a usage, and it is parked here deliberately - whether it earns its own Need is an open question in D0249, not a decision taken by moving it.";
+    }
+
     // ── The derivation edge: mine to derive, theirs to make Needs (D0216) ────────────────────────
 
     #DerivedFrom dependency from nIntakeBeforeInterpretation to us029;
     #DerivedFrom dependency from nTurnStartRecall to us029;
     #DerivedFrom dependency from nEnginePinAndEvolution to us029;
-    #DerivedFrom dependency from nRepoHoldsSeveralProjects to us029;
+    // nRepoHoldsSeveralProjects' edge is NOT here: the item left the Need tier at the acceptance
+    // gate, and its #DerivedFrom to us029 moved WITH it onto ucRepoHoldsSeveralProjects below.
     #DerivedFrom dependency from nForeignTreeVerification to us029;
     #DerivedFrom dependency from nPassDisclosesItsSource to us029;
     #DerivedFrom dependency from nMonitoredNotGated to us029;
@@ -174,4 +190,37 @@ package EngineDerivedNeeds {
     #DerivedFrom dependency from nParserIsTheTrustedBase to us029;
     #DerivedFrom dependency from nDeclaredControlDistinguishableFromArmed to us029;
     #DerivedFrom dependency from nDocSurfaceCannotOutliveTheChange to us029;
+    #DerivedFrom dependency from ucRepoHoldsSeveralProjects to us029;
+
+    // ── The Business gate: the human's acceptance of the SET (D0157 read-back) ───────────────────
+    //
+    // This is the gate the business-architecture workflow holds Phase 2 behind. It is recorded ONLY
+    // now, and deliberately was NOT recorded on the earlier one-word "proceed." (D0248): an
+    // instruction to continue says nothing about what any statement contains, and a confirmation
+    // asserts that a human judged THIS claim.
+
+    verification engineNeedsAccept : Test {
+        :>> id = "e6521d09-5eca-4694-9e3c-ca220434e9ef";
+        :>> title = "The derived Need set accepted, as narrowed by the human (Business gate)";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz, 2026-08-28, via the KEEL-ND-0001 v0.2 decision page returned as a Copy-for-AI digest. ACCEPTS the fourteen-item derived set AS NARROWED: thirteen stand as Needs and `nRepoHoldsSeveralProjects` is RECLASSIFIED to the use case `ucRepoHoldsSeveralProjects` on their note. Also accepted in the same digest: all six clause cuts stand (D0248); priorities stand as set, which after the reclassification is eleven must and two should across thirteen Needs; the decision-ungrounded ratio becomes the COMPUTED TRIGGER for the latent-need derivation process, MONITORED and not gated; and Phase 2 opens in full - SystemRequirements with measurable thresholds, then sprint design. This is a narrowing, which is the read-back working: D0157 asks what is WIDER than they meant, and they cut one item out of the tier entirely. The verbatim selections are quoted in engineNeedsAcceptAttest1.";
+    }
+
+    verification engineNeedsAcceptAttest1 : Test {
+        :>> id = "633b91c9-b3a0-4a7d-ab13-801018ae1121";
+        :>> title = "Quote receipt for engineNeedsAccept (D0198)";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::inspect;
+        :>> procedureText = "Their selections, verbatim from the returned digest. Tab 'The 14 Needs': [x] 'The fourteen say what I meant - accept the baseline as it now stands'; Note: 'Repo holds several projects is a use case, not a need'. Tab 'What I cut': [x] 'All six cuts stand'. Tab 'Why it was invisible': [x] 'Make the ungrounded ratio the computed trigger for the derivation process, monitored not gated'. Tab 'Priorities': [x] 'Priorities stand as set: 12 must, 2 should'. Tab 'The shut gate': [x] 'Open Phase 2: SystemRequirements with thresholds, then sprint design with Gherkin'. RECORDED DISCREPANCY, not smoothed over: they answered the priority tab against the FOURTEEN-item set, and their own note removes one of the twelve musts from the Need tier. The eleven remaining musts and two shoulds are unchanged in priority; only the tally moves, and no priority was reassigned on their behalf.";
+    }
+
+    // judgedBy differs between these two ON PURPOSE. The acceptance is the HUMAN's judgment and
+    // carries their id; the quote receipt is MY transcription of what they sent and carries mine.
+    // Recording both under the human would make my transcription look like their attestation.
+    part engineNeedsAcceptR1 : TestResult { :>> id = "63f19fee-11a4-47a6-bf19-0262803d4331"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32149b5"; :>> judgedAt = "2026-08-28"; :>> judgedBy = "wweatherholtz"; }
+    part engineNeedsAcceptAttest1R1 : TestResult { :>> id = "1c30b862-1f6b-480b-ab47-c3476567f474"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "32149b5"; :>> judgedAt = "2026-08-28"; :>> judgedBy = "claudeOpus5"; }
+
+    #Verify dependency from engineNeedsAccept to nIntakeBeforeInterpretation;
+    #Verify dependency from engineNeedsAcceptAttest1 to nIntakeBeforeInterpretation;
 }

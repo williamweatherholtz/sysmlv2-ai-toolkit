@@ -255,7 +255,7 @@ package ProjectIntake20260828 {
     #Implicates dependency from us029 to nIntakeBeforeInterpretation;
     #Implicates dependency from us029 to nTurnStartRecall;
     #Implicates dependency from us029 to nEnginePinAndEvolution;
-    #Implicates dependency from us029 to nRepoHoldsSeveralProjects;
+    #Implicates dependency from us029 to ucRepoHoldsSeveralProjects;
     #Implicates dependency from us029 to nForeignTreeVerification;
     #Implicates dependency from us029 to nPassDisclosesItsSource;
     #Implicates dependency from us029 to nMonitoredNotGated;
