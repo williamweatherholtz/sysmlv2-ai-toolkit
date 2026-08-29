@@ -695,8 +695,25 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
 /// `governing-version`/`reprocess-candidates` read the definition history per item (K10).
 #[allow(clippy::too_many_lines)]
 fn cmd_import(args: &[String], root: &Path) -> i32 {
-    let Some(dir) = args.get(1).map(PathBuf::from) else {
-        eprintln!("usage: keel process import <dir> [--update] [--degrade] [--assume-local-base]");
+    // `--from-library <name>` resolves the machine-local cache (D0250) and then delegates to the
+    // ONE import path below — the library changes where a bundle comes from, never what importing
+    // it means.
+    let dir = if let Some(i) = args.iter().position(|a| a == "--from-library") {
+        let Some(name) = args.get(i + 1) else {
+            eprintln!("usage: keel process import --from-library <name> [--update] [--degrade] [--assume-local-base]");
+            return 2;
+        };
+        match crate::library::resolve_unit(name) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("{e}");
+                return 2;
+            }
+        }
+    } else if let Some(d) = args.get(1).filter(|a| !a.starts_with("--")).map(PathBuf::from) {
+        d
+    } else {
+        eprintln!("usage: keel process import <dir> | --from-library <name>  [--update] [--degrade] [--assume-local-base]");
         return 2;
     };
     let update = args.iter().any(|a| a == "--update");

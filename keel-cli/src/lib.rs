@@ -69,6 +69,7 @@ pub mod proactive;
 pub mod claim;
 pub mod deck;
 pub mod launcher;
+pub mod library;
 pub mod enroll;
 pub mod gitx;
 pub mod govern;
