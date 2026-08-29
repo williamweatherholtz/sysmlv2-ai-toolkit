@@ -131,7 +131,7 @@ package ProjectBaselines {
         :>> title = "v0.3.1 - the pin binds, the wrapper resolves it, the library carries the working material";
         :>> createdAt = "2026-08-29";
         :>> createdBy = "claudeOpus5";
-        :>> commit = "TBD-AT-TAG";
+        :>> commit = "c4e306c";
         :>> purpose = "The portability release (D0250/D0251/D0252; the st033 readiness plan, increments 1-4). The engine pin becomes BINDING: writes refuse at the write-lock choke point and gates in the one gate body, reads warn, version/migrate never refuse, absent declarations keep working. keelw resolves the pin against a seeded machine-local cache, downloads exactly the pinned version verified against committed SHA-256s, and never falls back to PATH. keel library init/sync/list + process publish/import --from-library carry the working material: fast-forward-only sync, stated staleness offline, publish as one loud commit that never pushes, and a byte-identical-gate differential holding availability-is-never-activation. Guards 53-54 and six arming probes land with it; the pre-push bootstrap-refusal field defect (issue306) is fixed. BREAKING: a pinned project refuses a mismatched binary - keel migrate re-stamps and announces.";
     }
 }
