@@ -46,7 +46,7 @@ package EngineDerivedNeeds {
         :>> title = "An agent begins each turn with the model's relevant facts, not with its memory";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::internal;
-        :>> statement = "The facts an agent needs to act correctly are pushed to it from the model at the start of a turn, seeded from what was actually asked, within a declared budget and a declared latency cap, and with the retrieval visible in the turn. An agent's recollection is not a source: the model is. When retrieval cannot meet its cap it says so and pushes nothing, because silently doubling every turn's latency is a worse failure than an unrecalled fact.";
+        :>> statement = "The facts an agent needs to act correctly are pushed to it from the model at the start of a turn, seeded from what was actually asked, with the retrieval visible in the turn. An agent's recollection is not a source: the model is. Retrieval that cannot complete says so and pushes nothing, rather than silently degrading the turn.";
         :>> priority = Priority::must;
     }
 
@@ -69,7 +69,7 @@ package EngineDerivedNeeds {
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::operator;
         :>> statement = "Several tracked projects can live in one git repository without any of them losing gate coverage, identity or attribution. Where git forces a single answer for the whole repository — one hooks path, one push, one history — the engine gates every project the act touches and names the ones it skipped, rather than gating one and appearing to gate all. Where a name is unique only within a project, it is qualified by project wherever it crosses the repository boundary. A single-project repository is unaffected throughout.";
-        :>> priority = Priority::should;
+        :>> priority = Priority::must;
     }
 
     // ── U5: adoption_check.rs — 0 of 51 guards read another tree; 11 of 20 issues found there ────
@@ -79,7 +79,7 @@ package EngineDerivedNeeds {
         :>> title = "Verification runs against trees the engine did not author";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::internal;
-        :>> statement = "The engine is verified against projects other than the one that built it, because that is where its defects actually are: measured on this project's own record, no guard read another project's tree while defects clustered at exactly that boundary. A control must be shown to fire correctly on a project that ADOPTED it and to stay silent on a project that did not — an absent adoption is a legitimate state, never a violation.";
+        :>> statement = "The engine is verified against projects other than the one that built it, because that is where its defects actually are: measured on this project's own record, no guard read another project's tree while defects clustered at exactly that boundary. A project that has not adopted a control is in a legitimate state and is never reported as violating it.";
         :>> priority = Priority::must;
     }
 
@@ -90,7 +90,7 @@ package EngineDerivedNeeds {
         :>> title = "A pass discloses what produced it";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::internal;
-        :>> statement = "A recorded pass says what kind of thing produced it — a command that ran, a human's word, a reading — so a reader can tell a receipt from a testimony without trusting the recorder. Assurance is reported by judge kind rather than as one number. A claim that something was EXERCISED records what exercised it, and a machine actor cannot supply a human's acceptance for any claim.";
+        :>> statement = "A recorded pass says what kind of thing produced it — a command that ran, a human's word, a reading — so a reader can tell a receipt from a testimony without trusting the recorder. A claim that something was EXERCISED records what exercised it, and a machine actor cannot supply a human's acceptance for any claim.";
         :>> priority = Priority::must;
     }
 
@@ -118,12 +118,12 @@ package EngineDerivedNeeds {
 
     // ── U9: D0054, named the #1 project risk in CLAUDE.md and absent from all 64 prior Needs ─────
 
-    requirement nAuthoringCostsLessThanTheAlternative : Need {
+    requirement nAuthoringIsLowFriction : Need {
         :>> id = "a8847d7e-2ced-4750-b942-1e567986b49a";
-        :>> title = "Recording a fact costs less than the informal alternative it replaces";
+        :>> title = "Recording a fact is low-friction by construction";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::customer;
-        :>> statement = "Authoring a tracked fact is cheaper than writing it in a spreadsheet, a document or a commit message, because the dominant failure of disciplined modelling is adoption friction rather than bad structure. Identity, dates and provenance are supplied by the engine rather than typed; the scaffolding of a routine record is generated rather than hand-written; and a recurring friction that has been met more than once is removed by tooling rather than by remembering. If recording is harder than the alternative, the alternative wins and the model stops being true.";
+        :>> statement = "Identity, dates and provenance are supplied by the engine rather than typed; the scaffolding of a routine record is generated rather than hand-written; and a recurring friction that has been met more than once is removed by tooling rather than by remembering. The dominant failure of disciplined modelling is adoption friction rather than bad structure: if recording is harder than the informal alternative, the alternative wins and the model stops being true.";
         :>> priority = Priority::must;
     }
 
@@ -156,7 +156,7 @@ package EngineDerivedNeeds {
         :>> title = "The documented surface cannot outlive the change that invalidated it";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::internal;
-        :>> statement = "A change that invalidates a documented claim is not complete until that claim is corrected in the same act, because prose describing a surface that has moved is worse than no prose: it is read as current and cannot be distinguished from it. Documentation that restates a fact the engine can compute is a second home for that fact and drifts by construction, so the correction is either to update the claim or to remove it in favour of the computed one.";
+        :>> statement = "A change that invalidates a documented claim is not complete until that claim is corrected in the same act, because prose describing a surface that has moved is worse than no prose: it is read as current and cannot be distinguished from it.";
         :>> priority = Priority::should;
     }
 
@@ -170,7 +170,7 @@ package EngineDerivedNeeds {
     #DerivedFrom dependency from nPassDisclosesItsSource to us029;
     #DerivedFrom dependency from nMonitoredNotGated to us029;
     #DerivedFrom dependency from nDecisionPromisesTracked to us029;
-    #DerivedFrom dependency from nAuthoringCostsLessThanTheAlternative to us029;
+    #DerivedFrom dependency from nAuthoringIsLowFriction to us029;
     #DerivedFrom dependency from nParserIsTheTrustedBase to us029;
     #DerivedFrom dependency from nDeclaredControlDistinguishableFromArmed to us029;
     #DerivedFrom dependency from nDocSurfaceCannotOutliveTheChange to us029;

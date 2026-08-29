@@ -260,7 +260,7 @@ package ProjectIntake20260828 {
     #Implicates dependency from us029 to nPassDisclosesItsSource;
     #Implicates dependency from us029 to nMonitoredNotGated;
     #Implicates dependency from us029 to nDecisionPromisesTracked;
-    #Implicates dependency from us029 to nAuthoringCostsLessThanTheAlternative;
+    #Implicates dependency from us029 to nAuthoringIsLowFriction;
     #Implicates dependency from us029 to nParserIsTheTrustedBase;
     #Implicates dependency from us029 to nDeclaredControlDistinguishableFromArmed;
     #Implicates dependency from us029 to nDocSurfaceCannotOutliveTheChange;
@@ -287,4 +287,12 @@ package ProjectIntake20260828 {
     // us033 routes to an EXISTING Need rather than a new one: the outcome it asks for is already
     // stated, so it corroborates that Need instead of duplicating it.
     #Implicates dependency from us033 to nEnginePinAndEvolution;
+
+    part st028 : Statement {
+        :>> id = "cb0ce260-e2b0-4582-a910-c64f5e7f5b6d";
+        :>> title = "Use the exec-summary HTML template and its skill in se-templates, not the Typst requirements-doc";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> text = "should be an html template now, along with a skill to use in the .Claude folder iirc";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-28"; :>> channel = StatementChannel::chat;
+    }
 }

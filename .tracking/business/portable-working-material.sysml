@@ -36,7 +36,7 @@ package PortableWorkingMaterialNeeds {
         :>> title = "The working material is available in every project without being managed, and availability is never activation";
         :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
         :>> source = NeedSource::operator;
-        :>> statement = "Processes, skills, templates and output formats are available in every project without the author installing, copying or approving them project by project, and that content keeps itself current without asking permission for each update. AVAILABILITY IS NOT ACTIVATION: content being present lets it be read, searched and launched; it governs nothing until the project activates it, and an activated unit's version is pinned in that project's tree so its gate cannot change without its tree changing. Content the engine carries is opaque to the engine - it is versioned, moved and merged, never interpreted - so a project's own domain vocabulary cannot enter the engine through it.";
+        :>> statement = "Processes, skills, templates and output formats are available in every project without the author installing, copying or approving them project by project, and that content keeps itself current without asking permission for each update. AVAILABILITY IS NOT ACTIVATION: content being present lets it be read, searched and launched; it governs nothing until the project activates it, and an activated unit's version is pinned in that project's tree so its gate cannot change without its tree changing.";
         :>> priority = Priority::must;
     }
 
