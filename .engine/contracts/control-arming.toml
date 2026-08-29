@@ -39,7 +39,8 @@ reason = "Same as ctlAuditHistory: a CI job, proven both ways at sprint 409, who
 
 [ctlWriteLock]
 checkable = false
-reason = "In-process and unconditional (write.rs takes the lock or refuses loudly). There is no configuration that could disarm it, so there is nothing to probe: absence of a switch is stronger than a passing check."
+provenBy = "keel-cli/tests/write_lock_actually_serialises.rs"
+reason = "Not checkable BY THIS VIEW, which must not spawn processes - but the property IS verified, by test. The previous reason here was wrong and is recorded rather than quietly replaced: it argued that because no configuration can disarm the lock, there is nothing to probe. That rules out being DISARMED; it says nothing about whether the lock SERIALISES, which is the property the control exists for. issue184/issue185 are the counter-example - four concurrent writers once landed two issues with all four exiting 0, and on that day it was equally true that no configuration could disarm it. Six concurrent OS processes now contend for the real lock in the real write path and every write must land or fail loudly; the forbidden outcome is a writer exiting 0 having lost its write."
 
 [ctlPreWriteTiers]
 checkable = false

@@ -126,4 +126,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from storyLibraryManifestIntegrity to issue302;
+
+    part issue303 : Issue {
+        :>> id = "5c15d85a-35ca-41dc-a133-f5f9e99ffba7";
+        :>> title = "Eight of nine controls are classified unprobeable by a VIEW's constraints, and read as unverifiable";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 while answering a demand for REAL assurance. keel controls reports 9 declared controls: 1 ARMED, 8 not-machine-checkable, with uncoveredHazards [] and hazardsWithADisarmedControl [] - a clean bill of health resting on ONE probe. Each reason in control-arming.toml is individually careful, and the AGGREGATE is the issue240 failure at a higher level: truthful on the question asked, misleading on the question a reader has. THE SHARED ERROR: not-machine-checkable BY A READ-ONLY VIEW was generalised into not checkable at all. keel controls must not spawn processes, write files or make network calls, so it genuinely cannot establish most of these. A TEST may do all three. The arming question was answered against the constraints of the surface that happened to ask it, not against whether the property is verifiable. PROVEN ON THE FIRST ONE TRIED: ctlWriteLock was classified nothing to probe on the reasoning that no configuration can disarm it. That rules out being DISARMED and says nothing about whether the lock SERIALISES - and issue184/issue185 record four concurrent writers landing two issues with all four exiting 0, a day on which the same reasoning was equally true. A 30-line integration test with six real concurrent processes now proves it: all six land, all six exit 0, six distinct ids. The control is genuinely armed, and now demonstrably so rather than assumed. REMAINING, each needing its own probe rather than a reclassification: ctlPrePushBehind (a two-clone fixture can attempt a push - audit-history already built one), ctlReverify (run it against a fixture), ctlPreWriteTiers (invoke the hook, assert it denies), ctlFireLedger, ctlAuditHistory, ctlBranchProtection, ctlReleaseGateJob. FIX: a third arming state - proven-by-test, distinct from both checkable-by-view and not-checkable - plus a probe per control that admits one. The control-arming contract gains provenBy naming the test, so a reader can re-derive rather than trust the reason text.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyArmingIsProvenNotAssumed to issue303;
 }
