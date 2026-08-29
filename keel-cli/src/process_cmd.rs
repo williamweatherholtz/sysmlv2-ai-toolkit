@@ -383,6 +383,80 @@ fn install_record(root: &Path, unit_id: &str) -> Option<(u32, Vec<(String, Strin
     (version > 0).then_some((version, files))
 }
 
+/// The manifest key for one unit file: repository-relative, ALWAYS (issue301).
+///
+/// # Why this is a fallible function and not a `strip_prefix().unwrap_or(path)`
+///
+/// It was that, and the fallback was the defect. `unit_files` puts a unit's declared EXTRAS at
+/// `root/<extra>` rather than under `.engine`, so stripping only the `.engine` prefix FAILS for every
+/// extra — and falling back to the unstripped path wrote this machine's home directory into a
+/// committed contract. Four such keys landed under the `decision-channel` unit:
+/// `file.C:__SL__Users__SL__<user>__SL__claude_code__SL__...`.
+///
+/// That was survivable while the manifest only ever lived in one repository. Under D0250 the library
+/// is a git repository other machines clone, so a key naming the exporting machine resolves to
+/// nothing on the importing one — and the three-way base `--update` merges against is exactly what
+/// silently stops being found. The failure lands in the one file whose entire purpose is portability.
+///
+/// Returns `Err` rather than absolutising: a path outside the project is a unit the receiving project
+/// could not reconstruct anyway, so the honest outcome is a refusal naming the path, not a key that
+/// works on one machine.
+fn manifest_key(root: &Path, path: &Path) -> Result<String, String> {
+    let engine = root.join(".engine");
+    let rel = path
+        .strip_prefix(&engine)
+        .or_else(|_| path.strip_prefix(root))
+        .map_err(|_| format!("{} is outside the project root {}", path.display(), root.display()))?;
+    Ok(rel.to_string_lossy().replace('\\', "/"))
+}
+
+
+/// Do two (path, hash) sets describe the same content? Order-insensitive, because the manifest is
+/// read back in file order and that is not the order the caller assembled them in.
+///
+/// Split out from [`install_is_current`] so the comparison is testable without a filesystem: the
+/// disk read is the part that cannot be exercised in a unit test, and it is not the part that was
+/// wrong.
+fn hashes_match(recorded: &[(String, String)], files: &[(String, String)]) -> bool {
+    if recorded.len() != files.len() {
+        return false;
+    }
+    let mut a: Vec<_> = recorded.iter().map(|(p, h)| (p.as_str(), h.as_str())).collect();
+    let mut b: Vec<_> = files.iter().map(|(p, h)| (p.as_str(), h.as_str())).collect();
+    a.sort_unstable();
+    b.sort_unstable();
+    a == b
+}
+
+/// Every unit file as a `(repository-relative key, content hash)` pair, or `None` after reporting
+/// the file that could not be made relative.
+///
+/// Returns `None` rather than absolutising, and reports before anything is written: a half-stamped
+/// manifest is worse than a refused export (issue301).
+fn manifest_hashes(root: &Path, files: &[PathBuf]) -> Option<Vec<(String, String)>> {
+    let mut out = Vec::with_capacity(files.len());
+    for f in files {
+        match manifest_key(root, f) {
+            Ok(rel) => out.push((rel, file_hash(f))),
+            Err(msg) => {
+                eprintln!("error: cannot record unit file — {msg}");
+                eprintln!("  a unit file must live inside the project so a receiving project can reconstruct it.");
+                return None;
+            }
+        }
+    }
+    Some(out)
+}
+
+/// The version to record: unchanged when the content is unchanged (issue302), else one higher.
+fn next_unit_version(root: &Path, unit_id: &str, hashes: &[(String, String)]) -> u32 {
+    match install_record(root, unit_id) {
+        Some((v, recorded)) if hashes_match(&recorded, hashes) => v,
+        Some((v, _)) => v + 1,
+        None => 1,
+    }
+}
+
 /// Write/replace the install record (the three-way BASE for the next `--update`).
 fn write_install_record(root: &Path, unit_id: &str, process: &str, version: u32, files: &[(String, String)]) -> std::io::Result<()> {
     let reg = root.join(".engine").join("contracts").join("installed-units.toml");
@@ -577,7 +651,11 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                 }
             }
             let unit_id = unit_id_for(root, name);
-            let version = install_record(root, &unit_id).map_or(1, |(v, _)| v + 1);
+            // The hashes are computed BEFORE the version, because the version depends on them
+            // (issue302: it advances only when a byte moved). A key that cannot be made
+            // repository-relative refuses here, before anything is written (issue301).
+            let Some(exported_hashes) = manifest_hashes(root, &files) else { return 1 };
+            let version = next_unit_version(root, &unit_id, &exported_hashes);
             let manifest = format!(
                 "# keel process unit: {name}\n# Exported from a keel project. Import with `keel process import <this dir>`.\n\
                  #\n# The GUARDS below are the enforcement this process owns. A receiving project must have them\n\
@@ -594,13 +672,6 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
             }
             // The ORIGIN records its own exports too (found live: without this the origin re-exports
             // v1 forever and downstream --update can never see a version advance).
-            let exported_hashes: Vec<(String, String)> = files
-                .iter()
-                .map(|f| {
-                    let rel = f.strip_prefix(root.join(".engine")).unwrap_or(f).to_string_lossy().replace('\\', "/");
-                    (rel, file_hash(f))
-                })
-                .collect();
             if let Err(e) = write_install_record(root, &unit_id, name, version, &exported_hashes) {
                 eprintln!("warning: export registry not updated: {e}");
             }
@@ -1036,5 +1107,55 @@ mod tests {
             super::unit_files(root, intake).iter().any(|p| p.ends_with("SKILL.md")),
             "the files that MOVE with a guard-less unit must include its SKILL.md"
         );
+    }
+
+    /// Sprint 484 / issue301. A unit's declared EXTRAS live at `root/<extra>`, not under `.engine`,
+    /// so the old `strip_prefix(".engine").unwrap_or(path)` fell through to the absolute path and
+    /// wrote this machine's home directory into a committed contract.
+    #[test]
+    fn a_unit_file_outside_dot_engine_still_gets_a_repository_relative_key() {
+        let root = Path::new("/proj");
+        let engine_file = Path::new("/proj/.engine/processes/intake.sysml");
+        assert_eq!(super::manifest_key(root, engine_file).unwrap(), "processes/intake.sysml");
+
+        // The regression: an extra at the repository root, which is where D0219 extras live.
+        let extra = Path::new("/proj/.github/workflows/decision-record.yml");
+        let key = super::manifest_key(root, extra).unwrap();
+        assert_eq!(key, ".github/workflows/decision-record.yml");
+        assert!(!key.contains("proj"), "the key must not carry the exporting machine's path: {key}");
+    }
+
+    /// The other half of issue301: a path that cannot be made relative REFUSES rather than being
+    /// absolutised. A receiving project could not reconstruct such a file anyway, so a key that
+    /// works only on the exporting machine is worse than a stated failure.
+    #[test]
+    fn a_unit_file_outside_the_project_is_refused_not_absolutised() {
+        let err = super::manifest_key(Path::new("/proj"), Path::new("/elsewhere/thing.yml"))
+            .expect_err("a path outside the project must refuse");
+        assert!(err.contains("outside the project root"), "the refusal must say why: {err}");
+        assert!(err.contains("thing.yml"), "the refusal must name the path: {err}");
+    }
+
+    /// Sprint 484 / issue302. The version used to advance on every export whether or not a byte
+    /// moved - the `intake` unit went 42 -> 43 in a session that edited none of its files. Under
+    /// D0250 `--update` is decided by reading that number, so a version that moves for no reason
+    /// makes the honest answer to "should I update" unavailable.
+    #[test]
+    fn identical_hashes_are_recognised_as_current_and_a_changed_one_is_not() {
+        let recorded = vec![
+            ("processes/x.sysml".to_string(), "aaaa".to_string()),
+            ("skills/x/SKILL.md".to_string(), "bbbb".to_string()),
+        ];
+        // Order must not matter: the manifest is read back in file order, which is not authoring order.
+        let reordered: Vec<(String, String)> = recorded.iter().rev().cloned().collect();
+        assert!(super::hashes_match(&recorded, &reordered), "same set in a different order is still current");
+
+        let mut changed = recorded.clone();
+        changed[1].1 = "cccc".to_string();
+        assert!(!super::hashes_match(&recorded, &changed), "one changed hash means not current");
+
+        let mut extra = recorded.clone();
+        extra.push(("extras/new.yml".to_string(), "dddd".to_string()));
+        assert!(!super::hashes_match(&recorded, &extra), "an ADDED file means not current");
     }
 }

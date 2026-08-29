@@ -295,4 +295,26 @@ package ProjectIntake20260828 {
         :>> text = "should be an html template now, along with a skill to use in the .Claude folder iirc";
         :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-28"; :>> channel = StatementChannel::chat;
     }
+
+    part st029 : Statement {
+        :>> id = "a3d4a9ad-bc31-4df0-9b0a-59a96570b1bc";
+        :>> title = "Fork 1 answered: the portable-content library is a git repository, not a machine-local store";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> text = "#1 yeah i think repo for sure.\n\nproceed";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-28"; :>> channel = StatementChannel::chat;
+    }
+
+    part us045 : UserStory {
+        :>> id = "88c4fbd9-5a57-401a-97a1-474474852bd2";
+        :>> title = "The portable-content library is a git repository";
+        :>> createdAt = "2026-08-28"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "the library that carries processes, skills, templates and output formats to be a git repository rather than a machine-local store";
+        :>> soThat = "it syncs across machines, keeps its own history, and can be improved from any project that uses it";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture and not scopeConstraint: it CHOOSES a structure among the two I put to them, rather than bounding what is in scope. It is the answer to a question I asked, so the choice is theirs and the consequences below are mine to derive. Their hedge - i THINK repo - is preserved in the Statement verbatim rather than smoothed into certainty; the closing for sure is what makes it a decision rather than a lean.";
+    }
+    #DerivedFrom dependency from us045 to st029;
+
+    #Implicates dependency from us045 to d0250;
 }

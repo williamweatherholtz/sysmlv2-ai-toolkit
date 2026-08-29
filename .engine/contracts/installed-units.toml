@@ -148,10 +148,10 @@ version = 5
 file.processes__SL__decision-channel.sysml = "edc6bd1f5283fef7"
 file.skills__SL__decision-channel__SL__SKILL.md = "3f13a3b3d8f774a1"
 file.skills__SL__decision-channel__SL__registry.sysml = "de6c91c76a09c330"
-file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__workflows__SL__decision-issue.yml = "1bfbbb8f2f9823ea"
-file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
-file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__scripts__SL__open_decision_issues.py = "df3e1f1a422876a4"
-file.C:__SL__Users__SL__WilliamWeatherholtz__SL__claude_code__SL__sysmlv2-ai-toolkit__SL__.github__SL__scripts__SL__record_decision.sh = "f7e312c5d94e0b83"
+file..github__SL__workflows__SL__decision-issue.yml = "1bfbbb8f2f9823ea"
+file..github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
+file..github__SL__scripts__SL__open_decision_issues.py = "df3e1f1a422876a4"
+file..github__SL__scripts__SL__record_decision.sh = "f7e312c5d94e0b83"
 [79f2d321-7c55-41fb-86fa-7d549202caf7]
 process = "intake"
 version = 43

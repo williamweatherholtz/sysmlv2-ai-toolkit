@@ -1903,9 +1903,58 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 52] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality"];
+pub const GUARD_NAMES: [&str; 53] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability"];
 
+
+// ── manifest-key-portability guard (issue301, chartered by D0250) ────────────────────────────────
+
+/// Every key in `installed-units.toml` must be repository-relative.
+///
+/// # Why a guard and not a one-time cleanup
+///
+/// Four keys under the `decision-channel` unit named this machine's home directory
+/// (`file.C:__SL__Users__SL__<user>__SL__...`), because `unit_files` puts a unit's declared EXTRAS at
+/// `root/<extra>` while the key builder stripped only the `.engine` prefix and fell through to the
+/// absolute path. Fixing the builder and rewriting the four keys leaves nothing to stop the fifth:
+/// the next extra added outside `.engine` would reintroduce it silently. D0047 — a defect that can
+/// recur becomes a control, never a corrected file.
+///
+/// # Why this is now blocking rather than advisory
+///
+/// D0250 makes the library a git repository that other machines clone. A key naming the exporting
+/// machine resolves to nothing on the importing one, so the three-way base that `--update` merges
+/// against stops being found — silently, in the one file whose entire purpose is portability. The
+/// failure surfaces on the SECOND machine, days later, as content mysteriously not updating.
+///
+/// Detection is by shape, not by this machine's paths: a Windows drive letter, a POSIX absolute
+/// path, or a home-directory prefix. A guard that looked for `WilliamWeatherholtz` would pass on
+/// every machine except the one that already got it right.
+fn manifest_key_portability(root: &Path) -> GuardReport {
+    let path = root.join(".engine").join("contracts").join("installed-units.toml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        // D0136: absence is a state, stated. A project with no installed units has no manifest.
+        return GuardReport { name: "manifest-key-portability", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    };
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for line in text.lines() {
+        let Some(rest) = line.trim().strip_prefix("file.") else { continue };
+        let Some((key, _)) = rest.split_once(" = ") else { continue };
+        scanned += 1;
+        let decoded = key.replace("__SL__", "/");
+        let absolute = decoded.starts_with('/')
+            || decoded.starts_with('~')
+            || decoded.as_bytes().get(1).is_some_and(|c| *c == b':');
+        if absolute {
+            violations.push(format!(
+                "{}: unit-manifest key `{decoded}` is an ABSOLUTE path — it names one machine, so a project that clones this library cannot resolve it and the three-way `--update` base is silently lost (issue301/D0250). Keys are repository-relative; a unit file outside the project root is refused at export, never absolutised",
+                relpath(root, &path)
+            ));
+        }
+    }
+    GuardReport { name: "manifest-key-portability", scanned, warnings: Vec::new(), violations }
+}
 
 // ── type-collision guard (userDefinedTypedefs, D0128) ────────────────────────
 
@@ -3265,6 +3314,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "question-coverage" => Some(question_coverage(root)), // D0161: declared knowledge facts are well-formed; coverage itself stays a view
         "claim-ancestry" => Some(claim_ancestry(root)), // issue229: claimedAt bounded by the introducing commit (D0013 applied to claims)
         "judgment-request-quality" => Some(judgment_request_quality(root)), // D0207: a fork must earn the ask
+        "manifest-key-portability" => Some(manifest_key_portability(root)), // issue301/D0250 — a unit manifest key naming one machine
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
