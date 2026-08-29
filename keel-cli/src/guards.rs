@@ -1996,6 +1996,22 @@ fn control_map_reconciled(root: &Path) -> GuardReport {
             ));
         }
     }
+    // issue308 (propriety panel, pf33): a `provenBy` in control-arming.toml naming a file the tree
+    // does not hold is a receipt-shaped TESTIMONY — worse than no claim, in the very contract that
+    // exists to separate the two (D0253). Existence is the objective half and is checked here; that
+    // the named test EXERCISES the control stays with the panel, being judgment (pf35).
+    if let Ok(arming) = std::fs::read_to_string(root.join(".engine").join("contracts").join("control-arming.toml")) {
+        for line in arming.lines() {
+            let Some(v) = line.trim().strip_prefix("provenBy = ") else { continue };
+            let rel = v.trim().trim_matches('"');
+            scanned += 1;
+            if !rel.is_empty() && !root.join(rel).exists() {
+                violations.push(format!(
+                    "control-arming.toml names provenBy `{rel}`, which does not exist in the tree — a dangling proof pointer reads as a receipt while being a testimony (issue308/D0253). Fix the path, or remove the claim"
+                ));
+            }
+        }
+    }
     GuardReport { name: "control-map-reconciled", scanned, warnings: Vec::new(), violations }
 }
 
@@ -2038,9 +2054,15 @@ fn manifest_key_portability(root: &Path) -> GuardReport {
         let absolute = decoded.starts_with('/')
             || decoded.starts_with('~')
             || decoded.as_bytes().get(1).is_some_and(|c| *c == b':');
-        if absolute {
+        // issue307 (propriety panel, pf02): the class is "resolves outside the receiving project",
+        // and absolute keys are only its loudest members. A RELATIVE key with traversal segments
+        // (`../../elsewhere`) escapes the project root identically — the mutation the original
+        // predicate did not kill. Segment-wise, not substring: a filename containing ".." is legal.
+        let traverses = decoded.split('/').any(|seg| seg == "..");
+        if absolute || traverses {
+            let kind = if absolute { "an ABSOLUTE path" } else { "a TRAVERSAL path (contains a `..` segment)" };
             violations.push(format!(
-                "{}: unit-manifest key `{decoded}` is an ABSOLUTE path — it names one machine, so a project that clones this library cannot resolve it and the three-way `--update` base is silently lost (issue301/D0250). Keys are repository-relative; a unit file outside the project root is refused at export, never absolutised",
+                "{}: unit-manifest key `{decoded}` is {kind} — it resolves outside the receiving project, so a clone of this library cannot reconstruct it and the three-way `--update` base is silently lost (issue301/issue307/D0250). Keys are repository-relative and stay inside the root; a unit file outside it is refused at export, never absolutised",
                 relpath(root, &path)
             ));
         }

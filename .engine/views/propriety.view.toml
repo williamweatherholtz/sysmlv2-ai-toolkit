@@ -1,0 +1,9 @@
+# Propriety findings (D0257): every control-propriety panel finding, with its verdict and defeater.
+# Coverage question: a target with fewer than five lens rows has an incomplete assessment.
+name = "propriety"
+concern = "Is each enforcement mechanism sound under the five propriety lenses, and what would defeat each verdict?"
+audience = "maintainer"
+[select]
+type = "ProprietyFinding"
+[project]
+fields = ["target", "lens", "verdict", "rationale", "defeater"]

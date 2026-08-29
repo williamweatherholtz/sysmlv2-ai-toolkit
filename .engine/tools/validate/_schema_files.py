@@ -30,6 +30,8 @@ SCHEMA_ORDER = [
     "schema/codeaudit/codeelement.sysml",
     # Optional module (D0161). After core/element.sysml, which Question/Alias specialize.
     "schema/knowledge/knowledge.sysml",
+    # Optional module (D0257). After core/element.sysml, which ProprietyFinding specializes.
+    "schema/propriety/propriety.sysml",
 ]
 
 

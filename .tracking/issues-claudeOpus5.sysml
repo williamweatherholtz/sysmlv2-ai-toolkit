@@ -180,4 +180,26 @@ package IssuesClaudeOpus5 {
     // completes now - not the long-running probe task, which would hold a fixed defect open (the
     // inverse of the issue305 trap, where prose held a closed one open).
     #Resolves dependency from storyFourMoreControlsProven to issue306;
+
+    part issue307 : Issue {
+        :>> id = "bdee3068-393b-40d7-91f2-8f4ed566e017";
+        :>> title = "guard 53 passes a traversal key: relative-with-dotdot escapes the project exactly as an absolute key does";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 by the control-propriety panel (pf02, lens classCoverage), by mutating the guard's motivating defect: the class is 'a manifest key that resolves outside the receiving project', and manifest-key-portability checks only the ABSOLUTE members (drive letter, leading slash, tilde). A relative key with traversal segments - file...__SL__..__SL__elsewhere decodes to ../../elsewhere - escapes the project root identically and PASSES. Demonstrated against the predicate by hand. This is the mutation-testing question doing exactly what the research said it would: the guard killed the specimen and three shape-variants, and the fourth variant class slipped. FIX: the same predicate also flags any decoded key containing a '..' path segment; arming re-proven by injection.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyProprietyRound1 to issue307;
+
+    part issue308 : Issue {
+        :>> id = "4ac6c679-4a3e-4b93-844e-4034fa9024c1";
+        :>> title = "provenBy is a receipt-shaped testimony: nothing verifies the named test file exists";
+        :>> createdAt = "2026-08-29";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-08-29 by the control-propriety panel (pf33, lens changeRobustness), by construction: no check exists to fail. provenBy = 'a/test/that/never/existed.rs' passes every gate, and so does a stale pointer after a rename. A dangling provenBy is WORSE than none - it is a receipt-shaped testimony sitting in the very contract (control-arming.toml, D0253) that exists to separate receipts from testimonies. The keystone lock authenticates the ACT of writing it, not the CONTENT. FIX: control-map-reconciled (guard 54) additionally resolves every provenBy path in control-arming.toml against the tree; a missing file is a violation naming the entry. The qualitative half - whether the named test actually EXERCISES that control - remains judgment (pf35) and stays with the panel.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyProprietyRound1 to issue308;
 }
