@@ -109,4 +109,18 @@ package ProjectIntake20260829 {
         :>> text = "continue through all remaining\n[x] Kick off now on v0.3.1 - RECOMMENDED\n[x] Follow the assessed frontier: Critical resolver first, then the Highs - RECOMMENDED\n[x] Define library-stewardship now, one process for publish + consume - RECOMMENDED\n[x] Accept the residual as a recorded disposition (acceptRisk) - RECOMMENDED\nMy notes:";
         :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-29"; :>> channel = StatementChannel::chat;
     }
+
+    part us052 : UserStory {
+        :>> id = "23a0761a-0784-44cb-8472-0bf7e48148af";
+        :>> title = "All four summary picks executed; the frontier is being worked Critical-first";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "the four selections carried out and the remaining frontier worked through";
+        :>> soThat = "the program moves on the assessed order rather than waiting on me per item";
+        :>> implication = ImplicationKind::attestation;
+        :>> triageNote = "attestation and not priority: the digest is their verdict on four specific claims - kick off now, follow the frontier, define stewardship, acceptRisk pf07. Each selection routed to its act: pf07Disp1 records the disposition, D0259 the process, the frontier work is underway, and the kickoff waits on exactly one un-inventable input (the project's name), asked rather than invented.";
+    }
+    #DerivedFrom dependency from us052 to st036;
+
+    #Implicates dependency from us052 to pf07Disp1;
 }
