@@ -62,6 +62,21 @@ package EngineIntake {
 
     // WHERE A STATEMENT WAS MADE. Provenance of the channel, because a note typed into a review deck
     // and a line typed in a terminal carry different context and are recovered differently.
+    // HOW MUCH AUTHORITY AN EXTERNALLY-SOURCED UTTERANCE CARRIES (D0264).
+    //
+    // `untrusted` is not an insult and does not mean the reporter is acting in bad faith - it means
+    // ANYONE COULD HAVE WRITTEN IT. An issue on a public tracker is an instruction from an
+    // unauthenticated stranger, so acting on it autonomously is prompt injection with a filing form.
+    // Untrusted input may produce a PLAN and a proposed Decision; it may never produce an
+    // implementation without a human accepting one.
+    //
+    // The tier DEFAULTS from repository visibility and is a PROXY, not a measurement: a private repo
+    // with forty collaborators is not forty trusted people. So it is overridable by declaration, and
+    // an UNDETERMINED visibility resolves to `untrusted` - fail closed, because the failure modes are
+    // not symmetric (a wrongly-trusted stranger gets autonomous action; a wrongly-distrusted
+    // maintainer gets asked).
+    enum def SourceTrust { trusted; untrusted; }
+
     enum def StatementChannel { chat; console; deck; commitReview; github; other; }
     // `github` (D0263): an issue or comment on the repository is a channel in its own right, not
     // `other`. It differs from every other member in a way the model must keep: the speaker is a
@@ -87,6 +102,14 @@ package EngineIntake {
         // reader can go back to the source and check the transcription, which is the entire point of
         // recording verbatim.
         attribute sourceUrl : String [0..1];
+        // WHAT AUTHORITY THESE WORDS CARRIED WHEN THEY ARRIVED (D0264). Recorded ON the utterance
+        // rather than decided at act time, for two reasons: a repository's visibility can CHANGE
+        // after an issue is filed, so re-deriving it later answers a different question than the one
+        // that matters; and without it a Statement from a stranger on a public tracker is
+        // indistinguishable from one from the maintainer, which is precisely the distinction an
+        // autonomous pass must not have to guess. `[0..1]` because a spoken statement has no
+        // external source to trust or distrust.
+        attribute sourceTrust : SourceTrust [0..1];
         // Only DIRECTIVE statements are recorded: a request, a correction, a constraint, a priority, a
         // verdict. Not a transcript — a log of everything said is a second corpus with no questions
         // attached, which is the mistake D0161's first draft made.

@@ -95,6 +95,153 @@ fn flag(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == &format!("--{name}")).and_then(|i| args.get(i + 1)).cloned()
 }
 
+/// What authority a repository's issues carry, DEFAULTED FROM VISIBILITY and failing closed.
+///
+/// A private repository's issues can only be filed by people who were granted access, so acting on
+/// them autonomously is acting on a colleague's request. A PUBLIC repository's issues can be filed
+/// by anyone, so acting on them autonomously is executing instructions from an unauthenticated
+/// stranger — prompt injection with a filing form.
+///
+/// VISIBILITY IS A PROXY, NOT A MEASUREMENT: a private repo with forty collaborators is not forty
+/// trusted people. That is why `--trust` overrides this, and why the tier is RECORDED on each
+/// utterance rather than re-derived later — a repo's visibility can change after an issue is filed.
+///
+/// UNDETERMINED RESOLVES TO UNTRUSTED. The failure modes are not symmetric: guessing `trusted`
+/// wrongly hands a stranger autonomous action, while guessing `untrusted` wrongly means a maintainer
+/// gets asked. Only one of those is recoverable.
+#[must_use]
+pub fn repo_trust(repo: &str) -> (&'static str, String) {
+    let out = Command::new("gh").args(["api", &format!("repos/{repo}"), "--jq", ".private"]).output();
+    match out {
+        Ok(o) if o.status.success() => match String::from_utf8_lossy(&o.stdout).trim() {
+            "true" => ("trusted", format!("{repo} is PRIVATE — its issues come from people granted access")),
+            "false" => (
+                "untrusted",
+                format!("{repo} is PUBLIC — anyone can file, so an issue is an instruction from a stranger"),
+            ),
+            other => (
+                "untrusted",
+                format!("{repo} visibility answered `{other}`, neither true nor false — failing CLOSED"),
+            ),
+        },
+        _ => (
+            "untrusted",
+            format!("could not determine {repo} visibility (gh unavailable or the call failed) — failing CLOSED"),
+        ),
+    }
+}
+
+/// The autonomy a tier permits, printed at ingest time so the operator reads it BEFORE something is
+/// done on their behalf rather than after.
+#[must_use]
+pub fn autonomy_note(trust: &str) -> &'static str {
+    if trust == "trusted" {
+        "TRUSTED source: triage and act under the ordinary process."
+    } else {
+        "UNTRUSTED source: PLAN ONLY — triage it and propose a Decision for anything that would \
+         change this project. A human accepts before anything is implemented."
+    }
+}
+
+/// Resolve the tier for this invocation: an explicit `--trust`, else the repo's visibility, else
+/// UNTRUSTED. A fixture (`--from`) has no visibility to derive from, so it fails closed.
+fn resolve_trust(args: &[String]) -> (&'static str, String) {
+    if let Some(t) = flag(args, "trust") {
+        let tier: &'static str = if t == "trusted" { "trusted" } else { "untrusted" };
+        return (tier, "declared by --trust (overriding visibility)".to_string());
+    }
+    flag(args, "repo").map_or_else(
+        || ("untrusted", "no repository to derive visibility from — failing CLOSED".to_string()),
+        |r| repo_trust(&r),
+    )
+}
+
+/// Record one already-fetched issue. Shared by the single-issue and pull paths so the two cannot
+/// drift in what they record.
+fn ingest_one(json: &str, root: &Path, args: &[String], trust: &str) -> Result<String, String> {
+    let issue = parse_issue(json)?;
+    let author = flag(args, "by")
+        .or_else(|| std::env::var("KEEL_ACTOR").ok())
+        .ok_or_else(|| "--by ACTOR required (or KEEL_ACTOR)".to_string())?;
+    let at = flag(args, "at").ok_or_else(|| "--at YYYY-MM-DD required".to_string())?;
+    let title = format!("GH#{} {}", issue.number, issue.title);
+    crate::intake_write::record_statement(
+        root,
+        &crate::intake_write::NewStatement {
+            text: &issue.body,
+            said_by: &issue.login,
+            said_at: &issue.created_on,
+            channel: "github",
+            source_url: Some(&issue.url),
+            source_trust: Some(trust),
+            title: &title,
+            author: &author,
+            created_at: &at,
+        },
+    )
+    .map(|(name, _)| name)
+    .map_err(|e| e.to_string())
+}
+
+/// `keel github-pull --repo OWNER/NAME --by ACTOR --at DATE [--limit N] [--trust T] [--root R]`
+///
+/// Enumerate open issues and ingest the ones no Statement already cites. Idempotency is the
+/// ingestion path's own — a re-ingest REFUSES on the URL — so a pull is safe to repeat and REPORTS
+/// what it skipped rather than silently doing nothing.
+#[must_use]
+pub fn pull_cmd(args: &[String], root: &Path) -> i32 {
+    let Some(repo) = flag(args, "repo") else {
+        eprintln!(
+            "usage: keel github-pull --repo OWNER/NAME --by ACTOR --at YYYY-MM-DD [--limit N] [--trust trusted|untrusted]"
+        );
+        return 2;
+    };
+    let (trust, why) = resolve_trust(args);
+    println!("trust tier: {trust} — {why}");
+    println!("{}", autonomy_note(trust));
+    let limit: usize = flag(args, "limit").and_then(|l| l.parse().ok()).unwrap_or(30);
+    let Ok(o) = Command::new("gh")
+        .args(["api", &format!("repos/{repo}/issues?state=open&per_page={limit}")])
+        .output()
+    else {
+        eprintln!("github-pull: could not run `gh` — install the GitHub CLI");
+        return 1;
+    };
+    if !o.status.success() {
+        eprintln!("github-pull: gh api failed: {}", String::from_utf8_lossy(&o.stderr).trim());
+        return 1;
+    }
+    let Ok(items) = serde_json::from_slice::<Vec<serde_json::Value>>(&o.stdout) else {
+        eprintln!("github-pull: the issue list was not a JSON array");
+        return 1;
+    };
+    let (mut ingested, mut skipped, mut failed) = (0u32, 0u32, 0u32);
+    for item in &items {
+        // A pull request is an "issue" to the API and is NOT one to us: it carries a diff, not a
+        // report, and ingesting it would record a patch as somebody's words.
+        if item.get("pull_request").is_some() {
+            continue;
+        }
+        match ingest_one(&item.to_string(), root, args, trust) {
+            Ok(name) => {
+                let n = item.get("number").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                println!("  ingested GH#{n} -> {name}");
+                ingested += 1;
+            }
+            Err(e) if e.contains("already recorded") => skipped += 1,
+            Err(e) => {
+                eprintln!("  REFUSED: {e}");
+                failed += 1;
+            }
+        }
+    }
+    println!("pulled {} item(s): {ingested} ingested, {skipped} already recorded, {failed} refused", items.len());
+    if ingested > 0 {
+        println!("NOT YET TRIAGED — what each implicates is a judgment. Deploy the `github-intake` skill.");
+    }
+    i32::from(failed > 0)
+}
+
 /// `keel github-ingest --repo OWNER/NAME --issue N [--from FILE] --by ACTOR --at DATE [ROOT]`
 #[must_use]
 pub fn cmd(args: &[String], root: &Path) -> i32 {
@@ -136,6 +283,9 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         eprintln!("github-ingest: --at YYYY-MM-DD required — when it was recorded is its own fact");
         return 2;
     };
+    let (trust, why) = resolve_trust(args);
+    println!("trust tier: {trust} — {why}");
+    println!("{}", autonomy_note(trust));
     let title = format!("GH#{} {}", issue.number, issue.title);
     match crate::intake_write::record_statement(
         root,
@@ -145,6 +295,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
             said_at: &issue.created_on,
             channel: "github",
             source_url: Some(&issue.url),
+            source_trust: Some(trust),
             title: &title,
             author: &author,
             created_at: &at,

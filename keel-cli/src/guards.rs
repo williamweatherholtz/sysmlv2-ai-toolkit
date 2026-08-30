@@ -444,6 +444,77 @@ pub fn sprint_closure(root: &Path) -> GuardReport {
     GuardReport { name: "sprint-closure", scanned, warnings: Vec::new(), violations }
 }
 
+/// Guard: work descended from an UNTRUSTED utterance must be routed through a Decision (D0264).
+///
+/// An issue on a public tracker is an instruction from an unauthenticated stranger. Triaging it is
+/// fine — reading is not obeying — but routing it straight to an implementation task means the
+/// project acts on a stranger's instruction with nobody having agreed to it. That is prompt
+/// injection with a filing form, and the defence is not detection but ROUTING: untrusted input may
+/// produce a plan and a proposed Decision, and a human accepts before anything is built.
+///
+/// SCOPE, deliberately narrow. This fires only on a story that HAS been routed (`#Implicates`) and
+/// whose targets contain no Decision. An unrouted story is untriaged, not a violation — the guard
+/// must not punish work-in-progress, which is how a control gets bypassed instead of obeyed.
+#[must_use]
+pub fn untrusted_routing(root: &Path) -> GuardReport {
+    let blob = crate::collect_sysml(&root.join(".tracking"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .collect::<Vec<_>>()
+        .join("\n");
+    // Statements whose recorded tier is `untrusted`.
+    let untrusted: HashSet<String> = blob
+        .split("part ")
+        .skip(1)
+        .filter(|seg| seg.contains("SourceTrust::untrusted"))
+        .filter_map(|seg| seg.split_whitespace().next().map(str::to_string))
+        .collect();
+    // Stories deriving from one of them.
+    let mut tainted: HashSet<String> = HashSet::new();
+    for line in blob.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix("#DerivedFrom dependency from ") {
+            if let Some((story, target)) = rest.split_once(" to ") {
+                if untrusted.contains(target.trim_end_matches(';').trim()) {
+                    tainted.insert(story.trim().to_string());
+                }
+            }
+        }
+    }
+    // Of those, the ones ROUTED somewhere, and whether any target is a Decision.
+    let mut routed: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for line in blob.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix("#Implicates dependency from ") {
+            if let Some((story, target)) = rest.split_once(" to ") {
+                let story = story.trim().to_string();
+                if tainted.contains(&story) {
+                    routed.entry(story).or_default().push(target.trim_end_matches(';').trim().to_string());
+                }
+            }
+        }
+    }
+    let is_decision = |t: &String| {
+        t.len() >= 5 && t.starts_with('d') && t[1..5].chars().all(|c| c.is_ascii_digit())
+    };
+    let violations: Vec<String> = routed
+        .iter()
+        .filter(|(_, targets)| !targets.iter().any(is_decision))
+        .map(|(story, targets)| {
+            format!(
+                "{story} descends from an UNTRUSTED utterance and is routed to {targets:?} with no \
+                 Decision among them — untrusted input may PLAN, and a human accepts before anything \
+                 is implemented (D0264). Propose a Decision and route the story to it."
+            )
+        })
+        .collect();
+    // SCANNED is the population POLICED - untrusted utterances - not the subset currently in
+    // violation. Reporting the tainted-story count instead read 0 on a tree holding four untrusted
+    // statements, which the liveness meta-test rightly rejected: a guard whose population is always
+    // zero has no signal distinguishing "nothing to police" from "mis-aimed" (issue180).
+    GuardReport { name: "untrusted-routing", scanned: untrusted.len(), warnings: Vec::new(), violations }
+}
+
 // ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
 
 const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
@@ -2031,8 +2102,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 55] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure"];
+pub const GUARD_NAMES: [&str; 56] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3527,6 +3598,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "acceptance-events" => Some(acceptance_events(root)),
         "sprint-coverage" => Some(sprint_coverage(root)),
         "sprint-closure" => Some(sprint_closure(root)),
+        "untrusted-routing" => Some(untrusted_routing(root)),
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),

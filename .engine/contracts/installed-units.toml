@@ -164,6 +164,12 @@ version = 1
 file.processes__SL__library-stewardship.sysml = "796db6cf4bd0155a"
 file.skills__SL__library-stewardship__SL__SKILL.md = "0c7a0301193590f0"
 file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
+[7c98cf16-a702-41b3-99d2-84ad712f282f]
+process = "github-intake"
+version = 1
+file.processes__SL__github-intake.sysml = "0656702345d30db2"
+file.skills__SL__github-intake__SL__SKILL.md = "e38cc4d2db1449b6"
+file.skills__SL__github-intake__SL__registry.sysml = "43f955f619a10a80"
 [79f2d321-7c55-41fb-86fa-7d549202caf7]
 process = "intake"
 version = 43

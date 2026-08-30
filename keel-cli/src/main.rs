@@ -2596,6 +2596,8 @@ fn cmd_record_statement(args: &[String]) -> i32 {
             said_at: &said_at,
             channel: &channel,
             source_url: flag(args, "source-url").as_deref(),
+            // A statement typed by the operator carries no external source, so no tier applies.
+            source_trust: None,
             title: &title,
             author: &author,
             created_at: &created_at,
@@ -4077,6 +4079,7 @@ const CATALOGUE: &[&str] = &[
     "  ls [ROOT]                    list .tracking/ .sysml files",
     "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
     "  whats-next [ROOT]            print ready task names (one per line)",
+    "  github-pull --repo O/N --by ACTOR --at DATE [--limit N] [--trust T]   pull OPEN issues and ingest the new ones; autonomy follows repo VISIBILITY - private acts, public plans only, undetermined fails CLOSED (D0264)",
     "  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours (D0263)",
     "  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed (D0221)",
     "  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them (D0219). An unmapped login is refused, never defaulted",
@@ -4425,6 +4428,13 @@ fn main() {
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
+        Some("github-pull") => {
+            let root = resolve_guard_root(
+                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
+            )
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+            keel_cli::github_ingest::pull_cmd(rest, &root)
+        }
         Some("github-ingest") => {
             // ROOT is an explicit --root, never a trailing positional: the trailing argument here is
             // the value of --at, and guessing it as a path made the command fail with an opaque

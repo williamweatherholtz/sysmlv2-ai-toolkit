@@ -32,6 +32,10 @@ pub struct NewStatement<'a> {
     /// The utterance's durable external address, where it has one (a GitHub issue URL). `None` for
     /// a spoken statement — never defaulted, because a fabricated source is worse than no source.
     pub source_url: Option<&'a str>,
+    /// What authority these words carried when they ARRIVED — a `SourceTrust` member (D0264).
+    /// Recorded on the utterance, not decided at act time: a repository's visibility can change
+    /// after an issue is filed, and an autonomous pass must never have to guess.
+    pub source_trust: Option<&'a str>,
     /// A short human label for the statement — the AI's summary, kept separate from `text`.
     pub title: &'a str,
     /// Recording actor.
@@ -154,6 +158,9 @@ fn insert_before_close(text: &str, block: &str) -> String {
 /// `WriteError::Io` on filesystem failure; `WriteError::InvalidMethod` on an unknown channel.
 pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String), WriteError> {
     check_member(root, "StatementChannel", "channel", s.channel)?;
+    if let Some(t) = s.source_trust {
+        check_member(root, "SourceTrust", "sourceTrust", t)?;
+    }
     if s.text.trim().is_empty() {
         return Err(WriteError::Parse("a Statement with empty text records nothing".into()));
     }
@@ -179,7 +186,7 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
              \x20       :>> title = \"{}\";\n\
              \x20       :>> createdAt = \"{}\"; :>> createdBy = \"{}\";\n\
              \x20       :>> text = \"{}\";\n\
-             \x20       :>> saidBy = \"{}\"; :>> saidAt = \"{}\"; :>> channel = StatementChannel::{};{}\n\
+             \x20       :>> saidBy = \"{}\"; :>> saidAt = \"{}\"; :>> channel = StatementChannel::{};{}{}\n\
              \x20   }}\n",
             gen_uuid(),
             crate::write::sanitize_public(s.title),
@@ -192,6 +199,8 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
             s.source_url.map_or_else(String::new, |u| {
                 format!("\n\x20       :>> sourceUrl = \"{}\";", crate::write::sanitize_public(u))
             }),
+            s.source_trust
+                .map_or_else(String::new, |t| format!("\n\x20       :>> sourceTrust = SourceTrust::{t};")),
         );
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -293,7 +302,7 @@ mod tests {
                 text: "just leave me as the decision maker.",
                 said_by: "wweatherholtz",
                 said_at: "2026-08-26",
-                channel: "chat", source_url: None,
+                channel: "chat", source_trust: None, source_url: None,
                 title: "leave me as the only decider",
                 author: "claudeFable5",
                 created_at: "2026-08-26",
@@ -348,11 +357,11 @@ mod tests {
     fn an_unknown_channel_or_implication_is_refused_rather_than_defaulted() {
         let r = root("enum");
         assert!(record_statement(&r, &NewStatement {
-            text: "x", source_url: None, said_by: "w", said_at: "2026-08-26", channel: "smoke-signal",
+            text: "x", source_trust: None, source_url: None, said_by: "w", said_at: "2026-08-26", channel: "smoke-signal",
             title: "t", author: "a", created_at: "2026-08-26",
         }).is_err(), "an unknown channel must refuse, never default - the channel is provenance");
         assert!(record_statement(&r, &NewStatement {
-            text: "   ", said_by: "w", said_at: "2026-08-26", channel: "chat", source_url: None,
+            text: "   ", said_by: "w", said_at: "2026-08-26", channel: "chat", source_trust: None, source_url: None,
             title: "t", author: "a", created_at: "2026-08-26",
         }).is_err(), "empty text records nothing and must say so");
         let _ = std::fs::remove_dir_all(&r);
@@ -390,7 +399,7 @@ mod tests {
         }
         for m in crate::schema::enum_members("StatementChannel") {
             let out = record_statement(&r, &NewStatement {
-                text: "x", source_url: None, said_by: "w", said_at: "2026-08-26", channel: &m,
+                text: "x", source_trust: None, source_url: None, said_by: "w", said_at: "2026-08-26", channel: &m,
                 title: "t", author: "a", created_at: "2026-08-26",
             });
             assert!(out.is_ok(), "StatementChannel::{m} is declared but refused: {out:?}");
