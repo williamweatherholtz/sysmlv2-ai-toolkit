@@ -113,9 +113,15 @@ frozen (modify it only by out-of-band Decision).
 - **The write API is the sanctioned write path.** `keel append-result` / `append-gate-result`
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
   refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
-  `record decision` (prose via `--from FILE` — never as double-quoted shell arguments, D0224/issue256),
-  `record issue`, `record statement` / `record story` (intake's write path — a human's words VERBATIM,
+  `record decision` (prose via `--from FILE`) and `record issue` (prose via `--description-from FILE`) —
+  **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
+  has now happened three times (D0224/issue256, then issue316, which also ran `keel deactivate` against
+  this repo). `record statement` / `record story` (intake's write path — a human's words VERBATIM,
   then the story that translates them with its `#DerivedFrom` edge authored alongside; D0236/issue289),
+  `github-ingest` (an issue on the repository becomes a VERBATIM `Statement` attributed to the reporter's
+  GitHub **login**, carrying its URL as `sourceUrl` so a re-ingest REFUSES; it records WORDS, not work —
+  what an issue implicates is a judgment, and `record issue` needs a resolver ingestion cannot know.
+  Deploy the **`github-intake`** skill; D0263),
   `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
