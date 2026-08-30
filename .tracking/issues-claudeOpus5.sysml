@@ -224,4 +224,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from activateDoesNotLoseFacts to issue310;
+
+    part issue311 : Issue {
+        :>> id = "ae5000ae-cc76-4b89-b268-60c3332c5873";
+        :>> title = "The release process tags AFTER recording, so the tag and the recorded commit disagree by construction";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the rigor audit (2026-08-30) reading the release-recorded warning that had been standing since v0.3.1 shipped. The Release item recorded c4e306c (the content commit) while tag v0.3.1 points at c4d5dbf (the commit that RECORDED the release). Neither was a typo: the release process records the Release item, commits, and THEN tags HEAD - so the tag necessarily lands one commit after the commit the record names, for every release. The instance is corrected (the record now names the tagged commit, which is what users actually run); the PROCESS defect is this issue. Fix direction: tag the commit the record NAMES, not HEAD - or record the release and tag that same commit, so the two cannot diverge. Whichever is chosen must be held by a test that a release's recorded commit resolves to its own tag, since the guard that caught this is warning-tier and stood unread for days behind 61 undischargeable warnings (D0261).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue311;
+
+    part issue312 : Issue {
+        :>> id = "7937936b-24d5-417b-98ee-686f98669997";
+        :>> title = "decision-scaffolding has no way to say 'the change landed WITH the Decision', so self-executing decisions warn forever";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by the rigor audit. The guard warns when an accepted #ProspectiveChange Decision has no inbound tracked-item edge, on the premise that it 'promises process change but charters no work'. For a decision whose change IS the commit - d0211 froze the enforcement surface, d0247 reclassified STPA, d0248 cut six clauses, d0257 shipped the propriety process and its skill, all landing in the same commit as the Decision - there is no future work to charter and never will be. The premise is right for promises and wrong for self-executing changes, so those four warn permanently: the SAME defect as the legacy-actor lines this audit just collapsed (D0261), regenerating itself in another channel. The fix is the shape this codebase already reached twice - THREE buckets, not two (issue173, quoted in keel hardening: the two-bucket version made a judgment look identical to a missing guard). A decision needs a way to declare 'self-executing, the change is in this commit', reviewable and disagreeable, exactly like process-enforcement.toml's declaredUnenforceable. NOT FIXED HERE, deliberately: the guard is under the keystone lock and adding a bucket is a weakening unless the declaration is itself checkable, which needs a Decision and a design - hardening it today would either lock out legitimate self-executing decisions or add an unchecked escape hatch. What IS fixed here: the three decisions that genuinely promised unbuilt mechanisms (d0201 Option B device HMAC, d0252 migration rollback, d0249 ungrounded-ratio trigger) now carry tracked work.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcUngroundedRatioTriggers to issue312;
 }

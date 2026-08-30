@@ -73,6 +73,28 @@ const LEGACY_ACTORS: &[&str] = &[
 
 const ACTOR_ATTRS: &[&str] = &["authoredBy", "createdBy", "judgedBy"];
 
+/// The day the actor convention became binding. Every legacy-actor reference in the corpus is dated
+/// before it (newest observed: 2026-06-11), so this starts at zero violations; a legacy name on a
+/// record dated on or after it is a VIOLATION (D0261). Deriving the verdict from the RECORD'S OWN
+/// DATE is what makes this a ratchet rather than a second hand-maintained baseline that drifts.
+const LEGACY_ACTOR_CUTOFF: &str = "2026-06-12";
+
+/// The `judgedAt`/`createdAt` date declared on the same line, if any. Item declarations in this
+/// corpus are single-line, so the line carries its own date; a line without one is treated as
+/// undatable history rather than assumed recent.
+fn record_date(line: &str) -> Option<String> {
+    for attr in ["judgedAt", "createdAt", "saidAt", "acceptedAt"] {
+        if let Some(rest) = line.split(attr).nth(1) {
+            let digits: String =
+                rest.trim_start_matches([' ', '=', '"']).chars().take(10).collect();
+            if digits.len() == 10 && digits.as_bytes().get(4) == Some(&b'-') {
+                return Some(digits);
+            }
+        }
+    }
+    None
+}
+
 fn load_known_actors(root: &Path) -> HashSet<String> {
     let mut known = HashSet::new();
     let Ok(text) = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")) else {
@@ -136,6 +158,7 @@ pub fn actors(root: &Path) -> GuardReport {
     let legacy: HashSet<&str> = LEGACY_ACTORS.iter().copied().collect();
     let mut warnings = Vec::new();
     let mut violations = Vec::new();
+    let mut legacy_historic = 0usize;
     let files = crate::collect_sysml(&root.join(".tracking"));
     let scanned = files.len();
     for path in &files {
@@ -147,12 +170,30 @@ pub fn actors(root: &Path) -> GuardReport {
                     continue;
                 }
                 if legacy.contains(val.as_str()) {
-                    warnings.push(format!("{rel}:{}: legacy actor \"{val}\" (pre-convention)", i + 1));
+                    // A legacy name in a record dated ON OR AFTER the convention is a VIOLATION,
+                    // not tolerated history — the date comes from the record itself, so this needs
+                    // no baseline list to drift (D0261). Older ones are COUNTED, not enumerated:
+                    // 52 undischargeable lines per run were 54% of the whole warning channel, and
+                    // real findings sat unread behind them for four days.
+                    if record_date(line).is_some_and(|d| d.as_str() >= LEGACY_ACTOR_CUTOFF) {
+                        violations.push(format!(
+                            "{rel}:{}: legacy actor \"{val}\" in a record dated on/after {LEGACY_ACTOR_CUTOFF} \
+                             — legacy names are tolerated only in history that predates the convention",
+                            i + 1
+                        ));
+                    } else {
+                        legacy_historic += 1;
+                    }
                 } else {
                     violations.push(format!("{rel}:{}: unknown actor \"{val}\" not in ProjectActors", i + 1));
                 }
             }
         }
+    }
+    if legacy_historic > 0 {
+        warnings.push(format!(
+            "{legacy_historic} legacy actor reference(s) in records predating the {LEGACY_ACTOR_CUTOFF}              convention — immutable history, NOT dischargeable (rewriting a judgedBy would falsify              provenance). Counted, not enumerated: a warning nobody can act on trains blindness to              the ones they can. A legacy name dated on/after the cutoff is a violation above."
+        ));
     }
     GuardReport { name: "actors", scanned, warnings, violations }
 }
@@ -1579,16 +1620,25 @@ const GRANDFATHERED_THIN_ATTESTATIONS: [&str; 9] = [
 #[must_use]
 pub fn attestation_substance(root: &Path) -> GuardReport {
     let grandfathered: HashSet<&str> = GRANDFATHERED_THIN_ATTESTATIONS.iter().copied().collect();
+    // COUNTED, not enumerated (D0261). The allowlist is FIXED and anything outside it already
+    // violates, so nothing can hide in this number - unlike the per-instance lines, which added no
+    // information after the first run and crowded out findings a reader could act on.
+    let mut grandfathered_thin = 0usize;
     match crate::view::thin_attestations(root) {
         Ok(found) => {
             let mut warnings = Vec::new();
             let mut violations = Vec::new();
             for (name, reason) in &found {
                 if grandfathered.contains(name.as_str()) {
-                    warnings.push(format!("{name}: {reason} — GRANDFATHERED (pre-issue083); state what was attested when this record is next touched"));
+                    grandfathered_thin += 1;
                 } else {
                     violations.push(format!("{name}: {reason} — a confirmation records a HUMAN's word, so it must say what was attested and to what (D0016/issue083)"));
                 }
+            }
+            if grandfathered_thin > 0 {
+                warnings.push(format!(
+                    "{grandfathered_thin} grandfathered thin attestation(s) (pre-issue083) — counted,                      not enumerated (D0261): the allowlist is fixed, so anything outside it is a                      violation above and nothing can hide in this number"
+                ));
             }
             GuardReport { name: "attestation-substance", scanned: found.len(), warnings, violations }
         }
