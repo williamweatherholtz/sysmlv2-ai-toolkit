@@ -101,4 +101,12 @@ package ProjectIntake20260829 {
     #DerivedFrom dependency from us051 to st035;
 
     #Implicates dependency from us051 to d0258;
+
+    part st036 : Statement {
+        :>> id = "d5630885-7faf-408d-98c6-86f0fcd6d6f9";
+        :>> title = "Program summary returned: kick off now, follow the frontier, define stewardship, acceptRisk the event-less residual - continue through all remaining";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> text = "continue through all remaining\n[x] Kick off now on v0.3.1 - RECOMMENDED\n[x] Follow the assessed frontier: Critical resolver first, then the Highs - RECOMMENDED\n[x] Define library-stewardship now, one process for publish + consume - RECOMMENDED\n[x] Accept the residual as a recorded disposition (acceptRisk) - RECOMMENDED\nMy notes:";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-29"; :>> channel = StatementChannel::chat;
+    }
 }

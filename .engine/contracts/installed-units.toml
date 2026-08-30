@@ -164,3 +164,9 @@ version = 43
 file.processes__SL__intake.sysml = "8b880475eaab49ad"
 file.skills__SL__intake__SL__SKILL.md = "9a6aefa4c9668c8f"
 file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
+[63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
+process = "library-stewardship"
+version = 1
+file.processes__SL__library-stewardship.sysml = "796db6cf4bd0155a"
+file.skills__SL__library-stewardship__SL__SKILL.md = "0c7a0301193590f0"
+file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
