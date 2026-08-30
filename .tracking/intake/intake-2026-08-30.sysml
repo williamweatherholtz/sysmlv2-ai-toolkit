@@ -192,4 +192,24 @@ package ProjectIntake20260830 {
         :>> triageNote = "process and not architecture: the mechanism is small (a pull loop over the existing ingest path) and the substance is a POLICY about how much autonomy an input carries - which is a process rule with a guard behind it. Their two deployment questions are answered by existing mechanisms (engine-shipped unit plus library import), so they route as VIEW, not as new work.";
     }
     #DerivedFrom dependency from us059 to st047;
+
+    part st048 : Statement {
+        :>> id = "8ca9e8bb-90d9-4531-addc-9e853ac81774";
+        :>> title = "Is there a Django-migrations equivalent, and can antiquated data's authoring process be known? Panel it, then propose";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> text = "do we have a means up pulling data up to the current schema? like schema files for Django? or is that not a thing? I feel like there is a lot of antiquated data sitting out there with no indication as to what process it was authored under, thus it cannot be cleanly grandfathered in or updated or baselined or tracked. no? hold a panel to determine best implementations, then propose top ideas to me";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-30"; :>> channel = StatementChannel::chat;
+    }
+
+    part us060 : UserStory {
+        :>> id = "20b5cbd7-5169-4b88-9c97-1dddd6b5c632";
+        :>> title = "Vintage resolution: the derivation is right, its coverage is one item type and its corpus lens does not finish";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "to know what process governed any item, and which antiquated items need revisiting";
+        :>> soThat = "old data can be grandfathered, updated or baselined deliberately rather than by assumption";
+        :>> implication = ImplicationKind::question;
+        :>> triageNote = "question and not bug: they asked whether the capability exists and asked for PROPOSALS, not implementation - so the deliverable is the panel and a ranked set of options, and building would exceed what was asked. The panel nevertheless convicted twice on measured evidence, so two Issues are filed from it: the corpus lens cannot finish, and the resolver answers confidently for item types it does not cover.";
+    }
+    #DerivedFrom dependency from us060 to st048;
 }

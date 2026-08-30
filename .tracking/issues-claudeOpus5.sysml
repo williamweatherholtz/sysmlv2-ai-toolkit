@@ -279,4 +279,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcNoOpInvarianceControl to issue315;
+
+    part issue316 : Issue {
+        :>> id = "7ae8dd2e-20aa-4029-9213-a8e767b9423d";
+        :>> title = "reprocess-candidates cannot finish, so the antiquated-data question has never been answered on this project";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY THE VINTAGE PANEL (pf55), by measurement rather than inspection: keel reprocess-candidates does not finish. Timed twice - 240 seconds, exit 124, zero bytes of output - because it walks all 501 delivery stories and runs several git subprocesses PER STORY (govern.rs:362 all_delivery_stories, then govern_resolve -> git grep + git log per item). WHY IT MATTERS MORE THAN A SLOW COMMAND: this is the lens that answers 'which items were authored under a process version a SAFETY change later superseded' - that is, exactly the antiquated-data question. Because it never completes, that answer has never been computed on this project. The per-item lens (governing-version) works and is correct, but it is only usable by someone who ALREADY suspects a particular item, which D0261's own retro named as the shape of a metric that is not a control. THE FIX IS NOT A DESIGN CHANGE - the derivation is sound on four of five propriety lenses. It is a batched traversal: one git log --name-only pass building a commit -> touched-definition map and a decision -> intro-commit map, then an in-memory lookup per item, instead of a subprocess per item. VERIFY BOTH WAYS: the batched result must be IDENTICAL to the per-item result on a sample of items where the slow path can still be run to completion, and the whole-corpus run must finish - a fast lens that quietly answers differently is worse than a slow correct one.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue316;
+
+    part issue317 : Issue {
+        :>> id = "2c850de4-e479-4139-beaa-3ab746009abc";
+        :>> title = "governing-version answers DELIVERY for every item type it does not cover, instead of unknown";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY THE VINTAGE PANEL (pf52). governing_def_for falls back UNCONDITIONALLY to .engine/workflows/delivery.sysml when an item has no #CharteredBy edge (govern.rs:19 and :39), and reprocess-candidates iterates only all_delivery_stories (govern.rs:362). CONSEQUENCE: asking for the vintage of a Need, SystemRequirement, Issue, Test, Statement, Decision or critique does not return 'unknown' - it returns DELIVERY, confidently and wrongly. A Need is governed by the Business workflow, not Delivery. A lens that answers the wrong question fluently is worse than one that refuses, because nobody checks a fluent answer. MEASURED SCOPE: 447 of 501 delivery stories carry a #CharteredBy edge, so derivation has real input for that ONE item type. No other item type in the corpus carries one. The human's intuition - that antiquated data carries no indication of what process authored it - is CORRECT for every item type except Story. FIX DIRECTION, and the choice matters: either (a) resolve per item KIND, with a declared kind-to-workflow map so a Need resolves to Business, or (b) return UNKNOWN when no charter edge exists, which is honest and immediately less useful. (a) is better only if the map is declared and checkable rather than another hardcoded constant restating something the model already knows - the issue300 class. Whichever is chosen, the unconditional Delivery fallback must go: it manufactures an answer.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue317;
 }
