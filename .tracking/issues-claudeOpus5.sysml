@@ -213,4 +213,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyKickoffReady to issue309;
+
+    part issue310 : Issue {
+        :>> id = "cf924c95-0287-4152-ba14-484678d2ee02";
+        :>> title = "Regenerate-from-model writers silently drop what the engine's view cannot represent";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Generalised from issue293's retro (sprint497). keel activate regenerated activation.toml from a template plus two computed lists, so it deleted every fact the engine's view could not represent: comments, the charteredBy reference, and the whole category of non-switchable [always] processes. NOTHING DETECTED IT - the keystone lock caught the FILE changing, and only because that file happens to be locked. A write path whose only audit is the control guarding its output is unaudited for every output that is not locked. THE CLASS: any command that rebuilds a human-editable file from the engine's model of it. sync-claude is the next candidate and already claims the correct shape (it merges user entries in settings.json rather than overwriting) - claimed, not currently proven by a test that a hand-added user entry survives a regeneration. SCOPE: enumerate the writers that regenerate a human-editable file, and hold each one's preservation claim with a round-trip test of the sprint497 shape (write, regenerate, assert byte-identical apart from the intended change).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from activateDoesNotLoseFacts to issue310;
 }

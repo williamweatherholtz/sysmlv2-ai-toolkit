@@ -3547,6 +3547,64 @@ const ACTIVATION_HEADER: &str = "\
 /// edited would leave the other absent, and absent means EVERYTHING ACTIVE — so deactivating one
 /// viewpoint would silently re-activate every process the project had turned off. A partial write of a
 /// contract whose absence has meaning is a data-loss bug, not a convenience.
+/// Rewrite ONLY the `active = [...]` line inside `[section]`, leaving every other byte of the
+/// manifest untouched — comments, `charteredBy`, blank lines, ordering, line endings.
+///
+/// Regenerating the file from a template instead was issue293: one `deactivate`+`activate` round
+/// trip deleted `charteredBy = "d0226"` with the comment explaining it. Returns `None` when the
+/// section or its `active` line is absent, so the caller can fall back to generating a fresh file
+/// rather than silently writing a manifest with a section missing (absence has meaning here).
+fn replace_active_line(src: &str, section: &str, items: &[String]) -> Option<String> {
+    let want = format!("[{section}]");
+    let rendered = items.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(", ");
+    let (mut in_section, mut replaced) = (false, false);
+    let mut out = String::with_capacity(src.len() + rendered.len());
+    for line in src.split_inclusive('\n') {
+        let trimmed = line.trim_end();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = trimmed == want;
+        } else if in_section && !replaced && trimmed.starts_with("active") && trimmed.contains('=') {
+            let eol = &line[trimmed.len()..]; // preserve LF vs CRLF vs no trailing newline
+            out.push_str("active = [");
+            out.push_str(&rendered);
+            out.push(']');
+            out.push_str(eol);
+            replaced = true;
+            continue;
+        }
+        out.push_str(line);
+    }
+    replaced.then_some(out)
+}
+
+/// The `active` list the manifest currently RECORDS for a section, read from the file rather than
+/// recomputed from the engine's view of it.
+///
+/// The second half of issue293: the process list was rebuilt from `unit_names()`, which only knows
+/// SWITCHABLE processes, so every `[always]` one (`decision-authoring`) vanished on any write. An
+/// absent section means everything is active, but a PRESENT list naming 10 of 11 marks the 11th
+/// INACTIVE — so omitting a process from a list that exists deactivates it by silence.
+fn recorded_active(root: &Path, section: &str) -> Option<Vec<String>> {
+    let src = std::fs::read_to_string(root.join(".engine/contracts/activation.toml")).ok()?;
+    let want = format!("[{section}]");
+    let mut in_section = false;
+    for line in src.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = trimmed == want;
+        } else if in_section && trimmed.starts_with("active") {
+            let list = trimmed.split_once('[')?.1.rsplit_once(']')?.0;
+            return Some(
+                list.split(',')
+                    .map(|s| s.trim().trim_matches('"').to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect(),
+            );
+        }
+    }
+    None
+}
+
 fn write_activation(root: &Path, processes: &[String], viewpoints: &[String]) -> std::io::Result<()> {
     // JOIN `.engine/contracts` HERE, as the original did. Taking a pre-joined directory instead was my
     // regression and it wrote the manifest to the repo root, where `Activation::load` never looks - so
@@ -3555,6 +3613,16 @@ fn write_activation(root: &Path, processes: &[String], viewpoints: &[String]) ->
     // "deactivated" either way.
     let dir = root.join(".engine/contracts");
     std::fs::create_dir_all(&dir)?;
+    // PRESERVE FIRST (issue293): an existing manifest is EDITED, never regenerated. Only a missing
+    // or unparseable one falls through to the template below.
+    let path = dir.join("activation.toml");
+    if let Ok(existing) = std::fs::read_to_string(&path) {
+        if let Some(edited) = replace_active_line(&existing, "processes", processes)
+            .and_then(|s| replace_active_line(&s, "viewpoints", viewpoints))
+        {
+            return std::fs::write(&path, edited);
+        }
+    }
     std::fs::write(
         dir.join("activation.toml"),
         format!(
@@ -3595,7 +3663,8 @@ fn switch_viewpoint(
     set.sort();
     // The PROCESS section must be rewritten too, unchanged: absence means everything active, so omitting
     // it would silently re-activate every process the project had turned off.
-    let procs: Vec<String> = act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect();
+    let procs: Vec<String> = recorded_active(root, "processes")
+        .unwrap_or_else(|| act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect());
     if let Err(e) = write_activation(root, &procs, &set) {
         eprintln!("error writing .engine/contracts/activation.toml: {e}");
         return 1;
@@ -3705,7 +3774,11 @@ viewpoints ({} declared):", vps.len());
     }
 
     let materialising = !act.is_declared();
-    let mut set: Vec<String> = act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect();
+    // The RECORDED list is the base when a manifest exists (issue293) — rebuilding it from
+    // `unit_names()` drops every `[always]` process, and omission from a present list reads as
+    // INACTIVE. Only a project with no manifest gets the computed effective state.
+    let mut set: Vec<String> = recorded_active(&root, "processes")
+        .unwrap_or_else(|| act.unit_names().into_iter().filter(|p| act.is_process_active(p)).collect());
     match mode {
         "activate" => {
             if !set.iter().any(|p| p == target) {
