@@ -57,4 +57,26 @@ package ProjectIntake20260829 {
     #DerivedFrom dependency from us049 to st033;
 
     #Implicates dependency from us049 to dcPinBites;
+
+    part st034 : Statement {
+        :>> id = "44285b0a-74d3-4169-9050-fa1a35866bb9";
+        :>> title = "The library's home is github.com/williamweatherholtz/keel-lib";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> text = "use this for the repo https://github.com/williamweatherholtz/keel-lib";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-29"; :>> channel = StatementChannel::chat;
+    }
+
+    part us050 : UserStory {
+        :>> id = "efffbc02-2c35-41a7-8a86-37a203153f2b";
+        :>> title = "The library's remote is github.com/williamweatherholtz/keel-lib";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "the portable-content library homed at the keel-lib GitHub repository";
+        :>> soThat = "every machine syncs the working material from one owned remote";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "architecture and not convention: it binds D0250's open parameter - WHERE the library lives - which sprint 494's closeOut had named as the residual awaiting exactly this choice. No decision file needed: the remote is machine state discovered from the clone's origin (the D0245 rule), so the binding act was git remote set-url plus a push, and this story is its provenance.";
+    }
+    #DerivedFrom dependency from us050 to st034;
+
+    #Implicates dependency from us050 to d0250;
 }
