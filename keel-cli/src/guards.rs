@@ -326,6 +326,83 @@ pub fn sprint_coverage(root: &Path) -> GuardReport {
     GuardReport { name: "sprint-coverage", scanned: done.len(), warnings: Vec::new(), violations }
 }
 
+/// The tasks declared inside a delivery file's `action def` block, and the `TestResult` names
+/// present in that same file. A task is STAMPED when some result name starts with the task name
+/// (`storyFooDoDR1` / `storyFooR1` both stamp `storyFoo` — both spellings are in the corpus).
+fn sprint_tasks_and_results(src: &str) -> (Vec<String>, Vec<String>) {
+    let tasks = src
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("action ")?.strip_suffix(';'))
+        .filter(|t| !t.contains(' ') && !t.contains(':'))
+        .map(str::to_string)
+        .collect();
+    let results = src
+        .split("part ")
+        .skip(1)
+        .filter(|seg| seg.starts_with(char::is_alphanumeric))
+        .filter_map(|seg| {
+            let name = seg.split_whitespace().next()?;
+            seg.split_once(" : ")
+                .filter(|(_, rest)| rest.starts_with("TestResult"))
+                .map(|_| name.to_string())
+        })
+        .collect();
+    (tasks, results)
+}
+
+/// Guard: a sprint the work has MOVED ON FROM may not carry an unstamped task (D0260).
+///
+/// Sprint 483's story was finished and verified, its result never appended, and the frontier
+/// therefore served finished work as ready for three weeks — the one miss in 496 sprints, found
+/// only when D0258's priority-assessment step first read the frontier's head item by item.
+///
+/// The check is a RATCHET, not a new burden: all 496 sprint files already stamp every task, so
+/// this guard starts at zero violations and exists to keep a perfect record perfect. It is
+/// scoped to avoid the issue272 failure — blocking legitimate work to prevent an illegitimate
+/// state. The HIGHEST-numbered sprint is exempt, because an in-progress sprint has unstamped
+/// tasks by definition and gating it would make the guard a lockout. Opening sprint N+1 is the
+/// objective, self-declared event that says N is no longer in progress.
+#[must_use]
+pub fn sprint_closure(root: &Path) -> GuardReport {
+    let files = crate::collect_sysml(&root.join(".tracking").join("delivery"));
+    let number = |p: &Path| -> Option<u32> {
+        p.file_name()?
+            .to_str()?
+            .strip_prefix("sprint")?
+            .split(|c: char| !c.is_ascii_digit())
+            .next()?
+            .parse()
+            .ok()
+    };
+    // The in-progress exemption: the single highest sprint number present.
+    let newest = files.iter().filter_map(|p| number(p)).max();
+    let mut violations = Vec::new();
+    let mut scanned = 0usize;
+    for path in &files {
+        let Ok(src) = std::fs::read_to_string(path) else { continue };
+        if !src.contains("action def ") {
+            continue;
+        }
+        if number(path).is_some() && number(path) == newest {
+            continue; // in progress — see doc comment
+        }
+        let (tasks, results) = sprint_tasks_and_results(&src);
+        scanned += tasks.len();
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+        for t in tasks {
+            if !results.iter().any(|r| r.starts_with(&t)) {
+                violations.push(format!(
+                    "{name}: task `{t}` has no TestResult, but work has moved on to a later sprint \
+                     — an unstamped task is served as READY forever, so finished work is \
+                     indistinguishable from open work (D0260/sprint483)"
+                ));
+            }
+        }
+    }
+    violations.sort();
+    GuardReport { name: "sprint-closure", scanned, warnings: Vec::new(), violations }
+}
+
 // ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
 
 const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
@@ -1904,8 +1981,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 54] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled"];
+pub const GUARD_NAMES: [&str; 55] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3399,6 +3476,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "actors" => Some(actors(root)),
         "acceptance-events" => Some(acceptance_events(root)),
         "sprint-coverage" => Some(sprint_coverage(root)),
+        "sprint-closure" => Some(sprint_closure(root)),
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
