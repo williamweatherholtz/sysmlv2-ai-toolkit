@@ -63,6 +63,12 @@ pub fn cmd_init(remote: &str) -> i32 {
     }
     match crate::gitx::git().args(["clone", "-q"]).arg(remote).arg(&dst).output() {
         Ok(o) if o.status.success() => {
+            // An EMPTY remote gives the clone git's init.defaultBranch (often `master`), and the
+            // first `push origin HEAD` then CREATES that branch upstream while a later default
+            // lands on `main` — two branches, and `sync` (which fetches origin HEAD) serves the one
+            // without the publishes. Found live stocking keel-lib. A non-empty remote is immune
+            // (the clone tracks its real default), so only the empty-clone branch is renamed.
+            let _ = crate::gitx::git().arg("-C").arg(&dst).args(["branch", "-m", "main"]).output();
             println!("library: cloned {} -> {}", remote, dst.display());
             0
         }
