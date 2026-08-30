@@ -62,7 +62,12 @@ package EngineIntake {
 
     // WHERE A STATEMENT WAS MADE. Provenance of the channel, because a note typed into a review deck
     // and a line typed in a terminal carry different context and are recovered differently.
-    enum def StatementChannel { chat; console; deck; commitReview; other; }
+    enum def StatementChannel { chat; console; deck; commitReview; github; other; }
+    // `github` (D0263): an issue or comment on the repository is a channel in its own right, not
+    // `other`. It differs from every other member in a way the model must keep: the speaker is a
+    // GitHub login rather than an enrolled ProjectActor, and the utterance has a durable external
+    // URL - which is what makes ingestion idempotent. Forcing it into `other` would have thrown
+    // away both facts, which is the force-fit the intake process forbids.
 
     // A human's words, VERBATIM. No interpretation, no summary, no tidying.
     //
@@ -75,6 +80,13 @@ package EngineIntake {
         attribute saidBy : String;                 // actor id — whose words these are
         attribute saidAt : Timestamp;
         attribute channel : StatementChannel;
+        // The utterance's durable external address, where one exists (D0263). Present for a `github`
+        // statement, absent for a spoken one - so it is [0..1] and never defaulted. This is what makes
+        // ingestion IDEMPOTENT: re-ingesting an issue finds the Statement already carrying its URL and
+        // refuses, rather than recording the same words twice under two ids. It is also the only way a
+        // reader can go back to the source and check the transcription, which is the entire point of
+        // recording verbatim.
+        attribute sourceUrl : String [0..1];
         // Only DIRECTIVE statements are recorded: a request, a correction, a constraint, a priority, a
         // verdict. Not a transcript — a log of everything said is a second corpus with no questions
         // attached, which is the mistake D0161's first draft made.

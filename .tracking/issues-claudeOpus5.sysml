@@ -246,4 +246,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcUngroundedRatioTriggers to issue312;
+
+    part issue313 : Issue {
+        :>> id = "b5381977-0f45-42fd-93cf-16c70b9b04bd";
+        :>> title = "A fresh keel project cannot make its first commit at a deep path: reference-decision filenames blow Windows MAX_PATH";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY RECONNAISSANCE for the federation test platform, before any suite existed. keel init at a 150-character directory produces .engine/reference/decisions/0137-a-release-is-verified-by-running-the-published-asset.sysml at 249 characters; git add -A then fails with 'unable to index file ... fatal: adding files failed' and the project cannot make its FIRST COMMIT. Discriminated against the alternative explanation: the SAME scaffold at C:/kt1 stages 484 files with exit 0, so this is path length, not a corrupt scaffold. Windows MAX_PATH is 260 and git refuses without core.longpaths=true, which keel init does not set. 150 characters of parent path is not exotic - a user under C:/Users/<name>/Documents/Projects/<client>/<project>/ is most of the way there before keel adds 100 of its own. THE SHAPE OF THE FIX IS A CHOICE, not obvious: set core.longpaths in the project keel init creates (only helps if keel owns the git init), shorten reference filenames on copy (changes a stable path downstream readers may cite), or DETECT the margin at init and refuse loudly rather than let the failure surface as an opaque git error later. Refusing loudly is the honest floor: a project that cannot commit is not initialised, whatever else succeeded.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue313;
+
+    part issue314 : Issue {
+        :>> id = "39a31cb5-85c4-461f-9972-582a56813240";
+        :>> title = "keel migrate silently reverts a project's adoption choices: engine resync overwrites project-owned contracts";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND BY THE FEDERATION SUITE (F9), which exists because the propriety panel returned UNSOUND on the design for testing a project only at birth (pf42). step_engine_resync copies every shipped engine file over the project's copy, and .engine/contracts/ is shipped - so keel migrate overwrote activation.toml, adoption-profile.toml, engine-version.toml, installed-units.toml, github-actors.toml and parser-coverage-baseline.toml with the engine's defaults. DEMONSTRATED on a real project: deactivate render, commit, migrate - and render was ACTIVE again. THE DIRECTION THAT MATTERS MORE is the other one: where the engine's default has FEWER active processes than the project, migrate silently DISARMS controls the project had on, with no Decision anywhere - the unsigned control-weakening the keystone lock and audit-adherence exist to catch, arriving through a path neither of them watches. github-actors.toml is worse still: it declares WHO MAY DECIDE on the decision channel. FIXED: is_project_owned_contract - the engine ships a default so a fresh init has one, and resync ADDS it if absent but never overwrites it. The rule is 'a keel COMMAND writes this file'. Held by F9, which now asserts the deactivation survives the upgrade. THIS DESCRIPTION WAS REPAIRED (2026-08-30): its first version was written with backticks inside a double-quoted shell argument, so the shell EXECUTED them and substituted their stdout into the record - and also ran deactivate against this repository, whose activation.toml was restored from git. Third occurrence of a documented trap; routed to issue316.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue314;
+
+    part issue315 : Issue {
+        :>> id = "b7350b86-7701-4ead-bfb9-156c2bb29ac4";
+        :>> title = "A documented trap fired a third time because its fix was applied to the instance, not the class";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "THIRD OCCURRENCE of a trap that already has a fix. Prose passed to a write command as a double-quoted shell argument has its backticks EXECUTED by the shell, and the command's stdout is substituted into the governance record in place of the author's words. D0224 fixed this for `record decision` by adding --from FILE after it happened twice. `record issue` was left on the argument path, and on 2026-08-30 it fired again while recording issue314: the shell ran `keel deactivate render` and `keel migrate`, substituted their output into the description, AND modified this repository's keystone-locked activation.toml, which had to be restored from git. The record was repaired by hand and says so. THE LESSON IS NOT 'be careful with backticks'. That is manual vigilance, which D0047 rejects as a control, and my own memory already carries the warning verbatim - it did not help. The lesson is that D0224 fixed the INSTANCE (decisions) and not the CLASS (every write path that takes prose as an argument). FIXED HERE: `record issue --description-from FILE`, mirroring the decision path, with the argument form still accepted for one-liners and its usage text naming the hazard. STILL OPEN as the class: any other write path taking prose by argument. The honest closure is a check that no write command accepts a long prose field by argument alone - which needs an inventory of write paths, so it is named here rather than claimed.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcNoOpInvarianceControl to issue315;
 }

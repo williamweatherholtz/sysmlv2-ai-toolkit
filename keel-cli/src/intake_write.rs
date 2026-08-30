@@ -26,8 +26,12 @@ pub struct NewStatement<'a> {
     pub said_by: &'a str,
     /// ISO-8601 date they said it.
     pub said_at: &'a str,
-    /// `chat` | `console` | `deck` | `commitReview` | `other`.
+    /// A `StatementChannel` member. Validated against the SCHEMA, never a constant here (D0150) —
+    /// which is why adding `github` needed no change to this file.
     pub channel: &'a str,
+    /// The utterance's durable external address, where it has one (a GitHub issue URL). `None` for
+    /// a spoken statement — never defaulted, because a fabricated source is worse than no source.
+    pub source_url: Option<&'a str>,
     /// A short human label for the statement — the AI's summary, kept separate from `text`.
     pub title: &'a str,
     /// Recording actor.
@@ -155,6 +159,18 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
     }
     let path = intake_file(root, s.created_at);
     with_file_lock(&root.join(".tracking").join("issues.sysml"), || {
+        // IDEMPOTENCY, checked INSIDE the lock (issue185): two concurrent ingests of one issue must
+        // not both find it absent. A re-ingest is refused, not silently deduplicated — the caller
+        // asked to record an utterance that is already recorded, and a write that quietly does
+        // nothing while reporting success is the failure mode `keel deactivate` once had.
+        if let Some(url) = s.source_url {
+            let corpus = all_tracking_text(root);
+            if corpus.contains(&format!("sourceUrl = \"{}\"", crate::write::sanitize_public(url))) {
+                return Err(WriteError::Parse(format!(
+                    "an utterance from {url} is already recorded — re-ingesting would store the same                      words twice under two ids. Nothing was written."
+                )));
+            }
+        }
         let name = format!("st{:03}", next_number(&all_tracking_text(root), "part st"));
         let existing = ensure_intake_package(&path, s.created_at);
         let block = format!(
@@ -163,7 +179,7 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
              \x20       :>> title = \"{}\";\n\
              \x20       :>> createdAt = \"{}\"; :>> createdBy = \"{}\";\n\
              \x20       :>> text = \"{}\";\n\
-             \x20       :>> saidBy = \"{}\"; :>> saidAt = \"{}\"; :>> channel = StatementChannel::{};\n\
+             \x20       :>> saidBy = \"{}\"; :>> saidAt = \"{}\"; :>> channel = StatementChannel::{};{}\n\
              \x20   }}\n",
             gen_uuid(),
             crate::write::sanitize_public(s.title),
@@ -173,6 +189,9 @@ pub fn record_statement(root: &Path, s: &NewStatement) -> Result<(String, String
             s.said_by,
             s.said_at,
             s.channel,
+            s.source_url.map_or_else(String::new, |u| {
+                format!("\n\x20       :>> sourceUrl = \"{}\";", crate::write::sanitize_public(u))
+            }),
         );
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -274,7 +293,7 @@ mod tests {
                 text: "just leave me as the decision maker.",
                 said_by: "wweatherholtz",
                 said_at: "2026-08-26",
-                channel: "chat",
+                channel: "chat", source_url: None,
                 title: "leave me as the only decider",
                 author: "claudeFable5",
                 created_at: "2026-08-26",
@@ -329,11 +348,11 @@ mod tests {
     fn an_unknown_channel_or_implication_is_refused_rather_than_defaulted() {
         let r = root("enum");
         assert!(record_statement(&r, &NewStatement {
-            text: "x", said_by: "w", said_at: "2026-08-26", channel: "smoke-signal",
+            text: "x", source_url: None, said_by: "w", said_at: "2026-08-26", channel: "smoke-signal",
             title: "t", author: "a", created_at: "2026-08-26",
         }).is_err(), "an unknown channel must refuse, never default - the channel is provenance");
         assert!(record_statement(&r, &NewStatement {
-            text: "   ", said_by: "w", said_at: "2026-08-26", channel: "chat",
+            text: "   ", said_by: "w", said_at: "2026-08-26", channel: "chat", source_url: None,
             title: "t", author: "a", created_at: "2026-08-26",
         }).is_err(), "empty text records nothing and must say so");
         let _ = std::fs::remove_dir_all(&r);
@@ -371,7 +390,7 @@ mod tests {
         }
         for m in crate::schema::enum_members("StatementChannel") {
             let out = record_statement(&r, &NewStatement {
-                text: "x", said_by: "w", said_at: "2026-08-26", channel: &m,
+                text: "x", source_url: None, said_by: "w", said_at: "2026-08-26", channel: &m,
                 title: "t", author: "a", created_at: "2026-08-26",
             });
             assert!(out.is_ok(), "StatementChannel::{m} is declared but refused: {out:?}");

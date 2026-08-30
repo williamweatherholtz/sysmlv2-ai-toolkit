@@ -97,6 +97,31 @@ pub fn remap_engine_content(rel: &Path, contents: &str) -> Option<String> {
     renamed.then_some(out)
 }
 
+/// Contracts under `.engine/contracts/` that are the PROJECT'S state, not the engine's content.
+///
+/// The engine ships a default for each so a fresh `keel init` has one; from then on the file is
+/// written by the project's own commands and an engine resync must never overwrite it. Determined
+/// by the rule "a keel COMMAND writes this file": `activate`/`deactivate` write activation,
+/// `init`/`migrate` write the pin, `import`/`publish` write the install record, `init` writes the
+/// adoption profile, the decision channel reads the actor map, and the parser baseline is a ratchet
+/// over the project's OWN corpus.
+///
+/// issue315, found by the federation suite: `keel migrate` reverted a project's deactivation of
+/// `render` — silently re-arming a control the project had turned off, and equally able to disarm
+/// one it had on.
+fn is_project_owned_contract(mapped: &Path) -> bool {
+    const PROJECT_OWNED: [&str; 6] = [
+        "activation.toml",
+        "adoption-profile.toml",
+        "engine-version.toml",
+        "installed-units.toml",
+        "github-actors.toml",
+        "parser-coverage-baseline.toml",
+    ];
+    mapped.parent().is_some_and(|p| p.ends_with("contracts"))
+        && mapped.file_name().and_then(|f| f.to_str()).is_some_and(|f| PROJECT_OWNED.contains(&f))
+}
+
 /// Engine-DEV-only embedded paths EXCLUDED from the scaffold (D0093 boundary): the kernel/Python
 /// toolchain and any compiled-Python cache. Downstream projects use the Rust path (D0048).
 ///
@@ -446,6 +471,15 @@ fn step_engine_resync(root: &Path, engine: &Dir) -> StepPlan {
             return; // instance-specific — a project's own manifest is never overwritten
         }
         let dst = dst_engine.join(&mapped);
+        // PROJECT-OWNED CONTRACTS ARE ADDED, NEVER OVERWRITTEN (issue315). The engine ships a
+        // default so a fresh `init` has one; after that the file is the PROJECT'S state, written by
+        // the project's own commands. Resyncing it reverts choices nobody revisited: a project that
+        // deactivated a process had it silently switched back ON by `keel migrate` — demonstrated,
+        // not hypothetical — and the same path can silently switch a control OFF, which is the
+        // unsigned control-weakening the keystone lock exists to prevent.
+        if is_project_owned_contract(&mapped) && dst.exists() {
+            return;
+        }
         let Ok(shipped_text) = std::str::from_utf8(f.contents()) else { return };
         // issue291: compare the TRANSFORMED content, so this step IS the migration for a project
         // inited before the rename existed - and a no-op for one inited after it.

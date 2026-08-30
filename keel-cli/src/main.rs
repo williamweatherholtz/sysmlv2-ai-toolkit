@@ -2595,6 +2595,7 @@ fn cmd_record_statement(args: &[String]) -> i32 {
             said_by: &said_by,
             said_at: &said_at,
             channel: &channel,
+            source_url: flag(args, "source-url").as_deref(),
             title: &title,
             author: &author,
             created_at: &created_at,
@@ -3273,8 +3274,36 @@ declaredAt = \"{}\"
 ///
 /// Lifted out of `cmd_init` when adding the D0225 step pushed it past the line limit - it is
 /// narration, not logic, and it is the FIRST thing a newcomer reads.
+/// Warn when the scaffold's own deepest path leaves too little room under the host's path limit.
+///
+/// issue313, found by federation reconnaissance: at a 150-character parent directory, the shipped
+/// `.engine/reference/decisions/0137-a-release-is-verified-by-running-the-published-asset.sysml`
+/// reaches 249 characters and `git add -A` FAILS — so the project cannot make its FIRST COMMIT, and
+/// the failure surfaces much later as an opaque `unable to index file`. keel does not own the git
+/// repository and cannot set `core.longpaths` for it, but it can refuse to let this be discovered
+/// the hard way. The warning names the remedy; it does not block, because a project that never uses
+/// git is unaffected and a lockout here would be worse than the defect.
+fn warn_if_paths_are_near_the_limit(dir: &Path) {
+    const LIMIT: usize = 260;
+    const HEADROOM: usize = 20;
+    if !cfg!(windows) {
+        return;
+    }
+    let longest = keel_cli::walk_longest(dir);
+    if longest + HEADROOM < LIMIT {
+        return;
+    }
+    println!();
+    println!("  WARNING — this project's deepest file path is {longest} characters, and Windows");
+    println!("  refuses paths at {LIMIT}. `git add` will FAIL here with `unable to index file`, so the");
+    println!("  project cannot make its first commit (issue313). Either move it to a shorter parent");
+    println!("  directory, or enable long paths before committing:");
+    println!("      git config --global core.longpaths true");
+}
+
 fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
     println!("Scaffolded the engine into {} ({count} engine file(s)). Adoption profile: {profile} (declared).", dir.display());
+    warn_if_paths_are_near_the_limit(dir);
     println!();
     println!("Next:");
     println!("  1. cd {}", dir.display());
@@ -3834,10 +3863,27 @@ fn cmd_migrate(args: &[String]) -> i32 {
 fn cmd_record_issue(args: &[String]) -> i32 {
     let root = flag(args, "root").map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
     let req = |n: &str| flag(args, n);
+    // PROSE COMES FROM A FILE (D0224, extended here to `issue`). The decision path got this after
+    // shell backticks inside a double-quoted `--description` EXECUTED and injected tool output into
+    // a governance record. `issue` was left on the argument path and the same trap fired a third
+    // time on 2026-08-30 — corrupting issue314's own description and running `keel deactivate`
+    // against this repository. A trap that recurs after its fix is a fix that was applied to the
+    // instance instead of the class (issue316).
+    let description = flag(args, "description-from")
+        .and_then(|f| match std::fs::read_to_string(&f) {
+            Ok(t) => Some(t.trim().to_string()),
+            Err(e) => {
+                eprintln!("record issue: cannot read {f}: {e}");
+                None
+            }
+        })
+        .or_else(|| flag(args, "description"));
     let (Some(title), Some(description), Some(severity), Some(resolver)) =
-        (req("title"), req("description"), req("severity"), req("resolver"))
+        (req("title"), description, req("severity"), req("resolver"))
     else {
         eprintln!("error: --title --description --severity --resolver are all required.");
+        eprintln!("  PREFER --description-from FILE for anything long: prose passed as a shell argument");
+        eprintln!("  has had its backticks EXECUTED into the record three times now (D0224/issue316).");
         eprintln!("  --resolver names the EXISTING item that resolves this issue. It is required because the");
         eprintln!("  `issues` guard fails on an untriaged Issue, so recording one without triage would hand you");
         eprintln!("  a red gate as the command's output (D0077).");
@@ -4031,6 +4077,7 @@ const CATALOGUE: &[&str] = &[
     "  ls [ROOT]                    list .tracking/ .sysml files",
     "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
     "  whats-next [ROOT]            print ready task names (one per line)",
+    "  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours (D0263)",
     "  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed (D0221)",
     "  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them (D0219). An unmapped login is refused, never defaulted",
     "  github-decision-id <id>      split a channel decision id into project<TAB>name - `alpha/d0001` in a workspace, `d0001` alone (D0234)",
@@ -4378,6 +4425,16 @@ fn main() {
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
+        Some("github-ingest") => {
+            // ROOT is an explicit --root, never a trailing positional: the trailing argument here is
+            // the value of --at, and guessing it as a path made the command fail with an opaque
+            // filesystem error on its very first live run.
+            let root = resolve_guard_root(
+                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
+            )
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+            keel_cli::github_ingest::cmd(rest, &root)
+        }
         Some("github-decision-id") => keel_cli::github::decision_id_cmd(rest),
         Some("github-decider") => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
