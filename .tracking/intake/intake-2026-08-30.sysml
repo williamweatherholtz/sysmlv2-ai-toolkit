@@ -27,4 +27,26 @@ package ProjectIntake20260830 {
     #DerivedFrom dependency from us053 to st037;
 
     #Implicates dependency from us053 to d0260;
+
+    part st038 : Statement {
+        :>> id = "552fde3c-fdaa-437f-868a-6bd77ed63ed7";
+        :>> title = "What control prevents the regenerate-from-model class in future?";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> text = "solid what to prevent this in the future?";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-30"; :>> channel = StatementChannel::chat;
+    }
+
+    part us054 : UserStory {
+        :>> id = "48088f73-5b26-47de-b8c2-c3aac0813fc8";
+        :>> title = "No-op invariance becomes the control for regenerate-from-model writers";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "a control that prevents a writer silently dropping facts it cannot represent";
+        :>> soThat = "the next such defect fails a test instead of waiting for a locked file to change";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "process and not bug: the defect itself (issue293) is already resolved; what they are asking for is the standing prevention, which is a control plus its coverage floor. Routed to issue310, the generalisation filed from issue293's retro, rather than opening a new item - one governance home per defect class.";
+    }
+    #DerivedFrom dependency from us054 to st038;
+
+    #Implicates dependency from us054 to issue310;
 }

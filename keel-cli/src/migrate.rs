@@ -656,6 +656,35 @@ pub fn check_preconditions(root: &Path, dry_run: bool) -> Option<Refusal> {
 
 // ── the command ──────────────────────────────────────────────────────────────
 
+/// Re-stamp the binding engine pin, PRESERVING an existing file: only the `engine =` line is
+/// rewritten, so comments and any other key the project added survive.
+///
+/// Regenerating it from `fresh` instead is the issue293 class — a writer rebuilding a
+/// human-editable file from the engine's model of it drops whatever that model cannot represent.
+/// This instance was found by the no-op invariance floor (issue310), not by a second field
+/// incident, which is the whole point of having the floor. `fresh` is used only when no pin file
+/// exists yet.
+fn restamp_pin(root: &Path, fresh: &str) -> std::io::Result<()> {
+    let path = root.join(".engine").join("contracts").join("engine-version.toml");
+    let stamp = std::fs::read_to_string(&path).map_or_else(
+        |_| fresh.to_string(),
+        |existing| {
+            existing
+                .split_inclusive('\n')
+                .map(|line| {
+                    if line.trim_start().starts_with("engine") && line.contains('=') {
+                        let eol = &line[line.trim_end().len()..];
+                        format!("engine = \"{}\"{eol}", env!("CARGO_PKG_VERSION"))
+                    } else {
+                        line.to_string()
+                    }
+                })
+                .collect()
+        },
+    );
+    std::fs::write(&path, stamp)
+}
+
 /// `keel migrate [ROOT] [--dry-run]`. Returns the process exit code.
 ///
 /// Order is deliberate: refuse, then PLAN and print, then apply. The plan is always shown before
@@ -753,6 +782,7 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     // stamp means: it is no longer a parity-warning input but a BINDING pin — a binary whose version
     // differs from it now REFUSES writes and gates (reads warn; `version`/`migrate` never refuse).
     // Migrate is the repair path, so migrate is where an existing project hears about the change.
+    // (`restamp_pin` below PRESERVES an existing pin file — see its doc comment.)
     println!(
         "note (D0251): engine-version.toml is now BINDING — a binary that does not match the stamped {} will REFUSE writes and gates on this tree (reads warn; `keel migrate` re-stamps).",
         env!("CARGO_PKG_VERSION")
@@ -761,8 +791,7 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         "# engine-version - the BINDING engine pin: the version whose writes and gates this project accepts\n# (D0190 stamped it; D0251 made it bite). Written by `keel init`, re-stamped by `keel migrate`; a\n# mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin (D0251 B).\nengine = \"{}\"\n",
         env!("CARGO_PKG_VERSION")
     );
-    let stamp_path = root.join(".engine").join("contracts").join("engine-version.toml");
-    if let Err(e) = std::fs::write(&stamp_path, stamp) {
+    if let Err(e) = restamp_pin(root, &stamp) {
         eprintln!("keel migrate: migration complete but the version re-stamp failed ({e}) - the parity warning will keep firing until engine-version.toml is updated.");
     }
     println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
