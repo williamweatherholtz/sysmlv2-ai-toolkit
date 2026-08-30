@@ -47,6 +47,14 @@ package EngineAgileProcess {
         :>> cadence = Cadence::continuous;
         // APPLIES-WHEN: work arrives faster than it is finished, so what to do next has to be computed from a ranked frontier instead of chosen from a pile
     }
+    action refineAssessPriority : ProcessStep {
+        :>> id = "d0258a01-0829-4e5a-b1c2-3f4a5b6c7d8e";
+        :>> title = "Assess priority against the computed signals (D0258)";
+        :>> triggerCondition = "Refinement touches the backlog, or the priority-inversion guard carries a standing warning.";
+        :>> actionText = "Rank is DECLARATION ORDER (D0052) and it decays: work lands appended, so unattended order encodes arrival, not priority. Assess against the COMPUTED signals, never taste: resolver severity first (Critical > High > Medium > no-issue - the priority-inversion guard's warnings are this signal already spoken), then the human's standing direction, then stability within class. REORDER the backlog blocks; discharge every inversion warning or say in the block comment why an inversion is deliberate. The reorder comment names the signal that drove it. Found live (st035): a Critical resolver had decayed to rank 16, below two no-issue items, while the guard had been warning for weeks - a warning nobody acts on is arrival order with extra steps.";
+        :>> producedArtifact = "A frontier whose order is an assessed judgment, with zero undischarged inversion warnings.";
+        :>> owner = Owner::either;
+    }
     action refineCriteria : ProcessStep {
         :>> id = "c9bef132-83ef-44df-a312-24211035a191";
         :>> title = "Acceptance criteria as Tests";

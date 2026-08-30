@@ -79,4 +79,26 @@ package ProjectIntake20260829 {
     #DerivedFrom dependency from us050 to st034;
 
     #Implicates dependency from us050 to d0250;
+
+    part st035 : Statement {
+        :>> id = "d3cfe062-667b-4569-8cfb-372fcd9193ee";
+        :>> title = "Reorder the backlog now, and make priority assessment a step of the agile process";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> text = "reorder - assessing priority should be part of our agile process.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-29"; :>> channel = StatementChannel::chat;
+    }
+
+    part us051 : UserStory {
+        :>> id = "3495cad7-f0e6-43c4-979f-1ec37645c650";
+        :>> title = "Priority assessment is a refinement step, driven by the computed signals";
+        :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "the backlog reordered now, and priority assessment made a standing part of the agile process";
+        :>> soThat = "the frontier's order stays a judgment rather than decaying to arrival order";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "process and not priority: their sentence carries both, and the reorder itself is the priority half - executed under the new step so the recurring half does not stay conversational (D0040). The step obliges the AI to read the signal the engine already computes; the priority-inversion guard had been warning for weeks into the void.";
+    }
+    #DerivedFrom dependency from us051 to st035;
+
+    #Implicates dependency from us051 to d0258;
 }
