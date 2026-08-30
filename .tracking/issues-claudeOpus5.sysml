@@ -300,5 +300,8 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from dcNoOpInvarianceControl to issue317;
+    // Re-pointed 2026-08-30: issue317 was filed against the nearest AVAILABLE resolver because
+    // `record issue` requires one, which is the very antipattern the github-intake process warns
+    // about (an issue routed to a resolver that will not resolve it looks handled and is not).
+    #Resolves dependency from dcBatchedGovernanceIndex to issue317;
 }

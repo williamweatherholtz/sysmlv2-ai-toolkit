@@ -8,6 +8,7 @@
 //! plus D0050 deliverable-source drift) — a deliberate SUPERSET of query.py suspect, NOT
 //! byte-parity, per D0076 (orient is the single source of truth for suspect).
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::algo::{is_word, story_names};
@@ -63,6 +64,260 @@ fn git_lines(repo: &Path, args: &[&str]) -> Vec<String> {
 /// The commit that INTRODUCED a named item into `.tracking/delivery` (charter-time anchor).
 fn item_intro_commit(repo: &Path, name: &str) -> Option<String> {
     git_lines(repo, &["log", "--format=%H", "--reverse", "-S", name, "--", ".tracking/delivery"]).into_iter().next()
+}
+
+// ── the batched index (issue317) ──────────────────────────────────────────────────────────────
+//
+// The per-item resolver is CORRECT and unusable at corpus scale: each item costs a pickaxe search
+// over full history plus one `merge-base` per process-change Decision, so 501 stories cost roughly
+// fifty thousand git subprocesses. Measured: `reprocess-candidates` did not finish in 240 seconds
+// (exit 124, zero bytes), which means the question it answers — what was authored under a process
+// version since superseded — had never been answered on this project.
+//
+// Nothing about the DERIVATION changes here. The same facts are read from the same history; they
+// are read ONCE into memory instead of once per item. The equality of the two paths is asserted by
+// test, because a fast lens that quietly answers differently is worse than a slow correct one.
+
+/// Commit ancestry plus name-introduction, read in a fixed number of git calls.
+pub struct GovernIndex {
+    /// For each MARKER commit (a process-def change or a Decision's effective commit), every commit
+    /// that has it as an ancestor. `is_ancestor(marker, x)` becomes a set lookup.
+    descendants: HashMap<String, HashSet<String>>,
+    /// Item name -> the commit that introduced it under `.tracking/delivery`.
+    intro: HashMap<String, String>,
+    /// Process-def path -> the commits that changed it, newest-first.
+    def_commits: HashMap<String, Vec<String>>,
+    /// Every commit reachable from HEAD — the validity set `git_sha_valid` would answer one at a time.
+    known: HashSet<String>,
+    /// Item -> the Decision that charters it, read from the working tree rather than `git grep`.
+    charter: HashMap<String, String>,
+    /// Decision -> the commit that introduced its file.
+    decision_intro: HashMap<String, String>,
+    /// Commit -> the process/workflow definition files it touched.
+    commit_defs: HashMap<String, Vec<String>>,
+}
+
+impl GovernIndex {
+    fn is_ancestor(&self, marker: &str, commit: &str) -> bool {
+        self.descendants.get(marker).is_some_and(|d| d.contains(commit))
+    }
+    fn sha_valid(&self, sha: &str) -> bool {
+        // A short sha is stored in most records; match by prefix against the known set.
+        self.known.contains(sha) || self.known.iter().any(|k| k.starts_with(sha))
+    }
+}
+
+/// `parent -> children`, from one `git rev-list --parents HEAD`.
+fn child_map(repo: &Path) -> (HashMap<String, Vec<String>>, HashSet<String>) {
+    let mut children: HashMap<String, Vec<String>> = HashMap::new();
+    let mut known = HashSet::new();
+    for line in git_lines(repo, &["rev-list", "--parents", "HEAD"]) {
+        let mut it = line.split_whitespace();
+        let Some(commit) = it.next() else { continue };
+        known.insert(commit.to_string());
+        for parent in it {
+            children.entry(parent.to_string()).or_default().push(commit.to_string());
+        }
+    }
+    (children, known)
+}
+
+/// Every commit reachable FORWARD from `marker` — i.e. every commit `marker` is an ancestor of.
+fn descendants_from(children: &HashMap<String, Vec<String>>, marker: &str) -> HashSet<String> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut stack = vec![marker.to_string()];
+    while let Some(c) = stack.pop() {
+        if !seen.insert(c.clone()) {
+            continue;
+        }
+        if let Some(kids) = children.get(&c) {
+            stack.extend(kids.iter().cloned());
+        }
+    }
+    seen
+}
+
+/// The commit that introduced each of `names`, from ONE pass over `.tracking/delivery` history.
+///
+/// Faithful to the pickaxe it replaces: `git log -S <name>` finds the first commit where the string
+/// appears, so this scans ADDED lines and tokenises them, recording the OLDEST commit in which a
+/// name appears. The log is newest-first, so the last sighting wins.
+fn intro_commits(repo: &Path, names: &HashSet<String>) -> HashMap<String, String> {
+    const MARK: &str = "__keelcommit__";
+    let raw = crate::perf::timed(&crate::perf::GIT_NANOS, || {
+        crate::gitx::git()
+            .arg("-C")
+            .arg(repo)
+            .args(["log", &format!("--format={MARK}%H"), "-p", "-U0", "--", ".tracking/delivery"])
+            .output()
+    });
+    let Ok(out) = raw else { return HashMap::new() };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut intro: HashMap<String, String> = HashMap::new();
+    let mut commit = String::new();
+    for line in text.lines() {
+        if let Some(sha) = line.strip_prefix(MARK) {
+            commit = sha.trim().to_string();
+            continue;
+        }
+        // Only ADDED content introduces a name; `+++` is the file header, not content.
+        let Some(added) = line.strip_prefix('+') else { continue };
+        if added.starts_with("++") {
+            continue;
+        }
+        for word in added.split(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
+            if !word.is_empty() && names.contains(word) {
+                intro.insert(word.to_string(), commit.clone());
+            }
+        }
+    }
+    intro
+}
+
+/// `#CharteredBy` edges read from the WORKING TREE, not from `git grep` — the edges are current
+/// facts, and the per-item resolver was grepping HEAD once per item to learn the same thing.
+fn charter_edges(root: &Path) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for path in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        for line in text.lines() {
+            if let Some(rest) = line.trim().strip_prefix("#CharteredBy dependency from ") {
+                if let Some((item, decision)) = rest.split_once(" to ") {
+                    out.insert(item.trim().to_string(), decision.trim_end_matches(';').trim().to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Decision id -> introducing commit, from one `git log --diff-filter=A` over `.engine/decisions`.
+fn decision_intro_commits(repo: &Path) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    let mut commit = String::new();
+    for line in git_lines(
+        repo,
+        &["log", "--format=__C__%H", "--name-only", "--diff-filter=A", "--", ".engine/decisions"],
+    ) {
+        if let Some(sha) = line.strip_prefix("__C__") {
+            commit = sha.trim().to_string();
+        } else if let Some(file) = std::path::Path::new(&line).file_name().and_then(|f| f.to_str()) {
+            // `0261-slug.sysml` -> `d0261`
+            let digits: String = file.chars().take_while(char::is_ascii_digit).collect();
+            if digits.len() == 4 {
+                out.insert(format!("d{digits}"), commit.clone());
+            }
+        }
+    }
+    out
+}
+
+/// Commit -> process/workflow definition files it touched, and the inverted def -> commits map.
+fn def_touch_maps(repo: &Path) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    let (mut by_commit, mut by_def): (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) =
+        (HashMap::new(), HashMap::new());
+    let mut commit = String::new();
+    for line in git_lines(
+        repo,
+        &["log", "--format=__C__%H", "--name-only", "--", ".engine/processes", ".engine/workflows"],
+    ) {
+        if let Some(sha) = line.strip_prefix("__C__") {
+            commit = sha.trim().to_string();
+        } else if std::path::Path::new(&line).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")) {
+            by_commit.entry(commit.clone()).or_default().push(line.clone());
+            by_def.entry(line.clone()).or_default().push(commit.clone());
+        }
+    }
+    (by_commit, by_def)
+}
+
+/// Build the index once for a whole-corpus run: a fixed number of git calls regardless of how many
+/// items are resolved afterwards. Private: the two public entry points are the only callers, so the
+/// index cannot be built inconsistently from outside.
+fn build_index(root: &Path, names: &HashSet<String>, markers: &HashSet<String>) -> GovernIndex {
+    let (children, known) = child_map(root);
+    let mut descendants = HashMap::new();
+    let (commit_defs, def_commits) = def_touch_maps(root);
+    let decision_intro = decision_intro_commits(root);
+    // Markers are the commits ancestry is ever tested against: every def-change commit, plus each
+    // Decision's effective commit. Expanding them here means no `merge-base` runs per item.
+    let mut all_markers: HashSet<String> = markers.clone();
+    for commits in def_commits.values() {
+        all_markers.extend(commits.iter().cloned());
+    }
+    for m in &all_markers {
+        let full = if known.contains(m) {
+            Some(m.clone())
+        } else {
+            known.iter().find(|k| k.starts_with(m.as_str())).cloned()
+        };
+        if let Some(full) = full {
+            descendants.insert(m.clone(), descendants_from(&children, &full));
+        }
+    }
+    GovernIndex {
+        descendants,
+        intro: intro_commits(root, names),
+        def_commits,
+        known,
+        charter: charter_edges(root),
+        decision_intro,
+        commit_defs,
+    }
+}
+
+/// The indexed twin of [`govern_resolve`] — same derivation, no per-item git.
+fn govern_resolve_indexed(idx: &GovernIndex, pcs: &[ProcChange], item: &str) -> GovernData {
+    let governing_def = idx
+        .charter
+        .get(item)
+        .and_then(|d| idx.decision_intro.get(d))
+        .and_then(|c| idx.commit_defs.get(c))
+        .and_then(|defs| defs.first().cloned())
+        .unwrap_or_else(|| GOVERNING_PROCESS_STORY.to_string());
+    let Some(item_commit) = idx.intro.get(item).cloned() else {
+        return GovernData {
+            governing_def,
+            item: item.to_string(),
+            error: Some("no introduction commit found in .tracking/delivery".to_string()),
+            item_commit: None,
+            governing: None,
+            later_count: 0,
+            in_force: Vec::new(),
+            after: Vec::new(),
+            reprocess: Vec::new(),
+        };
+    };
+    let empty = Vec::new();
+    let def_commits = idx.def_commits.get(&governing_def).unwrap_or(&empty);
+    let governing = def_commits.iter().find(|c| idx.is_ancestor(c, &item_commit)).cloned();
+    let later_count = def_commits.iter().filter(|c| !idx.is_ancestor(c, &item_commit)).count();
+
+    let (mut in_force, mut after) = (Vec::new(), Vec::new());
+    for d in pcs {
+        let Some(ec) = &d.effective_commit else { continue };
+        if !idx.sha_valid(ec) {
+            continue;
+        }
+        if idx.is_ancestor(ec, &item_commit) {
+            in_force.push(d.decision.clone());
+        } else {
+            after.push((d.decision.clone(), d.retroactivity.clone()));
+        }
+    }
+    let mut reprocess: Vec<String> = after.iter().filter(|(_, r)| r == "safety").map(|(d, _)| d.clone()).collect();
+    reprocess.sort();
+    GovernData {
+        governing_def,
+        item: item.to_string(),
+        error: None,
+        item_commit: Some(item_commit),
+        governing,
+        later_count,
+        in_force,
+        after,
+        reprocess,
+    }
 }
 
 /// Commits that changed a process-def file, newest-first.
@@ -345,6 +600,21 @@ fn governing_version_json(d: &GovernData) -> Json {
 
 // ── public subcommands ────────────────────────────────────────────────────────
 
+/// The INDEXED twin of [`governing_version`], returning the identical JSON.
+///
+/// Not the default for a single item: building the index costs one full `git log -p` over delivery
+/// history, which is more than the ~15s a single per-item resolve takes. It exists so the two paths
+/// can be compared for EQUALITY by test — a fast lens that quietly answers differently is worse
+/// than a slow correct one, and without this the batched path would be trusted on its speed alone.
+#[must_use]
+pub fn governing_version_via_index(root: &Path, item: &str) -> String {
+    let pcs = proc_change_decisions(root);
+    let names: HashSet<String> = std::iter::once(item.to_string()).collect();
+    let markers: HashSet<String> = pcs.iter().filter_map(|p| p.effective_commit.clone()).collect();
+    let idx = build_index(root, &names, &markers);
+    governing_version_json(&govern_resolve_indexed(&idx, &pcs, item)).dump()
+}
+
 /// The process version governing `item` as-of its charter (D0068), as JSON — byte-identical to
 /// `query.py governing-version <item>`.
 #[must_use]
@@ -358,9 +628,15 @@ pub fn governing_version(root: &Path, item: &str) -> String {
 #[must_use]
 pub fn reprocess_candidates(root: &Path) -> String {
     let pcs = proc_change_decisions(root);
+    let stories = all_delivery_stories(root);
+    // ONE index for the whole corpus (issue317). The per-item path costs a pickaxe search plus a
+    // `merge-base` per Decision; at 501 stories that never finished.
+    let names: HashSet<String> = stories.iter().cloned().collect();
+    let markers: HashSet<String> = pcs.iter().filter_map(|p| p.effective_commit.clone()).collect();
+    let idx = build_index(root, &names, &markers);
     let mut items: Vec<Json> = Vec::new();
-    for story in all_delivery_stories(root) {
-        let d = govern_resolve(root, &pcs, &story);
+    for story in stories {
+        let d = govern_resolve_indexed(&idx, &pcs, &story);
         if !d.reprocess.is_empty() {
             items.push(Json::Obj(vec![
                 ("item".to_string(), Json::s(story)),
