@@ -27,6 +27,14 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
         run: cargo test --workspace --release
+        env:
+          # The federation suite's LIVE claim (F6) exercises the real GitHub contract, and pf44
+          # ruled that skipping it silently while reporting green proves nothing. `gh` on a runner
+          # refuses without this, so the token is supplied and the claim actually RUNS rather than
+          # being declared offline. The alternative — KEEL_FEDERATION_OFFLINE=1 — is a DECLARED skip
+          # and strictly weaker: it would leave the only assertion touching real GitHub unexercised
+          # in the one place that runs on every push. Read-only, repo-scoped, public repository.
+          GH_TOKEN: ${{ github.token }}
       - name: keel gates (kernel-free backstop — SKIP_VALIDATE can't bypass CI)
         run: |
           ./target/release/keel validate .

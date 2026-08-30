@@ -304,4 +304,15 @@ package IssuesClaudeOpus5 {
     // `record issue` requires one, which is the very antipattern the github-intake process warns
     // about (an issue routed to a resolver that will not resolve it looks handled and is not).
     #Resolves dependency from dcBatchedGovernanceIndex to issue317;
+
+    part issue318 : Issue {
+        :>> id = "219bc82c-091c-4777-ba90-1434843bbabd";
+        :>> title = "keel land reports success on a push whose CI it never looked at";
+        :>> createdAt = "2026-08-30";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CI was red for seven hours across five pushes and nothing noticed. The human noticed. WHY EVERY SIGNAL SAID FINE. The local gate is thorough - validate, 56 guards, check-engine, rules --enforce, clippy - and it passed every time, because the three failing cases were ENVIRONMENT-dependent and this machine has a configured library, a global git identity and an authenticated gh. `keel land` reports 'landed' on a successful PUSH, which is where its knowledge stops. Green locally, push succeeded, command said landed, CI red. THE GAP IS PRECISE: land makes a claim about a GIT OPERATION while reading as a claim about the tree's standing. A contributor who runs land and sees 'landed' has been told the thing worked. FIX DIRECTION, and it is a real design choice rather than an obvious patch. (a) land POLLS the resulting run and reports its verdict - accurate, but turns a fast command into a two-minute one and needs a network path that may not exist. (b) land reports the run URL and the PREVIOUS run's verdict, cheap and immediate but tells you about the last push rather than this one. (c) land records the pushed SHA as awaiting CI and the NEXT keel invocation reports any awaited SHA whose run has since failed - cheap, asynchronous, and it surfaces the failure at the start of the next session, which is when someone can act. (c) is the shape that fits how this project is actually used, and it needs no new network call in the hot path. WHATEVER IS CHOSEN MUST NOT BE A REMINDER. D0047 rejects manual vigilance as a control, and my own working memory already carried 'check gh run after EVERY push' verbatim - it did not help for seven hours. The check has to be mechanical and it has to fire where someone will read it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcBatchedGovernanceIndex to issue318;
 }

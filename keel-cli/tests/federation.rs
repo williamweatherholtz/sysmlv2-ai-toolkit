@@ -227,29 +227,37 @@ fn f3b_keels_domain_vocabulary_does_not_leak_into_the_projects_authored_surface(
 // ── F4 — a library unit is picked up, and availability is NOT activation ──────────────────────
 
 #[test]
-fn f4_an_imported_unit_lands_but_its_guards_stay_off_until_activated() {
-    let root = scaffold("import", "proj");
-    let before = run_in(&root, &["process", "show", "exec-summary"]);
-    let imported = run_in(&root, &["process", "import", "--from-library", "exec-summary"]);
-    if !imported.ok && imported.text.contains("no library") {
-        panic!("F4: no library configured on this machine — run `keel library init <remote>`; a \
-                federation claim cannot be satisfied by an absent federation");
-    }
-    assert!(imported.ok, "F4: import must land the unit: {}", imported.text);
-    let after = run_in(&root, &["process", "show", "exec-summary"]);
+fn f4_a_units_guards_are_switchable_and_availability_is_not_activation() {
+    // HERMETIC BY CONSTRUCTION. The first version of this case imported from the DEVELOPER'S
+    // library and panicked on a machine that had none - which is how it broke CI. A federation
+    // claim must not depend on the operator's private state to be checkable.
+    let root = scaffold("activation", "proj");
+    let listed = run_in(&root, &["activation", "."]);
+    assert!(listed.ok, "F4: keel activation must report the project's units: {}", listed.text);
     assert!(
-        after.ok && !before.ok || after.text.len() > before.text.len(),
-        "F4: the unit must be VISIBLE after import and not before — otherwise the test proves only \
-         that the command exits 0: before={} after={}",
-        before.text.len(),
-        after.text.len()
+        listed.text.contains("render"),
+        "F4: precondition - the scaffold ships a SWITCHABLE unit to switch: {}",
+        listed.text
     );
-    // The other half: availability is not activation.
-    let act = run_in(&root, &["activation", "."]);
     assert!(
-        act.ok,
-        "F4: keel activation must report the imported unit's state: {}",
-        act.text
+        listed.text.contains("[active  ] render"),
+        "F4: an undeclared or freshly declared project runs everything it ships: {}",
+        listed.text
+    );
+    let off = run_in(&root, &["deactivate", "render"]);
+    assert!(off.ok, "F4: deactivate must succeed: {}", off.text);
+    let after = run_in(&root, &["activation", "."]);
+    assert!(
+        after.text.contains("[INACTIVE] render"),
+        "F4: AVAILABILITY IS NOT ACTIVATION - the unit is still present and its guards are off.          `keel guard` reports a deactivated unit as NOT ACTIVE rather than skipping it silently: {}",
+        after.text
+    );
+    // And back: a switch that cannot be switched back is a trapdoor, not a switch.
+    let on = run_in(&root, &["activate", "render"]);
+    assert!(on.ok, "F4: activate must succeed: {}", on.text);
+    assert!(
+        run_in(&root, &["activation", "."]).text.contains("[active  ] render"),
+        "F4: and the unit returns to active"
     );
     cleanup(&root);
 }
@@ -287,6 +295,12 @@ fn f5_a_unit_authored_in_one_project_reaches_another_through_the_library() {
     };
     let init_lib = with_home(&base, &["library", "init", remote.to_str().expect("p")]);
     assert!(init_lib.ok, "F5: library init: {}", init_lib.text);
+    // The library CLONE needs an identity of its own: a CI runner has no global git user, so
+    // `publish` exported the unit and then failed to COMMIT it — the export succeeded and the
+    // command still exited non-zero, which is exactly the half-done state the assertion caught.
+    let lib = home.join(".keel").join("library");
+    let _ = Command::new("git").arg("-C").arg(&lib).args(["config", "user.email", "p@e.invalid"]).output();
+    let _ = Command::new("git").arg("-C").arg(&lib).args(["config", "user.name", "probe"]).output();
 
     // PROJECT A authors a process the ENGINE does not ship. This distinction is load-bearing and was
     // learned from this test's first draft: a keel-native process is already in every scaffold, so
