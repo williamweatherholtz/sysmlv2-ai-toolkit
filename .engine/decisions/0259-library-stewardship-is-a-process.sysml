@@ -1,4 +1,4 @@
-// D0259 (PROPOSED — NOT YET ACCEPTED) — Library stewardship becomes a process: publish deliberately, consume knowingly, update explicitly, unit-ify before folklore
+// D0259 (status: the `status` field below is the truth) — Library stewardship becomes a process: publish deliberately, consume knowingly, update explicitly, unit-ify before folklore
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0259Accept event on sign-off.
 package Decision0259 {
@@ -14,10 +14,14 @@ package Decision0259 {
         :>> title = "Library stewardship becomes a process: publish deliberately, consume knowingly, update explicitly, unit-ify before folklore";
         :>> createdAt = "2026-08-29";
         :>> createdBy = "claudeOpus5";
-        :>> status = DecisionStatus::proposed;
+        :>> status = DecisionStatus::accepted;
         :>> context = "The library's mechanics landed and were probe-proven (D0250-D0252), but the discipline around them - when to publish, what a staleness statement obliges, how a project takes an update, when a skill becomes a unit - existed only in conversation, which is the issue245 shape and the D0040 leak: publishing recurred four times on its first day with its method living in chat history. The human selected define-it-now on the program-summary page (st036).";
         :>> decision = "The libraryStewardship process (four steps: lsPublish, lsConsume, lsUpdate, lsStock) with its deploying skill, registered and shipped with the surface. Publish only from landed trees, one commit per changed unit, push as the deliberate fleet-visible act, no-op refusals read as information; sync any time but staleness statements and divergence refusals are obligations; a project updates via import --update plus its gate, committed under the keystone; any reusable skill becomes a UNIT (process + skill + registry + extras) before it spreads as folklore. Published to the library itself, alongside the units it governs.";
         :>> rationale = "The asymmetric shape (loud publish, silent consume) was already D0250's design; this process is where a NEW contributor learns it without reading four decisions. Making the process itself a library unit is the recursion that matters: the discipline for using the library travels IN the library, so a second machine gets the rules with the first sync.";
         :>> consequences = "The catalogue gains library-stewardship (guard-less, transferable). The library gains it as a unit. The 'not governed' column from the program summary - when to publish, when a project pulls, what the no-op obliges - is now governed. This Decision rides the keystone lock for the process-definition addition.";
     }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0259Accept : Test { :>> id = "1b7e3bb3-cbb7-4c90-ab5e-090f8c1aff4a"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/29."; }
+    part d0259AcceptR1 : TestResult { :>> id = "8a65d47b-67d5-4469-8a97-fccd2d32ede7"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "900f69c"; :>> judgedAt = "2026-08-30"; :>> judgedBy = "wweatherholtz"; }
 }
