@@ -66,7 +66,7 @@ fn item_intro_commit(repo: &Path, name: &str) -> Option<String> {
     git_lines(repo, &["log", "--format=%H", "--reverse", "-S", name, "--", ".tracking/delivery"]).into_iter().next()
 }
 
-// ── the batched index (issue317) ──────────────────────────────────────────────────────────────
+// ── the batched index (issue316) ──────────────────────────────────────────────────────────────
 //
 // The per-item resolver is CORRECT and unusable at corpus scale: each item costs a pickaxe search
 // over full history plus one `merge-base` per process-change Decision, so 501 stories cost roughly
@@ -629,7 +629,7 @@ pub fn governing_version(root: &Path, item: &str) -> String {
 pub fn reprocess_candidates(root: &Path) -> String {
     let pcs = proc_change_decisions(root);
     let stories = all_delivery_stories(root);
-    // ONE index for the whole corpus (issue317). The per-item path costs a pickaxe search plus a
+    // ONE index for the whole corpus (issue316). The per-item path costs a pickaxe search plus a
     // `merge-base` per Decision; at 501 stories that never finished.
     let names: HashSet<String> = stories.iter().cloned().collect();
     let markers: HashSet<String> = pcs.iter().filter_map(|p| p.effective_commit.clone()).collect();

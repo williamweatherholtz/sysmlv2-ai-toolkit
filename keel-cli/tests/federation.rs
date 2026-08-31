@@ -484,7 +484,7 @@ fn f9_a_project_can_be_migrated_when_the_engine_moves_underneath_it() {
         "F9: commit the stale state"
     );
 
-    // The project's own ADOPTION CHOICE, made before the engine moved. issue315: migrate resynced
+    // The project's own ADOPTION CHOICE, made before the engine moved. issue314: migrate resynced
     // every shipped engine file over the project's copy, so this deactivation was silently REVERTED
     // - a control the project turned off came back on, and the same path can turn one off.
     let _ = run_in(&root, &["deactivate", "render"]);
@@ -505,7 +505,7 @@ fn f9_a_project_can_be_migrated_when_the_engine_moves_underneath_it() {
     );
     assert!(
         !std::fs::read_to_string(root.join(".engine/contracts/activation.toml")).expect("activation").contains("\"render\""),
-        "F9: a project's ADOPTION CHOICE must survive an engine upgrade (issue315) - reverting it          silently re-arms a control the project turned off, with no Decision anywhere"
+        "F9: a project's ADOPTION CHOICE must survive an engine upgrade (issue314) - reverting it          silently re-arms a control the project turned off, with no Decision anywhere"
     );
     let gate = run_in(&root, &["gate", "--fast", "."]);
     assert!(gate.ok, "F9: the migrated tree must gate green — a migration that leaves a project \

@@ -263,7 +263,7 @@ package IssuesClaudeOpus5 {
         :>> title = "keel migrate silently reverts a project's adoption choices: engine resync overwrites project-owned contracts";
         :>> createdAt = "2026-08-30";
         :>> createdBy = "claudeOpus5";
-        :>> description = "FOUND BY THE FEDERATION SUITE (F9), which exists because the propriety panel returned UNSOUND on the design for testing a project only at birth (pf42). step_engine_resync copies every shipped engine file over the project's copy, and .engine/contracts/ is shipped - so keel migrate overwrote activation.toml, adoption-profile.toml, engine-version.toml, installed-units.toml, github-actors.toml and parser-coverage-baseline.toml with the engine's defaults. DEMONSTRATED on a real project: deactivate render, commit, migrate - and render was ACTIVE again. THE DIRECTION THAT MATTERS MORE is the other one: where the engine's default has FEWER active processes than the project, migrate silently DISARMS controls the project had on, with no Decision anywhere - the unsigned control-weakening the keystone lock and audit-adherence exist to catch, arriving through a path neither of them watches. github-actors.toml is worse still: it declares WHO MAY DECIDE on the decision channel. FIXED: is_project_owned_contract - the engine ships a default so a fresh init has one, and resync ADDS it if absent but never overwrites it. The rule is 'a keel COMMAND writes this file'. Held by F9, which now asserts the deactivation survives the upgrade. THIS DESCRIPTION WAS REPAIRED (2026-08-30): its first version was written with backticks inside a double-quoted shell argument, so the shell EXECUTED them and substituted their stdout into the record - and also ran deactivate against this repository, whose activation.toml was restored from git. Third occurrence of a documented trap; routed to issue316.";
+        :>> description = "FOUND BY THE FEDERATION SUITE (F9), which exists because the propriety panel returned UNSOUND on the design for testing a project only at birth (pf42). step_engine_resync copies every shipped engine file over the project's copy, and .engine/contracts/ is shipped - so keel migrate overwrote activation.toml, adoption-profile.toml, engine-version.toml, installed-units.toml, github-actors.toml and parser-coverage-baseline.toml with the engine's defaults. DEMONSTRATED on a real project: deactivate render, commit, migrate - and render was ACTIVE again. THE DIRECTION THAT MATTERS MORE is the other one: where the engine's default has FEWER active processes than the project, migrate silently DISARMS controls the project had on, with no Decision anywhere - the unsigned control-weakening the keystone lock and audit-adherence exist to catch, arriving through a path neither of them watches. github-actors.toml is worse still: it declares WHO MAY DECIDE on the decision channel. FIXED: is_project_owned_contract - the engine ships a default so a fresh init has one, and resync ADDS it if absent but never overwrites it. The rule is 'a keel COMMAND writes this file'. Held by F9, which now asserts the deactivation survives the upgrade. THIS DESCRIPTION WAS REPAIRED (2026-08-30): its first version was written with backticks inside a double-quoted shell argument, so the shell EXECUTED them and substituted their stdout into the record - and also ran deactivate against this repository, whose activation.toml was restored from git. Third occurrence of a documented trap; routed to issue315.";
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
@@ -300,7 +300,7 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    // Re-pointed 2026-08-30: issue317 was filed against the nearest AVAILABLE resolver because
+    // Re-pointed 2026-08-30: issue316 was filed against the nearest AVAILABLE resolver because
     // `record issue` requires one, which is the very antipattern the github-intake process warns
     // about (an issue routed to a resolver that will not resolve it looks handled and is not).
     #Resolves dependency from dcBatchedGovernanceIndex to issue317;
@@ -315,4 +315,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcBatchedGovernanceIndex to issue318;
+
+    part issue319 : Issue {
+        :>> id = "675a3b5d-97f9-473b-801c-70bf9481dc12";
+        :>> title = "An unrecognised flag becomes the ROOT, so a typo reports every guard green over a phantom directory";
+        :>> createdAt = "2026-08-31";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "INGESTED FROM GITHUB as GH#14 (st058), reported from field use. `keel guard --read` treated the unrecognised flag as the ROOT argument, gated a directory that does not exist, found no files, and reported every guard PASS with 0 scanned. TWO DEFECTS COMPOUNDING, which is why it is worse than either alone: silent argument mis-parsing, and pass-at-zero. Together they produce a GREEN RUN OVER NOTHING - output indistinguishable from a clean tree, on a command whose entire job is to tell you whether the tree is clean. REPRODUCED before fixing, on a fresh strict-profile project: every guard PASS, 0 scanned. NOT AN ISOLATED TYPO: the identical shape appeared hours earlier while building github-ingest, where the trailing value of --at was taken as the root and the command failed with an opaque filesystem error. Two independent instances of 'an argument that is not a path becomes the path' in one day is a class, not an accident - so the fix is a shared refusal applied to guard, validate and check-engine rather than a patch where it was noticed. FIXED: refuse_flag_as_path names the offending argument and states why refusing beats answering. Held by unknown_flag_is_refused.rs, which asserts BOTH that the three commands refuse with no verdict line AND that an ordinary root still scans the corpus - a refusal that broke real usage would have traded one vacuous pass for another.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUnknownFlagIsRefused to issue319;
+
+    part issue320 : Issue {
+        :>> id = "46806a42-912a-4810-b6f0-3d4e54d928c2";
+        :>> title = "Every issue id I cited in prose today was off by one, because I piped the command that told me through tail -1";
+        :>> createdAt = "2026-08-31";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "EVERY ISSUE ID I CITED IN PROSE TODAY, from the migrate-adoption defect onward, was off by one. Six distinct defects, cited in Decisions D0263/D0265/D0266/D0268, in CLAUDE.md, in four source files, in two sprint records and in a propriety round: 33 wrong references in total, corrected here. ROOT CAUSE, PROVEN NOT GUESSED: `keel record issue` prints the allocated id on its FIRST line - 'recorded issue320 -> ...' - and even prints the resolver edge to author. I piped every one of those calls through `| tail -1`, which showed only the closing 'run keel validate to confirm' line and discarded the id. I then wrote down the number I ASSUMED had been allocated. The command told me the truth every time and I truncated it away. THIS IS THE THIRD TIME TODAY that output truncation caused a defect: `| head -4` killed a migration mid-apply and left a half-written tree; `| tail -1` hid an id fourteen times; and the same reflex hid the ingest count earlier. The pattern is piping a command's output through a truncating filter and then reporting on what I did not read. WHAT CAUGHT IT, AND WHAT DID NOT. `edge-endpoints` caught it the moment a TYPED EDGE named a non-existent issue320 - that guard works exactly as designed. Nothing caught the 33 PROSE citations, because a reference inside a description string is not an edge. So the model's typed structure is verified and its prose is not, and prose is where most cross-references actually live. CONTROL GAP, stated as the honest finding rather than a resolution to be careful: a guard could check that every `issueNNN` / `dNNNN` token appearing in authored prose resolves to a declared item. It would have caught all 33 immediately. It is not built here because the false-positive surface needs thought - prose legitimately discusses ids that were superseded or that belong to another project - and shipping a noisy guard would repeat the D0261 mistake of adding lines nobody can act on.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUnknownFlagIsRefused to issue320;
 }

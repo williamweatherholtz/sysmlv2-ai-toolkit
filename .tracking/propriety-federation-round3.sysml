@@ -9,7 +9,7 @@
 //
 // INDEPENDENCE: same assessor as the author (claudeOpus5), so `sound` here is testimony, not a
 // receipt (D0232). The load-bearing evidence is not the verdicts but the RUN: the suite convicted
-// the product twice (issue313, issue315) and convicted its own author's tests three times, which is
+// the product twice (issue313, issue314) and convicted its own author's tests three times, which is
 // a discrimination record no verdict of mine can supply.
 // =====================================================================
 package ProprietyRound3 {
@@ -34,7 +34,7 @@ package ProprietyRound3 {
         :>> target = "suite:federation";
         :>> lens = ProprietyLens::classCoverage;
         :>> verdict = ProprietyVerdict::sound;
-        :>> rationale = "pf42 was the round's UNSOUND verdict: eight claims that all tested a project at birth and none at its second week. F9 was added for exactly that, and it earned the verdict immediately - it found issue315, where `keel migrate` resynced every shipped engine file over the project's copy and SILENTLY REVERTED the project's own adoption choice. A project that had deactivated a process had it switched back on by an engine upgrade, and the same path can switch one off, which is an unsigned control change of precisely the kind the keystone lock exists to prevent. The claim that a suite tests the easy day is refuted by the suite failing on the hard one.";
+        :>> rationale = "pf42 was the round's UNSOUND verdict: eight claims that all tested a project at birth and none at its second week. F9 was added for exactly that, and it earned the verdict immediately - it found issue314, where `keel migrate` resynced every shipped engine file over the project's copy and SILENTLY REVERTED the project's own adoption choice. A project that had deactivated a process had it switched back on by an engine upgrade, and the same path can switch one off, which is an unsigned control change of precisely the kind the keystone lock exists to prevent. The claim that a suite tests the easy day is refuted by the suite failing on the hard one.";
         :>> defeater = "TRIED AND FAILED: the obvious refutation is that F9 tests migration mechanics rather than federation, but the defect it found is federation-specific by construction - it can only occur where the engine and the project are separate artefacts moving at different speeds, which is what a federation IS. Sound.";
     }
 

@@ -1,4 +1,4 @@
-//! The equality proof for the batched governance index (issue317).
+//! The equality proof for the batched governance index (issue316).
 //!
 //! `reprocess-candidates` answers "what was authored under a process version a SAFETY change later
 //! superseded" — the antiquated-data question. It did not finish: 240 seconds, exit 124, zero

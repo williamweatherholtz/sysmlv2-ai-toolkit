@@ -115,7 +115,7 @@ frozen (modify it only by out-of-band Decision).
   refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
   `record decision` (prose via `--from FILE`) and `record issue` (prose via `--description-from FILE`) —
   **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
-  has now happened three times (D0224/issue256, then issue316, which also ran `keel deactivate` against
+  has now happened three times (D0224/issue256, then issue315, which also ran `keel deactivate` against
   this repo). `record statement` / `record story` (intake's write path — a human's words VERBATIM,
   then the story that translates them with its `#DerivedFrom` edge authored alongside; D0236/issue289),
   `github-pull` / `github-ingest` (an issue on the repository becomes a VERBATIM `Statement` attributed to the reporter's

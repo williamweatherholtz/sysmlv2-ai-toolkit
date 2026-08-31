@@ -106,7 +106,7 @@ pub fn remap_engine_content(rel: &Path, contents: &str) -> Option<String> {
 /// adoption profile, the decision channel reads the actor map, and the parser baseline is a ratchet
 /// over the project's OWN corpus.
 ///
-/// issue315, found by the federation suite: `keel migrate` reverted a project's deactivation of
+/// issue314, found by the federation suite: `keel migrate` reverted a project's deactivation of
 /// `render` — silently re-arming a control the project had turned off, and equally able to disarm
 /// one it had on.
 fn is_project_owned_contract(mapped: &Path) -> bool {
@@ -471,7 +471,7 @@ fn step_engine_resync(root: &Path, engine: &Dir) -> StepPlan {
             return; // instance-specific — a project's own manifest is never overwritten
         }
         let dst = dst_engine.join(&mapped);
-        // PROJECT-OWNED CONTRACTS ARE ADDED, NEVER OVERWRITTEN (issue315). The engine ships a
+        // PROJECT-OWNED CONTRACTS ARE ADDED, NEVER OVERWRITTEN (issue314). The engine ships a
         // default so a fresh `init` has one; after that the file is the PROJECT'S state, written by
         // the project's own commands. Resyncing it reverts choices nobody revisited: a project that
         // deactivated a process had it silently switched back ON by `keel migrate` — demonstrated,

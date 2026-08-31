@@ -1472,6 +1472,28 @@ fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
     arg.map_or_else(find_repo_root, |p| Some(PathBuf::from(p)))
 }
 
+/// Refuse an argument that LOOKS like a flag where a path or a name is expected (GH#14).
+///
+/// A mistyped or unsupported `--flag` used to be accepted as the ROOT: `keel guard --read` gated a
+/// directory named `--read`, found nothing, and reported every guard PASS with 0 scanned. Silent
+/// mis-parsing plus pass-at-zero produces a GREEN RUN OVER NOTHING, which is worse than an error
+/// because it is indistinguishable from a clean tree. The same shape was hit again while building
+/// `github-ingest`, where a trailing `--at` value was read as the root.
+///
+/// Returns the exit code to use, or `None` when the argument is fine. `cmd_activation` already did
+/// this for process names (issue179); this generalises it to every path-taking entry point.
+fn refuse_flag_as_path(arg: Option<&String>, cmd: &str) -> Option<i32> {
+    let a = arg?;
+    if !a.starts_with("--") {
+        return None;
+    }
+    eprintln!("keel {cmd}: `{a}` looks like a flag, not a path.");
+    eprintln!("  It would otherwise be taken as the ROOT — and a root that does not exist scans");
+    eprintln!("  NOTHING, so every check would report PASS over an empty tree (GH#14). Refusing");
+    eprintln!("  rather than answering green about a directory that is not there.");
+    Some(2)
+}
+
 /// A string that names a runnable guard (an enforced one, or a runnable-only diagnostic).
 fn is_guard_name(s: &str) -> bool {
     keel_cli::guards::GUARD_NAMES.contains(&s) || matches!(s, "assured" | "critique" | "critique-rigor" | "defect-guard-coverage")
@@ -1492,6 +1514,10 @@ fn classify_guard_args(args: &[String]) -> (Option<&str>, Option<&str>) {
 fn cmd_guard(args: &[String]) -> i32 {
     // `keel guard` / `guard [ROOT]` / `guard all [ROOT]` → run all; `guard <name> [ROOT]` → run one.
     let (name, root_arg) = classify_guard_args(args);
+    // GH#14: a mistyped flag must not become the ROOT and turn every guard green over nothing.
+    if let Some(code) = refuse_flag_as_path(root_arg.map(String::from).as_ref(), "guard") {
+        return code;
+    }
     let Some(root) = resolve_guard_root(root_arg.map(String::from).as_ref()) else {
         eprintln!("error: no .engine/ directory found. usage: keel guard [<name>] [ROOT]");
         return 2;
@@ -3870,7 +3896,7 @@ fn cmd_record_issue(args: &[String]) -> i32 {
     // a governance record. `issue` was left on the argument path and the same trap fired a third
     // time on 2026-08-30 — corrupting issue314's own description and running `keel deactivate`
     // against this repository. A trap that recurs after its fix is a fix that was applied to the
-    // instance instead of the class (issue316).
+    // instance instead of the class (issue315).
     let description = flag(args, "description-from")
         .and_then(|f| match std::fs::read_to_string(&f) {
             Ok(t) => Some(t.trim().to_string()),
@@ -3885,7 +3911,7 @@ fn cmd_record_issue(args: &[String]) -> i32 {
     else {
         eprintln!("error: --title --description --severity --resolver are all required.");
         eprintln!("  PREFER --description-from FILE for anything long: prose passed as a shell argument");
-        eprintln!("  has had its backticks EXECUTED into the record three times now (D0224/issue316).");
+        eprintln!("  has had its backticks EXECUTED into the record three times now (D0224/issue315).");
         eprintln!("  --resolver names the EXISTING item that resolves this issue. It is required because the");
         eprintln!("  `issues` guard fails on an untriaged Issue, so recording one without triage would hand you");
         eprintln!("  a red gate as the command's output (D0077).");
@@ -4357,10 +4383,12 @@ fn main() {
         Some("projects") => keel_cli::workspace::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
-        Some("validate") => cmd_validate(rest),
+        Some("validate") => refuse_flag_as_path(rest.first(), "validate")
+            .unwrap_or_else(|| cmd_validate(rest)),
         Some("hook") => cmd_hook(rest), // D0134: in-loop gates in the BINARY, no python runtime
         Some("gate") => cmd_gate(rest), // D0128 Tier-2: the fast per-edit in-loop gate
-        Some("check-engine") => cmd_check_engine(rest),
+        Some("check-engine") => refuse_flag_as_path(rest.first(), "check-engine")
+            .unwrap_or_else(|| cmd_check_engine(rest)),
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),
         Some("business") => cmd_business(rest),
