@@ -156,9 +156,20 @@ fn f2_the_first_decision_is_d0001_and_cannot_collide_with_reference_decisions() 
     );
     let dup = run_in(&root, &["guard", "duplicate-identity"]);
     assert!(dup.ok, "F2: d0001 must not collide with ReferenceDecision0001: {}", dup.text);
+    // PARSE the count rather than substring-matching it. The first version asserted
+    // `!contains("0 scanned")`, which passed at 368 and broke at 370 — every count ending in zero
+    // contains that substring. An anti-vacuity check that fails on an arithmetic accident is worse
+    // than none: it reds CI for a reason unrelated to the property under test.
+    let scanned: usize = dup
+        .text
+        .split_whitespace()
+        .zip(dup.text.split_whitespace().skip(1))
+        .find(|(_, w)| *w == "scanned,")
+        .and_then(|(n, _)| n.parse().ok())
+        .unwrap_or(0);
     assert!(
-        dup.text.contains("scanned") && !dup.text.contains("0 scanned"),
-        "F2: and the guard must have actually scanned the corpus: {}",
+        scanned > 100,
+        "F2: the guard must have actually scanned the corpus, not passed over nothing — got          {scanned}: {}",
         dup.text
     );
     cleanup(&root);
