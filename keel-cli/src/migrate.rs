@@ -690,6 +690,133 @@ pub fn check_preconditions(root: &Path, dry_run: bool) -> Option<Refusal> {
 
 // ── the command ──────────────────────────────────────────────────────────────
 
+// ── rollback (srMigrationIsReversible) ────────────────────────────────────────────────────────
+//
+// D0252 promised that a migration which cannot finish rolls back. It did not exist: the only
+// recovery was an error message advising the human to run `git checkout -- .`, which is a hope
+// rather than a mechanism. The failure is not hypothetical — during design, piping migrate's output
+// to `head` closed the pipe, killed the command mid-apply, and left one file written with the pin
+// unstamped: a tree that is neither vintage.
+//
+// TWO CASES, and only one of them can be handled from inside the process:
+//   DETECTED FAILURE — a write error or a mid-apply blocker. The process is alive, so it restores.
+//   INTERRUPTION — the process is killed and runs no code at all. Nothing in-process can help, so
+//     a MARKER is written before the first byte and removed after the last. Its presence on the
+//     next run means the previous one did not finish, and that run restores before planning.
+// The marker lives in `.keel/` (machine-local, untracked): it describes an interrupted RUN, not a
+// fact about the model.
+
+const IN_PROGRESS: &str = "migrate-in-progress";
+
+fn marker_path(root: &Path) -> PathBuf {
+    root.join(".keel").join(IN_PROGRESS)
+}
+
+fn head_sha(root: &Path) -> Option<String> {
+    let out = crate::gitx::git().arg("-C").arg(root).args(["rev-parse", "HEAD"]).output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Restore `.engine/` and `.tracking/` to `sha`, discarding anything the interrupted run wrote.
+///
+/// Safe precisely BECAUSE migrate refuses a dirty tree: everything under those directories was
+/// committed before the run, so resetting them to the pre-migration commit cannot destroy work.
+/// `checkout` restores modified and deleted files; `clean` removes ones the run created.
+fn restore(root: &Path, sha: &str) -> Result<(), String> {
+    let run = |args: &[&str]| -> Result<(), String> {
+        let out = crate::gitx::git()
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .map_err(|e| format!("git {args:?}: {e}"))?;
+        if out.status.success() {
+            Ok(())
+        } else {
+            Err(format!("git {args:?}: {}", String::from_utf8_lossy(&out.stderr).trim()))
+        }
+    };
+    run(&["checkout", sha, "--", ".engine", ".tracking"])?;
+    run(&["clean", "-fdq", "--", ".engine", ".tracking"])?;
+    // `checkout <sha> -- <paths>` also STAGES the restored content; unstage so the tree looks
+    // untouched rather than merely having the right bytes.
+    run(&["reset", "-q", "--", ".engine", ".tracking"])
+}
+
+/// Roll back a detected failure, and say plainly whether the rollback itself worked.
+fn rollback_after_failure(root: &Path, sha: Option<&String>, written: usize) -> i32 {
+    let Some(sha) = sha else {
+        eprintln!("  {written} file(s) were already written and NO pre-migration commit was recorded,");
+        eprintln!("  so this tree is PARTIALLY MIGRATED and cannot be restored automatically.");
+        return 1;
+    };
+    match restore(root, sha) {
+        Ok(()) => {
+            let _ = std::fs::remove_file(marker_path(root));
+            eprintln!("  ROLLED BACK: {written} written file(s) discarded; .engine/ and .tracking/ restored to {sha}.");
+            eprintln!("  The tree is as it was before this run. Nothing is half-migrated.");
+            1
+        }
+        Err(e) => {
+            eprintln!("  ROLLBACK FAILED ({e}) — this tree IS partially migrated after {written} file(s).");
+            eprintln!("  Restore by hand: git checkout {sha} -- .engine .tracking && git clean -fd -- .engine .tracking");
+            1
+        }
+    }
+}
+
+/// If a previous run was interrupted, restore before doing anything else. Returns a note to print.
+fn recover_interrupted(root: &Path) -> Option<String> {
+    let marker = marker_path(root);
+    let sha = std::fs::read_to_string(&marker).ok()?.trim().to_string();
+    if sha.is_empty() {
+        let _ = std::fs::remove_file(&marker);
+        return None;
+    }
+    let note = match restore(root, &sha) {
+        Ok(()) => format!(
+            "recovered: a previous migration did not finish. .engine/ and .tracking/ restored to {sha} before planning."
+        ),
+        Err(e) => format!(
+            "WARNING: a previous migration did not finish and could not be restored ({e}). Restore by hand: git checkout {sha} -- .engine .tracking"
+        ),
+    };
+    let _ = std::fs::remove_file(&marker);
+    Some(note)
+}
+
+/// Record the pre-migration commit BEFORE the first byte is written. An interruption after this
+/// point is detectable on the next run, which is the only recovery a killed process can have — so a
+/// failure to arm it REFUSES the apply rather than proceeding unrecoverably.
+fn arm_marker(root: &Path, pre_sha: Option<&String>) -> Result<(), i32> {
+    let Some(sha) = pre_sha else { return Ok(()) };
+    let _ = std::fs::create_dir_all(root.join(".keel"));
+    if let Err(e) = std::fs::write(marker_path(root), sha) {
+        eprintln!("keel migrate: cannot write the in-progress marker ({e}) — refusing to apply.");
+        eprintln!("  Without it an interrupted run could not be detected, and this command's whole");
+        eprintln!("  reversibility guarantee rests on that detection.");
+        return Err(1);
+    }
+    Ok(())
+}
+
+/// Write every planned file, reporting how many succeeded before a failure so the rollback can say
+/// what it discarded. Extracted from `cmd` to keep that function within its line budget.
+fn apply_files(p: &MigrationPlan) -> Result<usize, (usize, PathBuf, std::io::Error)> {
+    let mut written = 0usize;
+    for s in &p.steps {
+        for f in &s.files {
+            if let Some(parent) = f.path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| (written, f.path.clone(), e))?;
+            }
+            std::fs::write(&f.path, &f.new_content).map_err(|e| (written, f.path.clone(), e))?;
+            written += 1;
+        }
+    }
+    Ok(written)
+}
+
 /// Re-stamp the binding engine pin, PRESERVING an existing file: only the `engine =` line is
 /// rewritten, so comments and any other key the project added survive.
 ///
@@ -727,12 +854,24 @@ fn restamp_pin(root: &Path, fresh: &str) -> std::io::Result<()> {
 /// possible outcome.
 #[must_use]
 pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
+    // RECOVERY RUNS FIRST, before the preconditions. An interrupted migration leaves the tree
+    // DIRTY, and the dirty-tree precondition would refuse — so a genuine interruption could never
+    // be recovered by the very command that recovers it. Found by the interruption test, which is
+    // the case this ordering exists for.
+    let recovery = if dry_run { None } else { recover_interrupted(root) };
     if let Some(r) = check_preconditions(root, dry_run) {
+        if let Some(note) = &recovery {
+            println!("  {note}");
+        }
         eprintln!("keel migrate: {}", r.explain(root));
         return 2;
     }
+    let pre_sha = if dry_run { None } else { head_sha(root) };
     let p = plan(root, engine);
     let active = p.active();
+    if let Some(note) = &recovery {
+        println!("  {note}");
+    }
 
     println!("keel migrate — {}", root.display());
     println!("  binary engine: keel {} (build {})", env!("CARGO_PKG_VERSION"), env!("KEEL_BUILD_COMMIT"));
@@ -784,24 +923,16 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         return 0;
     }
 
-    let mut written = 0usize;
-    for s in &p.steps {
-        for f in &s.files {
-            if let Some(parent) = f.path.parent() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    eprintln!("keel migrate: FAILED writing {}: {e}", rel(root, &f.path));
-                    eprintln!("  {written} file(s) were already written — this tree is PARTIALLY MIGRATED. `git checkout -- .` to restore, then re-run.");
-                    return 1;
-                }
-            }
-            if let Err(e) = std::fs::write(&f.path, &f.new_content) {
-                eprintln!("keel migrate: FAILED writing {}: {e}", rel(root, &f.path));
-                eprintln!("  {written} file(s) were already written — this tree is PARTIALLY MIGRATED. `git checkout -- .` to restore, then re-run.");
-                return 1;
-            }
-            written += 1;
-        }
+    if let Err(code) = arm_marker(root, pre_sha.as_ref()) {
+        return code;
     }
+    let written = match apply_files(&p) {
+        Ok(n) => n,
+        Err((n, path, e)) => {
+            eprintln!("keel migrate: FAILED writing {}: {e}", rel(root, &path));
+            return rollback_after_failure(root, pre_sha.as_ref(), n);
+        }
+    };
 
     // Reconcile against the plan by RE-PLANNING. Every step is content-detected, so a correct run
     // leaves nothing matching; a non-empty re-plan means a transform did not do what it reported.
@@ -809,8 +940,11 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     let after = plan(root, engine);
     if !after.active().is_empty() {
         eprintln!("keel migrate: wrote {written} file(s), but re-planning still finds {} edit(s) and {} blocker(s).", after.edits(), after.blockers());
-        eprintln!("  A step did not do what it reported. The tree is migrated but NOT verified — inspect `git diff` before committing.");
-        return 1;
+        eprintln!("  A step did not do what it reported, so this migration is NOT verified.");
+        // Rolled back rather than left for inspection (srMigrationIsReversible): "migrated but not
+        // verified" is precisely the state that must not survive a run. Previously this advised a
+        // `git diff` and left the tree written.
+        return rollback_after_failure(root, pre_sha.as_ref(), written);
     }
     // D0190: a completed migration re-stamps the declared engine version. D0251 ESCALATED what the
     // stamp means: it is no longer a parity-warning input but a BINDING pin — a binary whose version
@@ -828,6 +962,10 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     if let Err(e) = restamp_pin(root, &stamp) {
         eprintln!("keel migrate: migration complete but the version re-stamp failed ({e}) - the parity warning will keep firing until engine-version.toml is updated.");
     }
+    // The run completed and verified: clear the marker so the NEXT run does not "recover" from a
+    // migration that finished. A marker left behind would restore a good tree to its pre-migration
+    // state on the next invocation — the rollback becoming the defect.
+    let _ = std::fs::remove_file(marker_path(root));
     println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
     println!();
     println!("  NEXT: run this project's own gate — `keel validate . && keel guard && keel check-engine .` — then commit.");

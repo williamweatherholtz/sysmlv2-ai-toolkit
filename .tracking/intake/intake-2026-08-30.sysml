@@ -212,4 +212,24 @@ package ProjectIntake20260830 {
         :>> triageNote = "question and not bug: they asked whether the capability exists and asked for PROPOSALS, not implementation - so the deliverable is the panel and a ranked set of options, and building would exceed what was asked. The panel nevertheless convicted twice on measured evidence, so two Issues are filed from it: the corpus lens cannot finish, and the resolver answers confidently for item types it does not cover.";
     }
     #DerivedFrom dependency from us060 to st048;
+
+    part st049 : Statement {
+        :>> id = "29358da2-60bf-4b67-923d-3f29e6530989";
+        :>> title = "Auto-update consent-gated is the choice, conditional on correctness actually being guaranteeable";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> text = "i like auto-update consent gated, if you really can guarantee correctness";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-30"; :>> channel = StatementChannel::chat;
+    }
+
+    part us061 : UserStory {
+        :>> id = "dd25b52f-68e6-41ed-8bb6-d810ec12c322";
+        :>> title = "Auto-update needs reversible-and-verified, not empty-plan; the rollback is the prerequisite";
+        :>> createdAt = "2026-08-30"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "engine updates applied automatically where correctness can be guaranteed, and consent asked where it cannot";
+        :>> soThat = "projects stay current without me approving every bump, and without a bad bump landing unnoticed";
+        :>> implication = ImplicationKind::question;
+        :>> triageNote = "question and not designChange: their choice was CONDITIONAL - 'if you really can guarantee correctness' - so the deliverable is an honest answer to the condition, not a build. Tested: the empty-plan gate is VACUOUS (an empty plan makes migrate return before it re-stamps the pin, so auto-applying one achieves nothing), and no rollback exists - demonstrated accidentally by killing migrate with a truncating pipe, leaving unit-ids.toml written and the pin unstamped. Routed as the answer plus a named prerequisite (dcMigrationRollsBack), not as work to start.";
+    }
+    #DerivedFrom dependency from us061 to st049;
 }
