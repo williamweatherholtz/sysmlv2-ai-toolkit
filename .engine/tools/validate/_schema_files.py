@@ -32,6 +32,7 @@ SCHEMA_ORDER = [
     "schema/knowledge/knowledge.sysml",
     # Optional module (D0257). After core/element.sysml, which ProprietyFinding specializes.
     "schema/propriety/propriety.sysml",
+    "schema/cli/cli.sysml",
 ]
 
 
