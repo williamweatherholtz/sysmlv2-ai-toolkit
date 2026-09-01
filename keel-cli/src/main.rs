@@ -1482,9 +1482,17 @@ fn cmd_guard(args: &[String]) -> i32 {
     }
     let Some(name) = name else {
         let reports = keel_cli::guards::run_all(&root);
+        // D0278: a control with a KNOWN defect says so beside its own verdict. Printed here rather
+        // than inside `GuardReport::print` because the runner is what holds the root — and because
+        // the note belongs to the reading, not to the report: the moment someone needs to know a
+        // green is unreliable is the moment they are looking at it.
+        let defects = keel_cli::control_defects::load(&root);
         let mut all_ok = true;
         for r in &reports {
             r.print();
+            if let Some(d) = defects.get(r.name) {
+                println!("{}", d.note(r.name));
+            }
             all_ok &= r.ok();
         }
         // issue244: the verdict used to be the bare word ALL PASS while 80 warnings scrolled above

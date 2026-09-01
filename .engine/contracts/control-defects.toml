@@ -1,0 +1,43 @@
+# Known defects in the CONTROLS themselves (D0278).
+#
+# WHY THIS FILE EXISTS. A defect in a guard is not an ordinary defect. An ordinary bug affects what it
+# touched; a broken control INVALIDATES ITS OWN HISTORY — every verdict it gave while broken is
+# unverified, and nobody knows which. That blast radius is retroactive and unbounded until somebody
+# assesses it, which is why these are triaged immediately rather than at a retro.
+#
+# WHAT IT IS FOR, mechanically: `keel guard` reads this file and, beside the verdict of any control
+# listed here, prints the defect. A green from a control you have been told under-reports is not a
+# green, and the moment you most need to know that is the moment you are reading its output.
+#
+# TWO DIRECTIONS, AND THEY ARE NOT SYMMETRIC.
+#   over  — flags what is fine. LOUD: somebody hits it. Costs trust and blocks real work, and it
+#           trains people to scroll past the control (the D0214 unread-warning failure).
+#   under — passes what is broken. SILENT. Nothing surfaces it; it is found by accident or by
+#           auditing the control itself. Strictly the more dangerous of the two.
+# An `over` finding is a reason to go looking for a matching `under`: one wrong predicate usually
+# does both, in different inputs.
+#
+# FORMAT: one [<guard-name>] section per defective control.
+#   issue        the tracked Issue. Must exist and be open, or `control-defect-registry` fails.
+#   direction    "over" | "under"
+#   effect       one line: what the wrong verdict IS, in the reader's terms
+#   invalidates  what this control passed while broken, and whether any of it was re-checked.
+#                The distinctive step: an ordinary bug has no equivalent question.
+
+[issues]
+issue = "issue333"
+direction = "under"
+effect = "A mis-triaged Issue reads as triaged: the guard checks that a #Resolves edge EXISTS, never that the named resolver could resolve it."
+invalidates = "Every `issues` PASS since the guard was written. Concretely observed: issue323's resolver was dcCliSurfaceConsolidation — carried over from the previous record call, unable to resolve a unit-identity defect — and the guard passed it. NOT re-checked across the 329-issue corpus; the ranked frontier may therefore be ordering work against issues it will not close."
+
+[decision-scaffolding]
+issue = "issue331"
+direction = "under"
+effect = "A multi-clause Decision satisfies the check as soon as ONE clause is chartered, so partial delivery of a compound Decision is invisible."
+invalidates = "Every `decision-scaffolding` PASS on a Decision with more than one clause. Concretely observed: d0252 clause A's command half sat unbuilt for nine days while clause B's rollback work carried the inbound edge, and the guard passed throughout. NOT re-checked: no view lists Decisions by clause, because clauses are prose."
+
+[ownership]
+issue = "issue332"
+direction = "over"
+effect = "Edits are attributed to the MACHINE's bound actor rather than the session's, so a session running under KEEL_ACTOR is reported as editing items it in fact owns."
+invalidates = "Nothing silently: this direction is over-reporting, so its errors are refusals rather than false greens. The cost is that the Stop hook — which runs without KEEL_ACTOR — over-reports whenever a session's actor differs from the machine binding, and an over-reporting gate is one people learn to work around. Observed at 12 false violations against 10 real ones."

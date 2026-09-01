@@ -456,4 +456,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcCliSurfaceConsolidation to issue330;
+
+    part issue331 : Issue {
+        :>> id = "0ef7db3e-7e53-4fa2-88f8-2df83ca34223";
+        :>> title = "decision-scaffolding passes a multi-clause Decision once ONE clause is chartered, so partial delivery is invisible";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CONTROL DEFECT, direction UNDER-REPORTING (D0278). `decision-scaffolding` checks that an accepted #ProspectiveChange Decision has SOME inbound tracked-item edge - one is enough. A Decision with several independent clauses therefore satisfies it the moment ONE clause is chartered, and partial delivery of a compound Decision becomes structurally invisible. OBSERVED: D0252 was accepted on 2026-08-30 with two clauses. Clause B (a migration that cannot finish rolls back) was chartered by dcMigrationRollsBack and built. Clause A (a unit declares the CAPABILITIES it invokes, and an install lacking one refuses by name) had its guard half already shipped under D0183 and its COMMAND half never built at all - the token `commands` appeared nowhere in process_cmd.rs. The guard passed for nine days while half an accepted Decision sat undelivered, and the gap surfaced only because D0273's clean break needed exactly that missing mechanism. INVALIDATION - what it passed while broken: every `decision-scaffolding` PASS on any multi-clause Decision, across 67 scanned. NOT RE-CHECKED, and worth being precise about why it is hard to re-check: no view lists Decisions by clause, because CLAUSES ARE PROSE. There is no authored fact saying D0252 has two of them. So the population cannot even be enumerated without reading 276 Decisions. FIX DIRECTION, and the honest one is not a guard change: per-clause charter edges would make delivery computable, which is a schema question (a Decision would need addressable clauses) and belongs in a proposal rather than a patch. Until then the guard is correct about what it checks and must not be read as checking more.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcControlDefectsAreFixed to issue331;
+
+    part issue332 : Issue {
+        :>> id = "2d29fe40-a4aa-47e1-9807-bb0ee2d459fd";
+        :>> title = "The ownership guard attributes edits to the machine's bound actor, not the session's, so it over-reports against items the session owns";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CONTROL DEFECT, direction OVER-REPORTING (D0278). The `ownership` guard (D0108: a non-owner ADDS or SUPERSEDES, never overwrites in place) attributes an edit to the actor bound to the MACHINE rather than to the actor the session is running as. A session that sets KEEL_ACTOR - the per-session mechanism D0129 explicitly sanctions - is therefore reported as a non-owner editing items it in fact owns. OBSERVED, with both numbers: this machine is bound to `claudeFable5`; this session runs as `claudeOpus5`. Running `keel guard` under KEEL_ACTOR=claudeOpus5 reported 10 ownership violations, all genuinely wweatherholtz-owned. The Stop hook, which runs WITHOUT the env var, reported those 10 plus 12 more against viewpoints owned by claudeOpus5 - items this session may edit. 12 false violations against 10 real ones: the majority of the gate's output was wrong. INVALIDATION - what it passed while broken: nothing silently. This is the over direction, so its errors are refusals rather than false greens, and no verdict needs re-checking. The cost is different in kind and is the reason it is still High: an over-reporting BLOCKING gate is one people learn to work around, and this one blocks the turn. It also actively obscures the real finding - the 10 genuine violations arrived buried in 22, which is how a true signal is lost inside its own noise (the D0214 failure through a different door). FIX DIRECTION: the guard should read the effective session actor the same way the write paths do (crate::actor::resolve, which honours KEEL_ACTOR before the machine binding) rather than the binding alone. That is a guard-source change under the keystone lock, so it needs its own signed Decision - which is the stated reason for carrying it rather than fixing it in the turn that found it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcControlDefectsAreFixed to issue332;
+
+    part issue333 : Issue {
+        :>> id = "3f4b3167-70d6-4022-9138-dba5f83308fc";
+        :>> title = "The issues guard passes a mis-triage - it checks a #Resolves edge EXISTS, never that the named resolver could resolve it";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CONTROL DEFECT, direction UNDER-REPORTING (D0278). The `issues` guard enforces that every Issue carries a #Resolves edge, and enforces nothing about whether the named resolver could possibly resolve it. Predicate at keel-cli/src/guards.rs:970-986: it sources the untriaged set from the declared issuesTriagedRule and reports only issues with NO edge. An edge to an unrelated task is indistinguishable from a correct triage. WHAT MAKES THIS THE UNDER DIRECTION rather than a missing feature: the guard PASSES a state it exists to catch. Triage is the thing being enforced, and a false triage is untriaged with an edge on it. OBSERVED, not theorised: issue323 (unit identity re-minted on republish) was recorded with resolver dcCliSurfaceConsolidation - the CLI consolidation task, carried over from the previous record call - and the guard passed it. dcCliSurfaceConsolidation cannot resolve a unit-identity defect and its DoD never mentions it. Caught by reading, not by any control. INVALIDATION - what it passed while broken: every `issues` PASS since the guard was written, over a corpus now at 329 issues. NOT RE-CHECKED. The exposure is not cosmetic: `keel whats-next` ranks the frontier partly by the severity of issues a task resolves, so a mis-pointed edge inflates a task's apparent priority and lets the real issue sit behind work that will not close it. WHY IT IS HARD, stated so the fix is not assumed cheap: issue322 points at that SAME task deliberately and says so in its own text, because the CLI consolidation genuinely is its resolver. So the distinguishing signal between a correct and an incorrect edge is PROSE, and a guard that fired on prose similarity would be wrong about half the time. The defensible shapes are (a) require the resolving task's DoD to NAME the issue id - a convention change with a migration cost across 329 issues, or (b) report a WARNING rather than a violation where the resolver's text does not mention the issue, accepting noise in exchange for visibility. Neither is a one-line fix, which is why this is registered and carried rather than fixed in the turn that found it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcControlDefectsAreFixed to issue333;
 }

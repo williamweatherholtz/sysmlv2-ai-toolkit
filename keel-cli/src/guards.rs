@@ -515,6 +515,65 @@ pub fn untrusted_routing(root: &Path) -> GuardReport {
     GuardReport { name: "untrusted-routing", scanned: untrusted.len(), warnings: Vec::new(), violations }
 }
 
+/// Guard (D0278): the control-defect registry names real controls and still-open Issues.
+///
+/// # Why the registry needs its own guard
+///
+/// `.engine/contracts/control-defects.toml` makes a defective control announce itself beside its own
+/// verdict, which only works while the entries are true. Two ways it rots, both silent:
+///
+/// - A typo'd or retired CONTROL NAME. The entry then belongs to nothing, so the announcement never
+///   prints and a known-broken guard goes back to handing out unqualified greens — the exact state
+///   the registry was built to end, restored without anyone noticing.
+/// - An Issue that has since been RESOLVED. The announcement then keeps qualifying verdicts that are
+///   now sound, which is how a true warning becomes noise and then becomes scrolled past (D0214).
+///   The process says the entry is removed in the same commit that resolves the Issue; this is what
+///   makes that a rule rather than a hope.
+///
+/// The direction is checked too, because `note()` picks its wording from it: a mistyped direction
+/// would tell the reader a green is untrustworthy when the defect is over-reporting, or worse, the
+/// reverse.
+#[must_use]
+pub fn control_defect_registry(root: &Path) -> GuardReport {
+    let entries = crate::control_defects::load(root);
+    if entries.is_empty() {
+        return GuardReport { name: "control-defect-registry", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    }
+    let done = crate::orient::done_names(root);
+    let open: std::collections::HashSet<String> = match crate::view::open_issue_names(root, &done) {
+        Ok(v) => v.into_iter().collect(),
+        Err(e) => {
+            return GuardReport {
+                name: "control-defect-registry",
+                scanned: entries.len(),
+                warnings: Vec::new(),
+                violations: vec![format!("cannot read issue resolution to check the registry: {e}")],
+            };
+        }
+    };
+    let mut violations = Vec::new();
+    for (control, d) in &entries {
+        if !GUARD_NAMES.contains(&control.as_str()) {
+            violations.push(format!(
+                "control-defects.toml names `{control}`, which is not a guard in this binary — the defect note would never print, so a control known to be broken would silently go back to giving unqualified verdicts"
+            ));
+        }
+        if d.direction != "over" && d.direction != "under" {
+            violations.push(format!(
+                "`{control}`: direction `{}` is neither `over` nor `under` — the note's wording is chosen from it, so a wrong value tells the reader to distrust the wrong half of the verdict",
+                d.direction
+            ));
+        }
+        if !open.contains(&d.issue) {
+            violations.push(format!(
+                "`{control}` is registered against {}, which is not an OPEN issue — either it was resolved and the entry should have been removed in that same commit (D0278), or it never existed. A note that outlives its defect is how a true warning becomes noise",
+                d.issue
+            ));
+        }
+    }
+    GuardReport { name: "control-defect-registry", scanned: entries.len(), warnings: Vec::new(), violations }
+}
+
 // ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
 
 const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
@@ -2102,8 +2161,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 56] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing"];
+pub const GUARD_NAMES: [&str; 57] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3599,6 +3658,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "sprint-coverage" => Some(sprint_coverage(root)),
         "sprint-closure" => Some(sprint_closure(root)),
         "untrusted-routing" => Some(untrusted_routing(root)),
+        "control-defect-registry" => Some(control_defect_registry(root)),
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
