@@ -543,7 +543,11 @@ fn enforcement_points(root: &Path) -> Json {
     let rows = vec![
         row("hook UserPromptSubmit (route-first)", has_event("UserPromptSubmit"), "no routing reminder - advisory only, nothing gates", "prints and allows (D0134)", HOOK_TIMEOUT),
         row("hook PostToolUse post-edit (fast tier)", has_event("PostToolUse"), "per-edit gate lost; turn/commit tiers still gate (K15)", "loud warning, allows", HOOK_TIMEOUT),
-        row("hook Stop (turn gate)", has_event("Stop"), "turn gate lost; commit/CI tiers still gate (K15)", "loud warning, allows", HOOK_TIMEOUT),
+        // D0279: the turn gate is the one hook that fails CLOSED on a missing binary — its wrapper emits
+        // a block decision rather than "this gate did not run" + allow. NOTE ON THIS TABLE: failMode is
+        // classified from the prose in the `absent` column, so a row is only as true as its text; that
+        // is a description, not a measurement, and the rigor panel named it as such.
+        row("hook Stop (turn gate)", has_event("Stop"), "missing binary BLOCKS the turn (D0279): the wrapper denies with the install path; only the harness timeout still resolves to allow", "validate/guard/rule errors are DENIED as problems; second red pass yields with a recorded obligation (loop avoidance)", HOOK_TIMEOUT),
         row("hook PreToolUse pre-bash (shell advisory)", has_event("PreToolUse"), "advisory only, nothing gates", "prints and allows", HOOK_TIMEOUT),
         row("hook PreToolUse pre-write (protected paths)", has_event("PreToolUse"), "PURE-SHELL fallback DENIES without the binary, loudly (P0.3)", "deny message malformed -> harness asks", HOOK_TIMEOUT),
         row("hook SubagentStop (subagent tree gate)", has_event("SubagentStop"), "subagent writes reach the turn gate instead", "loud warning, allows", HOOK_TIMEOUT),

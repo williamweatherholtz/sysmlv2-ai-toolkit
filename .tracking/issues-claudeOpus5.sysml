@@ -489,4 +489,52 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcControlDefectsAreFixed to issue333;
+
+    part issue334 : Issue {
+        :>> id = "85676c61-4aae-44aa-9b2c-126a4f9ac785";
+        :>> title = "The turn gate is fail-open - the Stop hook ALLOWS on its own error, so the control against a rogue turn holds only when nothing goes wrong";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PANEL FINDING, Critical (rigorTopologyCritique). The Stop hook - the turn gate, the control the human relies on to stop a rogue turn - is fail-OPEN. On its own error it prints a loud warning and ALLOWS. So do post-edit, subagent-stop and the CI gate. Of 12 enforcement points in keel hardening's own table, TWO are fail-closed: pre-write and the pre-commit git hook. On harness timeout every hook resolves to ALLOW. WHY THIS IS THE ANSWER TO 'WE STOP AI AGENTS FROM GOING ROGUE SOMETIMES'. The gate is real and it works when nothing goes wrong. Its failure mode is permission. A slow guard, a locked binary, a crashed validate - the conditions of a session under load, which is when a rogue turn is most likely - all end the turn with a green light. Authority that evaporates under load is not authority. WHAT IS AND IS NOT FIXABLE. The harness's timeout-resolves-to-allow is the harness's and stays a recorded residual (the fire-ledger detects an expected fire that did not happen). The hook's OWN error path is keel's choice, and it currently chooses to allow. That is the fix. RESOLVER: dcTurnGateFailsClosed. Deny on error, the way pre-commit already does.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcTurnGateFailsClosed to issue334;
+
+    part issue335 : Issue {
+        :>> id = "5992bb60-7227-4a20-ac22-82dd842ee652";
+        :>> title = "retro_backlog is vocabulary-keyed and satisfied by any task name, so retro findings are never examined";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CONTROL DEFECT, direction UNDER-REPORTING (D0278) - the fourth found today and the one behind the other three going unrouted. retro_backlog (guards.rs:1601-1628) fires only when a retro's text contains the literal tokens AVOIDABLE-ISSUE, AVOIDABLE ISSUE or LESSON:. It is then satisfied by names_tracked_item, which returns true if ANY dc-prefixed name appears anywhere in the file - and every sprint file names the task it just delivered. The check is satisfied by construction. OBSERVED: every retro written today said FINDING. None matched. Three control defects, two migration-path findings and a keystone-coverage gap went into retro procedureText, the guard examined none of them, and D0131 - retro findings become tracked items - held in prose only. The guard also accepts its `changed` parameter and discards it (`let _ = changed`), which is the tell: it was designed to ask whether THIS COMMIT adds a tracked item and never did. INVALIDATION - what it passed while broken: every retro since it was written, 500+ sprints. NOT RE-CHECKED; a sweep for analyze-method gates whose commit added no Issue or task is possible from git and is the honest follow-up. It is also a WARNING, not a violation, so even a match blocks nothing. RESOLVER: dcRetroFindingsRoute.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRetroFindingsRoute to issue335;
+
+    part issue336 : Issue {
+        :>> id = "f39529df-768e-493d-926a-2f8c861c3de1";
+        :>> title = "A process is a document with an optional guard - steps bind to no predicate, and analyses live in String fields no control can read";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PANEL FINDING, High, two critiques with one root (rigorProcessAuthorityCritique, rigorFactLifecycleCritique). A process in keel is a document with an optional guard, not a machine. MEASURED from keel hardening: 37 processes, 16 assert at least one guard, 10 are declared human-judgment, 11 are UNDECLARED with no guard and no reason - and five of those eleven were authored in the last two days, so authoring is outrunning enforcement and only the author's memory converts one into the other. 'Enforced' means the process asserts a guard SOMEWHERE, not that each step has a check: a ProcessStep is an actionText paragraph with no binding to any predicate, so a process cannot refuse to advance past a skipped step. Only agile-workflow's ceremony steps have per-step gates, which is the one place `keel advance --to` can refuse. THE SAME ROOT UNDERNEATH THE FACT-SLIPPING. Everything analytical in the model is a String field - rationale, consequences, description, procedureText, actionText - and no control can read a String for meaning. A Decision's clauses are prose, so partial delivery is invisible. A retro's findings are prose, so routing is a grep. A resolver's fit is prose. The human's phrase was exact: analyses of facts slip - not out of the repository, where they are all committed, but out of the ENFORCEABLE model into fields only a reader can check. THIS IS WHY THE PROCESS AUTHORITY IS WEAK: a well-written custom process ships as a unit, lands with its skill, and is followed exactly as far as the reader chooses. The process-enforcement contract's own comment names the missing mechanism - 'the constraint IS checkable and no guard was written' - and cannot make anyone write one. RESOLVER: dcProcessStepsBindToChecks - a PROPOSAL to the human, because both halves are schema questions under the frozen core.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcProcessStepsBindToChecks to issue336;
+
+    part issue337 : Issue {
+        :>> id = "2f7526e2-db6d-4c6a-bcea-eb10267e2846";
+        :>> title = "The session's actor never reaches the hooks, so hook-run guards attribute every edit to the machine binding";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "PANEL FINDING, High (rigorSelfReferenceCritique), and a CORRECTION of issue332. issue332 says the ownership guard reads the machine's bound actor rather than the session's. Read at source, that is wrong: actor::resolve (actor.rs:97-112) prefers explicit, then KEEL_ACTOR, then the binding, and ownership calls it (guards.rs:2498). The guard is correct. THE ACTUAL DEFECT: the Stop hook is spawned by the harness in an environment where KEEL_ACTOR was never set - it is exported per-command inside the session's shell - so resolve has nothing to prefer and falls through to the machine binding. This machine is bound to claudeFable5; this session is claudeOpus5. Result: 22 edits attributed to the wrong actor and 12 items the session owns flagged as non-owner edits, burying the 10 real ones. WHY THE CORRECTION MATTERS beyond accuracy: issue332 gave 'guard source under the keystone lock' as the reason for carrying rather than fixing. actor.rs and the hook plumbing are NOT on D0209 clause 2's surface. The reason was wrong, so the carry was unjustified - the process I wrote today names that as the unacceptable case. RESOLVER: dcSessionActorReachesHooks - a session-scoped binding, keyed by the session id the hook payload already carries, that resolve reads between KEEL_ACTOR and the machine binding.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSessionActorReachesHooks to issue337;
+
+    // issue337 CORRECTS issue332: the guard's predicate is right, the session's identity never
+    // reaches the hook. issue332 stays as the record of what was believed and why it was wrong.
+    #Supersede dependency from issue337 to issue332;
 }

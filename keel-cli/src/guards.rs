@@ -551,7 +551,16 @@ pub fn control_defect_registry(root: &Path) -> GuardReport {
             };
         }
     };
+    // Every Issue this project HAS, open or closed. The registry ships with the engine into every
+    // `keel init` project (the defects are the ENGINE's guards, so the note is true downstream), but
+    // the Issues it cites live in the engine repository's own .tracking. A downstream project sees
+    // the entry and lacks the Issue — found by init_smoke going red on a fresh scaffold. So an id
+    // that is ABSENT here is "tracked upstream" and a warning; an id that is PRESENT and CLOSED is
+    // the rot the guard exists to catch and stays a violation.
+    let known: std::collections::HashSet<String> =
+        crate::view::all_issue_names(root, &done).unwrap_or_default().into_iter().collect();
     let mut violations = Vec::new();
+    let mut warnings = Vec::new();
     for (control, d) in &entries {
         if !GUARD_NAMES.contains(&control.as_str()) {
             violations.push(format!(
@@ -564,14 +573,19 @@ pub fn control_defect_registry(root: &Path) -> GuardReport {
                 d.direction
             ));
         }
-        if !open.contains(&d.issue) {
+        if !known.contains(&d.issue) {
+            warnings.push(format!(
+                "`{control}` is registered against {}, which this project does not hold — the defect is the engine's and is tracked in the engine repository; the note still prints, and this entry is removed by the engine's next resync when it resolves upstream",
+                d.issue
+            ));
+        } else if !open.contains(&d.issue) {
             violations.push(format!(
-                "`{control}` is registered against {}, which is not an OPEN issue — either it was resolved and the entry should have been removed in that same commit (D0278), or it never existed. A note that outlives its defect is how a true warning becomes noise",
+                "`{control}` is registered against {}, which is RESOLVED — the entry should have been removed in that same commit (D0278). A note that outlives its defect is how a true warning becomes noise",
                 d.issue
             ));
         }
     }
-    GuardReport { name: "control-defect-registry", scanned: entries.len(), warnings: Vec::new(), violations }
+    GuardReport { name: "control-defect-registry", scanned: entries.len(), warnings, violations }
 }
 
 // ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
@@ -1587,9 +1601,6 @@ pub fn markers_declared_for_test(texts: &[String]) -> HashSet<String> {
 
 // ── retro-backlog guard (a retro finding that terminates in prose) ────────────────────────────────
 
-/// Markers a retro uses to name something it learned.
-const RETRO_FINDING_MARKERS: &[&str] = &["AVOIDABLE-ISSUE", "AVOIDABLE ISSUE", "LESSON:"];
-
 /// Phrases by which a retro EXPLICITLY justifies raising no tracked item.
 ///
 /// The obligation is not "always create an item" — sometimes a control already exists, and adding a
@@ -1597,69 +1608,116 @@ const RETRO_FINDING_MARKERS: &[&str] = &["AVOIDABLE-ISSUE", "AVOIDABLE ISSUE", "
 /// reader can tell a considered decision from an omission.
 const RETRO_NO_ITEM_JUSTIFICATIONS: &[&str] = &["no new item", "no item needed", "already tracked", "no further item"];
 
-/// Warnings for staged sprint records whose retro names a finding with nothing tracked and no reason.
-fn retro_backlog_warnings(changed: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
-    // THE CO-STAGED ITEM MUST BE TIED TO THE FINDING, NOT TO THE COMMIT (issue189 / D0172 step 4).
-    // This function used to return empty whenever the commit staged issues.sysml or backlog.sysml AT
-    // ALL - so a sprint that recorded its own unrelated findings satisfied the guard while its retro's
-    // AVOIDABLE-ISSUE went untracked. Measured consequence: one failure class reached FIVE retros and
-    // zero items, because every commit co-staged something. The exemption is now PER RETRO: the retro's
-    // own text must NAME a tracked item (dcCamelCase or issueNNN) or carry a no-item justification.
-    let _ = changed; // retained in the signature so existing callers and tests keep their shape
+/// Every tracked-item NAME this retro's own text mentions — `dcCamelCase` and `issueNNN` tokens.
+///
+/// The RETRO's text, not the whole sprint file: a sprint file legitimately names the task it
+/// delivered in its `DoD` line, and that name satisfied the old check for every retro ever written.
+fn named_items(text: &str) -> Vec<String> {
+    /// `dc` is followed by an uppercase letter; `issue` by a digit.
+    type NextOk = fn(char) -> bool;
+    let bytes = text.as_bytes();
+    let boundary =
+        |i: usize| i.checked_sub(1).and_then(|j| bytes.get(j)).is_none_or(|b| !b.is_ascii_alphanumeric());
     let mut out = Vec::new();
-    for (path, text) in sprint_texts {
-        let upper = text.to_uppercase();
-        if !RETRO_FINDING_MARKERS.iter().any(|m| upper.contains(m)) {
-            continue;
+    let pairs: [(&str, NextOk); 2] = [("dc", |c| c.is_ascii_uppercase()), ("issue", |c| c.is_ascii_digit())];
+    for (needle, ok_next) in pairs {
+        let mut from = 0;
+        while let Some(rel) = text[from..].find(needle) {
+            let st = from + rel;
+            let rest = &text[st + needle.len()..];
+            if boundary(st) && rest.starts_with(ok_next) {
+                let name: String = text[st..].chars().take_while(char::is_ascii_alphanumeric).collect();
+                out.push(name);
+            }
+            from = st + needle.len();
         }
-        let lower = text.to_lowercase();
-        if RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(j)) {
-            continue; // explicitly justified as needing no item
-        }
-        // The retro text NAMES the item it produced: `dcXxx` (a backlog action) or `issueNNN`.
-        if names_tracked_item(text) {
-            continue;
-        }
-        out.push(format!(
-            "{path}: the retro names a finding (AVOIDABLE-ISSUE / LESSON) but this commit records NO tracked Issue or backlog action, and gives no reason — a retro finding must become a tracked, prioritized item or say explicitly why it needs none (issue085; D0018 — never let a lesson terminate in prose)"
-        ));
     }
     out
 }
 
-/// Does this retro text NAME a tracked item — `dcCamelCase` or `issueNNN`?
+/// The `procedureText` of every RETRO gate in a sprint file — the `method = analyze` verifications
+/// whose title says retro. Returns the texts; a file with no retro gate yields none.
+fn retro_texts(sprint_file: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for block in sprint_file.split("verification ").skip(1) {
+        let head = block.split('{').next().unwrap_or("");
+        let is_retro = block.contains("VerificationMethod::analyze") && head.to_ascii_lowercase().contains("retro");
+        if !is_retro {
+            continue;
+        }
+        if let Some(i) = block.find("procedureText = \"") {
+            let rest = &block[i + 17..];
+            if let Some(j) = rest.find("\";") {
+                out.push(rest[..j].to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Violations for staged sprint records whose RETRO names findings that this commit does not track.
 ///
-/// Word-boundary checked on both sides, because `producedX` must not satisfy `produced` and prose like
-/// `reduced` must not match `dc`. No regex: the guard path stays dependency-light (D0048).
-fn names_tracked_item(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    let boundary =
-        |i: usize| i.checked_sub(1).and_then(|j| bytes.get(j)).is_none_or(|b| !b.is_ascii_alphanumeric());
-    let mut from = 0;
-    while let Some(rel) = text[from..].find("dc") {
-        let s = from + rel;
-        // dc + UpperCamel, at a word boundary: a named backlog action.
-        if boundary(s) && text[s + 2..].starts_with(|c: char| c.is_ascii_uppercase()) {
-            return true;
+/// # Why this is the third shape of the check, and why the first two were both wrong
+///
+/// The first version was satisfied when the commit CO-STAGED any tracked file — and every commit
+/// stages issues.sysml for something, so five retros reached zero items (issue189). The second
+/// version, the fix for that, required the retro's text to NAME an item — and every sprint file names
+/// the task it delivered, so the check was satisfied by construction; it also examined a retro only
+/// if the text contained the literal tokens AVOIDABLE-ISSUE or LESSON:, so a retro that said FINDING
+/// was never examined at all. Six findings on 2026-09-01 went through it that way (issue335).
+///
+/// This version asks the question the guard was always for: does THIS COMMIT add a tracked item that
+/// THIS RETRO names? `staged_added_items` is the set of `part issueNNN` / `action dcX;` declarations
+/// in the staged diff's added lines; a retro is clean when its own text names one of them, or when it
+/// carries an explicit no-item justification. Every retro gate is examined — a `method = analyze`
+/// gate titled retro IS a findings record, whatever words it uses.
+fn retro_backlog_violations(added_items: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (path, text) in sprint_texts {
+        for retro in retro_texts(text) {
+            let lower = retro.to_lowercase();
+            if RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(j)) {
+                continue;
+            }
+            let named = named_items(&retro);
+            if named.iter().any(|n| added_items.iter().any(|a| a == n)) {
+                continue;
+            }
+            out.push(format!(
+                "{path}: the retro records findings but this commit ADDS no tracked item the retro names ({}) — a finding must become a tracked, prioritized item in the SAME commit, or the retro must say why none is needed (D0131; issue335: naming an existing task is what every retro does, and is not tracking a finding)",
+                if named.is_empty() { "it names no item at all".to_string() } else { format!("it names {}, none of which this commit adds", named.join(", ")) }
+            ));
         }
-        from = s + 2;
     }
-    let mut from = 0;
-    while let Some(rel) = text[from..].find("issue") {
-        let s = from + rel;
-        if boundary(s) && text[s + 5..].starts_with(|c: char| c.is_ascii_digit()) {
-            return true;
+    out
+}
+
+/// `part issueNNN` and `action dcX;` declarations ADDED by the staged diff.
+fn staged_added_items(root: &Path) -> Vec<String> {
+    let out = crate::gitx::git().arg("-C").arg(root).args(["diff", "--cached", "-U0", "--", ".tracking"]).output();
+    let Ok(out) = out else { return Vec::new() };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut items = Vec::new();
+    for line in text.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")) {
+        let l = line[1..].trim_start();
+        if let Some(rest) = l.strip_prefix("part ") {
+            if rest.starts_with("issue") {
+                items.push(rest.chars().take_while(char::is_ascii_alphanumeric).collect());
+            }
+        } else if let Some(rest) = l.strip_prefix("action ") {
+            if rest.starts_with("dc") {
+                items.push(rest.chars().take_while(char::is_ascii_alphanumeric).collect());
+            }
         }
-        from = s + 5;
     }
-    false
+    items
 }
 
 /// Test-only re-export of the pure warning builder (the view self-tests exercise it).
 #[doc(hidden)]
 #[must_use]
-pub fn retro_backlog_warnings_for_test(changed: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
-    retro_backlog_warnings(changed, sprint_texts)
+pub fn retro_backlog_violations_for_test(added_items: &[String], sprint_texts: &[(String, String)]) -> Vec<String> {
+    retro_backlog_violations(added_items, sprint_texts)
 }
 
 /// Guard: a sprint retro's findings must become tracked items, not prose (issue085 / D0130).
@@ -1683,7 +1741,8 @@ pub fn retro_backlog(root: &Path) -> GuardReport {
         .filter_map(|p| std::fs::read_to_string(root.join(p)).ok().map(|t| (p.clone(), t)))
         .collect();
     let scanned = sprint_texts.len();
-    GuardReport { name: "retro-backlog", scanned, warnings: retro_backlog_warnings(&changed, &sprint_texts), violations: Vec::new() }
+    let added = staged_added_items(root);
+    GuardReport { name: "retro-backlog", scanned, warnings: Vec::new(), violations: retro_backlog_violations(&added, &sprint_texts) }
 }
 
 // ── priority-inversion guard (recorded order disagreeing with recorded severity) ──────────────────
@@ -4058,44 +4117,79 @@ pub fn engine_lint(root: &Path) -> GuardReport {
 
 #[cfg(test)]
 mod retro_tie_tests {
-    use super::{names_tracked_item, retro_backlog_warnings_for_test};
+    use super::{named_items, retro_backlog_violations_for_test, retro_texts};
 
-    /// THE CONTROL for issue189: co-staging a tracked file no longer satisfies the guard - the retro's
-    /// own text must name the item its finding produced. The old behaviour let one failure class reach
-    /// five retros and zero items, because every commit staged issues.sysml for something else.
-    #[test]
-    fn a_co_staged_file_no_longer_excuses_an_unnamed_finding() {
-        let changed = vec![".tracking/issues.sysml".to_string()];
-        let sprints = vec![(
-            "sprintX.sysml".to_string(),
-            "retro: AVOIDABLE-ISSUE: the same mistake again, described in prose.".to_string(),
-        )];
-        let w = retro_backlog_warnings_for_test(&changed, &sprints);
-        assert_eq!(w.len(), 1, "an unnamed finding must warn even when tracked files are co-staged");
+    /// A sprint file whose RETRO gate carries `finding`. The `DoD` line names the delivered task — as
+    /// every real sprint file does — which is exactly what defeated the previous shape of this guard.
+    fn sprint_with_retro(finding: &str) -> String {
+        format!(
+            "package S {{
+             verification storyXDoD : Test {{ :>> method = VerificationMethod::test; :>> procedureText = \"DELIVERED BACKLOG ITEMS: dcDeliveredThing.\"; }}
+             verification xRetroGate : Test {{ :>> title = \"Sprint X retro gate\"; :>> method = VerificationMethod::analyze; :>> procedureText = \"{finding}\"; }}
+             }}
+"
+        )
     }
 
-    /// A retro that NAMES its item, or justifies having none, is clean.
+    /// THE HOLE THAT LET SIX FINDINGS THROUGH IN ONE DAY (issue335). The retro says FINDING, not
+    /// LESSON — so the old vocabulary gate never examined it — and the file names the delivered task,
+    /// so the old naming check was satisfied by construction. Both were wrong; this must FAIL.
     #[test]
-    fn naming_the_item_or_justifying_none_satisfies_the_guard() {
-        let changed: Vec<String> = Vec::new();
-        for text in [
-            "AVOIDABLE-ISSUE: shell mangling, occurrence six - now tracked as dcAuthorViaWriteTool.",
-            "AVOIDABLE-ISSUE: the counter was wrong; recorded as issue188 with a resolver.",
-            "AVOIDABLE-ISSUE: a one-off typo; no new item - the edit gate already catches this class.",
-        ] {
-            let w = retro_backlog_warnings_for_test(&changed, &[("s.sysml".to_string(), text.to_string())]);
-            assert!(w.is_empty(), "should be clean: {text}");
-        }
+    fn a_finding_in_any_words_with_no_new_item_is_a_violation() {
+        let text = sprint_with_retro("TWO FINDINGS. (1) the guard checks that an edge EXISTS, not that the resolver fits. (2) the same per-instance repair recurred.");
+        let v = retro_backlog_violations_for_test(&[], &[("s.sysml".to_string(), text)]);
+        assert_eq!(v.len(), 1, "a retro with findings and no NEW tracked item must be a violation: {v:?}");
+        assert!(v[0].contains("names no item at all"), "{v:?}");
     }
 
-    /// Word boundaries: prose containing `dc` or `issue` must not satisfy the naming check.
+    /// issue189's hole, kept as a regression: naming the DELIVERED task is what every retro does and
+    /// tracks nothing. Only an item this commit ADDS counts.
+    #[test]
+    fn naming_the_delivered_task_does_not_track_a_finding() {
+        let text = sprint_with_retro("FINDING: the counter was wrong. This sprint delivered dcDeliveredThing, which is unrelated.");
+        let v = retro_backlog_violations_for_test(&[], &[("s.sysml".to_string(), text)]);
+        assert_eq!(v.len(), 1, "an EXISTING task's name must not satisfy the check: {v:?}");
+        assert!(v[0].contains("dcDeliveredThing") && v[0].contains("none of which this commit adds"), "{v:?}");
+    }
+
+    /// The satisfying condition: the retro names an item and THIS COMMIT adds it.
+    #[test]
+    fn a_finding_whose_named_item_this_commit_adds_is_clean() {
+        let text = sprint_with_retro("FINDING: the counter was wrong; recorded as issue188 with a resolver.");
+        let added = vec!["issue188".to_string()];
+        assert!(retro_backlog_violations_for_test(&added, &[("s.sysml".to_string(), text)]).is_empty());
+        let text = sprint_with_retro("LESSON: shell mangling again - now tracked as dcAuthorViaWriteTool.");
+        let added = vec!["dcAuthorViaWriteTool".to_string()];
+        assert!(retro_backlog_violations_for_test(&added, &[("s.sysml".to_string(), text)]).is_empty());
+    }
+
+    /// The obligation is a STATED choice, not always-an-item: an explicit justification is clean.
+    #[test]
+    fn an_explicit_no_item_justification_is_clean() {
+        let text = sprint_with_retro("FINDING: a one-off typo; no new item - the edit gate already catches this class.");
+        assert!(retro_backlog_violations_for_test(&[], &[("s.sysml".to_string(), text)]).is_empty());
+    }
+
+    /// Only the RETRO gate is examined — a `DoD` or review gate mentioning a finding-like word is not a
+    /// findings record, and a sprint with no retro gate yields nothing to check.
+    #[test]
+    fn only_retro_gates_are_examined() {
+        let no_retro = "package S {
+verification storyXDoD : Test { :>> method = VerificationMethod::test; :>> procedureText = \"FINDING: not a retro.\"; }
+}
+";
+        assert!(retro_texts(no_retro).is_empty());
+        assert!(retro_backlog_violations_for_test(&[], &[("s.sysml".to_string(), no_retro.to_string())]).is_empty());
+    }
+
+    /// Word boundaries on the item tokens, as before.
     #[test]
     fn prose_lookalikes_do_not_count_as_items() {
-        assert!(!names_tracked_item("the dc motor issue was discussed at length"));
-        assert!(!names_tracked_item("reproduced changes"));
-        assert!(names_tracked_item("tracked as dcFooBar"));
-        assert!(names_tracked_item("see issue123"));
-        assert!(!names_tracked_item("tissue42 is not an item"));
+        assert!(named_items("the dc motor issue was discussed at length").is_empty());
+        assert!(named_items("reproduced changes").is_empty());
+        assert_eq!(named_items("tracked as dcFooBar"), vec!["dcFooBar"]);
+        assert_eq!(named_items("see issue123"), vec!["issue123"]);
+        assert!(named_items("tissue42 is not an item").is_empty());
     }
 }
 

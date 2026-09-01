@@ -63,6 +63,34 @@ fn resolver() -> String {
     )
 }
 
+/// The resolver for a GATING hook (D0279): a missing binary BLOCKS instead of allowing.
+///
+/// # Why the Stop hook gets its own resolver
+///
+/// D0134's rule — a hook never fails a turn on infrastructure absence — is right for the ADVISORY
+/// hooks: a routing reminder or a shell tip that cannot run should cost nothing. It was wrong for the
+/// turn gate, and the five-critic rigor panel (2026-09-01) named the consequence: of twelve
+/// enforcement points, two failed closed, and the one relied on to stop a rogue turn switched itself
+/// off on a PATH problem, silently — printing "this gate did not run" and then permitting. That is
+/// the exact shape of "we lack the authority to drive our own process". The binary was locked twice
+/// that day during ordinary rebuilds; each time the gate did not run and each time the turn ended
+/// green.
+///
+/// The precedent already existed: `pre-write` has been fail-closed since it shipped, in D0134's own
+/// enforcement table. The line this draws is the principled one — GATING hooks fail closed, ADVISORY
+/// hooks fail open — and the Stop hook is a gate.
+///
+/// THE COST, stated: a project whose keel binary is genuinely absent cannot end a turn until it is
+/// installed. That is loud, immediate, and says exactly what to do — the correct failure mode for a
+/// project that has declared it runs under keel. The alternative was an enforcement layer that
+/// disabled itself and reported nothing.
+fn gating_resolver() -> String {
+    format!(
+        "K=\"${{KEEL_BIN:-}}\"; {{ [ -n \"$K\" ] && [ -x \"$K\" ]; }} || K=$(command -v keel 2>/dev/null); \
+         [ -n \"$K\" ] || {{ printf '%s' '{{\"decision\":\"block\",\"reason\":\"[keel] The turn gate could not run: the keel binary is NOT FOUND. This project runs under keel, so a turn cannot end ungated. Set KEEL_BIN or install: {INSTALL_URL}\"}}'; exit 0; }}; "
+    )
+}
+
 /// One keel-owned hook entry.
 fn hook_entry(cmd: &str, timeout: u64, status: &str) -> serde_json::Value {
     serde_json::json!({
@@ -98,10 +126,11 @@ fn protected_path_command() -> String {
 /// The keel-owned `hooks` object — FIVE events (D-P0a).
 fn keel_hooks() -> serde_json::Value {
     let r = resolver();
+    let g = gating_resolver();
     serde_json::json!({
         "UserPromptSubmit": [{ "hooks": [hook_entry(&format!("{r}\"$K\" hook user-prompt"), 30, "route-first checklist")] }],
         "PostToolUse": [{ "matcher": "Write|Edit", "hooks": [hook_entry(&format!("{r}\"$K\" hook post-edit"), 60, "keel fast gate")] }],
-        "Stop": [{ "hooks": [hook_entry(&format!("{r}\"$K\" hook stop"), 180, "keel turn gate")] }],
+        "Stop": [{ "hooks": [hook_entry(&format!("{g}\"$K\" hook stop"), 180, "keel turn gate")] }],
         "PreToolUse": [
             { "matcher": "Bash", "hooks": [hook_entry(&format!("{r}\"$K\" hook pre-bash"), 30, "shell adaptation advisory")] },
             { "matcher": "Write|Edit", "hooks": [hook_entry(&protected_path_command(), 30, "protected-path check")] }
@@ -319,6 +348,17 @@ mod tests {
         assert!(text.contains("KEEL_BIN"), "KEEL_BIN resolution missing");
         assert!(resolver().contains("NOT FOUND"), "missing-binary branch must be loud");
         assert!(resolver().contains("releases"), "the warning must name the install path");
+        // D0279: the TURN GATE fails closed on a missing binary; the advisory hooks still fail open.
+        let stop_cmd = h["Stop"][0]["hooks"][0]["command"].as_str().expect("stop command");
+        assert!(
+            stop_cmd.contains("\"decision\":\"block\"") && stop_cmd.contains("NOT FOUND"),
+            "a missing binary must BLOCK the turn, not print and allow: {stop_cmd}"
+        );
+        let prompt_cmd = h["UserPromptSubmit"][0]["hooks"][0]["command"].as_str().expect("prompt command");
+        assert!(
+            !prompt_cmd.contains("\"decision\":\"block\""),
+            "an ADVISORY hook still fails open — D0134 holds for advice: {prompt_cmd}"
+        );
     }
 
     /// The pure-shell protected-path test needs NO binary to deny, matches both separators, and its

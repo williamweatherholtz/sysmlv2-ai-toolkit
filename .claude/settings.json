@@ -44,7 +44,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook stop",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { printf '%s' '{\"decision\":\"block\",\"reason\":\"[keel] The turn gate could not run: the keel binary is NOT FOUND. This project runs under keel, so a turn cannot end ungated. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases\"}'; exit 0; }; \"$K\" hook stop",
             "shell": "bash",
             "statusMessage": "keel turn gate",
             "timeout": 180,

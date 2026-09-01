@@ -1740,6 +1740,16 @@ fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &Has
         .collect()
 }
 
+/// Every Issue this project HOLDS, open or resolved (D0278: the control-defect registry needs to tell
+/// "absent — tracked upstream" from "present and resolved — a stale entry").
+///
+/// # Errors
+/// Returns [`ViewError`] if a tracking/instance file fails to parse.
+pub fn all_issue_names<S: std::hash::BuildHasher>(root: &Path, done: &HashSet<String, S>) -> Result<Vec<String>, ViewError> {
+    let model = Model::build(root)?;
+    Ok(compute_issue_resolution(&model, done).into_iter().map(|i| i.issue).collect())
+}
+
 /// Names of OPEN issues (no complete `#Resolves` resolver), sorted. Used by orient to surface
 /// `open_issues`. `done` is orient's done-set.
 ///
@@ -5123,28 +5133,43 @@ mod tests {
     }
 
     #[test]
-    fn retro_backlog_warns_only_when_a_finding_is_neither_tracked_nor_justified() {
-        use crate::guards::retro_backlog_warnings_for_test as warn;
-        let sprint = |t: &str| vec![(".tracking/delivery/sprint999_x.sysml".to_string(), t.to_string())];
-        let staged_sprint_only = vec![".tracking/delivery/sprint999_x.sysml".to_string()];
-        let staged_with_item = vec![
-            ".tracking/delivery/sprint999_x.sysml".to_string(),
-            ".tracking/issues.sysml".to_string(),
-        ];
+    fn retro_backlog_fails_when_a_finding_is_neither_tracked_in_this_commit_nor_justified() {
+        use crate::guards::retro_backlog_violations_for_test as check;
+        // A sprint file whose RETRO gate carries the given text. The DoD line names the delivered
+        // task, as every real one does — which is what made the second shape of this guard vacuous.
+        let sprint = |t: &str| {
+            vec![(
+                ".tracking/delivery/sprint999_x.sysml".to_string(),
+                format!(
+                    "package S {{
+verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> procedureText = \"DELIVERED: dcTheWork.\"; }}
+                     verification xRetroGate : Test {{ :>> title = \"retro gate\"; :>> method = VerificationMethod::analyze; :>> procedureText = \"{t}\"; }}
+}}
+"
+                ),
+            )]
+        };
+        let nothing_added: Vec<String> = Vec::new();
+        let added_issue073 = vec!["issue073".to_string()];
 
-        // A finding with nothing tracked and no reason -> warn (the sprint-247 failure).
-        assert_eq!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
-        // D0172/issue189 CHANGED THIS CASE: co-staging a tracked file no longer excuses the finding
-        // - that exemption let one failure class reach five retros and zero items, because every
-        // commit staged issues.sysml for something else. The retro must NAME its item now.
-        assert_eq!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
-        // Naming the item the finding produced -> clean (the D0172 tie).
-        assert!(warn(&staged_with_item, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel - tracked as issue073.")).is_empty());
-        // Same finding, explicitly justified as needing none -> clean. The obligation is that the
-        // CHOICE is stated, not that an item always exists (a duplicate control is noise).
-        assert!(warn(&staged_sprint_only, &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded.")).is_empty());
-        // A retro naming nothing avoidable -> clean; the guard must not demand findings.
-        assert!(warn(&staged_sprint_only, &sprint("WELL: everything went fine.")).is_empty());
+        // THREE SHAPES OF THIS GUARD, and the two earlier ones are kept here as regressions.
+        // Shape 1 (pre-issue189): co-staging a tracked file satisfied it — every commit stages one.
+        // Shape 2 (D0172): the retro's text had to NAME an item — every sprint file names the task it
+        //   delivered, and the check only ran on the tokens AVOIDABLE-ISSUE / LESSON: (issue335).
+        // Shape 3 (D0279): this commit must ADD an item the retro's own text names, or say why not.
+        assert_eq!(check(&nothing_added, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
+        // The sprint-513 case: FINDING, not LESSON — shape 2 never looked. Shape 3 does.
+        assert_eq!(check(&nothing_added, &sprint("FINDING: piping hung the kernel.")).len(), 1);
+        // Naming the delivered task is what every retro does; it tracks nothing.
+        assert_eq!(check(&nothing_added, &sprint("FINDING: piping hung the kernel. Delivered dcTheWork.")).len(), 1);
+        // Naming an item THIS COMMIT ADDS -> clean.
+        assert!(check(&added_issue073, &sprint("FINDING: piping hung the kernel - tracked as issue073.")).is_empty());
+        // Explicitly justified as needing none -> clean. The obligation is a STATED choice.
+        assert!(check(&nothing_added, &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded.")).is_empty());
+        // A retro with no findings language still gets examined; it names nothing and justifies
+        // nothing, so it is a violation — a retro that records no finding and no reason is exactly
+        // the empty ceremony D0131 exists to prevent.
+        assert_eq!(check(&nothing_added, &sprint("WELL: everything went fine.")).len(), 1);
     }
 
     #[test]
