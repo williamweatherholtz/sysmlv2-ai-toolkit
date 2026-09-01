@@ -4510,34 +4510,31 @@ mod tests {
         assert_eq!(bash_tokens("a \"b c\" d"), vec!["a", "b c", "d"], "quoted text glues to one token");
     }
 
-    /// issue150: the oversight advisory must be ADVISORY. A turn boundary that blocked because a server
-    /// was not running would be the over-strict gate that trains its actor to disable it, taking the
-    /// honest-state checks in the same hook down with it (issue076/issue081, and D0132 in the large).
+    /// The turn boundary blocks ONLY on dishonest state, and says nothing otherwise.
+    ///
+    /// This replaces a test that asserted the OVERSIGHT ADVISORY never blocks. That advisory is gone
+    /// (D0270): it counted items waiting on the human and prescribed how to look at them, guessing
+    /// from an env var whether they were at a terminal or elsewhere. With it removed the old test
+    /// asserted the existence of the thing it was policing, so it failed the moment the thing was
+    /// deleted - a test bound to a mechanism rather than to a property.
+    ///
+    /// The property that survives: nothing but `problems` can reach the block, and a green turn is
+    /// silent.
     #[test]
-    fn the_oversight_advisory_never_blocks() {
+    fn the_turn_boundary_blocks_only_on_dishonest_state() {
         const MAIN_RS: &str = include_str!("main.rs");
         let at = MAIN_RS.find("fn hook_stop(").unwrap_or(0);
         assert!(at > 0, "hook_stop must exist");
         let hook = &MAIN_RS[at..];
-        // The property, not the layout: the advisory ALONE must resolve to a systemMessage. It now also
-        // appends to a blocking reason when the model is separately dishonest (issue150) - that block is
-        // caused by `problems`, never by the console being down - so the earlier version of this test,
-        // which scanned a region between two markers, asserted a structure rather than the property and
-        // failed the moment the advisory was hoisted out of the green branch.
-        let solo = hook.find("oversight.map_or(0,").unwrap_or(0);
-        assert!(solo > 0, "the advisory alone must resolve via map_or, returning 0 when absent");
-        // No char escape: the first line of the slice is the statement we care about.
-        let line_end = solo + hook[solo..].lines().next().map_or(0, str::len);
-        assert!(
-            hook[solo..line_end].contains("systemMessage"),
-            "the advisory's own emit must be a systemMessage -- the human's console being down is not              dishonest state and must never block a turn"
-        );
-        // And a block must still be gated on `problems`, so nothing can reach it via the advisory.
         let block = hook.find("\"decision\": \"block\"").unwrap_or(0);
         assert!(block > 0, "the block emit must exist");
         assert!(
             hook[..block].contains("if problems.is_empty() {"),
-            "the block path must sit behind the problems check"
+            "the block path must sit behind the problems check, so only dishonest state can reach it"
+        );
+        assert!(
+            hook[..block].contains("return 0;"),
+            "and a green turn must return silently - the boundary speaks only when something is wrong"
         );
     }
 
