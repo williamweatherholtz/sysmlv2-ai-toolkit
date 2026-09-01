@@ -94,8 +94,25 @@ fn this_repository_reports_its_real_state() {
     for section in ["engine", "library", "model", "work", "ci"] {
         assert!(text.contains(section), "every base must appear; missing `{section}`: {text}");
     }
+    assert!(text.contains("guards"), "the model section names its guard count: {text}");
+    let tracked = count_before(&text, " tracked file(s)").expect("a tracked-file count is printed");
     assert!(
-        text.contains("guards") && !text.contains("0 tracked file(s)"),
-        "and it must read the real corpus rather than an empty one: {text}"
+        tracked > 0,
+        "and it must read the real corpus rather than an empty one — {tracked} tracked file(s):
+{text}"
     );
+}
+
+/// The number immediately preceding `label` in `text`, if any.
+///
+/// # Why a parse and not `!contains("0 <label>")`
+///
+/// That substring form is wrong for every count ending in zero, because "580 tracked file(s)"
+/// CONTAINS "0 tracked file(s)". It has now broken this suite twice — once at 370 scanned, once at
+/// 580 tracked files — and the first fix was applied to one site while an identical one stayed live.
+/// Reading the number is the only form that says what was meant.
+fn count_before(text: &str, label: &str) -> Option<u64> {
+    let at = text.find(label)?;
+    let digits: String = text[..at].chars().rev().take_while(char::is_ascii_digit).collect();
+    digits.chars().rev().collect::<String>().parse().ok()
 }

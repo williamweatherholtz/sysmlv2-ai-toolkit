@@ -873,6 +873,45 @@ fn arm_marker(root: &Path, pre_sha: Option<&String>) -> Result<(), i32> {
 
 /// Write every planned file, reporting how many succeeded before a failure so the rollback can say
 /// what it discarded. Extracted from `cmd` to keep that function within its line budget.
+/// Name every file the migration wrote, repo-relative (issue328).
+///
+/// # Why a COUNT was not enough
+///
+/// Migrate reported "wrote 2 file(s)" and nothing else, so a project that had CUSTOMISED an
+/// engine-shipped file learned nothing when the resync replaced it. Observed directly: a local edit
+/// to `.engine/skills/actor-enrollment/SKILL.md` was present before the run and gone after, with the
+/// count as the only output. That is the issue314 class one file-kind over — that fix stopped the
+/// resync reverting a project's ADOPTION choices; this is its edited CONTENT.
+///
+/// # Why naming, rather than preserving or three-way merging
+///
+/// Overwriting is arguably the correct POLICY: engine files belong to the engine, and a project that
+/// wants durable local content has the unit mechanism for it. What is not defensible is doing it
+/// silently. Preserving instead would leave a project pinned to a stale engine file forever with no
+/// signal; a three-way merge would need the engine content at the project's OLD vintage, which is
+/// exactly what keel deliberately does not store (there is no vintage stamp — the vintage IS which
+/// steps still match). Naming the files costs nothing, is always truthful, and hands the reader the
+/// one tool that settles it: `git diff` on a specific path, before the commit that pm3Reconcile
+/// already tells them to make.
+fn report_written(p: &MigrationPlan, root: &Path) {
+    let mut paths: Vec<String> = p
+        .steps
+        .iter()
+        .flat_map(|s| &s.files)
+        .map(|f| f.path.strip_prefix(root).unwrap_or(&f.path).display().to_string().replace('\\', "/"))
+        .collect();
+    paths.sort();
+    paths.dedup();
+    if paths.is_empty() {
+        return;
+    }
+    println!("  REVIEW THESE BEFORE COMMITTING — a resync overwrites engine files in place, so any");
+    println!("  local edit to one of them is now gone. `git diff` says what changed (issue328):");
+    for path in &paths {
+        println!("    {path}");
+    }
+}
+
 fn apply_files(p: &MigrationPlan) -> Result<usize, (usize, PathBuf, std::io::Error)> {
     let mut written = 0usize;
     for s in &p.steps {
@@ -1042,6 +1081,7 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     // state on the next invocation — the rollback becoming the defect.
     let _ = std::fs::remove_file(marker_path(root));
     println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
+    report_written(&p, root);
     println!();
     println!("  NEXT: run this project's own gate — `keel validate . && keel guard && keel check-engine .` — then commit.");
     println!("  That gate, not this command, is the test that matters: it is the state you are actually in.");
