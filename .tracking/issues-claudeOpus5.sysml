@@ -337,4 +337,29 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcUnknownFlagIsRefused to issue320;
+
+    part issue321 : Issue {
+        :>> id = "7e18cd4f-8544-4640-a0d0-53398ef50bd6";
+        :>> title = "The CLI has 111 dispatch arms and ~30 of them are the same act: compute a lens and print it";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "INGESTED FROM THE HUMAN (st063), on the summary page: 'remove cruft from CLI. tons of commands, when a smaller subset should do, and parentheticals embedded in descriptions. tighten it up - what core functional hooks do we need in the CLI? a lot of these seem to be variations of an idea cemented as separate cli hooks. and critique all descriptions to trim them down to the real root of what is being done and what a user needs to know to run it.' MEASURED, and they are right about the scale. 111 dispatch arms in main.rs. About 30 of those are READ-ONLY LENSES - assumptions, attestation-coverage, authority-queue, concern-coverage, contentions, controls, coverage, critique-coverage, dispositions, hardening, indicators, intake, open-issues, orphans, outstanding, question-coverage, recent, reprocess-candidates, rootedness, sitting-coverage, suspect, tier-satisfaction, verification, why, workflows and more. Every one of them is the same act: compute a view of the model and print it. Each got its own top-level verb. THE DUPLICATION IS DEEPER THAN THE COMMAND LIST. 16 of the 32 declared VIEWPOINTS also have a dedicated top-level command of the same name - so a lens is declared in one mechanism and implemented in another. And the two are only half-connected: `keel view orphans` FAILS with 'view file not found' while `keel orphans` works. Two mechanisms for one idea, neither complete. DONE IN THIS PASS, because it breaks nothing: 55 help rows carried a decision-id parenthetical - (D0195), (issue171/D0169) - which is provenance for a maintainer, not something a user needs in order to run the command. All 55 stripped; the citations remain in the source doc comments, where someone looking for the reason will actually look. NOT DONE, and this is the part that needs a decision rather than initiative: collapsing ~30 verbs into one router is a BREAKING change to a surface other things call by name. Measured cost: 118 references across .engine skills and processes invoke these commands directly, and guard 39 (tool-reference) fails a process that names a tool it did not receive. So the migration is real work with a real failure mode, not a rename. THE SHAPE I WOULD PROPOSE, for their call: one `keel show <lens>` routing to the existing implementations, with all current names kept as aliases for a deprecation window so nothing breaks on the day it lands; then the alias list shrinks as the 118 call sites move. That collapses the visible surface from 111 arms to roughly twenty verbs - orient/status/whats-next, show, gate, record, audit, github, library, process, init/migrate/sync/land, serve/render/report/deck, actor/enroll, hook - without removing a single capability.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    // Re-pointed: record issue auto-triaged this onto a task that is already DONE. The honest
+    // resolver is the consolidation task, which the human has not yet authorised - so the issue
+    // carries the analysis and waits, rather than looking handled.
+    #Resolves dependency from dcCliSurfaceConsolidation to issue321;
+
+    part issue322 : Issue {
+        :>> id = "af25e075-18f6-4678-bae2-2b2aadcb6e2c";
+        :>> title = "The prose-by-argument trap fired a fourth time, because the fix was applied per-command not per-class";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOURTH OCCURRENCE of the same trap, and the reason it recurred is precisely diagnosable: the fix was applied per-command instead of per-class. D0224 added `--from FILE` to `record decision` after shell backticks in a double-quoted argument were EXECUTED into a governance record twice. issue315 recorded the third occurrence, in `record issue --description`, which also ran `keel deactivate` against this repository; that one was fixed with `--description-from FILE`. `add-task --dod` was the remaining prose-by-argument path and nobody looked, so today it ate `keel show <lens>` out of a task's Definition of Done, leaving the sentence 'one routing to the existing implementations' - a DoD that reads as finished prose and is missing the thing it specifies. WHAT MAKES THIS DIFFERENT FROM CARELESSNESS: after the third occurrence I wrote the rule into CLAUDE.md, into the skill, and into a Decision. All three said never pass prose as a double-quoted shell argument. The instruction was present, correct, and prominent - and the command I needed had no file-taking flag, so following the rule was impossible for that call. A rule that cannot be obeyed on some path is not a control on that path. FIXED: `add-task --dod-from FILE`, with the usage text naming the hazard on the inline form. That is now every write path that takes prose. THE REMAINING GAP, stated rather than claimed closed: nothing CHECKS that a write path taking a long prose field offers a file alternative. A fifth such path added tomorrow would reopen this. That check is cheap in principle - enumerate the write commands, assert each prose flag has a `-from` sibling - and it is not built here because the honest resolver is the CLI consolidation work (issue321), which will change what the write paths are.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCliSurfaceConsolidation to issue322;
 }

@@ -114,10 +114,11 @@ frozen (modify it only by out-of-band Decision).
 - **The write API is the sanctioned write path.** `keel append-result` / `append-gate-result`
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
   refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
-  `record decision` (prose via `--from FILE`) and `record issue` (prose via `--description-from FILE`) —
+  `record decision` (`--from FILE`), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
   **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
-  has now happened three times (D0224/issue256, then issue315, which also ran `keel deactivate` against
-  this repo). `record statement` / `record story` (intake's write path — a human's words VERBATIM,
+  has now happened FOUR times (D0224/issue256, then issue315, which also ran `keel deactivate` against
+  this repo, then issue322 — the fix had been applied per-command, so the one path left unfixed was
+  the one that fired). `record statement` / `record story` (intake's write path — a human's words VERBATIM,
   then the story that translates them with its `#DerivedFrom` edge authored alongside; D0236/issue289),
   `github-pull` / `github-ingest` (an issue on the repository becomes a VERBATIM `Statement` attributed to the reporter's
   GitHub **login**, carrying its URL as `sourceUrl` so a re-ingest REFUSES; it records WORDS, not work —

@@ -185,7 +185,7 @@ fn engine_version_skew(root: &Path) -> Option<String> {
         return None;
     }
     Some(format!(
-        "[keel] engine-version SKEW: this binary is {binary} but this project PINS {declared} (engine-version.toml).          The pin is BINDING (D0251): writes and gates REFUSE under skew; reads warn and proceed. Run the pinned          version, or `keel migrate` to bring the tree to this one (it re-stamps the pin)."
+        "[keel] engine-version SKEW: this binary is {binary} but this project PINS {declared} (engine-version.toml).          The pin is BINDING: writes and gates REFUSE under skew; reads warn and proceed. Run the pinned          version, or `keel migrate` to bring the tree to this one (it re-stamps the pin)."
     ))
 }
 
@@ -487,7 +487,7 @@ fn consume_override(root: &Path, written_path: &str, session: &str) -> Option<St
     let _ = std::fs::remove_file(&op); // single-use
     let title = format!("override used: direct write to {written_path}");
     let desc = format!(
-        "A recorded override unlocked a direct write (D0176 tier 3). Path actually written: {written_path}. Reason given: {reason}. Session: {session}. Discharge: a human reviews the write and triages this obligation with a #Resolves edge."
+        "A recorded override unlocked a direct write. Path actually written: {written_path}. Reason given: {reason}. Session: {session}. Discharge: a human reviews the write and triages this obligation with a #Resolves edge."
     );
     match keel_cli::write::record_obligation(root, "override", &title, &desc, &actor) {
         Ok(p) => {
@@ -560,7 +560,7 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
     match (tier1, profile) {
         (Some((surface, sanctioned)), "strict") => {
             let reason = format!(
-                "[keel] {surface} is an API-owned fact surface (D0176 tier 1). Use the sanctioned path: {sanctioned} - or, for what the API cannot express, `keel override {path} --reason \"...\"` (single-use, recorded, reviewed)."
+                "[keel] {surface} is an API-owned fact surface. Use the sanctioned path: {sanctioned} - or, for what the API cannot express, `keel override {path} --reason \"...\"` (single-use, recorded, reviewed)."
             );
             println!(
                 "{}",
@@ -967,7 +967,7 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
         body.truncate(2000);
         return hook_emit(&serde_json::json!({
             "systemMessage": format!(
-                "[proactive — non-blocking] That edit may have broken something downstream (D0209 clause 4):\n\n{body}\n\nThe model still parses, so this does NOT block — but fix it now, at the point of the edit, before it reaches a commit gate."
+                "[proactive — non-blocking] That edit may have broken something downstream:\n\n{body}\n\nThe model still parses, so this does NOT block — but fix it now, at the point of the edit, before it reaches a commit gate."
             )
         }));
     }
@@ -2320,7 +2320,7 @@ fn provenance_date(args: &[String], flag_name: &str, usage: &str) -> Result<Stri
     flag(args, flag_name).ok_or_else(|| {
         eprintln!("error: --{flag_name} YYYY-MM-DD is required.");
         eprintln!(
-            "  A provenance date is never defaulted (issue182): it used to fall back to 2026-01-01."
+"  A provenance date is never defaulted: it used to fall back to 2026-01-01."
         );
         eprintln!("usage: {usage}");
         2
@@ -2549,7 +2549,7 @@ fn cmd_record_statement(args: &[String]) -> i32 {
         // Derived, not restated (issue300): the usage line a user reads is the same vocabulary
         // surface as the check, so it must come from the same source or it will drift from it.
         eprintln!(
-            "       --said-by ACTOR --said-at YYYY-MM-DD --title T [--channel {}]",
+"       --said-by ACTOR --said-at YYYY-MM-DD --title T [--channel {}]",
             keel_cli::schema::enum_members_union(&root, "StatementChannel").join("|")
         );
         eprintln!("       [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
@@ -2614,7 +2614,7 @@ fn cmd_record_story(args: &[String]) -> i32 {
         eprintln!("usage: keel record story --from-statement stNNN --title T --as-a ROLE --i-want CAPABILITY");
         // Derived, not restated (issue300) — see the note at the `record statement` usage.
         eprintln!(
-            "       --implication {}",
+"       --implication {}",
             keel_cli::schema::enum_members_union(&root, "ImplicationKind").join("|")
         );
         eprintln!("       [--so-that OUTCOME] [--triage-note WHY] [--by RECORDER] [--at YYYY-MM-DD] [--root ROOT]");
@@ -2661,7 +2661,9 @@ fn cmd_record_story(args: &[String]) -> i32 {
 
 fn cmd_add_task(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: keel add-task --file FILE --def DEF --task TASK --dod TEXT --method METHOD");
+        eprintln!("usage: keel add-task --file FILE --def DEF --task TASK --method METHOD");
+        eprintln!("       --dod-from FILE   the criterion, read from a file (PREFER THIS)");
+        eprintln!("       --dod TEXT        the criterion inline — a shell EXECUTES backticks in it");
         return 2;
     };
     let Some(def_name) = flag(args, "def") else {
@@ -2672,7 +2674,22 @@ fn cmd_add_task(args: &[String]) -> i32 {
         eprintln!("error: --task required");
         return 2;
     };
-    let Some(dod) = flag(args, "dod") else {
+    // PROSE COMES FROM A FILE (D0224, now extended to the third and last write path that took it by
+    // argument). `record decision` got `--from` after shell backticks EXECUTED into a governance
+    // record twice; `record issue` got `--description-from` after a third occurrence. `add-task`
+    // was left on the argument path and the trap fired a FOURTH time, eating `keel show <lens>` out
+    // of a DoD and leaving the sentence "one  routing to the existing implementations". Fixing two
+    // of three call sites is what let this recur.
+    let dod = flag(args, "dod-from")
+        .and_then(|f| match std::fs::read_to_string(&f) {
+            Ok(t) => Some(t.trim().to_string()),
+            Err(e) => {
+                eprintln!("add-task: cannot read {f}: {e}");
+                None
+            }
+        })
+        .or_else(|| flag(args, "dod"));
+    let Some(dod) = dod else {
         eprintln!("error: --dod required");
         return 2;
     };
@@ -3389,7 +3406,7 @@ fn init_wrapper(dir: &Path) -> Result<(), i32> {
         return Err(1);
     }
     let wrapper_toml = format!(
-        "# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies\n# against (D0251 clause B). NEVER trust-on-first-use: a version with no entry here refuses to\n# download. Entries come from the release page's published checksums; the seeded cache entry in\n# .keel/bin/ covers THIS machine until then.\n[\"{}\"]\n",
+        "# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies\n# against. NEVER trust-on-first-use: a version with no entry here refuses to\n# download. Entries come from the release page's published checksums; the seeded cache entry in\n# .keel/bin/ covers THIS machine until then.\n[\"{}\"]\n",
         env!("CARGO_PKG_VERSION")
     );
     if let Err(e) = std::fs::write(dir.join("keel-wrapper.toml"), wrapper_toml) {
@@ -3518,7 +3535,7 @@ fn cmd_init(args: &[String]) -> i32 {
     // D0190: stamp the declared engine version - which binary's checks this engine is defined
     // against. Re-stamped by `keel migrate`; read only by the parity warning, never by migrate.
     let version_toml = format!(
-        "# engine-version - the BINDING engine pin: the version whose writes and gates this project accepts\n# (D0190 stamped it; D0251 made it bite). Written by `keel init`, re-stamped by `keel migrate`; a\n# mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin (D0251 B).\nengine = \"{}\"\n",
+        "# engine-version - the BINDING engine pin: the version whose writes and gates this project accepts\n#. Written by `keel init`, re-stamped by `keel migrate`; a\n# mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin.\nengine = \"{}\"\n",
         env!("CARGO_PKG_VERSION")
     );
     if let Err(code) = init_wrapper(&dir) {
@@ -3718,7 +3735,7 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
         for p in keel_cli::activation::declared_processes(&root) {
             match act.unit(&p) {
                 Some(unit) => println!(
-                    "  [{}] {p}  ({} guard(s))",
+"  [{}] {p}  ({} guard(s))",
                     if act.is_process_active(&p) { "active  " } else { "INACTIVE" },
                     unit.guards.len()
                 ),
@@ -3732,7 +3749,7 @@ fn cmd_activation(mode: &str, args: &[String]) -> i32 {
 viewpoints ({} declared):", vps.len());
         for vp in &vps {
             println!(
-                "  [{}] {}",
+"  [{}] {}",
                 if act.is_viewpoint_active(&vp.name) { "active  " } else { "INACTIVE" },
                 vp.name
             );
@@ -3772,7 +3789,7 @@ viewpoints ({} declared):", vps.len());
                 // Adding an assert is a process-definition change under the keystone and is now
                 // caught by audit-adherence as a Core -> Active/Inactive weakening; the CLI must not
                 // recommend it as a convenience.
-                "error: `{target}` is a declared process but asserts no guard, so there is nothing for {mode} to switch. Activation governs GUARDS (D0138). To stop running this process, remove the facts it authors -- a process whose inputs are absent produces nothing. Do NOT add an `assert constraint` to make it switchable: claiming a guard converts it from CORE to that process's switchable property, which DISARMS it (issue242), and audit-adherence gates that transition."
+                "error: `{target}` is a declared process but asserts no guard, so there is nothing for {mode} to switch. Activation governs GUARDS. To stop running this process, remove the facts it authors -- a process whose inputs are absent produces nothing. Do NOT add an `assert constraint` to make it switchable: claiming a guard converts it from CORE to that process's switchable property, which DISARMS it, and audit-adherence gates that transition."
             );
         } else {
             eprintln!(
@@ -4030,94 +4047,94 @@ fn cmd_enroll(rest: &[String]) -> i32 {
 /// table plus a test is not full derivation — clap would be — but it makes the drift impossible
 /// to land rather than merely unlikely.
 const CATALOGUE: &[&str] = &[
-    "  version | --version [--json] which build is this — release version + build commit + guard inventory",
-    "  init DIR                     scaffold the engine into a NEW project (D0093 cold start)",
-    "  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result (D0129)",
-    "  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history",
-    "  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED (D0147)",
-    "  verification [--pending]         EXAMINED vs EXERCISED, split — never one number",
-    "  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
-    "  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>",
-    "                                   computed views over an AUTHORED CodeElement registry (D0148)",
-    "  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate (D0129)",
-    "  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
-    "  process list|search|show|export|import   the process catalogue: a process is a movable UNIT (D0128)",
-    "  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered (D0225)",
-    "  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it (issue264)",
-    "  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate (D0232)",
-    "  recall --prompt -             seed recall from a PROMPT on stdin and print a budgeted, content-bearing brief; zero model calls (D0242/D0243)",
-    "  library init|sync|list       the machine-local cache of your portable-content repository - fast-forward-only, stated staleness, availability is never activation (D0250)",
-    "  record statement|story        intake's write path: a human's words VERBATIM, then the story that translates them with its #DerivedFrom edge authored alongside (D0236)",
-    "  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace (D0234)",
-    "  activation [ROOT]            which processes this project has ADOPTED, and which guards are core (D0138)",
-    "  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
-    "  serve [--port N] [ROOT]      the interactive console — localhost read dashboard (D0094 m1)",
-    "  validate [ROOT]              semantic-validate all .tracking/ files",
-    "  check FILE...                parse-check one or more .sysml files",
-    "  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)",
-    "  ls [ROOT]                    list .tracking/ .sysml files",
-    "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
-    "  whats-next [ROOT]            print ready task names (one per line)",
-    "  status [ROOT]                 every base in one screen: engine pin, library drift and NEW units, model honesty, work, CI verdict for HEAD (D0270)",
-    "  github-pull --repo O/N --by ACTOR --at DATE [--limit N] [--trust T]   pull OPEN issues and ingest the new ones; autonomy follows repo VISIBILITY - private acts, public plans only, undetermined fails CLOSED (D0264)",
-    "  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours (D0263)",
-    "  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed (D0221)",
-    "  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them (D0219). An unmapped login is refused, never defaulted",
-    "  github-decision-id <id>      split a channel decision id into project<TAB>name - `alpha/d0001` in a workspace, `d0001` alone (D0234)",
-    "  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass (D0209 clause 3)",
-    "  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance (issue106)",
-    "  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored (issue105)",
-    "  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions (issue099)",
-    "  diagram [ROOT]               whole-model interactive graph HTML (D0085; redirect to .html)",
-    "  render <view> [--mode graph|table|review]  render any declared view as HTML (D0086)",
-    "  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques (D0086)",
-    "  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
-    "  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
-    "  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance (D0106)",
-    "  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]",
-    "assured [ROOT]               composite READY/NOT-READY assurance verdict + per-check detail (D0079)",
+"  version | --version [--json] which build is this — release version + build commit + guard inventory",
+"  init DIR                     scaffold the engine into a NEW project",
+"  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result",
+"  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history",
+"  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED",
+"  verification [--pending]         EXAMINED vs EXERCISED, split — never one number",
+"  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit",
+"  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>",
+"                                   computed views over an AUTHORED CodeElement registry",
+"  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate",
+"  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
+"  process list|search|show|export|import   the process catalogue: a process is a movable UNIT",
+"  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered",
+"  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it",
+"  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate",
+"  recall --prompt -             seed recall from a PROMPT on stdin and print a budgeted, content-bearing brief; zero model calls",
+"  library init|sync|list       the machine-local cache of your portable-content repository - fast-forward-only, stated staleness, availability is never activation",
+"  record statement|story        intake's write path: a human's words VERBATIM, then the story that translates them with its #DerivedFrom edge authored alongside",
+"  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace",
+"  activation [ROOT]            which processes this project has ADOPTED, and which guards are core",
+"  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
+"  serve [--port N] [ROOT]      the interactive console — localhost read dashboard",
+"  validate [ROOT]              semantic-validate all .tracking/ files",
+"  check FILE...                parse-check one or more .sysml files",
+"  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)",
+"  ls [ROOT]                    list .tracking/ .sysml files",
+"  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View",
+"  whats-next [ROOT]            print ready task names (one per line)",
+"  status [ROOT]                 every base in one screen: engine pin, library drift and NEW units, model honesty, work, CI verdict for HEAD",
+"  github-pull --repo O/N --by ACTOR --at DATE [--limit N] [--trust T]   pull OPEN issues and ingest the new ones; autonomy follows repo VISIBILITY - private acts, public plans only, undetermined fails CLOSED",
+"  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours",
+"  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed",
+"  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them. An unmapped login is refused, never defaulted",
+"  github-decision-id <id>      split a channel decision id into project<TAB>name - `alpha/d0001` in a workspace, `d0001` alone",
+"  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass",
+"  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance",
+"  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored",
+"  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions",
+"  diagram [ROOT]               whole-model interactive graph HTML",
+"  render <view> [--mode graph|table|review]  render any declared view as HTML",
+"  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques",
+"  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
+"  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
+"  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance",
+"  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]",
+    "assured [ROOT]               composite READY/NOT-READY assurance verdict + per-check detail",
     "audit [ROOT]                 retrospective adherence: charter, ceremony, estimation, sitting review",
-    "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit (issue116)",
-    "audit-adherence [--since REF]  re-derive guard-set/severity monotonicity per commit - a control cannot be disarmed unsigned (D0209)",
-    "hardening [ROOT]             the critique process's own questions, computed (issue171/D0169)",
-    "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API (issue192)",
-    "  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
-    "  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
-    "  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift (D0174)",
-    "  override <path> --reason R   arm a single-use, path-bound write unlock; consumption records an obligation (D0176)",
-    "  enforcement-report [ROOT]    fires/blocks/overrides/red-yields from the fire-ledger - promotions cite this (D0180)",
-    "  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
-    "check-engine [ROOT]          .engine instance reference resolution, kernel-free (D0112 phase 2)",
-    "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary (D0134/D0174)",
-    "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results (D0101)",
+    "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit",
+    "audit-adherence [--since REF]  re-derive guard-set/severity monotonicity per commit - a control cannot be disarmed unsigned",
+    "hardening [ROOT]             the critique process's own questions, computed",
+    "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API",
+"  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
+"  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
+"  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift",
+"  override <path> --reason R   arm a single-use, path-bound write unlock; consumption records an obligation",
+"  enforcement-report [ROOT]    fires/blocks/overrides/red-yields from the fire-ledger - promotions cite this",
+"  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
+    "check-engine [ROOT]          .engine instance reference resolution, kernel-free",
+    "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary",
+    "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results",
     "suspect [ROOT]               done work whose evidence has DRIFTED from the tree it was judged against",
     "outstanding [ROOT]           every not-done item, flat — the burndown without the ranking",
     "orphans [ROOT]               items nothing references: tasks with no DoD, issues with no resolver",
     "recent [ROOT]                git-derived activity timeline: commits touching .tracking/.engine (sr15)",
-    "intake [ROOT]                statements -> user stories -> routing: unparsed, unrouted, unsourced (D0166)",
-    "dispositions [ROOT]          findings by verdict — act / acceptRisk / dismiss / undispositioned (D0165)",
+    "intake [ROOT]                statements -> user stories -> routing: unparsed, unrouted, unsourced",
+    "dispositions [ROOT]          findings by verdict — act / acceptRisk / dismiss / undispositioned",
     "authority-queue [ROOT]       what awaits a HUMAN's authority, and what may not be self-attested",
-    "attestation-coverage [ROOT]  accepted Decisions lacking a passing acceptance result (D0066)",
-    "open-issues [ROOT]           every OPEN issue + its resolvers + whether each resolver is complete (D0077)",
+    "attestation-coverage [ROOT]  accepted Decisions lacking a passing acceptance result",
+    "open-issues [ROOT]           every OPEN issue + its resolvers + whether each resolver is complete",
     "indicators [ROOT]            MONITORED with no enforced threshold — never gated (invariant 7)",
     "snapshot-indicators [ROOT]   stamp the current indicator values as a dated series point",
     "record-measurement --indicator I --value V [--at DATE]  add one measurement to an indicator series",
-    "rootedness [ROOT]            charter-source burndown: need-rooted vs decision-chartered vs orphan (D0099)",
+    "rootedness [ROOT]            charter-source burndown: need-rooted vs decision-chartered vs orphan",
     "tier-satisfaction [ROOT]     per tier, the fraction cleanly satisfied downstream (Needs -> SRs -> tests)",
     "concern-coverage [ROOT]      declared viewpoints vs stakeholder concerns — which concerns nothing serves",
-    "critique-coverage [ROOT]     per-element required-lens matrix + the gap set (D0097)",
-    "critique-policy [ROOT]       which antagonistic lenses each assurance-element type REQUIRES (D0097)",
+    "critique-coverage [ROOT]     per-element required-lens matrix + the gap set",
+    "critique-policy [ROOT]       which antagonistic lenses each assurance-element type REQUIRES",
     "sitting-coverage [ROOT]      per-sitting human review currency, grandfathered at D0155's line",
     "governing-version <item> [ROOT]  which process version governs this item",
     "decisions [ROOT]             load-bearing decisions, ranked by how much depends on them",
-    "business [ROOT]              the what/why layer: Brief -> Personas -> Needs -> UseCases (D0107)",
+    "business [ROOT]              the what/why layer: Brief -> Personas -> Needs -> UseCases",
     "launchables [ROOT]           the console's launchable set, computed from declared skills + processes",
     "workflows [ROOT]             the six workflows and their phases",
-    "contentions [ROOT]           recorded disagreements between contributors awaiting adjudication (D0108)",
-    "controls [ROOT]              the two-way hazard/control diff: uncovered failure conditions + unanchored controls (D0195)",
-    "decision-card [NAME] [--proposed]  a decision's deciding context as JSON - the githubChannel issue body source (D0205)",
-    "why <term> [ROOT]            answer from the model as a graph: seed on names/aliases, traverse, cite provenance + failing critiques (D0161)",
-    "knowledge question-coverage [ROOT]  per declared Question: does seeding find an entity and traversal reach an answer (D0161)",
+    "contentions [ROOT]           recorded disagreements between contributors awaiting adjudication",
+    "controls [ROOT]              the two-way hazard/control diff: uncovered failure conditions + unanchored controls",
+    "decision-card [NAME] [--proposed]  a decision's deciding context as JSON - the githubChannel issue body source",
+    "why <term> [ROOT]            answer from the model as a graph: seed on names/aliases, traverse, cite provenance + failing critiques",
+    "knowledge question-coverage [ROOT]  per declared Question: does seeding find an entity and traversal reach an answer",
     "trace <item> [ROOT]          every typed edge reaching an item, both directions",
     "trace-need <need> [ROOT]     one Need's full satisfaction chain down to test results",
     "boundary <element> [ROOT]    one element's interface surface — takes an ELEMENT, not a root",
@@ -4611,9 +4628,9 @@ mod tests {
         let src = concat!(
             "// D0001 - text files are truth\n",
             "package Decision0001 {\n",
-            "    part d0001 : Decision {\n",
-            "        :>> procedureText = \"ww confirmed d0001 on the call\";\n",
-            "    }\n",
+"    part d0001 : Decision {\n",
+"        :>> procedureText = \"ww confirmed d0001 on the call\";\n",
+"    }\n",
             "}\n",
         );
         // `unwrap_or_default` rather than `expect`: the fail-loud lints deny panic/expect/unwrap
@@ -4635,7 +4652,7 @@ mod tests {
     fn non_decision_engine_files_are_never_content_transformed() {
         let src = concat!(
             "package EngineRules {\n",
-            "    #JustifiedBy dependency from r to d0099;\n",
+"    #JustifiedBy dependency from r to d0099;\n",
             "}\n",
         );
         assert!(remap_engine_content(Path::new("rules/rules.sysml"), src).is_none());

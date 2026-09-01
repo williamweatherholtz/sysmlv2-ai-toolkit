@@ -50,10 +50,22 @@ package UnattendedDistributionRequirements {
         :>> statement = "THRESHOLD: for each unit in the project's install record, the report states the installed version, the library's version, and whether it is behind - and for each behind unit prints the exact update command. A project with no library configured says so rather than reporting zero drift, because 'nothing is behind' and 'I cannot tell' must not render identically. Today this requires reading `keel library list` and `keel process show` and comparing by hand.";
     }
 
+    // Added when the Need split (st063): the untrusted-input half had a MECHANISM in code (guard 56)
+    // and no contract citing it, which is how a Need becomes orphaned while looking covered.
+    part srUntrustedInputRoutesToADecision : SystemRequirement {
+        :>> id = "d08380a5-d9bb-4319-b259-88906c6b1864";
+        :>> title = "A story descending from an unauthenticated utterance cannot be routed to work without a Decision";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> statement = "THRESHOLD: for every UserStory whose #DerivedFrom chain reaches a Statement recorded at sourceTrust=untrusted AND which carries an #Implicates edge, at least one target of that edge is a Decision. An UNROUTED story is not a violation - untriaged is not misrouted, and a check that fired at ingest would make ingestion itself feel like a fault. The tier is read from the utterance rather than re-derived, so a repository whose visibility changes after an issue was filed does not retroactively alter what that issue was permitted to do.";
+    }
+
     // ── which Need each contract serves ──────────────────────────────────────────────────────────
-    satisfy nAutonomyBoundedByProof by srMigrationIsReversible;
-    satisfy nAutonomyBoundedByProof by srUpdateIsVerifiedOrReverted;
-    satisfy nAutonomyBoundedByProof by srUnprovenUpdateAsksRatherThanActs;
+    // Re-pointed after the split (st063): reversibility is about undoing a change the engine
+    // made to itself, not about who asked for it.
+    satisfy nUnverifiableChangeReverts by srMigrationIsReversible;
+    satisfy nUnverifiableChangeReverts by srUpdateIsVerifiedOrReverted;
+    satisfy nUnverifiableChangeReverts by srUnprovenUpdateAsksRatherThanActs;
     satisfy nUnattendedCurrency by srUnattendedPullIsIdempotent;
     satisfy nUnattendedCurrency by srDriftIsReportedPerUnit;
+    satisfy nUntrustedInputPlans by srUntrustedInputRoutesToADecision;
 }

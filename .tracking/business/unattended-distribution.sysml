@@ -134,4 +134,49 @@ package UnattendedDistributionNeeds {
     }
     part nAutonomyBoundedByProofAcceptR1 : TestResult { :>> id = "95edeb50-a603-45cb-bfa6-538a3c5ff7df"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a16624c"; :>> judgedAt = "2026-08-31"; :>> judgedBy = "wweatherholtz"; }
     #Verify dependency from nAutonomyBoundedByProofAccept to nAutonomyBoundedByProof;
+
+    // ── THE SPLIT (st063, 2026-09-01) — the human reversed yesterday's choice ────────────────────
+    //
+    // Yesterday they picked "keep ONE Need" from a three-way fork. Today, on the same fork, they
+    // picked SPLIT. Both answers were given with the statement quoted in front of them, so this is a
+    // change of mind and not a misread - and the trigger is the flip condition I wrote into the fork
+    // myself: "wanting auto-act on trusted issues while never auto-updating. That is two Needs."
+    //
+    // THE EARLIER ACCEPTANCE IS SUPERSEDED, NOT DELETED. It records what they attested on 2026-08-31
+    // and it stays visible; a recorded attestation is theirs (D0108), so a reversal is a new fact
+    // rather than an edit to an old one. nAutonomyBoundedByProof is superseded by the two Needs
+    // below, which divide it exactly along the seam the fork named: WHO is asking versus WHETHER THE
+    // OUTCOME CAN BE UNDONE.
+
+    part nUntrustedInputPlans : Need {
+        :>> id = "7dcc03ca-cf9c-47e3-88cd-16ec91659306";
+        :>> title = "Input whose authority cannot be established may plan, never act";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> priority = Priority::must;
+        :>> statement = "An instruction reaching the project from a source whose authority is not established - an issue anyone could have filed, a comment, any unauthenticated channel - is triaged and may produce a PLAN, and may never produce a change nobody accepted. MEASURABLE: a story descending from an untrusted utterance is routed to a Decision and never straight to work; the tier is recorded ON the utterance so a later pass never re-derives it; and an undetermined authority resolves to untrusted. WHAT THIS EXCLUDES: it says nothing about whether the input is CORRECT - a stranger's bug report can be entirely right, and reading it is not obeying it.";
+    }
+
+    part nUnverifiableChangeReverts : Need {
+        :>> id = "e6d12ee2-9275-4f88-abab-7f7c132e3da8";
+        :>> title = "A change the engine makes to itself is kept only if it can be verified, and undone otherwise";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> priority = Priority::must;
+        :>> statement = "When the engine changes a project on its own - an engine upgrade, a migration - the pre-change state is recorded first, the project's own gate runs after, and the change survives ONLY if that gate passes. MEASURABLE: after an unattended change the tree is either verified-green or byte-identical to before, with no third outcome; an interrupted change is restored by the next run; and a reverted change leaves a durable record naming the version and the gate that failed. WHAT THIS EXCLUDES: verified is not correct - a gate that passes says the tree is honest, not that the upgrade was wise.";
+    }
+
+    #DerivedFrom dependency from nUntrustedInputPlans to us066;
+    #DerivedFrom dependency from nUnverifiableChangeReverts to us066;
+    #Supersede dependency from nUntrustedInputPlans to nAutonomyBoundedByProof;
+    #Supersede dependency from nUnverifiableChangeReverts to nAutonomyBoundedByProof;
+
+    verification autonomySplitAccept : Test {
+        :>> id = "c4c08b6b-526b-43e8-ab9f-d7323f5c0d8e";
+        :>> title = "The autonomy Need is SPLIT in two (human adjudication, reversing 2026-08-31)";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "The human selected 'Split into two Needs - input trust and update consent diverge' from the same three-way fork on which they had previously selected 'keep ONE Need'. Both selections were made with the statement quoted in front of them and the alternatives costed, so the reversal is an adjudication and not a correction of a misunderstanding. Their reason is the one the fork's own flip condition named: the two surfaces may need different autonomy, and one contract cannot say that.";
+    }
+    part autonomySplitAcceptR1 : TestResult { :>> id = "ad2080f6-0d4d-4865-b023-2ef70fd1c109"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5453550"; :>> judgedAt = "2026-09-01"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from autonomySplitAccept to nUntrustedInputPlans;
+    #Verify dependency from autonomySplitAccept to nUnverifiableChangeReverts;
 }
