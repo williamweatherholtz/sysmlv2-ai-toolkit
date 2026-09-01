@@ -660,31 +660,102 @@ impl Refusal {
 
 /// Preconditions. `dry_run` relaxes only the tree-cleanliness check — a dry run writes nothing.
 #[must_use]
-pub fn check_preconditions(root: &Path, dry_run: bool) -> Option<Refusal> {
+/// Split one `git status --porcelain` line into `(status, path)`.
+fn porcelain_parts(line: &str) -> Option<(&str, &str)> {
+    (line.len() > 3).then(|| (&line[..2], line[3..].trim()))
+}
+
+/// May migrate proceed despite this uncommitted entry? (issue324)
+///
+/// # Why anything is tolerated at all
+///
+/// Three individually-correct controls composed into a lock with no non-bypassing exit. Migrate
+/// refuses a dirty tree; committing to clean it fails because the pre-commit gate refuses under
+/// engine-version skew (D0251); and skew clears only by running the pinned binary or by migrating.
+/// The file that sprang it was written BY THE ENGINE — `record_obligation` under D0176/K7, whose own
+/// doc comment reasons about deadlock at the FILE level and misses it at the TREE level. And it fires
+/// preferentially when a project is ALREADY unhealthy, because that is when an obligation gets
+/// recorded. Reported by a downstream session; unreachable here, since this tree refuses as a
+/// self-build.
+///
+/// # Why THIS carve-out and not a looser one
+///
+/// Migrate's refusal exists because "a half-migrated tree mixed with uncommitted edits cannot be told
+/// apart afterwards". A brand-new file in a dedicated engine-owned directory CAN be told apart, which
+/// is exactly the property that makes it safe to skip and the reason the test is this narrow:
+///
+/// - `.tracking/obligations/` only — the one directory nothing but the engine writes.
+/// - NEW entries only (`??` untracked, `A` staged-add). A MODIFIED obligation record is a hand-edit,
+///   is no longer purely additive, and stays refused.
+///
+/// Two looser shapes were rejected. Staging the file in the recorder does not help — staged is still
+/// uncommitted and `git status --porcelain` reports it either way. Degrading the pre-commit gate under
+/// skew weakens one control to work around another, which is how a control gets hollowed out.
+fn is_tolerable_obligation(status: &str, path: &str) -> bool {
+    let p = path.replace('\\', "/");
+    let is_new = status == "??" || status.starts_with('A');
+    let is_sysml = std::path::Path::new(&p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml"));
+    is_new && p.starts_with(".tracking/obligations/") && is_sysml
+}
+
+/// Say which uncommitted entries were tolerated, and why they were safe to move with (issue324).
+///
+/// Separate from `cmd` so the exemption has a named home: a carve-out nobody is told about is
+/// indistinguishable from a check that quietly stopped working, and this one exists precisely so an
+/// ALREADY-UNHEALTHY project can move — which is when a reader most needs to see what moved with it.
+fn report_tolerated(tolerated: &[String]) {
+    if tolerated.is_empty() {
+        return;
+    }
+    println!("  tolerated {} uncommitted engine-authored obligation record(s) — additive, and", tolerated.len());
+    println!("  separable from migration state, so they do not make this tree ambiguous (issue324):");
+    for line in tolerated {
+        println!("    {line}");
+    }
+}
+
+/// Preconditions. `dry_run` relaxes only the tree-cleanliness check — a dry run writes nothing.
+///
+/// `Ok` carries the uncommitted paths that were TOLERATED (see `is_tolerable_obligation`), so the
+/// caller can name them: an exemption nobody is told about is indistinguishable from a check that
+/// stopped working.
+///
+/// # Errors
+/// A [`Refusal`] naming why this tree may not be migrated: it is the engine's own build, it is not a
+/// keel project, it is not under version control, or it holds uncommitted changes that are not
+/// tolerable obligation records.
+pub fn check_preconditions(root: &Path, dry_run: bool) -> Result<Vec<String>, Refusal> {
     if root.join("keel-cli").join("Cargo.toml").is_file() {
-        return Some(Refusal::SelfBuild);
+        return Err(Refusal::SelfBuild);
     }
     if !root.join(".engine").is_dir() {
-        return Some(Refusal::NotAKeelProject);
+        return Err(Refusal::NotAKeelProject);
     }
     let out = crate::gitx::git()
         .arg("-C")
         .arg(root)
-        .args(["status", "--porcelain", "--", ".tracking", ".engine"])
+        // `-uall` because git COLLAPSES a wholly-untracked directory to one entry — the first run of
+        // the issue324 test got `?? .tracking/obligations/` and no filename, so a per-file decision
+        // was impossible. Listing files individually is also strictly better for the refusal path: it
+        // names the actual blocking files instead of a directory the reader then has to go inspect.
+        .args(["status", "--porcelain", "-uall", "--", ".tracking", ".engine"])
         .output();
-    let Ok(out) = out else { return Some(Refusal::NotAGitRepo) };
+    let Ok(out) = out else { return Err(Refusal::NotAGitRepo) };
     if !out.status.success() {
-        return Some(Refusal::NotAGitRepo);
+        return Err(Refusal::NotAGitRepo);
     }
     if dry_run {
-        return None;
+        return Ok(Vec::new());
     }
     let status = String::from_utf8_lossy(&out.stdout);
-    let status = status.trim();
-    if status.is_empty() {
-        None
+    let (tolerated, blocking): (Vec<&str>, Vec<&str>) = status
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .partition(|l| porcelain_parts(l).is_some_and(|(s, p)| is_tolerable_obligation(s, p)));
+    if blocking.is_empty() {
+        Ok(tolerated.into_iter().map(str::to_string).collect())
     } else {
-        Some(Refusal::DirtyTree(status.lines().take(20).map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n")))
+        Err(Refusal::DirtyTree(blocking.iter().take(20).map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n")))
     }
 }
 
@@ -859,13 +930,16 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     // be recovered by the very command that recovers it. Found by the interruption test, which is
     // the case this ordering exists for.
     let recovery = if dry_run { None } else { recover_interrupted(root) };
-    if let Some(r) = check_preconditions(root, dry_run) {
-        if let Some(note) = &recovery {
-            println!("  {note}");
+    let tolerated = match check_preconditions(root, dry_run) {
+        Ok(t) => t,
+        Err(r) => {
+            if let Some(note) = &recovery {
+                println!("  {note}");
+            }
+            eprintln!("keel migrate: {}", r.explain(root));
+            return 2;
         }
-        eprintln!("keel migrate: {}", r.explain(root));
-        return 2;
-    }
+    };
     let pre_sha = if dry_run { None } else { head_sha(root) };
     let p = plan(root, engine);
     let active = p.active();
@@ -875,6 +949,7 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
 
     println!("keel migrate — {}", root.display());
     println!("  binary engine: keel {} (build {})", env!("CARGO_PKG_VERSION"), env!("KEEL_BUILD_COMMIT"));
+    report_tolerated(&tolerated);
     if active.is_empty() {
         println!("  detected vintage: CURRENT — no step applies. Nothing to do.");
         return 0;
