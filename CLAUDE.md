@@ -145,8 +145,17 @@ frozen (modify it only by out-of-band Decision).
   convention → grep the doc surface and fix every claim it invalidates **in the same commit**.
 - **Corrections become permanent guards (D0047).** A defect revealing a recurrable gap must become (a) a
   tracked `Issue` and (b) an automated control. Manual vigilance is not a control.
-- **Bulk migrations follow the migration process (D0067).** Gated expand/migrate/contract, a committed
-  transform, a dry run reconciling control totals, green at every step. Never fabricate historical data.
+- **Two migrations, never conflated (D0067 / D0275).** Changing a project's OWN data at scale —
+  rename/split/drop a field across many sites — is **`migration`** (D0067): gated expand/migrate/contract,
+  a committed transform, a dry run reconciling control totals, green at every step, and never fabricate
+  historical data. Moving a project onto an **engine that changed underneath it** is
+  **`project-migration`** (D0275) — different actor, different failure modes: preflight to a recorded
+  green SHA, check what the engine REMOVES not what it adds, let `keel migrate` refuse and roll back
+  rather than hand-repairing, prove the project's own pin comment / adoption / project-owned contracts
+  survived the resync, read the project's OWN CI, and report the cost upstream. That last step is
+  load-bearing: `check_preconditions` refuses any tree holding `keel-cli/Cargo.toml` as a self-build,
+  so **the engine cannot migrate itself** — seven defects in this path (issue301/310/314/323/324/326/327)
+  and not one was found by a test.
 - **Authoring friction is the #1 risk (D0054).** The dominant MBSE failure mode is adoption friction, not
   bad architecture. If recording a fact is harder than a spreadsheet edit, fix that first.
 - **Adoption is declared (D0138/D0164).** `.engine/contracts/activation.toml` names the processes AND the
