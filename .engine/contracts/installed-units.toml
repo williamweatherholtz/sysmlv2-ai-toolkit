@@ -176,3 +176,17 @@ version = 43
 file.processes__SL__intake.sysml = "8b880475eaab49ad"
 file.skills__SL__intake__SL__SKILL.md = "9a6aefa4c9668c8f"
 file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
+[a2428932-77c0-4714-9d61-c41d2857811f]
+process = "exec-summary"
+version = 1
+file.processes__SL__exec-summary.sysml = "c71c1a1ca66d1c67"
+file.skills__SL__exec-summary__SL__registry.sysml = "64f218ec3c881f20"
+file.skills__SL__exec-summary__SL__SKILL.md = "88578e988ce56248"
+file.templates__SL__exec-summary__SL__exec-summary.html = "635e57f2fdcf1e67"
+file.tests__SL__exec_summary__SL__test_exec_summary.py = "2e8430173d6f7fbc"
+[a55244a1-6e05-4a58-85c9-6f7656366d6e]
+process = "exec-summary"
+version = 1
+file.processes__SL__exec-summary.sysml = "c71c1a1ca66d1c67"
+file.skills__SL__exec-summary__SL__SKILL.md = "f50390dde7294f08"
+file.skills__SL__exec-summary__SL__registry.sysml = "64f218ec3c881f20"

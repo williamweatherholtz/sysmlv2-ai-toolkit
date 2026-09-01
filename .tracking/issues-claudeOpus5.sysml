@@ -362,4 +362,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcCliSurfaceConsolidation to issue322;
+
+    part issue323 : Issue {
+        :>> id = "dae5054f-9128-40e5-98de-3ed72a35b88c";
+        :>> title = "Re-publishing an imported unit re-mints its identity and resets it to v1, so the drift report affirms there is no update";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while publishing an improvement to the exec-summary skill, and it defeats the drift report shipped one day earlier. WHAT HAPPENED, step by step and all verified on disk. This project imported `exec-summary` from the library; the import wrote an install record keyed by the LIBRARY's unit id a2428932. The skill was then improved and re-published. Export looked the unit id up in THIS project's .engine/contracts/unit-ids.toml, found a DIFFERENT id - a55244a1 - and wrote that into the library's unit.toml, replacing the original identity. Because install_record(a55244a1) finds nothing (the record is filed under a2428932), next_unit_version fell to its None arm and wrote version = 1. SO THE PUBLISHED UNIT CHANGED CONTENT, CHANGED IDENTITY, AND KEPT ITS VERSION NUMBER. The library's SKILL.md is now 151 lines carrying the new sufficiency rule; unit.toml still says version = 1. WHY THIS IS WORSE THAN A NUMBERING BUG. Every consuming project compares versions to decide whether it is behind - that is exactly what `keel status`'s drift section does, shipped yesterday against srDriftIsReportedPerUnit. A project holding the old v1 sees 'v1 available, v1 installed, nothing behind' while the content differs entirely. The report does not merely miss the update; it AFFIRMS that there is none. And the identity change means even a corrected version number would not help: the unit a project installed no longer exists under that id. TWO DEFECTS, and they should not be conflated. (1) A unit's identity is re-minted on export from a project that IMPORTED it, instead of being carried from the install record. (2) The version resets when the id lookup misses, silently, because None means 'new unit' and a missed lookup is indistinguishable from one. FIX DIRECTION. Export must prefer the id in the INSTALL RECORD over a locally minted one - a unit's identity belongs to the unit, not to the project that happens to be exporting it - and a version lookup that misses on a process the project demonstrably has installed should REFUSE rather than restart at 1. Whatever is chosen must be held by a round trip: import a unit, change one file, publish, and assert the identity is unchanged AND the version incremented. That test would have failed today.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCliSurfaceConsolidation to issue323;
 }
