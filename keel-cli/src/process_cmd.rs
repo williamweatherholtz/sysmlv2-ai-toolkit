@@ -640,6 +640,38 @@ fn write_install_record(root: &Path, unit_id: &str, process: &str, version: u32,
     Ok(())
 }
 
+/// The keel COMMANDS a unit's own files invoke, derived by reading them (D0252 clause A).
+///
+/// # Why derived and not authored
+///
+/// D0054 says authoring friction is the #1 risk, and a hand-maintained `commands` list in a contract
+/// is a list that goes stale the first time a skill's prose changes — a stale capability declaration
+/// is worse than none, because it refuses installs that would work and permits ones that will not.
+/// Deriving it has no authoring cost and cannot drift from the text it describes.
+///
+/// # Why scanning prose is safe HERE specifically
+///
+/// The scan is self-limiting: a token counts only when it follows `keel ` AND is already a name this
+/// binary dispatches. A prose word cannot become a false dependency unless someone wrote a real keel
+/// command after the word "keel", and at that point the unit genuinely does instruct its reader to
+/// run that command — which is the dependency being declared. The same reasoning guard 39
+/// (`tool-reference`) already relies on.
+fn unit_commands(files: &[std::path::PathBuf]) -> Vec<String> {
+    let mut found: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for f in files {
+        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        for (i, _) in text.match_indices("keel ") {
+            let rest = &text[i + 5..];
+            let word: String =
+                rest.chars().take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '-').collect();
+            if !word.is_empty() && crate::cli_surface::has_command(&word) {
+                found.insert(word);
+            }
+        }
+    }
+    found.into_iter().collect()
+}
+
 /// The version handshake, guard-names slice (D0183/K8): the unit's required guards diffed against
 /// THIS binary's inventory. Missing teeth refuse — or, with `--degrade`, proceed loudly with a
 /// recorded Issue (never prose-lands-enforcement-silently-missing). Rules travel with P4b.
@@ -650,6 +682,42 @@ fn handshake(root: &Path, manifest: &str, bundle_dir: Option<&Path>, degrade: bo
         .map(|l| l.trim_start_matches("guards = [").trim_end_matches(']').split(',').map(|s| s.trim().trim_matches('"').to_string()).filter(|s| !s.is_empty()).collect())
         .unwrap_or_default();
     let missing: Vec<String> = declared.iter().filter(|g| !crate::guards::GUARD_NAMES.contains(&g.as_str())).cloned().collect();
+    // D0252 clause A, COMMAND slice. A unit that invokes `keel orphans` cannot work on an engine
+    // that no longer dispatches it, and until this existed the failure was SILENT — the skill landed
+    // and its instructions simply did not run. This refuses BEFORE any file is written, naming the
+    // command rather than a version number, which is the whole point of declaring capabilities
+    // instead of a range: the message says what is missing, not two numbers to interpret.
+    //
+    // The `--degrade` escape is deliberately NOT offered here, unlike guards and rules. A missing
+    // guard means enforcement did not travel and the prose still reads correctly; a missing COMMAND
+    // means the prose instructs the reader to run something that does not exist, so degrading would
+    // install a skill that is actively wrong rather than merely toothless.
+    let declared_commands: Vec<String> = manifest
+        .lines()
+        .find(|l| l.starts_with("commands = "))
+        .map(|l| {
+            l.trim_start_matches("commands = [")
+                .trim_end_matches(']')
+                .split(',')
+                .map(|s| s.trim().trim_matches('"').to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+    let missing_commands: Vec<String> =
+        declared_commands.iter().filter(|c| !crate::cli_surface::has_command(c)).cloned().collect();
+    if !missing_commands.is_empty() {
+        eprintln!(
+            "error: this binary does not have {} command(s) the unit invokes: {} (D0252 clause A).",
+            missing_commands.len(),
+            missing_commands.join(", ")
+        );
+        eprintln!("  The unit's own text instructs a reader to run them, so importing it here would");
+        eprintln!("  land a skill whose instructions cannot be followed. Upgrade the engine, or take");
+        eprintln!("  a unit version published against this one. No --degrade: a skill that is WRONG");
+        eprintln!("  is worse than one that is merely toothless.");
+        return Err(1);
+    }
     // P4b slice: the unit's declared RULES must be evaluable at the destination - carried by the
     // bundle (a rules/*.sysml declaring them) or already present in the destination's rules dir.
     let rule_names: Vec<String> = manifest
@@ -867,7 +935,7 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                  #\n# The GUARDS below are the enforcement this process owns. A receiving project must have them\n\
                  # in its binary and activate this process for them to run — importing the files alone lands the\n\
                  # skill and leaves the teeth behind, which is the failure this manifest exists to prevent.\n\
-                 unitId = \"{unit_id}\"\nversion = {version}\nprocess = \"{name}\"\nskills = [{}]\nrules = [{}]\nguards = [{}]\nextras = [{}]\n",
+                 unitId = \"{unit_id}\"\nversion = {version}\nprocess = \"{name}\"\nskills = [{}]\nrules = [{}]\nguards = [{}]\nextras = [{}]\ncommands = [{}]\n",
                 r.skills.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
                 r.rules.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
                 r.guards.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
@@ -876,6 +944,10 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                 // the dot heuristic fit `.github/` (the specimen) and misplaced every dotless root
                 // extra into `.engine/`, found live by the kickoff demo importing exec-summary.
                 unit_extras(root, name).0.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
+                // D0252 clause A: the keel commands this unit's own text tells a reader to run.
+                // DERIVED from the files rather than authored, so it cannot go stale against the
+                // prose it describes — and the importing engine refuses, naming any it lacks.
+                unit_commands(&files).iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", "),
             );
             if let Err(e) = std::fs::write(dst.join("unit.toml"), manifest) {
                 eprintln!("error writing manifest: {e}");

@@ -25,6 +25,7 @@ use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
 use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod activation;
+pub mod cli_surface;
 /// The declared-vs-binary version skew for the project owning `target`, if any (D0251).
 ///
 /// Root discovery mirrors `write::model_lock_path`: walk up to the `.tracking`/`.engine` parent. Returns
