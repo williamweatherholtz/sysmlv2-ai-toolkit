@@ -179,4 +179,35 @@ package UnattendedDistributionNeeds {
     part autonomySplitAcceptR1 : TestResult { :>> id = "ad2080f6-0d4d-4865-b023-2ef70fd1c109"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5453550"; :>> judgedAt = "2026-09-01"; :>> judgedBy = "wweatherholtz"; }
     #Verify dependency from autonomySplitAccept to nUntrustedInputPlans;
     #Verify dependency from autonomySplitAccept to nUnverifiableChangeReverts;
+
+    // ── nUnattendedCurrency, read back and accepted (2026-09-01) ────────────────────────────────
+    //
+    // THE ONE NEED NOBODY HAD EVER BEEN ASKED ABOUT. Its sibling was forked and adjudicated twice
+    // while this one was never contested, so it reached three shipped capabilities - the pull
+    // pipeline, library sync and `keel status` - without a read-back. D0157 says to ask what is
+    // WIDER than they meant, so the tab named the widest clause rather than asking whether the Need
+    // was good, and offered narrowing and withdrawal beside acceptance.
+    verification unattendedCurrencyAccept : Test {
+        :>> id = "8c4b1f07-e2d6-4a95-b318-70fa5c92e6d1";
+        :>> title = "nUnattendedCurrency accepted AS WRITTEN, including its autonomy clause (Business gate)";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz, 2026-09-01, via the Unattended Distribution decision page returned as a Copy-for-AI digest. ACCEPTS nUnattendedCurrency AS WRITTEN, over the two narrowing alternatives offered beside it. WHAT THIS SPECIFICALLY SETTLES, because it is the clause the tab flagged as widest: 'without a person fetching each one by hand' is an AUTONOMY claim, not merely a convenience one, and it stands - so the scheduled currency pass (dcScheduledCurrency) is licensed by a Need the human has now read, rather than by my inference. The narrowing they declined would have kept reporting automatic while leaving fetching a command they run. WHAT IT DOES NOT SETTLE: the Need excludes conformance explicitly and that exclusion is unchanged; and autonomy over untrusted input remains bounded by nUntrustedInputPlans and D0264, which this acceptance does not touch. Their verbatim selection is quoted in unattendedCurrencyAcceptAttest1.";
+    }
+
+    verification unattendedCurrencyAcceptAttest1 : Test {
+        :>> id = "9d5c2a18-f3e7-4b06-a429-81f60ad37b2e";
+        :>> title = "Quote receipt for unattendedCurrencyAccept (D0198)";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::inspect;
+        :>> procedureText = "Their selection, verbatim from the returned digest. Tab 'The unaccepted Need', question 'Is anything in it wider than you meant?': [x] 'Accept as written - RECOMMENDED'. The two unselected options were 'Narrow it: currency is REPORTED automatically, but fetching stays a command I run' and 'Withdraw it - the shipped capabilities need no Need above them'. RECORDED RATHER THAN SMOOTHED OVER: this tab's Note field carried text about the CLI - 'remove cruft from CLI. tons of commands, when a smaller subset should do, and parentheticals embedded in descriptions. tighten it up - what core functional hooks do we need in the CLI? a lot of these seem to be variations of an idea cemented as separate cli hooks. and critique all descriptions to trim them down to the real root of what is being done and what a user needs to know to run it' - which is their earlier CLI instruction repeated, and belongs to the FIRST tab's subject, not this Need's. It is read as reinforcement of the CLI decision and NOT as a qualification on this acceptance; no clause of nUnattendedCurrency was altered on the strength of a note about a different tab.";
+    }
+
+    // judgedBy differs on purpose: the acceptance is the HUMAN's judgment, the quote receipt is MY
+    // transcription of what they sent.
+    part unattendedCurrencyAcceptR1 : TestResult { :>> id = "a1e93b7c-06d4-4f28-95b1-3ce8072f4d69"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ac8bdf6"; :>> judgedAt = "2026-09-01"; :>> judgedBy = "wweatherholtz"; }
+    part unattendedCurrencyAcceptAttest1R1 : TestResult { :>> id = "b2fa4c8d-17e5-4039-a6c2-4df1830e5b7a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ac8bdf6"; :>> judgedAt = "2026-09-01"; :>> judgedBy = "claudeOpus5"; }
+
+    #Verify dependency from unattendedCurrencyAccept to nUnattendedCurrency;
+    #Verify dependency from unattendedCurrencyAcceptAttest1 to nUnattendedCurrency;
 }
