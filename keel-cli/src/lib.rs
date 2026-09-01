@@ -90,6 +90,7 @@ pub mod queries;
 pub mod reverify;
 pub mod scaffold;
 pub mod serve;
+pub mod status;
 pub mod sync;
 pub mod shellcheck;
 pub mod view;

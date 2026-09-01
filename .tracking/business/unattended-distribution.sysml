@@ -112,4 +112,26 @@ package UnattendedDistributionNeeds {
     satisfy nAutonomyBoundedByProof by ucEngineUpdateAppliesItself;
     satisfy nAutonomyBoundedByProof by ucEngineUpdateRevertsItself;
     satisfy nAutonomyBoundedByProof by ucInterruptedMigrationLeavesNothing;
+
+    // ── The human's adjudication (st062, 2026-08-31) ────────────────────────────────────────────
+    //
+    // Asked per D0157 what was WIDER than they meant rather than whether the set was good, and given
+    // a concrete fork: one Need or two, or cut the size clause. They chose ONE, so the unification of
+    // input-trust and update-consent under a single predicate is THEIRS now, not my judgment.
+    //
+    // SCOPE OF THIS ACCEPTANCE, stated because an attestation must not be read wider than it was
+    // given: they adjudicated nAutonomyBoundedByProof, which is what the tab quoted and forked.
+    // nUnattendedCurrency was never contested and is NOT covered here - it stays unaccepted and
+    // keeps being carried until they answer or I withdraw it (D0269 dsCarry).
+    private import EngineVerification::*;
+
+    verification nAutonomyBoundedByProofAccept : Test {
+        :>> id = "3851088a-a733-4d95-973c-85977413353d";
+        :>> title = "nAutonomyBoundedByProof accepted as ONE Need (human adjudication)";
+        :>> createdAt = "2026-08-31"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "The human selected 'Keep ONE Need - trust and update-consent are the same predicate' from a three-way fork that offered splitting it, or cutting the clause 'not of how large the change looks'. They were shown the statement verbatim, what it binds (guard 56's untrusted routing AND the auto-update verify-or-revert gate), what was already true in code, and what I do with each answer. So the unification is an adjudicated choice against named alternatives, not assent to a summary.";
+    }
+    part nAutonomyBoundedByProofAcceptR1 : TestResult { :>> id = "95edeb50-a603-45cb-bfa6-538a3c5ff7df"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a16624c"; :>> judgedAt = "2026-08-31"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from nAutonomyBoundedByProofAccept to nAutonomyBoundedByProof;
 }

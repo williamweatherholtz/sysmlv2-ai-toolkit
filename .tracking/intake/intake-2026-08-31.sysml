@@ -155,4 +155,32 @@ package ProjectIntake20260831 {
     #Implicates dependency from us063 to d0268;
     #Implicates dependency from us064 to d0268;
     #Implicates dependency from us064 to issue319;
+
+    part st061 : Statement {
+        :>> id = "c7fee024-d357-469f-bfec-ac0437bc7806";
+        :>> title = "A process: pending decisions always come with a link to the exec-summary artifact, never buried";
+        :>> createdAt = "2026-08-31"; :>> createdBy = "claudeOpus5";
+        :>> text = "create a new process - if there are decisions for me to make, always give me a link to the executive summary artifact.  Do not bury it under past messages.  do that now please";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-31"; :>> channel = StatementChannel::chat;
+    }
+
+    part st062 : Statement {
+        :>> id = "e4fb6930-2f9e-4333-a48b-ea8f576bf625";
+        :>> title = "Adjudication: one Need, drift first but widened to a full status command, async CI, repo-level trust unchanged";
+        :>> createdAt = "2026-08-31"; :>> createdBy = "claudeOpus5";
+        :>> text = "[x] Keep ONE Need - trust and update-consent are the same predicate - RECOMMENDED\n[x] Drift report first - RECOMMENDED\nNote: I really want a full status output for state of everything including versioning, library update new processes, etc. a command I can run to check all bases\n[x] Asynchronous - land records the SHA, the next keel command surfaces a failure - RECOMMENDED\n[x] Keep repo-level trust exactly as written; --trust overrides case by case - RECOMMENDED";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-08-31"; :>> channel = StatementChannel::chat;
+    }
+
+    part us065 : UserStory {
+        :>> id = "ceb03e9b-203a-4bed-a1be-6fb894d185f5";
+        :>> title = "A single status command that checks all bases: versions, library drift, new units, work, CI";
+        :>> createdAt = "2026-08-31"; :>> createdBy = "claudeOpus5";
+        :>> asA = "supervisor";
+        :>> iWant = "one command that reports the state of everything - engine version, library units available and behind, and what is waiting";
+        :>> soThat = "I can check all bases without running five commands and comparing their output by hand";
+        :>> implication = ImplicationKind::verifiedRequirement;
+        :>> triageNote = "verifiedRequirement and not priority: their tab-2 SELECTION was a priority (drift first), but the NOTE widens what that task must deliver - from a unit-drift report to a full state readout including new processes available in the library. The widening is a contract change, so it routes as a requirement rather than as ordering. Recorded separately from the four acceptances because it is the one thing in the digest that is not an answer to a question I asked.";
+    }
+    #DerivedFrom dependency from us065 to st062;
 }

@@ -998,30 +998,6 @@ const HOOK_DEADLINE_SECS: u64 = 120;
 /// "something is listening on 7777" is not the claim being made. Reporting an unrelated process as a
 /// running console would be the same class of defect as issue140 and issue149 - a tool asserting more
 /// than it checked - and here it would tell the human their work is reachable when it is not.
-///
-/// Raw TCP with std, no HTTP client dependency, and short timeouts so a turn boundary can never hang on
-/// it. Any failure at all answers `false`: the advisory that follows is non-blocking, so a false negative
-/// costs one redundant line and a false positive costs the human their queue.
-fn console_is_up(port: u16) -> bool {
-    use std::io::{Read as _, Write as _};
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let Ok(mut s) = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(300)) else {
-        return false;
-    };
-    let _ = s.set_read_timeout(Some(std::time::Duration::from_millis(400)));
-    let req = format!("GET /api/version HTTP/1.1
-Host: 127.0.0.1:{port}
-Connection: close
-
-");
-    if s.write_all(req.as_bytes()).is_err() {
-        return false;
-    }
-    let mut buf = Vec::new();
-    let _ = s.take(4096).read_to_end(&mut buf);
-    String::from_utf8_lossy(&buf).contains("apiVersion")
-}
-
 /// Turn-boundary gate: refuse to end the turn while the model is dishonest. Loop-safe.
 fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     if let Some(w) = engine_version_skew(root) {
@@ -1084,34 +1060,17 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // the same single-channel blindness that let the console stay down while 70 items waited. The console
     // is their oversight lens (D0093) and its availability is not a function of the model's honesty.
     //
-    // ADVISORY, NEVER BLOCKING, in both branches: whether the console should be up is their call, and a
-    // gate that blocked on it would be the over-strict control that trains its actor to disable it
-    // (issue076/issue081), taking the honest-state checks in this same hook down with it.
-    // WHERE THE HUMAN IS CHANGES WHAT TO DO ABOUT IT (their request: on remote control, serve HTML
-    // feedback instead of a localhost console). A BRIDGED session is one driven through claude.ai rather
-    // than this terminal, and for a human on the other end of that bridge a localhost console is not
-    // merely down - it is UNREACHABLE, so telling me to start one is advice that cannot help them.
-    //
-    // THE BASIS IS STATED IN THE MESSAGE rather than asserted: the signal is that
-    // CLAUDE_CODE_BRIDGE_SESSION_ID is set, which is the id a remote client attaches to the session. I
-    // have not verified that it appears ONLY under remote control, so the message says what it observed
-    // instead of claiming to know where they are.
-    let bridged = std::env::var("CLAUDE_CODE_BRIDGE_SESSION_ID").is_ok_and(|v| !v.is_empty());
-    let oversight = keel_cli::serve::obligations_total(root)
-        .filter(|total| *total > 0 && (bridged || !console_is_up(CONSOLE_PORT)))
-        .map(|total| if bridged {
-            format!(
-                "[oversight] {total} item(s) are waiting on the HUMAN, and this session is BRIDGED (CLAUDE_CODE_BRIDGE_SESSION_ID is set), so a localhost console may not be reachable for them. Publish the review deck instead of starting `keel serve`: run the `obligation-review` skill (`keel deck . --out <path>`, publish per the skill with the mcp inbox declared), and hand them the URL."
-            )
-        } else {
-            format!(
-                "[oversight] {total} item(s) are waiting on the HUMAN and no keel console is answering on 127.0.0.1:{CONSOLE_PORT}. Start one so they can act: `keel serve . --port {CONSOLE_PORT}`. It holds target/release/keel.exe, so serve a COPY (e.g. keel-serve.exe) if you will rebuild. Only port {CONSOLE_PORT} is checked; a console elsewhere is not detected."
-            )
-        });
+    // THE OVERSIGHT NAG IS GONE (D0269). It counted items waiting on the human and then prescribed
+    // how to look at them - start a console on 127.0.0.1, or publish a deck - branching on an env
+    // var as a proxy for whether they were at this terminal or elsewhere. Their verdict: I cannot
+    // tell where they are reading, the proxy was never evidence that I could, and the line carried
+    // almost no value even when right. What waits on them is now surfaced deliberately, as a linked
+    // decision page, by the decision-surfacing process - a channel they asked for and can act in,
+    // rather than a count appended to every turn.
 
     if problems.is_empty() {
-        // green, and the human is not blocked -> silent
-        return oversight.map_or(0, |msg| hook_emit(&serde_json::json!({ "systemMessage": msg })));
+        // green -> silent. The turn boundary speaks only when the model is dishonest.
+        return 0;
     }
     if already {
         // Second consecutive red: allow the stop (loop-avoidance stands, issue081) but the yield is
@@ -1143,12 +1102,6 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     let mut body = problems.join("\n\n");
     body.truncate(4000);
-    // Carry it into the BLOCKING reason too, so a dishonest model never swallows the fact that the
-    // human cannot reach their queue.
-    if let Some(msg) = &oversight {
-        body.push_str("\n\n");
-        body.push_str(msg);
-    }
     hook_emit(&serde_json::json!({
         "decision": "block",
         "reason": format!(
@@ -4105,6 +4058,7 @@ const CATALOGUE: &[&str] = &[
     "  ls [ROOT]                    list .tracking/ .sysml files",
     "  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View (D0093)",
     "  whats-next [ROOT]            print ready task names (one per line)",
+    "  status [ROOT]                 every base in one screen: engine pin, library drift and NEW units, model honesty, work, CI verdict for HEAD (D0270)",
     "  github-pull --repo O/N --by ACTOR --at DATE [--limit N] [--trust T]   pull OPEN issues and ingest the new ones; autonomy follows repo VISIBILITY - private acts, public plans only, undetermined fails CLOSED (D0264)",
     "  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours (D0263)",
     "  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed (D0221)",
@@ -4456,6 +4410,15 @@ fn main() {
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
+        Some("status") => refuse_flag_as_path(rest.first(), "status").unwrap_or_else(|| {
+            resolve_guard_root(rest.first()).map_or_else(
+                || {
+                    eprintln!("error: no .engine/ directory found. usage: keel status [ROOT]");
+                    2
+                },
+                |root| keel_cli::status::cmd(&root),
+            )
+        }),
         Some("github-pull") => {
             let root = resolve_guard_root(
                 rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
