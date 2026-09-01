@@ -372,5 +372,22 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from dcCliSurfaceConsolidation to issue323;
+    // MIS-TRIAGED ON ARRIVAL and corrected here: this pointed at dcCliSurfaceConsolidation, which is
+    // the resolver of the two issues recorded immediately before it and has nothing to do with unit
+    // identity. The `issues` guard passed anyway, because it checks that a #Resolves edge EXISTS
+    // (guards.rs:970-986) and never that the resolver can resolve it — so a false triage reads as
+    // triaged. issue322 above points at the same task DELIBERATELY and says so in its own text; that
+    // is what a correct one looks like, and the difference is not visible to any control today.
+    #Resolves dependency from dcUnitIdentityIsCarriedNotMinted to issue323;
+
+    part issue324 : Issue {
+        :>> id = "9cdbc5c6-28d9-41fb-a5d9-80fa8e7960f4";
+        :>> title = "Migrate's dirty-tree refusal and D0251's skew refusal form a circular lock, sprung by a file the engine wrote itself";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "REPORTED BY A PEER SESSION working in another keel project (their issue021), and VERIFIED HERE IN SOURCE before recording rather than taken on their word. Three individually-correct controls compose into a lock with no non-bypassing exit, and the file that springs it is written BY THE ENGINE. THE CYCLE, each leg read at file:line. (1) `keel migrate` refuses on a dirty tree - migrate.rs:652-656, and the check at migrate.rs:670-687 runs `git status --porcelain -- .tracking .engine`, which reports UNTRACKED files, so a brand-new file trips it. (2) Committing that file to clean the tree fails - the pre-commit hook runs `keel validate`, and validate REFUSES under engine-version skew because a gate surface must not return a verdict from an engine the project did not pin (main.rs:226-230, D0251). (3) Skew clears by running the pinned binary or by `keel migrate` - main.rs:188. A project whose only available binary is the newer one has exactly one exit, and it is leg (1). WHY IT IS THE ENGINE'S OWN DOING. The uncommitted file in the reported case was `.tracking/obligations/red-yield-<short>.sysml`, auto-written by `record_obligation` (write.rs:471-481) when the Stop hook's second red pass yielded, under D0176/K7. That function's own doc comment reasons about deadlock - 'one Issue per file so recording can never deadlock on the very file being repaired' - and the reasoning is correct at the FILE level and blind at the TREE level: a new untracked file in a tree that cannot be committed is exactly as blocking as an edit to the file under repair. And the trigger correlates with the hazard: an obligation is recorded precisely when a project is already unhealthy, which is also when it is most likely to be behind its pin. NOT REPRODUCIBLE IN THIS REPO, and that is why it went unseen. check_preconditions returns Refusal::SelfBuild for any tree holding keel-cli/Cargo.toml (migrate.rs:664-666), so migrate never runs here at all. This class of defect can only be found downstream, which makes the peer's report the evidence and not a nuisance. WHAT THE HUMAN ACTUALLY DID: `git stash push -u -- <path>` then migrate then `git stash pop` - the escape migrate's own message names. It works and bypasses nothing. The outcome worth preventing is the contributor who reaches for `--no-verify` instead, which disables every other check in the hook to get past one. FIX DIRECTION, and the two rejected alternatives are the argument for the chosen one. (a) Have the obligation recorder STAGE its own file: does not help - staged is still uncommitted, and `git status --porcelain` reports it either way. (b) Degrade pre-commit validate to a warning under pure skew: weakens a gate to work around a different gate, which is how a control gets hollowed out one exception at a time. (c) Let migrate proceed when every uncommitted path under .tracking/ is an engine-authored obligation record: this is the only shape that breaks the cycle WITHOUT weakening anything, and it is defensible on migrate's own stated rationale - the refusal exists because 'a half-migrated tree mixed with uncommitted edits cannot be told apart afterwards', and a brand-new additive file in a dedicated directory CAN be told apart. It must stay narrow: the carve-out is `.tracking/obligations/` only, untracked-or-added only, and migrate must NAME the files it tolerated so the exemption is visible rather than silent.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcObligationDoesNotLockTheTree to issue324;
 }

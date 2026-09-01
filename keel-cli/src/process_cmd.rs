@@ -340,32 +340,117 @@ fn print_row(r: &Row, verbose: bool) {
 }
 
 
-/// `keel process export <name> --out <dir>` — write the unit as a portable bundle.
-/// Stable per-unit identity (D0183/K9): a unit's id survives re-export, so `--update` can match
-/// upstream revisions to installs. First export mints and records it in
-/// `.engine/contracts/unit-ids.toml` (committed — identity is shared truth, not machine state).
-fn unit_id_for(root: &Path, process: &str) -> String {
-    let reg = root.join(".engine").join("contracts").join("unit-ids.toml");
-    if let Ok(text) = std::fs::read_to_string(&reg) {
-        for line in text.lines() {
-            if let Some(rest) = line.strip_prefix(&format!("{process} = \"")) {
-                if let Some(id) = rest.split('"').next() {
-                    return id.to_string();
+/// Every unit id under which `process` is recorded in the install record.
+///
+/// # Why the install record and not `unit-ids.toml`
+///
+/// `unit-ids.toml` holds the ids this project MINTED. The install record holds the ids this project
+/// RECEIVED. For a unit that was imported and then improved and re-published, those are different
+/// registries answering different questions, and only the second one holds the unit's real exchange
+/// identity — see `unit_id_for`.
+///
+/// Returns every match rather than the first, because two ids for one process name is precisely the
+/// corrupted state issue323 produced, and the caller must refuse rather than pick.
+fn installed_ids_for_process(root: &Path, process: &str) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(root.join(".engine").join("contracts").join("installed-units.toml")) else {
+        return Vec::new();
+    };
+    let mut ids = Vec::new();
+    let mut current: Option<String> = None;
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(id) = l.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            current = Some(id.to_string());
+        } else if let Some(rest) = l.strip_prefix("process = ") {
+            if rest.trim().trim_matches('"') == process {
+                if let Some(id) = current.take() {
+                    ids.push(id);
                 }
             }
         }
     }
-    let id = crate::write::gen_uuid();
-    let mut text = std::fs::read_to_string(&reg).unwrap_or_else(|_| {
+    ids
+}
+
+/// Record `process = id` in `unit-ids.toml`, replacing any line already naming that process.
+fn write_minted_id(root: &Path, process: &str, id: &str) {
+    let reg = root.join(".engine").join("contracts").join("unit-ids.toml");
+    let existing = std::fs::read_to_string(&reg).unwrap_or_else(|_| {
         "# Process-unit identity registry (D0183): a unit's id is its EXCHANGE identity - stable\n# across exports, matched by import --update. Never rewritten.\n".to_string()
     });
+    let prefix = format!("{process} = \"");
+    let mut text: String = existing
+        .lines()
+        .filter(|l| !l.trim_start().starts_with(&prefix))
+        .fold(String::new(), |mut acc, l| {
+            acc.push_str(l);
+            acc.push('\n');
+            acc
+        });
     {
         use std::fmt::Write as _;
         let _ = writeln!(text, "{process} = \"{id}\"");
     }
     let _ = std::fs::create_dir_all(reg.parent().unwrap_or(root));
     let _ = crate::write::write_atomic(&reg, text);
-    id
+}
+
+/// `keel process export <name> --out <dir>` — write the unit as a portable bundle.
+/// Stable per-unit identity (D0183/K9): a unit's id survives re-export, so `--update` can match
+/// upstream revisions to installs. First export mints and records it in
+/// `.engine/contracts/unit-ids.toml` (committed — identity is shared truth, not machine state).
+///
+/// # Why the INSTALL RECORD outranks the minted registry (issue323)
+///
+/// A unit's identity belongs to the unit, not to the project that happens to be exporting it. When a
+/// project IMPORTS a unit and later re-publishes an improvement, `unit-ids.toml` is the wrong
+/// authority: the import filed the unit under the LIBRARY's id in `installed-units.toml` and wrote
+/// nothing to `unit-ids.toml`, so an export consulting only the minted registry found nothing, minted
+/// a FRESH id, and shipped the improved content under an identity no consumer had ever installed.
+/// `next_unit_version` then looked the new id up, missed, and restarted the version at 1 — so the
+/// content changed, the identity changed, and the version did NOT. Every consumer's drift check then
+/// reports "v1 installed, v1 available, nothing behind", which does not merely miss the update: it
+/// AFFIRMS there is none, defeating `srDriftIsReportedPerUnit`. Observed live publishing exec-summary.
+///
+/// So: install record first, minted registry second, mint last. When the two registries DISAGREE the
+/// minted one is repaired in place, because it is what the next export reads and leaving it wrong
+/// reopens the defect on the following publish.
+fn unit_id_for(root: &Path, process: &str) -> Result<String, String> {
+    let installed = installed_ids_for_process(root, process);
+    if installed.len() > 1 {
+        return Err(format!(
+            "'{process}' is recorded under {} DIFFERENT unit ids in .engine/contracts/installed-units.toml: {}.\n\
+             A unit has ONE exchange identity, so this cannot be resolved by guessing which is real \
+             (issue323 produced exactly this state by re-minting on export). Keep the id consumers \
+             actually installed - the OLDEST section - delete the other, point unit-ids.toml at the \
+             survivor, and re-run.",
+            installed.len(),
+            installed.join(", ")
+        ));
+    }
+    let minted = {
+        let reg = root.join(".engine").join("contracts").join("unit-ids.toml");
+        std::fs::read_to_string(&reg).ok().and_then(|text| {
+            text.lines().find_map(|line| {
+                line.strip_prefix(&format!("{process} = \""))?.split('"').next().map(str::to_string)
+            })
+        })
+    };
+    if let Some(received) = installed.into_iter().next() {
+        if minted.as_deref() != Some(received.as_str()) {
+            // The REPAIR, not a warning: unit-ids.toml is what the NEXT export reads, so leaving it
+            // disagreeing reopens the defect on the following publish.
+            write_minted_id(root, process, &received);
+            println!("  identity: '{process}' carries its installed id {received} (unit-ids.toml repaired)");
+        }
+        return Ok(received);
+    }
+    if let Some(id) = minted {
+        return Ok(id);
+    }
+    let id = crate::write::gen_uuid();
+    write_minted_id(root, process, &id);
+    Ok(id)
 }
 
 /// Content hash for the three-way base (D0183): the arch module's stable hash, one per file.
@@ -467,11 +552,58 @@ fn manifest_hashes(root: &Path, files: &[PathBuf]) -> Option<Vec<(String, String
 }
 
 /// The version to record: unchanged when the content is unchanged (issue302), else one higher.
-fn next_unit_version(root: &Path, unit_id: &str, hashes: &[(String, String)]) -> u32 {
+///
+/// # Why a missed lookup REFUSES rather than returning 1 (issue323)
+///
+/// `None` used to mean "a unit nobody has installed, so start at 1". But a missed lookup and a new
+/// unit are indistinguishable at this call site, and when they were conflated the version silently
+/// RESTARTED on a unit that already had consumers — shipping changed content under an unchanged
+/// number, which reads downstream as "nothing is behind". So the two cases are now separated by the
+/// only evidence that can tell them apart: whether the project has this PROCESS installed at all. If
+/// it does and the id still misses, the identity is inconsistent and refusing is the only honest
+/// answer; a wrong version number here is not recoverable by a later export, because consumers have
+/// already compared against it.
+fn next_unit_version(root: &Path, unit_id: &str, process: &str, hashes: &[(String, String)]) -> Result<u32, String> {
     match install_record(root, unit_id) {
-        Some((v, recorded)) if hashes_match(&recorded, hashes) => v,
-        Some((v, _)) => v + 1,
-        None => 1,
+        Some((v, recorded)) if hashes_match(&recorded, hashes) => Ok(v),
+        Some((v, _)) => Ok(v + 1),
+        None if installed_ids_for_process(root, process).is_empty() => Ok(1),
+        None => Err(format!(
+            "'{process}' HAS an install record but none under unit id {unit_id}, so its version cannot 
+             be derived. Restarting at v1 here would ship changed content under a number consumers 
+             have already compared against, and their drift check would then AFFIRM they are current 
+             (issue323). Reconcile .engine/contracts/unit-ids.toml with installed-units.toml and re-run."
+        )),
+    }
+}
+
+/// What an export must state about itself: the unit id, the version, and the per-file hashes.
+type ExportIdentity = (String, u32, Vec<(String, String)>);
+
+/// What the manifest must state about this export: `(unit_id, version, per-file hashes)`.
+///
+/// Grouped into one function because the three are one decision with a strict order, and getting the
+/// order wrong is how issue323 happened. IDENTITY comes first: a unit whose id cannot be resolved
+/// unambiguously must not be written at all, since a bundle carrying the wrong identity is worse than
+/// no bundle - consumers match on the id, so a re-minted one orphans every install. HASHES come
+/// before the version because the version depends on them (issue302: it advances only when a byte
+/// moved), and a key that cannot be made repository-relative refuses here, before anything is written
+/// (issue301). Any refusal returns `None` having already said why; the caller writes nothing.
+fn export_identity(root: &Path, name: &str, files: &[std::path::PathBuf]) -> Option<ExportIdentity> {
+    let unit_id = match unit_id_for(root, name) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return None;
+        }
+    };
+    let hashes = manifest_hashes(root, files)?;
+    match next_unit_version(root, &unit_id, name, &hashes) {
+        Ok(version) => Some((unit_id, version, hashes)),
+        Err(e) => {
+            eprintln!("error: {e}");
+            None
+        }
     }
 }
 
@@ -729,12 +861,7 @@ fn cmd_export(args: &[String], root: &Path) -> i32 {
                     return 1;
                 }
             }
-            let unit_id = unit_id_for(root, name);
-            // The hashes are computed BEFORE the version, because the version depends on them
-            // (issue302: it advances only when a byte moved). A key that cannot be made
-            // repository-relative refuses here, before anything is written (issue301).
-            let Some(exported_hashes) = manifest_hashes(root, &files) else { return 1 };
-            let version = next_unit_version(root, &unit_id, &exported_hashes);
+            let Some((unit_id, version, exported_hashes)) = export_identity(root, name, &files) else { return 1 };
             let manifest = format!(
                 "# keel process unit: {name}\n# Exported from a keel project. Import with `keel process import <this dir>`.\n\
                  #\n# The GUARDS below are the enforcement this process owns. A receiving project must have them\n\
