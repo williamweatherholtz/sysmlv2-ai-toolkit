@@ -1189,6 +1189,14 @@ fn add_task_locked(
     let indent = detect_indent(&lines, def_start, def_close);
 
     let action_line = format!("{indent}action {task_name};");
+    // SANITIZED like every other prose field, and it was the ONE that was not (issue325). A DoD
+    // containing a double-quoted phrase closed the SysML string literal early and left the BACKLOG
+    // UNPARSEABLE — so the next command could not read the model at all, and the repair had to be
+    // made by hand before anything else could run. Fixed HERE rather than in `cmd_add_task`, because
+    // issue322's whole lesson was that the previous prose defect recurred from being patched
+    // per-command: `record_issue_locked` and `record_decision` both bind `sanitize_field` and this
+    // was the last interpolation in the file that did not.
+    let dod_text = sanitize_field(dod_text);
     let dod_line = format!(
         "{indent}verification {task_name}DoD : Test {{ :>> id = \"{uuid}\"; :>> method = VerificationMethod::{method}; :>> procedureText = \"{dod_text}\"; }}"
     );
@@ -1762,6 +1770,38 @@ mod tests {
             assert!(crate::guards::uuid_shaped(&u), "guard 38 rejects a minted id: {u}");
             assert!(seen.insert(u), "duplicate within 10000 mints");
         }
+    }
+
+    /// issue325: a `DoD` containing a double-quoted phrase must not be able to close the `SysML` string
+    /// literal it is written into. This is the LAST prose interpolation in the write path that did
+    /// not sanitize, and the cost of that omission was not a malformed field — it was an UNPARSEABLE
+    /// backlog, so the very next command could not read the model to do anything, including to
+    /// report the problem. Armed: revert the `sanitize_field` call in `add_task_locked` and the
+    /// re-read below fails to parse.
+    #[test]
+    fn a_dod_containing_quotes_cannot_break_the_backlog() {
+        let dir = std::env::temp_dir().join(format!("keel-dodq-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("backlog.sysml");
+        std::fs::write(&path, "package B {\n    action def Work {\n    }\n}\n").expect("seed");
+
+        let hostile = "THE REMEDY IS NOT \"fill in the placeholder\", and the reason\n\tmatters.";
+        super::add_task(&path, "Work", "dcQuoted", hostile, "test").expect("the write succeeds");
+
+        let written = std::fs::read_to_string(&path).expect("read back");
+        let line = written.lines().find(|l| l.contains("dcQuotedDoD")).expect("the DoD line exists");
+        // Exactly the field's own delimiters — 8 for id/method-free literals is brittle, so assert
+        // the property that actually matters: nothing between the procedureText quotes reopens one.
+        let body = line.split("procedureText = \"").nth(1).expect("has a procedureText");
+        let body = &body[..body.rfind('"').expect("closing quote")];
+        assert!(!body.contains('"'), "the interior must carry NO double quote: {body}");
+        assert!(body.contains("'fill in the placeholder'"), "the phrase survives as apostrophes: {body}");
+        assert!(!body.contains('\n') && !body.contains('\t'), "and it stays one line: {body:?}");
+        // The point of all of it: the file still parses.
+        let tokens = keel_parser::tokenize(&written, "backlog.sysml").expect("it must still lex");
+        assert!(keel_parser::parse(tokens, "backlog.sysml").is_ok(), "the backlog must still PARSE:\n{written}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
