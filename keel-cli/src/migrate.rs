@@ -132,7 +132,10 @@ fn is_project_owned_contract(mapped: &Path) -> bool {
 /// repo-specific state, so shipping them keeps D0048 intact.
 #[must_use]
 pub fn is_engine_dev_only(rel: &Path) -> bool {
-    const PORTABLE_TOOLS: [&str; 2] = ["test_deck_e2e.py", "deck_inbox_record.py"];
+    // stpa_diagram.py (D0285): stdlib-only, referenced by the shipped stpa-diagram process - a scaffold
+    // that ships the process without the tool hands a follower a dead path (tool-reference went red on
+    // CI's foreign-tree check the day the process landed without this line).
+    const PORTABLE_TOOLS: [&str; 3] = ["test_deck_e2e.py", "deck_inbox_record.py", "stpa_diagram.py"];
     if rel.parent().is_some_and(|p| p.ends_with("tools"))
         && rel.file_name().is_some_and(|f| PORTABLE_TOOLS.iter().any(|t| f == *t))
     {
