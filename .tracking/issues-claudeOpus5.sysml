@@ -606,4 +606,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcConsentIsScopedAndExpires to issue342;
+
+    part issue343 : Issue {
+        :>> id = "fbca1f37-5314-44a7-945d-d2e1575248d7";
+        :>> title = "A done task's own DoD can be rewritten after its pass and the task stays done: criterion drift is computed for dependencies only, never for the task itself";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED 2026-09-02 by experiment: a done task's own DoD (instanceAwareDoD) was widened with an unverified claim, keel orient was run, the task appeared in no suspect entry and remained done; the edit was reverted. By reading: orient.rs criterion_suspects iterates data.deps only - a dependency's criterion changing since the verified commit makes the dependent suspect, the task's own criterion changing does not. proactive.rs names own-criterion drift as a post-edit ADVISORY, non-blocking, so nothing computed carries it forward. WHY IT MATTERS: the human's direction is trust-but-verify with the DoD as the gold standard; a standard the owner may rewrite after the pass, with the pass still standing, is not a standard. Under D0108 the owner of most tasks is the AI that will pass them. Same class as issue341 (acceptance binds to a commit, not to the accepted text), for the DoD instead of the Decision. FIX: dcOwnDoDDriftIsSuspect - compare own criterion at judgedAgainst with HEAD in criterion_suspects.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcOwnDoDDriftIsSuspect to issue343;
 }
