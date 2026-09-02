@@ -537,6 +537,9 @@ package IssuesClaudeOpus5 {
     // issue337 CORRECTS issue332: the guard's predicate is right, the session's identity never
     // reaches the hook. issue332 stays as the record of what was believed and why it was wrong.
     #Supersede dependency from issue337 to issue332;
+    // ...and the fix that resolved issue337's correct diagnosis resolves issue332's wrong one: the
+    // defect they both point at is gone. issue332's text stays as the record of what was believed.
+    #Resolves dependency from dcSessionActorReachesHooks to issue332;
 
     // ── issue330 resolved: the owner's word, and the mechanism that turned out to already exist ──
     verification issue330Accept : Test {
