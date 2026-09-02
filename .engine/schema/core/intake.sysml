@@ -129,6 +129,6 @@ package EngineIntake {
         // Edges carry the rest: `#DerivedFrom` to the Statement it translates (required — a UserStory
         // with no source is an invention), and `#Implicates` to whatever downstream item was created.
         // A story whose `implication` is not `none` and which reaches no downstream item is UNROUTED,
-        // and `keel intake` reports it.
+        // and `keel show intake` reports it.
     }
 }

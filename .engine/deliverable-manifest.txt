@@ -1,7 +1,7 @@
 # Deliverable-source suspicion manifest (D0050; PER-TASK precision — suspectDiagnostics, issue014).
 # Read by `keel orient` (orient.rs): a listed task whose latest passing TestResult was judged
 # at a commit BEFORE a commit touching ANY OF ITS OWN paths is marked SUSPECT — the deliverable
-# changed since it was verified, so the claim is stale. `keel suspect --explain` prints WHICH
+# changed since it was verified, so the claim is stale. `keel show suspect --explain` prints WHICH
 # path drifted at WHICH commit vs the verified-at commit. Re-verifying (append a TestResult judged
 # at HEAD) clears it.
 #

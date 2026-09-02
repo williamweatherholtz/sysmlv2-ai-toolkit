@@ -36,7 +36,7 @@ package EngineIndicatorMonitoring {
         :>> id = "63940516-2c7d-4e8f-c089-516273849713";
         :>> title = "Interpret — direction, not a gate";
         :>> triggerCondition = "Someone wants to read the indicators.";
-        :>> actionText = "Run `keel indicators [--trend]` (computed series need --trend). Read each indicator's value + baseline->latest + direction-aware status (improving/degrading/flat by its goal). An indicator never PASSES or FAILS — it informs. If a real, defensible boundary emerges (a baseline + a stakeholder commitment), THEN promote it to a requirement/guard (D0088); until then, watch the direction.";
+        :>> actionText = "Run `keel show indicators [--trend]` (computed series need --trend). Read each indicator's value + baseline->latest + direction-aware status (improving/degrading/flat by its goal). An indicator never PASSES or FAILS — it informs. If a real, defensible boundary emerges (a baseline + a stakeholder commitment), THEN promote it to a requirement/guard (D0088); until then, watch the direction.";
         :>> producedArtifact = "An ephemeral read (no stored artifact); possibly a decision to act on a degrading signal.";
         :>> owner = Owner::human;
     }

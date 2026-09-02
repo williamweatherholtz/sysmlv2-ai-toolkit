@@ -181,7 +181,7 @@ fn f2_the_first_decision_is_d0001_and_cannot_collide_with_reference_decisions() 
 fn f3_the_engines_history_is_reference_and_the_projects_own_model_is_empty() {
     let root = scaffold("purpose", "proj");
     // The project's OWN business model, read from the COMMAND rather than the directory (pf43).
-    let b = run_in(&root, &["business", "."]);
+    let b = run_in(&root, &["show", "business", "."]);
     assert!(b.ok, "F3: keel business must run in a fresh project: {}", b.text);
     for empty in ["\"briefs\": []", "\"personas\": []", "\"needs\": []", "\"useCases\": []"] {
         assert!(

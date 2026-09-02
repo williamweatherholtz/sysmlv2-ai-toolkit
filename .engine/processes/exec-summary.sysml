@@ -48,7 +48,7 @@ package ProcessExecSummary {
         :>> id = "7e4c2b91-58a3-4f6d-b2c7-9d0e1f2a3b50";
         :>> title = "Deliver; the returned digest is the decision record";
         :>> triggerCondition = "The suite passes.";
-        :>> actionText = "Send the page. The Copy-for-AI digest the reader pastes back carries their selections as checkbox markdown plus their notes - a STATEMENT about specific claims, which is what an acceptance gate can honestly record (the keel intake discipline: their words verbatim, then the reading). Provenance rides the footer: who generated it, when, from what.";
+        :>> actionText = "Send the page. The Copy-for-AI digest the reader pastes back carries their selections as checkbox markdown plus their notes - a STATEMENT about specific claims, which is what an acceptance gate can honestly record (the keel show intake discipline: their words verbatim, then the reading). Provenance rides the footer: who generated it, when, from what.";
         :>> producedArtifact = "A delivered page; on return, a recordable decision digest.";
         :>> owner = Owner::ai;
     }

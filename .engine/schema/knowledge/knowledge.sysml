@@ -1,8 +1,8 @@
 // =====================================================================
 // EngineKnowledge — the knowledge store's two declared fact types (D0161).
 // OPTIONAL MODULE — the feature's entire input is human-authored Questions
-// and Aliases under `.knowledge/`; delete them and `keel why` /
-// `keel knowledge question-coverage` report NOTHING DECLARED (data-level
+// and Aliases under `.knowledge/`; delete them and `keel show why` /
+// `keel show knowledge question-coverage` report NOTHING DECLARED (data-level
 // removability, D0161 part 3i). For keel's own corpus the MODEL IS THE
 // GRAPH: no entities, relations or answer text are stored here — these two
 // types only declare what a human wants findable and the words they use.
@@ -14,7 +14,7 @@ package EngineKnowledge {
     private import EngineElement::*;
 
     // A question a human wants the model to answer. Coverage is COMPUTED
-    // (`keel knowledge question-coverage`), never recorded: whether seeding
+    // (`keel show knowledge question-coverage`), never recorded: whether seeding
     // finds an entity and traversal reaches an answer is re-derived per run.
     part def Question :> Element {
         attribute questionText : String;   // the question in the human's own words

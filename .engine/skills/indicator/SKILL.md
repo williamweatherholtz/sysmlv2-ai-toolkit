@@ -3,7 +3,7 @@ name: indicator
 description: |
   Deploys the Indicator Monitoring process (D0089): declare monitored MEASURES (Indicators) that
   inform a need/decision by DIRECTION (not a threshold — that's a requirement, D0088), and collect
-  their data by method — computed (repo-derived, `keel indicators`), pulled (external/programmatic,
+  their data by method — computed (repo-derived, `keel show indicators`), pulled (external/programmatic,
   `record-measurement`), or manual (subjective survey/assessment, `record-measurement`). Use when
   asked to track/watch/monitor a metric or KPI over time, add an indicator, record a measurement,
   pull an external signal (market/regulation/social), or see how a measure is trending. An Indicator
@@ -38,7 +38,7 @@ serves. **No verify/satisfy edges** — it's excluded from the assurance/orphan 
   observation (external values can't be recomputed, so they're recorded with provenance).
 - **manual** (subjective): a human gathers the value (survey/assessment) and records it the same way.
 
-**View:** `keel indicators [--trend]` — per indicator: value, baseline→latest, and direction-aware
+**View:** `keel show indicators [--trend]` — per indicator: value, baseline→latest, and direction-aware
 **status** (improving/degrading/flat by goal). Computed series need `--trend` (git replay, slow);
 pulled/manual series come from the recorded Measurements (cheap).
 

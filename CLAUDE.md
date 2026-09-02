@@ -41,7 +41,7 @@ Don't restate those rules here: one canonical home per fact (D0105).
 7. **Requirement vs constraint vs indicator (D0088).** A **constraint** is an executable predicate — the
    guards *are* the constraint layer. A **requirement** is a constraint elevated to a verified stakeholder
    contract (Need/SystemRequirement + satisfy/verify). An **indicator** is monitored with no enforced
-   threshold (`keel indicators`). When a "good enough" boundary can't be defensibly set, it stays an
+   threshold (`keel show indicators`). When a "good enough" boundary can't be defensibly set, it stays an
    indicator — promote only when a justified boundary emerges (avoid Goodhart).
 8. **The CLI surface is an authored fact (D0271).** Every command is a `CliCommand` carrying its
    `family`, `effect` and `stability` — so "these are variations of one idea" is queryable, not an
@@ -247,7 +247,7 @@ conda run -n sysml --no-capture-output python .engine/tools/validate/conformance
 
 The same tool with no arguments is the **conformance lane**: it sweeps every instance file, reports the
 constructs the kernel rejects, and never blocks. Its number is tracked as `conformanceIndicator`
-(`keel indicators`) rather than gated, because a rejection may be the pilot kernel's gap rather than
+(`keel show indicators`) rather than gated, because a rejection may be the pilot kernel's gap rather than
 ours — and gating on it would repeat the D0132/issue081 all-or-nothing bypass.
 
 In-loop gating (D0128/D0130/D0134/D0174): `keel hook post-edit` runs the fast tier after each `.sysml`

@@ -41,7 +41,7 @@ package EngineIssueResolution {
         :>> id = "63940516-2c7d-4e8f-c078-516273849703";
         :>> title = "Resolve — computed, never prose";
         :>> triggerCondition = "A resolver completes (its action becomes done, or its Decision is accepted).";
-        :>> actionText = "Do NOTHING to 'close' the Issue by hand: resolution is COMPUTED (D0001/D0018). An Issue is RESOLVED iff a #Resolves resolver is complete; otherwise OPEN. Read it with `keel open-issues` (open set + resolvers) and `keel orient` (open_issues). A prose 'RESOLVED' note in the description is informational only, never the source of truth.";
+        :>> actionText = "Do NOTHING to 'close' the Issue by hand: resolution is COMPUTED (D0001/D0018). An Issue is RESOLVED iff a #Resolves resolver is complete; otherwise OPEN. Read it with `keel show open-issues` (open set + resolvers) and `keel orient` (open_issues). A prose 'RESOLVED' note in the description is informational only, never the source of truth.";
         :>> producedArtifact = "Computed open/resolved state (no stored status); the open frontier surfaced in orient.";
         :>> owner = Owner::ai;
     }

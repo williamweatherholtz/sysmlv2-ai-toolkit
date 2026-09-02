@@ -1216,15 +1216,6 @@ pub fn assured(root: &Path) -> GuardReport {
 
 // ── viewpoint-renderer guard (every declared viewpoint names a real renderer) ──────────────────
 
-/// View-ish `keel` subcommands a viewpoint renderer may legitimately name.
-const VIEW_SUBCOMMANDS: &[&str] = &[
-    "orient", "whats-next", "view", "diagram", "render", "report", "decisions", "suspect", "orphans",
-    "attestation-coverage", "governing-version", "reprocess-candidates", "coverage", "critique-coverage",
-    "assured", "open-issues", "audit", "validate", "guard", "indicators", "record-measurement",
-    "concern-coverage", "dispositions", "sitting-coverage", "critique-policy", "rootedness", "tier-satisfaction", "recent", "verification",
-    "authority-queue", // real since D0129 sync work; never added here, so the first viewpoint naming it failed
-    "arch", // D0148 — the six `arch` views register as viewpoints; the group name is what `keel <cmd>` matches
-];
 
 /// Classify a viewpoint renderer string: `"retired"` (query.py/report.py, a violation), `"planned"`
 /// (a tolerated warning), `"ok"` (names a real `keel` subcommand), or `"unknown"` (a violation).
@@ -1233,7 +1224,17 @@ fn classify_renderer(r: &str) -> &'static str {
         "retired"
     } else if r.starts_with("(planned") {
         "planned"
-    } else if r.strip_prefix("keel ").and_then(|s| s.split([' ', '(']).next()).is_some_and(|c| VIEW_SUBCOMMANDS.contains(&c)) {
+    } else if crate::cli_surface::renderer_command(r).is_some_and(|(verb, lens)| {
+        // D0273: the lens family collapsed into ONE router, so a renderer now reads
+        // `keel show <lens>`. Accepting only the verb would let `keel show frobnicate` pass, which
+        // is the same hole with an extra word in it — so when the verb is the router, the LENS is
+        // what must resolve.
+        if verb == "show" {
+            lens.is_some_and(crate::cli_surface::has_lens)
+        } else {
+            crate::cli_surface::has_command(verb)
+        }
+    }) {
         "ok"
     } else {
         "unknown"

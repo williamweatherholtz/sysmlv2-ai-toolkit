@@ -42,7 +42,7 @@ package ProcessIntake {
         :>> id = "4b78e0c1-3f52-4d96-a814-000000000i04";
         :>> title = "Create the downstream item and link it";
         :>> triggerCondition = "The story is triaged to anything other than `none`.";
-        :>> actionText = "Create the item the implication names - Need, UseCase, Decision, Issue, SystemRequirement, a process change, an architecture record, or code - and author `#Implicates` from the story to it. A story triaged and then dropped is WORSE than an untriaged one, because it looks handled; `keel intake` reports it as unrouted.";
+        :>> actionText = "Create the item the implication names - Need, UseCase, Decision, Issue, SystemRequirement, a process change, an architecture record, or code - and author `#Implicates` from the story to it. A story triaged and then dropped is WORSE than an untriaged one, because it looks handled; `keel show intake` reports it as unrouted.";
         :>> producedArtifact = "A downstream item, reachable from the statement that asked for it.";
         :>> owner = Owner::ai;
     }
@@ -51,7 +51,7 @@ package ProcessIntake {
         :>> id = "4b78e0c1-3f52-4d96-a814-000000000i05";
         :>> title = "Read the three gaps back";
         :>> triggerCondition = "After any intake, and at every sitting.";
-        :>> actionText = "Run `keel intake`. UNPARSED means direction nothing translated. UNROUTED means triaged and dropped. UNSOURCED means work with no recorded statement behind it - the ratio of what was asked for to what the AI invented. Treat unsourced as a FLOOR on the record's completeness, never as a claim about the human: nothing can force a statement to be written down.";
+        :>> actionText = "Run `keel show intake`. UNPARSED means direction nothing translated. UNROUTED means triaged and dropped. UNSOURCED means work with no recorded statement behind it - the ratio of what was asked for to what the AI invented. Treat unsourced as a FLOOR on the record's completeness, never as a claim about the human: nothing can force a statement to be written down.";
         :>> producedArtifact = "Three numbers, and a decision about each gap.";
         :>> owner = Owner::either;
     }

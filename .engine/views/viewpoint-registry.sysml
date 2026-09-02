@@ -78,7 +78,7 @@ package EngineViewpoints {
         :>> concernText = "Which monitored measures (Indicators) inform our needs/decisions, and which way are they trending — improving, degrading, or flat — by their goal (D0089)?";
         :>> audience = "maintainer / lead / program";
         :>> sources = "Indicator items + their measurement method (computed series via the report/trend engine; pulled/manual series from recorded Measurement datapoints, #Measures edges); direction-aware status by goal (D0088 measure spectrum)";
-        :>> renderer = "keel indicators [--trend] (+ keel record-measurement for pulled/manual datapoints, D0089)";
+        :>> renderer = "keel show indicators [--trend] (+ keel record-measurement for pulled/manual datapoints, D0089)";
         :>> surface = "explore";
     }
     part safetyVP : Viewpoint {
@@ -98,7 +98,7 @@ package EngineViewpoints {
         :>> concernText = "What does the system need to do, are requirements well-formed, and is each satisfied + verified?";
         :>> audience = "systems engineer / requirements owner";
         :>> sources = "Need / Requirement items; satisfy edges (to components) + verify edges (to Tests); requirement-quality (INCOSE/EARS)";
-        :>> renderer = "(planned) dedicated requirements view — partially served today by keel coverage + keel critique-coverage";
+        :>> renderer = "(planned) dedicated requirements view — partially served today by keel show coverage + keel show critique-coverage";
         :>> surface = "assurance";
     }
     part decisionsVP : Viewpoint {
@@ -108,7 +108,7 @@ package EngineViewpoints {
         :>> concernText = "What was decided, by whom, when, and why (incl. alternatives)?";
         :>> audience = "lead / auditor / future maintainer";
         :>> sources = ".engine/decisions/*.sysml Decision items (context/decisionText/consequences; alternatives via decisionAnalysis/issue016)";
-        :>> renderer = "keel decisions (+ the decisions TOML view: keel view decisions)";
+        :>> renderer = "keel show decisions (+ the decisions TOML view: keel view decisions)";
         :>> surface = "record";
     }
     part baselinesVP : Viewpoint {
@@ -128,7 +128,7 @@ package EngineViewpoints {
         :>> concernText = "Which done items have stale evidence (model OR deliverable-source drift) and need re-verification?";
         :>> audience = "maintainer / QA";
         :>> sources = "git-ancestry of judgedAgainst vs upstream change over satisfy/:> edges; deliverable-manifest source drift (D0050); unresolved failing critiques (D0086)";
-        :>> renderer = "keel suspect";
+        :>> renderer = "keel show suspect";
         :>> surface = "work";
     }
     part orphansVP : Viewpoint {
@@ -138,7 +138,7 @@ package EngineViewpoints {
         :>> concernText = "Which model elements are orphaned / dangling — a Need with no satisfying Requirement, a Requirement with no satisfy or verify edge, a task with no DoD, an Issue with no relatedTask, a Decision referenced by nothing — i.e. broken or missing required traceability?";
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "all items + typed edges; flag any element missing a REQUIRED incoming/outgoing edge for its kind (Need->Requirement satisfy; Requirement->Test verify; task->DoD; Issue->relatedTask)";
-        :>> renderer = "keel orphans";
+        :>> renderer = "keel show orphans";
         :>> surface = "assurance";
     }
 
@@ -149,7 +149,7 @@ package EngineViewpoints {
         :>> concernText = "Which items lack an attestation their governing process requires? Currently: every status=accepted Decision must carry a passing acceptance event (dNNNNAccept confirmation TestResult, D0066).";
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "all decisions; flag any status=accepted Decision with no passing dNNNNAcceptR1 TestResult (extensible to other process-required attestations)";
-        :>> renderer = "keel attestation-coverage";
+        :>> renderer = "keel show attestation-coverage";
         :>> surface = "assurance";
     }
 
@@ -182,7 +182,7 @@ package EngineViewpoints {
         :>> concernText = "Is every chartered capability rooted in a driving Need — and what is the charter-source balance (need-rooted vs legitimate decision-driven evolution vs orphan)? (D0098/D0099/issue047)";
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "delivery Story #CharteredBy chains -> Need (direct / via satisfy'd SystemRequirement / via a Decision #DerivedFrom a Need); the #Capability marker + its #DerivedFrom->Need link (the hard-gate set)";
-        :>> renderer = "keel rootedness (+ the requirement-rootedness guard for the #Capability hard gate)";
+        :>> renderer = "keel show rootedness (+ the requirement-rootedness guard for the #Capability hard gate)";
         :>> surface = "assurance";
     }
     part tierSatisfactionVP : Viewpoint {
@@ -192,7 +192,7 @@ package EngineViewpoints {
         :>> concernText = "Is each tier cleanly + comprehensively satisfied by its downstream items — are Needs decomposed into SystemRequirements and SystemRequirements verified by Tests? Thin downstream satisfaction is a leading indicator of insufficient implementation (D0098/issue047).";
         :>> audience = "maintainer / reviewer / systems engineer";
         :>> sources = "satisfy edges (Need->SystemRequirement) + verify edges (Test->SystemRequirement); per-tier structural-satisfaction fraction + the gap set";
-        :>> renderer = "keel tier-satisfaction (+ the orient burndown block)";
+        :>> renderer = "keel show tier-satisfaction (+ the orient burndown block)";
         :>> surface = "assurance";
     }
     part critiquePolicyVP : Viewpoint {
@@ -202,7 +202,7 @@ package EngineViewpoints {
         :>> concernText = "Which antagonistic critique lenses are REQUIRED per assurance-element type, and is that policy the built-in default or a project override (D0097)?";
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "the declared .engine/contracts/critique-policy.toml ([lenses] type -> required CritiqueLens list); the built-in Core-3 default when the file is absent; the CritiqueLens canon (schema/core)";
-        :>> renderer = "keel critique-policy";
+        :>> renderer = "keel show critique-policy";
         :>> surface = "assurance";
     }
     part concernCoverageVP : Viewpoint {
@@ -212,7 +212,7 @@ package EngineViewpoints {
         :>> concernText = "Which declared stakeholder concerns (Viewpoints) are SERVED by a working computed renderer, and which are still unserved (renderer planned/unbuilt) — i.e. the registry's own coverage of the concerns it declares (D0057/issue035)?";
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "this viewpoint registry: each Viewpoint's renderer classified served (names a keel command) vs unserved (planned), with a coverage %";
-        :>> renderer = "keel concern-coverage";
+        :>> renderer = "keel show concern-coverage";
         :>> surface = "assurance";
     }
     part archElementsVP : Viewpoint {
@@ -282,7 +282,7 @@ package EngineViewpoints {
         :>> concernText = "Which requirements has anyone formed a judgment ABOUT — adversarially critiqued, inspected or analysed — regardless of whether any code exists?";
         :>> audience = "reviewer / assurance lead";
         :>> sources = "#Verify edges into live SystemRequirements whose Test method is critique/inspect/analyze/confirmation; superseded requirements excluded";
-        :>> renderer = "keel verification [--pending]";
+        :>> renderer = "keel show verification [--pending]";
         :>> surface = "assurance";
     }
     part verificationExercisedVP : Viewpoint {
@@ -292,7 +292,7 @@ package EngineViewpoints {
         :>> concernText = "Which requirements has the SYSTEM actually been run against — test or demo — regardless of whether the requirement was ever adversarially read?";
         :>> audience = "maintainer / release gate";
         :>> sources = "#Verify edges into live SystemRequirements whose Test method is test/demo; superseded requirements excluded";
-        :>> renderer = "keel verification [--pending]";
+        :>> renderer = "keel show verification [--pending]";
         :>> surface = "assurance";
     }
     part acceptancesPendingVP : Viewpoint {
@@ -312,7 +312,7 @@ package EngineViewpoints {
         :>> concernText = "Which critique findings at or above Medium are waiting on MY typed verdict?";
         :>> audience = "asynchronous supervisor";
         :>> sources = "Issues carrying severity >= Medium with no #Dispositions-linked confirmation (D0092)";
-        :>> renderer = "keel dispositions";
+        :>> renderer = "keel show dispositions";
         :>> surface = "act";
     }
     part authorityQueueVP : Viewpoint {
@@ -322,7 +322,7 @@ package EngineViewpoints {
         :>> concernText = "What is waiting on a human authority I hold, and how long has it waited?";
         :>> audience = "asynchronous supervisor";
         :>> sources = "obligations whose attestation class permits only a human (attestation-policy.toml), with age";
-        :>> renderer = "keel authority-queue";
+        :>> renderer = "keel show authority-queue";
         :>> surface = "act";
     }
     part sittingReviewVP : Viewpoint {
@@ -332,7 +332,7 @@ package EngineViewpoints {
         :>> concernText = "Which sittings have not yet had their per-sitting human review (D0049's single gate)?";
         :>> audience = "asynchronous supervisor";
         :>> sources = "sprints and their #Covers-linked review records; sittings with no covering review";
-        :>> renderer = "keel sitting-coverage";
+        :>> renderer = "keel show sitting-coverage";
         :>> surface = "act";
     }
 }

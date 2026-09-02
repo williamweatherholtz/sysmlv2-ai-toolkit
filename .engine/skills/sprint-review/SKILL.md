@@ -26,7 +26,7 @@ Three outputs:
 3. **Improvement queue** — transcript-scan findings (feeds the autonomous retro).
 4. **Human confirmation + coverage** — the human accepts the sitting's content (the one gate),
    recorded as a `method=confirmation` review whose `#Covers` edges name the sprint `Story` items it
-   attests (D0049/issue040). Coverage is then COMPUTED: `keel sitting-coverage` reports which
+   attests (D0049/issue040). Coverage is then COMPUTED: `keel show sitting-coverage` reports which
    delivery sprints have a covering review vs await one (a VIEW, not a gate — never fabricate a
    review; the confirmation is the human's explicit word, D0016). Record shape:
    `verification sittingRev<id> : Test { :>> method = VerificationMethod::confirmation; ... }` +

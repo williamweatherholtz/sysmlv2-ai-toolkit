@@ -25,7 +25,7 @@ exactly right and only my reading was wrong — and only my reading was written 
 3. **Triage.** Set `implication` and write `triageNote` saying why this kind and not a neighbouring
    one. **The note is the reviewable part**; a bare verdict cannot be argued with.
 4. **Route.** Create the downstream item, author `#Implicates` from the story to it.
-5. **Audit.** `keel intake` → unparsed / unrouted / unsourced.
+5. **Audit.** `keel show intake` → unparsed / unrouted / unsourced.
 
 ## The vocabulary
 
@@ -54,7 +54,7 @@ direction to the wrong place and looks handled.
 - **Never edit a Statement to agree with a story derived from it.** A misreading is corrected by a NEW
   story citing the same Statement; the old one is superseded and stays visible. Their words are theirs
   (D0108).
-- **A story with no `#DerivedFrom` is an invention wearing a story's clothes.** `keel intake` reports it
+- **A story with no `#DerivedFrom` is an invention wearing a story's clothes.** `keel show intake` reports it
   separately from unrouted, because the two need different fixes: one needs a source, the other an
   outcome.
 - **`unsourced` measures the RECORD, not the human.** It is a floor: an item may be genuinely requested

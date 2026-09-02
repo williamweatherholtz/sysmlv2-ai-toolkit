@@ -31,7 +31,7 @@ that's **accepted**) is complete. The loop is record → triage → resolve → 
 **relatedTask** (D0029) is the *caused-by / related* link — NOT the resolver; an issue can
 relate to a done task yet still be open (issue014/025 were exactly this).
 
-**Resolution = computed (D0001/D0018):** `keel open-issues` (the open set + each
+**Resolution = computed (D0001/D0018):** `keel show open-issues` (the open set + each
 resolver + `untriaged`), `keel orient` (`open_issues`). There is **no** authored
 `status` field; a prose "RESOLVED …" clause in a description is *informational only*.
 
@@ -63,12 +63,12 @@ the Decision; a Need/Requirement → the existing `supersede` edge (D0004). [Iss
 2. **Triage:** decide the resolver. Is there an existing OPEN action that will fix it? Link
    `#Resolves` to it. Is it wontfix / resolved-by-design? Link `#Resolves` to the accepted
    Decision. Is there no fixing work yet? CREATE a backlog action first, then `#Resolves` to it.
-3. **Resolving:** never hand-close. When the resolver completes, `keel open-issues` /
+3. **Resolving:** never hand-close. When the resolver completes, `keel show open-issues` /
    `orient open_issues` recompute. Report the open set from the tool, not from memory.
 4. **Decision-moots-item:** when a Decision moots an item, record the typed edge in the SAME
    change as the Decision — `#Resolves` from the Decision (Issue) or `supersede`
    (Need/Requirement). Do not write "subsumed by DXXXX" as the only record.
-5. **Verify:** `keel guard issues` green (all triaged) and `keel open-issues` shows the
+5. **Verify:** `keel guard issues` green (all triaged) and `keel show open-issues` shows the
    intended open set before committing.
 
 ## Output Format
@@ -86,7 +86,7 @@ guard_issues: pass | fail
 
 - "Record / triage this issue"
 - "Resolve issue NNN" / "is issue NNN still open?"
-- "What issues are open?" (→ `keel open-issues`)
+- "What issues are open?" (→ `keel show open-issues`)
 - "This decision makes issue X moot / obsolete — how do I record that?"
 - "The `issues` guard is failing — what's untriaged?"
 - "How do I link an issue to the work that fixes it?"

@@ -1,7 +1,7 @@
 # Control ARMING (issue240 follow-on, D0217) — for each declared control, whether the fact that it can
 # actually FIRE is machine-checkable, and by which probe.
 #
-# WHY THIS FILE EXISTS. `keel controls` (D0195) computes the two-way hazard/control diff from typed
+# WHY THIS FILE EXISTS. `keel show controls` (D0195) computes the two-way hazard/control diff from typed
 # EDGES, so it answers "is a control DECLARED against this hazard" and cannot answer "can that control
 # fire". During issue240 `core.hooksPath` was set to a null device, the pre-commit gate could not run at
 # all, and `controls` reported `uncoveredHazards: []` — truthfully, on the question it was asking, and

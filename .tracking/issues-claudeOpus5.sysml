@@ -537,4 +537,37 @@ package IssuesClaudeOpus5 {
     // issue337 CORRECTS issue332: the guard's predicate is right, the session's identity never
     // reaches the hook. issue332 stays as the record of what was believed and why it was wrong.
     #Supersede dependency from issue337 to issue332;
+
+    // ── issue330 resolved: the owner's word, and the mechanism that turned out to already exist ──
+    verification issue330Accept : Test {
+        :>> id = "e2b14c07-58d9-4f36-a0c1-71f8b2d4e953";
+        :>> title = "The owner authorises the ten renderer edits (human word, recorded verbatim)";
+        :>> createdAt = "2026-09-01"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::confirmation;
+        :>> procedureText = "wweatherholtz, 2026-09-01, in response to the issue330 decision page listing the ten exact edits and three options. Their words, verbatim and in full: 'accept. continue'. READ AS: the owner authorises the ten renderer edits to their Viewpoints and directs the work to proceed - the page's recommended option was that they make the edits themselves, and 'continue' says they want them made. WHAT THIS DID NOT NEED TO DO, found after they answered: D0108's own sanctioned exemption already covered this case. The ownership guard suspends for a commit that co-commits a migration transform under .engine/tools/migrations/, because D0067 REQUIRES bulk transforms that cross every ownership boundary at once - and a mechanical rename of 86 call sites across 31 files is exactly that shape. The first attempt had done the rename with a scratchpad script, which is why the exemption did not apply and the human was asked. Their authorisation is recorded because it was given; the mechanism that lands the change is the committed transform, which is what D0067 asked for all along.";
+    }
+    part issue330AcceptR1 : TestResult { :>> id = "f3c25d18-69ea-4047-b1d2-82a9c3e5fa64"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3bb0125"; :>> judgedAt = "2026-09-01"; :>> judgedBy = "wweatherholtz"; }
+    #Verify dependency from issue330Accept to issue330;
+
+    part issue338 : Issue {
+        :>> id = "e4f198cb-0b4e-4355-a6cf-0935ca64b800";
+        :>> title = "D0273 promised fewer than 25 verbs and the lens collapse yields 66 - the criterion was never derived from the Decision's own measurements";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0273's consequences state that the visible verb count falls BELOW 25. The lens collapse landed at 66: 100 dispatch arms, minus 35 lens verbs moved into the `keel show` router, plus the router itself. Read back from `keel hardening` helpCoverage.dispatched, not estimated. THE DEFECT IS IN HOW THE CRITERION WAS WRITTEN, not in the work. D0273's own context section measured '43 read-only lenses of roughly 111 dispatch arms', which already implies the post-collapse count is near 66 - the arithmetic was available in the same paragraph and was not done. So an accepted Decision carries a verification criterion that its own numbers refute, and had nobody checked, the collapse would have been recorded as meeting it. Found by the person doing the work reading the number back; no control compares a Decision's stated criterion against its stated measurements, and none plausibly could, since both are prose. WHAT THIS IS NOT: a reason to redo the collapse. The lens family - the thing the human named, 'variations of an idea cemented as separate cli hooks' - is collapsed and byte-identical. The gate, record and orient/surface families were never measured or argued in D0273, so reaching 25 means either collapsing them too (a second breaking change) or amending the Decision to state what was achieved. RESOLVER: dcRemainingCliFamilies - measure the remaining families and put the choice to the human as a fork. Sprint 512's retro recorded the generalisable rule: a numeric criterion in a Decision must be DERIVED from the numbers already in that Decision, or it is a wish with a number attached.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRemainingCliFamilies to issue338;
+
+    part issue339 : Issue {
+        :>> id = "69935de0-41da-4cc3-9066-641ef6893e23";
+        :>> title = "A test exported from the live repository on every run, bumping the real install record";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A TEST WROTE TO THE LIVE WORKING TREE ON EVERY RUN. adoption_check_can_fail.rs:54 ran `keel process export intake` with cwd None; `export` locates the repository root and, per D0183 ('the ORIGIN records its own exports too'), writes .engine/contracts/installed-units.toml. So each `cargo test` that found the intake unit's content changed bumped its version in the REAL project - v43 became v44 during today's suite, and the file showed up modified after staging with no human or command having touched it. WHY IT MATTERS beyond hygiene: a version number in a committed contract is a fact consumers compare against (srDriftIsReportedPerUnit). A test silently advancing it means the number stops meaning 'the content changed and someone published' and starts meaning 'the suite ran'. It also produced a phantom out-of-band write that the hook flagged as possibly human-authored, which cost a diagnosis. THE GENERAL SHAPE, and it is worth a sweep rather than one fix: any test that invokes the binary with no cwd inherits cargo's, and every keel command that walks to a repository root will find the live one. The other export-invoking tests (federation, library_publish, capability_refusal_bites) pass an explicit fixture; this one did not. RESOLVER: dcTestsDoNotWriteTheLiveTree.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTestsDoNotWriteTheLiveTree to issue339;
 }

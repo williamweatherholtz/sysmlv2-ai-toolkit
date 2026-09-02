@@ -54,7 +54,7 @@ standingConsent = "d0207"
 # chose, and so a reader of this contract sees the delegation instead of discovering it in a guard.
 #
 # An AI-recorded disposition is recorded AS AI-recorded: judgedBy names the AI actor and its
-# procedureText cites D0165, so nothing claims a human judged it. `keel dispositions` reports the judge
+# procedureText cites D0165, so nothing claims a human judged it. `keel show dispositions` reports the judge
 # on every row — that is the audit trail this trades for throughput.
 #
 # TO WITHDRAW: restore `kinds = ["human"]`, `roles = ["supervisor"]`. One line, no code, no rebuild; the

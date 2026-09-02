@@ -18,7 +18,7 @@
 # accepted the day it was written — and blocking on an unbuilt promise would push the promise out of the
 # record rather than into it.
 #
-# REMOVAL PATH (D0163): delete this file; `keel hardening` reports `declared = 0` and says so.
+# REMOVAL PATH (D0163): delete this file; `keel show hardening` reports `declared = 0` and says so.
 
 # ── kept ─────────────────────────────────────────────────────────────────────────────────────────
 # WHAT DOES NOT BELONG HERE, learned by putting it here and watching the lens call it unbuilt: D0134
@@ -39,7 +39,7 @@ artifact = "keel-cli/src/hardening.rs"
 
 # D0161 accepted 2026-08-20, BUILT sprint 424 (2026-08-22): the archetype entry this lens exists
 # for stayed visible for two days and then got built - `.knowledge/` holds the declared Questions
-# and Aliases, `keel why` / `keel knowledge question-coverage` compute over them, and the rollback
+# and Aliases, `keel show why` / `keel show knowledge question-coverage` compute over them, and the rollback
 # was exercised (delete -> NOTHING DECLARED, gate green, unit deactivatable) per the decision.
 [d0161]
 artifact = ".knowledge"

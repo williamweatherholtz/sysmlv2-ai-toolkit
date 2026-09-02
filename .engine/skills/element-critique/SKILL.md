@@ -22,7 +22,7 @@ metadata:
 Runs the engine's Antagonistic Element Critique process (`.engine/processes/element-critique.sysml`).
 Its defining move: **antagonistic critique IS a lens-tagged verification** — a `method=critique`
 Test + TestResult `#Verify`-linked to the target, by a critic INDEPENDENT of the author. It reuses
-*all* the assurance machinery: coverage (`keel coverage`), staleness (`suspect`), the human
+*all* the assurance machinery: coverage (`keel show coverage`), staleness (`suspect`), the human
 confirmation gate, and findings-as-Issues (`#Resolves`, D0077/D0078). No parallel subsystem.
 
 ## Expert Vocabulary Payload
@@ -67,7 +67,7 @@ at HEAD. Read state from tooling, not memory.
 
 ## Behavioral Instructions
 
-1. **Scope:** pick targets — prioritize the `keel coverage` gap set (uncovered requirements/needs
+1. **Scope:** pick targets — prioritize the `keel show coverage` gap set (uncovered requirements/needs
    first), then accepted Decisions / Architecture. Choose the relevant canon lenses per element.
 2. **Critique:** for each (element x lens), an independent critic attacks the element through the
    lens. Record the `method=critique` Test (lens, critiquedBy) + TestResult (outcome, judgedBy != author,
@@ -80,7 +80,7 @@ at HEAD. Read state from tooling, not memory.
    via `keel apply-review` (batch verdict `act`/`accept-risk`/`dismiss` on the finding Issue) — a
    `#Dispositions`-linked `method=confirmation` verification carrying `disposition : DispositionKind`,
    never prose. ACCEPT-RISK/DISMISS close the finding; ACT also needs a `#Resolves` resolver. Critical
-   must be fixed or risk-accepted. Low is AI-dispositioned. Read state via `keel dispositions`.
+   must be fixed or risk-accepted. Low is AI-dispositioned. Read state via `keel show dispositions`.
 5. **Staleness:** if a target changed, its critiques are suspect — re-critique at HEAD and re-open any
    accept-risk disposition whose basis changed.
 6. **Verify:** validate green; read the critique coverage + open findings from tooling before committing.

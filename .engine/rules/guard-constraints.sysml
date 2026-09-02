@@ -3,7 +3,7 @@
 //
 // WHY THIS EXISTS. CLAUDE.md §1.7 already holds that "the guards ARE the constraint layer", so a
 // Process asserting the constraints it enforces is base SysML v2 stating exactly what the engine means.
-// Until now that mapping lived in `.engine/contracts/process-units.toml` — a table no `keel trace`,
+// Until now that mapping lived in `.engine/contracts/process-units.toml` — a table no `keel show trace`,
 // declared view or viewpoint could reach, so an ENGINE FACT sat outside the model that is supposed to
 // hold every engine fact.
 //

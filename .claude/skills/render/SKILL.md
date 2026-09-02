@@ -41,7 +41,7 @@ ingests an exported review batch and writes each disposition as a NEW LINKED cri
 a `#Verify` edge to the element (the human is an independent critic, D0080).
 - **accept** → `outcome=pass` — attests the element's state.
 - **finding** → `outcome=fail` + `severity` + `lens` — **induces suspicion**: the element shows in
-  `keel suspect` (`critique_suspect`) until cleared by a later passing critique. An `actionable`
+  `keel show suspect` (`critique_suspect`) until cleared by a later passing critique. An `actionable`
   finding is tagged for new implementation (planned through the normal sprint/issue flow).
 
 **Generate, don't commit:** `keel render decisions --mode table > t.html` then open it. Generated

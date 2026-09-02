@@ -31,19 +31,23 @@ impl Drop for Tmp {
 }
 
 /// Every command that reads a MODEL. Each must refuse at a workspace root and work inside a project.
-const MODEL_READERS: &[&str] = &[
-    "orient",          // root_arg — the AI's only legitimate state read
-    "whats-next",      // root_arg — the ranked frontier
-    "check-engine",    // root_arg — a BLOCKING step in the commit gate
-    "validate",        // root_arg — already refused (issue269); pinned so it stays refused
-    "coverage",
-    "suspect",
-    "audit",
-    "open-issues",
-    "indicators",
-    "verification",    // repo_arg + an explicit check
-    "controls",        // cmd_view0 — resolves its own root
-    "attestation",     // resolves its own root inside its module
+/// Invocations, not bare verbs: D0273 collapsed the lens family, so six of these are now reached as
+/// `keel show <lens>` and the refusal has to hold THROUGH the router. A router that resolved its own
+/// root before delegating would answer green over nothing for every lens at once, which is the
+/// failure this file exists to prevent made 35 times worse.
+const MODEL_READERS: &[&[&str]] = &[
+    &["orient"],          // root_arg — the AI's only legitimate state read
+    &["whats-next"],      // root_arg — the ranked frontier
+    &["check-engine"],    // root_arg — a BLOCKING step in the commit gate
+    &["validate"],        // root_arg — already refused (issue269); pinned so it stays refused
+    &["show", "coverage"],
+    &["show", "suspect"],
+    &["audit"],
+    &["show", "open-issues"],
+    &["show", "indicators"],
+    &["show", "verification"],    // repo_arg + an explicit check
+    &["show", "controls"],        // cmd_view0 — resolves its own root
+    &["attestation"],             // resolves its own root inside its module
 ];
 
 fn init_project(at: &Path) {
@@ -66,9 +70,9 @@ fn no_model_command_answers_green_at_a_workspace_root() {
     init_project(&base.join("beta"));
 
     // At the workspace root every one of them must REFUSE. An empty answer here is a false clean.
-    let mut green: Vec<&str> = Vec::new();
+    let mut green: Vec<&&[&str]> = Vec::new();
     for cmd in MODEL_READERS {
-        let out = keel().arg(cmd).arg(&base).output().expect("run keel");
+        let out = keel().args(*cmd).arg(&base).output().expect("run keel");
         if out.status.success() {
             green.push(cmd);
         }
@@ -86,9 +90,9 @@ fn no_model_command_answers_green_at_a_workspace_root() {
     assert!(said.contains("alpha") && said.contains("beta"), "the refusal must name the projects: {said}");
 
     // Inside a project they must all still work, or this is a refusal rather than a fix.
-    let mut broken: Vec<&str> = Vec::new();
+    let mut broken: Vec<&&[&str]> = Vec::new();
     for cmd in MODEL_READERS {
-        let out = keel().arg(cmd).arg(base.join("alpha")).output().expect("run keel");
+        let out = keel().args(*cmd).arg(base.join("alpha")).output().expect("run keel");
         if !out.status.success() {
             broken.push(cmd);
         }

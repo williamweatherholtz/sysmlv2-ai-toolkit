@@ -83,6 +83,74 @@ fn the_command_inventory_matches_the_dispatch() {
     );
 }
 
+/// Every lens `cmd_show` routes must be in `LENS_NAMES`, and vice versa (D0273).
+///
+/// The same argument as the command inventory, one level down. The viewpoint-renderer guard now
+/// accepts `keel show <lens>` only when the LENS resolves — accepting the verb alone would let
+/// `keel show frobnicate` pass, which is the original hole with an extra word in it. So `LENS_NAMES`
+/// became load-bearing the moment a guard started reading it, and a list a guard trusts has to be
+/// held equal to the thing it describes.
+#[test]
+fn the_lens_inventory_matches_the_router() {
+    let src = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("main.rs"))
+        .expect("main.rs is readable");
+    let start = src.find("fn cmd_show(args: &[String]) -> i32 {").expect("the router exists");
+    let block = &src[start..start + src[start..].find("\n}\n").expect("the router closes")];
+    let mut routed: Vec<String> = Vec::new();
+    for line in block.lines().filter(|l| l.trim_start().starts_with("Some(\"")) {
+        let mut rest = line;
+        while let Some(q) = rest.find('"') {
+            rest = &rest[q + 1..];
+            let Some(end) = rest.find('"') else { break };
+            let tok = &rest[..end];
+            if tok.starts_with(|c: char| c.is_ascii_lowercase())
+                && tok.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
+                routed.push(tok.to_string());
+            }
+            rest = &rest[end + 1..];
+        }
+    }
+    routed.sort();
+    routed.dedup();
+    assert!(!routed.is_empty(), "the parser must find the router's arms, or this proves nothing");
+
+    let declared: Vec<String> = keel_cli::cli_surface::LENS_NAMES.iter().map(|s| (*s).to_string()).collect();
+    let unlisted: Vec<&String> = routed.iter().filter(|c| !declared.contains(c)).collect();
+    let unrouted: Vec<&String> = declared.iter().filter(|c| !routed.contains(c)).collect();
+    assert!(unlisted.is_empty(), "routed by `keel show` but absent from LENS_NAMES: {unlisted:?}");
+    assert!(
+        unrouted.is_empty(),
+        "in LENS_NAMES but NOT routed — a viewpoint naming one would pass the renderer guard and then \
+         fail when anyone ran it: {unrouted:?}"
+    );
+}
+
+/// The old lens spellings are GONE, not aliased (D0273 — the human chose the clean break).
+#[test]
+fn a_retired_lens_verb_is_no_longer_a_command() {
+    let base = std::env::temp_dir().join(format!("keel-retired-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).expect("mkdir");
+    for retired in ["orphans", "coverage", "suspect", "indicators"] {
+        let (ok, text) = run(&base, &[retired, "."]);
+        assert!(!ok, "`keel {retired}` must no longer be a command — no alias window: {text}");
+        assert!(
+            text.contains("keel <subcommand>"),
+            "and an unknown verb falls through to the usage banner rather than a confusing error: {text}"
+        );
+    }
+    // ...while the router reaches every one of them.
+    for lens in ["orphans", "coverage", "suspect", "indicators"] {
+        let (_, text) = run(&base, &["show", lens, "--help"]);
+        assert!(
+            !text.contains("unknown lens"),
+            "`keel show {lens}` must resolve — the point of the collapse is that the lens survives: {text}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&base);
+}
+
 #[test]
 fn an_exported_unit_declares_the_commands_its_own_text_invokes() {
     let base = std::env::temp_dir().join(format!("keel-cap-export-{}", std::process::id()));
@@ -96,7 +164,7 @@ fn an_exported_unit_declares_the_commands_its_own_text_invokes() {
     // to live there for the export to see it.
     std::fs::write(
         proj.join(".engine").join("processes").join("capy.sysml"),
-        "// Run `keel orphans` and then `keel definitely-not-a-command` to finish.\npackage ProcessCapy {\n}\n",
+        "// Run `keel audit` and then `keel definitely-not-a-command` to finish.\npackage ProcessCapy {\n}\n",
     )
     .expect("process");
     std::fs::write(proj.join(".engine").join("skills").join("capy").join("SKILL.md"), "# capy\n").expect("skill");
@@ -111,7 +179,7 @@ fn an_exported_unit_declares_the_commands_its_own_text_invokes() {
     assert!(ok, "export: {text}");
     let manifest = std::fs::read_to_string(out.join("capy").join("unit.toml")).expect("unit.toml");
     let line = manifest.lines().find(|l| l.starts_with("commands = ")).expect("a commands line exists");
-    assert!(line.contains("\"orphans\""), "a real command the text invokes is declared: {line}");
+    assert!(line.contains("\"audit\""), "a real command the text invokes is declared: {line}");
     assert!(
         !line.contains("definitely-not-a-command"),
         "and the scan is SELF-LIMITING: a token following `keel ` that this binary does not dispatch \
@@ -137,7 +205,7 @@ fn importing_a_unit_that_needs_a_missing_command_refuses_and_names_it() {
     std::fs::write(
         unit.join("unit.toml"),
         "unitId = \"11111111-2222-3333-4444-555555555555\"\nversion = 1\nprocess = \"futureproc\"\n\
-         skills = []\nrules = []\nguards = []\nextras = []\ncommands = [\"show\", \"orphans\"]\n",
+         skills = []\nrules = []\nguards = []\nextras = []\ncommands = [\"orphans\", \"audit\"]\n",
     )
     .expect("manifest");
     std::fs::write(unit.join("processes").join("futureproc.sysml"), "package ProcessFuture {\n}\n").expect("proc");
@@ -149,13 +217,14 @@ fn importing_a_unit_that_needs_a_missing_command_refuses_and_names_it() {
          skill whose instructions cannot be followed:\n{text}"
     );
     assert!(
-        text.contains("show"),
+        text.contains("orphans"),
         "and the refusal NAMES the missing command rather than printing two version numbers, which \
-         is the whole reason D0252 chose capabilities over a range:\n{text}"
+         is the whole reason D0252 chose capabilities over a range. `orphans` is a RETIRED lens verb \
+         (D0273), so this is precisely the case the clean break creates downstream:\n{text}"
     );
     assert!(
-        !text.contains("orphans"),
-        "only the MISSING one is named — listing capabilities the engine has would bury the signal:\n{text}"
+        !text.contains("audit"),
+        "only the MISSING one is named — listing capabilities the engine HAS would bury the signal:\n{text}"
     );
     // And nothing was written: the refusal happens before any file lands.
     assert!(

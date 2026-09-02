@@ -7,7 +7,7 @@
 #   (b) the constraint is a HUMAN JUDGMENT and no guard can exist — correct, and permanent.
 #
 # Both printed identically, so 68% of the catalogue looked like debt when much of it is not. This file
-# records the distinction. `keel hardening` reads it and reports three buckets instead of two: enforced,
+# records the distinction. `keel show hardening` reads it and reports three buckets instead of two: enforced,
 # declared-unenforceable (with the reason), and UNDECLARED — the last being the honest gap.
 #
 # THIS IS AN INDICATOR, NEVER A GATE (invariant 7). A guard cannot be conjured for a judgment, so gating
@@ -17,7 +17,7 @@
 # A process with NO entry is UNDECLARED — deliberately, so silence reads as a gap rather than as consent
 # (D0138: a project that never adopted a control has not violated it, and the converse holds here).
 #
-# REMOVAL PATH (D0163): delete this file. `keel hardening` falls back to reporting every unguarded
+# REMOVAL PATH (D0163): delete this file. `keel show hardening` falls back to reporting every unguarded
 # process as undeclared, which is the pre-issue173 behaviour and is strictly less informative.
 
 [dod]
@@ -34,7 +34,7 @@ reason = "An antagonistic critique is a judgment by construction — D0046's who
 
 [intake]
 checkable = false
-reason = "Whether a Statement was recorded verbatim, and whether the UserStory faithfully translates it, are both judgments about fidelity to something outside the model. `keel intake` reports the computable gaps instead — unparsed, unrouted, unsourced — and the intake process's own audit step reads those numbers back. A guard could only check that fields are non-empty, which would make the practice look enforced while enforcing nothing."
+reason = "Whether a Statement was recorded verbatim, and whether the UserStory faithfully translates it, are both judgments about fidelity to something outside the model. `keel show intake` reports the computable gaps instead — unparsed, unrouted, unsourced — and the intake process's own audit step reads those numbers back. A guard could only check that fields are non-empty, which would make the practice look enforced while enforcing nothing."
 
 [indicatorMonitoring]
 checkable = false
@@ -97,7 +97,7 @@ core = ["decision-rationale", "acceptance-events", "decision-requirement-link", 
 # entirely in the author's intent.
 #
 # WHAT ACTUALLY CAUGHT IT, and the only thing that will: reading the computed view back after writing.
-# `keel open-issues` said CLOSED while the sprint's own closeOut gate said OPEN, and the disagreement
+# `keel show open-issues` said CLOSED while the sprint's own closeOut gate said OPEN, and the disagreement
 # was visible the moment both were read together. That is the verify-don't-assert discipline doing the
 # work a guard cannot.
 [issue305PartialResolution]

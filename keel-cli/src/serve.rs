@@ -2207,7 +2207,13 @@ pub fn obligations_json(root: &Path) -> Result<String, crate::view::ViewError> {
     for vp in &act {
         let get = |k: &str| vp.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
         let renderer = get("renderer");
-        let cmd = renderer.trim_start_matches("keel ").split([' ', '(']).next().unwrap_or("").to_string();
+        // D0273: renderers now read `keel show <lens>`, so the token after `keel ` is the ROUTER for
+        // 35 of them. Binding on the verb would give every collapsed viewpoint the same key and the
+        // console would serve one view for all of them — worse than the "no computed view is bound"
+        // it replaced, because it would answer with the WRONG view instead of refusing.
+        let cmd = crate::cli_surface::renderer_command(&renderer).map_or_else(String::new, |(verb, lens)| {
+            if verb == "show" { lens.unwrap_or(verb).to_string() } else { verb.to_string() }
+        });
         let mut row = vec![
             // The viewpoint's ELEMENT NAME, so a console can link the card to the place the work is
             // done by identity rather than by matching a title (srConsoleObligationActionable).
@@ -2817,8 +2823,14 @@ mod tests {
                 files += 1;
                 for (i, _) in text.match_indices("keel ") {
                     let tail = &text[i + 5..];
-                    let cmd: String =
+                    let mut cmd: String =
                         tail.chars().take_while(|c| c.is_ascii_lowercase() || *c == '-').collect();
+                    // The router is not a view (D0273). What the console must bind is the LENS behind
+                    // it, so step past `show` to the name that actually identifies the view.
+                    if cmd == "show" {
+                        let rest = tail[cmd.len()..].trim_start();
+                        cmd = rest.chars().take_while(|c| c.is_ascii_lowercase() || *c == '-').collect();
+                    }
                     if cmd.len() > 3 && !NOT_A_COMPUTED_VIEW.contains(&cmd.as_str()) {
                         advertised.insert(cmd);
                     }

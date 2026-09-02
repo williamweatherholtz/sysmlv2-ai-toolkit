@@ -4343,6 +4343,79 @@ const WARNING_ONLY_GUARDS: [&str; 9] =
 
 #[allow(clippy::too_many_lines)] // one dispatch table = one place a subcommand can be reached from;
 // splitting it by arbitrary length would hide half the surface from anyone reading for what exists
+/// `keel show <lens> [ROOT] ...` — the ONE read-only lens surface (D0273).
+///
+/// # What replaced what
+///
+/// 35 top-level verbs each computed one view of the model and printed it. The human's words for that
+/// were "a lot of these seem to be variations of an idea cemented as separate cli hooks", and they
+/// chose the CLEAN BREAK over an alias window: the old spellings are GONE, not deprecated. Every arm
+/// below is the arm that used to sit in `main`, moved verbatim — a consolidation that changed an
+/// answer would be a rewrite wearing a rename's clothes, so the calls are untouched and byte-equality
+/// against the pre-collapse binary is asserted per lens.
+///
+/// # Why removal, and why it is safe to remove
+///
+/// An alias list that shrinks "as call sites move" has no forcing function. The cost the human
+/// accepted is that every skill naming an old verb must move in the SAME commit, which is why this
+/// lands with its 118 call sites rewritten and guard 39 green throughout — no tree ever exists in
+/// which a skill names a command the binary lacks. Downstream, D0252 clause A's capability refusal
+/// makes the break a NAMED error at import rather than a silent no-op.
+fn cmd_show(args: &[String]) -> i32 {
+    let rest: &[String] = args.get(1..).unwrap_or(&[]);
+    match args.first().map(String::as_str) {
+            Some("assumptions") => cmd_view0(rest, "assumptions", keel_cli::view::assumptions),
+            Some("attestation-coverage") => cmd_attestation_coverage(rest),
+            Some("authority-queue") => cmd_view0(rest, "authority-queue", keel_cli::view::authority_queue),
+            Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("boundary-sweep") => cmd_query0(rest, "keel boundary-sweep [ROOT]", |r| keel_cli::view::boundary_sweep_json(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("business") => cmd_business(rest),
+            Some("concern-coverage") => cmd_concern_coverage(rest),
+            Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
+            Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
+            Some("coverage") => cmd_coverage(rest),
+            Some("critique-coverage") => cmd_critique_coverage(rest),
+            Some("critique-policy") => cmd_critique_policy(rest),
+            Some("decision-follow-through") => cmd_decision_follow_through(rest),
+            Some("decisions") => cmd_decisions(rest),
+            Some("dispositions") => cmd_dispositions(rest),
+            Some("hardening") => cmd_hardening(rest),
+            Some("indicators") => cmd_indicators(rest),
+            Some("intake") => cmd_intake(rest),
+            Some("knowledge") => cmd_knowledge(rest),
+            Some("launchables") => cmd_launchables(rest),
+            Some("ls") => cmd_ls(rest),
+            Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
+            Some("open-issues") => cmd_open_issues(rest),
+            Some("orphans") => cmd_orphans(rest),
+            Some("outstanding") => cmd_query0(rest, "outstanding", keel_cli::queries::outstanding),
+            Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("sitting-coverage") => cmd_sitting_coverage(rest),
+            Some("suspect") => cmd_suspect(rest),
+            Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("trace") => cmd_query1(rest, "trace", keel_cli::queries::trace),
+            Some("trace-need") => cmd_query1(rest, "trace-need", keel_cli::queries::trace_need),
+            Some("verification") => {
+                let root = repo_arg(rest);
+                keel_cli::workspace::require_project(&root, "keel verification [ROOT] [--pending]")
+                    .map_or_else(|code| code, |()| keel_cli::verification::cmd(rest, &root))
+            }
+            Some("why") => cmd_why(rest),
+            Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
+        Some(other) => {
+            eprintln!("keel show: unknown lens `{other}`.");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            2
+        }
+        None => {
+            eprintln!("usage: keel show <lens> [ROOT] [flags]");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            2
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = args.get(2..).unwrap_or(&[]);
@@ -4370,51 +4443,24 @@ fn main() {
             .unwrap_or_else(|| cmd_check_engine(rest)),
         Some("check") => cmd_check(rest),
         Some("rules") => cmd_rules(rest),
-        Some("business") => cmd_business(rest),
-        Some("launchables") => cmd_launchables(rest),
-        Some("ls") => cmd_ls(rest),
         Some("library") => keel_cli::library::run(rest),
+        Some("show") => cmd_show(rest),
         Some("orient") => cmd_orient(rest),
         Some("whats-next") => cmd_whats_next(rest),
         Some("view") => cmd_view(rest),
-        Some("attestation-coverage") => cmd_attestation_coverage(rest),
-        Some("orphans") => cmd_orphans(rest),
         Some("audit") => cmd_audit(rest),
-        Some("hardening") => cmd_hardening(rest),
         Some("deck") => cmd_deck(rest),
         Some("mint") => cmd_mint(rest),
         Some("new") => cmd_new(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
         Some("override") => cmd_override(rest),
         Some("enforcement-report") => cmd_enforcement_report(rest),
-        Some("decision-follow-through") => cmd_decision_follow_through(rest),
         Some("guard") => cmd_guard(rest),
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
-        Some("suspect") => cmd_suspect(rest),
-        Some("open-issues") => cmd_open_issues(rest),
-        Some("intake") => cmd_intake(rest),
-        Some("dispositions") => cmd_dispositions(rest),
-        Some("sitting-coverage") => cmd_sitting_coverage(rest),
-        Some("concern-coverage") => cmd_concern_coverage(rest),
-        Some("coverage") => cmd_coverage(rest),
-        Some("critique-coverage") => cmd_critique_coverage(rest),
-        Some("critique-policy") => cmd_critique_policy(rest),
         Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("assumptions") => cmd_view0(rest, "assumptions", keel_cli::view::assumptions),
-        Some("authority-queue") => cmd_view0(rest, "authority-queue", keel_cli::view::authority_queue),
-        Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
-        Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
         Some("decision-card") => cmd_decision_card(rest),
-        Some("why") => cmd_why(rest),
         Some("recall") => cmd_recall(rest),
-        Some("knowledge") => cmd_knowledge(rest),
-        Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
-        Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("boundary-sweep") => cmd_query0(rest, "keel boundary-sweep [ROOT]", |r| keel_cli::view::boundary_sweep_json(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
@@ -4427,11 +4473,6 @@ fn main() {
         // therefore carries no project precondition. Found by sweeping every command at a workspace
         // root rather than by trusting that one chokepoint covered them all: nine refused, this one
         // still exited 0.
-        Some("verification") => {
-            let root = repo_arg(rest);
-            keel_cli::workspace::require_project(&root, "keel verification [ROOT] [--pending]")
-                .map_or_else(|code| code, |()| keel_cli::verification::cmd(rest, &root))
-        }
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
@@ -4466,19 +4507,13 @@ fn main() {
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
-        Some("decisions") => cmd_decisions(rest),
         Some("diagram") => cmd_diagram(rest),
         Some("render") => cmd_render(rest),
         Some("report") => cmd_report(rest),
-        Some("indicators") => cmd_indicators(rest),
         Some("record-measurement") => cmd_record_measurement(rest),
         Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
         Some("apply-review") => cmd_apply_review(rest),
-        Some("outstanding") => cmd_query0(rest, "outstanding", keel_cli::queries::outstanding),
-        Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
         Some("item") => cmd_query1(rest, "item", keel_cli::queries::item),
-        Some("trace") => cmd_query1(rest, "trace", keel_cli::queries::trace),
-        Some("trace-need") => cmd_query1(rest, "trace-need", keel_cli::queries::trace_need),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),

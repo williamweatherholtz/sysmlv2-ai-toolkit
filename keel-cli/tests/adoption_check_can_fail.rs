@@ -51,7 +51,11 @@ fn a_unit_that_leaves_its_binding_behind_turns_the_foreign_gate_red() {
 
     // Export a unit, then MUTILATE the bundle the way the engine really did before D0222: the
     // process and the SKILL.md travel, the declaration binding them does not.
-    assert!(run(&["process", "export", "intake", "--out", &bundles.to_string_lossy()], None).0, "export failed");
+    // From the FIXTURE, not from wherever cargo is running (issue339). With `None` the export resolved
+    // to the LIVE repository root and wrote its install record there — every test run bumped the real
+    // project's `intake` version. A test with a write side-effect on the working tree is a test that
+    // edits history nobody asked it to.
+    assert!(run(&["process", "export", "intake", "--out", &bundles.to_string_lossy()], Some(&fixture)).0, "export failed");
     let bundle = bundles.join("intake");
     let binding = bundle.join("skills").join("intake").join("registry.sysml");
     assert!(binding.is_file(), "the bundle should carry the binding declaration (D0222)");

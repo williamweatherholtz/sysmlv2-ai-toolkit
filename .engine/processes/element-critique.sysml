@@ -8,7 +8,7 @@
 // through required adversarial LENSES, recording each critique as a `method=critique` Test +
 // TestResult `#Verify`-linked to the target, by an INDEPENDENT critic. Findings become Issues
 // (the D0077/D0078 #Resolves loop); coverage + staleness reuse the assurance machinery
-// (keel coverage, suspect). Deployed by the element-critique skill (D0059).
+// (keel show coverage, suspect). Deployed by the element-critique skill (D0059).
 // =====================================================================
 package EngineElementCritique {
     private import EngineElement::*;     // Cadence / Owner / CritiqueLens / Severity / CriticKind
@@ -28,7 +28,7 @@ package EngineElementCritique {
         :>> id = "63940516-2c7d-4e8f-c080-516273849801";
         :>> title = "Scope — pick targets + required lenses";
         :>> triggerCondition = "An assurance element lacks a required-lens critique (computed gap), OR a target changed and its critique is suspect, OR critique is requested.";
-        :>> actionText = "Pick the target element(s): prioritize the `keel coverage` gap set (uncovered requirements/needs first), then accepted Decisions and Architecture. The GATED required lenses per element type are the DECLARED critique policy (`.engine/contracts/critique-policy.toml`, D0097 — default Core-3; `keel critique-policy` shows the active set); lenses are drawn from the requirement-quality canon (CritiqueLens: completeness, correctness, ambiguity, testability, feasibility, consistency, necessity) and a critique may apply BROADER lenses than the gate requires (D0079). Fix the (element x lens) work-list before critiquing.";
+        :>> actionText = "Pick the target element(s): prioritize the `keel show coverage` gap set (uncovered requirements/needs first), then accepted Decisions and Architecture. The GATED required lenses per element type are the DECLARED critique policy (`.engine/contracts/critique-policy.toml`, D0097 — default Core-3; `keel show critique-policy` shows the active set); lenses are drawn from the requirement-quality canon (CritiqueLens: completeness, correctness, ambiguity, testability, feasibility, consistency, necessity) and a critique may apply BROADER lenses than the gate requires (D0079). Fix the (element x lens) work-list before critiquing.";
         :>> producedArtifact = "The (element x lens) critique work-list (ephemeral input to ecCritique).";
         :>> owner = Owner::ai;
     }
@@ -52,7 +52,7 @@ package EngineElementCritique {
         :>> id = "63940516-2c7d-4e8f-c080-516273849804";
         :>> title = "Disposition — human gate at >= Medium";
         :>> triggerCondition = "A finding Issue has severity >= Medium (Critical / High / Medium).";
-        :>> actionText = "A human dispositions every >= Medium finding with a TYPED verdict (D0092), recorded via `keel apply-review` as a method=confirmation disposition carrying `disposition : DispositionKind` (#Dispositions-linked to the finding Issue): ACT (also add a #Resolves resolver action to do the fix), ACCEPT-RISK (the verdict closes the finding — knowingly accepted), or DISMISS (the verdict moots it). A Critical finding MUST be fixed or explicitly risk-accepted — it cannot be left open. Low findings are AI-dispositioned (surfaced, not gated). The disposition is the human's word (D0016/D0051) — never inferred. State is COMPUTED: `keel dispositions` (dispositioned vs not) + `assured` read the typed verdict, never prose.";
+        :>> actionText = "A human dispositions every >= Medium finding with a TYPED verdict (D0092), recorded via `keel apply-review` as a method=confirmation disposition carrying `disposition : DispositionKind` (#Dispositions-linked to the finding Issue): ACT (also add a #Resolves resolver action to do the fix), ACCEPT-RISK (the verdict closes the finding — knowingly accepted), or DISMISS (the verdict moots it). A Critical finding MUST be fixed or explicitly risk-accepted — it cannot be left open. Low findings are AI-dispositioned (surfaced, not gated). The disposition is the human's word (D0016/D0051) — never inferred. State is COMPUTED: `keel show dispositions` (dispositioned vs not) + `assured` read the typed verdict, never prose.";
         :>> producedArtifact = "A typed disposition (D0092): a #Dispositions-linked method=confirmation verification carrying the DispositionKind verdict (act/acceptRisk/dismiss) + rationale + provenance; ACT additionally has a #Resolves resolver.";
         :>> owner = Owner::human;
     }
