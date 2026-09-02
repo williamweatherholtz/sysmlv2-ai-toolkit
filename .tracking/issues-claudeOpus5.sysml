@@ -584,4 +584,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcPublishSaysWhatMoved to issue340;
+
+    part issue341 : Issue {
+        :>> id = "19e1f750-9937-4bcb-8e1e-72001f5fd6b6";
+        :>> title = "An accepted Decision's text can change after sign-off and still compute as accepted: acceptance binds to a commit, never to what was accepted";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED: keel-cli/src/govern.rs acceptance_judged_against extracts the acceptance's commit SHA and that is the only binding an acceptance has to what was accepted; a grep of the write path and guards for a body digest or an edited-after-acceptance check finds nothing (checked 2026-09-02 during the agent-corral landscape spike). So the text a human signed at commit X and the text the tree carries at HEAD can differ, and the Decision still computes as accepted. keel refuses this exact drift elsewhere: evidence whose judgedAgainst no longer resolves is suspect, and a confirmation flip on chat words carries a quote receipt (D0198). Consent has no such receipt. WHY IT MATTERS: the landscape names this the rug-pull class (mcp-scan: the tool description you consented to is not the one that executes) and the operand-binding gap (PAuth: OAuth grants an operator, the call carries operands). A model that owns a Decision may edit its fields under D0108 - the owner of most Decisions is the AI that proposed them. FIX: dcAcceptanceBindsToTheText - compare the accepted fields at the acceptance SHA with HEAD, violation on difference, acceptance reported suspect.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAcceptanceBindsToTheText to issue341;
+
+    part issue342 : Issue {
+        :>> id = "e2269ef3-26b5-4708-b8aa-83b1c25df255";
+        :>> title = "Standing consent is revision-unbound and non-expiring: an auto-acceptance names D0207 but not the revision of the rule or the guard set it was granted under";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED: the auto-accept step in .github/workflows/decision-issue.yml writes the AUTO-ACCEPTED token, the standing words verbatim and the override thread URL; it records neither the commit of the D0207 file nor the guard count or adherence revision at acceptance time (checked 2026-09-02). So a standing consent granted under one rule set silently covers acceptances under any later rule set, and an override on the thread is not bound to the acceptance it overrides. WHY IT MATTERS: every product in the landscape spike that has thought about consent lifecycle has moved AWAY from this shape - Entra Agent ID time-bounds grants and re-opens approval on extension; CapLease shows even single-use tokens replay under agent retry without durable state over the confirmation event; the IETF compliance-receipts draft makes policy_digest and expires_at mandatory. The unauthenticated commenter on the override thread asked precisely this question, which the recording Action correctly refused to record - the refusal was right, the question stands. THIS IS A FORK, not a defect with one fix: the human chose standing consent (D0207) knowingly, and the options trade interruptions against attributability. FIX: dcConsentIsScopedAndExpires writes the costed proposal and puts it to the human.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcConsentIsScopedAndExpires to issue342;
 }
