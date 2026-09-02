@@ -187,7 +187,7 @@ pub fn merge_settings(existing: &serde_json::Value) -> serde_json::Value {
 
 /// The scaffolded single-vendor CI workflow (P0.1): layer 3's hook-independent downstream home.
 /// The `rules` step's blocking behavior activates with P1.5; until then it reports.
-pub const CI_TEMPLATE: &str = r"# keel gate - scaffolded by `keel init` (optional; delete if your CI wires keel itself).
+pub const CI_TEMPLATE: &str = r#"# keel gate - scaffolded by `keel init` (optional; delete if your CI wires keel itself).
 # Layer-3 verification, hook-independent (K15): validate + guards + rules + audit-history.
 name: keel-gate
 on: [push, pull_request]
@@ -197,11 +197,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: install keel
+      # Installs the version this project PINS, not the latest (D0281, issue327). The previous step here
+      # was three echo lines that installed nothing, so every fresh project's gate failed on its first
+      # push with `keel: command not found` — and read as "the placeholder nobody deleted" rather than
+      # "your gate is not running". Latest would be wrong too: the pin is BINDING and validate/guard
+      # REFUSE under skew (D0251), so the runner must run what the project declared.
+      - name: install keel (the pinned release)
         run: |
-          echo 'Install the released keel binary for linux and put it on PATH.'
-          echo 'Releases: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases'
-          echo 'Then delete this echo block.'
+          set -euo pipefail
+          PIN=$(sed -nE 's/^engine *= *"([^"]+)".*/\1/p' .engine/contracts/engine-version.toml)
+          [ -n "$PIN" ] || { echo "::error::no engine pin in .engine/contracts/engine-version.toml"; exit 1; }
+          curl -fsSL -o keel "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases/download/v${PIN}/keel-linux-x86_64"
+          chmod +x keel && sudo mv keel /usr/local/bin/keel
+          keel version
       - name: validate
         run: keel validate .
       - name: guards
@@ -210,7 +218,7 @@ jobs:
         run: keel rules . --enforce
       - name: audit-history
         run: keel audit-history --since origin/main || true
-";
+"#;
 
 /// Report from [`sync_claude`].
 pub struct SyncReport {
@@ -337,6 +345,24 @@ mod tests {
 
     /// D-P0a: five events, every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
     /// and the missing-binary branch is loud and names the install path.
+    /// issue327: the scaffolded gate's install step was three `echo` lines that installed nothing, so
+    /// every fresh project's own gate failed on its first push with `keel: command not found` — and read
+    /// as "the placeholder nobody deleted" rather than "your gate is not running". The step must now
+    /// INSTALL, and it must install the PINNED version: latest would put the runner in D0251 skew and
+    /// every gate step would refuse.
+    #[test]
+    fn the_scaffolded_gate_installs_the_pinned_release_not_an_echo() {
+        let t = super::CI_TEMPLATE;
+        assert!(!t.contains("Then delete this echo block"), "the placeholder must be gone");
+        assert!(t.contains(".engine/contracts/engine-version.toml"), "the install must READ THE PIN, not fetch latest");
+        assert!(t.contains("releases/download/v${PIN}/keel-linux-x86_64"), "and fetch that exact release asset");
+        assert!(t.contains("keel version"), "and prove the binary runs before any gate step trusts it");
+        // The gate steps that follow still name the binary they now actually have.
+        for step in ["keel validate .", "keel guard .", "keel rules . --enforce"] {
+            assert!(t.contains(step), "gate step present: {step}");
+        }
+    }
+
     #[test]
     fn generated_hooks_have_five_events_and_fail_loud_resolution() {
         let h = keel_hooks();

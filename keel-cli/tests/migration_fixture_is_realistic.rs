@@ -11,9 +11,9 @@
 //!   3. it holds an untracked obligation record while behind its pin;
 //!   4. it has its own CI workflow.
 //!
-//! Cases 1-3 are here. Case 4 is deliberately NOT: issue326 and issue327 are still open, so a test
-//! for it would have to assert the defect (locking it in) or be ignored (a test that does not run is
-//! a claim, D0253). It lands with the fix, in step 5 of the D0275 plan.
+//! All four are here. Case 4 landed WITH its fix (step 5 of the D0275 plan, D0281): until then a test
+//! for it would have had to assert the defect (locking it in) or be ignored (a test that does not run
+//! is a claim, D0253), so it waited for the day the scaffold's install step became real.
 //!
 //! SHORT PATHS ARE LOAD-BEARING HERE. The first attempt at this fixture died on Windows MAX_PATH
 //! mid-`git add`, which left the tree uncommitted, which made migrate refuse — a failure that looked
@@ -151,3 +151,31 @@ fn a_lived_in_project_holding_an_obligation_record_still_migrates() {
     assert!(text.contains("red-yield-abc12345"), "and still name what it tolerated: {text}");
     cleanup(&root);
 }
+
+#[test]
+fn a_lived_in_projects_own_ci_survives_migration_and_installs_the_pin() {
+    let (root, _) = realistic_project("ci");
+    let wf = root.join(".github").join("workflows").join("keel-gate.yml");
+    assert!(wf.is_file(), "a scaffolded project has its own gate workflow");
+    let before = std::fs::read_to_string(&wf).expect("workflow");
+    assert!(
+        before.contains(".engine/contracts/engine-version.toml") && !before.contains("Then delete this echo block"),
+        "the scaffolded workflow installs the PINNED release, not an echo placeholder (issue327):
+{before}"
+    );
+
+    let (ok, text) = run(&root, &["migrate", "."]);
+    assert!(ok, "migrate: {text}");
+    let after = std::fs::read_to_string(&wf).expect("workflow after");
+    // The workflow reads the pin at RUN time, so migration re-stamping the pin needs no edit to it —
+    // and a resync must not have reverted it to a placeholder either.
+    assert!(
+        after.contains(".engine/contracts/engine-version.toml") && !after.contains("Then delete this echo block"),
+        "the project's CI must still install the pinned release after migration:
+{after}"
+    );
+    let pin = std::fs::read_to_string(root.join(".engine/contracts/engine-version.toml")).expect("pin");
+    assert!(!pin.contains("0.0.1"), "and the pin it will read was re-stamped: {pin}");
+    cleanup(&root);
+}
+

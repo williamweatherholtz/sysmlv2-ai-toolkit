@@ -234,3 +234,26 @@ fn importing_a_unit_that_needs_a_missing_command_refuses_and_names_it() {
     );
     let _ = std::fs::remove_dir_all(&base);
 }
+
+/// issue326: the decision-channel unit ships two CI workflows as extras, and both ran
+/// `cargo build -p keel-cli` — a crate no consumer has. Every import handed the consumer two
+/// permanently red workflows. Both must now build ONLY where the crate exists and download the
+/// project's PINNED release everywhere else, producing the binary at the same path either way so
+/// nothing downstream in the workflow changes.
+#[test]
+fn the_shipped_workflows_build_here_and_download_the_pin_downstream() {
+    let wf = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("repo root").join(".github").join("workflows");
+    for name in ["decision-issue.yml", "decision-record.yml"] {
+        let t = std::fs::read_to_string(wf.join(name)).expect(name);
+        assert!(t.contains("if [ -f keel-cli/Cargo.toml ]"), "{name}: the build must be CONDITIONAL on the crate existing");
+        assert!(t.contains(".engine/contracts/engine-version.toml"), "{name}: the download must read the PIN");
+        assert!(t.contains("releases/download/v${PIN}/keel-linux-x86_64"), "{name}: and fetch that exact asset");
+        assert!(t.contains("target/release/keel"), "{name}: the binary lands where the rest of the workflow already looks");
+        // The Rust toolchain steps are pointless downstream and must be gated the same way.
+        assert!(
+            t.contains("if: hashFiles('keel-cli/Cargo.toml') != ''"),
+            "{name}: toolchain/cache steps must be skipped where there is no crate to build"
+        );
+    }
+}
+
