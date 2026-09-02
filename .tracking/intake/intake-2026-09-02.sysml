@@ -89,4 +89,48 @@ package ProjectIntake20260902 {
         :>> triageNote = "Recurring by the human's words (a strong process), so D0040 makes it a CHANGE: define the process and skill, then run it. The schema (EngineSafety, STPA steps 1-4) already exists and steps 1 and 3 have instances; step 2 landed today. The process definition is the next fork item.";
     }
     #DerivedFrom dependency from us071 to st065;
+
+    part st067 : Statement {
+        :>> id = "576397a2-9d29-4df3-9d95-0a00470deb05";
+        :>> title = "The STPA diagram: authority descending on the vertical axis, control down, feedback up, edges labelled with what is passed";
+        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
+        :>> text = "this stpa diagram needs to b ebetter.  authority is vertical axis descending.  control actions go down, feedback up.  and label the edges with what is passed, not just ''an action'' etc.  labeling the edges is critical in this diagram.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-02"; :>> channel = StatementChannel::chat;
+    }
+
+    part st068 : Statement {
+        :>> id = "159bb784-0120-462a-b20e-38abc6415f66";
+        :>> title = "Edges linear, not curved";
+        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
+        :>> text = "keep edges linear, not curved";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-02"; :>> channel = StatementChannel::chat;
+    }
+
+    part st069 : Statement {
+        :>> id = "6c45d997-d3c9-40fd-b148-4aa4443a5dfc";
+        :>> title = "Ortholinear: 90-degree lines, minimal overlap, semicircles at orthogonal crossings, no overlapping lines";
+        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
+        :>> text = "i meant like 90 degree lines (ortholinear?).  minimal overlapping, semicircles when lines cross orthogonally, no lines overlapping";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-02"; :>> channel = StatementChannel::chat;
+    }
+
+    part st070 : Statement {
+        :>> id = "7e5f9723-753b-487a-b8db-b6871fed5bc3";
+        :>> title = "Save this as the STPA graphing process";
+        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
+        :>> text = "YES save this as the stpa graphing process";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-02"; :>> channel = StatementChannel::chat;
+    }
+
+    part us072 : UserStory {
+        :>> id = "f27c9feb-5809-4412-b4d7-8c997dc1372d";
+        :>> title = "Drawing a control structure is a process with a tool, not a per-session judgment";
+        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
+        :>> asA = "the human reading STPA diagrams";
+        :>> iWant = "every control-structure diagram keel produces to hold the five conventions I set - authority descending, control down and feedback up, labels that say what passes, right angles with nothing overlapping, semicircles at crossings - without my having to say them again";
+        :>> soThat = "the picture is readable the first time and the same every time";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "st067, st068, st069 are the conventions themselves, set one message at a time over three renders; st070 is the instruction to keep them. Recurring by the human's word, so D0040 makes it a process (stpa-diagram) with a tool that enforces the conventions by construction (.engine/tools/stpa_diagram.py), and a chartered port into the binary (D0221).";
+    }
+    #DerivedFrom dependency from us072 to st070;
 }
