@@ -135,8 +135,10 @@ fn a_retired_lens_verb_is_no_longer_a_command() {
     for retired in ["orphans", "coverage", "suspect", "indicators"] {
         let (ok, text) = run(&base, &[retired, "."]);
         assert!(!ok, "`keel {retired}` must no longer be a command — no alias window: {text}");
+        // The banner is rendered from the CLI facts (D0283); assert the property - the usage header
+        // and the router's own row - not a wording the facts may restate.
         assert!(
-            text.contains("keel <subcommand>"),
+            text.contains("usage: keel") && text.contains("show <lens>"),
             "and an unknown verb falls through to the usage banner rather than a confusing error: {text}"
         );
     }

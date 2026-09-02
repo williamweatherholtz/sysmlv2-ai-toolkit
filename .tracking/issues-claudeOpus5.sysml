@@ -639,4 +639,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcDeliberateRankIsRecorded to issue345;
+
+    part issue346 : Issue {
+        :>> id = "cb8dfb2b-2a85-4f17-8add-376d707c5423";
+        :>> title = "record decision --from accepted an unknown marker silently and wrote an unmarked Decision - the process-change guard then refused the edit it was meant to authorise";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED 2026-09-02 while recording D0283: the --from file carried marker: prospective-change; the Decision was written with NO marker and no message; the process-change guard then refused the co-committed guards.rs edit for want of a marker. main.rs record-decision recognised only process-change and safety-change and treated anything else as none. D0282 (2026-09-02) landed unmarked the same way and, being accepted history, stays as written. A write path that drops a field silently is the issue118 class on the command line. FIX: dcUnknownMarkerRefused - refuse by name, write nothing; test in the same commit.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcUnknownMarkerRefused to issue346;
 }

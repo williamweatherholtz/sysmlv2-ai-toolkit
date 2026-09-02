@@ -2221,8 +2221,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 57] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry"];
+pub const GUARD_NAMES: [&str; 58] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3719,6 +3719,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "sprint-closure" => Some(sprint_closure(root)),
         "untrusted-routing" => Some(untrusted_routing(root)),
         "control-defect-registry" => Some(control_defect_registry(root)),
+        "cli-surface-declared" => Some(cli_surface_declared(root)),
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
@@ -4114,6 +4115,191 @@ pub fn engine_lint(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "engine-lint", scanned: decision_files.len() + inst_files.len(), warnings, violations }
+}
+
+/// One CLI fact as authored in `.engine/cli/commands.sysml`, reduced to the fields the guard compares.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredCliFact {
+    pub name: String,
+    pub family: String,
+    pub effect: String,
+    pub stability: String,
+    pub synopsis: String,
+}
+
+/// Read one `:>> key = "value"` or `:>> key = Enum::member` attribute out of a single-line part.
+fn cli_attr(line: &str, key: &str) -> Option<String> {
+    let needle = format!(":>> {key} = ");
+    let i = line.find(&needle)? + needle.len();
+    let rest = &line[i..];
+    if let Some(r) = rest.strip_prefix('"') {
+        return r.find('"').map(|e| r[..e].to_string());
+    }
+    let end = rest.find(';')?;
+    Some(rest[..end].rsplit("::").next().unwrap_or("").to_string())
+}
+
+/// Parse the `CliCommand` facts out of the file text.
+///
+/// Pure, so the comparison is unit-testable on a fixture; the model loader is not used because this guard must also run in a tree whose `.tracking`
+/// is unrelated to the engine (a downstream project).
+#[must_use]
+pub fn parse_cli_facts(text: &str) -> Vec<AuthoredCliFact> {
+    text.lines()
+        .filter(|l| l.contains(": CliCommand {"))
+        .filter_map(|l| {
+            Some(AuthoredCliFact {
+                name: cli_attr(l, "name")?,
+                family: cli_attr(l, "family")?,
+                effect: cli_attr(l, "effect")?,
+                stability: cli_attr(l, "stability")?,
+                synopsis: cli_attr(l, "synopsis")?,
+            })
+        })
+        .collect()
+}
+
+/// The comparison, pure: authored facts vs the Rust mirror vs the dispatch inventory.
+///
+/// BOTH WAYS on every edge. Returns violations only - there is no advisory shape here, because any disagreement
+/// means `keel --help` describes a surface that does not exist or hides one that does.
+#[must_use]
+pub fn cli_surface_violations(
+    authored: &[AuthoredCliFact],
+    mirror: &[crate::cli_facts::CliFact],
+    commands: &[&str],
+    lenses: &[&str],
+) -> Vec<String> {
+    use std::collections::BTreeMap;
+    let mut out = Vec::new();
+    let by_name: BTreeMap<&str, &AuthoredCliFact> = authored.iter().map(|f| (f.name.as_str(), f)).collect();
+    let mirror_by: BTreeMap<&str, &crate::cli_facts::CliFact> = mirror.iter().map(|f| (f.name, f)).collect();
+    // authored <-> mirror
+    for f in authored {
+        match mirror_by.get(f.name.as_str()) {
+            None => out.push(format!("`{}` is an authored CliCommand fact with no entry in cli_facts.rs - the help cannot describe it", f.name)),
+            Some(m) => {
+                for (what, a, b) in [("family", f.family.as_str(), m.family), ("effect", f.effect.as_str(), m.effect), ("stability", f.stability.as_str(), m.stability), ("synopsis", f.synopsis.as_str(), m.synopsis)] {
+                    if a != b {
+                        out.push(format!("`{}` {what} differs: facts say `{a}`, cli_facts.rs says `{b}` - one home, the .sysml; regenerate the mirror", f.name));
+                    }
+                }
+            }
+        }
+    }
+    for m in mirror {
+        if !by_name.contains_key(m.name) {
+            out.push(format!("`{}` is in cli_facts.rs but has no authored CliCommand fact - the help describes a command the model does not declare", m.name));
+        }
+    }
+    // authored <-> dispatch, by kind
+    for f in authored {
+        let is_lens = f.family == "lens";
+        let dispatched = if is_lens { lenses.contains(&f.name.as_str()) } else { commands.contains(&f.name.as_str()) };
+        if !dispatched {
+            out.push(format!("`{}` is declared as a {} but nothing dispatches it", f.name, if is_lens { "show lens" } else { "command" }));
+        }
+    }
+    for c in commands {
+        if by_name.get(c).is_none_or(|f| f.family == "lens") {
+            out.push(format!("`{c}` is dispatched as a command but has no CliCommand fact (D0271: every command is an authored fact)"));
+        }
+    }
+    for l in lenses {
+        if by_name.get(l).is_none_or(|f| f.family != "lens") {
+            out.push(format!("`{l}` is dispatched as a show lens but has no CliCommand fact with family `lens`"));
+        }
+    }
+    out
+}
+
+/// Guard: the CLI surface is an authored fact, held equal to the dispatch and to the help.
+///
+/// (D0271, issue344.) `.engine/cli/commands.sysml` is the home; `cli_facts::CLI_FACTS` mirrors it and renders
+/// `keel --help`; `cli_surface::COMMAND_NAMES` / `LENS_NAMES` are the dispatch. Any of the three
+/// disagreeing is a violation. An absent facts file is a violation too: a project on this engine
+/// vintage ships the file, and a tree without it is a tree whose help describes nothing.
+#[must_use]
+pub fn cli_surface_declared(root: &Path) -> GuardReport {
+    let path = root.join(".engine").join("cli").join("commands.sysml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return GuardReport {
+            name: "cli-surface-declared",
+            scanned: 0,
+            warnings: Vec::new(),
+            violations: vec![format!("{} is absent - the CLI facts (D0271) are not in this tree; `keel migrate` resyncs it", path.display())],
+        };
+    };
+    let authored = parse_cli_facts(&text);
+    let violations = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
+    GuardReport { name: "cli-surface-declared", scanned: authored.len(), warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod guard_catalogue_tests {
+    /// THE CONTROL for the catalogue: every enforced guard has a row in `.engine/docs/guards.md`. Six
+    /// guards had none on 2026-09-02 - five of them older than a week - because `doc-guard-count` polices
+    /// the COUNT claim and nothing policed the rows. A guard nobody can look up is a refusal nobody can
+    /// act on.
+    #[test]
+    fn every_guard_has_a_catalogue_row() {
+        let md = std::fs::read_to_string("../.engine/docs/guards.md").expect("guards.md ships with the engine");
+        let missing: Vec<&str> = super::GUARD_NAMES.iter().copied().filter(|n| !md.contains(&format!("| `{n}` |"))).collect();
+        assert!(missing.is_empty(), "guards with no row in .engine/docs/guards.md: {missing:?}");
+    }
+}
+
+#[cfg(test)]
+mod cli_surface_declared_tests {
+    use super::*;
+
+    fn fact(name: &str, family: &str, effect: &str) -> String {
+        format!(":>> name = \"{name}\"; :>> family = \"{family}\"; :>> effect = CliEffect::{effect}; :>> stability = CliStability::stable; :>> synopsis = \"s\";")
+    }
+    fn line(name: &str, family: &str, effect: &str) -> String {
+        format!("    part x : CliCommand {{ :>> id = \"i\"; {} }}", fact(name, family, effect))
+    }
+    fn mirror(name: &'static str, family: &'static str, effect: &'static str) -> crate::cli_facts::CliFact {
+        crate::cli_facts::CliFact { name, family, effect, stability: "stable", invocation: "", synopsis: "s" }
+    }
+
+    #[test]
+    fn a_dispatched_command_with_no_fact_is_a_violation() {
+        let authored = parse_cli_facts(&line("orient", "orientation", "reads"));
+        let m = [mirror("orient", "orientation", "reads")];
+        let v = cli_surface_violations(&authored, &m, &["orient", "ghost"], &[]);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("`ghost` is dispatched"), "{v:?}");
+    }
+
+    #[test]
+    fn a_fact_nothing_dispatches_is_a_violation_and_so_is_a_lens_declared_as_a_command() {
+        let text = format!("{}\n{}", line("orient", "orientation", "reads"), line("suspect", "orientation", "reads"));
+        let authored = parse_cli_facts(&text);
+        let m = [mirror("orient", "orientation", "reads"), mirror("suspect", "orientation", "reads")];
+        let v = cli_surface_violations(&authored, &m, &["orient"], &["suspect"]);
+        // `suspect` is a lens in the dispatch but declared as a command: undispatched as a command AND
+        // the lens has no `lens` fact - two violations, both true.
+        assert_eq!(v.len(), 2, "{v:?}");
+    }
+
+    #[test]
+    fn a_mirror_that_drifts_from_the_facts_is_caught_field_by_field() {
+        let authored = parse_cli_facts(&line("status", "orientation", "reads"));
+        let m = [mirror("status", "orientation", "writes")];
+        let v = cli_surface_violations(&authored, &m, &["status"], &[]);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("effect differs") && v[0].contains("`reads`") && v[0].contains("`writes`"), "{v:?}");
+    }
+
+    #[test]
+    fn the_live_facts_mirror_and_dispatch_agree() {
+        let text = std::fs::read_to_string("../.engine/cli/commands.sysml").expect("the facts ship with the engine");
+        let authored = parse_cli_facts(&text);
+        assert_eq!(authored.len(), crate::cli_facts::CLI_FACTS.len(), "every fact parsed");
+        let v = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
+        assert!(v.is_empty(), "{v:#?}");
+    }
 }
 
 #[cfg(test)]

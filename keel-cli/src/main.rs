@@ -2516,6 +2516,15 @@ fn cmd_record(args: &[String]) -> i32 {
     }
     // issue213: the D0070 marker as a first-class flag - forgetting it cost two landing commits.
     let from_marker = from_file.as_ref().and_then(|m| m.get("marker")).map(String::as_str);
+    // An unknown `marker:` used to be accepted SILENTLY, producing an unmarked Decision - which is how
+    // `marker: prospective-change` (a plausible spelling) yielded a Decision the process-change guard
+    // could not see (issue346). The vocabulary is two words; anything else is refused by name.
+    if let Some(m) = from_marker {
+        if m != "process-change" && m != "safety-change" {
+            eprintln!("error: unknown marker `{m}` - the marker vocabulary is `process-change` (emits #ProspectiveChange) or `safety-change` (emits #SafetyChange); an unrecognised value would have produced an UNMARKED Decision silently");
+            return 2;
+        }
+    }
     let marker = if args.iter().any(|a| a == "--process-change") || from_marker == Some("process-change") {
         Some("ProspectiveChange")
     } else if args.iter().any(|a| a == "--safety-change") || from_marker == Some("safety-change") {
@@ -4051,118 +4060,12 @@ fn cmd_enroll(rest: &[String]) -> i32 {
 }
 
 /// The subcommand catalogue, printed when no arm matches.
-///
-/// Extracted from `main` because a dispatcher whose fallback is thirty lines of `eprintln!` makes
-/// the DISPATCH unreadable — the lint that forced this out is doing the right job.
-/// The subcommand catalogue: ONE table, printed here and asserted COMPLETE by
-/// `hardening::tests::every_dispatched_subcommand_is_documented`.
-///
-/// It used to be a wall of `eprintln!` beside a hand-maintained `match`, and the two drifted in
-/// one direction only: 35 of 75 subcommands were dispatched and never described (issue172). A
-/// table plus a test is not full derivation — clap would be — but it makes the drift impossible
-/// to land rather than merely unlikely.
-const CATALOGUE: &[&str] = &[
-"  version | --version [--json] which build is this — release version + build commit + guard inventory",
-"  init DIR                     scaffold the engine into a NEW project",
-"  sync [ROOT]                  fetch, report divergence, integrate by MERGE, gate the result",
-"  land [ROOT]                  push; on rejection integrate and retry, bounded. Never rewrites history",
-"  claim <item> | --list | --mine   take/inspect a work claim; liveness is COMPUTED",
-"  verification [--pending]         EXAMINED vs EXERCISED, split — never one number",
-"  audit-history [--since REF] [--max N]  re-derive the gate verdict per commit",
-"  arch <elements|criticality|coupling|drift|stpa-inputs|coverage>",
-"                                   computed views over an AUTHORED CodeElement registry",
-"  enroll --actor I --name N --kind human|ai   enroll a contributor: register, bind, verify the gate",
-"  migrate [ROOT] [--dry-run]   bring an EXISTING project's .engine/.tracking up to this binary's vintage",
-"  process list|search|show|export|import   the process catalogue: a process is a movable UNIT",
-"  onboard [ROOT] [--json]      has this project chosen its processes, and on what basis? each process's declared APPLIES-WHEN + whether the set is chartered",
-"  adoption-check [ROOT] [--unit N] [--keep]   gate a FOREIGN tree: every unit must land clean in a project that lacks it, AND that project must gate clean WITHOUT it",
-"  attestation [ROOT] [--json]  is a `pass` a receipt or a testimony? results by judge kind, how many EXERCISED claims record what produced them, and the fail rate",
-"  recall --prompt -             seed recall from a PROMPT on stdin and print a budgeted, content-bearing brief; zero model calls",
-"  library init|sync|list       the machine-local cache of your portable-content repository - fast-forward-only, stated staleness, availability is never activation",
-"  record statement|story        intake's write path: a human's words VERBATIM, then the story that translates them with its #DerivedFrom edge authored alongside",
-"  projects [ROOT] [--json]     every keel project in this git repository, and which one you are in - a workspace",
-"  activation [ROOT]            which processes this project has ADOPTED, and which guards are core",
-"  activate|deactivate PROCESS  adopt/drop a process as a UNIT — skill + rules + guards in one step",
-"  serve [--port N] [ROOT]      the interactive console — localhost read dashboard",
-"  validate [ROOT]              semantic-validate all .tracking/ files",
-"  check FILE...                parse-check one or more .sysml files",
-"  check --spec-version         report the baked grammar version vs upstream (--no-fetch to skip the live check)",
-"  ls [ROOT]                    list .tracking/ .sysml files",
-"  orient [ROOT] [--html]       orient state as JSON, or --html = the human dashboard #View",
-"  whats-next [ROOT]            print ready task names (one per line)",
-"  status [ROOT]                 every base in one screen: engine pin, library drift and NEW units, model honesty, work, CI verdict for HEAD",
-"  github-pull --repo O/N --by ACTOR --at DATE [--limit N] [--trust T]   pull OPEN issues and ingest the new ones; autonomy follows repo VISIBILITY - private acts, public plans only, undetermined fails CLOSED",
-"  github-ingest --repo O/N --issue N [--from FILE] --by ACTOR --at DATE   a GitHub issue becomes a recorded Statement, VERBATIM, idempotent on its URL; triage stays yours",
-"  github-gesture               parse a channel comment (COMMENT_BODY/ISSUE_BODY/COMMENT_ID/COMMENT_BODIES by ENV, never argv) -> JSON verdict/option/reason/decision; exit 1 if unparsed",
-"  github-decider [<login>]     who may decide on the GitHub decision channel; no arg lists them. An unmapped login is refused, never defaulted",
-"  github-decision-id <id>      split a channel decision id into project<TAB>name - `alpha/d0001` in a workspace, `d0001` alone",
-"  advance <sprint> [--to G]    process cursor: the sprint's current ceremony step; --to is refused until earlier steps' verify-Tests pass",
-"  actor-trace <actor> [ROOT]   everything an actor authored / judged / owns — computed from provenance",
-"  assumptions [ROOT]           accepted-but-unverified items something DEPENDS on — computed, never authored",
-"  marker-census [ROOT]         per-marker EDGE count (the migration control total) vs prose mentions",
-"  diagram [ROOT]               whole-model interactive graph HTML",
-"  render <view> [--mode graph|table|review]  render any declared view as HTML",
-"  apply-review --batch F [--sha S] [--judged-by A] [--judged-at D]  write a review batch back as linked critiques",
-"  append-result --file F --task T --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
-"  append-gate-result --file F --gate G --sha S [--verdict pass|fail] [--judged-by A] [--judged-at D]",
-"  accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD   record a HUMAN acceptance",
-"  add-task --file F --def D --task T --dod TEXT [--method test|inspect|confirmation|demo|analysis]",
-    "assured [ROOT]               composite READY/NOT-READY assurance verdict + per-check detail",
-    "audit [ROOT]                 retrospective adherence: charter, ceremony, estimation, sitting review",
-    "audit-history [--since REF] [--max N]  re-derive the gate verdict per commit",
-    "audit-adherence [--since REF]  re-derive guard-set/severity monotonicity per commit - a control cannot be disarmed unsigned",
-    "hardening [ROOT]             the critique process's own questions, computed",
-    "deck [ROOT] [--out FILE]    the mobile obligation deck - served at /deck by keel serve, saving via this API",
-"  mint [N]                     engine-minted v4 UUIDs, one per line - identity is never hand-authored (us019)",
-"  new sprint <N> <slug> --charter <dNNNN> [--points P]   scaffold the ceremony record - ids minted, placeholders the fast gate rejects",
-"  sync-claude [ROOT] [--check]   regenerate the keel-owned .claude/ enforcement surface in place; --check reports drift",
-"  override <path> --reason R   arm a single-use, path-bound write unlock; consumption records an obligation",
-"  enforcement-report [ROOT]    fires/blocks/overrides/red-yields from the fire-ledger - promotions cite this",
-"  decision-follow-through [ROOT] [--table]   every accepted Decision's downstream tracked items + evidence, and the gaps (us020)",
-    "check-engine [ROOT]          .engine instance reference resolution, kernel-free",
-    "hook post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt   the in-loop gates, in the binary",
-    "reverify [--all-drift|--task N] [--by A]  re-run the declared gate at HEAD; stamp fresh results",
-    "suspect [ROOT]               done work whose evidence has DRIFTED from the tree it was judged against",
-    "outstanding [ROOT]           every not-done item, flat — the burndown without the ranking",
-    "orphans [ROOT]               items nothing references: tasks with no DoD, issues with no resolver",
-    "recent [ROOT]                git-derived activity timeline: commits touching .tracking/.engine (sr15)",
-    "intake [ROOT]                statements -> user stories -> routing: unparsed, unrouted, unsourced",
-    "dispositions [ROOT]          findings by verdict — act / acceptRisk / dismiss / undispositioned",
-    "authority-queue [ROOT]       what awaits a HUMAN's authority, and what may not be self-attested",
-    "attestation-coverage [ROOT]  accepted Decisions lacking a passing acceptance result",
-    "open-issues [ROOT]           every OPEN issue + its resolvers + whether each resolver is complete",
-    "indicators [ROOT]            MONITORED with no enforced threshold — never gated (invariant 7)",
-    "snapshot-indicators [ROOT]   stamp the current indicator values as a dated series point",
-    "record-measurement --indicator I --value V [--at DATE]  add one measurement to an indicator series",
-    "rootedness [ROOT]            charter-source burndown: need-rooted vs decision-chartered vs orphan",
-    "tier-satisfaction [ROOT]     per tier, the fraction cleanly satisfied downstream (Needs -> SRs -> tests)",
-    "concern-coverage [ROOT]      declared viewpoints vs stakeholder concerns — which concerns nothing serves",
-    "critique-coverage [ROOT]     per-element required-lens matrix + the gap set",
-    "critique-policy [ROOT]       which antagonistic lenses each assurance-element type REQUIRES",
-    "sitting-coverage [ROOT]      per-sitting human review currency, grandfathered at D0155's line",
-    "governing-version <item> [ROOT]  which process version governs this item",
-    "decisions [ROOT]             load-bearing decisions, ranked by how much depends on them",
-    "business [ROOT]              the what/why layer: Brief -> Personas -> Needs -> UseCases",
-    "launchables [ROOT]           the console's launchable set, computed from declared skills + processes",
-    "workflows [ROOT]             the six workflows and their phases",
-    "contentions [ROOT]           recorded disagreements between contributors awaiting adjudication",
-    "controls [ROOT]              the two-way hazard/control diff: uncovered failure conditions + unanchored controls",
-    "decision-card [NAME] [--proposed]  a decision's deciding context as JSON - the githubChannel issue body source",
-    "why <term> [ROOT]            answer from the model as a graph: seed on names/aliases, traverse, cite provenance + failing critiques",
-    "knowledge question-coverage [ROOT]  per declared Question: does seeding find an entity and traversal reach an answer",
-    "trace <item> [ROOT]          every typed edge reaching an item, both directions",
-    "trace-need <need> [ROOT]     one Need's full satisfaction chain down to test results",
-    "boundary <element> [ROOT]    one element's interface surface — takes an ELEMENT, not a root",
-    "boundary-sweep [ROOT]        tier-satisfaction white-box sweep, per Need-slice",
-    "reprocess-candidates [ROOT]  items whose governing process version has moved on since they were judged",
-];
-
-/// The subcommand catalogue, printed when no arm matches.
+/// Rendered from the CLI FACTS (`cli_facts::CLI_FACTS`, the mirror of `.engine/cli/commands.sysml`,
+/// D0271/issue344) so a synopsis has one home. The hand-written CATALOGUE it replaces had already gone
+/// stale against D0273 - it listed `hardening`, `suspect` and `outstanding` as verbs a month after they
+/// moved under `show` - which is the drift a table-plus-test cannot see and a fact-plus-guard can.
 fn print_usage() -> i32 {
-    eprintln!("keel <subcommand> [args]");
-    for line in CATALOGUE {
-        eprintln!("  {line}");
-    }
+    eprint!("{}", keel_cli::cli_facts::render_help());
     2
 }
 /// A read-only view subcommand: run `f` against the repo root and print its JSON, or the error as

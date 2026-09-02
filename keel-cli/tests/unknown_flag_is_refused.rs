@@ -113,3 +113,40 @@ fn no_test_asserts_a_count_by_substring() {
          the number instead (see `count_before`): {offenders:?}"
     );
 }
+
+/// issue346: `record decision --from FILE` accepted an unknown `marker:` value SILENTLY and produced an
+/// UNMARKED Decision - `marker: prospective-change`, a plausible spelling of the real `process-change`,
+/// yielded a Decision the process-change guard could not see, and the locked-file edit it was meant to
+/// authorise was refused for want of a marker that had been written. The vocabulary is two words; an
+/// unrecognised value is refused by name, and nothing is written.
+#[test]
+fn an_unknown_decision_marker_is_refused_not_dropped() {
+    let dir = std::env::temp_dir().join(format!("keel-marker-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tmp");
+    let f = dir.join("d.md");
+    std::fs::write(
+        &f,
+        "slug: marker-probe
+date: 2026-09-02
+marker: prospective-change
+--- title
+t
+--- context
+c
+--- decision
+d
+--- rationale
+r
+--- consequences
+q
+",
+    )
+    .expect("write");
+    let before = std::fs::read_dir(repo().join(".engine/decisions")).map(|d| d.count()).unwrap_or(0);
+    let (code, text) = run(&["record", "decision", "--from", f.to_str().expect("utf8"), "--author", "claudeOpus5"]);
+    let after = std::fs::read_dir(repo().join(".engine/decisions")).map(|d| d.count()).unwrap_or(0);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(code, 2, "an unknown marker must refuse: {text}");
+    assert!(text.contains("unknown marker") && text.contains("prospective-change"), "the refusal names the value: {text}");
+    assert_eq!(before, after, "nothing was written");
+}

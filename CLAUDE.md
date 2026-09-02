@@ -43,10 +43,11 @@ Don't restate those rules here: one canonical home per fact (D0105).
    contract (Need/SystemRequirement + satisfy/verify). An **indicator** is monitored with no enforced
    threshold (`keel show indicators`). When a "good enough" boundary can't be defensibly set, it stays an
    indicator — promote only when a justified boundary emerges (avoid Goodhart).
-8. **The CLI surface is an authored fact (D0271).** Every command is a `CliCommand` carrying its
-   `family`, `effect` and `stability` — so "these are variations of one idea" is queryable, not an
-   impression. Measured today: 90 commands, 9 intents, 43 in one. Never author an ICD document; the
-   ICD is a computed view over these facts.
+8. **The CLI surface is an authored fact (D0271, authored at issue344).** Every command and every
+   `show` lens is a `CliCommand` in `.engine/cli/commands.sysml` carrying its `family`, `effect` and
+   `stability` — so "these are variations of one idea" is queryable, not an impression. `keel --help`
+   renders from them and guard `cli-surface-declared` holds facts, help and dispatch equal both ways;
+   the counts live in the facts, not here. Never author an ICD document; the ICD is a computed view.
 9. **Dual surface, one truth (D0093).** CLI/JSON is the authority and automation substrate; HTML is the
    human's oversight lens. HTML never stores truth — it renders `#View`s and wraps the write API.
 

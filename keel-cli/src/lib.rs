@@ -25,6 +25,7 @@ use keel_parser::ast::{ActionDef, Item, Package, Part, Value};
 use keel_parser::{parse, tokenize, Diagnostic, PackageRegistry};
 
 pub mod activation;
+pub mod cli_facts;
 pub mod cli_surface;
 pub mod control_defects;
 /// The declared-vs-binary version skew for the project owning `target`, if any (D0251).
@@ -504,6 +505,9 @@ fn is_engine_instance_file(path: &Path) -> bool {
         // coverage gap that reads exactly like coverage.
         || (s.contains("/skills/") && s.ends_with("registry.sysml"))
         || s.ends_with("tracking-template.sysml")
+        // D0271/issue344: the CLI command facts. Added the day the file was created, so it never sits
+        // unvalidated the way the 36 skill registries did.
+        || s.contains("/cli/")
 }
 
 /// Semantically validate the `.engine` INSTANCE files against the schema, KERNEL-FREE (D0112 phase 2,

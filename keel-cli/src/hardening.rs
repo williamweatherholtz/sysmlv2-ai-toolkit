@@ -143,20 +143,16 @@ fn string_literals(frag: &str) -> Vec<String> {
     out
 }
 
-/// The help text as the binary prints it: the `CATALOGUE` table `print_usage` iterates.
+/// The help text as the binary prints it - rendered from `cli_facts::CLI_FACTS` (D0271/issue344).
 ///
-/// TWO WRONG VERSIONS OF THIS FUNCTION, both caught by the lens itself rather than by inspection. The
-/// first looked for `fn usage(`, which does not exist - the function is `print_usage` - and so read an
-/// EMPTY help text and reported 0 of 75 documented. The second read `print_usage`'s body, which was
-/// right until the fix for issue172 moved the lines into a `const CATALOGUE`, at which point it reported
-/// 1 of 75. A lens over source has to be re-aimed when the source moves; the value of it being a lens is
-/// that a wrong aim shows up as an absurd number instead of a plausible one.
-fn usage_text(main: &str) -> String {
-    let Some(i) = main.find("const CATALOGUE:") else { return String::new() };
-    let body = &main[i..];
-    let end = body.find("
-];").map_or(body.len(), |e| e + 3);
-    body[..end].to_string()
+/// THREE VERSIONS OF THIS FUNCTION. The first looked for `fn usage(`, which did not exist, and read an
+/// EMPTY help text (0 of 75 documented). The second read `print_usage`'s body, which was right until
+/// issue172 moved the lines into a `const CATALOGUE` (1 of 75). The third read the CATALOGUE out of
+/// `main.rs` source - right until the CATALOGUE itself went stale against D0273. This one reads the
+/// facts the help is rendered from, so there is no second text to drift; `main` is accepted and
+/// ignored so the call sites that pass the source keep compiling while the lens is re-aimed.
+fn usage_text(_main: &str) -> String {
+    crate::cli_facts::render_help()
 }
 
 /// Does the help text NAME this subcommand? WORD-BOUNDED, because a plain substring test lets
@@ -618,11 +614,11 @@ mod tests {
         let dispatched = dispatch_arms(&main);
         assert!(dispatched.len() > 50, "the dispatch scan found {} arms - the lens is mis-aimed", dispatched.len());
         let help = usage_text(&main);
-        assert!(!help.is_empty(), "the CATALOGUE could not be located - the lens is mis-aimed");
+        assert!(!help.is_empty(), "the rendered help is empty - the facts table is empty");
         let absent: Vec<&String> = dispatched.iter().filter(|c| !help_names(&help, c)).collect();
         assert!(
             absent.is_empty(),
-            "{} subcommand(s) dispatched but absent from the help CATALOGUE: {absent:?}",
+            "{} subcommand(s) dispatched but absent from the CLI facts (.engine/cli/commands.sysml / cli_facts.rs): {absent:?}",
             absent.len()
         );
     }
