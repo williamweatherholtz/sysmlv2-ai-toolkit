@@ -88,6 +88,64 @@ pub fn person_names(root: &Path) -> Vec<String> {
         .collect()
 }
 
+/// Where a SESSION's declared actor is remembered: `.keel/sessions/<session-id>/actor`, machine-local
+/// and gitignored like every `.keel/` runtime file.
+///
+/// # Why a session binding exists at all (issue337)
+///
+/// `KEEL_ACTOR` is set per command in the session's shell. The Stop hook is spawned by the harness in
+/// ITS environment, where that variable was never set — so `resolve` fell through to the MACHINE
+/// binding, and on a machine two models share, the binding named the other one. The ownership guard
+/// then attributed 22 edits to the wrong actor and flagged 12 items the session in fact owned. The
+/// guard's predicate was correct; the session's identity had no path to it.
+///
+/// The harness gives both sides the same key: `CLAUDE_CODE_SESSION_ID` in the shell, `session_id` in
+/// every hook payload (the dispatcher seeds the env var from it). So the session's own commands
+/// remember what they declared, and the hooks read it back. Machine binding stays the fallback for a
+/// session that never declared anything.
+/// The binding path for an EXPLICIT session id — pure, so it can be tested without touching the
+/// process environment (env-var tests race across threads). The env-reading callers are
+/// `session_actor` and `remember_session_actor`.
+fn session_binding_path_for(root: &Path, id: &str) -> Option<std::path::PathBuf> {
+    let id = id.trim();
+    // A session id is a UUID; anything else is not a directory name this should create.
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return None;
+    }
+    Some(root.join(".keel").join("sessions").join(id).join("actor"))
+}
+
+/// The actor this session declared earlier, if any.
+fn session_actor(root: &Path) -> Option<String> {
+    session_actor_for(root, &std::env::var("CLAUDE_CODE_SESSION_ID").ok()?)
+}
+
+fn session_actor_for(root: &Path, id: &str) -> Option<String> {
+    let p = session_binding_path_for(root, id)?;
+    let v = std::fs::read_to_string(p).ok()?;
+    let v = v.trim();
+    (!v.is_empty()).then(|| v.to_owned())
+}
+
+/// Remember the session's declared actor. Best-effort: a failure to write leaves the hooks on the
+/// machine binding, which is today's behaviour, never worse.
+fn remember_session_actor(root: &Path, actor: &str) {
+    let Some(id) = std::env::var("CLAUDE_CODE_SESSION_ID").ok() else { return };
+    remember_session_actor_for(root, &id, actor);
+}
+
+fn remember_session_actor_for(root: &Path, id: &str, actor: &str) {
+    let Some(p) = session_binding_path_for(root, id) else { return };
+    if std::fs::read_to_string(&p).is_ok_and(|v| v.trim() == actor) {
+        return; // already remembered — no write, no churn
+    }
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&p, format!("{actor}
+"));
+}
+
 /// Resolve the acting actor from explicit sources only.
 ///
 /// # Errors
@@ -100,8 +158,14 @@ pub fn resolve(root: &Path, explicit: Option<&str>) -> Result<String, String> {
     }
     if let Ok(v) = std::env::var("KEEL_ACTOR") {
         if !v.trim().is_empty() {
+            // The session DECLARED its actor. Remember it where the hooks can find it — see
+            // `session_binding_path` for why they otherwise cannot (issue337).
+            remember_session_actor(root, v.trim());
             return Ok(v.trim().to_owned());
         }
+    }
+    if let Some(a) = session_actor(root) {
+        return Ok(a);
     }
     if let Ok(v) = std::fs::read_to_string(root.join(BINDING_PATH)) {
         if !v.trim().is_empty() {
@@ -292,5 +356,63 @@ mod tests {
         assert!(registered(Path::new("/nonexistent-keel-root-for-test")).is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod session_binding_tests {
+    use super::{remember_session_actor_for, session_actor_for, session_binding_path_for};
+
+    fn tmp(tag: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("keel-sess-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).expect("mkdir");
+        d
+    }
+
+    /// THE DEFECT (issue337): a session that declared its actor was attributed to the machine's
+    /// binding inside the hooks. The session binding is what the hooks read instead — and it must be
+    /// what the session's own commands wrote, not what the machine says.
+    #[test]
+    fn a_session_that_declared_its_actor_is_read_back_by_that_session_id() {
+        let root = tmp("declared");
+        std::fs::create_dir_all(root.join(".keel")).expect("mkdir");
+        std::fs::write(root.join(".keel").join("actor"), "theOtherModel
+").expect("machine binding");
+        let sid = "60405c11-f525-4aed-b42f-e87923d904f2";
+        assert!(session_actor_for(&root, sid).is_none(), "nothing declared yet");
+        remember_session_actor_for(&root, sid, "claudeOpus5");
+        assert_eq!(session_actor_for(&root, sid).as_deref(), Some("claudeOpus5"));
+        // A DIFFERENT session on the same machine sees nothing — bindings are per session, which is
+        // the whole point: two models share this machine and one binding cannot be right for both.
+        assert!(session_actor_for(&root, "00000000-0000-0000-0000-000000000000").is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A session id that is not a UUID is not a directory this should create: the id comes from an
+    /// environment variable, and an arbitrary string there must not become a path.
+    #[test]
+    fn a_malformed_session_id_never_becomes_a_path() {
+        let root = tmp("malformed");
+        for bad in ["", "../escape", "not a uuid", "x; rm -rf"] {
+            assert!(session_binding_path_for(&root, bad).is_none(), "{bad:?} must not map to a path");
+        }
+        assert!(session_binding_path_for(&root, "60405c11-f525-4aed-b42f-e87923d904f2").is_some());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Re-declaring the same actor is a no-op write: a hook that runs every turn must not churn the file.
+    #[test]
+    fn remembering_the_same_actor_twice_does_not_rewrite() {
+        let root = tmp("idem");
+        let sid = "60405c11-f525-4aed-b42f-e87923d904f2";
+        remember_session_actor_for(&root, sid, "claudeOpus5");
+        let p = session_binding_path_for(&root, sid).expect("path");
+        let m1 = std::fs::metadata(&p).and_then(|m| m.modified()).expect("mtime");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        remember_session_actor_for(&root, sid, "claudeOpus5");
+        let m2 = std::fs::metadata(&p).and_then(|m| m.modified()).expect("mtime");
+        assert_eq!(m1, m2, "an unchanged declaration must not touch the file");
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

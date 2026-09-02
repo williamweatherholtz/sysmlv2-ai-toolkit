@@ -74,30 +74,12 @@ version = 3
 file.processes__SL__doc-sync.sysml = "a5092bcfc5d97060"
 file.skills__SL__doc-sync__SL__SKILL.md = "fea54abda9e73367"
 file.skills__SL__doc-sync__SL__registry.sysml = "4f66c09feb5ba512"
-[ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
-process = "element-critique"
-version = 3
-file.processes__SL__element-critique.sysml = "39ab4fc4a0bfae2b"
-file.skills__SL__element-critique__SL__SKILL.md = "78205a3820e65fcb"
-file.skills__SL__element-critique__SL__registry.sysml = "8eae8b1352df5261"
-[dc4b3507-7a33-4b58-b2fc-77f439b8421a]
-process = "indicator"
-version = 3
-file.processes__SL__indicator.sysml = "a23edb9f27af0ef6"
-file.skills__SL__indicator__SL__SKILL.md = "e502965ab6d6a916"
-file.skills__SL__indicator__SL__registry.sysml = "eee9fa32a0363b2c"
 [e93dfbda-8844-49c4-a4b6-a874c6774eab]
 process = "introduction"
 version = 3
 file.processes__SL__introduction.sysml = "a416337d33a0a1d2"
 file.skills__SL__introduction__SL__SKILL.md = "0d4538a3429878ad"
 file.skills__SL__introduction__SL__registry.sysml = "33dd76f65dd2a415"
-[560d74d4-9184-46e6-afcc-83226b891dd4]
-process = "issue-resolution"
-version = 3
-file.processes__SL__issue-resolution.sysml = "3d7fe3c1710e592f"
-file.skills__SL__issue-resolution__SL__SKILL.md = "785bb4ed9d68bb28"
-file.skills__SL__issue-resolution__SL__registry.sysml = "de888f7fe2805679"
 [8477f7e8-becf-40fb-a7f3-9bd521a258d7]
 process = "knowledge-graph-memory"
 version = 3
@@ -122,12 +104,6 @@ version = 3
 file.processes__SL__project-onboarding.sysml = "d05ea1f572d17698"
 file.skills__SL__project-onboarding__SL__SKILL.md = "8d890aa201ffb817"
 file.skills__SL__project-onboarding__SL__registry.sysml = "bcfdc1daaade0498"
-[ac8fb70e-91dd-4765-b832-a41e45267c44]
-process = "render"
-version = 3
-file.processes__SL__render.sysml = "cf05272365cb0ad0"
-file.skills__SL__render__SL__SKILL.md = "fd21c5114db3dcc8"
-file.skills__SL__render__SL__registry.sysml = "f842d5bdbaccf7ef"
 [f5756101-8c80-4afe-ae52-7b33cd653d99]
 process = "report"
 version = 3
@@ -152,6 +128,48 @@ file..github__SL__workflows__SL__decision-issue.yml = "1bfbbb8f2f9823ea"
 file..github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
 file..github__SL__scripts__SL__open_decision_issues.py = "1e391075a4dd7281"
 file..github__SL__scripts__SL__record_decision.sh = "82716418a23728d9"
+[79f2d321-7c55-41fb-86fa-7d549202caf7]
+process = "intake"
+version = 44
+file.processes__SL__intake.sysml = "7b1626cbe15b99f1"
+file.skills__SL__intake__SL__SKILL.md = "f58c93354678262b"
+file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
+[ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
+process = "element-critique"
+version = 4
+file.processes__SL__element-critique.sysml = "d42437f9f292b597"
+file.skills__SL__element-critique__SL__SKILL.md = "1d696e62350a0b4a"
+file.skills__SL__element-critique__SL__registry.sysml = "77d6ae2675d1bd7a"
+[dc4b3507-7a33-4b58-b2fc-77f439b8421a]
+process = "indicator"
+version = 4
+file.processes__SL__indicator.sysml = "cd07734b6358ba05"
+file.skills__SL__indicator__SL__SKILL.md = "e88effc5a3adb534"
+file.skills__SL__indicator__SL__registry.sysml = "32408566b1dc3109"
+[560d74d4-9184-46e6-afcc-83226b891dd4]
+process = "issue-resolution"
+version = 4
+file.processes__SL__issue-resolution.sysml = "03bce904a33c3d38"
+file.skills__SL__issue-resolution__SL__SKILL.md = "ade6cf1823200b20"
+file.skills__SL__issue-resolution__SL__registry.sysml = "de888f7fe2805679"
+[ac8fb70e-91dd-4765-b832-a41e45267c44]
+process = "render"
+version = 4
+file.processes__SL__render.sysml = "be4d5490fde454cb"
+file.skills__SL__render__SL__SKILL.md = "57d12d336da8c2ff"
+file.skills__SL__render__SL__registry.sysml = "f842d5bdbaccf7ef"
+[a2428932-77c0-4714-9d61-c41d2857811f]
+process = "exec-summary"
+version = 3
+file.processes__SL__exec-summary.sysml = "75cda8248453b8f4"
+file.skills__SL__exec-summary__SL__SKILL.md = "f50390dde7294f08"
+file.skills__SL__exec-summary__SL__registry.sysml = "64f218ec3c881f20"
+[63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
+process = "library-stewardship"
+version = 2
+file.processes__SL__library-stewardship.sysml = "796db6cf4bd0155a"
+file.skills__SL__library-stewardship__SL__SKILL.md = "53cb953f96647b95"
+file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
 [4e625dfb-3276-499e-b032-795341335984]
 process = "control-propriety"
 version = 1
@@ -164,21 +182,3 @@ version = 1
 file.processes__SL__github-intake.sysml = "0656702345d30db2"
 file.skills__SL__github-intake__SL__SKILL.md = "e38cc4d2db1449b6"
 file.skills__SL__github-intake__SL__registry.sysml = "43f955f619a10a80"
-[a2428932-77c0-4714-9d61-c41d2857811f]
-process = "exec-summary"
-version = 2
-file.processes__SL__exec-summary.sysml = "c71c1a1ca66d1c67"
-file.skills__SL__exec-summary__SL__SKILL.md = "f50390dde7294f08"
-file.skills__SL__exec-summary__SL__registry.sysml = "64f218ec3c881f20"
-[63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
-process = "library-stewardship"
-version = 2
-file.processes__SL__library-stewardship.sysml = "796db6cf4bd0155a"
-file.skills__SL__library-stewardship__SL__SKILL.md = "53cb953f96647b95"
-file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
-[79f2d321-7c55-41fb-86fa-7d549202caf7]
-process = "intake"
-version = 43
-file.processes__SL__intake.sysml = "8b880475eaab49ad"
-file.skills__SL__intake__SL__SKILL.md = "9a6aefa4c9668c8f"
-file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"

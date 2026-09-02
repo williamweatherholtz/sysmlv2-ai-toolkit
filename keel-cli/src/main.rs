@@ -314,6 +314,13 @@ fn cmd_hook(args: &[String]) -> i32 {
     // hooks-actually-fired checks read. A session's FIRST fire also stores the tree fingerprint,
     // which is the SubagentStop baseline (P0.6).
     let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("").to_string();
+    // issue337: the hook runs in the HARNESS's environment, not the session's shell, so the session's
+    // declared actor is not in KEEL_ACTOR here. The payload carries the session id; seed it so
+    // `actor::resolve` can read the session binding the session's own commands remembered. Never
+    // overrides an id already present, and sets only what the payload actually said.
+    if !session.is_empty() && std::env::var_os("CLAUDE_CODE_SESSION_ID").is_none() {
+        std::env::set_var("CLAUDE_CODE_SESSION_ID", &session);
+    }
     // Never write the baseline from the subagent-stop event itself: a subagent whose FIRST fire is
     // its own stop would baseline against the post-work tree and silently skip the gate — found by
     // running the branch, not by reading it.

@@ -570,4 +570,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcTestsDoNotWriteTheLiveTree to issue339;
+
+    part issue340 : Issue {
+        :>> id = "1039a969-82ac-494f-acc2-f5ec0ea152e6";
+        :>> title = "publish commits a manifest-only change at an unchanged version with a message that reads as a duplicate publish";
+        :>> createdAt = "2026-09-01";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The library log carries two commits titled 'publish library-stewardship v2' (643a188 and 707fefe), and the same for control-propriety v1 and github-intake v1 - three units re-published today at unchanged versions. NOT a version defect: next_unit_version compares file hashes and the files were identical, so holding the version was right. The manifest changed - every unit.toml gained `commands = [...]` when D0252 clause A's command declaration landed - and publish commits whenever the bundle differs, without saying WHAT differed. The issue302 no-op check reads 'did the files change', not 'did the bundle change', so a manifest-only change is neither a no-op nor a version bump and the commit message cannot tell the reader which it was. Low, one-time per manifest schema change, and worth fixing because a library log that says the same version was published twice is a log a consumer learns not to read. RESOLVER: dcPublishSaysWhatMoved.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcPublishSaysWhatMoved to issue340;
 }
