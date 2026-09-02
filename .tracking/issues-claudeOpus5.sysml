@@ -617,4 +617,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcOwnDoDDriftIsSuspect to issue343;
+
+    part issue344 : Issue {
+        :>> id = "6ae2e51b-0677-4198-8a95-cfd0786dedde";
+        :>> title = "CLAUDE.md invariant 8 states the CliCommand facts exist; D0271 deferred them and D0273 never picked them up - zero instances in the tree";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED 2026-09-02: grep for CliCommand instances across .engine, .tracking and keel-cli/src finds only the schema (cli.sysml) and two Decisions; zero instances. D0271 says so itself - 'NOT YET AUTHORED: the 90 instances and the two-way guard ... held until the human answers whether the lens family collapses'. The human answered (D0273), the collapse landed (65 commands, 35 lenses, held equal to dispatch by a unit test), and the instances were never authored. CLAUDE.md invariant 8 nevertheless states 'Every command is a CliCommand carrying its family, effect and stability' as a present fact. WHY IT MATTERS: a doc claim ahead of reality is the class D0105 and doc-sync exist to prevent; and these facts are the source the computed control structure needs to tell a write action from feedback. FIX: dcCliCommandFactsAuthored - author the instances from the dispatch, guard both ways, correct the invariant's wording and count in the same commit.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCliCommandFactsAuthored to issue344;
+
+    part issue345 : Issue {
+        :>> id = "00b6c2c9-b173-4ba8-83d3-1ffca59505fc";
+        :>> title = "priority-inversion asks the author to 'say so' and reads nothing they could say it in - a deliberate ranking cannot be recorded";
+        :>> createdAt = "2026-09-02";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED 2026-09-02: guards.rs priority_inversion emits 'if that is deliberate say so, otherwise reorder' and consumes no edge, marker or field in which it could be said; 30 warnings stood after the human's stated first step (st066) was ranked at the head, and the reason - a recorded Statement - had no way to reach the guard. A warning nobody can discharge trains blindness to the ones they can (the actors guard says this about itself). FIX: dcDeliberateRankIsRecorded - a #PrioritizedBy edge to the ranking Statement or Decision, read by the guard.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcDeliberateRankIsRecorded to issue345;
 }
