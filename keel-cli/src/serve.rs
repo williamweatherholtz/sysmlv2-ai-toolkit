@@ -2082,6 +2082,7 @@ fn computed_binding(cmd: &str) -> Option<ComputedFn> {
         "coverage" => crate::view::coverage,
         "rootedness" => crate::view::rootedness,
         "tier-satisfaction" => crate::view::tier_satisfaction,
+        "control-structure" => crate::view::control_structure::control_structure,
         "indicators" => |root: &Path| crate::view::indicators(root, false),
         "orphans" => |root: &Path| {
             crate::algo::orphans(root)

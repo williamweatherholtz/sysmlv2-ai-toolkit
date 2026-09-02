@@ -88,7 +88,7 @@ package EngineViewpoints {
         :>> concernText = "Are safety-relevant losses/hazards/UCAs identified and constrained, and is each constraint verified?";
         :>> audience = "safety engineer";
         :>> sources = "STPA losses/hazards/UCAs/constraints (EngineSafety); safety-kind requirements; verify edges to their Tests";
-        :>> renderer = "(planned) STPA safety view (losses/hazards/UCAs/constraints + verify coverage) — not yet rendered";
+        :>> renderer = "keel show control-structure (STPA step 2, computed; losses/hazards from engine-safety.sysml via hazardsByProcess)";
         :>> surface = "assurance";
     }
     part requirementsVP : Viewpoint {

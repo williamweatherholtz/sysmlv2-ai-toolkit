@@ -23,6 +23,7 @@ use crate::json::Json;
 // model core (spec, Model build, traversal, JSON emit) stays here. `pub use` keeps every
 // existing `crate::view::X` path valid - callers are untouched by design.
 mod checks;
+pub mod control_structure;
 mod critique;
 mod knowledge;
 mod reports;

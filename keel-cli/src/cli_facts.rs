@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 100] = [
+pub const CLI_FACTS: [CliFact; 101] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
@@ -90,6 +90,7 @@ pub const CLI_FACTS: [CliFact; 100] = [
     CliFact { name: "business", family: "lens", effect: "reads", stability: "stable", invocation: "show business [ROOT]", synopsis: "the what/why layer: Brief, Personas, Needs, UseCases" },
     CliFact { name: "concern-coverage", family: "lens", effect: "reads", stability: "stable", invocation: "show concern-coverage [ROOT]", synopsis: "declared viewpoints against stakeholder concerns - which concerns nothing serves" },
     CliFact { name: "contentions", family: "lens", effect: "reads", stability: "stable", invocation: "show contentions [ROOT]", synopsis: "recorded disagreements between contributors awaiting adjudication" },
+    CliFact { name: "control-structure", family: "lens", effect: "reads", stability: "stable", invocation: "show control-structure [ROOT]", synopsis: "STPA step 2 for this project's own workflow, computed: authorities, what each issues on which process carrying what data, and what feedback returns" },
     CliFact { name: "controls", family: "lens", effect: "reads", stability: "stable", invocation: "show controls [ROOT]", synopsis: "the two-way hazard/control diff: uncovered failure conditions and unanchored controls" },
     CliFact { name: "coverage", family: "lens", effect: "reads", stability: "stable", invocation: "show coverage [ROOT]", synopsis: "Needs and requirements with and without satisfy and verify edges" },
     CliFact { name: "critique-coverage", family: "lens", effect: "reads", stability: "stable", invocation: "show critique-coverage [ROOT]", synopsis: "per-element required-lens matrix and the gap set" },

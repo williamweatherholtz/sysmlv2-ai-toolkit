@@ -544,6 +544,13 @@ fn model_root_of(target: &Path) -> Option<std::path::PathBuf> {
     None
 }
 
+/// The commands whose write path calls `refuse_ai_judgment` on the actor doing the writing.
+///
+/// They are the HUMAN's control actions even when typed in the agent's shell. Read by the computed
+/// control structure (`view::control_structure`), whose test holds the two lists equal: a command
+/// listed there without a refusal here would be a label, not a fact.
+pub const HUMAN_ONLY_WRITE_COMMANDS: [&str; 1] = ["accept"];
+
 /// D0178/K6 write-layer check: refuse when `judged_by` is a registered AI-kind actor. An
 /// UNREGISTERED name is refused too — an attestation by nobody is not weaker than one by an AI.
 fn refuse_ai_judgment(path: &Path, judged_by: &str, what: &str) -> Result<(), WriteError> {
