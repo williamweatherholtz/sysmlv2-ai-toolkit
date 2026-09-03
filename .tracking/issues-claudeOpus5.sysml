@@ -661,4 +661,136 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcUntrustedTaintClosure to issue347;
+
+    part issue348 : Issue {
+        :>> id = "8725fcd4-c00d-43b7-a3f1-8d79ef9af091";
+        :>> title = "The generated hooks resolve keel from PATH before the pin, so a project's turns can run a different engine vintage than its gates";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#43 (st086, untrusted, owner's own downstream report). Every hook claude_surface generates opens by taking KEEL_BIN else `command -v keel` - PATH first - while the scaffolded pre-commit hook probes .keel/bin/keel before PATH (D0230). Two resolution orders for one pin: a project pinned on purpose ran its turns on an unreleased PATH build. This is the D0251 skew the pin exists to prevent, at the turn boundary. Resolver: dcHooksResolveThePinFirst.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHooksResolveThePinFirst to issue348;
+
+    part issue349 : Issue {
+        :>> id = "21eaf3df-2c39-45dc-a37b-6b4d81168a63";
+        :>> title = "keel migrate silently deletes project-authored sections in engine-shipped contract files";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#44 (st085, untrusted, owner's own report). migrate rewrites .engine/contracts files wholesale; a project's own [exec-summary] section in unit-extras.toml was deleted and the published unit lost its declared payload silently. Adjacent to issue314 (project-owned contracts survive resync), which covered whole files, not sections within an engine file. Resolver: dcMigratePreservesProjectSections.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcMigratePreservesProjectSections to issue349;
+
+    part issue350 : Issue {
+        :>> id = "c5f29355-9fc7-46af-8451-35214a53202d";
+        :>> title = "adoption-check reports FAIL for every unit, and the reason it prints is a guard PASS line";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#45 (st084, untrusted, owner's own report, se-templates on 0.3.1). Every unit including known-good ones reported FAIL; the printed reason was a guard PASS line. The issue329 class (a substring test on guard text) in adoption_check.rs. A gate that is always red is routed around (D0214). Resolver: dcAdoptionCheckReportsTheRealVerdict.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAdoptionCheckReportsTheRealVerdict to issue350;
+
+    part issue351 : Issue {
+        :>> id = "183ecd77-1bcf-4c27-b5dd-94b099ed5e29";
+        :>> title = "guard:claude-surface-drift byte-compares output-styles/keel.md against an embedded literal, so every fresh clone on Windows fails it";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#46 (st083, untrusted, owner's own report). sync-claude writes LF; git on Windows checks out CRLF; the guard byte-compares against the embedded literal and fails every fresh Windows clone. Resolver: dcSurfaceDriftIgnoresLineEndings.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSurfaceDriftIgnoresLineEndings to issue351;
+
+    part issue352 : Issue {
+        :>> id = "f4161393-22b6-4b8f-85ba-6acaafc57f87";
+        :>> title = "A forward-only rule ships upstream's adoption date as a literal, so it is RETROACTIVE for every downstream project that migrates into it";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#47 (st082, untrusted, owner's own report, Penumbra 0.3.0 -> 0.3.1). Two rules carry acceptQuotesDelegatedWords(2026-08-22) / confirmationQuotesOrAttested(2026-08-23): this repo's dates, shipped, so every downstream project is retro-failed from the day it migrates. The general form of issue068. Resolver: dcForwardOnlyCutoffIsTheProjectsOwn.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcForwardOnlyCutoffIsTheProjectsOwn to issue352;
+
+    part issue353 : Issue {
+        :>> id = "f1c13472-4838-41f2-a4ef-286903b43c66";
+        :>> title = "keel append-result inserts the TestResult INSIDE a multi-line verification block, and the error it causes points at the wrong thing";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#48 (st081, untrusted, owner's own report, Penumbra 0.3.1). The insert point is the line matching `verification <T>DoD : Test {`, correct only when the DoD is a one-liner; a multi-line DoD gets the result inserted inside the block and validate's error names the wrong construct. Resolver: dcAppendResultFindsTheClosingBrace.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAppendResultFindsTheClosingBrace to issue353;
+
+    part issue354 : Issue {
+        :>> id = "57a4fd46-ab2e-406c-b3bb-4a848a94a5ba";
+        :>> title = "add-task's def lookup breaks on a DoD whose string contains a block-opener brace: the write path scans braces without honouring strings";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-03 while routing the intake: keel add-task refused with 'action def not found: EngineBuild' after a DoD was recorded whose text contained the literal characters of a block opener inside its string (the phrase verification T DoD colon Test followed by an open brace). keel check and keel validate both reported the file clean - the real parser respects strings - but the write path's own scan (write.rs parse_file / action_def_exists) does not, so the def vanished from its view and every subsequent add-task failed. Bisected: removing that one DoD line restored add-task. Same root as GH#48 / issue353: the write API locates blocks by scanning braces without honouring string literals - there for the INSERT point, here for the DEF lookup. Workaround applied: the DoD reworded without the literal brace, which hides the defect rather than fixing it. Resolver: dcAppendResultFindsTheClosingBrace (the brace scan is one function and must become string-aware for both uses).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAppendResultFindsTheClosingBrace to issue354;
+
+    part issue355 : Issue {
+        :>> id = "a7147f16-6ce5-485d-9a2e-dc79ac5c8d03";
+        :>> title = "Deactivating a process turns off its guard but still deploys its SKILL, so an agent is advertised a channel the project switched off";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#49 (st080, untrusted, owner's own report, Penumbra 0.3.1). sync-claude builds the surface from the skills registry and consults activation nowhere; a deactivated process's skill stays deployed and an agent has no way to learn the state. Resolver: dcDeactivatedSkillSaysSo (option B: deploy it stated).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDeactivatedSkillSaysSo to issue355;
+
+    part issue356 : Issue {
+        :>> id = "07a5529a-e30f-40cd-b84b-19a25ee77386";
+        :>> title = "red-yield obligation truncates its captured diagnostic at a fixed 726 chars, mid-token";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#50 (st079, untrusted, owner's own report). The Stop hook's obligation writer cuts description at a fixed width; three records at exactly 726 chars, mid-token. Resolver: dcRedYieldKeepsTheDiagnostic.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcRedYieldKeepsTheDiagnostic to issue356;
+
+    part issue357 : Issue {
+        :>> id = "5931f6dc-a850-4883-9279-9279ddb640a7";
+        :>> title = "Two builds of the same version silently disagree on the .claude surface; drift report names no binary";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#51 (st078, untrusted, owner's own report). Version alone is not identity for a dirty build; two 0.3.1 binaries on one machine generated different surfaces and the drift report could not say which. Resolver: dcSurfaceStampNamesTheBuild.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSurfaceStampNamesTheBuild to issue357;
+
+    part issue358 : Issue {
+        :>> id = "b51c124b-2c0d-461c-9ae7-b715916648dd";
+        :>> title = "Stop-hook advisory: configurable summary (outstanding-decisions count + names) instead of the [oversight] nag";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#52 (st077, untrusted, owner's own report). The per-turn [oversight] advisory reads as noise; the owner wants one line with the outstanding decisions and how to accept. Resolver: dcStopAdvisoryIsOneLine.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcStopAdvisoryIsOneLine to issue358;
+
+    part issue359 : Issue {
+        :>> id = "faa82bb8-cc34-48b1-8761-33c7b035f59b";
+        :>> title = "keel accept from a TTY writes --note bare, but acceptQuotesDelegatedWords needs a single-quoted span - so the one command only a human may run lands red";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#53 (st076, untrusted, owner's own report, Penumbra 0.3.1). The human ran keel accept six times from their own terminal with a plain-sentence note; all wrote; the guard then reported six violations for want of a quote receipt. The TTY IS the gesture the rule already accepts when cited - the command did not cite it. Resolver: dcTtyAcceptCitesTheGesture.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcTtyAcceptCitesTheGesture to issue359;
 }

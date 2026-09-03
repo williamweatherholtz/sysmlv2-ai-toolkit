@@ -377,4 +377,37 @@ package ProjectIntake20260903 {
         :>> triageNote = "UNTRUSTED: plan only, but this is the mirror of D0289: the rule wants a quoted span or a cited gesture, and a human typing at their own terminal supplied the gesture without the word. RECOMMEND: when stdin is a TTY, cmd_accept records the note with the gesture cited (TTY) so the rule is satisfied; High (six red acceptances on a downstream project, from the one path the docs told them to use).";
     }
     #DerivedFrom dependency from us089 to st076;
+
+    part st089 : Statement {
+        :>> id = "4affcaed-fa34-4908-ad37-c5acd0232c5b";
+        :>> title = "Route all twelve intake issues as recommended - they are the owner's own reports";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "all work. these are essentially from me";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
+    // Routing of the twelve downstream issues on the owner's word (D0292): story -> Issue, story -> the accepting Decision.
+    #Implicates dependency from us079 to issue348;
+    #Implicates dependency from us079 to d0292;
+    #Implicates dependency from us080 to issue349;
+    #Implicates dependency from us080 to d0292;
+    #Implicates dependency from us081 to issue350;
+    #Implicates dependency from us081 to d0292;
+    #Implicates dependency from us082 to issue351;
+    #Implicates dependency from us082 to d0292;
+    #Implicates dependency from us083 to issue352;
+    #Implicates dependency from us083 to d0292;
+    #Implicates dependency from us084 to issue353;
+    #Implicates dependency from us084 to d0292;
+    #Implicates dependency from us085 to issue355;
+    #Implicates dependency from us085 to d0292;
+    #Implicates dependency from us086 to issue356;
+    #Implicates dependency from us086 to d0292;
+    #Implicates dependency from us087 to issue357;
+    #Implicates dependency from us087 to d0292;
+    #Implicates dependency from us088 to issue358;
+    #Implicates dependency from us088 to d0292;
+    #Implicates dependency from us089 to issue359;
+    #Implicates dependency from us089 to d0292;
+    // GH#42 (us078): verified fixed at this vintage on a fresh scaffold - deactivate succeeds, activation reads INACTIVE; closed without an Issue.
+    #Implicates dependency from us078 to d0292;
 }
