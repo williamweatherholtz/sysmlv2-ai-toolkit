@@ -22,4 +22,14 @@ package Decision0289 {
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0289Accept : Test { :>> id = "341e119c-abf0-41f9-947c-c95361e59ebe"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/29."; }
     part d0289AcceptR1 : TestResult { :>> id = "36d7a819-5050-47d2-b3e8-046236567748"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "03d25b0"; :>> judgedAt = "2026-09-03"; :>> judgedBy = "wweatherholtz"; }
+
+    // QUOTE RECEIPT (D0198 shape) - the human's own word on this Decision and on what it supersedes, given
+    // 2026-09-03 after the auto-acceptance above; recorded verbatim, judged by the recorder as a record of words.
+    verification d0289AcceptAttest1 : Test { :>> id = "e99886ab-821e-4ea9-82e6-97e42e907ffc"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-09-03, in chat, verbatim: 'D0289 supersedes layer 3 of D0178: from an agent session, my words quoted verbatim in the acceptance note are the channel, under the D0192 delegation, until a better non-local channel exists' (st075). This receipt makes the acceptance above THEIRS rather than standing consent's, and scopes the supersession: layer 3 of D0178 only - layers 1 and 2 stand."; }
+    part d0289AcceptAttest1R1 : TestResult { :>> id = "c99ef04b-8fc3-48a7-bbf4-ffc58b4010ba"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f72aef4"; :>> judgedAt = "2026-09-03"; :>> judgedBy = "claudeOpus5"; }
+
+    // What this Decision changes and where it came from - edges the auto-accepted text did not carry.
+    #Supersede dependency from d0289 to d0178;
+    dependency from d0289 to d0192;
+    #DerivedFrom dependency from d0289 to us076;
 }

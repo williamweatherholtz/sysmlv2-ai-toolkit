@@ -85,4 +85,24 @@ package ProjectIntake20260903 {
         :>> triageNote = "The delegation already existed (D0192 option A, attestation-policy.toml decisionAcceptance.delegatedRecording) and the substance rule already demanded the quote; only cmd_accept's channel layer (D0178/P1.3) refused every agent session regardless. D0289 makes the command honour the declared policy: quoted note -> recorded citing the delegation; unquoted -> refused and told to quote; delegation withdrawn -> refused as before. The human's stated limit is D0192's stated limit, and the withdrawal is one deleted line.";
     }
     #DerivedFrom dependency from us076 to st074;
+
+    part st075 : Statement {
+        :>> id = "3aca8bab-9917-4548-9019-edb3f3b63e8d";
+        :>> title = "D0289 supersedes layer 3 of D0178 - the human's authoritative word on the supersession";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "D0289 supersedes layer 3 of D0178: from an agent session, my words quoted verbatim in the acceptance note are the channel, under the D0192 delegation, until a better non-local channel exists";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
+
+    part us077 : UserStory {
+        :>> id = "a0aae10a-733f-4630-a12d-e05a99c35865";
+        :>> title = "A supersession is recorded as an edge and the human's word, never only as a deleted line";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "the human whose word ends a delegation";
+        :>> iWant = "D0289 to carry the supersede edge to D0178 layer 3 and my quote as its receipt, and every withdrawal in the policy to require a superseding Decision";
+        :>> soThat = "what is in force is computable from the model, not remembered";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "Recorded as D0290 with the receipt on D0289 and the four TO WITHDRAW comments rewritten.";
+    }
+    #DerivedFrom dependency from us077 to st075;
 }

@@ -30,16 +30,17 @@ roles = ["supervisor"]
 # there (forward-only from the acceptance date). STATED LIMIT (D0192): a fabricated quote defeats the
 # check; the protections are the human reading their own queue and the audit trail.
 #
-# TO WITHDRAW: delete the line below and the substance rule stops being demanded by this contract;
-# recording then requires the human's own gesture again (deck, console, TTY-checked CLI).
+# TO WITHDRAW (D0290): record a Decision that #Supersedes d0192 (and d0289, which rides on it) and delete the
+# line below IN THE SAME COMMIT. The Decision is the record; the deleted line is the mechanism. Recording then
+# requires the human's own gesture again (deck, console, TTY-checked CLI).
 delegatedRecording = "d0192"
 #
 # STANDING CONSENT (D0207), 2026-08-23, verbatim: "issues raised are automatically accepted. they
 # can be customizedly changed post-fact." A NON-FORK proposed Decision is accepted at issue creation;
 # the acceptance note carries the AUTO-ACCEPTED machine token, quotes the standing words, and links
 # the issue where the override stays open forever. Forks are excluded - accepting means choosing -
-# and the judgment-request-quality guard prices the ask. TO WITHDRAW: delete the line below;
-# decisions return to individually-judged acceptance.
+# and the judgment-request-quality guard prices the ask. TO WITHDRAW (D0290): a Decision that #Supersedes
+# d0207, and the line below deleted in the same commit; decisions return to individually-judged acceptance.
 standingConsent = "d0207"
 
 [findingDisposition]
@@ -57,9 +58,9 @@ standingConsent = "d0207"
 # procedureText cites D0165, so nothing claims a human judged it. `keel show dispositions` reports the judge
 # on every row — that is the audit trail this trades for throughput.
 #
-# TO WITHDRAW: restore `kinds = ["human"]`, `roles = ["supervisor"]`. One line, no code, no rebuild; the
-# guard then reports every AI-judged disposition above the threshold as a violation, which is correct for
-# a project that takes the delegation back.
+# TO WITHDRAW (D0290): a Decision that #Supersedes d0165, and in the same commit restore `kinds = ["human"]`,
+# `roles = ["supervisor"]`. One line, no code, no rebuild; the guard then reports every AI-judged disposition
+# above the threshold as a violation, which is correct for a project that takes the delegation back.
 kinds = ["human", "ai"]
 roles = ["supervisor", "contributor"]
 
@@ -78,7 +79,8 @@ roles = ["supervisor"]
 # defeats the check; the protections are the human's own queue and the audit trail - and tap-to-sign
 # (D0201), if adopted, hardens this channel too.
 #
-# TO WITHDRAW: delete the line below; confirmation flips then require the human's own gesture.
+# TO WITHDRAW (D0290): a Decision that #Supersedes d0198, and the line below deleted in the same commit;
+# confirmation flips then require the human's own gesture.
 delegatedRecording = "d0198"
 
 [contentionAdjudication]
