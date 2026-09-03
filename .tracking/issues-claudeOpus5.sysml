@@ -650,4 +650,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcUnknownMarkerRefused to issue346;
+
+    part issue347 : Issue {
+        :>> id = "3fe6c2a4-76c5-4ac7-84ff-d0fa786f8aa5";
+        :>> title = "Record-time standing consent (D0291) can auto-accept a Decision derived from an untrusted story, laundering D0264's plan-only tier";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while triaging twelve untrusted Statements (public repo, D0264) the same hour D0291 landed. D0264 says an untrusted story may reach work only through a Decision a human accepts; guard 56 checks a Decision is among the story's targets. D0291 makes keel record decision accept every NON-FORK Decision at record time under standing consent. Composed, a non-fork Decision proposed from an untrusted story is accepted by the agent's own record call, with no human act - the guard sees an accepted Decision and is satisfied, and D0264's plan-only tier is laundered through standing consent. Not yet exercised: the twelve stories are triaged and unrouted, and their reporter is the project owner. But the path exists. FIX: dcUntrustedTaintClosure already charters the taint walk from sourceTrust = untrusted through #DerivedFrom/#Implicates; record time must consult it - a Decision derived from an untrusted story is a FORK by construction (the human chooses), never auto-accepted.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUntrustedTaintClosure to issue347;
 }

@@ -233,4 +233,148 @@ package ProjectIntake20260903 {
         :>> text = "i don't want github issue notifications. disconnect that pipeline.  it wasn't really doing anything anyway, no?";
         :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
     }
+
+    part us078 : UserStory {
+        :>> id = "d10e7434-12d1-4e75-be55-d8d2cbb20d7e";
+        :>> title = "GH#42: deactivating a guardless process refuses";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "keel deactivate to work for a process that asserts no guard";
+        :>> soThat = "the documented, committed off-switch is the one that works";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED (public repo): plan only. Per GH#49 (same reporter) this refusal is FIXED at v0.3.1 - deactivate knowledge-graph-memory succeeds. RECOMMEND: verify on a scaffold, close #42 as resolved-at-0.3.1 with the commit named.";
+    }
+    #DerivedFrom dependency from us078 to st087;
+
+    part us079 : UserStory {
+        :>> id = "755892ee-6c9a-4d66-9522-d38c7fe8865e";
+        :>> title = "GH#43: hooks resolve keel from PATH, so turns can run a different vintage than gates";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the generated hooks to resolve the PINNED binary (.keel/bin) before PATH, as the git hooks already do";
+        :>> soThat = "a project's turns and gates run the same engine";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. Real and precise: the pre-commit hook resolves .keel/bin first (D0230) while claude_surface's hooks resolve PATH first - two resolution orders for one pin. RECOMMEND: fix in claude_surface.rs (one line per hook template) + a test; High, because a turn gated by a different binary than the commit is the D0251 skew the pin exists to prevent.";
+    }
+    #DerivedFrom dependency from us079 to st086;
+
+    part us080 : UserStory {
+        :>> id = "0866fb6f-a480-41c3-a5f8-31c5d2772c90";
+        :>> title = "GH#44: migrate deletes project-authored sections in engine-shipped contract files";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "keel migrate to preserve or refuse over project-authored sections in .engine/contracts files it resyncs";
+        :>> soThat = "a published unit does not lose its declared payload silently";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. Adjacent to issue314 (project-owned contracts survive resync) - unit-extras.toml is partly engine, partly project. RECOMMEND: treat sections keyed by a project's own unit as project-owned in is_project_owned_contract, or refuse with the section named; High (data loss, silent).";
+    }
+    #DerivedFrom dependency from us080 to st085;
+
+    part us081 : UserStory {
+        :>> id = "d6bacb6f-5a08-49af-92ef-d9477b820ac3";
+        :>> title = "GH#45: adoption-check FAILs every unit and cites a guard PASS line as the reason";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "adoption-check to report the actual failing check, and PASS when the foreign gate is green";
+        :>> soThat = "a green unit is not reported red";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. Likely the issue329 class (a substring test on guard output) in adoption_check.rs. RECOMMEND: parse the verdict line, not its text; a fixture with a green unit must report PASS; High (a gate that is always red is routed around, D0214).";
+    }
+    #DerivedFrom dependency from us081 to st084;
+
+    part us082 : UserStory {
+        :>> id = "9b50a77c-d726-4497-9c76-9d2eeaefa346";
+        :>> title = "GH#46: claude-surface-drift byte-compares keel.md, so every fresh Windows clone fails it";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the drift check to compare line-ending-normalised content, or sync-claude to write what git will check out";
+        :>> soThat = "a Windows clone is not red on arrival";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. CRLF vs LF on the embedded literal. RECOMMEND: normalise line endings on both sides of the comparison in guards.rs claude_surface_drift; Medium-High (every Windows adopter hits it first).";
+    }
+    #DerivedFrom dependency from us082 to st083;
+
+    part us083 : UserStory {
+        :>> id = "57de4d22-2854-4beb-8ec8-0f15d515d7d5";
+        :>> title = "GH#47: a forward-only rule ships upstream's adoption date, so it is retroactive downstream";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "forward-only cutoffs to be the ADOPTING project's date, not the engine's";
+        :>> soThat = "a downstream project is not retro-failed on the day it migrates";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. The general form of issue068: predicate = acceptQuotesDelegatedWords(2026-08-22) is this repo's date baked into a shipped rule. RECOMMEND: the cutoff comes from the project's own adoption record (activation date of the rule or the migration date), with the literal kept only as this repo's value; touches rules.sysml (keystone) and checks.rs; High.";
+    }
+    #DerivedFrom dependency from us083 to st082;
+
+    part us084 : UserStory {
+        :>> id = "034f13e3-cc0a-4f9e-8f26-50868050a4b8";
+        :>> title = "GH#48: append-result inserts the TestResult inside a multi-line verification block";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "append-result to insert after the block's closing brace, whether the DoD is one line or many";
+        :>> soThat = "a result recorded by the API never breaks the file it is recorded into";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. write.rs inserts after the line matching verification <T>DoD : Test { - correct only for one-liners. RECOMMEND: find the matching close brace; test with a multi-line DoD; High (the write API corrupting a file is the issue325 class).";
+    }
+    #DerivedFrom dependency from us084 to st081;
+
+    part us085 : UserStory {
+        :>> id = "70262bf8-78e4-4e90-a235-f00f1ceb7558";
+        :>> title = "GH#49: deactivating a process leaves its SKILL deployed";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "sync-claude to skip or mark the skills of deactivated processes";
+        :>> soThat = "an agent is not advertised a channel the project switched off";
+        :>> implication = ImplicationKind::designChange;
+        :>> triageNote = "UNTRUSTED: plan only, and a FORK the reporter themselves frames: (A) skip inactive processes' skills, (B) deploy them with the inactive state written into the description. RECOMMEND (B), as the reporter leans: removal would read as drift to claude-surface-drift (GH#46) and a stated inactive skill teaches the model the state; Medium.";
+    }
+    #DerivedFrom dependency from us085 to st080;
+
+    part us086 : UserStory {
+        :>> id = "62aec0d1-ca9f-4a56-86d4-823af7c77083";
+        :>> title = "GH#50: the red-yield obligation truncates its diagnostic at 726 chars mid-token";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the captured gate output preserved whole, or truncated at a line boundary with the truncation stated";
+        :>> soThat = "the first problem at yield is actually preserved";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. A fixed-width cut in the Stop hook's obligation writer. RECOMMEND: cut at a line boundary with a '... (N more lines)' marker, or no cut with the field allowed to be long; Low-Medium.";
+    }
+    #DerivedFrom dependency from us086 to st079;
+
+    part us087 : UserStory {
+        :>> id = "90f5987b-e48b-4502-a0f2-0d61aaa3893e";
+        :>> title = "GH#51: two builds of the same version disagree on the .claude surface; the drift report names no binary";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the surface stamp and the drift report to carry the build commit, and the drift message to name both binaries";
+        :>> soThat = "a second binary on the machine is diagnosable from the report";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only. Two 0.3.1 builds (cf985ec+dirty vs 6eafa86+dirty) generated different surfaces; version alone is not identity for a dirty build. RECOMMEND: stamp build commit into .keel-surface and print it in the drift message; Medium.";
+    }
+    #DerivedFrom dependency from us087 to st078;
+
+    part us088 : UserStory {
+        :>> id = "44cea2b6-3388-431f-855a-08f5d13198fb";
+        :>> title = "GH#52: the Stop-hook advisory reads as noise; wanted a configurable one-line summary";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the exit-0 advisory replaced by a short configurable summary: outstanding decisions and how to accept";
+        :>> soThat = "the turn-boundary message is read instead of skimmed past";
+        :>> implication = ImplicationKind::designChange;
+        :>> triageNote = "UNTRUSTED: plan only. The reporter quotes the owner's wanted format. Partly moot after D0291 (record-time consent leaves far fewer outstanding decisions) and D0289 (accept by quoted word). RECOMMEND: one line - N decisions outstanding, names, and 'accept with your word or keel accept' - with the console nag dropped; Low.";
+    }
+    #DerivedFrom dependency from us088 to st077;
+
+    part us089 : UserStory {
+        :>> id = "1e98d48f-85d9-45e3-876c-3b54c5521761";
+        :>> title = "GH#53: keel accept from a TTY writes the note bare, so the human's own command lands red";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "a TTY-run accept to satisfy the substance rule by construction - the TTY IS the human gesture";
+        :>> soThat = "the one command only a human may run does not fail the gate it exists to pass";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED: plan only, but this is the mirror of D0289: the rule wants a quoted span or a cited gesture, and a human typing at their own terminal supplied the gesture without the word. RECOMMEND: when stdin is a TTY, cmd_accept records the note with the gesture cited (TTY) so the rule is satisfied; High (six red acceptances on a downstream project, from the one path the docs told them to use).";
+    }
+    #DerivedFrom dependency from us089 to st076;
 }
