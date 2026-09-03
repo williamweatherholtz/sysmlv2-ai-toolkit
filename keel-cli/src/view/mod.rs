@@ -3225,7 +3225,8 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
     let tiers = compute_tier_satisfaction(&model);
     let need = tiers.iter().find(|t| t.tier == "Need");
     let sr = tiers.iter().find(|t| t.tier == "SystemRequirement");
-    let pct_of = |t: Option<&TierStat>| t.map_or(100, |s| pct(s.satisfied, s.total));
+    // A tier with no items is 0% satisfied, not 100 (D0286): nothing authored is nothing done.
+    let pct_of = |t: Option<&TierStat>| t.map_or(0, |s| pct(s.satisfied, s.total));
     let unrooted_caps = capability_root_violations(&model).len();
     let mut stories: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
     stories.sort();
@@ -3373,6 +3374,9 @@ struct ReadinessBlockers {
     undispositioned_findings: Vec<String>, // open finding Issues with severity >= Medium
     unfixed_critical: Vec<String>,         // open finding Issues with severity == Critical
     invariant_violations: Vec<String>,     // enforced-guard violations (guard all)
+    /// How many governed coverage rows exist at all. Zero means there is NOTHING to assure, and
+    /// readiness over nothing is not readiness (D0286) - a fresh scaffold read READY for that reason.
+    governed: usize,
 }
 
 impl ReadinessBlockers {
@@ -3380,11 +3384,34 @@ impl ReadinessBlockers {
     /// informational signal — cleared by re-verification, never a commit gate), so it does not
     /// affect readiness; it is surfaced separately.
     const fn ready(&self) -> bool {
-        self.coverage_gaps.is_empty()
+        self.governed > 0
+            && self.coverage_gaps.is_empty()
             && self.critique_gaps.is_empty()
             && self.undispositioned_findings.is_empty()
             && self.unfixed_critical.is_empty()
             && self.invariant_violations.is_empty()
+    }
+
+    /// The verdict word. Three, not two: an empty population is neither READY nor NOT READY, it is
+    /// NOTHING TO ASSURE - and saying READY there was the clean-sweep defect (D0286).
+    const fn verdict(&self) -> &'static str {
+        if self.governed == 0 {
+            "NOTHING TO ASSURE"
+        } else if self.ready() {
+            "READY"
+        } else {
+            "NOT READY"
+        }
+    }
+
+    const fn tone(&self) -> &'static str {
+        if self.governed == 0 {
+            "empty"
+        } else if self.ready() {
+            "good"
+        } else {
+            "bad"
+        }
     }
 }
 
@@ -3427,7 +3454,9 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     // count as gaps — grandfathered elements are out of the gate.
     let gf_cov = crate::perf::phase("grandfatherCoverage", || crate::govern::grandfathered_under(root, COVERAGE_DECISION));
     let gf_crit = crate::perf::phase("grandfatherCritique", || crate::govern::grandfathered_under(root, CRITIQUE_DECISION));
-    let coverage_gaps: Vec<String> = crate::perf::phase("computeCoverage", || compute_coverage(&model, &done, &task_suspect, &stale))
+    let coverage_rows = crate::perf::phase("computeCoverage", || compute_coverage(&model, &done, &task_suspect, &stale));
+    let governed_n = coverage_rows.iter().filter(|c| governed(gf_cov.as_ref(), &c.element)).count();
+    let coverage_gaps: Vec<String> = coverage_rows
         .into_iter()
         .filter(|c| !is_covered_tier(c.tier) && governed(gf_cov.as_ref(), &c.element))
         .map(|c| c.element)
@@ -3457,6 +3486,7 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     });
 
     Ok(ReadinessBlockers {
+        governed: governed_n,
         coverage_gaps,
         critique_gaps,
         stale_verifications: suspect_vec,
@@ -3516,6 +3546,8 @@ pub fn assured(root: &Path) -> Result<String, ViewError> {
             Json::s("assurance readiness (D0079 c; charter-time scoped, D0081): READY iff GOVERNED coverage complete AND GOVERNED critique complete AND every >=Medium finding dispositioned AND no Critical open AND invariants green. stale_verifications is advisory (re-verify; not gating)"),
         ),
         ("ready".to_string(), Json::Bool(b.ready())),
+        ("verdict".to_string(), Json::s(b.verdict())),
+        ("governed".to_string(), Json::Int(i64::try_from(b.governed).unwrap_or(0))),
         ("blockers".to_string(), blockers),
         ("advisories".to_string(), advisories),
     ]);
@@ -4675,7 +4707,7 @@ mod tests {
 
     #[test]
     fn pct_handles_empty_denominator() {
-        assert_eq!(pct(0, 0), 100, "nothing to measure = vacuously complete");
+        assert_eq!(pct(0, 0), 0, "nothing to measure = nothing done, never vacuously complete (D0286)");
         assert_eq!(pct(1, 2), 50);
         assert_eq!(pct(9, 10), 90);
         assert_eq!(cov_tone(90), "good");

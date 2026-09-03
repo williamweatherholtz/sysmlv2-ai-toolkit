@@ -65,13 +65,10 @@ pub fn rows(root: &Path) -> Result<Vec<Row>, ViewError> {
 }
 
 const fn pct(n: usize, total: usize) -> usize {
-    // No requirements in scope: nothing is pending, so nothing is missing.
-    match n.checked_mul(100) {
-        Some(x) => match x.checked_div(total) {
-            Some(p) => p,
-            None => 100,
-        },
-        None => 100,
+    // No requirements in scope: nothing is DONE, so 0% - never a vacuous 100 (D0286).
+    match n.saturating_mul(100).checked_div(total) {
+        Some(p) => p,
+        None => 0,
     }
 }
 

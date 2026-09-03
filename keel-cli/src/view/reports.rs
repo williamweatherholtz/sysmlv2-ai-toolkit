@@ -160,14 +160,23 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
 // a health/opportunity read. Each report emits a `cards` array (label/value/detail/tone) so ONE
 // HTML template renders all of them. Computed on demand; never authored, never committed (§2.1).
 
-/// Integer percentage `n/d` (vacuously 100% when there is nothing to measure).
+/// Integer percentage `n/d`. An EMPTY population is 0%, never 100% (D0286): a project that has
+/// authored nothing has done nothing, and a fresh scaffold reporting a clean sweep of 100% was the
+/// defect the human saw on every inheriting project. Callers that can tell "nothing yet" from "0 of
+/// many" should pair this with [`cov_tone_of`], which gives the empty case its own tone.
 pub(super) fn pct(n: usize, d: usize) -> u32 {
-    n.saturating_mul(100).checked_div(d).map_or(100, |x| u32::try_from(x).unwrap_or(0))
+    n.saturating_mul(100).checked_div(d).map_or(0, |x| u32::try_from(x).unwrap_or(0))
 }
 
 /// Tone for a coverage-style percentage (higher is better).
 pub(super) const fn cov_tone(p: u32) -> &'static str {
     if p >= 90 { "good" } else if p >= 70 { "warn" } else { "bad" }
+}
+
+/// Tone for a ratio whose population may be empty: `empty` (neutral) when there is nothing to
+/// measure, so a fresh project reads "nothing yet" rather than "failing" - and never "complete".
+pub(super) fn cov_tone_of(n: usize, d: usize) -> &'static str {
+    if d == 0 { "empty" } else { cov_tone(pct(n, d)) }
 }
 
 /// One scorecard metric card.
@@ -402,7 +411,6 @@ pub fn orient_html(root: &Path) -> Result<String, ViewError> {
         if more > 0 { format!("{} \u{2026} +{more} more", shown.join(", ")) } else { shown.join(", ") }
     };
     let rb = compute_readiness(root)?;
-    let ready = rb.ready();
     let wip: Vec<String> = o
         .in_progress_sprints
         .iter()
@@ -432,9 +440,9 @@ pub fn orient_html(root: &Path) -> Result<String, ViewError> {
         card("Suspect / stale", suspect_total.to_string(), format!("{} drift/criterion + {} invalid-evidence \u{2014} re-verify", o.suspect.len(), o.invalid_evidence.len()), if suspect_total == 0 { "good" } else { "warn" }),
         card(
             "Assurance readiness",
-            if ready { "READY".to_string() } else { "NOT READY".to_string() },
-            format!("{} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()),
-            if ready { "good" } else { "bad" },
+            rb.verdict().to_string(),
+            format!("{} governed; {} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.governed, rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()),
+            rb.tone(),
         ),
     ];
     Ok(REPORT_TEMPLATE
@@ -463,14 +471,13 @@ fn assurance_cards(root: &Path, model: &Model, cov: &[Coverage], stale: &HashSet
     let undisp = crit_f + high_f + med_f;
     let suspect_load = task_suspect.len() + critique_suspect_set(model).len();
     let rb = compute_readiness(root)?;
-    let ready = rb.ready();
     Ok(vec![
-        card("Verification coverage", format!("{covered_pct}%"), format!("{verified} verified + {attested} attested of {total} (gate-covered)"), cov_tone(covered_pct)),
-        card("Critique coverage", format!("{crit_pct}%"), format!("{crit_cov} of {} elements Core-3 critiqued", crit.len()), cov_tone(crit_pct)),
-        card("Acceptance integrity", format!("{att_pct}%"), format!("{} of {att_total} accepted decisions attested", att_total - att_missing.len()), cov_tone(att_pct)),
+        card("Verification coverage", format!("{covered_pct}%"), format!("{verified} verified + {attested} attested of {total} (gate-covered)"), if total == 0 { "empty" } else { cov_tone(covered_pct) }),
+        card("Critique coverage", format!("{crit_pct}%"), format!("{crit_cov} of {} elements Core-3 critiqued", crit.len()), cov_tone_of(crit_cov, crit.len())),
+        card("Acceptance integrity", format!("{att_pct}%"), format!("{} of {att_total} accepted decisions attested", att_total - att_missing.len()), cov_tone_of(att_total - att_missing.len(), att_total)),
         card("Open findings (\u{2265}Medium)", undisp.to_string(), format!("{crit_f} Critical / {high_f} High / {med_f} Medium / {low_f} Low open"), if crit_f > 0 { "bad" } else if undisp > 0 { "warn" } else { "good" }),
         card("Suspect load", suspect_load.to_string(), format!("{} drift/criterion + {} failing-critique; {} stale verifications", task_suspect.len(), critique_suspect_set(model).len(), stale.len()), if suspect_load == 0 { "good" } else { "warn" }),
-        card("Assurance readiness", if ready { "READY".to_string() } else { "NOT READY".to_string() }, format!("{} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()), if ready { "good" } else { "bad" }),
+        card("Assurance readiness", rb.verdict().to_string(), format!("{} governed; {} coverage + {} critique + {} \u{2265}Medium + {} Critical + {} invariant blocker(s)", rb.governed, rb.coverage_gaps.len(), rb.critique_gaps.len(), rb.undispositioned_findings.len(), rb.unfixed_critical.len(), rb.invariant_violations.len()), rb.tone()),
     ])
 }
 
@@ -498,7 +505,7 @@ fn traceability_cards(model: &Model, cov: &[Coverage]) -> Vec<Json> {
     vec![
         card("Needs verified", format!("{n_pct}%"), format!("{} of {} needs reach a verified requirement", needs.iter().filter(|c| c.tier == "verified").count(), needs.len()), cov_tone(n_pct)),
         card("Requirements verified", format!("{r_pct}%"), format!("{} verified / {} attested / {} addressed / {} uncovered of {}", r_tier("verified"), r_tier("attested"), r_tier("addressed"), r_tier("uncovered") + r_tier("suspect"), reqs.len()), cov_tone(r_pct)),
-        card("Needs with satisfy edge", format!("{}%", pct(n_sat, n_tot)), format!("{n_sat} of {n_tot} needs carry a satisfy edge"), cov_tone(pct(n_sat, n_tot))),
+        card("Needs with satisfy edge", format!("{}%", pct(n_sat, n_tot)), format!("{n_sat} of {n_tot} needs carry a satisfy edge"), cov_tone_of(n_sat, n_tot)),
         card("Requirements with verify edge", format!("{}%", pct(r_ver, r_tot)), format!("{r_ver} of {r_tot} requirements carry a verify edge (DO-178C-style traceability)"), cov_tone(pct(r_ver, r_tot))),
     ]
 }
@@ -804,7 +811,7 @@ const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
  .c .l{font-size:11px;text-transform:uppercase;color:#666;letter-spacing:.03em}
  .c .v{font-size:30px;font-weight:600;margin:4px 0}
  .c .d{font-size:11px;color:#555;line-height:1.4}
- .c.good{border-left:5px solid #59a14f} .c.warn{border-left:5px solid #f2a900} .c.bad{border-left:5px solid #e15759}
+ .c.empty{border-left:5px solid #9aa4b1} .c.good{border-left:5px solid #59a14f} .c.warn{border-left:5px solid #f2a900} .c.bad{border-left:5px solid #e15759}
  .c.good .v{color:#3d7a34} .c.warn .v{color:#b07a00} .c.bad .v{color:#b03a3c}
 </style></head><body>
 <header><h1>keel · <span id="t"></span></h1><p>computed aggregate report (D0087) — regenerate, never commit as truth</p></header>
@@ -1106,3 +1113,58 @@ fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>
         .replace("/*ROWS*/", &Json::Arr(rows).dump())
 }
 
+
+#[cfg(test)]
+mod empty_population_tests {
+    use super::{cov_tone_of, pct};
+
+    /// D0286: an empty population is 0%, never 100%. Every fresh project inheriting keel used to open
+    /// on a clean sweep of 100% cards - nothing authored, everything "complete".
+    #[test]
+    fn an_empty_population_is_zero_percent_not_a_clean_sweep() {
+        assert_eq!(pct(0, 0), 0, "0/0 is nothing done, not everything done");
+        assert_eq!(pct(3, 0), 0, "a numerator over nothing is still nothing measured");
+        assert_eq!(pct(0, 4), 0, "and zero of four is a real 0%");
+        assert_eq!(pct(4, 4), 100);
+        assert_eq!(pct(3, 4), 75);
+    }
+
+    /// The empty case gets its OWN tone so a fresh project reads "nothing yet", not "failing" - and
+    /// certainly not "good".
+    #[test]
+    fn the_empty_case_has_its_own_tone_and_never_reads_good() {
+        assert_eq!(cov_tone_of(0, 0), "empty");
+        assert_eq!(cov_tone_of(0, 4), "bad");
+        assert_eq!(cov_tone_of(4, 4), "good");
+    }
+
+    /// THE CONTROL: no ratio anywhere in the crate may default to full on an empty denominator. A
+    /// source scan, because the three sites this fixed were in three files with three different
+    /// spellings of the same mistake (`map_or(100`, `None => 100`, `t.map_or(100`), and the fourth
+    /// would be spelled a fourth way. Any `100` chosen as the fallback of a division is caught.
+    #[test]
+    fn no_division_in_the_crate_falls_back_to_one_hundred() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).expect("src").flatten() {
+                let p = e.path();
+                if p.is_dir() { walk(&p, out); } else if p.extension().is_some_and(|x| x == "rs") { out.push(p); }
+            }
+        }
+        let mut files = Vec::new();
+        walk(std::path::Path::new("src"), &mut files);
+        let mut hits = Vec::new();
+        for f in files {
+            let text = std::fs::read_to_string(&f).expect("read");
+            for (n, line) in text.lines().enumerate() {
+                let l = line.trim();
+                if l.starts_with("//") || l.contains("l.contains(") { continue; } // comments, and this scanner's own pattern line
+                let bad = (l.contains("checked_div") || l.contains("map_or(") || l.contains("unwrap_or(") || l.contains("=> 100"))
+                    && (l.contains("map_or(100") || l.contains("unwrap_or(100") || l.contains("None => 100") || l.contains("map_or(100.0") || l.contains("unwrap_or(100.0"));
+                if bad {
+                    hits.push(format!("{}:{}: {l}", f.display(), n + 1));
+                }
+            }
+        }
+        assert!(hits.is_empty(), "a ratio falls back to 100 on an empty population - D0286 says nothing measured is 0%:\n{}", hits.join("\n"));
+    }
+}
