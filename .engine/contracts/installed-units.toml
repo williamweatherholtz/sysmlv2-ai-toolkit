@@ -118,16 +118,6 @@ file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
 file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
 file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
 file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
-[20cd43e6-1d23-4f2f-aadd-2b4a52fcab81]
-process = "decision-channel"
-version = 6
-file.processes__SL__decision-channel.sysml = "edc6bd1f5283fef7"
-file.skills__SL__decision-channel__SL__SKILL.md = "3f13a3b3d8f774a1"
-file.skills__SL__decision-channel__SL__registry.sysml = "de6c91c76a09c330"
-file..github__SL__workflows__SL__decision-issue.yml = "1bfbbb8f2f9823ea"
-file..github__SL__workflows__SL__decision-record.yml = "f09f03cb277185a8"
-file..github__SL__scripts__SL__open_decision_issues.py = "1e391075a4dd7281"
-file..github__SL__scripts__SL__record_decision.sh = "82716418a23728d9"
 [79f2d321-7c55-41fb-86fa-7d549202caf7]
 process = "intake"
 version = 44

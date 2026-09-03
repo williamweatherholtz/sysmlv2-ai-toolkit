@@ -1,4 +1,5 @@
-# github-actors — GitHub login -> keel actor mapping (D0205 githubChannel).
+# github-actors — GitHub login -> keel actor mapping: the project's declared DECIDERS (D0219). Read by
+# github-intake (who filed what) and by record-time standing consent (D0291: the single decider is the judge).
 #
 # The recording Action maps `github.event.comment.user.login` through THIS committed table to the
 # keel actor named in the acceptance's judgedBy. An unmapped login is REFUSED, never defaulted

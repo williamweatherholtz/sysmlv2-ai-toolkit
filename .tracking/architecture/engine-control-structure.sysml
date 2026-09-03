@@ -38,11 +38,6 @@ package EngineControlStructure {
         :>> title = "GitHub Actions ci.yml";
         :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
     }
-    part ctChannel : Controller {
-        :>> id = "c925d673-e193-4dd9-803f-fc9741bddd7c";
-        :>> title = "Decision channel workflows (decision-issue.yml, decision-record.yml)";
-        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
-    }
     part ctRemote : Controller {
         :>> id = "47c9294e-7e74-440c-8340-3a9accd7c353";
         :>> title = "GitHub remote (origin/main, branch protection)";
@@ -107,13 +102,6 @@ package EngineControlStructure {
         :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
         :>> heldBy = ctHooks;
         :>> beliefs = "That the session is an agent session because the environment says so (agent-mutable); that the binary they resolve is the pinned one (true only where KEEL_BIN or PATH agrees with the pin - issue 43 downstream); that a clean fast tier means the edit was safe to continue (form only).";
-    }
-    part pmChannel : ProcessModel {
-        :>> id = "775c69b9-6aff-40e1-a9c3-6f3a40b7d4aa";
-        :>> title = "What the channel believes";
-        :>> createdAt = "2026-09-02"; :>> createdBy = "claudeOpus5";
-        :>> heldBy = ctChannel;
-        :>> beliefs = "That github-actors.toml is the complete set of deciders (true by construction); that the agent's fork/non-fork marker is correct (unverified); that the standing consent is still in force (never re-checked - no expiry, no revision binding, issue342).";
     }
     part pmCI : ProcessModel {
         :>> id = "8380019d-4ce9-4a76-80a7-e50d717ff0af";

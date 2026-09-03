@@ -512,6 +512,17 @@ pub fn attestation_policy(root: &Path, class: &str) -> ClassPolicy {
 /// Names the Decision that authorizes an agent to RECORD a human's judgment, provided the record
 /// quotes their words verbatim and names them as judge. `None` = not declared — the substance check
 /// then demands nothing, and recording requires the human's own gesture.
+/// The standing consent declared for `decisionAcceptance` (D0207: `standingConsent = "d0207"`), or
+/// `None`. Under it a NON-FORK proposed Decision is accepted at RECORD time by `keel record decision`
+/// (D0291) - the GitHub channel that used to do this at issue creation is gone.
+#[must_use]
+pub fn standing_consent(root: &Path) -> Option<String> {
+    let path = root.join(".engine").join("contracts").join("attestation-policy.toml");
+    let text = std::fs::read_to_string(path).ok()?;
+    let v = text.parse::<toml::Value>().ok()?;
+    v.get("decisionAcceptance")?.get("standingConsent")?.as_str().map(str::to_owned)
+}
+
 #[must_use]
 pub fn recording_delegation(root: &Path, class: &str) -> Option<String> {
     let path = root.join(".engine").join("contracts").join("attestation-policy.toml");

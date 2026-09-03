@@ -33,10 +33,9 @@ package ProjectActors {
     // it. A kernel-adjudicated critique is recorded that way — see .tracking/panel-critiques.sysml.
     part claudeFable5 : Actor { :>> name = "Claude Fable 5"; :>> kind = ActorKind::ai; :>> role = "contributor"; }
 
-    // D0205 (githubChannel): the GitHub Actions recorder - durable compute that transcribes the
-    // human's authenticated issue-comment gesture into the tree while the local machine is off.
-    // kind=ai (it is automation, never a Person); it RECORDS human judgment under the D0192-family
-    // delegation and never supplies it - the acceptance's judgedBy stays the mapped human, and the
-    // ownership guard admits only the exact accept transform from a non-owner.
+    // The GitHub Actions recorder (D0205). It transcribed 80 auto-acceptances and 2 human comments
+    // (2026-08-23 to 2026-09-03) as RECORDER only - judgedBy stayed the mapped human, so no record
+    // names it. The channel is disconnected (D0291); the registration stays as the record that this
+    // actor existed. kind=ai - automation, never a Person.
     part githubRecorder : Actor { :>> name = "GitHub Actions recorder (keel binary in CI, D0205)"; :>> kind = ActorKind::ai; :>> role = "contributor"; }
 }

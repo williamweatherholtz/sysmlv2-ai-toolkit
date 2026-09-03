@@ -197,9 +197,10 @@ frozen (modify it only by out-of-band Decision).
   `git fetch` before a shared-region edit. Conflicting conclusions → record an `Issue`; the human
   adjudicates. Run a multi-contributor session through the **`distributed-collaboration`** skill; enroll a
   contributor with **`actor-enrollment`**.
-- **Decisions auto-accept under standing consent (D0207).** A NON-FORK proposed Decision is accepted
-  when its GitHub issue is raised (decision-channel process): the note carries the AUTO-ACCEPTED token
-  and the issue stays the override thread forever. A FORK still reaches out - and must first pass
+- **Decisions auto-accept under standing consent (D0207), at record time (D0291).** `keel record decision`
+  accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words, the
+  judge is the single decider in `github-actors.toml`; override = a superseding Decision (D0290) or your quoted
+  word (D0289). No GitHub issue is raised — the decision channel is disconnected. A FORK still reaches out - and must first pass
   judgment-request-quality (short name, rationale, per-option COST, a `--research` statement; guard 48) - through the
   **`decision-surfacing`** process: one published page, one section per pending decision (stake, steelmanned options with
   costs, recommendation, what would change it), republished to the same URL so there is one queue; `keel deck` carries the

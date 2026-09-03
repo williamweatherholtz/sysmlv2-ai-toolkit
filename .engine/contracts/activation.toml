@@ -18,7 +18,7 @@
 # collection of switches nobody can account for. Absent is not a violation - an undeclared project
 # runs everything by default (D0138/D0164) - it just means onboarding has not been run.
 charteredBy = "d0226"
-active = ["actor-enrollment", "agile-workflow", "decision-authoring", "decision-channel", "deploy", "distributed-collaboration", "doc-sync", "element-critique", "issue-resolution", "knowledge-graph-memory", "render"]
+active = ["actor-enrollment", "agile-workflow", "decision-authoring", "deploy", "distributed-collaboration", "doc-sync", "element-critique", "issue-resolution", "knowledge-graph-memory", "render"]
 
 [viewpoints]
 active = ["acceptancesPendingVP", "archCouplingVP", "archCoverageVP", "archCriticalityVP", "archDriftVP", "archElementsVP", "archStpaInputsVP", "attestationCoverageVP", "authorityQueueVP", "baselinesVP", "concernCoverageVP", "critiquePolicyVP", "decisionsVP", "diagramVP", "findingsAwaitingDispositionVP", "governingVersionVP", "indicatorsVP", "orientVP", "orphansVP", "renderVP", "reportVP", "reprocessVP", "requirementsVP", "rootednessVP", "safetyVP", "sittingReviewVP", "suspectVP", "tierSatisfactionVP", "traceabilityVP", "verificationExaminedVP", "verificationExercisedVP", "whatsNextVP"]

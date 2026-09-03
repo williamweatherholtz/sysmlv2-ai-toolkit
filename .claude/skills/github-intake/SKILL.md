@@ -1,8 +1,7 @@
 # github-intake — an issue becomes their words, then my judgment
 
 Deploys `.engine/processes/github-intake.sysml` (D0263). The inbound half of the federation loop:
-the decision-channel carries decisions **out** and approval gestures **in**; nothing carried an
-**issue** in, so a defect found downstream lived in a browser tab.
+issues come **in** as verbatim Statements. Before it, a defect found downstream lived in a browser tab.
 
 ## Procedure
 

@@ -96,9 +96,14 @@ fn this_repository_decorates_the_roles_with_its_authored_residue() {
     assert!(ok, "{text}");
     let v = parse(&text);
     let found: Vec<String> = anchors(&v).into_iter().flatten().collect();
-    for anchor in ["ctHuman", "ctAgent", "ctHooks", "ctCommitGate", "ctCI", "ctChannel", "ctRemote", "ctConsole"] {
+    for anchor in ["ctHuman", "ctAgent", "ctHooks", "ctCommitGate", "ctCI", "ctRemote", "ctConsole"] {
         assert!(found.iter().any(|a| a == anchor), "{anchor} decorates its role: {found:?}");
     }
+    // D0291: the decision channel is disconnected here, so its role has no anchor and is INERT - the
+    // view says so rather than inventing a controller this project no longer has.
+    assert!(!found.iter().any(|a| a == "ctChannel"), "no channel anchor after D0291: {found:?}");
+    let inert: Vec<&str> = v["inertControllers"].as_array().expect("inert").iter().filter_map(|x| x.as_str()).collect();
+    assert!(inert.contains(&"channel"), "the channel role reads inert: {inert:?}");
     let pms = names(&v, "processModels");
     assert!(pms.iter().any(|n| n == "pmHuman"), "process models are read from the residue: {pms:?}");
     assert!(text.contains("issue343"), "a false belief cites the Issue that makes it false");

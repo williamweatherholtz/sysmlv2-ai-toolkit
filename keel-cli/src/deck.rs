@@ -63,7 +63,7 @@ pub(crate) fn decision_digest(root: &Path, rel_file: &str) -> Option<(String, St
 
 /// Extract `OPTION X (short label)` enumerations from a Decision file's text. Two or more make the
 /// decision a FORK; fewer yield an empty list and the ordinary single Sign button.
-pub(crate) fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
+pub fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
     let Ok(text) = std::fs::read_to_string(root.join(rel_file)) else { return Vec::new() };
     let mut out = Vec::new();
     let mut rest = text.as_str();

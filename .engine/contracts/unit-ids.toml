@@ -1,7 +1,6 @@
 # Process-unit identity registry (D0183): a unit's id is its EXCHANGE identity - stable
 # across exports, matched by import --update. Never rewritten.
 decision-authoring = "ee8778a7-d0f8-4d4f-aa43-dd4820d43a43"
-decision-channel = "20cd43e6-1d23-4f2f-aadd-2b4a52fcab81"
 actor-enrollment = "aec6f856-abcc-47be-9806-0d28bbf461e8"
 adversarial-panel-review = "87ed7c53-5894-4917-ab6c-3f6c864ea8d2"
 agile-workflow = "41e6457a-b7d8-4653-a65a-c6291e2e6ebf"

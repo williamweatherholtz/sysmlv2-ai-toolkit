@@ -47,7 +47,7 @@ package ProcessLibraryStewardship {
         :>> id = "d0259a01-0829-4b5c-8d1e-2f3a4b5c6d82";
         :>> title = "A skill worth reusing becomes a UNIT before it becomes folklore";
         :>> triggerCondition = "A project grows a skill, template or working method a second project would want.";
-        :>> actionText = "The issue245 test: if it has no process definition, it appears in no catalogue and travels nowhere. Author the process file, the engine-side skill + registry, and unit-extras naming what it needs to RUN (repo files only - never a machine environment); then publish. The decision-channel kit is the worked example: skill + template + browser suite existed for weeks, transferable only after its process file made it a unit.";
+        :>> actionText = "The issue245 test: if it has no process definition, it appears in no catalogue and travels nowhere. Author the process file, the engine-side skill + registry, and unit-extras naming what it needs to RUN (repo files only - never a machine environment); then publish. The control-defect kit is the worked example: skill + template + browser suite existed for weeks, transferable only after its process file made it a unit.";
         :>> producedArtifact = "A new unit in the library, importable whole.";
         :>> owner = Owner::either;
     }

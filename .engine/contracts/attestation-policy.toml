@@ -36,10 +36,13 @@ roles = ["supervisor"]
 delegatedRecording = "d0192"
 #
 # STANDING CONSENT (D0207), 2026-08-23, verbatim: "issues raised are automatically accepted. they
-# can be customizedly changed post-fact." A NON-FORK proposed Decision is accepted at issue creation;
-# the acceptance note carries the AUTO-ACCEPTED machine token, quotes the standing words, and links
-# the issue where the override stays open forever. Forks are excluded - accepting means choosing -
-# and the judgment-request-quality guard prices the ask. TO WITHDRAW (D0290): a Decision that #Supersedes
+# can be customizedly changed post-fact." A NON-FORK proposed Decision is accepted AT RECORD TIME by
+# `keel record decision` (D0291; the GitHub channel that did this at issue creation is disconnected -
+# the human did not want the notifications): the note carries the AUTO-ACCEPTED token and quotes the
+# standing words; the judge is the single decider declared in github-actors.toml, and with none or
+# several declared the Decision stays proposed. Override = a superseding Decision (D0290) or the
+# human's quoted word (D0289). Forks are excluded - accepting means choosing - and the
+# judgment-request-quality guard prices the ask. TO WITHDRAW (D0290): a Decision that #Supersedes
 # d0207, and the line below deleted in the same commit; decisions return to individually-judged acceptance.
 standingConsent = "d0207"
 

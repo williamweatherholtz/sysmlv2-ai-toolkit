@@ -1,7 +1,6 @@
 // githubIntake — an issue on the repository becomes a recorded utterance, then a judgment (D0263).
 //
-// This is the INBOUND half of the federation loop. The decision-channel carries decisions OUT and
-// approval gestures IN; nothing carried an issue in, so a defect found by a downstream project or a
+// This is the INBOUND half of the federation loop: issues come IN as verbatim Statements. Nothing carried an issue in, so a defect found by a downstream project or a
 // collaborator lived in a browser tab until someone remembered it.
 //
 // It is deliberately intake, not a second tracker: a GitHub issue is SOMEONE'S WORDS, and what those

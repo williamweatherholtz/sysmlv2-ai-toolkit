@@ -2539,7 +2539,32 @@ fn cmd_record(args: &[String]) -> i32 {
     match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref()) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
-            println!("accept later via an explicit human sign-off (flip status + add the d{nnnn}Accept event).");
+            // D0291: standing consent (D0207) is applied HERE, at record time, for a NON-FORK - the
+            // GitHub channel that used to do it at issue creation (and notify the human every time) is
+            // disconnected. A fork (a Decision carrying OPTIONS) stays proposed for the human; the
+            // recorder is the single declared decider, and if the deciders table does not name exactly
+            // one Person the Decision stays proposed and says why rather than guessing a judge.
+            let dname = format!("d{nnnn}");
+            let rel = path.replace('\\', "/");
+            let rel = rel.strip_prefix(&format!("{}/", root.to_string_lossy().replace('\\', "/"))).unwrap_or(&rel).to_string();
+            match (keel_cli::activation::standing_consent(&root), keel_cli::deck::fork_options(&root, &rel).is_empty()) {
+                (Some(consent), true) => {
+                    let deciders: Vec<String> = keel_cli::github::deciders(&root).into_values().collect();
+                    if let [judge] = deciders.as_slice() {
+                        let sha = keel_cli::gitx::git().arg("-C").arg(&root).args(["rev-parse", "--short", "HEAD"]).output().ok()
+                            .filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+                        let note = format!("AUTO-ACCEPTED under standing consent ({}). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289).", consent.to_uppercase());
+                        match keel_cli::write::accept_decision(Path::new(&path), &dname, &sha, &date, judge, &note) {
+                            Ok(_) => println!("accepted D{nnnn} at record time under standing consent {consent} (non-fork; judge {judge}; override by a superseding Decision or your quoted word)"),
+                            Err(e) => eprintln!("standing consent {consent} declared but the acceptance could not be recorded: {e} - D{nnnn} stays proposed"),
+                        }
+                    } else {
+                        println!("standing consent {consent} declared but github-actors.toml names {} decider(s), not one - D{nnnn} stays proposed; accept with your quoted word (D0289)", deciders.len());
+                    }
+                }
+                (Some(consent), false) => println!("a FORK (carries options): stays proposed under standing consent {consent} - the human chooses; surface it (decision-surfacing) and accept with their quoted word (D0289)."),
+                (None, _) => println!("accept later via an explicit human sign-off (a quoted word in chat under the D0192 delegation, the console, or your terminal)."),
+            }
             0
         }
         Err(e) => {
