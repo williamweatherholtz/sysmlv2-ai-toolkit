@@ -28,10 +28,10 @@ impl GuardReport {
     /// Print the human report (warnings, then violations, then a summary line).
     pub fn print(&self) {
         for w in &self.warnings {
-            println!("  WARN  {w}");
+            println!("  {}  {w}", crate::color::warn("WARN"));
         }
         for v in &self.violations {
-            println!("  ERROR {v}");
+            println!("  {} {v}", crate::color::fail("ERROR"));
         }
         // SELF-CONTRADICTION CHECK (issue180). A guard cannot find a violation in a population of
         // zero, so `0 scanned, 1 violation(s)` means the guard is not reporting what it examined. Three
@@ -41,7 +41,8 @@ impl GuardReport {
         // so it holds for every guard added after this one without anybody remembering to.
         if self.scanned == 0 && !self.violations.is_empty() {
             println!(
-                "  WARN  guard `{}` reports {} violation(s) against a scan count of 0 - it is not                  reporting the population it examined (issue180)",
+                "  {}  guard `{}` reports {} violation(s) against a scan count of 0 - it is not                  reporting the population it examined (issue180)",
+                crate::color::warn("WARN"),
                 self.name,
                 self.violations.len()
             );
@@ -49,7 +50,7 @@ impl GuardReport {
         println!(
             "[guard:{}] {} — {} scanned, {} warning(s), {} violation(s)",
             self.name,
-            if self.ok() { "PASS" } else { "FAIL" },
+            crate::color::verdict(self.ok()),
             self.scanned,
             self.warnings.len(),
             self.violations.len()

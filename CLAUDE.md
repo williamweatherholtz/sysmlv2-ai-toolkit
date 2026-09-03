@@ -234,6 +234,9 @@ keel gate --workspace  # the COMMIT tier for a repo holding several projects: ev
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
 
+Verdicts are coloured on a terminal — PASS green, FAIL/ERROR red, WARN yellow, a registered control defect magenta
+(D0287); piped output is bare text, `NO_COLOR` turns it off, `KEEL_COLOR=1|0` forces it either way.
+
 **Honest-state gates, not self-assurance gates (D0098).** A commit gate enforces only that the recorded
 model is truthful, well-formed, and traceable — **never** that the work is complete. Completeness is a
 non-blocking burndown surfaced in `orient`. Don't fake a pass; don't block recording true state.

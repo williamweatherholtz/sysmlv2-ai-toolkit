@@ -243,14 +243,17 @@ fn cmd_validate(args: &[String]) -> i32 {
     }
 
     if report.is_clean() {
-        println!("{} tracking file(s) validated clean.", report.validated);
+        println!("{}", keel_cli::color::pass(&format!("{} tracking file(s) validated clean.", report.validated)));
         0
     } else {
         eprintln!(
-            "{} tracking file(s) validated — {} parse error(s), {} semantic diagnostic(s).",
-            report.validated,
-            report.errors.len(),
-            report.diagnostics.len()
+            "{}",
+            keel_cli::color::fail(&format!(
+                "{} tracking file(s) validated — {} parse error(s), {} semantic diagnostic(s).",
+                report.validated,
+                report.errors.len(),
+                report.diagnostics.len()
+            ))
         );
         1
     }
@@ -1194,10 +1197,10 @@ fn cmd_check_engine(args: &[String]) -> i32 {
         }
     }
     if diags.is_empty() {
-        println!(".engine instance files validated clean (kernel-free; D0112 phase 2).");
+        println!("{}", keel_cli::color::pass(".engine instance files validated clean (kernel-free; D0112 phase 2)."));
         0
     } else {
-        eprintln!("{} .engine semantic diagnostic(s).", diags.len());
+        eprintln!("{}", keel_cli::color::fail(&format!("{} .engine semantic diagnostic(s).", diags.len())));
         1
     }
 }
@@ -1498,7 +1501,7 @@ fn cmd_guard(args: &[String]) -> i32 {
         for r in &reports {
             r.print();
             if let Some(d) = defects.get(r.name) {
-                println!("{}", d.note(r.name));
+                println!("{}", keel_cli::color::defect(&d.note(r.name)));
             }
             all_ok &= r.ok();
         }
@@ -1519,7 +1522,7 @@ fn cmd_guard(args: &[String]) -> i32 {
                 warned.join(", ")
             )
         };
-        println!("[guard] {}{tail}", if all_ok { "ALL PASS" } else { "FAILED" });
+        println!("[guard] {}{tail}", if all_ok { keel_cli::color::pass("ALL PASS") } else { keel_cli::color::fail("FAILED") });
         return i32::from(!all_ok);
     };
     let Some(report) = keel_cli::guards::run_one(name, &root) else {

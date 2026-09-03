@@ -4,7 +4,9 @@
 and warning-only (visible every commit, never blocking). `keel version` reports the exact split
 computed from the enforced set — read it there rather than here, so the number has one home.
 
-Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands.
+Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the commands. On a terminal the
+verdict words are coloured (PASS green, FAIL/ERROR red, WARN yellow, DEFECT magenta; D0287) — piped output is
+bare text, `NO_COLOR` disables, `KEEL_COLOR=1|0` forces.
 
 ## Hard-blocking
 
