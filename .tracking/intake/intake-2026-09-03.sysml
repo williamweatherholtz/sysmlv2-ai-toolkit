@@ -45,4 +45,24 @@ package ProjectIntake20260903 {
         :>> triageNote = "Colour only when stdout is a terminal (NO_COLOR and KEEL_COLOR respected), so every text-parsing consumer - hooks, CI, tests, land - sees the same bytes; the words never change. Chat cannot carry colour, so the tool is where it lives.";
     }
     #DerivedFrom dependency from us074 to st072;
+
+    part st073 : Statement {
+        :>> id = "e4507698-fe31-4acc-9d14-421f56b5e487";
+        :>> title = "Remove exec-summary as a process";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "remove exec-summary as a process";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
+
+    part us075 : UserStory {
+        :>> id = "4f168112-eb13-47aa-8b74-04c0d00e8d9d";
+        :>> title = "The engine does not carry exec-summary";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "the owner of the engine";
+        :>> iWant = "the exec-summary process, skill, template and unit record gone from the engine, with decision-surfacing rendering its own page";
+        :>> soThat = "one process states how a decision reaches me, and the engine ships nothing it does not use";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "Executed as D0288 the same hour: files deleted, unit record and id removed, five dependents rewritten with no tombstones; the library's published copy at v3 is untouched and said so.";
+    }
+    #DerivedFrom dependency from us075 to st073;
 }

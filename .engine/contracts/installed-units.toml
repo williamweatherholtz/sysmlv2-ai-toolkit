@@ -158,12 +158,6 @@ version = 4
 file.processes__SL__render.sysml = "be4d5490fde454cb"
 file.skills__SL__render__SL__SKILL.md = "57d12d336da8c2ff"
 file.skills__SL__render__SL__registry.sysml = "f842d5bdbaccf7ef"
-[a2428932-77c0-4714-9d61-c41d2857811f]
-process = "exec-summary"
-version = 3
-file.processes__SL__exec-summary.sysml = "75cda8248453b8f4"
-file.skills__SL__exec-summary__SL__SKILL.md = "f50390dde7294f08"
-file.skills__SL__exec-summary__SL__registry.sysml = "64f218ec3c881f20"
 [63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
 process = "library-stewardship"
 version = 2

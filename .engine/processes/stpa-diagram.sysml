@@ -90,7 +90,7 @@ package ProcessStpaDiagram {
         :>> title = "Look at it before anyone else does";
         :>> triggerCondition = "The SVG is rendered.";
         :>> actionText = "Render the SVG in a browser and read it back against the five properties above - axis, direction, right angles with nothing shared, labels that state what passes, hops at crossings - at full size and at a zoomed crop of the densest region. The tool enforces the properties by construction, but a label can still hide a line it was placed over or float past a short channel; those are the two defects the first review found, and they are visible only by looking. Fix in the tool, never by hand-editing the SVG.";
-        :>> producedArtifact = "A reviewed diagram, embedded where the human reads (the exec-summary page or the console).";
+        :>> producedArtifact = "A reviewed diagram, embedded where the human reads (the console or the published page).";
         :>> owner = Owner::ai;
     }
 }

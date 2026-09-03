@@ -30,7 +30,7 @@ keel show control-structure . | python .engine/tools/stpa_diagram.py --out diagr
    region; check the five properties. The two defects construction cannot rule out are a label hiding
    a line it was placed over and a label floating past a short channel — both were found only by
    looking. Fix in the tool; never edit the SVG.
-4. Embed the SVG where the human reads: the exec-summary page or the console. The SVG uses CSS
+4. Embed the SVG where the human reads: the console or the published page. The SVG uses CSS
    variables (`--ctl --fb --proc --ctl-bg --proc-bg --panel --ink --muted`) so the host page owns the
    palette and dark mode.
 

@@ -17,9 +17,10 @@ session. Each report was true and each was buried under the work that produced i
    priority order I chose. **Not** pending: anything I decided and can defend, or a question I can
    answer by reading the model. *Manufacturing a decision to have something to surface is worse than
    burying one.*
-2. **Render.** Deploy `exec-summary` against the se-templates instance — one tab per decision, each
-   with stake, steelmanned options, honest costs, a recommendation, and what would change it. Run
-   the browser suite; its word budgets have rejected my drafts three times for good reason.
+2. **Render.** Author one published page (an Artifact) with one section per pending decision — the
+   stake, the options each with a steelmanned case and an honest cost, my recommendation, and what
+   would change my mind. Republish the same file path so the URL stays one queue. The console deck
+   (`keel deck`) carries the same pending set.
 3. **Ground each tab so it can be judged independently.** The failure this ends, in their words:
    *"I get some semblance of 'we need Need1 & Need2 judged. WHAT DECIDES IT: picking which ones are
    good.'"* That is circular. Every tab carries, **inline**:
@@ -45,5 +46,4 @@ session. Each report was true and each was buried under the work that produced i
 
 ## Removal path
 
-Delete this skill + registry + the process file. Nothing else depends on it; the exec-summary skill
-and template are independent and stay.
+Delete this skill + registry + the process file. Nothing else depends on it.

@@ -32,9 +32,9 @@ package ProcessDecisionSurfacing {
 
     action dsRender : ProcessStep {
         :>> id = "d0269a01-0831-4d7e-9b2c-3e4f5a6b7c8f";
-        :>> title = "Put them in the exec-summary artifact, one tab each";
+        :>> title = "Put them on one published page, one decision per section";
         :>> triggerCondition = "At least one decision is pending.";
-        :>> actionText = "Deploy the `exec-summary` skill against the se-templates instance: one tab per decision, each with its stake, its options carrying a STEELMANNED case and an honest cost, my recommendation, and what would change my mind. Run the browser suite - the template's word budgets and contract checks are what keep the page readable, and they have rejected my drafts three times for good reason. Then publish it as an ARTIFACT so it has a durable URL. UPDATE the existing artifact by republishing the same file path rather than creating a second one: a decision page that forks into several links is buried again, differently.";
+        :>> actionText = "Author the page directly and publish it as an ARTIFACT so it has a durable URL: one section per pending decision, each with its stake, its options carrying a STEELMANNED case and an honest cost, my recommendation, and what would change my mind. Keep it short - a decision the human cannot read in a minute is one they will not judge. UPDATE the existing artifact by republishing the same file path rather than creating a second one: a decision page that forks into several is a queue nobody can find the head of. The console deck (keel deck) carries the same pending decisions for a human who prefers it.";
         :>> producedArtifact = "One artifact URL holding every open decision.";
         :>> owner = Owner::ai;
     }

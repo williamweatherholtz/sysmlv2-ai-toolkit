@@ -16,7 +16,7 @@ Deploys `.engine/processes/library-stewardship.sysml` (D0259). The mechanics (`k
    adaptation back if it is generally right.
 4. **Reusable skill → UNIT, before folklore.** No process definition = no catalogue = travels
    nowhere (issue245). Process file + engine-side skill + registry + extras (repo files only), then
-   publish. exec-summary is the worked example.
+   publish. decision-channel is the worked example.
 5. **Publishing back carries the unit's identity — you never mint a new one** (D0272). A unit you
    IMPORTED is filed under the library's id in `installed-units.toml`, and that is its identity
    forever; export reads it from there, not from the ids this project minted. So the version you

@@ -1423,15 +1423,15 @@ mod tests {
     #[test]
     fn a_declared_extra_restores_at_the_root_and_the_dot_fallback_survives() {
         let root = Path::new("/proj");
-        let extras = vec!["templates/exec-summary/exec-summary.html".to_string()];
+        let extras = vec!["templates/brief/brief.html".to_string()];
         assert_eq!(
-            super::restore_dst_with(root, Path::new("templates/exec-summary/exec-summary.html"), &extras),
-            root.join("templates/exec-summary/exec-summary.html"),
+            super::restore_dst_with(root, Path::new("templates/brief/brief.html"), &extras),
+            root.join("templates/brief/brief.html"),
             "a DECLARED extra lands where it lived — residence travels with the bundle, never guessed"
         );
         assert_eq!(
-            super::restore_dst_with(root, Path::new("processes/exec-summary.sysml"), &extras),
-            root.join(".engine/processes/exec-summary.sysml"),
+            super::restore_dst_with(root, Path::new("processes/brief.sysml"), &extras),
+            root.join(".engine/processes/brief.sysml"),
             "an engine file still lands under .engine/"
         );
         assert_eq!(
