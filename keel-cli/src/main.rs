@@ -3989,9 +3989,30 @@ fn cmd_accept(args: &[String]) -> i32 {
             .iter()
             .any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()));
         if agent_marked && !std::io::stdin().is_terminal() {
-            eprintln!("keel accept: this session carries agent-environment markers and no interactive terminal (D0178/K6).");
-            eprintln!("  Acceptance is the human's own act: run `keel accept` from YOUR terminal, or accept from the console approve queue / the deck.");
-            return 1;
+            // D0289: the channel layer HONOURS the declared recording delegation (D0192 option A). When
+            // attestation-policy.toml delegates the RECORDING of acceptance to the agent, the human's
+            // quoted words ARE the channel - the same quote receipt the substance rule demands after
+            // the fact is demanded here before the write. The human's words, 2026-09-03: "i want an
+            // exception for user text that was quoted to be authoritative ... until we have a better
+            // non-local authoritative channel". Withdraw by deleting the delegation line; this arm
+            // then refuses exactly as before.
+            let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+            let delegation = keel_cli::activation::recording_delegation(&root, "decisionAcceptance");
+            let note_quotes = flag(args, "note").is_some_and(|n| keel_cli::view::note_quotes_human(&n));
+            match (delegation, note_quotes) {
+                (Some(d), true) => {
+                    eprintln!("keel accept: recording the human's acceptance under delegation {d} - the note quotes their words (D0289).");
+                }
+                (Some(d), false) => {
+                    eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but the note must QUOTE their words verbatim - a single-quoted span of at least ten characters, e.g. --note \"their words: 'yes, accept it'\" - or cite their deck/console/GitHub gesture (D0192/D0289).");
+                    return 1;
+                }
+                (None, _) => {
+                    eprintln!("keel accept: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
+                    eprintln!("  Acceptance is the human's own act: run `keel accept` from YOUR terminal, or accept from the console approve queue / the deck.");
+                    return 1;
+                }
+            }
         }
     }
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));

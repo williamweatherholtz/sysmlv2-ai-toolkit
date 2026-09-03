@@ -24,6 +24,17 @@ use crate::json::Json;
 // existing `crate::view::X` path valid - callers are untouched by design.
 mod checks;
 pub mod control_structure;
+
+/// Does an acceptance note carry the human's words as a quote receipt (D0192)?
+///
+/// A single-quoted span of at least ten characters, or a named human-surface gesture (deck, console,
+/// GitHub comment). The same
+/// predicate the `delegatedAcceptanceSubstanceRule` applies after the fact, exposed so `keel accept`
+/// can apply it BEFORE writing (D0289) instead of writing a record the gate will refuse.
+#[must_use]
+pub fn note_quotes_human(text: &str) -> bool {
+    checks::quotes_conversational_words(text)
+}
 mod critique;
 mod knowledge;
 mod reports;

@@ -249,7 +249,7 @@ fn latest_result_full(model: &Model, v: &str) -> Option<(String, String, String)
 /// Does an acceptance record carry its channel evidence (D0192 OPTION A)? True on a single-quoted
 /// span of at least 10 characters (the human's verbatim conversational words) or a named human
 /// surface gesture (deck/console).
-fn quotes_conversational_words(text: &str) -> bool {
+pub(super) fn quotes_conversational_words(text: &str) -> bool {
     let lower = text.to_lowercase();
     // Named human-surface gestures that ARE the channel evidence: the localhost deck/console, and a
     // GitHub comment citation (issue235). A GitHub comment is 2FA-authenticated, server-timestamped,

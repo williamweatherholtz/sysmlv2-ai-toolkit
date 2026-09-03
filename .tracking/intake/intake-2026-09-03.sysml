@@ -65,4 +65,24 @@ package ProjectIntake20260903 {
         :>> triageNote = "Executed as D0288 the same hour: files deleted, unit record and id removed, five dependents rewritten with no tombstones; the library's published copy at v3 is untouched and said so.";
     }
     #DerivedFrom dependency from us075 to st073;
+
+    part st074 : Statement {
+        :>> id = "e6271ffc-3ebc-4b3d-ade4-392ebbb253ed";
+        :>> title = "Quoted user text is authoritative for acceptance - an explicit exception until a better non-local channel exists";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "i want an exception for user text that was quoted to be authoritative.  yes i know AI could misquote me, but they could go modify the keel files also and they're not doing that.  so permit it - workflow is awful if i need to go to terminal to type acceptance directly on everything.  until we have a better non-local authoritative channel for providing feedback that isn't github issues, i just want to have that exception in place";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
+
+    part us076 : UserStory {
+        :>> id = "be390b82-0c69-4a93-83e4-1737141d5935";
+        :>> title = "The accept command honours the recording delegation the policy already declares";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "the human who accepts decisions in chat";
+        :>> iWant = "an acceptance I give in chat, quoted verbatim, to be recordable by the agent without my going to a terminal or GitHub";
+        :>> soThat = "the workflow stops stalling on a gesture the policy stopped requiring on 2026-08-22";
+        :>> implication = ImplicationKind::implementationChange;
+        :>> triageNote = "The delegation already existed (D0192 option A, attestation-policy.toml decisionAcceptance.delegatedRecording) and the substance rule already demanded the quote; only cmd_accept's channel layer (D0178/P1.3) refused every agent session regardless. D0289 makes the command honour the declared policy: quoted note -> recorded citing the delegation; unquoted -> refused and told to quote; delegation withdrawn -> refused as before. The human's stated limit is D0192's stated limit, and the withdrawal is one deleted line.";
+    }
+    #DerivedFrom dependency from us076 to st074;
 }
