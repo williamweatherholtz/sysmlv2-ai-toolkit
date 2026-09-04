@@ -793,4 +793,59 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcTtyAcceptCitesTheGesture to issue359;
+
+    part issue360 : Issue {
+        :>> id = "2d871d6a-bc1e-4872-b2f7-7078cc74c001";
+        :>> title = "keel land has no evidence the suite ran at HEAD: a sprint landed on guards alone and CI was red for twenty minutes on a test the suite runs locally";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "2026-09-02: sprint 521 (the stpa-diagram process) was landed after validate and guards but WITHOUT the full suite; the suite had last run at sprint 520. CI failed twenty minutes later on adoption_check_can_fail: the shipped process named a tool the scaffold did not ship - a test the suite runs locally in seconds. Nothing refused the land: keel land gates validate and guards, not the deliverable's tests, and no receipt records whether the suite ran on the tree being pushed. CI caught it, and CI is detective (branch protection requires no status check - computed, keel show control-structure). Recorded in the fix commit's message only, until now. FIX: dcLandRequiresASuiteReceipt.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLandRequiresASuiteReceipt to issue360;
+
+    part issue361 : Issue {
+        :>> id = "871a1757-0a84-436d-ac61-99d521b29792";
+        :>> title = "Six enforced guards had no catalogue row and nothing checked the catalogue was complete (control added 2026-09-02; Issue recorded late)";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-09-02 while authoring the CLI facts: six enforced guards (manifest-key-portability, control-map-reconciled, sprint-closure, untrusted-routing, control-defect-registry, cli-surface-declared) had no row in .engine/docs/guards.md, the file that calls itself the catalogue - five of them older than a week. doc-guard-count polices the total-count claim and nothing policed the rows. Fixed the same day with the rows and a test (guard_catalogue_tests::every_guard_has_a_catalogue_row) that fails the build on the next omission - the CONTROL half of D0047 - but no Issue was recorded, which is the RECORD half. Recorded now; the resolver is the sprint that fixed it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcCliCommandFactsAuthored to issue361;
+
+    part issue362 : Issue {
+        :>> id = "77dea60d-488b-48ef-97d2-37d3d1669a1e";
+        :>> title = "A fresh scaffold ships this repository's standing consent and recording delegations as its own policy";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-09-03 (sprint 527 retro, recorded there as prose and nowhere else): keel init ships attestation-policy.toml with THIS repository's grants in it - standingConsent = d0207 and the two delegatedRecording lines, each quoting the owner's words from August - so a fresh project declares a standing consent and two recording delegations nobody granted it. Inert today only because the scaffold also declares no decider (two absences cancelling). The D0219 class: project data shipped as engine data. FIX: dcScaffoldShipsNoGrants.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcScaffoldShipsNoGrants to issue362;
+
+    part issue363 : Issue {
+        :>> id = "409e6d40-d7f2-4620-99de-e4a5137fa41b";
+        :>> title = "record decision cannot declare what a Decision supersedes or derives from, so a reversing Decision lands edgeless";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found 2026-09-03 (sprint 526 retro, prose only): D0289 reversed layer 3 of D0178 and landed with no #Supersede edge, no dependency on D0192, no #DerivedFrom - the human asked whether it had to be superseded, which is how the gap was seen. record decision has no way to declare what a Decision supersedes or where it came from; decision-requirement-link warns only when the prose names an item by id. FIX: dcRecordDecisionDeclaresSupersedes.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecordDecisionDeclaresSupersedes to issue363;
+
+    part issue364 : Issue {
+        :>> id = "f6b55dfb-877f-46c3-819f-53ef57adfbb4";
+        :>> title = "retro-backlog under-reports: 'already tracked' is accepted as a justification without any item being checked, so retro findings go untracked";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CONTROL DEFECT (D0278), direction UNDER. The retro-backlog guard (guards.rs RETRO_NO_ITEM_JUSTIFICATIONS) accepts the phrase 'already tracked' as a justification for a retro that adds no item, without checking that anything tracks the finding. Established against the source, guards.rs:1611 and :1681: the justification match is a substring test and consults no item. INVALIDATES: every retro-backlog PASS on a retro carrying that phrase. Concretely observed this week: sprint 526's retro said the supersede-field gap 'belongs to issue336' (it does not; issue336 is about ProcessStep predicates) and sprint 527's retro said the scaffold-ships-grants finding 'belongs to dcVerificationByAuthority' (that task's DoD does not mention it) - both passed, and both findings were untracked until the human asked. NOT re-checked across earlier retros: a scan for the phrase is the first step of the fix. Registered in control-defects.toml so every retro-backlog verdict carries the note until fixed. FIX: dcRetroAlreadyTrackedMustName.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRetroAlreadyTrackedMustName to issue364;
 }
