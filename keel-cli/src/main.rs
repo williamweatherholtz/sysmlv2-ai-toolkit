@@ -1830,7 +1830,7 @@ fn cmd_mint(args: &[String]) -> i32 {
 /// engine scaffolds the ceremony record: ids minted, provenance from the bound actor (refused when
 /// absent), placeholders the fast gate rejects. See [`keel_cli::scaffold`].
 fn cmd_new(args: &[String]) -> i32 {
-    const USAGE: &str = "keel new sprint <NUMBER> <slug> --charter <decision> [--points P]";
+    const USAGE: &str = "keel new sprint <NUMBER> <slug> --charter <decision> [--points P] [--fill FILE]";
     if args.first().map(String::as_str) != Some("sprint") {
         eprintln!("usage: {USAGE}");
         return 2;
@@ -1885,6 +1885,30 @@ fn cmd_new(args: &[String]) -> i32 {
             return 1;
         }
     };
+    // issue267/D0301: `--fill FILE` writes the record's PROSE from a `--- key` draft (purpose, dod,
+    // refine, standup, implement, review, closeOut, retro) - the sanctioned path for what a scratchpad
+    // script used to emit, TestResult lines included. The fill writes no result; append-result and
+    // append-gate-result are the only writers of verdicts.
+    if let Some(fill_path) = flag(rest, "fill") {
+        let fill = match decision_fields_from_file(&fill_path) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("keel new sprint: {e}");
+                return 2;
+            }
+        };
+        return match keel_cli::scaffold::sprint_filled(&root, number, slug, &charter, points, &actor, &fill) {
+            Ok(path) => {
+                println!("scaffolded and filled -> {}", path.display());
+                println!("no result was written: record the DoD with `keel append-result --file {} --task story<Slug> ...` and gates with `append-gate-result`", path.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("keel new sprint: {e}");
+                1
+            }
+        };
+    }
     match keel_cli::scaffold::sprint(&root, number, slug, &charter, points, &actor) {
         Ok(path) => {
             println!("scaffolded -> {}", path.display());

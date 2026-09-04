@@ -22,7 +22,7 @@ human's acceptance happens once per sitting at the sprint review, not here.
 ## Behavioral Instructions
 
 1. **Verify DoD is complete:**
-   - The sprint story's `DoDR1` TestResult is recorded `outcome = pass`.
+   - The sprint story's `DoDR1` TestResult is recorded `outcome = pass` — by `keel append-result --file <sprint> --task story<Slug> --evidence "<what you ran>"`, never by a script writing the line (D0301/issue267); the record itself comes from `keel new sprint ... --fill FILE`.
    - The `DoDR1` is appended to the backlog (`DeliveryRun`/`NextWork`).
    - All earlier phase gates (refine/standup/implement/review) are recorded — the
      ceremony-ordering guard (D0047) enforces no out-of-order closeOut.

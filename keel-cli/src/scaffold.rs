@@ -35,6 +35,46 @@ const GATES: [(&str, &str, &str); 6] = [
 /// A used sprint number or existing file, a malformed slug, an unknown charter Decision, or an io
 /// failure — each as a message naming the refusal, because every one is a caller mistake this
 /// command exists to catch before it becomes a recorded fact.
+/// The sections a filled sprint needs (issue267 / D0301): the purpose line, the story's `DoD`, and one
+/// prose block per ceremony gate. Keys as the `--- key` draft format spells them.
+pub const FILL_KEYS: [&str; 8] = ["purpose", "dod", "refine", "standup", "implement", "review", "closeOut", "retro"];
+
+/// Scaffold a sprint with its prose already in place - the write path for sprint records (issue267).
+///
+/// Every ceremony record used to be filled by a scratchpad script emitting `TestResult` lines
+/// directly, bypassing actor validation, the write lock, the confirmation refusal and the evidence
+/// receipt, and double-stamping results the API wrote. This writes PROSE ONLY: the purpose, the `DoD`
+/// text and the six gates' text, sanitised like every other API field. It writes NO `TestResult` -
+/// every verdict comes later from `append-result` / `append-gate-result`, so there is one write path
+/// and one result per test. A missing or empty section is REFUSED by name rather than left as a
+/// placeholder the fast gate would catch later.
+///
+/// # Errors
+/// Everything `sprint` refuses, plus a missing or empty fill section.
+pub fn sprint_filled(
+    root: &Path,
+    number: u32,
+    slug: &str,
+    charter: &str,
+    points: u32,
+    actor: &str,
+    fill: &std::collections::BTreeMap<String, String>,
+) -> Result<PathBuf, String> {
+    let missing: Vec<&str> = FILL_KEYS.iter().copied().filter(|k| fill.get(*k).is_none_or(|v| v.trim().is_empty())).collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "fill is missing {}: a sprint record with a placeholder gate is not a record. Sections: {}",
+            missing.join(", "),
+            FILL_KEYS.join(", ")
+        ));
+    }
+    sprint_with(root, number, slug, charter, points, actor, Some(fill))
+}
+
+/// Scaffold a sprint's ceremony record with placeholders (see `sprint_filled` for the filled form).
+///
+/// # Errors
+/// See `sprint_with`.
 pub fn sprint(
     root: &Path,
     number: u32,
@@ -42,6 +82,23 @@ pub fn sprint(
     charter: &str,
     points: u32,
     actor: &str,
+) -> Result<PathBuf, String> {
+    sprint_with(root, number, slug, charter, points, actor, None)
+}
+
+/// The text of one field: the fill's sanitised prose when present, else the placeholder.
+fn field(fill: Option<&std::collections::BTreeMap<String, String>>, key: &str, placeholder: &str) -> String {
+    fill.and_then(|f| f.get(key)).map_or_else(|| placeholder.to_string(), |v| crate::write::sanitize_field(v))
+}
+
+fn sprint_with(
+    root: &Path,
+    number: u32,
+    slug: &str,
+    charter: &str,
+    points: u32,
+    actor: &str,
+    fill: Option<&std::collections::BTreeMap<String, String>>,
 ) -> Result<PathBuf, String> {
     if !slug.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         || !slug.chars().all(|c| c.is_ascii_alphanumeric())
@@ -80,7 +137,8 @@ pub fn sprint(
     let mut t = String::new();
     let _ = writeln!(
         t,
-        "// ProjectDeliveryS{number} — Sprint {number}: {PLACEHOLDER} (one-line purpose). EXECUTE. {points} pts."
+        "// ProjectDeliveryS{number} — Sprint {number}: {}. EXECUTE. {points} pts.",
+        field(fill, "purpose", &format!("{PLACEHOLDER} (one-line purpose)"))
     );
     let _ = writeln!(t, "package ProjectDeliveryS{number} {{");
     for imp in ["EngineElement", "EngineWork", "EngineVerification", "EngineRelationships"] {
@@ -89,7 +147,7 @@ pub fn sprint(
     let _ = writeln!(t, "\n    #CharteredBy dependency from {slug}Story to {charter};\n");
     let _ = writeln!(t, "    part {slug}Story : Story {{");
     let _ = writeln!(t, "        :>> id = \"{}\";", gen_uuid());
-    let _ = writeln!(t, "        :>> title = \"Sprint {number}: {PLACEHOLDER} ({points} pts)\";");
+    let _ = writeln!(t, "        :>> title = \"Sprint {number}: {} ({points} pts)\";", field(fill, "purpose", PLACEHOLDER));
     let _ = writeln!(
         t,
         "        :>> createdAt = \"{today}\"; :>> createdBy = \"{actor}\"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = \"{actor}\"; :>> estimatedPoints = {points};"
@@ -99,15 +157,17 @@ pub fn sprint(
     let _ = writeln!(t, "        action story{cap};");
     let _ = writeln!(
         t,
-        "        verification story{cap}DoD : Test {{ :>> id = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"{PLACEHOLDER}: DELIVERED BACKLOG ITEMS: <items>. <what done means, verified how>.\"; }}",
-        gen_uuid()
+        "        verification story{cap}DoD : Test {{ :>> id = \"{}\"; :>> method = VerificationMethod::test; :>> procedureText = \"{}\"; }}",
+        gen_uuid(),
+        field(fill, "dod", &format!("{PLACEHOLDER}: DELIVERED BACKLOG ITEMS: <items>. <what done means, verified how>."))
     );
     let _ = writeln!(t, "    }}\n");
     for (g, method, title) in GATES {
         let _ = writeln!(
             t,
-            "    verification {slug}{g}Gate : Test {{ :>> id = \"{}\"; :>> title = \"Sprint {number} {title}\"; :>> createdAt = \"{today}\"; :>> createdBy = \"{actor}\"; :>> method = VerificationMethod::{method}; :>> procedureText = \"{PLACEHOLDER}\"; }}",
-            gen_uuid()
+            "    verification {slug}{g}Gate : Test {{ :>> id = \"{}\"; :>> title = \"Sprint {number} {title}\"; :>> createdAt = \"{today}\"; :>> createdBy = \"{actor}\"; :>> method = VerificationMethod::{method}; :>> procedureText = \"{}\"; }}",
+            gen_uuid(),
+            field(fill, &key_for(g), PLACEHOLDER)
         );
     }
     let _ = writeln!(t, "}}");
@@ -115,6 +175,15 @@ pub fn sprint(
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     crate::write::write_atomic(&path, &t).map_err(|e| e.to_string())?;
     Ok(path)
+}
+
+/// The fill key for a gate: `Refine` -> `refine`, `CloseOut` -> `closeOut`.
+fn key_for(gate: &str) -> String {
+    let mut k = gate.to_string();
+    if let Some(first) = k.get_mut(0..1) {
+        first.make_ascii_lowercase();
+    }
+    k
 }
 
 /// True when `name` is declared `part <name> : Decision` under `.engine/decisions`.
@@ -150,7 +219,36 @@ pub fn today() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{sprint, PLACEHOLDER};
+    use super::{sprint, sprint_filled, PLACEHOLDER};
+
+    /// issue267: the filled scaffold carries every section's prose, no placeholder, and ZERO
+    /// `TestResult`s - verdicts come from the write API alone; a missing section is refused by name.
+    #[test]
+    fn a_filled_sprint_has_prose_everywhere_and_no_result() {
+        let root = std::env::temp_dir().join(format!("keel-fill-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine").join("decisions")).expect("mkdir");
+        std::fs::write(root.join(".engine").join("decisions").join("0001-x.sysml"), "package D1 {\n    part d0001 : Decision { }\n}\n").expect("decision");
+        let mut fill: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+        for k in super::FILL_KEYS {
+            fill.insert(k.to_string(), format!("{k} prose with a \"quote\" inside"));
+        }
+        fill.remove("retro");
+        let err = sprint_filled(&root, 7, "probe", "d0001", 1, "claudeOpus5", &fill).expect_err("missing section refused");
+        assert!(err.contains("retro"), "{err}");
+        fill.insert("retro".to_string(), "no new item - already tracked: d0001".to_string());
+        let path = sprint_filled(&root, 7, "probe", "d0001", 1, "claudeOpus5", &fill).expect("filled");
+        let text = std::fs::read_to_string(&path).expect("read");
+        assert!(!text.contains(PLACEHOLDER), "no placeholder survives a fill:\n{text}");
+        assert!(!text.contains("TestResult"), "a fill writes PROSE ONLY - every verdict comes from the API:\n{text}");
+        for k in ["purpose", "dod", "refine", "standup", "implement", "review", "closeOut"] {
+            assert!(text.contains(&format!("{k} prose with a 'quote' inside")), "{k} prose present and sanitised:\n{text}");
+        }
+        assert!(text.contains("no new item - already tracked: d0001"));
+        let tokens = keel_parser::tokenize(&text, "sprint.sysml").expect("lex");
+        assert!(keel_parser::parse(tokens, "sprint.sysml").is_ok(), "the filled record parses");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     fn temp_root(tag: &str) -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!("keel-scaffold-{tag}"));

@@ -137,7 +137,7 @@ frozen (modify it only by out-of-band Decision).
   stranger; UNDETERMINED **fails closed**. The tier is recorded ON the utterance (`sourceTrust`), and
   guard 56 `untrusted-routing` enforces the ROUTING, never the judgment.
   Deploy the **`github-intake`** skill; D0263/D0264),
-  `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`. Direct file editing is for what the API doesn't cover.
+  `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`, and **`new sprint --fill FILE`** (D0301: a sprint record's prose from a `--- key` draft - purpose, dod, refine, standup, implement, review, closeOut, retro - writing NO result; the DoD verdict is `append-result --file <sprint> --task story<Slug>`, gates `append-gate-result`; a script that emits a `TestResult` line is the issue267 bypass and recurred in sprints 530-542). Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,
   (b) carry its recorded acceptance (who, when, what commit), and (c) validate green before commit.
   Commit messages and memory are **not** decision records. The keystone lock also covers the

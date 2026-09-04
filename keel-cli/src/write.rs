@@ -1278,7 +1278,7 @@ pub fn sanitize_public(v: &str) -> String {
     sanitize_field(v)
 }
 
-fn sanitize_field(v: &str) -> String {
+pub(crate) fn sanitize_field(v: &str) -> String {
     v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 

@@ -1,0 +1,29 @@
+// ProjectDeliveryS543 — Sprint 543: sprint records are written by keel new sprint --fill, and verdicts only by the write API - this record is the first. EXECUTE. 2 pts.
+package ProjectDeliveryS543 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from sprintFillStory to d0301;
+
+    part sprintFillStory : Story {
+        :>> id = "f53d905a-c0dc-42ef-95fa-d59217ff557f";
+        :>> title = "Sprint 543: sprint records are written by keel new sprint --fill, and verdicts only by the write API - this record is the first (2 pts)";
+        :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 2;
+    }
+
+    action def DeliveryRunS543 {
+        action storySprintFill;
+        verification storySprintFillDoD : Test { :>> id = "1e88a8cc-bb0b-4d84-89ee-91f1644ce0e4"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcSprintFillIsAWritePath (resolves issue267). DONE: keel new sprint gains --fill FILE, a --- key draft with eight sections (purpose, dod, refine, standup, implement, review, closeOut, retro) rendered into the scaffold with every field sanitised and a missing section refused by name; the fill writes zero TestResults; scaffold::sprint_filled is unit-tested for prose-everywhere, no-placeholder, no-result, parses; the cli fact and commands.sysml carry the flag; CLAUDE.md and the sprint-closeout skill name the path. VERIFY: THIS record was produced by keel new sprint 543 sprintFill --charter d0301 --fill; its only TestResult is the one append-result writes after this text; guard attestation-substance passes over it; the duplicate-result count for it is zero."; }
+        // RAN: keel new sprint 543 sprintFill --charter d0301 --fill -> 0 TestResults, 0 placeholders; cargo test --lib scaffold 4/4; clippy 0; cli-surface-declared 102 PASS; this result is the file's only one
+        part storySprintFillDoDR1 : TestResult { :>> id = "1dece151-8ad6-4aa0-838e-feb282c16aa4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bd996ee"; :>> judgedAt = "2026-09-04"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification sprintFillRefineGate : Test { :>> id = "c6de5322-86e5-4127-8e2b-c91b8e6c97ea"; :>> title = "Sprint 543 refine gate (DoR)"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY once the existing scaffold was read: keel new sprint already minted ids and wrote zero results, so the gap was exactly one flag - the prose had no sanctioned way in, and a script was the shortest path. The DoD's own author wrote sprints 530 through 542 by that script this week, which made the item's priority obvious rather than arguable."; }
+    verification sprintFillStandupGate : Test { :>> id = "f9ff073c-f9aa-42f5-b97c-002ebd70c8bf"; :>> title = "Sprint 543 standup gate"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "ONE CHOICE: the fill reuses the --- key draft format record decision --from already takes, so an author learns one file shape for two commands and no prose ever crosses a shell argument. Second: a missing section is refused at fill time, by name, rather than left as a placeholder for the fast gate to find later."; }
+    verification sprintFillImplementGate : Test { :>> id = "e286a1cb-2a12-4f46-a62a-3a6220710f01"; :>> title = "Sprint 543 implement gate"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: sprint_filled renders through one field() helper for the header, the story title, the DoD and the six gates; a unit test asserts prose everywhere, no placeholder, no TestResult, sanitised quotes and a clean parse; three clippy items (backticks, map_or_else). The first live use is this file."; }
+    verification sprintFillReviewGate : Test { :>> id = "4b1b7789-f1f3-4fdf-bbef-b5c9ff8781b0"; :>> title = "Sprint 543 review gate — three passes per D0172"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) DOES THE FILL EVER WRITE A VERDICT: no - grep TestResult over the filled output is asserted empty in the unit test and on this record before append-result ran. (2) IS THE OLD PATH CLOSED OR MERELY DISCOURAGED: discouraged - a script can still write a line; what closes it is guard 52 finding a result the API never wrote, which is the existing control, and the sanctioned path now being shorter than the script. (3) WHAT ABOUT THE THIRTEEN RECORDS WRITTEN BY SCRIPT THIS WEEK: each carries one result with a receipt; they stand, because rewriting them would be the D0129 class."; }
+    verification sprintFillCloseOutGate : Test { :>> id = "6e598263-b24a-4168-8db4-74fc61a42e9e"; :>> title = "Sprint 543 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. issue267 resolves; this record is its own receipt."; }
+    verification sprintFillRetroGate : Test { :>> id = "6fb92c60-0d0d-4834-b87c-46626f35c239"; :>> title = "Sprint 543 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: the recurrence of issue267 in my own hands is recorded in d0301's context and closed by the flag; the residual - a script CAN still emit a line - is guard 52's standing finding class and needs no new item. The lesson is d0054's: when the sanctioned path is longer than the shortcut, the shortcut wins, and the fix is the path, not the reminder."; }
+}
