@@ -147,13 +147,46 @@ fn is_keel_hook(h: &serde_json::Value) -> bool {
         .is_some_and(|c| c.contains("hook user-prompt") || c.contains("hook post-edit") || c.contains("hook stop") || c.contains("hook pre-bash") || c.contains("hook subagent-stop") || c.contains("hook pre-write") || c.contains("permissionDecision"))
 }
 
-/// Deep-merge the keel-owned subset into `existing` settings. Foreign entries survive untouched;
-/// keel-owned entries are REPLACED (idempotent: merging twice equals merging once).
+/// The one settings key that silences EVERY hook from whichever scope sets it.
+///
+/// Keel's, any plugin's and the user's alike (issue365 / D0296 runs 2 and 5). Claude Code reads it from any file and
+/// hook lists merge across scopes, so a repo-scope `true` beside byte-identical keel entries turns
+/// the whole in-loop tier off while an entry-by-entry drift check reads clean.
+pub const HOOK_KILL_SWITCH: &str = "disableAllHooks";
+
+/// The repo-scope settings files Claude Code reads for a project - both are the agent's to edit.
+pub const REPO_SCOPE_SETTINGS: [&str; 2] = [".claude/settings.json", ".claude/settings.local.json"];
+
+/// Does this settings document silence the hooks? Truthy `disableAllHooks` at top level.
+#[must_use]
+pub fn hooks_silenced(settings: &serde_json::Value) -> bool {
+    settings
+        .get(HOOK_KILL_SWITCH)
+        .is_some_and(|v| v.as_bool() == Some(true) || v.as_str().is_some_and(|s| s.eq_ignore_ascii_case("true")))
+}
+
+/// Does this text - a Write's `content` or an Edit's `new_string` - set the kill switch?
+///
+/// Textual on purpose: a partial Edit is not a JSON document, and a refusal here is cheap.
+#[must_use]
+pub fn text_sets_kill_switch(text: &str) -> bool {
+    let Some(i) = text.find(HOOK_KILL_SWITCH) else { return false };
+    let rest = &text[i + HOOK_KILL_SWITCH.len()..];
+    let rest = rest.trim_start_matches(|c: char| c == '"' || c == '\'' || c == '\\' || c == ':' || c.is_whitespace());
+    rest.starts_with("true")
+}
+
+/// Deep-merge the keel-owned subset into `existing` settings.
+///
+/// Foreign entries survive untouched; keel-owned entries are REPLACED (idempotent: merging twice
+/// equals merging once). The kill switch is keel-owned in the negative - it must be ABSENT - so
+/// `sync-claude` removes it (issue365).
 #[must_use]
 pub fn merge_settings(existing: &serde_json::Value) -> serde_json::Value {
     let mut out = if existing.is_object() { existing.clone() } else { serde_json::json!({}) };
     if let Some(obj) = out.as_object_mut() {
         obj.insert("outputStyle".to_string(), serde_json::json!("keel"));
+        obj.remove(HOOK_KILL_SWITCH);
         if !obj.get("hooks").is_some_and(serde_json::Value::is_object) {
             obj.insert("hooks".to_string(), serde_json::json!({}));
         }
@@ -275,7 +308,19 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     };
     let merged = merge_settings(&existing);
     let mut drift = Vec::new();
-    if existing != merged {
+    // The kill switch is named on its own line: "entries differ" would be true too and would hide
+    // that every hook is off (issue365). settings.local.json is read as well - not keel-generated,
+    // but it silences the hooks from the same repo-scope position.
+    for rel in REPO_SCOPE_SETTINGS {
+        let text = std::fs::read_to_string(root.join(rel)).unwrap_or_default();
+        let doc: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::Value::Null);
+        if hooks_silenced(&doc) {
+            drift.push(format!(
+                "{rel}: {HOOK_KILL_SWITCH} is set - EVERY keel hook is silenced from this repo-scope file (Claude Code reads the key from any scope; issue365/D0296). Remove the key - `keel sync-claude` removes it."
+            ));
+        }
+    }
+    if existing != merged && !hooks_silenced(&existing) {
         drift.push("settings.json: keel-owned entries differ from this binary's generator".to_string());
     }
     // sidecar version stamp
@@ -341,7 +386,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 
 #[cfg(test)]
 mod tests {
-    use super::{keel_hooks, merge_settings, protected_path_command, resolver, PROTECTED_PATHS};
+    use super::{hooks_silenced, keel_hooks, merge_settings, protected_path_command, resolver, sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, PROTECTED_PATHS};
 
     /// D-P0a: five events, every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
     /// and the missing-binary branch is loud and names the install path.
@@ -402,6 +447,35 @@ mod tests {
 
     /// Mixed ownership: a foreign hook group and foreign top-level settings survive the merge
     /// byte-for-byte; merging twice equals merging once (idempotent).
+    /// issue365: the kill switch is stripped on merge, seen as drift on check, and NAMED - not
+    /// folded into the generic "entries differ" line.
+    #[test]
+    fn kill_switch_is_stripped_named_and_detected() {
+        let poisoned = serde_json::json!({"hooks": {}, "disableAllHooks": true, "theirs": 1});
+        assert!(hooks_silenced(&poisoned));
+        let merged = merge_settings(&poisoned);
+        assert!(merged.get(HOOK_KILL_SWITCH).is_none(), "sync removes the kill switch: {merged}");
+        assert_eq!(merged["theirs"], 1, "a foreign entry still survives");
+        assert!(!hooks_silenced(&serde_json::json!({"disableAllHooks": false})));
+        assert!(text_sets_kill_switch(r#"{"hooks": {}, "disableAllHooks": true}"#));
+        assert!(text_sets_kill_switch(r#"\"disableAllHooks\":true"#));
+        assert!(!text_sets_kill_switch(r#"{"disableAllHooks": false}"#));
+        assert!(!text_sets_kill_switch("nothing about hooks"));
+
+        let root = std::env::temp_dir().join(format!("keel-killswitch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+        std::fs::write(root.join(".claude").join("settings.json"), merge_settings(&serde_json::json!({})).to_string()).expect("clean");
+        std::fs::write(root.join(".claude").join("settings.local.json"), r#"{"disableAllHooks": true}"#).expect("local");
+        let report = sync_claude(&root, true).expect("check runs");
+        assert!(
+            report.drift.iter().any(|d| d.starts_with(".claude/settings.local.json") && d.contains(HOOK_KILL_SWITCH)),
+            "the check must NAME the file and the key, got: {:?}",
+            report.drift
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn merge_preserves_foreign_entries_and_is_idempotent() {
         let existing = serde_json::json!({

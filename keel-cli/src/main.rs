@@ -535,6 +535,25 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
         .unwrap_or_default()
         .replace('\\', "/");
     let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("");
+    // The hook kill switch is DENIED in every profile (issue365/D0296): a repo-scope
+    // `disableAllHooks` silences every hook from every scope, and the write asking for it is the
+    // one write no advisory can follow - the advisory would be the first thing switched off.
+    if keel_cli::claude_surface::REPO_SCOPE_SETTINGS.iter().any(|p| path.contains(p)) {
+        let text = ["/tool_input/content", "/tool_input/new_string"]
+            .iter()
+            .filter_map(|ptr| payload.pointer(ptr).and_then(serde_json::Value::as_str))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if keel_cli::claude_surface::text_sets_kill_switch(&text) {
+            let key = keel_cli::claude_surface::HOOK_KILL_SWITCH;
+            println!(
+                "{}",
+                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                    "permissionDecisionReason": format!("[keel] {path} would set {key} - that silences EVERY hook from every scope (issue365/D0296). Refused in all profiles; a hook host changes through a Decision, never by switching the hooks off.")}})
+            );
+            return 0;
+        }
+    }
     // Control plane first (D0179/K7): weakening or redirecting enforcement is approval-gated and,
     // under strict, leaves an orient-visible record — never a quiet config edit.
     if keel_cli::claude_surface::CONTROL_PLANE_PATHS.iter().any(|p| path.contains(p)) {

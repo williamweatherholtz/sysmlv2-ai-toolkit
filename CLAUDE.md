@@ -273,7 +273,7 @@ the edit changed while its pass result stands; `keel hook stop` runs validate + 
 dishonest; `keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) —
 **advisory, never blocking**, and silent unless it has something to say; `keel hook pre-write` guards
 the protected fact surfaces (deny in strict-profile projects, advisory here until P1 lands the tiered
-model — the pure-shell fallback denies when the binary is absent); `keel hook subagent-stop` gates a
+model — the pure-shell fallback denies when the binary is absent; a Write/Edit that sets `disableAllHooks` in a repo-scope settings file is DENIED in every profile, issue365/D0296); `keel hook subagent-stop` gates a
 subagent only when the tree changed during its lifetime. Every hook fire appends one line to the
 machine-local fire-ledger (`.keel/metrics/hooks.jsonl`, D0180) — the single instrumentation path the
 hooks-actually-fired checks read. The whole `.claude/` surface is engine-generated: `keel sync-claude`

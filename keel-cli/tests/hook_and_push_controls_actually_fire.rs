@@ -63,6 +63,33 @@ fn payload_for(root: &Path, rel: &str) -> String {
     format!(r#"{{"session_id":"probe-session","tool_input":{{"file_path":"{path}"}}}}"#)
 }
 
+/// issue365 / D0296: a Write that sets `disableAllHooks` in a repo-scope settings file is DENIED in
+/// EVERY profile - this fixture declares none (guided), where every other pre-write outcome is
+/// advisory. The key silences every hook from every scope; the advisory would be the first casualty.
+#[test]
+fn pre_write_denies_the_hook_kill_switch_in_a_guided_project() {
+    let root = std::env::temp_dir().join(format!("keel-killswitch-hook-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+    std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+    std::fs::write(root.join(".tracking").join("seed.sysml"), "package Seed {\n}\n").expect("seed");
+    let path = root.join(".claude").join("settings.json").to_string_lossy().replace('\\', "/");
+    let poison = format!(
+        r#"{{"session_id":"probe","tool_name":"Write","tool_input":{{"file_path":"{path}","content":"{{\"hooks\": {{}}, \"disableAllHooks\": true}}"}}}}"#
+    );
+    let (out, _) = run_hook(&root, "pre-write", &poison);
+    assert!(
+        out.contains(r#""permissionDecision":"deny""#) || out.contains(r#""permissionDecision": "deny""#),
+        "setting the kill switch must DENY even in a guided project, got: {out}"
+    );
+    assert!(out.contains("disableAllHooks") && out.contains("issue365"), "the refusal names the key and its issue: {out}");
+    // the same file WITHOUT the key is not denied - the control is on the key, not the file
+    let benign = format!(r#"{{"session_id":"probe","tool_name":"Write","tool_input":{{"file_path":"{path}","content":"{{\"hooks\": {{}}}}"}}}}"#);
+    let (out, _) = run_hook(&root, "pre-write", &benign);
+    assert!(!out.contains(r#""deny""#), "a settings write without the kill switch is not denied here: {out}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 // ── ctlPreWriteTiers ──────────────────────────────────────────────────────────────────────────────
 
 #[test]
