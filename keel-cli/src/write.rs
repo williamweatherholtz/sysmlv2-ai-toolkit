@@ -1567,16 +1567,22 @@ fn rewrite_proposed_header(path: &Path) -> Result<(), WriteError> {
 /// # Errors
 /// `WriteError::TaskNotFound` if the decision part or a `proposed` status is not present (already
 /// accepted, or wrong file); `WriteError::Io` on filesystem errors.
+/// `recorded_by` (issue287): WHO RECORDED the acceptance, written as the result's `createdBy` and
+/// distinct from `judged_by`, the human whose word it is. Before this, nothing recorded the recorder,
+/// so `delegatedAcceptanceSubstanceRule` could not tell an acceptance the human typed into the console
+/// from one an AI recorded on their behalf - and demanded the human quote themselves. Never defaulted:
+/// the caller knows who is running.
 pub fn accept_decision(
     path: &Path,
     decision: &str,
     sha: &str,
     judged_at: &str,
     judged_by: &str,
+    recorded_by: &str,
     note: &str,
 ) -> Result<String, WriteError> {
     // issue185: the whole read-modify-write under one lock.
-    with_file_lock(path, || accept_decision_locked(path, decision, sha, judged_at, judged_by, note))
+    with_file_lock(path, || accept_decision_locked(path, decision, sha, judged_at, judged_by, recorded_by, note))
 }
 
 fn accept_decision_locked(
@@ -1585,6 +1591,7 @@ fn accept_decision_locked(
     sha: &str,
     judged_at: &str,
     judged_by: &str,
+    recorded_by: &str,
     note: &str,
 ) -> Result<String, WriteError> {
     refuse_ai_judgment(path, judged_by, "accepting a Decision")?;
@@ -1603,10 +1610,11 @@ fn accept_decision_locked(
     let u1 = gen_uuid();
     let u2 = gen_uuid();
     let note_c = sanitize_field(note);
+    let recorded_by_c = sanitize_field(recorded_by);
     let block = format!(
         "\n    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)\n\
          \x20   verification {decision}Accept : Test {{ :>> id = \"{u1}\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"{note_c}\"; }}\n\
-         \x20   part {decision}AcceptR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
+         \x20   part {decision}AcceptR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; :>> createdBy = \"{recorded_by_c}\"; }}\n",
     );
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
     write_atomic(path, new_content)?;
@@ -1779,12 +1787,12 @@ mod tests {
         let d = root.join(".engine").join("decisions").join("0001-t.sysml");
         let body = "package D1 {\n    part d1 : Decision { :>> id = \"e2e00000-0000-4000-8000-00000000d001\"; :>> status = DecisionStatus::proposed; }\n}\n";
         std::fs::write(&d, body).expect("decision");
-        let ai = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "bot", "their words");
+        let ai = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "bot", "bot", "their words");
         assert!(ai.is_err(), "an AI-kind judge must be refused");
         assert!(format!("{}", ai.unwrap_err()).contains("AI actor"), "the refusal names the cause");
-        let nobody = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "ghost", "their words");
+        let nobody = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "ghost", "ghost", "their words");
         assert!(nobody.is_err(), "an unregistered judge must be refused");
-        let human = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "hum", "their words");
+        let human = super::accept_decision(&d, "d1", "abc1234", "2026-08-21", "hum", "hum", "their words");
         assert!(human.is_ok(), "a registered Person accepts: {human:?}");
     }
 

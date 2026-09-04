@@ -214,7 +214,7 @@ frozen (modify it only by out-of-band Decision).
   because `attestation-policy.toml` delegates the RECORDING — the quote is the receipt, the human is the judge,
   and an unquoted note is refused. The human's stated exception, in their words: *"i want an exception for user
   text that was quoted to be authoritative ... until we have a better non-local authoritative channel"*.
-  Quote exactly; never paraphrase into an acceptance. Withdraw by deleting the policy's `delegatedRecording` line. **Confirm only what tests can't (D0051):** never ask a human
+  Quote exactly; never paraphrase into an acceptance. Withdraw by deleting the policy's `delegatedRecording` line. Every accept path also stamps WHO RECORDED (`createdBy` on the acceptance result, distinct from `judgedBy`, D0299): a record the human made themselves (console, or their own terminal) is not delegated and owes no quote; `keel accept --by <human>` from a session is delegated and refuses if the session's own actor is unbound. **Confirm only what tests can't (D0051):** never ask a human
   to confirm a green test. Sprint closeOut and retro are AI-recorded and autonomous (D0049). The human's
   only inherent gates are direction decisions that block work and confirmations they choose to give;
   sitting review is an OPTIONAL pull-audit, never scheduled or owed (D0204) - coverage keeps computing

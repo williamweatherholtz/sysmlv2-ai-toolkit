@@ -758,7 +758,9 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     } else {
         format!("{}{CONSOLE_GESTURE}", b.note)
     };
-    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &note) {
+    // The human recorded this themselves: recorder == judge, which is what lets the substance rule
+    // scope itself to genuinely delegated records (issue287).
+    match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, judged_by, &note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }

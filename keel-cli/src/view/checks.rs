@@ -130,11 +130,22 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
     // STATED LIMIT (D0192): a fabricated quote defeats this; the protections behind it are the human
     // reading their own queue and the audit trail.
     if let Some(cutoff) = predicate_args(term, "acceptQuotesDelegatedWords(") {
-        let Some(judged_at) = model.items.get(&format!("{name}AcceptR1")).and_then(|i| i.attrs.get("judgedAt"))
-        else {
+        let Some(r1) = model.items.get(&format!("{name}AcceptR1")) else {
+            return Some(true);
+        };
+        let Some(judged_at) = r1.attrs.get("judgedAt") else {
             return Some(true);
         };
         if judged_at.as_str() < cutoff.trim() {
+            return Some(true);
+        }
+        // issue287: a record the HUMAN made themselves is not delegated - its recorder (`createdBy`,
+        // written by every accept path since D0299) is the judge - and demanding they quote themselves
+        // points governance at the one party it must never bind. A record with NO recorder stamped
+        // (every acceptance before D0299) is read as delegated: absence of provenance is not evidence
+        // of self-recording, and those records already carry their quote or gesture.
+        let self_recorded = r1.attrs.get("createdBy").is_some_and(|rec| r1.attrs.get("judgedBy") == Some(rec));
+        if self_recorded {
             return Some(true);
         }
         let text = model
@@ -558,6 +569,39 @@ pub fn rootedness(root: &Path) -> Result<String, ViewError> {
 #[cfg(test)]
 mod tests {
     use super::quotes_conversational_words;
+
+    fn item(type_name: &str, attrs: &[(&str, &str)]) -> super::ItemInfo {
+        super::ItemInfo {
+            type_name: type_name.to_string(),
+            attrs: attrs.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect(),
+            marker: None,
+            file: String::new(),
+        }
+    }
+
+    /// issue287: the substance rule binds DELEGATED records only. A record whose recorder IS the judge
+    /// (the human in the console, or at their own terminal) passes without quoting themselves; a record
+    /// an AI made on their behalf with no quote still FAILS; a record with no recorder stamped (every
+    /// acceptance before D0299) is read as delegated, so provenance absent is never provenance assumed.
+    #[test]
+    fn the_substance_rule_binds_only_delegated_acceptances() {
+        let eval = |recorder: Option<&str>, note: &str| {
+            let mut model = super::Model { items: std::collections::HashMap::new(), edges: Vec::new() };
+            model.items.insert("d1".to_string(), item("Decision", &[("status", "accepted")]));
+            model.items.insert("d1Accept".to_string(), item("Test", &[("method", "confirmation"), ("procedureText", note)]));
+            let mut r1 = vec![("outcome", "pass"), ("judgedAt", "2026-09-04"), ("judgedBy", "hum")];
+            if let Some(r) = recorder {
+                r1.push(("createdBy", r));
+            }
+            model.items.insert("d1AcceptR1".to_string(), item("TestResult", &r1));
+            super::eval_predicate_term(&model, "d1", "acceptQuotesDelegatedWords(2026-08-22)")
+        };
+        assert_eq!(eval(Some("hum"), "agreed with panel's decisions"), Some(true), "self-recorded: the human need not quote themselves");
+        assert_eq!(eval(Some("bot"), "agreed with panel's decisions"), Some(false), "AI-delegated without a quote still FAILS");
+        assert_eq!(eval(Some("bot"), "their words: 'yes, accept it as written'"), Some(true), "AI-delegated with the quote passes");
+        assert_eq!(eval(None, "agreed with panel's decisions"), Some(false), "no recorder stamped = delegated, not self-recorded");
+        assert_eq!(eval(None, "accepted in the keel console"), Some(true), "a cited human gesture still passes unstamped records");
+    }
 
     /// D0192 OPTION A: the substance check's boundary. A delegated record passes on a verbatim
     /// single-quoted span (>= 10 chars) or a named human gesture; a bare assertion fails.

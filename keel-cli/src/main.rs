@@ -2653,7 +2653,9 @@ fn cmd_record(args: &[String]) -> i32 {
                         let sha = keel_cli::gitx::git().arg("-C").arg(&root).args(["rev-parse", "--short", "HEAD"]).output().ok()
                             .filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
                         let note = format!("AUTO-ACCEPTED under standing consent ({}). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289).", consent.to_uppercase());
-                        match keel_cli::write::accept_decision(Path::new(&path), &dname, &sha, &date, judge, &note) {
+                        // Recorded by the actor running `record decision`, judged by the standing decider:
+                        // a DELEGATED record by construction, so the substance rule reads its quote.
+                        match keel_cli::write::accept_decision(Path::new(&path), &dname, &sha, &date, judge, &author, &note) {
                             Ok(_) => println!("accepted D{nnnn} at record time under standing consent {consent} (non-fork; judge {judge}; override by a superseding Decision or your quoted word)"),
                             Err(e) => eprintln!("standing consent {consent} declared but the acceptance could not be recorded: {e} - D{nnnn} stays proposed"),
                         }
@@ -4159,6 +4161,20 @@ fn cmd_accept(args: &[String]) -> i32 {
             return 2;
         }
     };
+    // WHO IS RECORDING (issue287): the session's own actor, never defaulted. With no `--by` the
+    // judge and the recorder are the same person at their own terminal; with `--by <human>` an
+    // agent is recording on the human's behalf and the record says so.
+    let recorded_by = if flag(args, "by").is_some() {
+        match keel_cli::actor::resolve(&root, None) {
+            Ok(a) => a,
+            Err(msg) => {
+                eprintln!("keel accept: --by names the judge, but WHO IS RECORDING is unbound - {msg}");
+                return 2;
+            }
+        }
+    } else {
+        judged_by.clone()
+    };
     // Find the decision's file rather than making the caller supply it: a path argument here is a
     // chance to accept the wrong file, and the name is unambiguous.
     let mut found = None;
@@ -4181,7 +4197,7 @@ fn cmd_accept(args: &[String]) -> i32 {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_owned())
         .unwrap_or_default();
-    match keel_cli::write::accept_decision(&path, decision, &sha, &date, &judged_by, &note) {
+    match keel_cli::write::accept_decision(&path, decision, &sha, &date, &judged_by, &recorded_by, &note) {
         Ok(_) => {
             println!("accepted {decision} (judged by {judged_by} at {date}, against {sha})");
             println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
