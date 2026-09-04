@@ -989,6 +989,172 @@ pub fn process_change(root: &Path) -> GuardReport {
 }
 
 
+// ── decision-amends-process (issue298 / D0244): an amendment reaches the definition ──────────────
+
+/// One process definition's lexical anchors: its file, and the identifiers a Decision would use to
+/// speak about it - the `Process` action name, the file stem, and every `ProcessStep` name.
+struct ProcessAnchors {
+    file: String,
+    names: Vec<String>,
+}
+
+fn process_anchors(root: &Path) -> Vec<ProcessAnchors> {
+    let dir = root.join(".engine").join("processes");
+    let Ok(rd) = std::fs::read_dir(&dir) else { return Vec::new() };
+    let mut out = Vec::new();
+    for entry in rd.flatten() {
+        let path = entry.path();
+        if path.extension().is_none_or(|e| e != "sysml") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let mut names = vec![stem];
+        for line in text.lines() {
+            let l = line.trim();
+            if let Some(rest) = l.strip_prefix("action ") {
+                if rest.contains(": Process ") || rest.contains(": Process{") || rest.contains(": ProcessStep") {
+                    if let Some(name) = rest.split(|c: char| c == ':' || c.is_whitespace()).next() {
+                        if !name.is_empty() {
+                            names.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        out.push(ProcessAnchors { file: format!(".engine/processes/{}", path.file_name().unwrap_or_default().to_string_lossy()), names });
+    }
+    out.sort_by(|a, b| a.file.cmp(&b.file));
+    out
+}
+
+/// Does `text` contain `ident` as a whole identifier (not as a substring of a longer name)?
+fn names_identifier(text: &str, ident: &str) -> bool {
+    text.match_indices(ident).any(|(i, _)| {
+        let before = text[..i].chars().next_back();
+        let after = text[i + ident.len()..].chars().next();
+        !before.is_some_and(|c| c.is_alphanumeric() || c == '_') && !after.is_some_and(|c| c.is_alphanumeric() || c == '_')
+    })
+}
+
+/// Pure core (issue298): for each staged Decision, every process it names by identifier whose
+/// definition file is NOT also staged yields one warning naming the Decision, the identifier and the
+/// file it should have reached.
+fn amendment_warnings(decision_texts: &[(String, String)], staged: &[String], anchors: &[ProcessAnchors]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (path, text) in decision_texts {
+        for a in anchors {
+            if staged.iter().any(|s| s == &a.file) {
+                continue;
+            }
+            // An anchor must LOOK like an identifier - camelCase or hyphenated. A process whose name is a
+            // plain English word (`migration`, `dor`) would fire on every sentence using the word: the
+            // first commit carrying this guard warned on "step 5 of the migration plan".
+            let mut hit: Vec<&str> = a
+                .names
+                .iter()
+                .filter(|n| n.len() > 3 && (n.contains('-') || n.chars().any(char::is_uppercase)) && names_identifier(text, n))
+                .map(String::as_str)
+                .collect();
+            hit.sort_unstable();
+            hit.dedup();
+            if hit.is_empty() {
+                continue;
+            }
+            out.push(format!(
+                "{path} names `{}` of {} and this commit does not touch that definition - if the Decision AMENDS the step, edit the process file in the same commit so the definition carries it (D0244: a design may amend a process, never quietly disagree with one; issue298 is D0243 doing exactly this); if it only CITES the step, this is noise to read past",
+                hit.join("`, `"),
+                a.file
+            ));
+        }
+    }
+    out
+}
+
+/// Guard (WARNING-tier, D0102 promote-once-low-noise): a staged Decision that names a process or one
+/// of its steps by identifier while that process definition is unchanged in the same commit.
+///
+/// THE CLASS (issue298): D0243 changed what knowledge-graph-memory's steps 1 and 2 MEAN - `.knowledge/`
+/// optional, seeding corpus-derived - and never touched the process file, so the keystone lock never
+/// fired: the guarded artifact was not edited, the change was made AROUND the control. D0244 wrote the
+/// rule ("a design may amend a process; it may not quietly disagree with one") and carried D0243's
+/// amendment into the definition by hand. This guard watches for the next one.
+///
+/// WHAT IT CAN AND CANNOT SEE, measured over the 296 Decisions in this tree before it was written:
+/// 17 name a process step by identifier and 5 of those did not touch the file (D0242 among them - a
+/// real amendment). 24 mention steps by NUMBER ("steps 1-2", "step 5 of the plan", "STPA step 2") and
+/// two thirds of those are not amendments at all, so numbers are not an anchor. D0243 itself says
+/// "the source process's steps 1-2" and names nothing - the identifier rule would NOT have caught it.
+/// That residual is stated here rather than hidden behind a passing check: the durable fix for the
+/// unnamed shape is an `#Amends` edge a Decision must carry, which is a schema change and a fork.
+#[must_use]
+pub fn decision_amends_process(root: &Path) -> GuardReport {
+    let staged = staged_files(root);
+    let decision_texts: Vec<(String, String)> = staged
+        .iter()
+        .filter(|p| is_decision_file(p))
+        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        .collect();
+    let anchors = process_anchors(root);
+    let warnings = amendment_warnings(&decision_texts, &staged, &anchors);
+    GuardReport { name: "decision-amends-process", scanned: decision_texts.len(), warnings, violations: Vec::new() }
+}
+
+#[cfg(test)]
+mod amendment_tests {
+    use super::{amendment_warnings, names_identifier, ProcessAnchors};
+
+    fn kg() -> Vec<ProcessAnchors> {
+        vec![ProcessAnchors {
+            file: ".engine/processes/knowledge-graph-memory.sysml".to_string(),
+            names: vec!["knowledge-graph-memory".to_string(), "knowledgeGraphMemory".to_string(), "kgInjection".to_string(), "kgQuestions".to_string()],
+        }]
+    }
+
+    /// issue298, the D0242 shape: a Decision names `kgInjection`; the process file is not staged; one
+    /// warning names the Decision, the identifier and the file.
+    #[test]
+    fn a_decision_naming_a_step_without_the_definition_warns() {
+        let d = (".engine/decisions/0242-x.sysml".to_string(), "The kgInjection step now pushes before the model thinks.".to_string());
+        let w = amendment_warnings(std::slice::from_ref(&d), std::slice::from_ref(&d.0), &kg());
+        assert_eq!(w.len(), 1, "{w:?}");
+        assert!(w[0].contains("kgInjection") && w[0].contains("knowledge-graph-memory.sysml") && w[0].contains("D0244"), "{}", w[0]);
+        // the same commit touching the definition is the amendment reaching it: silent
+        let staged = vec![d.0.clone(), ".engine/processes/knowledge-graph-memory.sysml".to_string()];
+        assert!(amendment_warnings(&[d], &staged, &kg()).is_empty());
+    }
+
+    /// The stated residual, armed so it cannot be forgotten: D0243's own sentence names NOTHING and is
+    /// not caught. If this test ever fails, the residual has been closed and the doc must say so.
+    #[test]
+    fn the_unnamed_shape_is_a_known_miss() {
+        let d = (".engine/decisions/0243-x.sysml".to_string(), "as the source process's steps 1-2 imply - rejected; .knowledge/ becomes an optional refinement".to_string());
+        let staged = vec![d.0.clone()];
+        assert!(amendment_warnings(std::slice::from_ref(&d), &staged, &kg()).is_empty(), "the identifier rule does not see an unnamed process");
+    }
+
+    /// A process named by a plain English word is not an anchor: `migration` in "step 5 of the
+    /// migration plan" is prose, and the first commit carrying this guard warned on exactly that.
+    #[test]
+    fn a_plain_word_process_name_is_not_an_anchor() {
+        let anchors = vec![ProcessAnchors { file: ".engine/processes/migration.sysml".to_string(), names: vec!["migration".to_string(), "migration".to_string(), "mgExpand".to_string()] }];
+        let d = (".engine/decisions/0281-x.sysml".to_string(), "This is step 5 of the migration plan.".to_string());
+        assert!(amendment_warnings(std::slice::from_ref(&d), std::slice::from_ref(&d.0), &anchors).is_empty());
+        let d = (".engine/decisions/0281-y.sysml".to_string(), "The mgExpand step now also copies the pin.".to_string());
+        let w = amendment_warnings(std::slice::from_ref(&d), std::slice::from_ref(&d.0), &anchors);
+        assert_eq!(w.len(), 1, "a camelCase step name still anchors: {w:?}");
+    }
+
+    /// Whole identifiers only: `kgInjectionProvenOnTheTrap` (a backlog task) must not read as the
+    /// step `kgInjection`, or every sprint that delivered the step would warn.
+    #[test]
+    fn a_longer_name_containing_the_step_is_not_the_step() {
+        assert!(!names_identifier("dcKgInjectionProvenOnTheTrap kgInjectionProvenOnTheTrap", "kgInjection"));
+        assert!(names_identifier("the kgInjection step", "kgInjection"));
+        assert!(names_identifier("(kgInjection)", "kgInjection"));
+    }
+}
+
 // ── doc-sync guard (D0113: the doc-sync discipline made a CONTROL — was pure vigilance) ────────────
 
 /// A staged path whose change is DEFINITIONAL and near-always carries doc implications: `.engine`
@@ -2262,8 +2428,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 58] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared"];
+pub const GUARD_NAMES: [&str; 59] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3761,6 +3927,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "untrusted-routing" => Some(untrusted_routing(root)),
         "control-defect-registry" => Some(control_defect_registry(root)),
         "cli-surface-declared" => Some(cli_surface_declared(root)),
+        "decision-amends-process" => Some(decision_amends_process(root)), // WARNING-tier (issue298/D0244)
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
@@ -4515,7 +4682,7 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 12] = [
+        const LEGITIMATELY_EMPTY: [&str; 13] = [
             // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
             // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
             // The population returns the moment the backlog holds ranked work again.
@@ -4538,6 +4705,7 @@ mod scan_count_tests {
             "judgment-request-quality",  // scans PROPOSED fork decisions - zero between forks is the healthy state (D0207: most decisions auto-accept and never ask)
             "retro-backlog",             // scans retro findings needing a backlog item
             "doc-sync",                  // scans CHANGED doc surface
+            "decision-amends-process",   // scans STAGED Decisions - zero between commits
             "base-first-justification",  // scans new base-construct adoptions
             "ownership",                 // scans cross-owner edits
         ];
