@@ -410,4 +410,25 @@ package ProjectIntake20260903 {
     #Implicates dependency from us089 to d0292;
     // GH#42 (us078): verified fixed at this vintage on a fresh scaffold - deactivate succeeds, activation reads INACTIVE; closed without an Issue.
     #Implicates dependency from us078 to d0292;
+    #Implicates dependency from us090 to dcHooksOutsideTheAgentsWritePath;
+
+    part st090 : Statement {
+        :>> id = "0aff12e2-6161-405b-a8eb-8f0c2ad5639f";
+        :>> title = "Would keel work better as an extension with forced pre/post hooks";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "would keel work better as an extension? forced pre post hooks?";
+        :>> saidBy = "williamWeatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
+
+    part us090 : UserStory {
+        :>> id = "16096387-01a8-4571-8140-4c8f174617d8";
+        :>> title = "Host the keel hooks where the agent cannot rewrite them";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> asA = "human directing an agent through keel";
+        :>> iWant = "the pre/post hooks that gate the agent to be forced - hosted where the agent they gate cannot edit or silence them";
+        :>> soThat = "the in-loop tier is a control, not a convention the controlled party maintains";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "st090 asks whether keel would work better as an extension with forced pre/post hooks. Routed as ARCHITECTURE, plan-only: a spike ranks the hosts (repo settings, plugin, plugin+self-guarding deny hook, managed settings) by who can write them; the concrete gap found while checking - disableAllHooks from any scope, unseen by the drift guard - is issue365 with its own resolver.";
+    }
+    #DerivedFrom dependency from us090 to st090;
 }

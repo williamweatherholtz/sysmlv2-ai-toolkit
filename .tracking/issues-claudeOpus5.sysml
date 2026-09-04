@@ -848,4 +848,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRetroAlreadyTrackedMustName to issue364;
+
+    part issue365 : Issue {
+        :>> id = "916b17a2-ce1a-4527-b34d-8b0bd7a985d1";
+        :>> title = "disableAllHooks in a repo-scope settings file silences every keel hook and the drift guard reports clean";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND while answering st090 (would keel work better as an extension with forced hooks), 2026-09-03. CHECK: grep disableAllHooks over keel-cli/src and .engine/docs/guards.md returns nothing; the Claude Code settings reference documents disableAllHooks with scope 'any file' and hook lists MERGE across scopes, so a project-scope key turns off user-, plugin- and (absent allowManagedHooksOnly) managed-scope hooks too. MECHANISM: claude_surface.rs compares the keel-OWNED entries (hooks by event, outputStyle) and lets user entries survive by design; a foreign top-level key is a surviving user entry, so `'disableAllHooks': true` beside intact hook entries reads as NO DRIFT. CONSEQUENCE: the in-loop tier (post-edit fast gate, stop gate, protected-path check, pre-bash advisory) is silenced by one line the agent may write, with the guard that exists to notice hook-surface tampering reporting clean; CI still re-derives validate and every guard on the tree (the third leg holds), so dishonest state is caught at push, not at the edit - detection is delayed, not lost. This is the same class the landscape spike (D0282) named in Kiro: blocking hooks the controlled party can edit. PREVENTING CHANGE: dcDriftGuardRefusesDisableAllHooks. The wider question - hosting the hooks outside the agent's write path at all - is us090 / dcHooksOutsideTheAgentsWritePath, not this issue.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDriftGuardRefusesDisableAllHooks to issue365;
 }
