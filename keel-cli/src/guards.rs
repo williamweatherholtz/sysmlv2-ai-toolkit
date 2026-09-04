@@ -989,6 +989,143 @@ pub fn process_change(root: &Path) -> GuardReport {
 }
 
 
+// ── unit-extras-present (issue290 / D0300): a unit's declared mechanism is in the tree ──────────
+
+/// Every `[unit]` section of `unit-extras.toml` with its declared `files`, in file order.
+fn declared_extras(root: &Path) -> Vec<(String, Vec<String>)> {
+    let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/unit-extras.toml")) else {
+        return Vec::new();
+    };
+    let mut out: Vec<(String, Vec<String>)> = Vec::new();
+    let mut in_files = false;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('#') {
+            continue;
+        }
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            out.push((name.to_string(), Vec::new()));
+            in_files = false;
+            continue;
+        }
+        // A key line may carry its array INLINE (`files = ["a", "b"]`) or open a multi-line one; both
+        // are TOML, and the first draft of this parser (like `process_cmd::unit_extras`) read only the
+        // second - a one-line declaration scanned as zero files, silently.
+        if let Some(rest) = l.strip_prefix("files") {
+            let rest = rest.trim_start_matches([' ', '=']).trim();
+            if let Some(inline) = rest.strip_prefix('[').filter(|r| r.contains(']')) {
+                if let Some(body) = inline.split(']').next() {
+                    if let Some((_, files)) = out.last_mut() {
+                        files.extend(body.split(',').map(|v| v.trim().trim_matches('"').to_string()).filter(|v| !v.is_empty()));
+                    }
+                }
+                in_files = false;
+            } else {
+                in_files = true;
+            }
+            continue;
+        }
+        if l.starts_with("requires") || l == "]" {
+            in_files = false;
+            continue;
+        }
+        if in_files {
+            let v = l.trim_end_matches(',').trim().trim_matches('"');
+            if let (false, Some((_, files))) = (v.is_empty(), out.last_mut()) {
+                files.push(v.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// The process names `installed-units.toml` records as installed here.
+fn installed_unit_names(root: &Path) -> Vec<String> {
+    std::fs::read_to_string(root.join(".engine/contracts/installed-units.toml"))
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("process = "))
+        .map(|v| v.trim().trim_matches('"').to_string())
+        .collect()
+}
+
+/// Pure core (issue290): for every INSTALLED unit that declares extras, each declared file must exist;
+/// a missing one is a violation naming unit and path. A unit not installed here is not judged - its
+/// extras are somebody else's mechanism.
+fn extras_violations(declared: &[(String, Vec<String>)], installed: &[String], exists: &dyn Fn(&str) -> bool) -> (usize, Vec<String>) {
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for (unit, files) in declared {
+        if !installed.iter().any(|u| u == unit) {
+            continue;
+        }
+        for f in files {
+            scanned += 1;
+            if !exists(f) {
+                violations.push(format!(
+                    "unit `{unit}` declares `{f}` as part of its mechanism (unit-extras.toml) and the file is not in this tree - the process definition and its skill reference machinery that does not exist here (issue290: penumbra adopted a unit whose four mechanism files were hand-staged out). Import the unit with `keel process import` rather than staging files by hand, or remove the declaration if the unit no longer carries it."
+                ));
+            }
+        }
+    }
+    (scanned, violations)
+}
+
+/// Guard: a declared unit extra exists in every project that installed the unit (D0300).
+///
+/// The tool-reference guard already refuses a doc naming a deleted `.engine/tools/` file; this is the
+/// same predicate for a unit's declared MECHANISM - workflows, scripts, contracts a process needs to
+/// RUN. issue290: a project adopted a unit whose definition and skill were present and whose four
+/// mechanism files were not, because they were hand-staged out of the PR; nothing caught it, since
+/// adoption-check gates what EXPORT produces and never what a target received.
+#[must_use]
+pub fn unit_extras_present(root: &Path) -> GuardReport {
+    let declared = declared_extras(root);
+    let installed = installed_unit_names(root);
+    let (scanned, violations) = extras_violations(&declared, &installed, &|f| root.join(f).exists());
+    GuardReport { name: "unit-extras-present", scanned, warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod extras_tests {
+    use super::extras_violations;
+
+    fn decl() -> Vec<(String, Vec<String>)> {
+        vec![("channel".to_string(), vec![".github/workflows/decision-issue.yml".to_string(), ".github/scripts/decide.py".to_string()])]
+    }
+
+    /// Both TOML array shapes are read - inline and multi-line - because a one-line declaration used to
+    /// scan as zero files, which is a guard passing over the thing it was built to see.
+    #[test]
+    fn declared_extras_reads_inline_and_multiline_arrays() {
+        let root = std::env::temp_dir().join(format!("keel-extras-parse-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine").join("contracts")).expect("mkdir");
+        std::fs::write(
+            root.join(".engine").join("contracts").join("unit-extras.toml"),
+            "# header\n[one]\nfiles = [\"a.yml\", \"b.py\"]\nrequires = [\"x\"]\n[two]\nfiles = [\n  \"c.yml\",\n]\n",
+        )
+        .expect("toml");
+        let d = super::declared_extras(&root);
+        assert_eq!(d, vec![("one".to_string(), vec!["a.yml".to_string(), "b.py".to_string()]), ("two".to_string(), vec!["c.yml".to_string()])]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// issue290, the penumbra shape: the unit is installed, two of its mechanism files are absent - two
+    /// violations naming unit and path; present -> none; not installed here -> not judged.
+    #[test]
+    fn an_installed_unit_with_absent_mechanism_fails_and_present_passes() {
+        let installed = vec!["channel".to_string()];
+        let (scanned, v) = extras_violations(&decl(), &installed, &|_| false);
+        assert_eq!((scanned, v.len()), (2, 2), "{v:?}");
+        assert!(v[0].contains("channel") && v[0].contains("decision-issue.yml") && v[0].contains("keel process import"), "{}", v[0]);
+        let (_, v) = extras_violations(&decl(), &installed, &|_| true);
+        assert!(v.is_empty(), "present files are not a finding");
+        let (scanned, v) = extras_violations(&decl(), &[], &|_| false);
+        assert_eq!((scanned, v.len()), (0, 0), "a unit not installed here is not judged");
+    }
+}
+
 // ── decision-amends-process (issue298 / D0244): an amendment reaches the definition ──────────────
 
 /// One process definition's lexical anchors: its file, and the identifiers a Decision would use to
@@ -2428,8 +2565,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 59] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process"];
+pub const GUARD_NAMES: [&str; 60] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3928,6 +4065,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "control-defect-registry" => Some(control_defect_registry(root)),
         "cli-surface-declared" => Some(cli_surface_declared(root)),
         "decision-amends-process" => Some(decision_amends_process(root)), // WARNING-tier (issue298/D0244)
+        "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
@@ -4682,7 +4820,7 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 13] = [
+        const LEGITIMATELY_EMPTY: [&str; 14] = [
             // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
             // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
             // The population returns the moment the backlog holds ranked work again.
@@ -4706,6 +4844,7 @@ mod scan_count_tests {
             "retro-backlog",             // scans retro findings needing a backlog item
             "doc-sync",                  // scans CHANGED doc surface
             "decision-amends-process",   // scans STAGED Decisions - zero between commits
+            "unit-extras-present",       // scans declared unit extras; no installed unit declares any since the channel left (D0292)
             "base-first-justification",  // scans new base-construct adoptions
             "ownership",                 // scans cross-owner edits
         ];

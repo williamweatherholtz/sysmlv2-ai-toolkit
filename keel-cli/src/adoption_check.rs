@@ -154,6 +154,8 @@ pub fn cmd(args: &[String]) -> i32 {
     }
 
     println!("adoption-check: scaffolding a FOREIGN project (nothing here has adopted anything)");
+    println!("  SCOPE: this verifies what EXPORT produces, not what any real target received (issue290); a");
+    println!("  target's own `keel guard unit-extras-present` is what checks its mechanism files are there.");
     if let Err(e) = keel(&["init", &fixture.to_string_lossy()], None) {
         eprintln!("error: the scaffold itself failed: {e}");
         return 1;

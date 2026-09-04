@@ -271,12 +271,20 @@ fn unit_extras(root: &Path, unit: &str) -> (Vec<String>, Vec<String>) {
         if !in_unit {
             continue;
         }
-        if l.starts_with("files") {
-            list = Some(&mut files);
+        // Inline arrays too (`files = ["a", "b"]`): the first reader took only multi-line ones, so a
+        // one-line declaration exported NOTHING - the issue290 shape produced by the exporter itself.
+        let inline = |rest: &str, target: &mut Vec<String>| -> bool {
+            let rest = rest.trim_start_matches([' ', '=']).trim();
+            let Some(body) = rest.strip_prefix('[').filter(|r| r.contains(']')).and_then(|r| r.split(']').next()) else { return false };
+            target.extend(body.split(',').map(|v| v.trim().trim_matches('"').to_string()).filter(|v| !v.is_empty()));
+            true
+        };
+        if let Some(rest) = l.strip_prefix("files") {
+            list = if inline(rest, &mut files) { None } else { Some(&mut files) };
             continue;
         }
-        if l.starts_with("requires") {
-            list = Some(&mut requires);
+        if let Some(rest) = l.strip_prefix("requires") {
+            list = if inline(rest, &mut requires) { None } else { Some(&mut requires) };
             continue;
         }
         if l == "]" {

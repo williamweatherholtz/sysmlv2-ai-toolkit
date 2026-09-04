@@ -12,18 +12,23 @@
 # This is the same class as issue241 (the catalogue denied 12 processes that existed) and issue245
 # (the elicitation skill was in no catalogue): a unit whose teeth stay behind.
 #
-# Paths are repo-relative and travel VERBATIM. A path that does not exist is skipped silently — a
-# unit may legitimately declare an optional file — but `keel process show <unit>` lists what it will
-# actually carry, so a typo is visible before an export rather than after an import.
+# Paths are repo-relative and travel VERBATIM. A declared path is REQUIRED in every project that
+# installs the unit (D0300, issue290): `keel guard unit-extras-present` fails when one is absent, because
+# a definition and a skill referencing machinery that is not there is exactly how penumbra received the
+# channel - four mechanism files hand-staged out of the PR, nothing catching it. Declare only what the
+# unit actually carries; an optional file is not a mechanism.
 #
-# INSTANCE DATA IS NOT AN EXTRA. `.engine/contracts/github-actors.toml` is deliberately ABSENT from
-# the list below: it names WHO MAY DECIDE on a specific project, and shipping this project's deciders
-# into another one is precisely the defect D0219 exists to fix. The importing project declares its
-# own; an unmapped login is refused rather than defaulted (issue182).
-
-# Declared so an importer is TOLD, rather than discovering it when nothing records.
-requires = [
-  ".engine/contracts/github-actors.toml — declare YOUR deciders: `<githubLogin> = <keelActor>` (quoted) under [logins]. An unmapped login is refused, never defaulted.",
-  "GitHub Actions enabled on the repo; the workflows use the built-in github.token and need no secret.",
-  "A `keel actor` bound in the target project whose name matches the actor you map above.",
-]
+# INSTANCE DATA IS NOT AN EXTRA. `.engine/contracts/github-actors.toml` names WHO MAY DECIDE on a
+# specific project, and shipping this project's deciders into another one is precisely the defect
+# D0219 exists to fix. The importing project declares its own; an unmapped login is refused rather
+# than defaulted (issue182).
+#
+# ADOPT WITH `keel process import <unit>`, never by staging files by hand: the importer places every
+# carried file and records the install; hand-staging is what dropped four (issue290).
+#
+# No installed unit declares extras today: the decision-channel unit, the only one that did, left at
+# D0292. A unit that gains a mechanism declares it here as:
+#
+#   [<unit>]
+#   files = [".github/workflows/<unit>.yml", ".github/scripts/<unit>.py"]
+#   requires = ["what the adopter must supply themselves, in words"]

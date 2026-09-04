@@ -892,4 +892,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcEveryAdvertisedViewIsBound to issue368;
+
+    part issue369 : Issue {
+        :>> id = "84844a68-8160-4b46-8932-fa78108cca90";
+        :>> title = "a launcher test fails intermittently under the full suite and passes alone - a control that lies one run in five";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-04, twice in one day during full-suite runs: cargo test --release stopped early with one failure - once uncaptured (397 passed), once named: finish_writes_a_record_carrying_every_declared_field in tests/launcher_controls_actually_fire.rs. The test passes alone and in the following full run. A test that fails one run in five is a control that lies one run in five: a red suite the author re-runs to green trains everyone to distrust red, and a green suite that would have been red on the next run hides the defect it is there to show. MECHANISM: not yet established - the fixture is process-id-unique and the failure is intermittent under parallel test threads, so shared state (the gate finish runs, the ledger it reads, or the working directory) is the first suspect. PREVENTING CHANGE: dcLauncherFinishTestIsDeterministic - capture the failure text with --no-fail-fast, name the cause in the test, prove twenty consecutive runs.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLauncherFinishTestIsDeterministic to issue369;
 }

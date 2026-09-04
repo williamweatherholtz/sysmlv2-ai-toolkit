@@ -1,0 +1,27 @@
+// D0300 (status: the `status` field below is the truth) — A unit's declared mechanism is REQUIRED in every project that installs it: guard unit-extras-present fails on an absent declared file, adopt by keel process import never by hand-staging, and adoption-check says it verifies the export and not a target
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0300Accept event on sign-off.
+package Decision0300 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #SafetyChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #SafetyChange part d0300 : Decision {
+        :>> id = "24edb832-5d2e-4a77-bee1-dcd0bbd86f4e";
+        :>> title = "A unit's declared mechanism is REQUIRED in every project that installs it: guard unit-extras-present fails on an absent declared file, adopt by keel process import never by hand-staging, and adoption-check says it verifies the export and not a target";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "issue290: a downstream project adopted the decision-channel unit and its MECHANISM never landed - both workflows and both scripts were absent from the merged PR, so the project held a process definition and a skill referencing scripts that did not exist. Cause: hand-staging - explicit paths staged to avoid untracked junk, .github omitted, then deleted from the working tree, destroying the only copy - issue251 reproduced by hand after being fixed in the exporter. Nothing caught it: adoption-check gates a fresh fixture, verifying what export PRODUCES and never what a target RECEIVED; no guard flagged a process whose declared mechanism was absent; and unit-extras.toml's own header said 'a path that does not exist is skipped silently'. Since then the channel unit itself has left (D0292), so no installed unit declares extras today - the class remains.";
+        :>> decision = "(1) Guard 60, unit-extras-present, hard: for every unit recorded in installed-units.toml that declares files in unit-extras.toml, each declared path must exist in the tree; a missing one is a violation naming the unit, the path, and the remedy (import the unit, or remove the declaration). A unit not installed here is not judged. The contract's meaning changes with it: a declared extra is REQUIRED, not optional - declare only what the unit carries, an optional file is not a mechanism. (2) The contract header says adopt with keel process import, never by staging files by hand, and why. (3) adoption-check prints its scope on every run: it verifies what export produces, not what any target received; a target's own guard is what checks its files. (4) Found while building it and fixed in both readers: unit-extras.toml arrays written inline on one line (valid TOML) were read as EMPTY by the exporter's reader and by the guard's first draft - so a one-line declaration would have exported nothing, the issue290 shape produced by the exporter itself.";
+        :>> rationale = "WHY A GUARD IN THE TARGET AND NOT A BETTER FIXTURE: the fixture can only ever test the exporter; the failure was in the target's tree, and only the target's own gate runs there. WHY REQUIRED AND NOT OPTIONAL: 'skipped silently' is how a missing mechanism reads as a clean tree; a unit that wants an optional file can leave it undeclared and document it under requires. WHY NOT JUDGE UNINSTALLED UNITS: their extras are another project's mechanism; judging them here would fail every project on files it never adopted (the issue259 direction). WHY THE INLINE-ARRAY FIX IS IN THIS DECISION: the exporter's reader is the enforcement surface for what a unit carries, and a silent zero there is a control that passes over the thing it exists to move.";
+        :>> consequences = "dcMechanismMustBePresent is delivered; issue290 resolves. Guard count 60; guards.md carries the row; the guard is legitimately empty in this tree until an installed unit declares extras, and the scan-count test names that. The penumbra tree itself is not re-verified here - it is another project's tree, and its own guard on its own pin is what says whether its files are present; the DoD's penumbra clause is therefore satisfied by the control existing for that project to run, not by this repository asserting it.";
+    }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0300Accept : Test { :>> id = "50063735-92d7-4a89-b05f-d97817699f71"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289)."; }
+    part d0300AcceptR1 : TestResult { :>> id = "e4544269-211e-4cc7-b4ee-2f0c9190b92f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a708369"; :>> judgedAt = "2026-09-04"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeOpus5"; }
+}
