@@ -342,13 +342,54 @@ fn cmd_hook(args: &[String]) -> i32 {
         "pre-bash" => hook_pre_bash(&payload, &root, &session),
         "pre-write" => hook_pre_write(&payload, &root),
         "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
+        "config-change" => hook_config_change(&payload),
         other => {
-            eprintln!("unknown hook event '{other}' (expected stop|post-edit|pre-bash|user-prompt|pre-write|subagent-stop)");
+            eprintln!("unknown hook event '{other}' (expected stop|post-edit|pre-bash|user-prompt|pre-write|subagent-stop|config-change)");
             2
         }
     };
     ledger_emit(&root, &session, event, code, started.elapsed().as_millis());
     code
+}
+
+/// `ConfigChange` (D0296 / issue365): a repo-scope settings change that sets the hook kill switch or
+/// alters a keel-owned hook entry is REFUSED (exit 2 - the change is not applied to this session)
+/// and the file is RESTORED in place, because Claude Code does not revert a blocked change and a
+/// key left on disk kills every hook at the next launch (D0296 run 5). The payload carries `source`
+/// and `file_path` only - no content (run 3) - so the file is read here. Runs in every profile: an
+/// advisory against a kill switch would be the first thing switched off. A file that cannot be read
+/// or parsed is REPORTED and allowed - the hook never blocks on what it cannot see.
+fn hook_config_change(payload: &serde_json::Value) -> i32 {
+    let source = payload.get("source").and_then(serde_json::Value::as_str).unwrap_or("");
+    let is_local = match source {
+        "project_settings" => false,
+        "local_settings" => true,
+        _ => return 0, // user, policy and skills changes are not this hook's business
+    };
+    let Some(file) = payload.get("file_path").and_then(serde_json::Value::as_str) else { return 0 };
+    let text = match std::fs::read_to_string(file) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("[keel] config-change: {file} cannot be read ({e}) - nothing to restore; the plugin rendering still carries the hook set");
+            return 0;
+        }
+    };
+    let doc: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("[keel] config-change: {file} is not JSON ({e}) - not restored; fix the file or run `keel sync-claude`");
+            return 0;
+        }
+    };
+    let Some((restored, why)) = keel_cli::claude_surface::restored_settings(&doc, is_local) else { return 0 };
+    let pretty = serde_json::to_string_pretty(&restored).unwrap_or_default() + "\n";
+    match keel_cli::write::write_atomic(Path::new(file), &pretty) {
+        Ok(()) => eprintln!(
+            "[keel] config-change REFUSED: {file} - {why} (issue365/D0296). The change is not applied and the file is restored in place; a hook host changes through a Decision, never by switching the hooks off."
+        ),
+        Err(e) => eprintln!("[keel] config-change REFUSED: {file} - {why}; the restore FAILED ({e}) - run `keel sync-claude` before the next launch"),
+    }
+    2
 }
 
 /// Append one fire-ledger line (machine-local, `.keel/metrics/hooks.jsonl`, gitignored class).

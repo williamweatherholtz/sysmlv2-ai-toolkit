@@ -90,6 +90,62 @@ fn pre_write_denies_the_hook_kill_switch_in_a_guided_project() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// D0296 / issue365: the ConfigChange handler refuses a repo-scope settings change that sets the
+/// kill switch or removes a keel entry, and RESTORES the file - Claude Code does not revert a blocked
+/// change, and a key on disk at the next launch kills every hook (D0296 run 5). A benign change to the
+/// same file is allowed and untouched.
+#[test]
+fn config_change_refuses_and_restores_the_settings_file() {
+    let root = std::env::temp_dir().join(format!("keel-configchange-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+    std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+    std::fs::write(root.join(".tracking").join("seed.sysml"), "package Seed {\n}\n").expect("seed");
+    let settings = root.join(".claude").join("settings.json");
+    let clean = keel_cli::claude_surface::merge_settings(&serde_json::json!({"theirs": 1}));
+    let path = settings.to_string_lossy().replace('\\', "/");
+    let payload = |src: &str| format!(r#"{{"session_id":"probe","hook_event_name":"ConfigChange","source":"{src}","file_path":"{path}"}}"#);
+
+    // kill switch planted -> exit 2, file restored, foreign entry kept
+    let mut poisoned = clean.clone();
+    poisoned["disableAllHooks"] = serde_json::json!(true);
+    std::fs::write(&settings, poisoned.to_string()).expect("plant");
+    let mut child = Command::new(keel_bin()).args(["hook", "config-change"]).current_dir(&root).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn");
+    child.stdin.as_mut().expect("stdin").write_all(payload("project_settings").as_bytes()).expect("payload");
+    let out = child.wait_with_output().expect("done");
+    assert_eq!(out.status.code(), Some(2), "the change must be REFUSED: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("kill switch"), "the refusal says why");
+    let after: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).expect("read")).expect("json");
+    assert!(after.get("disableAllHooks").is_none(), "the key is gone from disk: {after}");
+    assert_eq!(after, clean, "the file is the clean merge again, foreign entry intact");
+
+    // a keel entry removed -> exit 2 and back
+    let mut gutted = clean.clone();
+    gutted["hooks"].as_object_mut().expect("hooks").remove("Stop");
+    std::fs::write(&settings, gutted.to_string()).expect("gut");
+    let mut child = Command::new(keel_bin()).args(["hook", "config-change"]).current_dir(&root).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn");
+    child.stdin.as_mut().expect("stdin").write_all(payload("project_settings").as_bytes()).expect("payload");
+    let out = child.wait_with_output().expect("done");
+    assert_eq!(out.status.code(), Some(2), "removing the turn gate is refused");
+    let after: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).expect("read")).expect("json");
+    assert!(after["hooks"].get("Stop").is_some(), "the turn gate is restored");
+
+    // a benign foreign change -> exit 0, untouched
+    let mut benign = clean.clone();
+    benign["theirs"] = serde_json::json!(2);
+    std::fs::write(&settings, benign.to_string()).expect("benign");
+    let mut child = Command::new(keel_bin()).args(["hook", "config-change"]).current_dir(&root).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn");
+    child.stdin.as_mut().expect("stdin").write_all(payload("project_settings").as_bytes()).expect("payload");
+    let out = child.wait_with_output().expect("done");
+    assert_eq!(out.status.code(), Some(0), "a foreign change is the user's: {}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(std::fs::read_to_string(&settings).expect("read"), benign.to_string(), "and the file is not rewritten");
+
+    // the fire-ledger carries the refusals as blocks
+    let ledger = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).expect("ledger");
+    assert_eq!(ledger.lines().filter(|l| l.contains(r#""event":"config-change""#) && l.contains(r#""decision":"block""#)).count(), 2, "two refusals recorded: {ledger}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 // ── ctlPreWriteTiers ──────────────────────────────────────────────────────────────────────────────
 
 #[test]

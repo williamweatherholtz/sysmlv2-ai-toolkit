@@ -123,11 +123,12 @@ fn protected_path_command() -> String {
     )
 }
 
-/// The keel-owned `hooks` object — FIVE events (D-P0a).
+/// The keel-owned `hooks` object — SIX events (D-P0a, then `ConfigChange` under D0296).
 fn keel_hooks() -> serde_json::Value {
     let r = resolver();
     let g = gating_resolver();
     serde_json::json!({
+        "ConfigChange": [{ "matcher": "project_settings|local_settings", "hooks": [hook_entry(&format!("{r}\"$K\" hook config-change"), 30, "hook kill-switch guard")] }],
         "UserPromptSubmit": [{ "hooks": [hook_entry(&format!("{r}\"$K\" hook user-prompt"), 30, "route-first checklist")] }],
         "PostToolUse": [{ "matcher": "Write|Edit", "hooks": [hook_entry(&format!("{r}\"$K\" hook post-edit"), 60, "keel fast gate")] }],
         "Stop": [{ "hooks": [hook_entry(&format!("{g}\"$K\" hook stop"), 180, "keel turn gate")] }],
@@ -144,7 +145,7 @@ fn keel_hooks() -> serde_json::Value {
 fn is_keel_hook(h: &serde_json::Value) -> bool {
     h.get("command")
         .and_then(serde_json::Value::as_str)
-        .is_some_and(|c| c.contains("hook user-prompt") || c.contains("hook post-edit") || c.contains("hook stop") || c.contains("hook pre-bash") || c.contains("hook subagent-stop") || c.contains("hook pre-write") || c.contains("permissionDecision"))
+        .is_some_and(|c| c.contains("hook user-prompt") || c.contains("hook post-edit") || c.contains("hook stop") || c.contains("hook pre-bash") || c.contains("hook subagent-stop") || c.contains("hook pre-write") || c.contains("hook config-change") || c.contains("permissionDecision"))
 }
 
 /// The one settings key that silences EVERY hook from whichever scope sets it.
@@ -222,6 +223,35 @@ pub fn marketplace_manifest() -> serde_json::Value {
             "version": SURFACE_VERSION
         }]
     })
+}
+
+/// What `keel hook config-change` writes back for a repo-scope settings document, if anything.
+///
+/// `settings.json` is keel-generated: the keel-owned subset is re-merged (which also strips the
+/// kill switch). `settings.local.json` is the user's: only the kill switch is removed. `None` means
+/// the document needs nothing - the change is allowed. The payload carries only `file_path` (D0296
+/// run 3), so the caller reads the file; a blocked `ConfigChange` is NOT reverted by Claude Code, so
+/// the hook restores the file itself or the key survives to the next launch (run 5).
+#[must_use]
+pub fn restored_settings(doc: &serde_json::Value, is_local: bool) -> Option<(serde_json::Value, &'static str)> {
+    if is_local {
+        if !hooks_silenced(doc) {
+            return None;
+        }
+        let mut out = doc.clone();
+        if let Some(obj) = out.as_object_mut() {
+            obj.remove(HOOK_KILL_SWITCH);
+        }
+        return Some((out, "the hook kill switch was set"));
+    }
+    let merged = merge_settings(doc);
+    if hooks_silenced(doc) {
+        return Some((merged, "the hook kill switch was set"));
+    }
+    if merged != *doc {
+        return Some((merged, "a keel-owned hook entry was altered or removed"));
+    }
+    None
 }
 
 /// The three plugin files as `(relative path, pretty JSON)` - the single list both the writer and
@@ -465,11 +495,11 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 #[cfg(test)]
 mod tests {
     use super::{
-        hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, sync_claude,
-        text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS,
+        hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
+        sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS,
     };
 
-    /// D-P0a: five events, every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
+    /// D-P0a: six events (five, then `ConfigChange` under D0296), every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
     /// and the missing-binary branch is loud and names the install path.
     /// issue327: the scaffolded gate's install step was three `echo` lines that installed nothing, so
     /// every fresh project's own gate failed on its first push with `keel: command not found` — and read
@@ -490,9 +520,9 @@ mod tests {
     }
 
     #[test]
-    fn generated_hooks_have_five_events_and_fail_loud_resolution() {
+    fn generated_hooks_have_six_events_and_fail_loud_resolution() {
         let h = keel_hooks();
-        for ev in ["UserPromptSubmit", "PostToolUse", "Stop", "PreToolUse", "SubagentStop"] {
+        for ev in ["ConfigChange", "UserPromptSubmit", "PostToolUse", "Stop", "PreToolUse", "SubagentStop"] {
             assert!(h.get(ev).is_some(), "missing event {ev}");
         }
         let text = h.to_string();
@@ -528,6 +558,28 @@ mod tests {
 
     /// Mixed ownership: a foreign hook group and foreign top-level settings survive the merge
     /// byte-for-byte; merging twice equals merging once (idempotent).
+    /// D0296: what config-change restores - the kill switch and any altered keel entry in
+    /// settings.json; only the kill switch in settings.local.json; nothing when nothing is wrong.
+    #[test]
+    fn restored_settings_repairs_exactly_what_was_broken() {
+        let clean = merge_settings(&serde_json::json!({"theirs": 1}));
+        assert!(restored_settings(&clean, false).is_none(), "a clean file needs nothing");
+        let mut poisoned = clean.clone();
+        poisoned["disableAllHooks"] = serde_json::json!(true);
+        let (fixed, why) = restored_settings(&poisoned, false).expect("repair");
+        assert!(why.contains("kill switch"));
+        assert_eq!(fixed, clean, "settings.json is restored to the clean merge");
+        let mut gutted = clean;
+        gutted["hooks"].as_object_mut().expect("hooks").remove("Stop");
+        let (fixed, why) = restored_settings(&gutted, false).expect("repair");
+        assert!(why.contains("altered or removed"));
+        assert!(fixed["hooks"].get("Stop").is_some(), "the removed keel entry is back");
+        let local = serde_json::json!({"disableAllHooks": true, "permissions": {"allow": ["Bash"]}});
+        let (fixed, _) = restored_settings(&local, true).expect("local repair");
+        assert!(fixed.get("disableAllHooks").is_none() && fixed["permissions"]["allow"][0] == "Bash", "local: only the key leaves");
+        assert!(restored_settings(&serde_json::json!({"permissions": {}}), true).is_none(), "a local file without the key is the user's");
+    }
+
     /// D0296: the plugin is the SAME hook set - one generator, two renderings - and its three files
     /// are walked by one list for both the writer and the check.
     #[test]

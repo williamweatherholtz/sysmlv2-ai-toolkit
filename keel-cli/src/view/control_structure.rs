@@ -137,6 +137,7 @@ fn hook_actions(root: &Path, out: &mut Vec<Action>) {
         let kind = match event.as_str() {
             "Stop" | "PostToolUse" | "SubagentStop" => "blocks",
             "PreToolUse" => "denies or advises",
+            "ConfigChange" => "refuses and restores",
             _ => "advises",
         };
         out.push(Action {

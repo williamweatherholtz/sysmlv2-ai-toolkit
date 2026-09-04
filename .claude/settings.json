@@ -1,5 +1,19 @@
 {
   "hooks": {
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook config-change",
+            "shell": "bash",
+            "statusMessage": "hook kill-switch guard",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "project_settings|local_settings"
+      }
+    ],
     "PostToolUse": [
       {
         "hooks": [

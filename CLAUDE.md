@@ -274,7 +274,7 @@ dishonest; `keel hook pre-bash` advises on host/shell adaptation before a Bash c
 **advisory, never blocking**, and silent unless it has something to say; `keel hook pre-write` guards
 the protected fact surfaces (deny in strict-profile projects, advisory here until P1 lands the tiered
 model — the pure-shell fallback denies when the binary is absent; a Write/Edit that sets `disableAllHooks` in a repo-scope settings file is DENIED in every profile, issue365/D0296); `keel hook subagent-stop` gates a
-subagent only when the tree changed during its lifetime. Every hook fire appends one line to the
+subagent only when the tree changed during its lifetime. `keel hook config-change` (D0296) REFUSES a repo-scope settings change that sets `disableAllHooks` or alters a keel-owned hook entry and RESTORES the file in place - Claude Code does not revert a blocked change, and a key left on disk kills every hook at the next launch; it runs in every profile, and a file it cannot parse is reported, never blocked on. Every hook fire appends one line to the
 machine-local fire-ledger (`.keel/metrics/hooks.jsonl`, D0180) — the single instrumentation path the
 hooks-actually-fired checks read. The whole `.claude/` surface is engine-generated: `keel sync-claude`
 regenerates the keel-owned subset in place (user entries survive), and `sync-claude --check` is the
