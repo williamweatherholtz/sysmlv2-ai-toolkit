@@ -1,0 +1,15 @@
+{
+  "author": {
+    "name": "keel"
+  },
+  "description": "keel's in-loop tier hosted above the repository: the same hook set the repo's settings.json declares, rendered by the same generator (D0296).",
+  "homepage": "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases",
+  "keywords": [
+    "keel",
+    "hooks",
+    "gate",
+    "sysml"
+  ],
+  "name": "keel",
+  "version": "0.3.1"
+}

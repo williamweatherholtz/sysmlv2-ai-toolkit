@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "description": "The keel engine's Claude Code plugin: the hook set as an enforcement copy a repo-scope settings file cannot remove (D0296)."
+  },
+  "name": "keel",
+  "owner": {
+    "name": "keel"
+  },
+  "plugins": [
+    {
+      "description": "keel hooks: post-edit fast gate, turn gate, protected-path check, shell advisory, subagent gate.",
+      "name": "keel",
+      "source": "./.engine/claude-plugin",
+      "version": "0.3.1"
+    }
+  ]
+}

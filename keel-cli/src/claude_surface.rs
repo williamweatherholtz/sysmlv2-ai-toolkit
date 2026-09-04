@@ -176,6 +176,66 @@ pub fn text_sets_kill_switch(text: &str) -> bool {
     rest.starts_with("true")
 }
 
+/// Where the repository carries the keel PLUGIN - the enforcement copy of the hook set (D0296).
+///
+/// Rendered by the same generator as the repo's `settings.json` entries, so the hook set has ONE
+/// source and two renderings; `sync-claude --check` reports drift in either. A launch passes
+/// `--plugin-dir` at this path (or a marketplace install of it), which a repo-scope settings file
+/// cannot remove: hook lists merge across scopes.
+pub const PLUGIN_DIR: &str = ".engine/claude-plugin";
+/// The marketplace manifest at the repository root, so a project's settings can carry the plugin in
+/// `extraKnownMarketplaces` / `enabledPlugins` (both are settable from any scope).
+pub const MARKETPLACE_MANIFEST: &str = ".claude-plugin/marketplace.json";
+/// The plugin's name in both manifests.
+pub const PLUGIN_NAME: &str = "keel";
+
+/// `.claude-plugin/plugin.json` for the shipped plugin.
+#[must_use]
+pub fn plugin_manifest() -> serde_json::Value {
+    serde_json::json!({
+        "name": PLUGIN_NAME,
+        "version": SURFACE_VERSION,
+        "description": "keel's in-loop tier hosted above the repository: the same hook set the repo's settings.json declares, rendered by the same generator (D0296).",
+        "author": {"name": "keel"},
+        "homepage": INSTALL_URL,
+        "keywords": ["keel", "hooks", "gate", "sysml"]
+    })
+}
+
+/// `hooks/hooks.json` for the shipped plugin - the keel hook set, unchanged.
+#[must_use]
+pub fn plugin_hooks() -> serde_json::Value {
+    serde_json::json!({"hooks": keel_hooks()})
+}
+
+/// `.claude-plugin/marketplace.json` at the repository root, naming the plugin by relative source.
+#[must_use]
+pub fn marketplace_manifest() -> serde_json::Value {
+    serde_json::json!({
+        "name": PLUGIN_NAME,
+        "owner": {"name": "keel"},
+        "metadata": {"description": "The keel engine's Claude Code plugin: the hook set as an enforcement copy a repo-scope settings file cannot remove (D0296)."},
+        "plugins": [{
+            "name": PLUGIN_NAME,
+            "source": format!("./{PLUGIN_DIR}"),
+            "description": "keel hooks: post-edit fast gate, turn gate, protected-path check, shell advisory, subagent gate.",
+            "version": SURFACE_VERSION
+        }]
+    })
+}
+
+/// The three plugin files as `(relative path, pretty JSON)` - the single list both the writer and
+/// the drift check walk, so neither can forget one.
+#[must_use]
+pub fn plugin_files() -> Vec<(String, String)> {
+    let pretty = |v: &serde_json::Value| serde_json::to_string_pretty(v).unwrap_or_default() + "\n";
+    vec![
+        (format!("{PLUGIN_DIR}/.claude-plugin/plugin.json"), pretty(&plugin_manifest())),
+        (format!("{PLUGIN_DIR}/hooks/hooks.json"), pretty(&plugin_hooks())),
+        (MARKETPLACE_MANIFEST.to_string(), pretty(&marketplace_manifest())),
+    ]
+}
+
 /// Deep-merge the keel-owned subset into `existing` settings.
 ///
 /// Foreign entries survive untouched; keel-owned entries are REPLACED (idempotent: merging twice
@@ -351,6 +411,17 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
         drift.push(format!("{missing_skills} skill(s) missing or stale under .claude/skills/"));
     }
 
+    // the plugin rendering (D0296): every file byte-equal to this binary's generator
+    let mut plugin_stale = Vec::new();
+    for (rel, want) in plugin_files() {
+        if std::fs::read_to_string(root.join(&rel)).unwrap_or_default().replace("\r\n", "\n") != want {
+            plugin_stale.push(rel);
+        }
+    }
+    if !plugin_stale.is_empty() {
+        drift.push(format!("plugin rendering stale or missing: {} (D0296 - the same hook set, second rendering)", plugin_stale.join(", ")));
+    }
+
     if check_only {
         return Ok(SyncReport {
             wrote_settings: false,
@@ -365,6 +436,13 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     crate::write::write_atomic(&settings_path, &serde_json::to_string_pretty(&merged).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     crate::write::write_atomic(&style_path, OUTPUT_STYLE).map_err(|e| e.to_string())?;
+    for (rel, text) in plugin_files() {
+        let dst = root.join(&rel);
+        if let Some(parent) = dst.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        crate::write::write_atomic(&dst, &text).map_err(|e| e.to_string())?;
+    }
     let mut skills_written = 0usize;
     for (title, loc) in &registry {
         let src_text = std::fs::read_to_string(root.join(loc))
@@ -386,7 +464,10 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 
 #[cfg(test)]
 mod tests {
-    use super::{hooks_silenced, keel_hooks, merge_settings, protected_path_command, resolver, sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, PROTECTED_PATHS};
+    use super::{
+        hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, sync_claude,
+        text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS,
+    };
 
     /// D-P0a: five events, every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
     /// and the missing-binary branch is loud and names the install path.
@@ -447,6 +528,31 @@ mod tests {
 
     /// Mixed ownership: a foreign hook group and foreign top-level settings survive the merge
     /// byte-for-byte; merging twice equals merging once (idempotent).
+    /// D0296: the plugin is the SAME hook set - one generator, two renderings - and its three files
+    /// are walked by one list for both the writer and the check.
+    #[test]
+    fn plugin_rendering_is_the_same_hook_set_and_checked() {
+        assert_eq!(plugin_hooks()["hooks"], keel_hooks(), "plugin hooks.json carries the settings.json hook set unchanged");
+        let files = plugin_files();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|(p, _)| p.ends_with("plugin.json")) && files.iter().any(|(p, _)| p.ends_with("hooks.json")));
+        let mp = marketplace_manifest();
+        assert_eq!(mp["plugins"][0]["source"], format!("./{PLUGIN_DIR}"), "the marketplace names the plugin by its in-repo path");
+
+        let root = std::env::temp_dir().join(format!("keel-plugin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+        std::fs::write(root.join(".claude").join("settings.json"), merge_settings(&serde_json::json!({})).to_string()).expect("clean");
+        let before = sync_claude(&root, true).expect("check");
+        assert!(before.drift.iter().any(|d| d.starts_with("plugin rendering stale or missing")), "no plugin yet = drift: {:?}", before.drift);
+        sync_claude(&root, false).expect("write");
+        let after = sync_claude(&root, true).expect("check again");
+        assert!(!after.drift.iter().any(|d| d.starts_with("plugin rendering")), "written plugin = no plugin drift: {:?}", after.drift);
+        assert!(root.join(PLUGIN_DIR).join("hooks").join("hooks.json").exists());
+        assert!(root.join(MARKETPLACE_MANIFEST).exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// issue365: the kill switch is stripped on merge, seen as drift on check, and NAMED - not
     /// folded into the generic "entries differ" line.
     #[test]
