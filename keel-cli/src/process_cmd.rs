@@ -1185,14 +1185,141 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
 /// The audit answers ONE question per unit: if a project that lacks this process imports it, does
 /// its gate stay green? It reports the reason when the answer is no, and never guesses — every
 /// check reads the tree.
+/// Every `<kind> def <Name>` a set of `SysML` texts declares: the names a reader of those texts may
+/// reference without reaching outside them.
+fn defined_names(texts: &[String]) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    for t in texts {
+        for line in t.lines() {
+            let l = line.trim_start().trim_start_matches('#').trim_start();
+            let Some(idx) = l.find(" def ") else { continue };
+            let kind = &l[..idx];
+            if !matches!(kind, "part" | "attribute" | "enum" | "occurrence" | "constraint" | "item" | "action" | "metadata" | "port" | "requirement" | "use case" | "verification") {
+                continue;
+            }
+            if let Some(name) = l[idx + 5..].split(|c: char| !c.is_alphanumeric() && c != '_').next() {
+                if !name.is_empty() {
+                    out.insert(name.to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Every TYPE and CONSTRAINT name a set of `SysML` texts references: the `: Name` after a declared
+/// usage (`part x : Name`, `verification x : Name`, `assert constraint x : Name`, ...) and the `Enum`
+/// of every `Enum::member` value. Comments are skipped; the names are returned with the shape of the
+/// reference so a report can say what kind of thing is missing.
+fn referenced_names(texts: &[String]) -> Vec<(String, &'static str)> {
+    let mut out: Vec<(String, &'static str)> = Vec::new();
+    let ident = |s: &str| -> String { s.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect() };
+    for t in texts {
+        for raw in t.lines() {
+            let line = raw.split("//").next().unwrap_or_default();
+            let l = line.trim_start().trim_start_matches('#').trim_start();
+            // An import names a PACKAGE, not a type; the names it brings in are seen where they are used.
+            if l.starts_with("import ") || l.starts_with("private import ") || l.starts_with("public import ") || l.starts_with("package ") {
+                continue;
+            }
+            // `assert constraint local : Name;`
+            if let Some(rest) = l.strip_prefix("assert constraint ") {
+                if let Some((_, target)) = rest.split_once(':') {
+                    let n = ident(target.trim());
+                    if !n.is_empty() {
+                        out.push((n, "constraint"));
+                    }
+                }
+                continue;
+            }
+            // `part|action|verification|item|requirement x : Name {` - a usage typed by Name
+            for kw in ["part ", "action ", "verification ", "item ", "requirement "] {
+                if let Some(rest) = l.strip_prefix(kw) {
+                    if rest.starts_with("def ") {
+                        break;
+                    }
+                    if let Some((_, target)) = rest.split_once(':') {
+                        let n = ident(target.trim().trim_start_matches(">> "));
+                        if !n.is_empty() && n.chars().next().is_some_and(char::is_uppercase) {
+                            out.push((n, "type"));
+                        }
+                    }
+                    break;
+                }
+            }
+            // `Enum::member` values
+            for (i, _) in line.match_indices("::") {
+                let before: String = line[..i].chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<Vec<_>>().into_iter().rev().collect();
+                if before.chars().next().is_some_and(char::is_uppercase) {
+                    out.push((before, "enum"));
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// The base schema's names - what every adopter has, because `init` ships `.engine/schema/`.
+fn schema_names(root: &Path) -> std::collections::HashSet<String> {
+    let texts: Vec<String> = crate::collect_sysml(&root.join(".engine").join("schema"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .collect();
+    defined_names(&texts)
+}
+
+/// Where a name outside the unit and the schema is defined in THIS engine, if anywhere - so the
+/// report can say which file the adopter would need, or that the symbol is defined nowhere.
+fn defining_file(root: &Path, name: &str) -> Option<String> {
+    for dir in [".engine/rules", ".engine/processes", ".engine/skills", ".engine/views", ".engine/workflows"] {
+        for p in crate::collect_sysml(&root.join(dir)) {
+            let Ok(t) = std::fs::read_to_string(&p) else { continue };
+            if defined_names(std::slice::from_ref(&t)).contains(name) {
+                return Some(p.strip_prefix(root).unwrap_or(&p).to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    None
+}
+
+/// Pure core (issue263): the names a unit's carried files reference that neither the unit nor the base
+/// schema defines - EXTERNAL references, each a portability dependency the audit cannot judge (it
+/// cannot see the target's schema) and therefore REPORTS, naming the symbol and its kind.
+fn external_references(carried: &[String], schema: &std::collections::HashSet<String>) -> Vec<(String, &'static str)> {
+    let own = defined_names(carried);
+    referenced_names(carried).into_iter().filter(|(n, _)| !own.contains(n) && !schema.contains(n)).collect()
+}
+
+/// The external-reference lines for one unit's report (check 5 of the audit).
+fn external_report(root: &Path, r: &Row, schema: &std::collections::HashSet<String>) -> Vec<String> {
+    let carried: Vec<String> = unit_files(root, r).iter().filter(|f| f.extension().is_some_and(|e| e == "sysml")).filter_map(|f| std::fs::read_to_string(f).ok()).collect();
+    external_references(&carried, schema)
+        .into_iter()
+        .map(|(name, kind)| {
+            let where_ = defining_file(root, &name).map_or_else(
+                || "defined NOWHERE in this engine - the reference is dangling here too".to_string(),
+                |f| format!("defined in {f}, which the adopter must already have at this vintage"),
+            );
+            let remedy = if kind == "constraint" { " - an unclaimed guard is CORE, so dropping the assert is usually better than importing it" } else { "" };
+            format!("{name} ({kind}; {where_}{remedy})")
+        })
+        .collect()
+}
+
 fn audit(root: &Path) -> i32 {
     let rows = rows(root);
     let central =
         std::fs::read_to_string(root.join(".engine/skills/skills-registry.sysml")).unwrap_or_default();
     let mut red = 0u32;
+    let schema = schema_names(root);
     println!("process audit: would each unit land GREEN in a project that lacks it? (D0222)");
     println!("  a unit TRAVELS WHOLE when it carries its definition, its deploying skill, and the");
     println!("  declaration binding them - plus every extra it declares. Anything else lands red.");
+    println!("  ~ external: a type or constraint the unit references but does not carry and the base");
+    println!("    schema does not define (issue263) - a dependency on the adopter's engine vintage, reported");
+    println!("    not judged, because this audit cannot see the target's schema.");
     println!();
     for r in &rows {
         let mut problems: Vec<String> = Vec::new();
@@ -1262,6 +1389,13 @@ fn audit(root: &Path) -> i32 {
                 ));
             }
         }
+        // 5. EXTERNAL SCHEMA REFERENCES (issue263): a type or constraint name the carried files
+        //    reference that neither the unit nor the base schema defines. The audit cannot see the
+        //    target's schema, so this is a REPORTED DEPENDENCY, not a verdict - the unit still travels
+        //    whole if everything else holds, and the reader learns what the adopter must already have.
+        //    decision-channel asserted `judgmentRequestQuality`, defined in the source's rules file, and
+        //    landed on penumbra with an unresolved type reference; the audit had said TRAVELS WHOLE.
+        let external = external_report(root, r, &schema);
         let verdict = if problems.is_empty() { "TRAVELS-WHOLE" } else { "LANDS-RED" };
         if !problems.is_empty() {
             red += 1;
@@ -1271,9 +1405,13 @@ fn audit(root: &Path) -> i32 {
         } else {
             format!(", {} stated prerequisite(s)", requires.len())
         };
-        println!("  [{verdict}] {}  ({} file(s){prereq})", r.name, unit_files(root, r).len());
+        let ext = if external.is_empty() { String::new() } else { format!(", {} external reference(s)", external.len()) };
+        println!("  [{verdict}] {}  ({} file(s){prereq}{ext})", r.name, unit_files(root, r).len());
         for p in &problems {
             println!("      - {p}");
+        }
+        for e in &external {
+            println!("      ~ external: {e}");
         }
     }
     println!();
@@ -1383,6 +1521,44 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    /// issue263: a constraint the unit asserts but does not carry, and the base schema does not define,
+    /// is an EXTERNAL reference named with its kind; a name the unit defines itself, or the schema does,
+    /// is not; imports and comments never count; enum values reference their enum.
+    #[test]
+    fn external_references_name_what_the_unit_does_not_carry() {
+        let schema: std::collections::HashSet<String> = ["Process", "ProcessStep", "VerificationMethod", "Test"].iter().map(|s| (*s).to_string()).collect();
+        let unit = vec![
+            "package P {
+    private import EngineElement::*;
+    private import EngineGuardConstraints::*; // brings the constraint in
+    constraint def ownRule;
+    action p : Process {
+        assert constraint a : judgmentRequestQuality;
+        assert constraint b : ownRule;
+        // assert constraint c : commentedOut;
+    }
+    action s : ProcessStep { :>> owner = Owner::human; }
+    verification t : Test { :>> method = VerificationMethod::inspect; }
+    part x : ForeignThing { }
+}
+".to_string(),
+        ];
+        let ext = super::external_references(&unit, &schema);
+        assert!(ext.contains(&("judgmentRequestQuality".to_string(), "constraint")), "{ext:?}");
+        assert!(ext.contains(&("ForeignThing".to_string(), "type")), "{ext:?}");
+        assert!(ext.contains(&("Owner".to_string(), "enum")), "an enum the schema fixture lacks is external: {ext:?}");
+        assert!(!ext.iter().any(|(n, _)| n == "ownRule"), "a name the unit defines is carried: {ext:?}");
+        assert!(!ext.iter().any(|(n, _)| n == "Process" || n == "VerificationMethod"), "schema names are what every adopter has: {ext:?}");
+        assert!(!ext.iter().any(|(n, _)| n == "commentedOut" || n == "EngineGuardConstraints" || n == "EngineElement"), "comments and imports are not references: {ext:?}");
+        // a unit with no external reference stays clean
+        let clean = vec!["package Q {
+    action q : Process { }
+    verification t : Test { :>> method = VerificationMethod::test; }
+}
+".to_string()];
+        assert!(super::external_references(&clean, &schema).is_empty());
+    }
 
     /// THE CONTROL for issue241: the catalogue reports every DECLARED process, not the
     /// guard-bearing subset. `rows()` once iterated `unit_names()`, so `keel process show intake`
