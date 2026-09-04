@@ -197,6 +197,11 @@ frozen (modify it only by out-of-band Decision).
   `git fetch` before a shared-region edit. Conflicting conclusions → record an `Issue`; the human
   adjudicates. Run a multi-contributor session through the **`distributed-collaboration`** skill; enroll a
   contributor with **`actor-enrollment`**.
+- **A Decision is ONE clause (D0303, option C, the human's choice 2026-09-04).** A layered change is several
+  Decisions with `#DependsOn` edges between them, each chartered on its own - because `decision-scaffolding` can
+  see whether a Decision is chartered but not which clause an edge covers, so a compound Decision half-built
+  read as covered (issue331, d0252). From 2026-09-05 a Decision whose text enumerates `(1) ... (2)` clauses fails
+  the guard; the ones before are grandfathered and counted, never re-split.
 - **Decisions auto-accept under standing consent (D0207), at record time (D0291).** `keel record decision`
   accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words, the
   judge is the single decider in `github-actors.toml`; override = a superseding Decision (D0290) or your quoted

@@ -3537,7 +3537,7 @@ pub fn decision_scaffolding(root: &Path) -> GuardReport {
     if !bare.is_empty() {
         bare.pop();
     }
-    let warnings = bare
+    let mut warnings: Vec<String> = bare
         .into_iter()
         .map(|(d, at)| {
             format!(
@@ -3545,7 +3545,99 @@ pub fn decision_scaffolding(root: &Path) -> GuardReport {
             )
         })
         .collect();
-    GuardReport { name: "decision-scaffolding", scanned, warnings, violations: Vec::new() }
+    // D0303 OPTION C (issue331): a Decision is ONE clause. The guard can see whether a Decision is
+    // chartered but not which clause an edge covers - so a compound Decision half-delivered read as
+    // covered (d0252, nine days). The human chose the convention over a schema change: from the day
+    // after acceptance, a Decision whose text enumerates clauses is a violation naming the count and
+    // the fix (one Decision per clause, edges between them); the ones before are counted once.
+    let (forward, grandfathered) = compound_decisions(&texts, COMPOUND_DECISION_CUTOFF);
+    let mut violations: Vec<String> = forward
+        .into_iter()
+        .map(|(d, n)| format!("{d}: a COMPOUND Decision - its text enumerates {n} clauses - and decision-scaffolding cannot see which clause an edge charters, so partial delivery would be invisible (issue331). D0303 option C: record one Decision per clause, with #DependsOn edges between them, and let each be chartered on its own."))
+        .collect();
+    violations.sort();
+    if grandfathered > 0 {
+        warnings.push(format!(
+            "{grandfathered} compound Decision(s) recorded before {COMPOUND_DECISION_CUTOFF} enumerate several clauses - grandfathered under D0303 option C; their partial delivery is not visible to this guard, and re-splitting history is the D0129 class, so they are counted, not reported"
+        ));
+    }
+    GuardReport { name: "decision-scaffolding", scanned, warnings, violations }
+}
+
+/// D0303 option C's date: a Decision created on or after it is one clause.
+const COMPOUND_DECISION_CUTOFF: &str = "2026-09-05";
+
+/// Pure core (issue331 / D0303 C): every Decision whose `decision` text enumerates two or more clauses
+/// (`(1) ... (2) ...`, `(a) ... (b) ...`, or `clause A ... clause B`), split by its `createdAt`
+/// against the cutoff into `(forward violators as (name, clause count), grandfathered count)`.
+fn compound_decisions(texts: &[(String, String)], cutoff: &str) -> (Vec<(String, usize)>, usize) {
+    let mut forward = Vec::new();
+    let mut grandfathered = 0usize;
+    for (_, t) in texts {
+        let mut rest = t.as_str();
+        while let Some(i) = rest.find("part d0") {
+            let block = &rest[i..];
+            let name: String = block[5..].chars().take_while(|c| c.is_alphanumeric()).collect();
+            let end = block.find("\n    }").map_or(block.len(), |e| e + 6);
+            let body = &block[..end];
+            rest = &rest[i + 5 + name.len()..];
+            if !body.contains(": Decision") {
+                continue;
+            }
+            let field = |key: &str| -> &str {
+                body.find(&format!("{key} = \"")).map_or("", |s| {
+                    let v = &body[s + key.len() + 4..];
+                    v.find('"').map_or(v, |e| &v[..e])
+                })
+            };
+            let decision = field("decision");
+            let clauses = clause_count(decision);
+            if clauses < 2 {
+                continue;
+            }
+            if field("createdAt") >= cutoff {
+                forward.push((name, clauses));
+            } else {
+                grandfathered += 1;
+            }
+        }
+    }
+    (forward, grandfathered)
+}
+
+/// How many enumerated clauses a decision text carries: the largest of `(N)` numerals, `(x)` letters,
+/// and `clause X` markers that appear in sequence from the first.
+fn clause_count(text: &str) -> usize {
+    let numeric = (1..=9).take_while(|n| text.contains(&format!("({n})"))).count();
+    let lettered = ('a'..='i').take_while(|c| text.contains(&format!("({c})"))).count();
+    let clause = ('A'..='I').take_while(|c| text.contains(&format!("clause {c}"))).count();
+    numeric.max(lettered).max(clause)
+}
+
+#[cfg(test)]
+mod compound_decision_tests {
+    use super::{clause_count, compound_decisions};
+
+    /// D0303 C armed against the broken predicate (D0253): a two-clause Decision created after the
+    /// cutoff is reported with its count; one before is counted; a single-clause one is neither.
+    #[test]
+    fn a_compound_decision_is_reported_forward_only() {
+        assert_eq!(clause_count("(1) first. (2) second. (3) third."), 3);
+        assert_eq!(clause_count("clause A says x; clause B says y"), 2);
+        assert_eq!(clause_count("one thing, said once"), 0);
+        assert_eq!(clause_count("(2) alone does not enumerate"), 0);
+        let mk = |name: &str, created: &str, decision: &str| format!(
+            "package X {{\n    part {name} : Decision {{\n        :>> id = \"x\";\n        :>> title = \"t\";\n        :>> createdAt = \"{created}\";\n        :>> decision = \"{decision}\";\n    }}\n}}\n"
+        );
+        let texts = vec![
+            ("a".to_string(), mk("d0901", "2026-09-10", "(1) build the thing; (2) also the other thing")),
+            ("b".to_string(), mk("d0902", "2026-01-01", "(1) old; (2) compound; grandfathered")),
+            ("c".to_string(), mk("d0903", "2026-09-10", "one clause, one Decision")),
+        ];
+        let (forward, grandfathered) = compound_decisions(&texts, "2026-09-05");
+        assert_eq!(forward, vec![("d0901".to_string(), 2)]);
+        assert_eq!(grandfathered, 1);
+    }
 }
 
 /// Guard 43 (D0191, WARNING tier, owned by the `deploy` unit).
@@ -4922,7 +5014,7 @@ mod scan_count_tests {
     /// guard silently going quiet cannot hide behind them.
     #[test]
     fn the_guards_that_report_a_population_still_do() {
-        const LEGITIMATELY_EMPTY: [&str; 14] = [
+        const LEGITIMATELY_EMPTY: [&str; 15] = [
             // scans priority-ordering pairs on the ready frontier; D0189's scope closure emptied
             // the frontier down to a handful of same-rank resolvers, so there is nothing to order.
             // The population returns the moment the backlog holds ranked work again.
@@ -4947,6 +5039,7 @@ mod scan_count_tests {
             "doc-sync",                  // scans CHANGED doc surface
             "decision-amends-process",   // scans STAGED Decisions - zero between commits
             "unit-extras-present",       // scans declared unit extras; no installed unit declares any since the channel left (D0292)
+            "control-defect-registry",   // scans registered control defects - EMPTY since 2026-09-04, when the last of D0278's three left with D0303 C; a registered defect is the unhealthy state
             "base-first-justification",  // scans new base-construct adoptions
             "ownership",                 // scans cross-owner edits
         ];
