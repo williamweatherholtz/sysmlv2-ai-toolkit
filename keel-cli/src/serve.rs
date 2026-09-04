@@ -1365,6 +1365,15 @@ async fn api_agent_stream(State(s): State<AppState>, Query(q): Query<AgentReq>) 
             command.env("KEEL_ACTOR", &setup.actor);
             command.env("KEEL_RUN_ID", &setup.id);
         }
+        // D0296 layer 2: the plugin rendering and the launch-scope kill-switch pin. A failure to
+        // write the pin is reported and the run still launches - the repo-scope hooks are the
+        // fallback, and a console run must not die on a machine-local file.
+        match crate::launcher::hook_pin_args(&root) {
+            Ok(pin) => {
+                command.args(&pin);
+            }
+            Err(e) => yield Ok(Event::default().event("status").data(format!("hook pin not applied ({e}); the repo-scope hooks still run"))),
+        }
         let spawned = command
             .args(["-p", &prompt, "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--max-turns", AGENT_MAX_TURNS])
             .current_dir(&root)

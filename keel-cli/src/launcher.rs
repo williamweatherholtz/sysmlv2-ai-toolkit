@@ -34,6 +34,40 @@ pub const RUN_RECORD_FIELDS: [&str; 14] = [
     "durationMs", "timedOut", "gate", "diffFiles", "ledgerSignal",
 ];
 
+/// The launch-scope settings document keel passes to every `claude` it spawns (D0296 run 6).
+///
+/// `--settings` sits ABOVE project and local scope in Claude Code's precedence, so an explicit
+/// `disableAllHooks: false` here beats a `true` already on disk in the repository's settings - the
+/// one hole the `ConfigChange` handler cannot close (run 5: a key present at launch kills every hook
+/// before any hook can fire). Written machine-local under `.keel/`, never committed.
+pub const LAUNCH_SETTINGS: &str = "{\n  \"disableAllHooks\": false\n}\n";
+
+/// The `claude` arguments that pin the keel hooks ON for a spawned session (D0296 layer 2).
+///
+/// `--plugin-dir <root>/.engine/claude-plugin` loads the plugin rendering - the hook set a
+/// repo-scope settings file cannot remove, since hook lists merge across scopes - and `--settings
+/// <root>/.keel/launch-settings.json` pins the kill switch off above project scope. The plugin flag
+/// is passed only when the rendering exists (a project that has not run `sync-claude` still gets
+/// the settings pin). The settings file is (re)written on every call so it is never stale.
+///
+/// # Errors
+/// The `.keel/` directory or the settings file cannot be written.
+pub fn hook_pin_args(root: &Path) -> Result<Vec<String>, String> {
+    let keel_dir = root.join(".keel");
+    std::fs::create_dir_all(&keel_dir).map_err(|e| format!("cannot create {}: {e}", keel_dir.display()))?;
+    let settings = keel_dir.join("launch-settings.json");
+    crate::write::write_atomic(&settings, LAUNCH_SETTINGS).map_err(|e| format!("cannot write {}: {e}", settings.display()))?;
+    let mut args = Vec::new();
+    let plugin = root.join(crate::claude_surface::PLUGIN_DIR);
+    if plugin.join("hooks").join("hooks.json").is_file() {
+        args.push("--plugin-dir".to_string());
+        args.push(plugin.to_string_lossy().replace('\\', "/"));
+    }
+    args.push("--settings".to_string());
+    args.push(settings.to_string_lossy().replace('\\', "/"));
+    Ok(args)
+}
+
 /// A prepared (not yet spawned) run.
 pub struct RunSetup {
     pub id: String,
@@ -330,4 +364,28 @@ mod tests {
         assert!(text.contains("judgedBy = \"hum\""), "the RUN'S stamped actor, not the machine binding");
         assert!(text.contains("AWAITS HUMAN REVIEW"), "review is unconditional");
     }
+    /// D0296 run 6: the pin is `--settings` with the kill switch OFF, above project scope, plus the
+    /// plugin rendering when present. The settings file is rewritten each call.
+    #[test]
+    fn hook_pin_args_pin_the_kill_switch_off_and_load_the_plugin_when_present() {
+        let root = std::env::temp_dir().join(format!("keel-pin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("mkdir");
+        let args = super::hook_pin_args(&root).expect("args");
+        assert_eq!(args.len(), 2, "no plugin rendering yet: only the settings pin: {args:?}");
+        assert_eq!(args[0], "--settings");
+        let text = std::fs::read_to_string(&args[1]).expect("settings file written");
+        let doc: serde_json::Value = serde_json::from_str(&text).expect("json");
+        assert_eq!(doc["disableAllHooks"], false, "the pin is an explicit false: {text}");
+        std::fs::write(&args[1], "stale").expect("stale");
+        let plugin = root.join(crate::claude_surface::PLUGIN_DIR).join("hooks");
+        std::fs::create_dir_all(&plugin).expect("plugin dir");
+        std::fs::write(plugin.join("hooks.json"), "{}").expect("hooks.json");
+        let args = super::hook_pin_args(&root).expect("args again");
+        assert_eq!(args[0], "--plugin-dir", "the plugin rendering is loaded when it exists: {args:?}");
+        assert!(args[1].ends_with(".engine/claude-plugin"), "{args:?}");
+        assert_eq!(std::fs::read_to_string(&args[3]).expect("rewritten"), super::LAUNCH_SETTINGS, "the settings file is rewritten, never stale");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
 }

@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 101] = [
+pub const CLI_FACTS: [CliFact; 102] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
@@ -67,6 +67,7 @@ pub const CLI_FACTS: [CliFact; 101] = [
     CliFact { name: "sync", family: "integration", effect: "both", stability: "stable", invocation: "[ROOT]", synopsis: "fetch, report divergence, integrate by merge, gate the result" },
     CliFact { name: "land", family: "integration", effect: "both", stability: "stable", invocation: "[ROOT]", synopsis: "gate every project, push; on rejection merge and gate the merged tree, then retry" },
     CliFact { name: "migrate", family: "integration", effect: "both", stability: "stable", invocation: "[ROOT] [--dry-run]", synopsis: "bring an existing project onto this binary's engine vintage, refusing and rolling back on failure" },
+    CliFact { name: "claude", family: "integration", effect: "tooling", stability: "stable", invocation: "[claude args...]", synopsis: "launch Claude Code with the keel hooks pinned ON: the plugin rendering, disableAllHooks:false above project scope, KEEL_BIN = this binary (D0296)" },
     CliFact { name: "sync-claude", family: "integration", effect: "both", stability: "stable", invocation: "[ROOT] [--check]", synopsis: "regenerate the keel-owned .claude/ surface; --check reports drift only" },
     CliFact { name: "projects", family: "integration", effect: "reads", stability: "stable", invocation: "[ROOT] [--json]", synopsis: "every keel project in this repository, and which one you are in" },
     CliFact { name: "version", family: "integration", effect: "tooling", stability: "stable", invocation: "[--json]  (also --version)", synopsis: "release version, build commit, guard inventory" },

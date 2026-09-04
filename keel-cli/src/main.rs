@@ -1953,6 +1953,45 @@ fn cmd_decision_follow_through(args: &[String]) -> i32 {
 /// `keel sync-claude [ROOT] [--check]` (D0174/P0.2) — regenerate the keel-owned subset of the
 /// `.claude/` surface in place (foreign entries survive), or with `--check` report drift and
 /// version skew without writing. `--check` IS the `claude-surface-drift` guard's implementation.
+/// `keel claude [claude args...]` - launch an interactive (or `-p`) Claude Code session with the keel
+/// hooks pinned ON (D0296 layer 2): `--plugin-dir` at the plugin rendering and `--settings` with
+/// `disableAllHooks: false` above project scope, `KEEL_BIN` pointing at this binary so every hook
+/// resolves the engine that launched it. Everything after `claude` is passed through. Runs from
+/// inside a keel project; the exit code is claude's own.
+fn cmd_claude(args: &[String]) -> i32 {
+    let Some(root) = find_repo_root() else {
+        eprintln!("keel claude: not inside a keel project (no .engine/ up to the repository boundary) - run it from the project you want gated");
+        return 2;
+    };
+    let pin = match keel_cli::launcher::hook_pin_args(&root) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("keel claude: cannot write the hook pin ({e}) - refusing to launch unpinned; a launch without the pin is `claude` itself");
+            return 2;
+        }
+    };
+    let mut command = if cfg!(windows) {
+        let mut c = std::process::Command::new("cmd");
+        c.arg("/C").arg("claude");
+        c
+    } else {
+        std::process::Command::new("claude")
+    };
+    if let Ok(exe) = std::env::current_exe() {
+        command.env("KEEL_BIN", exe);
+    }
+    // A keel-launched session is not a nested one: the harness marks its own shells, and a launch
+    // from inside one would be refused by claude itself.
+    command.env_remove("CLAUDECODE");
+    match command.args(&pin).args(args).current_dir(&root).status() {
+        Ok(st) => st.code().unwrap_or(1),
+        Err(e) => {
+            eprintln!("keel claude: cannot launch the `claude` CLI ({e}) - install Claude Code and put it on PATH");
+            2
+        }
+    }
+}
+
 fn cmd_sync_claude(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel sync-claude [ROOT] [--check]", &["check"], 0) {
         Ok(r) => r,
@@ -4473,6 +4512,7 @@ fn main() {
         Some("mint") => cmd_mint(rest),
         Some("new") => cmd_new(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
+        Some("claude") => cmd_claude(rest),
         Some("override") => cmd_override(rest),
         Some("enforcement-report") => cmd_enforcement_report(rest),
         Some("guard") => cmd_guard(rest),
