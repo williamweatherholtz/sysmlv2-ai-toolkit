@@ -131,6 +131,14 @@ fn hook_actions(root: &Path, out: &mut Vec<Action>) {
         events.push((event, subs.join(", ")));
     }
     events.sort();
+    // D0296: when the plugin rendering carries the same event, the action has two hosts - and a
+    // settings edit cannot remove the second one, since hook lists merge across scopes.
+    let plugin_rel = format!("{}/hooks/hooks.json", crate::claude_surface::PLUGIN_DIR);
+    let plugin_events: Vec<String> = std::fs::read_to_string(root.join(&plugin_rel))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("hooks").and_then(|h| h.as_object()).map(|h| h.keys().cloned().collect()))
+        .unwrap_or_default();
     for (event, subs) in events {
         // The verdict kind is a property of the event, from the dispatcher's contract: Stop and
         // PostToolUse can BLOCK, PreToolUse can DENY, the rest can only advise.
@@ -146,7 +154,19 @@ fn hook_actions(root: &Path, out: &mut Vec<Action>) {
             issued_by: "hooks",
             acts_on: "agent-turn",
             data: format!("keel hook {subs}; verdict JSON the harness enforces"),
-            source: ".claude/settings.json".to_string(),
+            source: if plugin_events.contains(event) { format!(".claude/settings.json; {plugin_rel}") } else { ".claude/settings.json".to_string() },
+        });
+    }
+    // D0296 layer 2: the launch pin is a control action of its own - it acts on the SESSION's
+    // settings precedence, not on a turn - present when a keel launch has written it here.
+    if root.join(".keel").join("launch-settings.json").is_file() {
+        out.push(Action {
+            name: "launchPin".to_string(),
+            title: "launch: disableAllHooks pinned false above project scope".to_string(),
+            issued_by: "hooks",
+            acts_on: "agent-turn",
+            data: "--settings .keel/launch-settings.json; --plugin-dir the plugin rendering; KEEL_BIN".to_string(),
+            source: ".keel/launch-settings.json".to_string(),
         });
     }
 }

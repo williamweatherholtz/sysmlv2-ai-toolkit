@@ -43,6 +43,94 @@ impl State {
             Self::Unknown => "UNKNOWN",
         }
     }
+
+    /// The tag coloured for a terminal (D0287): OK green, ATTENTION red, UNKNOWN yellow - the
+    /// three verdicts must never look alike at a glance. Padded on the bare text so colour codes do
+    /// not shift the columns.
+    fn painted(&self) -> String {
+        let padded = format!("{:<10}", self.tag());
+        match self {
+            Self::Ok => crate::color::pass(&padded),
+            Self::Attention => crate::color::fail(&padded),
+            Self::Unknown => crate::color::warn(&padded),
+        }
+    }
+}
+
+/// Where the platform keeps managed (admin-deployed) Claude Code settings - the one hook host the
+/// agent's shell cannot write. Read for presence only, never parsed for policy (that is the admin's).
+const fn managed_settings_path() -> &'static str {
+    if cfg!(windows) {
+        "C:/Program Files/ClaudeCode/managed-settings.json"
+    } else if cfg!(target_os = "macos") {
+        "/Library/Application Support/ClaudeCode/managed-settings.json"
+    } else {
+        "/etc/claude-code/managed-settings.json"
+    }
+}
+
+/// HOOKS — which hosts carry the keel hook set for this project, and whether anything silences them
+/// (D0296). An out-of-hook check on purpose: a silenced hook cannot report itself (D0296 run 5), so
+/// the one place that can say "your hooks are off" is a command the human runs by hand.
+fn hooks_section(root: &Path) -> Section {
+    use crate::claude_surface::{hooks_silenced, merge_settings, PLUGIN_DIR, REPO_SCOPE_SETTINGS};
+    let mut lines = Vec::new();
+    let mut state = State::Ok;
+    // the kill switch first: it decides the verdict regardless of how many hosts exist
+    for rel in REPO_SCOPE_SETTINGS {
+        let text = std::fs::read_to_string(root.join(rel)).unwrap_or_default();
+        let doc: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::Value::Null);
+        if hooks_silenced(&doc) {
+            state = State::Attention;
+            lines.push(format!("{rel} sets disableAllHooks - a plain `claude` launch runs NO hook; `keel sync-claude` removes it, `keel claude` overrides it"));
+        }
+    }
+    // host 1: the repo-scope declaration
+    let settings = root.join(".claude").join("settings.json");
+    let declared = std::fs::read_to_string(&settings).is_ok_and(|text| {
+        if let Ok(doc) = serde_json::from_str::<serde_json::Value>(&text) {
+            let merged = merge_settings(&doc);
+            let events = merged.get("hooks").and_then(serde_json::Value::as_object).map_or(0, serde_json::Map::len);
+            if merged.get("hooks") == doc.get("hooks") {
+                lines.push(format!("repo settings: {events} keel events declared"));
+            } else {
+                state = State::Attention;
+                lines.push("repo settings: keel entries DRIFTED from this binary - `keel sync-claude`".to_string());
+            }
+        } else {
+            state = State::Attention;
+            lines.push("repo settings: .claude/settings.json is not JSON".to_string());
+        }
+        true
+    });
+    // host 2: the plugin rendering
+    let plugin = root.join(PLUGIN_DIR).join("hooks").join("hooks.json").is_file();
+    lines.push(if plugin {
+        format!("plugin rendering: {PLUGIN_DIR} present (a settings edit cannot remove it)")
+    } else {
+        format!("plugin rendering: none at {PLUGIN_DIR} - `keel sync-claude` writes it")
+    });
+    // host 3: the launch pin
+    lines.push(if root.join(".keel").join("launch-settings.json").is_file() {
+        "launch pin: .keel/launch-settings.json written by a `keel claude` / console launch".to_string()
+    } else {
+        "launch pin: no keel launch on this machine yet (`keel claude` writes it)".to_string()
+    });
+    // host 4: managed settings - presence only
+    lines.push(if Path::new(managed_settings_path()).is_file() {
+        format!("managed settings: present at {} (admin-deployed; the one host the agent cannot write)", managed_settings_path())
+    } else {
+        "managed settings: none (optional, admin-deployed)".to_string()
+    });
+    if !declared && !plugin {
+        state = State::Attention;
+        lines.insert(0, "NO hook host: neither repo settings nor a plugin rendering - only the commit gate and CI gate this project; `keel sync-claude` creates both".to_string());
+    }
+    if state == State::Ok {
+        let hosts = usize::from(declared) + usize::from(plugin);
+        lines.insert(0, format!("{hosts} host(s) carry the hook set; nothing silences them"));
+    }
+    Section { label: "hooks", state, lines }
 }
 
 fn field(text: &str, key: &str) -> Option<String> {
@@ -264,12 +352,18 @@ fn ci_section(root: &Path) -> Section {
 /// `keel status [ROOT]` — every base, in one screen.
 #[must_use]
 pub fn cmd(root: &Path) -> i32 {
-    let sections =
-        [engine_section(root), library_section(root), model_section(root), work_section(root), ci_section(root)];
+    let sections = [
+        engine_section(root),
+        library_section(root),
+        model_section(root),
+        work_section(root),
+        hooks_section(root),
+        ci_section(root),
+    ];
     println!("keel status — {}", root.display());
     println!();
     for s in &sections {
-        println!("  {:<9} {:<10} {}", s.label, s.state.tag(), s.lines.first().map_or("", String::as_str));
+        println!("  {:<9} {} {}", s.label, s.state.painted(), s.lines.first().map_or("", String::as_str));
         for extra in s.lines.iter().skip(1) {
             println!("  {:<20}{extra}", "");
         }
@@ -281,4 +375,45 @@ pub fn cmd(root: &Path) -> i32 {
     // report" is how a status screen becomes a comfort blanket.
     println!("  {attention} section(s) need attention, {unknown} could not be determined.");
     i32::from(attention > 0)
+}
+
+#[cfg(test)]
+mod hooks_section_tests {
+    use super::{hooks_section, State};
+
+    fn fixture(tag: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("keel-status-hooks-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+        root
+    }
+
+    /// D0296: the kill switch is ATTENTION even when every host is present - a silenced hook cannot
+    /// report itself, so this line is the one place a human sees it.
+    #[test]
+    fn kill_switch_is_attention_and_named() {
+        let root = fixture("kill");
+        let clean = crate::claude_surface::merge_settings(&serde_json::json!({}));
+        std::fs::write(root.join(".claude").join("settings.json"), clean.to_string()).expect("clean");
+        std::fs::write(root.join(".claude").join("settings.local.json"), r#"{"disableAllHooks": true}"#).expect("local");
+        let s = hooks_section(&root);
+        assert!(s.state == State::Attention);
+        assert!(s.lines[0].contains("settings.local.json") && s.lines[0].contains("disableAllHooks"), "{:?}", s.lines);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// No host at all is ATTENTION, not a clean zero (the pass-at-zero rule this module is built on).
+    #[test]
+    fn no_host_is_attention_and_a_clean_declaration_is_ok() {
+        let root = fixture("none");
+        let s = hooks_section(&root);
+        assert!(s.state == State::Attention && s.lines[0].starts_with("NO hook host"), "{:?}", s.lines);
+        let clean = crate::claude_surface::merge_settings(&serde_json::json!({}));
+        std::fs::write(root.join(".claude").join("settings.json"), clean.to_string()).expect("clean");
+        let s = hooks_section(&root);
+        assert!(s.state == State::Ok, "{:?}", s.lines);
+        assert!(s.lines[0].starts_with("1 host(s)"), "{:?}", s.lines);
+        assert!(s.lines.iter().any(|l| l.starts_with("plugin rendering: none")), "{:?}", s.lines);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
