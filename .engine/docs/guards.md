@@ -24,7 +24,7 @@ bare text, `NO_COLOR` disables, `KEEL_COLOR=1|0` forces.
 | `ceremony` | Sprint gates passed in order (D0047/issue010+011) |
 | `charter` | Work traces to a chartering item (D0068) |
 | `process-change` | A change to a process-def OR the enforcement surface co-commits a `#ProspectiveChange`/`#SafetyChange` Decision — the D0070 keystone, extended by D0209 clause 2 to guard source (`keel-cli/src/guards.rs`, `adherence.rs`), hook config (`.githooks/`), and CI workflows (`.github/workflows/*.yml`); a unit test re-derives the guard-source set so a new guard file cannot escape the lock |
-| `issues` | Every Issue is triaged with a `#Resolves` resolver (D0077/D0078). Rule-sourced |
+| `issues` | Every Issue is triaged with a `#Resolves` resolver (D0077/D0078). Rule-sourced FORWARD from 2026-09-04 (D0304, issue333): an edge is not a triage - the resolver's text must name the issue, or the issue's text must name the resolver; a miss is a violation for issues created on/after the cutoff and one counted history line before it (111 on 2026-09-04). |
 | `viewpoint-renderer` | Every declared viewpoint names a real `keel` command (D0056/issue034) |
 | `manifest-coverage` | The deliverable-suspicion manifest has no dead entries (D0050/issue033) |
 | `critic-independence` | A critique is by an **independent** critic (D0080/issue031) |

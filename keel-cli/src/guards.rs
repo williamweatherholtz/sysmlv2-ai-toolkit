@@ -1337,6 +1337,9 @@ pub fn doc_sync(root: &Path) -> GuardReport {
     GuardReport { name: "doc-sync", scanned, warnings: doc_sync_warnings(&changed), violations: Vec::new() }
 }
 
+/// D0304's date: an Issue created on or after it must be NAMED by its resolver's text.
+const ISSUE_NAMING_CUTOFF: &str = "2026-09-04";
+
 /// Guard: every Issue carries a `#Resolves` edge (D0077).
 ///
 /// An untriaged issue (no resolver) is a violation — it has no resolving work/Decision and can
@@ -1348,11 +1351,33 @@ pub fn issues(root: &Path) -> GuardReport {
     // CONTRACT (D0107): sourced from the declared issuesTriagedRule (single gate source), not a bespoke predicate.
     match crate::view::rule_violations_opt(root, "issuesTriagedRule") {
         Ok(Some((total, untriaged))) => {
-            let violations = untriaged
+            let mut violations: Vec<String> = untriaged
                 .into_iter()
                 .map(|i| format!("{i}: untriaged — no #Resolves edge (D0077; link a resolving action or Decision)"))
                 .collect();
-            GuardReport { name: "issues", scanned: total, warnings: Vec::new(), violations }
+            let mut warnings = Vec::new();
+            // issue333 / D0304: an edge that EXISTS is not a triage - the resolver must NAME the issue.
+            // Forward-only from D0304's date (the issue068 pattern): 144 of 387 historical resolutions
+            // never name their issue and re-triaging them is a sitting review the human may choose
+            // (D0204), never owed; they are counted once so the number cannot hide. NOTE issue352: this
+            // cutoff is the ENGINE's adoption date and is retroactive for a downstream project that
+            // migrates into it - dcForwardOnlyCutoffIsTheProjectsOwn is the open fix for that class.
+            match crate::view::unnamed_resolutions(root, ISSUE_NAMING_CUTOFF) {
+                Ok((_, forward, historical)) => {
+                    for (issue, resolver) in forward {
+                        violations.push(format!(
+                            "{issue}: its resolver `{resolver}` never names it (title, DoD text or decision) - an edge that exists is not a triage; a resolver that will close the issue says so (issue333/D0304). Name the issue in the resolver's DoD, or re-triage to the item that resolves it."
+                        ));
+                    }
+                    if historical > 0 {
+                        warnings.push(format!(
+                            "{historical} resolution(s) recorded before {ISSUE_NAMING_CUTOFF} do not name their issue - history, forward-only from D0304; re-triaging them is a pull-audit the human may choose (D0204), never owed"
+                        ));
+                    }
+                }
+                Err(e) => violations.push(format!("error reading resolutions: {e}")),
+            }
+            GuardReport { name: "issues", scanned: total, warnings, violations }
         }
                 // D0136/issue090: an ABSENT rule means the project has not ADOPTED this control —
         // it has not violated it. Warn (never silent, so deleting a rule to dodge the gate is
@@ -4579,6 +4604,56 @@ pub fn cli_surface_declared(root: &Path) -> GuardReport {
     let authored = parse_cli_facts(&text);
     let violations = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
     GuardReport { name: "cli-surface-declared", scanned: authored.len(), warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod issue_naming_tests {
+    /// issue333 / D0304: a resolver that never names its issue - and whose issue never names it - is
+    /// a violation for an issue created on/after the cutoff, a counted history line before it; either
+    /// direction of naming satisfies the check; the shape issue323 had (carried-over resolver, neither
+    /// text mentioning the other) is what fires.
+    #[test]
+    fn a_resolver_that_names_neither_way_is_a_mistriage_forward_only() {
+        let root = std::env::temp_dir().join(format!("keel-issuename-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let iss = |n: &str, created: &str, desc: &str| {
+            format!("    part {n} : Issue {{ :>> id = \"00000000-0000-4000-8000-0000000{}\"; :>> title = \"t\"; :>> createdAt = \"{created}\"; :>> createdBy = \"bot\"; :>> description = \"{desc}\"; :>> severity = Severity::Low; }}
+", &n[5..])
+        };
+        let text = format!(
+            "package Fx {{
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    action def Build {{
+        action dcNamesIt;
+        verification dcNamesItDoD : Test {{ :>> id = \"00000000-0000-4000-8000-000000000001\"; :>> method = VerificationMethod::test; :>> procedureText = \"resolves issue901 by doing the thing\"; }}
+        action dcCarriedOver;
+        verification dcCarriedOverDoD : Test {{ :>> id = \"00000000-0000-4000-8000-000000000002\"; :>> method = VerificationMethod::test; :>> procedureText = \"an unrelated task\"; }}
+        action dcNamedByIssue;
+        verification dcNamedByIssueDoD : Test {{ :>> id = \"00000000-0000-4000-8000-000000000003\"; :>> method = VerificationMethod::test; :>> procedureText = \"another task\"; }}
+    }}
+{}{}{}{}    #Resolves dependency from dcNamesIt to issue901;
+    #Resolves dependency from dcCarriedOver to issue902;
+    #Resolves dependency from dcNamedByIssue to issue903;
+    #Resolves dependency from dcCarriedOver to issue904;
+}}
+",
+            iss("issue901", "2026-09-10", "the resolver names me"),
+            iss("issue902", "2026-09-10", "nothing here names the resolver - the issue323 shape"),
+            iss("issue903", "2026-09-10", "PREVENTING CHANGE: dcNamedByIssue"),
+            iss("issue904", "2026-01-01", "old, unnamed both ways - history"),
+        );
+        std::fs::write(root.join(".tracking").join("fx.sysml"), text).expect("fixture");
+        let (scanned, forward, historical) = crate::view::unnamed_resolutions(&root, "2026-09-04").expect("model");
+        assert_eq!(scanned, 4);
+        assert_eq!(forward, vec![("issue902".to_string(), "dcCarriedOver".to_string())], "only the issue323 shape, forward of the cutoff, is a violation");
+        assert_eq!(historical, 1, "the pre-cutoff miss is counted, not reported");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
 
 #[cfg(test)]

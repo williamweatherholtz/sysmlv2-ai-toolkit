@@ -466,7 +466,7 @@ package IssuesClaudeOpus5 {
         :>> discoveredInField = false;
         :>> severity = Severity::High;
     }
-    #Resolves dependency from dcControlDefectsAreFixed to issue331;
+    #Resolves dependency from dcDecisionClausesAreAddressable to issue331;
 
     part issue332 : Issue {
         :>> id = "2d29fe40-a4aa-47e1-9807-bb0ee2d459fd";
@@ -909,7 +909,7 @@ package IssuesClaudeOpus5 {
         :>> title = "twelve enforced guards had no constraint-def identity while the rules file said every guard has one";
         :>> createdAt = "2026-09-04";
         :>> createdBy = "claudeOpus5";
-        :>> description = "FOUND 2026-09-04 while building the vintage fixture (issue265): guard-constraints.sysml states (D0195 clause 1) that EVERY enforced guard has a constraint-def identity - the model identity the control map, a unit's assert and the K8 capability handshake bind to. Computed from GUARD_NAMES against the file: 60 guards, 48 constraint defs, TWELVE guards without one - evidence-cited, gating-workflow-history, process-applicability, doc-guard-count, manifest-key-portability, control-map-reconciled, sprint-closure, untrusted-routing, control-defect-registry, cli-surface-declared, decision-amends-process, unit-extras-present. Eight predate guard 49; the last three are this week's. CONSEQUENCE: a unit could not claim those guards by assert, and the rule that says every guard has an identity was false on a fifth of them with nothing checking it. PREVENTING CHANGE: the twelve are added (D0302); the durable control is every_guard_has_a_constraint_def_identity in guards.rs, which computes GUARD_NAMES against the file's constraint defs and fails on any guard without one - built in the same sprint, so the file's rule is now held rather than stated.";
+        :>> description = "FOUND 2026-09-04 while building the vintage fixture (issue265): guard-constraints.sysml states (D0195 clause 1) that EVERY enforced guard has a constraint-def identity - the model identity the control map, a unit's assert and the K8 capability handshake bind to. Computed from GUARD_NAMES against the file: 60 guards, 48 constraint defs, TWELVE guards without one - evidence-cited, gating-workflow-history, process-applicability, doc-guard-count, manifest-key-portability, control-map-reconciled, sprint-closure, untrusted-routing, control-defect-registry, cli-surface-declared, decision-amends-process, unit-extras-present. Eight predate guard 49; the last three are this week's. CONSEQUENCE: a unit could not claim those guards by assert, and the rule that says every guard has an identity was false on a fifth of them with nothing checking it. PREVENTING CHANGE: the twelve are added under D0302 within dcVintageFixture, the sprint that found them; the durable control is every_guard_has_a_constraint_def_identity in guards.rs, which computes GUARD_NAMES against the file's constraint defs and fails on any guard without one - built in the same sprint, so the file's rule is now held rather than stated.";
         :>> discoveredInField = false;
         :>> severity = Severity::Medium;
     }

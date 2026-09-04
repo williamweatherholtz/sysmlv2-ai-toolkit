@@ -200,6 +200,68 @@ pub(crate) struct Model {
     edges: Vec<Edge>,
 }
 
+/// issue333 / D0304: every `resolves` edge whose RESOLVER never names the issue it resolves.
+///
+/// The `issues` guard checks that a `#Resolves` edge EXISTS; it cannot tell a correct triage from an
+/// edge to an unrelated task - issue323 rode on a resolver carried over from the previous command and
+/// the guard passed it. The one signal available is textual: a resolver that will close an issue names
+/// it (in its title, its `DoD` text, or - for a Decision - its decision/consequences). Returns
+/// `(edges scanned, forward misses as (issue, resolver), pre-cutoff miss count)`: misses on issues
+/// created on/after `cutoff` are the caller's violations; earlier ones are history, counted once.
+///
+/// # Errors
+/// Propagates model-build failures.
+/// `(edges scanned, forward misses as (issue, resolver), pre-cutoff miss count)`.
+pub(crate) type UnnamedResolutions = (usize, Vec<(String, String)>, usize);
+
+pub(crate) fn unnamed_resolutions(root: &Path, cutoff: &str) -> Result<UnnamedResolutions, ViewError> {
+    let model = Model::build(root)?;
+    let mut scanned = 0usize;
+    let mut forward = Vec::new();
+    let mut historical = 0usize;
+    for e in model.edges.iter().filter(|e| e.kind == "resolves") {
+        let Some(issue) = model.items.get(&e.to) else { continue };
+        if issue.type_name != "Issue" {
+            continue;
+        }
+        scanned += 1;
+        let mut text = String::new();
+        for name in [e.from.clone(), format!("{}DoD", e.from)] {
+            if let Some(info) = model.items.get(&name) {
+                for k in ["title", "procedureText", "decision", "consequences", "description", "actionText"] {
+                    if let Some(v) = info.attrs.get(k) {
+                        text.push_str(v);
+                        text.push(' ');
+                    }
+                }
+            }
+        }
+        let whole = |hay: &str, needle: &str| {
+            hay.match_indices(needle).any(|(i, _)| {
+                let before = hay[..i].chars().next_back();
+                let after = hay[i + needle.len()..].chars().next();
+                !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+            })
+        };
+        // EITHER direction is a stated link: the resolver names the issue, or the issue's own text
+        // names the resolver ("PREVENTING CHANGE: dcX" - the recorder's judgment at triage time).
+        // issue323's mis-triage had neither: the resolver was carried over from the previous command
+        // and the issue's text never mentioned it.
+        let issue_text = issue.attrs.get("description").map_or("", String::as_str);
+        if whole(&text, &e.to) || whole(issue_text, &e.from) {
+            continue;
+        }
+        let created = issue.attrs.get("createdAt").map_or("", String::as_str);
+        if created >= cutoff {
+            forward.push((e.to.clone(), e.from.clone()));
+        } else {
+            historical += 1;
+        }
+    }
+    forward.sort();
+    Ok((scanned, forward, historical))
+}
+
 /// The directories whose `.sysml` files ARE the model.
 ///
 /// Authored instances live in `.tracking` and in the `.engine` INSTANCE dirs. Parsing is syntactic

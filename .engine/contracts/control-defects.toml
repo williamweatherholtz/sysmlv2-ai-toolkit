@@ -24,11 +24,6 @@
 #   invalidates  what this control passed while broken, and whether any of it was re-checked.
 #                The distinctive step: an ordinary bug has no equivalent question.
 
-[issues]
-issue = "issue333"
-direction = "under"
-effect = "A mis-triaged Issue reads as triaged: the guard checks that a #Resolves edge EXISTS, never that the named resolver could resolve it."
-invalidates = "Every `issues` PASS since the guard was written. Concretely observed: issue323's resolver was dcCliSurfaceConsolidation — carried over from the previous record call, unable to resolve a unit-identity defect — and the guard passed it. NOT re-checked across the 329-issue corpus; the ranked frontier may therefore be ordering work against issues it will not close."
 
 [decision-scaffolding]
 issue = "issue331"
