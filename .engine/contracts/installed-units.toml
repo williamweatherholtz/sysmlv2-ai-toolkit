@@ -118,12 +118,6 @@ file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
 file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
 file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
 file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
-[79f2d321-7c55-41fb-86fa-7d549202caf7]
-process = "intake"
-version = 44
-file.processes__SL__intake.sysml = "7b1626cbe15b99f1"
-file.skills__SL__intake__SL__SKILL.md = "f58c93354678262b"
-file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
 [ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
 process = "element-critique"
 version = 4
@@ -166,3 +160,9 @@ version = 1
 file.processes__SL__github-intake.sysml = "0656702345d30db2"
 file.skills__SL__github-intake__SL__SKILL.md = "e38cc4d2db1449b6"
 file.skills__SL__github-intake__SL__registry.sysml = "43f955f619a10a80"
+[79f2d321-7c55-41fb-86fa-7d549202caf7]
+process = "intake"
+version = 50
+file.processes__SL__intake.sysml = "8df46b86e524597b"
+file.skills__SL__intake__SL__SKILL.md = "f58c93354678262b"
+file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"

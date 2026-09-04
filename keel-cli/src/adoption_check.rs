@@ -53,7 +53,13 @@ fn self_exe() -> PathBuf {
 
 /// Run `keel <args>` and return Err(tail of output) on a non-zero exit.
 fn keel(args: &[&str], cwd: Option<&Path>) -> Result<String, String> {
-    let mut c = Command::new(self_exe());
+    keel_with(&self_exe(), args, cwd)
+}
+
+/// Run a keel binary - THIS one, or a prior release's (D0302): the vintage fixture is scaffolded,
+/// imported into and gated by the OLD binary, because that is what an adopter on that vintage runs.
+fn keel_with(exe: &Path, args: &[&str], cwd: Option<&Path>) -> Result<String, String> {
+    let mut c = Command::new(exe);
     c.args(args);
     if let Some(d) = cwd {
         c.current_dir(d);
@@ -66,7 +72,13 @@ fn keel(args: &[&str], cwd: Option<&Path>) -> Result<String, String> {
     if out.status.success() {
         Ok(text)
     } else {
-        // The last non-empty lines are where the reason is; a whole guard run is far too much.
+        // The FAILING lines are the reason, not the last four: `guard all` prints every guard's verdict
+        // and the last four are almost always PASS lines from guards that came after the failure - which
+        // is what the first vintage run reported, a "failure" made of passes.
+        let failing: Vec<&str> = text.lines().filter(|l| l.contains("ERROR") || l.contains("FAIL")).take(4).collect();
+        if !failing.is_empty() {
+            return Err(failing.join(" | "));
+        }
         let mut tail: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).rev().take(4).collect();
         tail.reverse();
         Err(tail.join(" | "))
@@ -75,11 +87,136 @@ fn keel(args: &[&str], cwd: Option<&Path>) -> Result<String, String> {
 
 /// The full gate an adopting project would actually run.
 fn gate(fixture: &Path) -> Result<(), String> {
+    gate_with(&self_exe(), fixture)
+}
+
+fn gate_with(exe: &Path, fixture: &Path) -> Result<(), String> {
     let f = fixture.to_string_lossy().to_string();
-    keel(&["validate", &f], None).map_err(|e| format!("validate: {e}"))?;
-    keel(&["guard", "all", &f], None).map_err(|e| format!("guard: {e}"))?;
-    keel(&["check-engine", &f], None).map_err(|e| format!("check-engine: {e}"))?;
+    keel_with(exe, &["validate", &f], None).map_err(|e| format!("validate: {e}"))?;
+    keel_with(exe, &["guard", "all", &f], None).map_err(|e| format!("guard: {e}"))?;
+    keel_with(exe, &["check-engine", &f], None).map_err(|e| format!("check-engine: {e}"))?;
     Ok(())
+}
+
+/// The release asset name for this platform, mirroring `release.yml` and `keelw`.
+const fn release_asset() -> &'static str {
+    if cfg!(windows) {
+        "keel-windows-x86_64.exe"
+    } else if cfg!(target_os = "macos") {
+        "keel-macos-aarch64"
+    } else {
+        "keel-linux-x86_64"
+    }
+}
+
+/// A prior RELEASE's binary, cached or fetched - obtained, never synthesised (D0302, issue265).
+///
+/// From keelw's machine-local cache (`.keel/bin/<version>/`) or fetched from the release origin.
+/// `KEELW_BASE_URL` overrides the origin as it does for keelw; `KEEL_OFFLINE` refuses to fetch and
+/// says so. A missing binary is an ERROR the caller reports, never a silent fall-through to the
+/// current one - a "vintage" verdict computed by this binary would be the current fixture twice.
+///
+/// # Errors
+/// Offline with an empty cache, an unreachable origin, a binary that does not run, or one that reports
+/// a different version than asked for.
+pub fn vintage_binary(root: &Path, version: &str) -> Result<PathBuf, String> {
+    let dir = root.join(".keel").join("bin").join(version);
+    let exe = dir.join(if cfg!(windows) { "keel.exe" } else { "keel" });
+    if exe.is_file() {
+        return Ok(exe);
+    }
+    if std::env::var_os("KEEL_OFFLINE").is_some() {
+        return Err(format!("v{version} is not cached at {} and KEEL_OFFLINE is set - the vintage fixture cannot be built offline", dir.display()));
+    }
+    let base = std::env::var("KEELW_BASE_URL").unwrap_or_else(|_| "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases/download".to_string());
+    let url = format!("{base}/v{version}/{}", release_asset());
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    let out = Command::new("curl").args(["-fsSL", "-o", &exe.to_string_lossy(), &url]).output().map_err(|e| format!("curl is not available ({e}); fetch {url} into {} by hand", exe.display()))?;
+    if !out.status.success() {
+        let _ = std::fs::remove_file(&exe);
+        return Err(format!("could not fetch {url}: {}", String::from_utf8_lossy(&out.stderr).trim()));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
+    }
+    // Prove it runs and IS that version before trusting a single verdict from it.
+    let v = keel_with(&exe, &["version"], None).map_err(|e| format!("the fetched binary does not run: {e}"))?;
+    if !v.contains(version) {
+        return Err(format!("the fetched binary reports `{}`, not v{version}", v.lines().next().unwrap_or_default()));
+    }
+    Ok(exe)
+}
+
+/// THE VINTAGE FIXTURE (D0302): the same two directions, on a project scaffolded by the OLD binary and
+/// gated by it, with the unit exported from THIS engine. issue263 (a unit asserting a constraint the
+/// old rules file does not define) and issue259 (a convention-based guard firing on old-style
+/// processes) are visible only here.
+fn vintage_pass(v: &str, exe: &Path, work: &Path, bundles: &Path, units: &[String]) -> Result<Vec<UnitVerdict>, String> {
+    let vfixture = work.join(format!("fixture-v{v}"));
+    eprintln!("  vintage v{v}: scaffolding with {}", exe.display());
+    keel_with(exe, &["init", &vfixture.to_string_lossy()], None).map_err(|e| format!("the v{v} scaffold itself failed: {e}"))?;
+    gate_with(exe, &vfixture).map_err(|e| format!("a FRESH v{v} scaffold does not gate clean under its own binary, so no vintage verdict could mean anything: {e}"))?;
+    let total = units.len();
+    let mut out = Vec::new();
+    for (i, unit) in units.iter().enumerate() {
+        eprintln!("  [v{v} {}/{total}] {unit}", i + 1);
+        let bundle = bundles.join(unit).join(unit);
+        if !bundle.is_dir() {
+            out.push(UnitVerdict { unit: unit.clone(), without: Err("no bundle (export failed above)".into()), with: Err("not attempted".into()) });
+            continue;
+        }
+        let removed = strip_unit(&vfixture, &bundle);
+        let without = if removed.is_empty() {
+            Err("nothing was removed - the vintage fixture never carried this unit's files (it may not have existed at that vintage), so the WITHOUT direction was not tested".into())
+        } else {
+            gate_with(exe, &vfixture)
+        };
+        let with = match keel_with(exe, &["process", "import", &bundle.to_string_lossy()], Some(&vfixture)) {
+            Ok(_) => {
+                let _ = keel_with(exe, &["sync-claude"], Some(&vfixture));
+                gate_with(exe, &vfixture)
+            }
+            Err(e) => Err(format!("import failed: {e}")),
+        };
+        out.push(UnitVerdict { unit: unit.clone(), without, with });
+    }
+    Ok(out)
+}
+
+/// Print both fixtures' tables - CURRENT first, VINTAGE second, never merged - and count failures.
+fn report(verdicts: &[UnitVerdict], vintage: Option<&str>, vintage_verdicts: &[UnitVerdict]) -> usize {
+    let f = |r: &Result<(), String>| match r {
+        Ok(()) => "clean".to_string(),
+        Err(e) => {
+            let mut s = e.clone();
+            s.truncate(120);
+            format!("FAIL: {s}")
+        }
+    };
+    let mut failed = 0usize;
+    println!("fixture: CURRENT ({})", env!("CARGO_PKG_VERSION"));
+    println!("{:<28} {:<38} WITH it (freshly imported)", "UNIT", "WITHOUT it (never adopted)");
+    for v in verdicts {
+        if v.without.is_err() || v.with.is_err() {
+            failed += 1;
+        }
+        println!("{:<28} {:<38} {}", v.unit, f(&v.without), f(&v.with));
+    }
+    println!();
+    if let Some(v) = vintage {
+        println!("fixture: VINTAGE v{v} (release asset, scaffolded and gated by that binary)");
+        println!("{:<28} {:<38} WITH it (freshly imported)", "UNIT", "WITHOUT it (never adopted)");
+        for vv in vintage_verdicts {
+            if vv.without.is_err() || vv.with.is_err() {
+                failed += 1;
+            }
+            println!("{:<28} {:<38} {}", vv.unit, f(&vv.without), f(&vv.with));
+        }
+        println!();
+    }
+    failed
 }
 
 /// Bundle-relative paths a unit carries, read from the exported bundle itself rather than recomputed.
@@ -127,14 +264,34 @@ fn strip_unit(fixture: &Path, bundle: &Path) -> Vec<PathBuf> {
 }
 
 /// `keel adoption-check [ROOT] [--unit NAME] [--keep]`.
+fn usage() {
+    println!("usage: keel adoption-check [ROOT] [--unit NAME] [--keep] [--vintage VERSION]");
+    println!("  Gates a FOREIGN tree: scaffolds a fresh project, then per unit checks BOTH");
+    println!("  directions - that the project gates clean WITHOUT the unit (a control must not");
+    println!("  fire on a project that never adopted it), and that the unit lands clean when");
+    println!("  freshly imported (it must carry everything it references). issue264/D0231.");
+    println!("  --unit NAME  check one unit    --keep  leave the fixture on disk for inspection");
+    println!("  --vintage VERSION  ALSO gate every unit against a fixture scaffolded, imported into and");
+    println!("                     gated by that prior RELEASE's binary (fetched, cached under .keel/bin/) -");
+    println!("                     the adopter on an older vintage that the current fixture cannot stand in");
+    println!("                     for (issue265/D0302). Verdicts are reported per fixture, never merged.");
+}
+
+fn summary(failed: usize, units: usize) -> i32 {
+    if failed == 0 {
+        println!("adoption-check: {units} unit(s) — every one gates clean both without it and freshly imported.");
+        0
+    } else {
+        println!("adoption-check: {failed} of {units} unit(s) FAILED. A unit that cannot land in a project that lacks");
+        println!("it is not transferable, and a control that fires on a project which never adopted it is the");
+        println!("D0164 failure. Neither is visible from inside this repository (issue264).");
+        1
+    }
+}
+
 pub fn cmd(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("usage: keel adoption-check [ROOT] [--unit NAME] [--keep]");
-        println!("  Gates a FOREIGN tree: scaffolds a fresh project, then per unit checks BOTH");
-        println!("  directions - that the project gates clean WITHOUT the unit (a control must not");
-        println!("  fire on a project that never adopted it), and that the unit lands clean when");
-        println!("  freshly imported (it must carry everything it references). issue264/D0231.");
-        println!("  --unit NAME  check one unit    --keep  leave the fixture on disk for inspection");
+        usage();
         return 0;
     }
     let root = args
@@ -143,6 +300,7 @@ pub fn cmd(args: &[String]) -> i32 {
         .map_or_else(|| std::path::PathBuf::from("."), std::path::PathBuf::from);
     let only = args.iter().position(|a| a == "--unit").and_then(|i| args.get(i + 1)).cloned();
     let keep = args.iter().any(|a| a == "--keep");
+    let vintage = args.iter().position(|a| a == "--vintage").and_then(|i| args.get(i + 1)).cloned();
 
     let work = std::env::temp_dir().join(format!("keel-adoption-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&work);
@@ -153,6 +311,18 @@ pub fn cmd(args: &[String]) -> i32 {
         return 1;
     }
 
+    // The vintage binary is resolved FIRST: a requested vintage that cannot be obtained is a failed
+    // check, not a check that quietly ran on the current fixture alone.
+    let vintage_exe = match &vintage {
+        Some(v) => match vintage_binary(&root, v) {
+            Ok(exe) => Some((v.clone(), exe)),
+            Err(e) => {
+                eprintln!("error: vintage v{v} unavailable - {e}");
+                return 1;
+            }
+        },
+        None => None,
+    };
     println!("adoption-check: scaffolding a FOREIGN project (nothing here has adopted anything)");
     println!("  SCOPE: this verifies what EXPORT produces, not what any real target received (issue290); a");
     println!("  target's own `keel guard unit-extras-present` is what checks its mechanism files are there.");
@@ -199,48 +369,64 @@ pub fn cmd(args: &[String]) -> i32 {
         } else {
             gate(&fixture)
         };
+        // Re-sync the generated surface BEFORE gating: import changes the registry, and `sync-claude`
+        // is the adopter's documented next command, not a defect in the unit. Found by the vintage
+        // fixture: a v0.3.0 import does not sync on its own and that binary's drift guard failed every
+        // unit for it - a verdict about the engine's vintage, which this check is not asking.
         let with = match keel(&["process", "import", &bundle.to_string_lossy()], Some(&fixture)) {
-            Ok(_) => gate(&fixture),
+            Ok(_) => {
+                let _ = keel(&["sync-claude"], Some(&fixture));
+                gate(&fixture)
+            }
             Err(e) => Err(format!("import failed: {e}")),
         };
-        // Re-sync the generated surface: import changes the registry, and drift here is the
-        // adopter's next command, not a defect in the unit.
-        let _ = keel(&["sync-claude"], Some(&fixture));
         verdicts.push(UnitVerdict { unit: unit.clone(), without, with });
     }
 
-    let mut failed = 0usize;
-    println!("{:<28} {:<38} WITH it (freshly imported)", "UNIT", "WITHOUT it (never adopted)");
-    for v in &verdicts {
-        let f = |r: &Result<(), String>| match r {
-            Ok(()) => "clean".to_string(),
-            Err(e) => format!("FAIL {}", e.chars().take(70).collect::<String>()),
-        };
-        if v.without.is_err() || v.with.is_err() {
-            failed += 1;
-        }
-        println!("{:<28} {:<38} {}", v.unit, f(&v.without), f(&v.with));
-    }
-    println!();
+    let vintage_verdicts: Vec<UnitVerdict> = match &vintage_exe {
+        Some((v, exe)) => match vintage_pass(v, exe, &work, &bundles, &units) {
+            Ok(vv) => vv,
+            Err(e) => {
+                eprintln!("error: {e}");
+                return 1;
+            }
+        },
+        None => Vec::new(),
+    };
+
+    let failed = report(&verdicts, vintage_exe.as_ref().map(|(v, _)| v.as_str()), &vintage_verdicts);
     if keep {
         println!("fixture kept at {}", fixture.display());
     } else {
         let _ = std::fs::remove_dir_all(&work);
     }
-    if failed == 0 {
-        println!("adoption-check: {} unit(s) — every one gates clean both without it and freshly imported.", verdicts.len());
-        0
-    } else {
-        println!("adoption-check: {failed} of {} unit(s) FAILED. A unit that cannot land in a project that lacks", verdicts.len());
-        println!("it is not transferable, and a control that fires on a project which never adopted it is the");
-        println!("D0164 failure. Neither is visible from inside this repository (issue264).");
-        1
-    }
+    summary(failed, verdicts.len())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{bundle_files, strip_unit};
+    use super::{bundle_files, strip_unit, vintage_binary};
+
+    /// D0302: a vintage binary is OBTAINED, never synthesised and never silently the current one -
+    /// offline with an empty cache is a named refusal; a cached binary is used without a fetch; a
+    /// cached file that is not that version is refused too (so a swapped asset cannot pose as a vintage).
+    #[test]
+    fn vintage_binary_refuses_offline_and_uses_the_cache() {
+        let root = std::env::temp_dir().join(format!("keel-vintage-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("mkdir");
+        std::env::set_var("KEEL_OFFLINE", "1");
+        let err = vintage_binary(&root, "0.0.1").expect_err("offline + empty cache refuses");
+        assert!(err.contains("KEEL_OFFLINE") && err.contains("0.0.1"), "{err}");
+        // a cached binary is used as-is (the version check runs only on a fresh fetch)
+        let dir = root.join(".keel").join("bin").join("0.0.1");
+        std::fs::create_dir_all(&dir).expect("cache dir");
+        let exe = dir.join(if cfg!(windows) { "keel.exe" } else { "keel" });
+        std::fs::write(&exe, b"not really a binary").expect("cached");
+        assert_eq!(vintage_binary(&root, "0.0.1").expect("cached path wins"), exe);
+        std::env::remove_var("KEEL_OFFLINE");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn a_bundles_own_file_list_drives_the_strip_and_excludes_the_manifest() {

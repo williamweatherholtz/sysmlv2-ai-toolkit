@@ -4583,6 +4583,33 @@ pub fn cli_surface_declared(root: &Path) -> GuardReport {
 
 #[cfg(test)]
 mod guard_catalogue_tests {
+    /// D0195 clause 1 / issue370: EVERY enforced guard has a constraint-def identity in
+    /// `.engine/rules/guard-constraints.sysml` (its camelCased name). Twelve did not, for weeks, while
+    /// the file said all did - because nothing computed the two lists against each other.
+    #[test]
+    fn every_guard_has_a_constraint_def_identity() {
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../.engine/rules/guard-constraints.sysml")).expect("guard-constraints.sysml");
+        let declared: std::collections::HashSet<String> = text
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("constraint def "))
+            .map(|r| r.split(|c: char| c == ';' || c.is_whitespace()).next().unwrap_or_default().to_string())
+            .collect();
+        let camel = |k: &str| {
+            let mut out = String::new();
+            for (i, part) in k.split('-').enumerate() {
+                if i == 0 {
+                    out.push_str(part);
+                } else if let Some(c) = part.chars().next() {
+                    out.push(c.to_ascii_uppercase());
+                    out.push_str(&part[c.len_utf8()..]);
+                }
+            }
+            out
+        };
+        let missing: Vec<&str> = super::GUARD_NAMES.iter().copied().filter(|g| !declared.contains(&camel(g))).collect();
+        assert!(missing.is_empty(), "guards with no constraint-def identity (D0195 clause 1): {missing:?}");
+    }
+
     /// THE CONTROL for the catalogue: every enforced guard has a row in `.engine/docs/guards.md`. Six
     /// guards had none on 2026-09-02 - five of them older than a week - because `doc-guard-count` polices
     /// the COUNT claim and nothing policed the rows. A guard nobody can look up is a refusal nobody can

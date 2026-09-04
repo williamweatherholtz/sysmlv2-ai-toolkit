@@ -87,5 +87,22 @@ package EngineGuardConstraints {
     constraint def questionCoverage;      // guard 46 (D0161): declared knowledge facts are well-formed
     constraint def claimAncestry;         // guard 47 (issue229): claimedAt bounded by its introducing commit
     constraint def judgmentRequestQuality; // guard 48 (D0207): a fork decision must earn the ask
+    // D0302 (issue370): twelve guards had NO constraint-def identity although this file's own rule
+    // (D0195 clause 1, above) says every enforced guard has one - eight of them from before guard 49,
+    // found when the vintage fixture needed a constraint the current rules define and an older
+    // release does not. Named here so the control map, a unit's assert, and the K8 handshake all
+    // have the identity to bind to.
+    constraint def evidenceCited;
+    constraint def gatingWorkflowHistory;
+    constraint def processApplicability;
+    constraint def docGuardCount;
+    constraint def manifestKeyPortability;
+    constraint def controlMapReconciled;
+    constraint def sprintClosure;
+    constraint def untrustedRouting;
+    constraint def controlDefectRegistry;
+    constraint def cliSurfaceDeclared;      // guard 58 (D0271/D0283)
+    constraint def decisionAmendsProcess;   // guard 59 (D0297), warning-tier
+    constraint def unitExtrasPresent;       // guard 60 (D0300)
 
 }
