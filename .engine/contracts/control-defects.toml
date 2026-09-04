@@ -36,8 +36,3 @@ direction = "under"
 effect = "A multi-clause Decision satisfies the check as soon as ONE clause is chartered, so partial delivery of a compound Decision is invisible."
 invalidates = "Every `decision-scaffolding` PASS on a Decision with more than one clause. Concretely observed: d0252 clause A's command half sat unbuilt for nine days while clause B's rollback work carried the inbound edge, and the guard passed throughout. NOT re-checked: no view lists Decisions by clause, because clauses are prose."
 
-[retro-backlog]
-issue = "issue364"
-direction = "under"
-effect = "A retro that says 'already tracked' passes with nothing checked: the justification is a substring match that consults no item, so a finding the retro waves at goes untracked."
-invalidates = "Every `retro-backlog` PASS on a retro carrying an 'already tracked' or 'no new item' justification. Concretely observed 2026-09-03: sprint 526 and sprint 527 retros each named a finding as tracked elsewhere; neither was; both passed. NOT re-checked across earlier retros - the phrase scan is the fix's first step."

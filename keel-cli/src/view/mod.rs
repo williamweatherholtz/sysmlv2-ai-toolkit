@@ -5201,19 +5201,19 @@ verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> proce
         // Shape 2 (D0172): the retro's text had to NAME an item — every sprint file names the task it
         //   delivered, and the check only ran on the tokens AVOIDABLE-ISSUE / LESSON: (issue335).
         // Shape 3 (D0279): this commit must ADD an item the retro's own text names, or say why not.
-        assert_eq!(check(&nothing_added, &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
+        assert_eq!(check(&nothing_added, &[], &sprint("AVOIDABLE-ISSUE 1: piping hung the kernel.")).len(), 1);
         // The sprint-513 case: FINDING, not LESSON — shape 2 never looked. Shape 3 does.
-        assert_eq!(check(&nothing_added, &sprint("FINDING: piping hung the kernel.")).len(), 1);
+        assert_eq!(check(&nothing_added, &[], &sprint("FINDING: piping hung the kernel.")).len(), 1);
         // Naming the delivered task is what every retro does; it tracks nothing.
-        assert_eq!(check(&nothing_added, &sprint("FINDING: piping hung the kernel. Delivered dcTheWork.")).len(), 1);
+        assert_eq!(check(&nothing_added, &[], &sprint("FINDING: piping hung the kernel. Delivered dcTheWork.")).len(), 1);
         // Naming an item THIS COMMIT ADDS -> clean.
-        assert!(check(&added_issue073, &sprint("FINDING: piping hung the kernel - tracked as issue073.")).is_empty());
+        assert!(check(&added_issue073, &[], &sprint("FINDING: piping hung the kernel - tracked as issue073.")).is_empty());
         // Explicitly justified as needing none -> clean. The obligation is a STATED choice.
-        assert!(check(&nothing_added, &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded.")).is_empty());
+        assert!(check(&nothing_added, &["dcPreBashAdvisory".to_string()], &sprint("AVOIDABLE-ISSUE 1: x — no new item, already guarded by dcPreBashAdvisory.")).is_empty());
         // A retro with no findings language still gets examined; it names nothing and justifies
         // nothing, so it is a violation — a retro that records no finding and no reason is exactly
         // the empty ceremony D0131 exists to prevent.
-        assert_eq!(check(&nothing_added, &sprint("WELL: everything went fine.")).len(), 1);
+        assert_eq!(check(&nothing_added, &[], &sprint("WELL: everything went fine.")).len(), 1);
     }
 
     #[test]
