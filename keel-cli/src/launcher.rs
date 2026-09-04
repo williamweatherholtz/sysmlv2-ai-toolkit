@@ -146,7 +146,19 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
-    let diff_files: Vec<String> = diff.lines().filter_map(|l| l.get(3..)).map(str::to_string).collect();
+    // `.keel/` is MACHINE-LOCAL by definition (the fire-ledger, run records, session bindings, the
+    // launch pin) and gitignored in every real project - but a run's diff must not depend on the
+    // project's .gitignore to know that. issue369: the finish probe failed one full-suite run in three
+    // with `got [".keel/sessions/"]` - the session binding issue337 writes whenever the test process
+    // inherits CLAUDE_CODE_SESSION_ID, which it does under an agent session and not under CI. A diff
+    // that counts machine-local state is a diff that differs by machine, the K15 dependence the gate
+    // exists to remove.
+    let diff_files: Vec<String> = diff
+        .lines()
+        .filter_map(|l| l.get(3..))
+        .filter(|p| !p.trim_start_matches('"').starts_with(".keel/"))
+        .map(str::to_string)
+        .collect();
 
     // The gate: validate + activation-filtered guards + blocking rules — the same three surfaces
     // every other tier runs (K15: all re-derivable from the tree; no hook is trusted to have run).

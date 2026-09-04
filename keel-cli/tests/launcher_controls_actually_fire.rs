@@ -92,6 +92,8 @@ fn a_prepared_run_captures_the_spawn_time_head() {
 #[test]
 fn finish_writes_a_record_carrying_every_declared_field() {
     let root = repo("finish");
+    // Force the issue369 condition rather than hoping the environment supplies it.
+    std::env::set_var("CLAUDE_CODE_SESSION_ID", "issue369-probe-session");
     let setup = keel_cli::launcher::prepare(&root, "sprint-planning", "wweatherholtz").expect("prepare");
 
     let outcome = keel_cli::launcher::finish(&root, &setup, Some(0), 3, false).expect("finish");
@@ -108,9 +110,14 @@ fn finish_writes_a_record_carrying_every_declared_field() {
              checks, so this test is the only thing holding it. Record was: {text}"
         );
     }
+    // issue369: this assertion failed one full-suite run in three with `[".keel/sessions/"]` - the
+    // session binding written when the test process inherits CLAUDE_CODE_SESSION_ID (an agent session
+    // running the suite; CI never has it). `finish` now excludes `.keel/` from a run's diff, because
+    // machine-local state is not the run's work; this test runs with the variable SET so the cause is
+    // exercised, not avoided.
     assert!(
         outcome.diff_files.is_empty(),
-        "this run changed nothing, so its diff must be empty; got {:?}",
+        "this run changed nothing, so its diff must be empty (machine-local .keel/ is never counted); got {:?}",
         outcome.diff_files
     );
     assert!(
