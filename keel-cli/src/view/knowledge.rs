@@ -27,10 +27,19 @@ const HUB_DEGREE_LIMIT: usize = 25;
 /// How many reached rows `keel why` prints. The full count is always reported beside it.
 const MAX_REPORTED_ROWS: usize = 40;
 
-/// How many WORD tokens from one prompt may seed. Identifiers are exempt and unlimited: a prompt
-/// naming three decisions means all three. Words are capped because each extra seed widens the walk,
-/// and the rarest few carry nearly all the information in a sentence.
-const MAX_PROMPT_WORDS: usize = 3;
+/// How many top-scoring elements SEED the graph walk (issue295). Every matching element is SCORED -
+/// BM25 needs no cap - but the walk expands only from the best few, because expanding from every
+/// element a common word touches reaches the whole model (the D0243 explosion) and hops then mean
+/// nothing. The walk adds neighbours the words did not name; the score decides the order.
+const TRAVERSAL_SEEDS: usize = 30;
+
+/// BM25 parameters, the textbook defaults. `k1` saturates term frequency (a body that says
+/// `provenance` nine times is not nine times as relevant); `b` is how fully length normalisation
+/// applies (a long rationale is not more relevant for being long).
+const BM25_K1: f64 = 1.2;
+/// Share of an adjacent seed's score a reached element receives (before degree normalisation).
+const LIFT: f64 = 0.5;
+const BM25_B: f64 = 0.75;
 
 /// Characters held back for the always-appended `recall:` summary and any truncation note, so the
 /// declared budget is the WHOLE payload rather than the rows alone.
@@ -132,7 +141,7 @@ fn is_function_word(w: &str) -> bool {
 /// IDF weight of a token: how much a match on it is worth (issue295).
 ///
 /// REPLACES THE BINARY AGREEMENT VOTE, which the panel measured as inert. Agreement counted how many
-/// distinct prompt tokens reached an element, capped at three by `MAX_PROMPT_WORDS`, and reached max 1
+/// distinct prompt tokens reached an element, capped at three by a prompt-word cap, and reached max 1
 /// in 43 of 50 benchmark cases — so the primary sort key was CONSTANT and ranking degenerated to
 /// (hops, name), i.e. alphabetical. That is the exact failure agreement was introduced to fix.
 ///
@@ -148,65 +157,126 @@ fn idf(corpus: usize, hits: usize) -> f64 {
     ((n - df + 0.5) / (df + 0.5)).ln_1p()
 }
 
-/// Tokens worth seeding on, drawn from a free-form PROMPT (D0242 part 2 / D0243).
-///
-/// Returns `(token, match count, kind)` for tokens that survive, and the dropped-as-common list so the
-/// caller can SAY what it ignored rather than silently narrowing. Order: identifiers first, then rare
-/// words by increasing frequency — the rarest token is the most informative seed.
-fn prompt_tokens(model: &Model, prompt: &str) -> (Vec<(String, usize, &'static str)>, Vec<String>) {
-    // A token matching more than this share of the corpus carries no information. DERIVED from the
-    // tree, not authored, so it re-weights itself as the corpus grows (D0243 rule 3).
-    // Tuned from the corpus, and reported beside the answer so the rule is auditable rather than a
-    // magic number: at ~12k items this lands near 60, which drops `gate` (5,736) and `decision` (236)
-    // while keeping `workspace` (65) and `keystone` (38). A payload can usefully show a dozen or two
-    // elements, so seeding on a token that matches hundreds cannot inform the ranking.
-    let ceiling = std::cmp::max(20, model.items.len() / 200);
+/// The query terms of a free-form PROMPT: identifiers, and every word of three letters or more that
+/// is not English filler. No rarity ceiling and no cap on count (issue295): BM25's IDF weights a common
+/// word near zero instead of deleting it, and a word that matches nothing scores nothing. Returned with
+/// the dropped filler so the caller can SAY what it ignored.
+fn query_terms(prompt: &str) -> (Vec<(String, &'static str)>, Vec<String>) {
     let mut seen: HashSet<String> = HashSet::new();
-    let mut kept: Vec<(String, usize, &'static str)> = Vec::new();
+    let mut kept: Vec<(String, &'static str)> = Vec::new();
     let mut dropped: Vec<String> = Vec::new();
     for raw in prompt.split(|c: char| !c.is_alphanumeric() && c != '-') {
         let tok = raw.trim_matches('-');
-        if tok.chars().count() < 3 || !seen.insert(tok.to_lowercase()) {
+        if tok.chars().count() < 3 {
             continue;
         }
         if is_identifier_token(tok) {
-            kept.push((tok.to_string(), 0, "identifier"));
+            if seen.insert(tok.to_lowercase()) {
+                kept.push((tok.to_string(), "identifier"));
+            }
             continue;
         }
-        if tok.chars().count() < 5 || is_function_word(&tok.to_lowercase()) {
-            // Measured: `made` matched 7 elements — rare, and semantically empty, so it seeded an
-            // unrelated Issue. Frequency alone cannot separate a rare DOMAIN term from a rare filler
-            // word, so language is filtered as language. This list is ENGLISH, not this corpus's
-            // vocabulary, so it stays true for any project and needs no maintenance (D0243 keeps
-            // domain stop-wording derived; this is a different thing).
-            continue;
-        }
-        let hits = model
-            .items
-            .iter()
-            .filter(|(n, i)| {
-                matches_term(n, tok) || i.attrs.get("title").is_some_and(|t| matches_term(t, tok))
-            })
-            .count();
-        if hits == 0 {
-            continue;
-        }
-        if hits > ceiling {
-            dropped.push(format!("{tok} ({hits} matches)"));
-        } else {
-            kept.push((tok.to_string(), hits, "word"));
+        // The index is built from SEGMENTS, so the query must be too: `issue-resolution` is the two
+        // segments issue and resolution, `ProspectiveChange` is prospective and change. Measured: a
+        // 14-word query from an element's own body lost 8 words as "unknown" before this, and the
+        // element it was drawn from ranked below the process named `dor`.
+        for seg in segments(tok) {
+            if seg.chars().count() < 3 || !seen.insert(seg.clone()) {
+                continue;
+            }
+            if is_function_word(&seg) {
+                // MEASURED (D0243): `made` matched 7 elements - rare, and semantically empty. Frequency
+                // cannot separate a rare DOMAIN term from a rare filler word, so language is filtered
+                // as language; the list is English, not this corpus's vocabulary.
+                dropped.push(seg);
+            } else {
+                kept.push((seg, "word"));
+            }
         }
     }
-    kept.sort_by_key(|(tok, hits, _)| (*hits, tok.clone()));
-    // Identifiers are never dropped; among WORDS keep only the rarest few, because the fifth-rarest
-    // word in a sentence is close to noise and every extra seed widens the walk.
-    let mut ids: Vec<(String, usize, &'static str)> =
-        kept.iter().filter(|(_, _, k)| *k == "identifier").cloned().collect();
-    let words: Vec<(String, usize, &'static str)> =
-        kept.into_iter().filter(|(_, _, k)| *k != "identifier").take(MAX_PROMPT_WORDS).collect();
-    ids.extend(words);
     dropped.sort();
-    (ids, dropped)
+    (kept, dropped)
+}
+
+/// One element's term bags for BM25F scoring, one per field, with each field's length in segments.
+///
+/// PER FIELD, not one bag: normalising a whole element by its total length let a two-segment name
+/// with a tiny title score 2.0 x idf - above BM25's own saturation ceiling of 1.0 - while a Decision
+/// that said the word once in a long rationale scored 0.1 x idf. Measured on `rebase`: d0129 ranked
+/// 29th of 30 seeds behind every short item NAMED with the word. BM25F normalises each field against
+/// the average length of THAT field, weights, sums, then saturates once.
+struct Doc {
+    tf: [HashMap<String, f64>; 3],
+    len: [f64; 3],
+}
+
+/// The fielded index over every element, with the corpus average length PER FIELD.
+struct Index {
+    docs: HashMap<String, Doc>,
+    avg_len: [f64; 3],
+}
+
+/// Field order in the per-field arrays: name, title, body.
+const FIELDS: [Field; 3] = [Field::Name, Field::Title, Field::Body];
+
+impl Index {
+    fn build(model: &Model) -> Self {
+        let mut docs: HashMap<String, Doc> = HashMap::with_capacity(model.items.len());
+        let mut total = [0.0f64; 3];
+        for (name, info) in &model.items {
+            let mut tf: [HashMap<String, f64>; 3] = Default::default();
+            let mut len = [0.0f64; 3];
+            let add = |bag: &mut HashMap<String, f64>, count: &mut f64, text: &str| {
+                for seg in segments(text) {
+                    *bag.entry(seg).or_insert(0.0) += 1.0;
+                    *count += 1.0;
+                }
+            };
+            let [tf_name, tf_title, tf_body] = &mut tf;
+            let [len_name, len_title, len_body] = &mut len;
+            add(tf_name, len_name, name);
+            if let Some(t) = info.attrs.get("title") {
+                add(tf_title, len_title, t);
+            }
+            for f in BODY_FIELDS {
+                if let Some(v) = info.attrs.get(f) {
+                    add(tf_body, len_body, v);
+                }
+            }
+            for (t, l) in total.iter_mut().zip(len.iter()) {
+                *t += l;
+            }
+            docs.insert(name.clone(), Doc { tf, len });
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let n = docs.len().max(1) as f64;
+        let avg_len = total.map(|t| (t / n).max(1.0));
+        Self { docs, avg_len }
+    }
+
+    /// Documents containing `term` in any field - BM25's document frequency.
+    fn df(&self, term: &str) -> usize {
+        self.docs.values().filter(|d| d.tf.iter().any(|m| m.contains_key(term))).count()
+    }
+
+    /// BM25F contribution of one term to every element that contains it: `(element, score)`. Each
+    /// field's tf is normalised by that field's length ratio, weighted (name 3 > title 2 > body 1),
+    /// summed, and saturated ONCE by `k1` - so no element can exceed `idf * (k1 + 1)` however short.
+    fn score_term(&self, term: &str, idf: f64) -> Vec<(String, f64)> {
+        self.docs
+            .iter()
+            .filter_map(|(name, d)| {
+                let mut tfn = 0.0;
+                for (((field, bag), len), avg) in FIELDS.iter().zip(d.tf.iter()).zip(d.len.iter()).zip(self.avg_len.iter()) {
+                    if let Some(tf) = bag.get(term) {
+                        let b_norm = 1.0 - BM25_B + BM25_B * len / avg;
+                        tfn += field.weight() * tf / b_norm;
+                    }
+                }
+                (tfn > 0.0).then(|| (name.clone(), idf * tfn * (BM25_K1 + 1.0) / (tfn + BM25_K1)))
+            })
+            .collect()
+    }
 }
 
 /// The substantive fields a seed may match, beyond name and title (issue295).
@@ -215,7 +285,7 @@ fn prompt_tokens(model: &Model, prompt: &str) -> (Vec<(String, usize, &'static s
 /// An adversarial panel measured the consequence: a prompt about provenance and defaulted dates
 /// contributed ZERO seeds for `provenance`, the most informative word in it, because the word appears
 /// in dozens of bodies and in no name or title.
-const BODY_FIELDS: [&str; 5] = ["decision", "description", "rationale", "actionText", "consequences"];
+const BODY_FIELDS: [&str; 6] = ["decision", "description", "rationale", "actionText", "consequences", "procedureText"];
 
 /// Where a term matched, and how much that is worth. A name is what an author chose to call a thing; a
 /// title is how they summarised it; a body mention is evidence but weaker, and there is a lot more body
@@ -286,6 +356,23 @@ fn seeds_scored(model: &Model, term: &str) -> Vec<(String, Field, f64)> {
     }
     out.sort_by(|a, b| (&a.0, a.1.label()).cmp(&(&b.0, b.1.label())));
     out.dedup_by(|a, b| a.0 == b.0);
+    out
+}
+
+/// The targets of every Alias whose `term` matches `term` - the one lookup that must stay cheap per
+/// query word: it reads ALIAS items only, never the bodies (which made a recall take 51 seconds when
+/// it went through `seeds_scored`).
+fn alias_targets(model: &Model, term: &str) -> Vec<(String, Field, f64)> {
+    let mut out = Vec::new();
+    for (name, info) in &model.items {
+        if info.type_name == "Alias" && info.attrs.get("term").is_some_and(|t| matches_term(t, term)) {
+            for e in model.edges.iter().filter(|e| e.kind == "dependency" && e.from == *name) {
+                if model.items.contains_key(&e.to) {
+                    out.push((e.to.clone(), Field::Alias, Field::Alias.weight()));
+                }
+            }
+        }
+    }
     out
 }
 
@@ -543,6 +630,35 @@ fn brief_from_seeds(
         .map(|(n, _)| n.as_str())
         .collect();
     let (reached, hubs) = traverse(model, &seed_names);
+    // THE GRAPH LIFTS WHAT THE WORDS POINT AT (issue295). Before this, a neighbour reached by the walk
+    // kept only its own lexical score, so the walk could only APPEND: for "why must we never rebase",
+    // the requirement and DoD derived from d0129 led and d0129 itself sat 47th, although half the top
+    // seeds link to it. An element that many high-scoring seeds link to is what those seeds are ABOUT.
+    // Each reached element receives a share of every adjacent seed's score, divided by the square root
+    // of its own degree so a hub every gate verifies does not collect the whole payload.
+    let mut degree: HashMap<&str, f64> = HashMap::new();
+    for e in &model.edges {
+        *degree.entry(e.from.as_str()).or_default() += 1.0;
+        *degree.entry(e.to.as_str()).or_default() += 1.0;
+    }
+    let seed_set: HashSet<&str> = seed_names.iter().map(String::as_str).collect();
+    let mut lifted: HashMap<String, f64> = HashMap::new();
+    for e in &model.edges {
+        for (from, to) in [(&e.from, &e.to), (&e.to, &e.from)] {
+            if seed_set.contains(from.as_str()) && reached.contains_key(to) && !seed_set.contains(to.as_str()) {
+                *lifted.entry(to.clone()).or_insert(0.0) += score.get(from).copied().unwrap_or(0.0);
+            }
+        }
+    }
+    let final_score: HashMap<String, f64> = reached
+        .keys()
+        .map(|n| {
+            let own = score.get(n).copied().unwrap_or(0.0);
+            let lift = lifted.get(n).copied().unwrap_or(0.0) * LIFT / degree.get(n.as_str()).copied().unwrap_or(1.0).sqrt();
+            (n.clone(), own + lift)
+        })
+        .collect();
+    let score = &final_score;
     let mut sorted: Vec<(&String, &(usize, String))> = reached.iter().collect();
     sorted.sort_by(|a, b| {
         // Score DESC, then hops ASC, then name — and an element the prompt NAMED outright is pinned
@@ -642,45 +758,81 @@ pub fn why_brief(root: &Path, term: &str, budget: usize) -> Result<String, ViewE
 /// Propagates model-build failures.
 pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<String, ViewError> {
     let model = Model::build(root)?;
-    let (tokens, dropped) = prompt_tokens(&model, prompt);
-    if tokens.is_empty() {
+    let (terms, dropped) = query_terms(prompt);
+    let index = Index::build(&model);
+    let corpus = model.items.len();
+    // BM25F SCORE per element, accumulated across terms (issue295). Scores add, so two terms agreeing
+    // on one element still beats one - the signal agreement was reaching for - while IDF makes a rare
+    // term worth more than a common one and length normalisation stops a long rationale winning for
+    // being long. A term matching most of the corpus contributes almost nothing instead of being
+    // deleted, so nothing is "too common" any more; a term matching nothing is reported as unknown.
+    let mut score: HashMap<String, f64> = HashMap::new();
+    let mut how: HashMap<String, String> = HashMap::new();
+    let mut matched: Vec<String> = Vec::new();
+    let mut unknown: Vec<String> = Vec::new();
+    let mut has_identifier = false;
+    for (tok, kind) in &terms {
+        if *kind == "identifier" {
+            has_identifier = true;
+            // An identifier is not a guess about relevance: weight it as the rarest possible term.
+            for (n, field, fw) in seeds_scored(&model, tok) {
+                *score.entry(n.clone()).or_insert(0.0) += idf(corpus, 1) * fw;
+                how.entry(n).or_insert_with(|| format!("identifier `{tok}` / {}", field.label()));
+            }
+            matched.push(tok.clone());
+            continue;
+        }
+        let df = index.df(tok);
+        // Aliases (the human-owned vocabulary under .knowledge/) still route a term to their targets.
+        let alias_hits = alias_targets(&model, tok);
+        if df == 0 && alias_hits.is_empty() {
+            unknown.push(tok.clone());
+            continue;
+        }
+        matched.push(format!("{tok}({df})"));
+        let w = idf(corpus, df.max(1));
+        for (n, s) in index.score_term(tok, w) {
+            *score.entry(n.clone()).or_insert(0.0) += s;
+            how.entry(n).or_insert_with(|| format!("word `{tok}`"));
+        }
+        for (n, field, fw) in alias_hits {
+            *score.entry(n.clone()).or_insert(0.0) += w * fw;
+            how.entry(n).or_insert_with(|| format!("word `{tok}` / {}", field.label()));
+        }
+    }
+    if score.is_empty() {
         // SAYING SO is the point: a silent empty recall is indistinguishable from a broken one.
-        let mut msg = String::from("recall: no informative term in this prompt — nothing pushed.\n");
+        let mut msg = String::from("recall: no term of this prompt matches the model — nothing pushed.\n");
+        if !unknown.is_empty() {
+            let _ = writeln!(msg, "  unknown to the model: {}", unknown.join(", "));
+        }
         if !dropped.is_empty() {
-            let _ = writeln!(msg, "  ignored as too common to inform: {}", dropped.join(", "));
+            let _ = writeln!(msg, "  ignored as filler: {}", dropped.join(", "));
         }
         return Ok(msg);
     }
-    let mut seeds: Vec<(String, String)> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-    // IDF-WEIGHTED SCORE per element, accumulated across tokens (issue295). Scores add, so two tokens
-    // agreeing on one element still beats one token — the signal agreement was reaching for — but a
-    // single RARE token now also outranks a single common one, which the vote could not express.
-    let mut score: HashMap<String, f64> = HashMap::new();
-    let corpus = model.items.len();
-    for (tok, hits, kind) in &tokens {
-        // An identifier is not a guess about relevance: weight it as the rarest possible term.
-        let w = if *kind == "identifier" { idf(corpus, 1) } else { idf(corpus, *hits) };
-        for (n, field, fw) in seeds_scored(&model, tok) {
-            *score.entry(n.clone()).or_insert(0.0) += w * fw;
-            if seen.insert(n.clone()) {
-                seeds.push((n, format!("{kind} `{tok}` / {}", field.label())));
-            }
-        }
-    }
-    let best = score.values().copied().fold(0.0_f64, f64::max);
-    let has_identifier = tokens.iter().any(|(_, _, k)| *k == "identifier");
-    let named: Vec<String> = tokens.iter().map(|(t, h, k)| {
-        if *k == "identifier" { t.clone() } else { format!("{t}({h})") }
-    }).collect();
+    // The walk expands from the best-scoring few (and every element an identifier NAMED); everything
+    // scored is still ranked, so a strong lexical match outside the seed set is not lost.
+    let mut ranked: Vec<(&String, &f64)> = score.iter().collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)));
+    let seeds: Vec<(String, String)> = ranked
+        .iter()
+        .enumerate()
+        .filter(|(i, (n, _))| *i < TRAVERSAL_SEEDS || how.get(*n).is_some_and(|h| h.starts_with("identifier")))
+        .map(|(_, (n, _))| ((*n).clone(), how.get(*n).cloned().unwrap_or_default()))
+        .collect();
+    let best = ranked.first().map_or(0.0, |(_, s)| **s);
     let mut header = format!(
-        "recalled on {} [corpus {} items, top score {best:.1}{}]:",
-        named.join(", "),
-        model.items.len(),
+        "recalled on {} [corpus {corpus} items, {} scored, top score {best:.1}{}]:",
+        matched.join(", "),
+        score.len(),
         if has_identifier { ", named" } else { "" }
     );
+    if !unknown.is_empty() {
+        let _ = write!(header, " [unknown to the model: {}]", unknown.join(", "));
+    }
     if !dropped.is_empty() {
-        let _ = write!(header, " [ignored as too common: {}]", dropped.join(", "));
+        let _ = write!(header, " [ignored as filler: {}]", dropped.join(", "));
     }
     Ok(brief_from_seeds(&model, &header, &seeds, &score, budget))
 }
@@ -704,8 +856,9 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
 /// verdict governs only unrequested INJECTION.
 /// Is there anything worth PUSHING unasked?
 ///
-/// The honest answer turned out to be "did any informative token survive", which `prompt_tokens`
-/// already decides — so this is that check, named for what it does, and nothing more.
+/// The honest answer turned out to be "does any term of the prompt occur in the model at all" (an
+/// identifier, or a word with a non-zero document frequency) — so this is that check, named for
+/// what it does, and nothing more.
 ///
 /// # A confidence gate lived here and was wrong twice
 ///
@@ -726,39 +879,59 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
 /// Propagates model-build failures; the caller treats an error as "push nothing" (fail-open).
 pub fn has_pushable_facts(root: &Path, prompt: &str) -> Result<bool, ViewError> {
     let model = Model::build(root)?;
-    Ok(!prompt_tokens(&model, prompt).0.is_empty())
+    let (terms, _) = query_terms(prompt);
+    if terms.iter().any(|(_, k)| *k == "identifier") {
+        return Ok(true);
+    }
+    let index = Index::build(&model);
+    Ok(terms.iter().any(|(t, _)| index.df(t) > 0))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The uninformative-prompt check that DID survive, and where it actually lives: a prompt made only
-    /// of function words and corpus-common words produces no seeding tokens at all.
+    /// A prompt of filler and words the model does not know pushes nothing, and SAYS which is which.
+    /// A common word is no longer deleted as "too common" - BM25's IDF weights it near zero instead -
+    /// and a four-letter domain word seeds (issue294: `hook` used to be dropped for length alone).
     #[test]
-    fn a_prompt_of_filler_and_common_words_yields_no_tokens() {
+    fn filler_is_dropped_common_words_are_weighted_not_deleted_and_short_words_seed() {
         let mut model = Model { items: HashMap::new(), edges: Vec::new() };
         for i in 0..300u32 {
             let mut attrs = HashMap::new();
             attrs.insert("title".to_string(), "the ceremony ran".to_string());
+            if i == 7 {
+                attrs.insert("description".to_string(), "the hook fired at the ceremony".to_string());
+            }
             model.items.insert(
                 format!("ceremonyThing{i}"),
                 ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() },
             );
         }
-        // "thing" is filler; "ceremony" matches all 300 and is dropped as too common — and SAID.
-        let (kept, dropped) = prompt_tokens(&model, "what about the thing at the ceremony");
-        assert!(kept.is_empty(), "nothing informative survives: {kept:?}");
-        assert!(dropped.iter().any(|d| d.starts_with("ceremony")), "it SAYS what it ignored: {dropped:?}");
-
-        // A LIMITATION, found by this test's first premise being wrong rather than by design review:
-        // a token under five characters is dropped for LENGTH before frequency is ever consulted, so
-        // four-letter domain words never seed at all — `gate`, `hook`, `land`, `push`. `hooks` seeds
-        // and `hook` does not, which is arbitrary from the reader's side. Recorded as issue294 rather
-        // than tuned here, because lowering the floor re-admits `been`, `does` and `made` unless the
-        // language list grows to compensate, and that trade needs measuring, not guessing.
-        let (kept, _) = prompt_tokens(&model, "what about the hook");
-        assert!(kept.is_empty(), "four-letter domain words do not seed today: {kept:?}");
+        let (kept, dropped) = query_terms("what about the thing at the ceremony, its closeOut and force-push");
+        assert!(dropped.contains(&"thing".to_string()), "filler is dropped and named: {dropped:?}");
+        assert!(kept.iter().any(|(t, _)| t == "ceremony"), "a plain word is KEPT for weighting: {kept:?}");
+        // MEASURED: a dedupe on the raw token silently dropped every plain word and kept only the
+        // segmented ones - a 14-word query recalled on two terms. Both shapes must survive together.
+        for seg in ["force", "push", "what", "ceremony"] {
+            assert!(kept.iter().any(|(t, _)| t == seg), "segment `{seg}` must be a query term: {kept:?}");
+        }
+        assert!(kept.contains(&("closeOut".to_string(), "identifier")), "a camelCase token is an identifier, matched by name: {kept:?}");
+        assert_eq!(kept.iter().filter(|(t, _)| t == "ceremony").count(), 1, "deduped once, not dropped");
+        let index = Index::build(&model);
+        assert_eq!(index.df("ceremony"), 300);
+        assert!(idf(300, 300) < idf(300, 1), "a word in every document is worth almost nothing");
+        // `hook` appears in ONE body: it seeds, and that element is the top score.
+        let scored = index.score_term("hook", idf(300, index.df("hook")));
+        assert_eq!(scored.len(), 1, "four-letter domain words seed now: {scored:?}");
+        assert_eq!(scored[0].0, "ceremonyThing7");
+        // length normalisation: the same tf in a longer document scores lower
+        let mut long = model.items.get("ceremonyThing7").cloned().expect("doc");
+        long.attrs.insert("rationale".to_string(), "many many words of unrelated rationale text ".repeat(20));
+        model.items.insert("ceremonyLong".to_string(), long);
+        let index = Index::build(&model);
+        let scored: HashMap<String, f64> = index.score_term("hook", 1.0).into_iter().collect();
+        assert!(scored["ceremonyLong"] < scored["ceremonyThing7"], "longer document, same tf, lower score: {scored:?}");
     }
 
     /// D0243 rule 2: segments, not substrings. Every case here is measured from the real corpus.

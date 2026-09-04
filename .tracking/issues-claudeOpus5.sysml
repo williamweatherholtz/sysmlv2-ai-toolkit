@@ -870,4 +870,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSanitizeMakesBackslashesSafe to issue366;
+
+    part issue367 : Issue {
+        :>> id = "cf6322fe-abe5-420a-9169-751a2dfaf38a";
+        :>> title = "the ranked recall payload is beaten by grep plus one hop on the linked-record set, and lost two hand-set answers two hops away";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-04 by the corrected harness (issue296) on the first ranker that indexes bodies (issue295). CHECK: recall_bench.py, linked-record set, 50 cases: ranked KG 41/50 in a mean 21 shown rows; naive control 7/50; the SECOND control - the rarest-word grep hits plus everything they link to - 49/50 in a mean 16 UNRANKED candidates. The trivial listing beats the traversal-and-rank on the task the graph exists for, in a smaller set. On the 8-case hand-written set the same ranker scores 5/8 against the previous ranker's 7/8 (measured against a rebuilt shipped binary on the same day): both d0129 questions are lost because d0129 is two hops from every element that carries the words (requirement -> need -> decision) and the one-hop lift cannot reach it. MECHANISM: the walk expands from the 30 best lexical seeds and the lift spreads only one hop from seeds, so a target with none of the query's words competes with 29 lexically-matching seeds for ~20 rows; the control has one rare word, a handful of hits, and lists their links. CONSEQUENCE: the payload the human is handed is worse than what they would get by hand on this task shape, and the graph's traversal is not yet earning its place over grep. PREVENTING CHANGE: recallRanksLinkedRecordsAsWellAsGrepDoes; the harness is the arbiter and the hand set is read, not fitted.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from recallRanksLinkedRecordsAsWellAsGrepDoes to issue367;
 }
