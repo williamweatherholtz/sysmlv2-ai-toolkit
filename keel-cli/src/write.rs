@@ -400,29 +400,67 @@ fn find_result_insertion(lines: &[&str], task_name: &str) -> Result<usize, Write
         }
     }
 
+    // issue353 (GH#48): the DoD's verification block may span several lines. The result goes after
+    // the line that CLOSES the block, not after the line that opens it - otherwise a multi-line DoD
+    // gets the result inserted inside itself and validate's error names the wrong construct.
+    let dod_close = dod_line.map(|start| block_close_line(lines, start).unwrap_or(start));
     last_result
-        .or(dod_line)
+        .or(dod_close)
         .ok_or_else(|| WriteError::InsertionPointNotFound(task_name.to_owned()))
+}
+
+/// Brace depth change contributed by one line, IGNORING braces inside string literals and after a
+/// `//` comment marker (issue354): a `DoD` whose text contains `Test {` is text, not structure. The
+/// write path's block scans used to count every brace character, so one such `DoD` pushed the depth
+/// off by one and the next `add-task` either refused ("action def not found", this repository) or -
+/// worse - landed the new task OUTSIDE its def at package level, silently (a small fixture).
+fn braces_in(line: &str) -> (i32, i32) {
+    let (mut opens, mut closes) = (0i32, 0i32);
+    let mut in_str = false;
+    let mut prev = ' ';
+    for ch in line.chars() {
+        if in_str {
+            if ch == '"' {
+                in_str = false;
+            }
+        } else if ch == '"' {
+            in_str = true;
+        } else if ch == '/' && prev == '/' {
+            break; // the rest of the line is a comment
+        } else if ch == '{' {
+            opens += 1;
+        } else if ch == '}' {
+            closes += 1;
+        }
+        prev = ch;
+    }
+    (opens, closes)
+}
+
+/// The line on which the block that opens at `start` returns to depth 0 - string- and comment-aware.
+/// A one-line block closes on `start` itself.
+fn block_close_line(lines: &[&str], start: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut opened = false;
+    for (i, line) in lines.iter().enumerate().skip(start) {
+        let (o, c) = braces_in(line);
+        if o > 0 {
+            opened = true;
+        }
+        depth += o - c;
+        if opened && depth == 0 {
+            return Some(i);
+        }
+    }
+    None
 }
 
 /// Return the 0-indexed line number of the closing `}` for an action def.
 ///
 /// Scans forward from `def_start_line`, tracking brace depth.
 fn find_action_def_close(lines: &[&str], def_start_line: usize) -> Option<usize> {
-    let mut depth = 0i32;
-    for (i, line) in lines.iter().enumerate().skip(def_start_line) {
-        for ch in line.chars() {
-            if ch == '{' {
-                depth += 1;
-            } else if ch == '}' {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-        }
-    }
-    None
+    // String- and comment-aware since issue354; see `brace_delta`.
+    block_close_line(lines, def_start_line)
 }
 
 /// Detect the indentation prefix used for existing `action` lines inside an
@@ -1785,6 +1823,68 @@ mod tests {
     /// backlog, so the very next command could not read the model to do anything, including to
     /// report the problem. Armed: revert the `sanitize_field` call in `add_task_locked` and the
     /// re-read below fails to parse.
+    /// issue354: a `DoD` whose text contains `Test {` is text, not structure. The old brace count took it
+    /// as an open brace, so the NEXT add-task either refused ("action def not found") or landed the task
+    /// at package level, outside its def, silently. Both symptoms come from one scan; this test is the
+    /// small-fixture shape (misplacement), and the refusal shape reduces to the same scanner.
+    #[test]
+    fn a_dod_containing_a_brace_does_not_misplace_the_next_task() {
+        let dir = std::env::temp_dir().join(format!("keel-brace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("backlog.sysml");
+        std::fs::write(&path, "package B {\n    action def Work {\n    }\n}\n").expect("seed");
+        super::add_task(&path, "Work", "dcFirst", "the insert followed the line matching verification <T>DoD : Test {, which is wrong", "test").expect("first write");
+        super::add_task(&path, "Work", "dcSecond", "plain", "test").expect("the second write must not refuse");
+        let written = std::fs::read_to_string(&path).expect("read back");
+        let def_close = written.lines().position(|l| l.trim() == "}" && l.starts_with("    ")).expect("the def's own close brace");
+        let second = written.lines().position(|l| l.trim() == "action dcSecond;").expect("dcSecond exists");
+        assert!(second < def_close, "dcSecond must land INSIDE the def, before its close brace:\n{written}");
+        let tokens = keel_parser::tokenize(&written, "backlog.sysml").expect("lex");
+        assert!(keel_parser::parse(tokens, "backlog.sysml").is_ok(), "still parses:\n{written}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// issue353 (GH#48): a MULTI-LINE `DoD` block takes its result after the block's closing brace, not
+    /// after its opening line. `add-task` writes one-liners, so most results never met this; a human
+    /// who reflowed a `DoD` did, and the result landed inside the block with validate's error naming the
+    /// wrong construct.
+    #[test]
+    fn a_result_lands_after_a_multi_line_dod_block_closes() {
+        let dir = std::env::temp_dir().join(format!("keel-mldod-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("backlog.sysml");
+        std::fs::write(
+            &path,
+            "package B {\n    action def Work {\n        action dcWide;\n        verification dcWideDoD : Test {\n            :>> id = \"0d800000-0000-4000-8000-0000000000aa\";\n            :>> method = VerificationMethod::test;\n            :>> procedureText = \"a DoD that a human reflowed over several lines\";\n        }\n    }\n}\n",
+        )
+        .expect("seed");
+        super::append_result(&path, "dcWide", "abc1234", "pass", "2026-09-03", "someone", None).expect("the result is recorded");
+        let written = std::fs::read_to_string(&path).expect("read back");
+        let block_close = written.lines().position(|l| l.trim() == "}" && l.starts_with("        ")).expect("the DoD block's close");
+        let result = written.lines().position(|l| l.contains("dcWideDoDR1")).expect("the result line");
+        assert!(result > block_close, "the result must follow the block's CLOSING brace, not sit inside the block:\n{written}");
+        let tokens = keel_parser::tokenize(&written, "backlog.sysml").expect("lex");
+        assert!(keel_parser::parse(tokens, "backlog.sysml").is_ok(), "still parses:\n{written}");
+        // and a one-liner DoD still takes its result on the next line, as every add-task-written DoD does
+        std::fs::write(&path, "package B {\n    action def Work {\n        action dcOne;\n        verification dcOneDoD : Test { :>> id = \"0d800000-0000-4000-8000-0000000000ab\"; :>> method = VerificationMethod::test; :>> procedureText = \"one line\"; }\n    }\n}\n").expect("seed 2");
+        super::append_result(&path, "dcOne", "abc1234", "pass", "2026-09-03", "someone", None).expect("one-liner result");
+        let w2 = std::fs::read_to_string(&path).expect("read back 2");
+        let dod = w2.lines().position(|l| l.contains("dcOneDoD :")).expect("dod");
+        let res = w2.lines().position(|l| l.contains("dcOneDoDR1")).expect("result");
+        assert_eq!(res, dod + 1, "a one-line DoD's result follows it directly:\n{w2}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn braces_in_ignores_strings_and_comments() {
+        assert_eq!(super::braces_in("    action def Work {"), (1, 0));
+        assert_eq!(super::braces_in("    verification x : Test { :>> procedureText = \"Test { inside } text\"; }"), (1, 1));
+        assert_eq!(super::braces_in("    } // closes { nothing"), (0, 1));
+        assert_eq!(super::braces_in("    // a comment with { braces }"), (0, 0));
+    }
+
     #[test]
     fn a_dod_containing_quotes_cannot_break_the_backlog() {
         let dir = std::env::temp_dir().join(format!("keel-dodq-{}", std::process::id()));
