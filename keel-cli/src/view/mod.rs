@@ -2983,33 +2983,64 @@ struct TierStat {
 /// declared coverage from typed edges and, during issue240, truthfully reported no uncovered hazard
 /// while the pre-commit gate could not run at all. The association is data a project edits rather than
 /// Rust, so a downstream project declares its own probes without a fork (the D0184 precedent).
-fn control_arming(root: &Path) -> std::collections::BTreeMap<String, (bool, String)> {
+/// One control's arming declaration: `checkable` with its probe-or-reason, and - D0253 - the test that
+/// PROVES it fires where a read-only view cannot establish that (`provenBy`, a repo-relative path).
+struct ArmingDecl {
+    checkable: bool,
+    detail: String,
+    proven_by: Option<String>,
+}
+
+fn control_arming(root: &Path) -> std::collections::BTreeMap<String, ArmingDecl> {
     let mut out = std::collections::BTreeMap::new();
     let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/control-arming.toml")) else {
         return out;
     };
     let mut current: Option<String> = None;
-    let (mut checkable, mut detail) = (false, String::new());
+    let (mut checkable, mut detail, mut proven_by) = (false, String::new(), None::<String>);
     for line in text.lines() {
         let l = line.trim();
         if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
             if let Some(c) = current.take() {
-                out.insert(c, (checkable, std::mem::take(&mut detail)));
+                out.insert(c, ArmingDecl { checkable, detail: std::mem::take(&mut detail), proven_by: proven_by.take() });
             }
             current = Some(name.to_string());
             checkable = false;
             continue;
         }
+        let value = |v: &str| v.trim_start_matches([' ', '=']).trim().trim_matches('"').to_string();
         if l.starts_with("checkable") {
             checkable = l.contains("true");
+        } else if let Some(v) = l.strip_prefix("provenBy") {
+            proven_by = Some(value(v));
         } else if let Some(v) = l.strip_prefix("probe").or_else(|| l.strip_prefix("reason")) {
-            detail = v.trim_start_matches([' ', '=']).trim().trim_matches('"').to_string();
+            detail = value(v);
         }
     }
     if let Some(c) = current {
-        out.insert(c, (checkable, detail));
+        out.insert(c, ArmingDecl { checkable, detail, proven_by });
     }
     out
+}
+
+/// The honest evidence count (issue303): how many declared controls have EVIDENCE they can fire - a
+/// passing probe or a named, present test - against how many rest on a stated reason or on nothing.
+fn arming_evidence(arming_rows: &[Json]) -> Json {
+    let count = |state: &str| {
+        let n = arming_rows
+            .iter()
+            .filter(|r| matches!(r, Json::Obj(fields) if fields.iter().any(|(k, v)| k == "arming" && matches!(v, Json::Str(s) if s == state))))
+            .count();
+        Json::Int(i64::try_from(n).unwrap_or(i64::MAX))
+    };
+    Json::Obj(vec![
+        ("armedByProbe".to_string(), count("ARMED")),
+        ("provenByTest".to_string(), count("PROVEN-BY-TEST")),
+        ("reasonOnly".to_string(), count("not-machine-checkable")),
+        ("proofMissing".to_string(), count("PROOF-MISSING")),
+        ("notArmed".to_string(), count("NOT-ARMED")),
+        ("undeclared".to_string(), count("UNDECLARED")),
+    ])
 }
 
 /// Is a checkable control ACTUALLY armed right now? `None` when no probe of that name exists, which is
@@ -3102,8 +3133,18 @@ pub fn controls(root: &Path) -> Result<String, ViewError> {
         }
         let (state, detail) = match arming_decl.get(c.as_str()) {
             None => ("UNDECLARED".to_string(), "no entry in control-arming.toml - silence is a gap, not consent".to_string()),
-            Some((false, reason)) => ("not-machine-checkable".to_string(), reason.clone()),
-            Some((true, probe)) => match probe_armed(root, probe) {
+            // D0253/issue303: a control a VIEW cannot check may still be PROVEN, by a test that exercises
+            // it both ways. The evidence is the named test, and the name is checked against the tree -
+            // a proof that names a file which does not exist is a claim, not evidence.
+            Some(ArmingDecl { checkable: false, detail: reason, proven_by: Some(test) }) => {
+                if root.join(test).is_file() {
+                    ("PROVEN-BY-TEST".to_string(), format!("{test} - {reason}"))
+                } else {
+                    ("PROOF-MISSING".to_string(), format!("provenBy names `{test}`, which is not in the tree - {reason}"))
+                }
+            }
+            Some(ArmingDecl { checkable: false, detail: reason, proven_by: None }) => ("not-machine-checkable".to_string(), reason.clone()),
+            Some(ArmingDecl { checkable: true, detail: probe, .. }) => match probe_armed(root, probe) {
                 None => ("PROBE-MISSING".to_string(), format!("declared checkable by probe `{probe}` which this binary does not implement")),
                 Some(Ok(())) => ("ARMED".to_string(), format!("probe `{probe}` passes")),
                 Some(Err(why)) => {
@@ -3123,12 +3164,14 @@ pub fn controls(root: &Path) -> Result<String, ViewError> {
         .filter(|h| disarmed.iter().any(|c| reaches(c, h)))
         .map(|h| Json::s((*h).clone()))
         .collect();
+    let evidence = arming_evidence(&arming_rows);
     Ok(Json::Obj(vec![
         ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side. DECLARED is not ARMED: `controlArming` reports whether each control can actually fire, because during issue240 this view truthfully reported no uncovered hazard while the commit gate could not run at all (D0217).".to_string())),
         ("hazards".to_string(), Json::Arr(rows)),
         ("uncoveredHazards".to_string(), Json::Arr(uncovered.into_iter().map(Json::s).collect())),
         ("controlArming".to_string(), Json::Arr(arming_rows)),
         ("hazardsWithADisarmedControl".to_string(), Json::Arr(hazards_with_disarmed)),
+        ("armingEvidence".to_string(), evidence),
         ("unanchoredConstraints".to_string(), Json::Arr(unanchored)),
         ("unlinkedHighIncidentsSinceD0195".to_string(), Json::Arr(unlinked_incidents)),
     ])

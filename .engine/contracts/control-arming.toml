@@ -62,3 +62,28 @@ reason = "The old reason ('armed whenever the binary exists, nothing to check') 
 checkable = false
 provenBy = "keel-cli/tests/launcher_controls_actually_fire.rs"
 reason = "Not establishable by this view - a read-only view must not spawn a launch. PROVEN BY TEST (D0253 clause A) and declared proven-at-birth rather than retrofitted (D0254). The probe builds a throwaway git repository, confirms a CLEAN tree prepares (a control that refuses everything is stuck, not armed), then dirties the tree and asserts the refusal fires naming the reason. Before D0254 this control was IMPLEMENTED, load-bearing and absent from the control map entirely, which is the third failure class: an undeclared control cannot appear as a gap, so its omission made the coverage view read cleaner rather than worse."
+
+[ctlPostEditGate]
+checkable = false
+provenBy = "keel-cli/tests/remaining_controls_actually_fire.rs"
+reason = "Whether the harness invokes the hook is a harness property (issue248); what the hook DOES is proven: on a scaffolded project a clean edit passes silently and an edit that leaves the model unparseable returns the block decision naming the edit gate. Both directions, so a stuck gate cannot pass as an armed one."
+
+[ctlTurnBoundaryGate]
+checkable = false
+provenBy = "keel-cli/tests/remaining_controls_actually_fire.rs"
+reason = "Same harness caveat as ctlPostEditGate. Proven: a fresh scaffold ends its turn (exit 0, no block), and the same tree with one unparseable model file cannot end its turn (block). The scaffold is the fixture because the turn gate runs every guard, and only a real project passes them clean."
+
+[ctlOverrideObligation]
+checkable = false
+provenBy = "keel-cli/tests/remaining_controls_actually_fire.rs"
+reason = "Proven under a strict fixture: the protected surface denies; `keel override <path>` opens THAT path once (a second path stays closed); the write through it is announced; its consumption leaves an obligation under .tracking/obligations/; the next write to the same path denies again. Single-use, path-bound, recorded - the three properties the control exists for."
+
+[ctlAuditAdherence]
+checkable = false
+provenBy = "keel-cli/tests/remaining_controls_actually_fire.rs"
+reason = "Proven in a throwaway repository: an unchanged range passes; a rule downgraded from blocking to warning with no Decision FAILS the audit naming the rule; the same downgrade co-committed with a #SafetyChange-marked Decision passes - the sanctioned path stays open, which is what separates a gate from a wall."
+
+[ctlAdoptionCheck]
+checkable = false
+provenBy = "keel-cli/tests/adoption_check_can_fail.rs"
+reason = "Proven both ways: a fresh foreign scaffold gates clean, and a unit whose bundle leaves its skill binding behind turns that foreign gate red (the D0222 mutilation, reproduced). The entry was missing here although the test had existed for several sprints - the third failure class (D0254): a proven control that the arming view listed as UNDECLARED read as a gap that was not one."
