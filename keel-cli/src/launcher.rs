@@ -252,7 +252,10 @@ pub fn finish(root: &Path, setup: &RunSetup, exit: Option<i32>, turns: u64, time
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = dir.join(format!("run-{short}.sysml"));
         let verdict = if gate_green { "pass" } else { "fail" };
-        let esc = |s: &str| s.replace('"', "'").replace(['\n', '\r'], " ");
+        // ONE sanitiser (D0305): this closure used to be a second one - quotes and newlines only - and the
+        // first parse-before-write refusal caught it embedding a Windows path from a gate problem as an
+        // invalid escape. Two sanitisers is how the second one stays behind.
+        let esc = |s: &str| crate::write::sanitize_field(s);
         let text = format!(
             "// LAUNCHED-RUN SUMMARY (auto-recorded after the post-run gate, D0182/K12). The gate verifies\n\
              // FORM; substance verification is the human diff review, which this run's diff awaits\n\

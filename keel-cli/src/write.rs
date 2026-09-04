@@ -215,8 +215,24 @@ pub fn with_file_lock<T, E: From<std::io::Error>>(
 /// failure at that point rather than the original being gone.
 ///
 /// # Errors
-/// Returns the underlying [`std::io::Error`] if the temp write, the removal or the rename fails.
+/// Returns the underlying [`std::io::Error`] if the temp write, the removal or the rename fails - or,
+/// for a `.sysml` target, an `InvalidData` error when the content would not parse: the write is
+/// REFUSED and nothing on disk changes (issue366 / D0305). A record command that reports success over
+/// a file `validate` rejects is worse than the failure it hides, so this is the one choke point every
+/// API writer of model text passes through and the one place the refusal can live.
 pub fn write_atomic(path: &std::path::Path, content: impl AsRef<str>) -> std::io::Result<()> {
+    if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")) {
+        let name = path.display().to_string();
+        let parsed = keel_parser::tokenize(content.as_ref(), &name)
+            .map_err(|e| e.to_string())
+            .and_then(|t| keel_parser::parse(t, &name).map(|_| ()).map_err(|e| e.to_string()));
+        if let Err(e) = parsed {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("refusing to write {name}: the result would not parse - {e} (issue366: a write API never reports success over a file validate rejects)"),
+            ));
+        }
+    }
     let tmp = path.with_extension(format!(
         "{}.keel-tmp",
         path.extension().map_or_else(String::new, |e| e.to_string_lossy().to_string())
@@ -1278,8 +1294,14 @@ pub fn sanitize_public(v: &str) -> String {
     sanitize_field(v)
 }
 
+/// One line, no double quote, NO BACKSLASH (issue366 / D0305): a backslash inside a `SysML` string
+/// literal is an escape, so a Windows path pasted into a Decision produced `invalid escape sequence
+/// '\P'`, and three write commands wrote the file and reported success before validate reversed
+/// them. It becomes a forward slash - the portable form of the one thing that carries backslashes
+/// in this corpus, a path - which is lossy for a regex and safe for a record; a field that needs a
+/// literal backslash is code and does not belong in prose.
 pub(crate) fn sanitize_field(v: &str) -> String {
-    v.replace('"', "'").split_whitespace().collect::<Vec<_>>().join(" ")
+    v.replace('"', "'").replace('\\', "/").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Does this prose field carry captured TOOL OUTPUT rather than authored text? (issue255/D0223)
@@ -1687,8 +1709,10 @@ mod atomic_write_tests {
         let _ = std::fs::create_dir_all(&dir);
         let target = dir.join("model.sysml");
         std::fs::write(&target, "old").expect("seed");
-        write_atomic(&target, "new content").expect("atomic write");
-        assert_eq!(std::fs::read_to_string(&target).expect("read"), "new content");
+        // Parseable content: a `.sysml` target is parsed before it lands (D0305), and this test is about
+        // atomicity, not the refusal, which has its own test.
+        write_atomic(&target, "package NewContent {\n}\n").expect("atomic write");
+        assert_eq!(std::fs::read_to_string(&target).expect("read"), "package NewContent {\n}\n");
         let strays: Vec<_> = std::fs::read_dir(&dir)
             .expect("readdir")
             .filter_map(Result::ok)
@@ -1916,6 +1940,30 @@ mod tests {
         // The point of all of it: the file still parses.
         let tokens = keel_parser::tokenize(&written, "backlog.sysml").expect("it must still lex");
         assert!(keel_parser::parse(tokens, "backlog.sysml").is_ok(), "the backlog must still PARSE:\n{written}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// issue366: a Windows path's backslashes become forward slashes, and a `.sysml` write whose
+    /// content would not parse is REFUSED with nothing written - both directions, so a refusal that
+    /// fires on valid content would be seen too.
+    #[test]
+    fn backslashes_are_made_safe_and_an_unparsable_sysml_write_is_refused() {
+        assert_eq!(super::sanitize_field(r"C:\Program Files\ClaudeCode\managed-settings.json"), "C:/Program Files/ClaudeCode/managed-settings.json");
+        assert_eq!(super::sanitize_field(r"invalid escape sequence '\P'"), "invalid escape sequence '/P'");
+        let dir = std::env::temp_dir().join(format!("keel-refuse-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("probe.sysml");
+        std::fs::write(&path, "package Before {\n}\n").expect("seed");
+        let err = super::write_atomic(&path, "package Broken {\n    part x : Decision { :>> title = \"a \\P escape\"; }\n}\n").expect_err("unparsable content is refused");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("refusing to write") && err.to_string().contains("issue366"), "{err}");
+        assert_eq!(std::fs::read_to_string(&path).expect("read"), "package Before {\n}\n", "nothing on disk changed");
+        assert!(!path.with_extension("sysml.keel-tmp").exists(), "no temp file is left behind by a refusal");
+        super::write_atomic(&path, "package After {\n}\n").expect("valid content still writes");
+        assert!(std::fs::read_to_string(&path).expect("read").contains("After"));
+        let json = dir.join("probe.json");
+        super::write_atomic(&json, "{ not sysml, not checked").expect("non-sysml targets are not parsed");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
