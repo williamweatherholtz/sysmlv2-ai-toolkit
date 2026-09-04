@@ -859,4 +859,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDriftGuardRefusesDisableAllHooks to issue365;
+
+    part issue366 : Issue {
+        :>> id = "0d451672-03a3-4be1-a548-afa0deabca10";
+        :>> title = "record decision and add-task wrote unparsable files over a Windows path backslash and reported success";
+        :>> createdAt = "2026-09-03";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-03 recording D0296. CHECK: `keel record decision --from` with a context field containing the literal path C:/Program Files/ClaudeCode/managed-settings.json wrote the file, printed 'recorded' and 'accepted at record time', and the next `keel validate .` reported `0296-...sysml:18:2724: invalid escape sequence '/P'` - every guard that reads decisions then FAILED (acceptance-events, charter). MECHANISM: sanitize_field (write.rs) neutralises double quotes and newlines but not backslashes, and the record path writes without tokenizing the result. CONSEQUENCE: a write API whose contract is 'prose verbatim, safely' (issue255) produced an unparsable governance record and reported success; on a Windows host any pasted path does this. Same class as issue354 (structure vs text) on the WRITE side. PREVENTING CHANGE: dcSanitizeMakesBackslashesSafe - escape or replace, and tokenize-before-write so the command refuses instead of reporting a success validate will reverse.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSanitizeMakesBackslashesSafe to issue366;
 }

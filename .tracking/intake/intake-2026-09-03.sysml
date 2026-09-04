@@ -431,4 +431,12 @@ package ProjectIntake20260903 {
         :>> triageNote = "st090 asks whether keel would work better as an extension with forced pre/post hooks. Routed as ARCHITECTURE, plan-only: a spike ranks the hosts (repo settings, plugin, plugin+self-guarding deny hook, managed settings) by who can write them; the concrete gap found while checking - disableAllHooks from any scope, unseen by the drift guard - is issue365 with its own resolver.";
     }
     #DerivedFrom dependency from us090 to st090;
+
+    part st091 : Statement {
+        :>> id = "3eca90dd-54c2-431d-81b0-70a10c7765ed";
+        :>> title = "Pull the hook-hosting spike forward and run it";
+        :>> createdAt = "2026-09-03"; :>> createdBy = "claudeOpus5";
+        :>> text = "we do. go";
+        :>> saidBy = "williamWeatherholtz"; :>> saidAt = "2026-09-03"; :>> channel = StatementChannel::chat;
+    }
 }
