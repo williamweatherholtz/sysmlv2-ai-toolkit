@@ -881,4 +881,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from recallRanksLinkedRecordsAsWellAsGrepDoes to issue367;
+
+    part issue368 : Issue {
+        :>> id = "987724d7-5f71-4fc2-9a30-fdb699b812c1";
+        :>> title = "two computed views stamped viewStatus twice - a duplicate JSON key on the field that exists to be unambiguous";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-04 while receipting issue285 from a live server: GET /api/computed/whats-next and /api/computed/verification returned a body beginning viewStatus computed, viewStatus computed - the same key twice. MECHANISM: those two views stamp their own status inside computed_binding and the choke point with_status (serve.rs) stamps every cached body again without looking. CONSEQUENCE: duplicate keys are accepted by most JSON parsers and resolved differently by each (first wins, last wins), so the one field the N-C2 requirement says every render path must carry unambiguously was the one field that was ambiguous; on the stale path the inner computed would have hidden the outer stale in a last-wins parser. PREVENTING CHANGE: with_status drops an inner viewStatus and re-stamps with its own verdict; the test with_status_never_duplicates_the_key covers the four body shapes including stale-over-computed. Fixed in the same sprint as dcEveryAdvertisedViewIsBound, which resolves it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcEveryAdvertisedViewIsBound to issue368;
 }

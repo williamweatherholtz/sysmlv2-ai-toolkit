@@ -1704,6 +1704,18 @@ fn with_status(body: &str, status: &str, extra: &str) -> String {
             // reader, which is worse than the failure it was reporting.
             if rest.trim() == "}" {
                 format!("{{\"viewStatus\":\"{status}\"{extra}}}")
+            } else if let Some(after) = rest.trim_start().strip_prefix("\"viewStatus\"") {
+                // A view that stamps ITSELF (whats-next, verification) came through here twice and the
+                // console received `"viewStatus":"computed","viewStatus":"computed"` - a duplicate key,
+                // valid to most parsers and ambiguous to all of them. Found live while receipting
+                // issue285. The inner stamp is DROPPED and the choke point's verdict stands: a cached
+                // body that went stale must read stale whatever it said about itself.
+                let remainder = after.split_once(',').map_or("}", |(_, tail)| tail);
+                if remainder.trim() == "}" {
+                    format!("{{\"viewStatus\":\"{status}\"{extra}}}")
+                } else {
+                    format!("{{\"viewStatus\":\"{status}\"{extra},{remainder}")
+                }
             } else {
                 format!("{{\"viewStatus\":\"{status}\"{extra},{rest}")
             }
@@ -2783,6 +2795,24 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     const SERVE_RS: &str = include_str!("serve.rs");
     use super::{CONSOLE_HTML, build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
+
+    /// A body that already carries `viewStatus` is not stamped twice (found live: whats-next and
+    /// verification rendered the key twice), and the other three shapes still are.
+    #[test]
+    fn with_status_never_duplicates_the_key() {
+        use super::with_status;
+        let once = with_status(r#"{"viewStatus":"computed","ready":[]}"#, "computed", "");
+        assert_eq!(once.matches("viewStatus").count(), 1, "{once}");
+        assert!(once.contains(r#""ready":[]"#), "the body survives: {once}");
+        // the choke point's verdict wins over the inner stamp
+        let stale = with_status(r#"{"viewStatus":"computed","ready":[]}"#, "stale", r#","staleReason":"tree moved""#);
+        assert!(stale.starts_with(r#"{"viewStatus":"stale","staleReason":"tree moved","ready":[]"#), "{stale}");
+        assert_eq!(with_status(r#"{"viewStatus":"computed"}"#, "computed", ""), r#"{"viewStatus":"computed"}"#);
+        assert_eq!(with_status(r#"{"a":1}"#, "computed", "").matches("viewStatus").count(), 1);
+        assert_eq!(with_status("{}", "failed", ""), r#"{"viewStatus":"failed"}"#);
+        assert!(with_status("[1,2]", "computed", "").starts_with(r#"{"viewStatus":"computed","data":[1,2]}"#));
+        let _: serde_json::Value = serde_json::from_str(&once).expect("still JSON");
+    }
 
     /// issue285: every computed view a declared VIEWPOINT advertises must be bound in this server.
     ///
