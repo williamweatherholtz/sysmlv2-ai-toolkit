@@ -516,6 +516,226 @@ pub fn untrusted_routing(root: &Path) -> GuardReport {
     GuardReport { name: "untrusted-routing", scanned: untrusted.len(), warnings: Vec::new(), violations }
 }
 
+// ── untrusted-taint guard (D0314 / issue347: the label travels with the derivation) ──────────────
+
+/// How a Decision was accepted, as far as trust conferral is concerned.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Acceptance {
+    /// A human's own act - their quoted words (D0289), the console, a terminal - confers trust.
+    Human,
+    /// Standing consent applied by the recorder at record time (D0291): nobody read it; confers nothing.
+    Auto,
+}
+
+/// Guard: nothing transitively derived from an UNTRUSTED utterance reaches a privileged sink without
+/// a human having accepted it on the way.
+///
+/// Guard 56 (`untrusted-routing`) enforces the first hop: an untrusted story must be routed to a
+/// Decision. It does not follow the label further. A `UserStory` derived from an untrusted
+/// `Statement`, a `Need` derived from that story, a task chartered by a Decision that story
+/// implicated - three hops and the label is gone, and the task builds (the `CaMeL` finding, D0282).
+///
+/// This guard computes the TAINT CLOSURE over the derivation edges - `#DerivedFrom` (target to
+/// source), `#Implicates` (story to target), `#CharteredBy` and `#Resolves` (item to what it serves)
+/// - from every `SourceTrust::untrusted` utterance, and fails when a tainted item is
+///
+/// - a Decision that is ACCEPTED, but only automatically (standing consent, D0291) - an instruction
+///   from an unauthenticated stranger became an accepted direction with nobody reading it; or
+/// - a task that is DONE (a passing result) - built on that instruction.
+///
+/// Trust is conferred at exactly one point: a Decision a HUMAN accepted - their quoted word, the
+/// console, a terminal. Propagation stops there; what descends from it is the human's direction. A
+/// proposed Decision is a plan, and planning is what untrusted input may do (D0264), so it is never a
+/// violation on its own.
+///
+/// STATED RESIDUAL: a guard, contract or hook edit is not a model item and carries no edge, so a
+/// tainted task that changes the enforcement surface is caught here only as a done task; the keystone
+/// lock (D0209) is what requires its Decision.
+#[must_use]
+pub fn untrusted_taint(root: &Path) -> GuardReport {
+    let blob = crate::collect_sysml(&root.join(".tracking"))
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let deciders: HashSet<String> = crate::github::deciders(root).into_keys().collect();
+    let (scanned, sources) = untrusted_sources(&blob, &deciders);
+    let edges = taint_edges(&blob);
+    let accepted = decision_acceptances(root);
+    let done = crate::orient::done_names(root);
+    let violations = taint_violations(&sources, &edges, &accepted, &done);
+    GuardReport { name: "untrusted-taint", scanned, warnings: Vec::new(), violations }
+}
+
+/// The untrusted utterances (count) and the ones whose speaker is NOT a declared decider (sources).
+///
+/// `sourceTrust` is a proxy from repository visibility and stays as recorded (D0264): the human's
+/// own GitHub issues on this public repository carry `untrusted`. But `saidBy` is the GitHub login
+/// the API attributed the words to, and `github-actors.toml` is the committed table that maps a
+/// login to the human whose judgment it is (D0219) - the same table the decision channel trusts to
+/// record an acceptance. A decider's own words are the human's direction, not a stranger's
+/// instruction: trust is conferred at the source. The first live run found exactly this - three
+/// violations, every one an issue the decider filed themself.
+pub(crate) fn untrusted_sources(blob: &str, deciders: &HashSet<String>) -> (usize, Vec<String>) {
+    let mut scanned = 0usize;
+    let mut sources = Vec::new();
+    for seg in blob.split("part ").skip(1).filter(|seg| seg.contains("SourceTrust::untrusted")) {
+        let Some(name) = seg.split_whitespace().next() else { continue };
+        scanned += 1;
+        let said_by = seg.split(":>> saidBy = \"").nth(1).and_then(|r| r.split('"').next()).unwrap_or("");
+        if !deciders.contains(said_by) {
+            sources.push(name.to_string());
+        }
+    }
+    (scanned, sources)
+}
+
+/// Every derivation edge as (from, to) in the DIRECTION TAINT FLOWS, with the edge's kind for the path.
+pub(crate) fn taint_edges(blob: &str) -> Vec<(String, String, &'static str)> {
+    let mut out = Vec::new();
+    for line in blob.lines() {
+        let t = line.trim();
+        // (marker, taint flows from the edge's `to` to its `from`)
+        for (marker, reversed) in [("#DerivedFrom", true), ("#Implicates", false), ("#CharteredBy", true), ("#Resolves", true)] {
+            let Some(rest) = t.strip_prefix(marker).and_then(|r| r.strip_prefix(" dependency from ")) else { continue };
+            let Some((a, b)) = rest.split_once(" to ") else { continue };
+            let a = a.trim().to_string();
+            let b = b.trim_end_matches(';').trim().to_string();
+            if reversed { out.push((b, a, marker)) } else { out.push((a, b, marker)) }
+        }
+    }
+    out
+}
+
+/// Every accepted Decision under `.engine/decisions`, with how it was accepted.
+fn decision_acceptances(root: &Path) -> HashMap<String, Acceptance> {
+    let mut out = HashMap::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Some(name) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.get(..4)).filter(|n| n.chars().all(|c| c.is_ascii_digit())) else { continue };
+        let dname = format!("d{name}");
+        if let Some(kind) = acceptance_kind(&text, &dname) {
+            out.insert(dname, kind);
+        }
+    }
+    out
+}
+
+/// How `dname` was accepted, from its file: a passing `AcceptR` result, and whether the `Accept` Test
+/// says the acceptance was automatic.
+pub(crate) fn acceptance_kind(text: &str, dname: &str) -> Option<Acceptance> {
+    let has_pass = text.match_indices(&format!("part {dname}AcceptR")).any(|(i, _)| text[i..].split('}').next().is_some_and(|seg| seg.contains("VerdictKind::pass")));
+    if !has_pass {
+        return None;
+    }
+    let auto = text.find(&format!("verification {dname}Accept : Test")).is_some_and(|i| text[i..].split('}').next().is_some_and(|seg| seg.contains("AUTO-ACCEPTED")));
+    Some(if auto { Acceptance::Auto } else { Acceptance::Human })
+}
+
+/// The closure and its verdicts. Breadth-first from every source, carrying the path; a HUMAN-accepted
+/// Decision is where trust is conferred and the walk stops; an AUTO-accepted Decision or a DONE task
+/// reached with the label still on it is a violation naming the whole path.
+pub(crate) fn taint_violations(
+    sources: &[String],
+    edges: &[(String, String, &'static str)],
+    accepted: &HashMap<String, Acceptance>,
+    done: &HashSet<String>,
+) -> Vec<String> {
+    let mut out: BTreeMap<String, String> = BTreeMap::new();
+    for src in sources {
+        let mut seen: HashSet<&str> = HashSet::new();
+        let mut queue: std::collections::VecDeque<(String, Vec<String>)> = std::collections::VecDeque::new();
+        queue.push_back((src.clone(), vec![src.clone()]));
+        while let Some((node, path)) = queue.pop_front() {
+            for (from, to, kind) in edges.iter().filter(|(f, _, _)| *f == node) {
+                if !seen.insert(to.as_str()) {
+                    continue;
+                }
+                let mut p = path.clone();
+                p.push(format!("{kind}-> {to}"));
+                let _ = from;
+                match accepted.get(to) {
+                    Some(Acceptance::Human) => continue, // trust conferred here; nothing below is tainted
+                    Some(Acceptance::Auto) => {
+                        out.entry(to.clone()).or_insert_with(|| format!(
+                            "{to} is an ACCEPTED Decision descended from the UNTRUSTED utterance {src} and its acceptance was automatic (standing consent) - an unauthenticated stranger's instruction became direction with nobody reading it; a human accepts it in their own words (D0289) or it stays proposed. Path: {}",
+                            p.join(" ")
+                        ));
+                        // nobody read it, so nothing below it is the human's: keep walking
+                    }
+                    None => {}
+                }
+                if done.contains(to) {
+                    out.entry(to.clone()).or_insert_with(|| format!(
+                        "{to} is DONE and descends from the UNTRUSTED utterance {src} with no human acceptance on the path - built on an unauthenticated stranger's instruction (D0264). Route the chain through a Decision a human accepts. Path: {}",
+                        p.join(" ")
+                    ));
+                }
+                queue.push_back((to.clone(), p));
+            }
+        }
+    }
+    out.into_values().collect()
+}
+
+#[cfg(test)]
+mod taint_tests {
+    use super::{acceptance_kind, taint_edges, taint_violations, untrusted_sources, Acceptance};
+    use std::collections::{HashMap, HashSet};
+
+    /// A decider's own GitHub issue is recorded `untrusted` (visibility) but its speaker is the human:
+    /// counted in the population, not a taint source. A stranger's is.
+    #[test]
+    fn a_declared_deciders_own_words_are_not_a_taint_source() {
+        let blob = "part st1 : Statement { :>> saidBy = \"williamweatherholtz\"; :>> sourceTrust = SourceTrust::untrusted; }\npart st2 : Statement { :>> saidBy = \"stranger\"; :>> sourceTrust = SourceTrust::untrusted; }\n";
+        let deciders: HashSet<String> = std::iter::once("williamweatherholtz".to_string()).collect();
+        let (scanned, sources) = untrusted_sources(blob, &deciders);
+        assert_eq!(scanned, 2);
+        assert_eq!(sources, vec!["st2".to_string()]);
+    }
+
+    const CHAIN: &str = "#DerivedFrom dependency from us9 to st9;\n#DerivedFrom dependency from n9 to us9;\n#CharteredBy dependency from dcBuildIt to d0900;\n#Implicates dependency from us9 to d0900;\n";
+
+    fn set(names: &[&str]) -> HashSet<String> {
+        names.iter().map(std::string::ToString::to_string).collect()
+    }
+
+    /// The `DoD` fixture: `Statement(untrusted)` -> story -> Decision -> task, task done, Decision
+    /// auto-accepted: red, naming the path. The same chain with the Decision HUMAN-accepted: green.
+    #[test]
+    fn three_hops_do_not_lose_the_label_and_a_human_acceptance_confers_trust() {
+        let edges = taint_edges(CHAIN);
+        assert_eq!(edges.len(), 4);
+        let sources = vec!["st9".to_string()];
+        let mut accepted = HashMap::new();
+        accepted.insert("d0900".to_string(), Acceptance::Auto);
+        let v = taint_violations(&sources, &edges, &accepted, &set(&["dcBuildIt"]));
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v.iter().any(|m| m.starts_with("d0900 is an ACCEPTED") && m.contains("st9 #DerivedFrom-> us9 #Implicates-> d0900")), "{v:?}");
+        assert!(v.iter().any(|m| m.starts_with("dcBuildIt is DONE") && m.contains("#CharteredBy-> dcBuildIt")), "{v:?}");
+        accepted.insert("d0900".to_string(), Acceptance::Human);
+        assert!(taint_violations(&sources, &edges, &accepted, &set(&["dcBuildIt"])).is_empty(), "the human's acceptance is where trust is conferred");
+    }
+
+    /// A proposed Decision is a plan; planning is what untrusted input may do. A task not yet done is
+    /// work in progress, not a violation - the guard must not punish the route it prescribes.
+    #[test]
+    fn a_plan_and_unbuilt_work_are_not_violations() {
+        let edges = taint_edges(CHAIN);
+        assert!(taint_violations(&["st9".to_string()], &edges, &HashMap::new(), &HashSet::new()).is_empty());
+    }
+
+    /// The acceptance Test's own text says whether anyone read it.
+    #[test]
+    fn auto_and_human_acceptances_are_told_apart_by_the_record() {
+        let auto = "verification d0900Accept : Test { :>> procedureText = \"AUTO-ACCEPTED under standing consent (D0207).\"; }\npart d0900AcceptR1 : TestResult { :>> outcome = VerdictKind::pass; }";
+        assert_eq!(acceptance_kind(auto, "d0900"), Some(Acceptance::Auto));
+        let human = "verification d0900Accept : Test { :>> procedureText = \"their words: 'i do like C the best'\"; }\npart d0900AcceptR1 : TestResult { :>> outcome = VerdictKind::pass; }";
+        assert_eq!(acceptance_kind(human, "d0900"), Some(Acceptance::Human));
+        assert_eq!(acceptance_kind("verification d0900Accept : Test { }", "d0900"), None, "no passing result: proposed");
+    }
+}
+
 /// Guard (D0278): the control-defect registry names real controls and still-open Issues.
 ///
 /// # Why the registry needs its own guard
@@ -2872,8 +3092,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 62] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency"];
+pub const GUARD_NAMES: [&str; 63] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -4467,6 +4687,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
         "stpa-currency" => Some(stpa_currency(root)), // WARNING-tier (D0313) - the computed control structure says when STPA must run again
+        "untrusted-taint" => Some(untrusted_taint(root)), // hard (issue347/D0314) - the untrusted label travels through derivation
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),

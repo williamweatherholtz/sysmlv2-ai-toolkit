@@ -57,6 +57,7 @@ package ControlMap {
     part gUnitExtrasPresent : SystemSafetyConstraint { :>> id = "363515fd-e2c5-4907-a6dc-ba82dee040d3"; :>> title = "guard: unit-extras-present"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> statement = "A unit's declared mechanism files exist in every project that installs the unit (D0300, issue290). ENFORCED BY guard `unit-extras-present`."; }
     part gAcceptanceBindsToText : SystemSafetyConstraint { :>> id = "63704f16-691e-46aa-9a95-564dad0b3c7c"; :>> title = "guard: acceptance-binds-to-text"; :>> createdAt = "2026-09-04"; :>> createdBy = "claudeOpus5"; :>> statement = "The text a human signed is the text the tree carries: an accepted Decision's signed fields equal their text at the SHA the latest acceptance binds to (D0308). ENFORCED BY guard `acceptance-binds-to-text`."; }
     part gStpaCurrency : SystemSafetyConstraint { :>> id = "8e4b1c7a-2f9d-4a6e-b3c5-7d1f9e2a4b6c"; :>> title = "guard: stpa-currency"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> statement = "Every computed control action has been walked by a recorded stpa-self run, or the commit names the ones no run has analysed (D0313). ENFORCED BY guard `stpa-currency`, warning-tier."; }
+    part gUntrustedTaint : SystemSafetyConstraint { :>> id = "9f5c2d8b-3a0e-4b7f-8c4d-6e2a0f4b8c9d"; :>> title = "guard: untrusted-taint"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> statement = "Nothing transitively derived from an untrusted utterance is an auto-accepted Decision or a done task unless a human accepted a Decision on the path (D0314). ENFORCED BY guard `untrusted-taint`."; }
     part ctlAuditHistory : SystemSafetyConstraint { :>> id = "bb545d93-36b0-4a58-8ec1-8586c5ceeac1"; :>> title = "control: ctlAuditHistory"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Gate verdicts re-derive from committed truth over every pushed range (keel audit-history, CI layer 3)"; }
     part ctlBranchProtection : SystemSafetyConstraint { :>> id = "b0736aea-ea26-46a4-99fd-dbaadb32887b"; :>> title = "control: ctlBranchProtection"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "The remote refuses force-push and deletion on main; squash and rebase merges are disabled (GitHub configuration, probed sprint 401)"; }
     part ctlPrePushBehind : SystemSafetyConstraint { :>> id = "1e67ab1f-c1d3-43f7-9304-c5736a6cc15d"; :>> title = "control: ctlPrePushBehind"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "A main push that is not a fast-forward of the fetched trunk is refused at the pusher's terminal (.githooks/pre-push)"; }
@@ -87,6 +88,8 @@ package ControlMap {
     dependency from gProcessChange to ehz7;
     dependency from gAcceptanceBindsToText to ehz7;
     dependency from gStpaCurrency to ehz7;
+    dependency from gUntrustedTaint to ehz2;
+    dependency from gUntrustedTaint to ehz3;
     dependency from gUnitExtrasPresent to ehz7;
     dependency from gDecisionAmendsProcess to ehz7;
     dependency from gIssues to ehz4;

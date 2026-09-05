@@ -136,7 +136,7 @@ frozen (modify it only by out-of-band Decision).
   process; public -> `untrusted`, **plan only** - triage, propose a Decision, a human accepts before
   anything is built, because an issue anyone can file is an instruction from an unauthenticated
   stranger; UNDETERMINED **fails closed**. The tier is recorded ON the utterance (`sourceTrust`), and
-  guard 56 `untrusted-routing` enforces the ROUTING, never the judgment.
+  guard 56 `untrusted-routing` enforces the ROUTING, never the judgment, and guard 63 `untrusted-taint` follows the label through derivation to every auto-accepted Decision or done task, until a human accepts on the path or the speaker is a declared decider (D0314).
   Deploy the **`github-intake`** skill; D0263/D0264),
   `accept` (the human sign-off), `apply-review`, `actor set`, `enroll`, and **`new sprint --fill FILE`** (D0301: a sprint record's prose from a `--- key` draft - purpose, dod, refine, standup, implement, review, closeOut, retro - writing NO result; the DoD verdict is `append-result --file <sprint> --task story<Slug>`, gates `append-gate-result`; a script that emits a `TestResult` line is the issue267 bypass and recurred in sprints 530-542). Direct file editing is for what the API doesn't cover.
 - **Every schema/process change must** (a) be recorded as a `Decision` file in `.engine/decisions/`,

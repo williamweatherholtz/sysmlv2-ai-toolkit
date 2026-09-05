@@ -106,5 +106,6 @@ package EngineGuardConstraints {
     constraint def unitExtrasPresent;       // guard 60 (D0300)
     constraint def acceptanceBindsToText;   // guard 61 (D0308): the text signed is the text carried
     constraint def stpaCurrency;            // guard 62 (D0313), warning-tier: the computed control structure says when STPA must run again
+    constraint def untrustedTaint;          // guard 63 (D0314): the untrusted label travels through derivation to every sink
 
 }
