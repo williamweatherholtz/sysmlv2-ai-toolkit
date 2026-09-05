@@ -2693,8 +2693,20 @@ fn cmd_record(args: &[String]) -> i32 {
             let dname = format!("d{nnnn}");
             let rel = path.replace('\\', "/");
             let rel = rel.strip_prefix(&format!("{}/", root.to_string_lossy().replace('\\', "/"))).unwrap_or(&rel).to_string();
-            match (keel_cli::activation::standing_consent(&root), keel_cli::deck::fork_options(&root, &rel).is_empty()) {
-                (Some(consent), true) => {
+            // D0322 / issue373 (stpa-self UCA-R1): a Decision that WEIGHS alternatives in prose without
+            // the OPTION marker is a fork in substance; standing consent must not accept it on the spot.
+            // Two distinct signals in the decision text hold it proposed and say which words; the
+            // author writes it as a fork or states `NOT A FORK` in the text.
+            let disguised = keel_cli::deck::disguised_fork(&decision);
+            match (keel_cli::activation::standing_consent(&root), keel_cli::deck::fork_options(&root, &rel).is_empty(), disguised) {
+                (Some(consent), true, Some(signals)) => {
+                    println!(
+                        "HELD as a fork in substance: the decision text weighs alternatives ({}) without the `OPTION X (label)` marker, so standing consent {consent} does not apply (D0322/issue373). Write it as a fork (OPTION A (label) ... COST ...; OPTION B ...), or state `{}: <why it chooses one course>` in the text and re-record; a human may still accept it with their quoted word (D0289).",
+                        signals.join(", "),
+                        keel_cli::deck::NOT_A_FORK
+                    );
+                }
+                (Some(consent), true, None) => {
                     let deciders: Vec<String> = keel_cli::github::deciders(&root).into_values().collect();
                     if let [judge] = deciders.as_slice() {
                         let sha = keel_cli::gitx::git().arg("-C").arg(&root).args(["rev-parse", "--short", "HEAD"]).output().ok()
@@ -2710,8 +2722,8 @@ fn cmd_record(args: &[String]) -> i32 {
                         println!("standing consent {consent} declared but github-actors.toml names {} decider(s), not one - D{nnnn} stays proposed; accept with your quoted word (D0289)", deciders.len());
                     }
                 }
-                (Some(consent), false) => println!("a FORK (carries options): stays proposed under standing consent {consent} - the human chooses; surface it (decision-surfacing) and accept with their quoted word (D0289)."),
-                (None, _) => println!("accept later via an explicit human sign-off (a quoted word in chat under the D0192 delegation, the console, or your terminal)."),
+                (Some(consent), false, _) => println!("a FORK (carries options): stays proposed under standing consent {consent} - the human chooses; surface it (decision-surfacing) and accept with their quoted word (D0289)."),
+                (None, _, _) => println!("accept later via an explicit human sign-off (a quoted word in chat under the D0192 delegation, the console, or your terminal)."),
             }
             0
         }
@@ -4644,6 +4656,11 @@ fn main() {
         // still exited 0.
         Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        // D0323 / issue374: the external-fact gate - a ci-run receipt is checked against the run itself.
+        Some("audit-ci-runs") => refuse_flag_as_path(rest.first(), "audit-ci-runs").unwrap_or_else(|| {
+            let root = rest.first().filter(|a| !a.starts_with('-')).map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
+            keel_cli::ci_runs::cmd(rest, &root)
+        }),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
         Some("status") => refuse_flag_as_path(rest.first(), "status").unwrap_or_else(|| {
             resolve_guard_root(rest.first()).map_or_else(

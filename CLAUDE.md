@@ -122,7 +122,8 @@ frozen (modify it only by out-of-band Decision).
   cannot acquire the lock **fails loudly** — a refused write is recoverable, a lost one is not.
 - **The write API is the sanctioned write path.** `keel append-result` / `append-gate-result`
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
-  refused, D0232/issue266; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
+  refused, D0232/issue266; a receipt of the form `ci-run id=<run id> workflow=<name>` is the EXTERNAL-FACT kind - CI verifies the run
+  itself, D0323/issue374; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
   `record decision` (`--from FILE`), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
   **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
   has now happened FOUR times (D0224/issue256, then issue315, which also ran `keel deactivate` against
@@ -178,7 +179,7 @@ frozen (modify it only by out-of-band Decision).
   a clean tree over nothing (issue269); and the decision channel qualifies an id as `alpha/d0001`,
   because `dNNNN` is unique only per project. A single-project repo is unaffected throughout.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
-- **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook.** `sync` fetches, reports divergence,
+- **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook - and `keel audit-ci-runs` (D0323): every TestResult whose receipt reads `// RAN: ci-run id=<run> workflow=<name>` is checked by CI against the run itself (exists here, concluded success, ran on the judgedAgainst SHA) - the external-fact gate an agent cannot talk past.** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` **gates before the first push** (workspace-wide —
   a push carries the whole repository, issue280) and, on rejection, merges and **gates the MERGED tree**
   before retrying — two contributions that pass alone can fail together. `orient` reports
@@ -205,7 +206,9 @@ frozen (modify it only by out-of-band Decision).
   the guard; the ones before are grandfathered and counted, never re-split.
 - **Decisions auto-accept under standing consent (D0207), at record time (D0291).** `keel record decision`
   accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words, the
-  judge is the single decider in `github-actors.toml`; override = a superseding Decision (D0290) or your quoted
+  judge is the single decider in `github-actors.toml`. A Decision that WEIGHS alternatives in prose without the OPTION marker
+  (two fork signals - alternative/either/option/versus/trade-off/a lettered enumeration/recommend) is HELD proposed as a fork in substance
+  (D0322/issue373): write it as a fork, or say `NOT A FORK: <why>` in the text; override = a superseding Decision (D0290) or your quoted
   word (D0289). No GitHub issue is raised — the decision channel is disconnected. A FORK still reaches out - and must first pass
   judgment-request-quality (short name, rationale, per-option COST, a `--research` statement; guard 48) - through the
   **`decision-surfacing`** process: one published page, one section per pending decision (stake, steelmanned options with

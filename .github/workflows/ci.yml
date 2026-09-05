@@ -57,3 +57,10 @@ jobs:
         # on infra the agent cannot touch, that no rule severity weakened / guard vanished across the
         # pushed range without a co-committed signed Decision (the issue236 self-modification class).
         run: ./target/release/keel audit-adherence --since "${{ github.event.before || 'HEAD~50' }}"
+      - name: keel audit-ci-runs (the external-fact gate — a ci-run receipt names a real green run on the judged SHA, D0323)
+        # A GATE: a TestResult whose receipt cites a GitHub Actions run is checked HERE, by the party the
+        # agent cannot write to - the run exists in this repository, concluded success, ran on the
+        # result's judgedAgainst. A fabricated id or a run for another tree fails the build (issue374).
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./target/release/keel audit-ci-runs . --repo "${{ github.repository }}"

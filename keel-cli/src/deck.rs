@@ -83,6 +83,89 @@ pub fn fork_options(root: &Path, rel_file: &str) -> Vec<(String, String)> {
     if out.len() >= 2 { out } else { Vec::new() }
 }
 
+/// The words that mark a Decision as WEIGHING alternatives rather than stating one course (D0322,
+/// issue373). Each is a signal; two distinct signals in the `decision` field is the disguised-fork shape.
+const FORK_SIGNALS: [(&str, &[&str]); 8] = [
+    ("alternative", &["alternative", "alternatives"]),
+    ("either", &["either"]),
+    ("or-we-could", &["or we could", "we could instead", "could instead"]),
+    ("option", &["option", "options"]),
+    ("versus", &["versus", " vs ", " vs. "]),
+    ("trade-off", &["trade-off", "tradeoff", "trade-offs", "tradeoffs"]),
+    ("enumeration", &["(a)", "(b)", " a: ", " b: ", " a) ", " b) "]),
+    ("recommend", &["recommend", "recommends", "recommended", "recommendation"]),
+];
+
+/// The author's stated way out: a Decision that weighs alternatives in passing and IS a decision says
+/// so, in these words, and the record carries the assertion.
+pub const NOT_A_FORK: &str = "NOT A FORK";
+
+/// Which fork signals a Decision's `decision` text carries, by name - the disguised-fork detector
+/// (D0322 / issue373, found by stpa-self run 1 as UCA-R1).
+///
+/// `fork_options` reads ONE lexical shape, `OPTION X (label)`; a Decision that weighs alternatives in
+/// prose without it auto-accepted under standing consent, and the author controlled the lexicon that
+/// decided whether the human was asked. This reads the words that weigh: two distinct signals hold the
+/// Decision proposed. Measured before the threshold was set (the D0102 way): over 109 auto-accepted
+/// Decisions, four carry two signals - three describe the surfacing process itself (D0207, D0269,
+/// D0288, false positives an author answers with `NOT A FORK`) and one (D0292) recommended a routing
+/// and executed it, which is the class this exists to catch. No auto-accepted Decision carries three.
+#[must_use]
+pub fn fork_signals(decision_text: &str) -> Vec<&'static str> {
+    let lower = format!(" {} ", decision_text.to_lowercase());
+    let word = |w: &str| -> bool {
+        // whole-word for alphabetic tokens; the punctuation-bearing ones match as written
+        if w.chars().all(|c| c.is_ascii_alphabetic() || c == '-') {
+            lower.match_indices(w).any(|(i, _)| {
+                let before = lower[..i].chars().last().is_none_or(|c| !c.is_alphanumeric());
+                let after = lower[i + w.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric());
+                before && after
+            })
+        } else {
+            lower.contains(w)
+        }
+    };
+    FORK_SIGNALS.iter().filter(|(_, words)| words.iter().any(|w| word(w))).map(|(name, _)| *name).collect()
+}
+
+/// Is this Decision a fork in substance without the marker - and not declared otherwise?
+#[must_use]
+pub fn disguised_fork(decision_text: &str) -> Option<Vec<&'static str>> {
+    if decision_text.contains(NOT_A_FORK) {
+        return None;
+    }
+    let s = fork_signals(decision_text);
+    (s.len() >= 2).then_some(s)
+}
+
+#[cfg(test)]
+mod fork_shape_tests {
+    use super::{disguised_fork, fork_signals};
+
+    /// The D0292 shape: a routing RECOMMENDED with per-item OPTIONS, then executed under consent - held.
+    #[test]
+    fn a_recommendation_naming_options_is_a_disguised_fork() {
+        let d = "Route as recommended. Eleven Issues with resolver tasks; a deactivated process's skill is deployed stating its state, option B.";
+        assert_eq!(disguised_fork(d), Some(vec!["option", "recommend"]));
+    }
+
+    /// A genuine decision that mentions the rejected alternative in passing carries ONE signal: it
+    /// auto-accepts as before. The author's `NOT A FORK` also clears a two-signal text.
+    #[test]
+    fn one_signal_in_passing_is_a_decision_and_the_author_may_say_so() {
+        assert_eq!(fork_signals("Adopt the merge; the alternative of a never-overwrite list would freeze the engine's sections."), vec!["alternative"]);
+        assert!(disguised_fork("Adopt the merge; the alternative would freeze the engine's sections.").is_none());
+        assert!(disguised_fork("The surfacing page carries the options and my recommendation. NOT A FORK: this defines the page, it chooses nothing.").is_none());
+        assert!(fork_signals("optional fields and a recommender system").is_empty(), "whole words only: `optional`, `recommender` are not the signals");
+    }
+
+    /// Enumerated courses with a verdict phrase read as weighing.
+    #[test]
+    fn enumerated_courses_are_a_signal() {
+        assert_eq!(disguised_fork("Two ways: (a) refuse at record time; (b) warn at the gate. Either works; we take (a)."), Some(vec!["either", "enumeration"]));
+    }
+}
+
 /// `keel decision-card [NAME] [--proposed]` (D0205 githubChannel).
 ///
 /// The decision's own deciding context as machine-readable JSON, for the Action that opens

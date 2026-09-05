@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 103] = [
+pub const CLI_FACTS: [CliFact; 104] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
@@ -42,6 +42,7 @@ pub const CLI_FACTS: [CliFact; 103] = [
     CliFact { name: "audit", family: "gating", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "retrospective adherence: charter, ceremony, estimation, sitting review" },
     CliFact { name: "audit-history", family: "gating", effect: "reads", stability: "stable", invocation: "[--since REF] [--max N]", synopsis: "re-derive the gate verdict per commit over a range" },
     CliFact { name: "audit-adherence", family: "gating", effect: "reads", stability: "stable", invocation: "[--since REF]", synopsis: "re-derive guard-set and severity monotonicity per commit - a control cannot be disarmed unsigned" },
+    CliFact { name: "audit-ci-runs", family: "gating", effect: "reads", stability: "stable", invocation: "[ROOT] [--repo OWNER/NAME]", synopsis: "the external-fact gate: every ci-run receipt names a real green run on the judged SHA (D0323)" },
     CliFact { name: "assured", family: "gating", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "composite READY / NOT-READY assurance verdict with per-check detail" },
     CliFact { name: "adoption-check", family: "gating", effect: "reads", stability: "stable", invocation: "[ROOT] [--unit N] [--keep] [--vintage VERSION]", synopsis: "gate a foreign tree: every unit must land clean in a project that lacks it" },
     CliFact { name: "hook", family: "gating", effect: "tooling", stability: "internal", invocation: "post-edit|stop|pre-bash|pre-write|subagent-stop|user-prompt|config-change", synopsis: "the in-loop gates the harness calls; not for a human to invoke" },
