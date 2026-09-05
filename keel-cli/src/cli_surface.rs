@@ -46,11 +46,11 @@ pub fn has_command(name: &str) -> bool {
 /// viewpoint-renderer guard diffed renderer strings against. Two inventories of the same fact is one
 /// too many — the guard's copy had already grown apologetic comments about names "never added here,
 /// so the first viewpoint naming it failed". Both now read this module.
-pub const LENS_NAMES: [&str; 36] = [
+pub const LENS_NAMES: [&str; 37] = [
     "assumptions", "attestation-coverage", "authority-queue", "boundary", "boundary-sweep", "business",
     "concern-coverage", "contentions", "control-structure", "controls", "coverage", "critique-coverage", "critique-policy",
     "decision-follow-through", "decisions", "dispositions", "hardening", "indicators", "intake",
-    "knowledge", "launchables", "ls", "marker-census", "open-issues", "orphans",
+    "knowledge", "launchables", "ls", "marker-census", "open-issues", "orphans", "priority",
     "outstanding", "recent", "rootedness", "sitting-coverage", "suspect", "tier-satisfaction",
     "trace", "trace-need", "verification", "why", "workflows",
 ];

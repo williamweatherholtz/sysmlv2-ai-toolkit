@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 102] = [
+pub const CLI_FACTS: [CliFact; 103] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
@@ -106,6 +106,7 @@ pub const CLI_FACTS: [CliFact; 102] = [
     CliFact { name: "launchables", family: "lens", effect: "reads", stability: "stable", invocation: "show launchables [ROOT]", synopsis: "the console's launchable set from declared skills and processes" },
     CliFact { name: "ls", family: "lens", effect: "reads", stability: "stable", invocation: "show ls [ROOT]", synopsis: "the .tracking files" },
     CliFact { name: "marker-census", family: "lens", effect: "reads", stability: "stable", invocation: "show marker-census [ROOT]", synopsis: "per-marker edge count against prose mentions" },
+    CliFact { name: "priority", family: "lens", effect: "reads", stability: "stable", invocation: "show priority [ROOT]", synopsis: "the priority metric: every ready item in declared order with its computed class - resolver severity or retro recurrence - and the inversions (D0311)" },
     CliFact { name: "open-issues", family: "lens", effect: "reads", stability: "stable", invocation: "show open-issues [ROOT]", synopsis: "every open Issue, its resolvers, and whether each resolver is complete" },
     CliFact { name: "orphans", family: "lens", effect: "reads", stability: "stable", invocation: "show orphans [ROOT]", synopsis: "items nothing references: tasks with no DoD, Issues with no resolver" },
     CliFact { name: "outstanding", family: "lens", effect: "reads", stability: "stable", invocation: "show outstanding [ROOT]", synopsis: "every not-done item, flat" },

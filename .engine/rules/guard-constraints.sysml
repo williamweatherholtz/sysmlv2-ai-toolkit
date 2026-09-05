@@ -105,6 +105,5 @@ package EngineGuardConstraints {
     constraint def decisionAmendsProcess;   // guard 59 (D0297), warning-tier
     constraint def unitExtrasPresent;       // guard 60 (D0300)
     constraint def acceptanceBindsToText;   // guard 61 (D0308): the text signed is the text carried
-    constraint def recurrenceEscalates;     // guard 62 (D0309): "already tracked" twice is a recurrence
 
 }

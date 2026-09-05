@@ -1723,6 +1723,24 @@ fn cmd_intake(args: &[String]) -> i32 {
     }
 }
 
+/// `keel show priority [ROOT]` (D0311): the priority metric made visible.
+fn cmd_priority(args: &[String]) -> i32 {
+    let root = match root_arg(args, "keel show priority [ROOT]", &[], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::view::priority(&root) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("priority error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_open_issues(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel open-issues [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -4513,6 +4531,7 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("ls") => cmd_ls(rest),
             Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
             Some("open-issues") => cmd_open_issues(rest),
+            Some("priority") => cmd_priority(rest),
             Some("orphans") => cmd_orphans(rest),
             Some("outstanding") => cmd_query0(rest, "outstanding", keel_cli::queries::outstanding),
             Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),

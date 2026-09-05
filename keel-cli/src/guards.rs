@@ -989,126 +989,6 @@ pub fn process_change(root: &Path) -> GuardReport {
 }
 
 
-// ── recurrence-escalates (issue372 / D0309): "already tracked" twice means the defect recurred ───
-
-/// Pure core: open backlog items named as the tracked home by two or more retro gates, with their
-/// citation counts - excluding items blocked on a PROPOSED Decision, which wait on a human and not on
-/// the frontier. `retros` are the retro texts across every sprint; `open` the not-done items;
-/// `blocked` the items with a `#DependsOn` edge to a proposed Decision.
-fn recurring_open_items(retros: &[String], open: &std::collections::HashSet<String>, blocked: &std::collections::HashSet<String>) -> Vec<(String, usize)> {
-    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    for t in retros {
-        let lower = t.to_lowercase();
-        if !RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(*j)) {
-            continue;
-        }
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-        for n in named_items(t) {
-            if open.contains(&n) && !blocked.contains(&n) && seen.insert(n.clone()) {
-                *counts.entry(n).or_insert(0) += 1;
-            }
-        }
-    }
-    let mut out: Vec<(String, usize)> = counts.into_iter().filter(|(_, c)| *c >= 2).collect();
-    out.sort();
-    out
-}
-
-/// How many ready items count as "the front": a recurring item this close to the top is being worked.
-const FRONTIER_FRONT: usize = 3;
-
-/// Guard (hard, D0309 / issue372): a retro may say "already tracked" ONCE per finding.
-///
-/// The heredoc defect was tracked on 2026-09-03 as dcPreBashSeesHeredocSource, placed below the
-/// High-issue resolvers to quiet a priority warning, and then recurred eight or more times in two
-/// days - each retro writing "already tracked" and each pass of the retro-backlog guard accepting it,
-/// because that guard checks the FORM of the justification (an item is named) and nothing checked
-/// that the named item was moving. The second time a retro names the same open item as the home of a
-/// recurring finding, the finding has recurred, and an item that keeps absorbing recurrences without
-/// being worked is a reminder wearing an item's clothes (D0047). An item blocked on a proposed
-/// Decision is exempt: it waits on the human, not on the frontier.
-#[must_use]
-pub fn recurrence_escalates(root: &Path) -> GuardReport {
-    let backlog = std::fs::read_to_string(root.join(".tracking").join("backlog.sysml")).unwrap_or_default();
-    // Open = declared, no result, and NOT superseded: a `#Supersede dependency from X to item;` edge
-    // retires an item (invariant 4), and dcProvenanceAsRefs - retired by dcActorTraceView at sprint 278 -
-    // read as recurring on the first run because only results were consulted.
-    let superseded: std::collections::HashSet<String> = backlog
-        .lines()
-        .filter_map(|l| l.trim().strip_prefix("#Supersede dependency from "))
-        .filter_map(|r| r.split_once(" to ").map(|(_, b)| b.trim_end_matches(';').trim().to_string()))
-        .collect();
-    let mut open: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for line in backlog.lines() {
-        let l = line.trim();
-        if let Some(rest) = l.strip_prefix("action ") {
-            if let Some(name) = rest.strip_suffix(';') {
-                if !backlog.contains(&format!("part {name}DoDR")) && !superseded.contains(name) {
-                    open.insert(name.to_string());
-                }
-            }
-        }
-    }
-    // Blocked on a proposed Decision: `#DependsOn dependency from <item> to <dNNNN>;` where dNNNN is proposed.
-    let proposed: std::collections::HashSet<String> = crate::collect_sysml(&root.join(".engine").join("decisions"))
-        .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
-        .filter(|t| t.contains("DecisionStatus::proposed"))
-        .filter_map(|t| t.find("part d0").map(|i| t[i + 5..].chars().take_while(|c| c.is_alphanumeric()).collect::<String>()))
-        .collect();
-    let blocked: std::collections::HashSet<String> = backlog
-        .lines()
-        .filter_map(|l| l.trim().strip_prefix("#DependsOn dependency from "))
-        .filter_map(|r| r.split_once(" to ").map(|(a, b)| (a.trim().to_string(), b.trim_end_matches(';').trim().to_string())))
-        .filter(|(_, d)| proposed.contains(d))
-        .map(|(a, _)| a)
-        .collect();
-    let mut retros: Vec<String> = Vec::new();
-    for f in crate::collect_sysml(&root.join(".tracking").join("delivery")) {
-        if let Ok(t) = std::fs::read_to_string(&f) {
-            retros.extend(retro_texts(&t));
-        }
-    }
-    // AT THE FRONT is the other honest state: an item among the next three ready items IS being
-    // worked, and the guard exists to force exactly that move. Read from the same ranked frontier
-    // `whats-next` prints, never from a hand-kept list.
-    let recurring = recurring_open_items(&retros, &open, &blocked);
-    // The ranked frontier costs an orient (seconds, git blob batches); it is consulted only when a
-    // candidate exists, so the common case - nothing recurring - costs one pass over the retros.
-    let front: std::collections::HashSet<String> = if recurring.is_empty() {
-        std::collections::HashSet::new()
-    } else {
-        crate::orient::compute(root).ready.into_iter().take(FRONTIER_FRONT).collect()
-    };
-    let violations = recurring
-        .iter()
-        .filter(|(item, _)| !front.contains(item))
-        .map(|(item, n)| format!("{item}: named by {n} retros as the already-tracked home of a finding and still not done - the second citation means the defect RECURRED; pull it into the next {FRONTIER_FRONT} ready items or block it on a proposed Decision that says why it waits (D0309/issue372: dcPreBashSeesHeredocSource absorbed eight recurrences this way)"))
-        .collect();
-    GuardReport { name: "recurrence-escalates", scanned: retros.len(), warnings: Vec::new(), violations }
-}
-
-#[cfg(test)]
-mod recurrence_tests {
-    use super::recurring_open_items;
-
-    /// D0309 armed: one citation is tracking, two is recurrence; a done item and a fork-blocked item
-    /// are not counted; a retro that adds an item (no justification phrase) counts nothing.
-    #[test]
-    fn a_second_already_tracked_citation_of_an_open_item_is_a_recurrence() {
-        let retros = vec![
-            "no new item - already tracked: dcHeredoc".to_string(),
-            "no new item - already tracked: the heredoc class is dcHeredoc again, and dcFork waits".to_string(),
-            "no new item - already tracked: dcFork".to_string(),
-            "new item dcHeredoc added this sprint".to_string(),
-            "no new item - already tracked: dcDone".to_string(),
-        ];
-        let open: std::collections::HashSet<String> = ["dcHeredoc", "dcFork", "dcOnce"].iter().map(|s| (*s).to_string()).collect();
-        let blocked: std::collections::HashSet<String> = std::iter::once("dcFork".to_string()).collect();
-        assert_eq!(recurring_open_items(&retros, &open, &blocked), vec![("dcHeredoc".to_string(), 2)]);
-    }
-}
-
 // ── acceptance-binds-to-text (issue341 / D0308): the text signed is the text carried ─────────────
 
 /// The three fields an acceptance is a judgment OF.
@@ -2230,13 +2110,13 @@ pub fn markers_declared_for_test(texts: &[String]) -> HashSet<String> {
 /// The obligation is not "always create an item" — sometimes a control already exists, and adding a
 /// duplicate is noise. The obligation is that the choice is STATED rather than left silent, so a
 /// reader can tell a considered decision from an omission.
-const RETRO_NO_ITEM_JUSTIFICATIONS: &[&str] = &["no new item", "no item needed", "already tracked", "no further item"];
+pub(crate) const RETRO_NO_ITEM_JUSTIFICATIONS: &[&str] = &["no new item", "no item needed", "already tracked", "no further item"];
 
 /// Every tracked-item NAME this retro's own text mentions — `dcCamelCase` and `issueNNN` tokens.
 ///
 /// The RETRO's text, not the whole sprint file: a sprint file legitimately names the task it
 /// delivered in its `DoD` line, and that name satisfied the old check for every retro ever written.
-fn named_items(text: &str) -> Vec<String> {
+pub(crate) fn named_items(text: &str) -> Vec<String> {
     /// `dc` is followed by an uppercase letter; `issue` by a digit.
     type NextOk = fn(char) -> bool;
     let bytes = text.as_bytes();
@@ -2268,7 +2148,7 @@ fn named_items(text: &str) -> Vec<String> {
 /// first version split the whole file on the word, so a retro whose text mentioned "verification"
 /// (the commonest word in this repository) was cut in half and silently not examined: the guard passed
 /// a retro it had not read. Found by this guard's own arming test on 2026-09-03 (issue364, second shape).
-fn retro_texts(sprint_file: &str) -> Vec<String> {
+pub(crate) fn retro_texts(sprint_file: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut blocks: Vec<String> = Vec::new();
     for line in sprint_file.lines() {
@@ -2429,7 +2309,7 @@ pub fn priority_inversion(root: &Path) -> GuardReport {
             let warnings = pairs
                 .iter()
                 .map(|(lower, high, sev)| {
-                    format!("{lower} outranks {high}, which resolves a {sev} issue — if that is deliberate say so, otherwise reorder the backlog (D0052: declaration order IS priority; reordering is how you reprioritize)")
+                    format!("{lower} outranks {high}, whose computed class is {sev} (a resolved Issue's severity, or a finding retros keep naming as already tracked - D0311; `keel show priority` shows which) — if that is deliberate say so, otherwise reorder the backlog (D0052: declaration order IS priority; reordering is how you reprioritize)")
                 })
                 .collect();
             GuardReport { name: "priority-inversion", scanned: pairs.len(), warnings, violations: Vec::new() }
@@ -2884,8 +2764,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 62] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "recurrence-escalates"];
+pub const GUARD_NAMES: [&str; 61] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -4478,7 +4358,6 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-amends-process" => Some(decision_amends_process(root)), // WARNING-tier (issue298/D0244)
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
-        "recurrence-escalates" => Some(recurrence_escalates(root)), // hard (issue372/D0309) - "already tracked" twice is a recurrence
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),

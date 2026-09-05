@@ -3445,6 +3445,132 @@ fn inversion_pairs(ready: &[(String, Option<String>)]) -> Vec<(String, String, S
     out
 }
 
+/// One ready item's computed priority signals (D0311): where it stands, what it resolves, how many
+/// retros have named it as the already-tracked home of a finding, and the class those combine to.
+pub struct PrioritySignal {
+    pub task: String,
+    pub position: usize,
+    pub resolver_severity: Option<String>,
+    pub recurrences: usize,
+    /// The rank class the signals justify: `Critical`, `High`, `Medium`, `Low` or `none`.
+    pub effective: String,
+    /// Which signal set the class - `severity`, `recurrence`, or `none`.
+    pub driven_by: &'static str,
+}
+
+fn class_rank(s: &str) -> u8 {
+    match s {
+        "Critical" => 4,
+        "High" => 3,
+        "Medium" => 2,
+        "Low" => 1,
+        _ => 0,
+    }
+}
+
+/// How many sprint retros name each open backlog item as the tracked home of a finding they chose not
+/// to open an item for. One citation is tracking; every further one is the finding coming back while
+/// the item sat (D0311, the heredoc case: eight recurrences under "already tracked").
+fn retro_citations(root: &Path) -> HashMap<String, usize> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for f in crate::collect_sysml(&root.join(".tracking").join("delivery")) {
+        let Ok(t) = std::fs::read_to_string(&f) else { continue };
+        for retro in crate::guards::retro_texts(&t) {
+            let lower = retro.to_lowercase();
+            if !crate::guards::RETRO_NO_ITEM_JUSTIFICATIONS.iter().any(|j| lower.contains(*j)) {
+                continue;
+            }
+            let mut seen: HashSet<String> = HashSet::new();
+            for n in crate::guards::named_items(&retro) {
+                if seen.insert(n.clone()) {
+                    *counts.entry(n).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    counts
+}
+
+/// The rank class recurrence alone justifies: twice puts a finding with the High resolvers, three or
+/// more with the Critical ones - each citation past the first is one more time the defect came back.
+const fn recurrence_class(citations: usize) -> Option<&'static str> {
+    match citations {
+        0 | 1 => None,
+        2 => Some("High"),
+        _ => Some("Critical"),
+    }
+}
+
+/// Every ready item's priority signals, in declaration (= priority) order (D0311).
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn priority_signals(root: &Path) -> Result<Vec<PrioritySignal>, ViewError> {
+    let model = Model::build(root)?;
+    let ready = crate::orient::compute(root).ready;
+    let citations = retro_citations(root);
+    let severity_of = |task: &str| -> Option<String> {
+        model
+            .edges
+            .iter()
+            .filter(|e| e.kind == "resolves" && e.from == task)
+            .filter_map(|e| model.items.get(&e.to))
+            .filter_map(|i| i.attrs.get("severity").cloned())
+            .max_by_key(|s| class_rank(s))
+    };
+    Ok(ready
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let sev = severity_of(t);
+            let rec = citations.get(t).copied().unwrap_or(0);
+            let rec_class = recurrence_class(rec);
+            let sev_rank = sev.as_deref().map_or(0, class_rank);
+            let rec_rank = rec_class.map_or(0, class_rank);
+            let (effective, driven_by) = if rec_rank > sev_rank {
+                (rec_class.unwrap_or("none").to_string(), "recurrence")
+            } else if sev_rank > 0 {
+                (sev.clone().unwrap_or_default(), "severity")
+            } else {
+                ("none".to_string(), "none")
+            };
+            PrioritySignal { task: t.clone(), position: i + 1, resolver_severity: sev, recurrences: rec, effective, driven_by }
+        })
+        .collect())
+}
+
+/// `keel show priority` (D0311): the priority metric, made visible - every ready item in its declared
+/// order with the computed signals and the class they justify, and the inversions the guard reports.
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn priority(root: &Path) -> Result<String, ViewError> {
+    let signals = priority_signals(root)?;
+    let rows: Vec<Json> = signals
+        .iter()
+        .map(|s| {
+            Json::Obj(vec![
+                ("position".to_string(), Json::Int(i64::try_from(s.position).unwrap_or(i64::MAX))),
+                ("task".to_string(), Json::s(s.task.clone())),
+                ("effective".to_string(), Json::s(s.effective.clone())),
+                ("drivenBy".to_string(), Json::s(s.driven_by)),
+                ("resolverSeverity".to_string(), s.resolver_severity.clone().map_or(Json::Null, Json::s)),
+                ("retroRecurrences".to_string(), Json::Int(i64::try_from(s.recurrences).unwrap_or(i64::MAX))),
+            ])
+        })
+        .collect();
+    let inversions: Vec<Json> = inversion_pairs(&signals.iter().map(|s| (s.task.clone(), (s.effective != "none").then(|| s.effective.clone()))).collect::<Vec<_>>())
+        .into_iter()
+        .map(|(lower, higher, class)| Json::Obj(vec![("outranks".to_string(), Json::s(lower)), ("item".to_string(), Json::s(higher)), ("class".to_string(), Json::s(class))]))
+        .collect();
+    Ok(Json::Obj(vec![
+        ("priority".to_string(), Json::s("D0052: declaration order IS priority. D0258/D0311: rank is reassessed against COMPUTED signals - the resolver Issue's severity, and how many sprint retros named the item as the already-tracked home of a finding (twice = High, three or more = Critical). An inversion is a lower-class item declared ABOVE a higher one; the priority-inversion guard warns on each, and refineAssessPriority discharges it by reordering or by saying why.")),
+        ("ready".to_string(), Json::Arr(rows)),
+        ("inversions".to_string(), Json::Arr(inversions)),
+    ])
+    .dump())
+}
+
 /// Backlog priority inversions: a ready item ranked ABOVE work that resolves a >= High Issue.
 ///
 /// Closes issue084 (D0130). D0052 makes backlog DECLARATION ORDER the priority and requires the AI to
@@ -3462,24 +3588,11 @@ fn inversion_pairs(ready: &[(String, Option<String>)]) -> Vec<(String, String, S
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn priority_inversions(root: &Path) -> Result<Vec<(String, String, String)>, ViewError> {
-    let model = Model::build(root)?;
-    let ready = crate::orient::compute(root).ready; // already in declaration/priority order
-    let severity_of = |task: &str| -> Option<String> {
-        model
-            .edges
-            .iter()
-            .filter(|e| e.kind == "resolves" && e.from == task)
-            .filter_map(|e| model.items.get(&e.to))
-            .filter_map(|i| i.attrs.get("severity").cloned())
-            .max_by_key(|s| match s.as_str() {
-                "Critical" => 4,
-                "High" => 3,
-                "Medium" => 2,
-                "Low" => 1,
-                _ => 0,
-            })
-    };
-    let pairs: Vec<(String, Option<String>)> = ready.iter().map(|t| (t.clone(), severity_of(t))).collect();
+    // D0311: the class compared is the EFFECTIVE one - resolver severity or retro recurrence, whichever
+    // is higher - so a finding that keeps coming back climbs the same ladder a High Issue does, and the
+    // same guard, the same warning and the same refinement step carry it.
+    let signals = priority_signals(root)?;
+    let pairs: Vec<(String, Option<String>)> = signals.iter().map(|s| (s.task.clone(), (s.effective != "none").then(|| s.effective.clone()))).collect();
     Ok(inversion_pairs(&pairs))
 }
 
