@@ -73,7 +73,7 @@ gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `governing-version`, `open-issues`, `indicators`, `intake`, `control-structure` (D0284: STPA step 2 for
 this project's own workflow, computed from hook config, git hooks, workflow files, CLI facts and declared deciders — the
 `safety` viewpoint's renderer; draw it with the **`stpa-diagram`** skill, D0285 — authority descending, control down / feedback
-up, every edge labelled with what passes, ortholinear, hops at crossings, by construction from the JSON), `attestation` (D0232: is a `pass` a receipt or a
+up, every edge labelled with what passes, ortholinear, hops at crossings, by construction from the JSON; the **`stpa-self`** skill, D0313, runs STPA on that computed structure and the `stpa-currency` guard warns when it grows an action no run has analysed), `attestation` (D0232: is a `pass` a receipt or a
 testimony — results by judge kind, and how many EXERCISED claims record what produced them), `controls` (D0195: the two-way hazard/control diff, and per control its arming EVIDENCE - probe, named present test, or stated reason - counted apart, D0298), `why <term>` +
 `knowledge question-coverage` (D0161: the model as a graph - seed on names/aliases, traverse, answer with provenance), `hardening` (D0169: the
 critique process's own questions - help coverage, process enforceability, decision follow-through) (D0166: what was said, what it

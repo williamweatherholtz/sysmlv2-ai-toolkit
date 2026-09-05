@@ -326,14 +326,46 @@ fn camel(s: &str) -> String {
     out
 }
 
+/// The computed control-action NAMES that need no network.
+///
+/// Everything `gather` finds except the remote's branch-protection row, which is fetched live. This
+/// is what the `stpa-currency` guard (D0313) compares a run's `ANALYSED:` list against - a commit
+/// gate must not call `gh`.
+#[must_use]
+pub fn local_action_names(root: &Path) -> Vec<String> {
+    let mut actions = Vec::new();
+    let mut feedback = Vec::new();
+    gather_local(root, &mut actions, &mut feedback);
+    actions.into_iter().map(|a| a.name).collect()
+}
+
 /// The structural, derivable half: every action and feedback path, from facts.
 fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
     let mut actions = Vec::new();
     let mut feedback = Vec::new();
-    hook_actions(root, &mut actions);
-    githook_actions(root, &mut actions);
-    workflow_actions(root, &mut actions, &mut feedback);
-    cli_actions(root, &mut actions, &mut feedback);
+    gather_local(root, &mut actions, &mut feedback);
+    let remote = remote_rules(root);
+    if let Json::Obj(fields) = &remote {
+        if fields.iter().any(|(k, v)| k == "refusesForcePush" && matches!(v, Json::Bool(true))) {
+            actions.push(Action {
+                name: "remoteRefusesRewrite".to_string(),
+                title: "the remote refuses a history rewrite".to_string(),
+                issued_by: "remote",
+                acts_on: "main-ref",
+                data: "force-push and deletion rejected; requires no status check and no review unless the row says otherwise".to_string(),
+                source: "branch protection, fetched live".to_string(),
+            });
+        }
+    }
+    (actions, feedback, remote)
+}
+
+/// Every control action and feedback path computable from the TREE alone.
+fn gather_local(root: &Path, actions: &mut Vec<Action>, feedback: &mut Vec<Fb>) {
+    hook_actions(root, actions);
+    githook_actions(root, actions);
+    workflow_actions(root, actions, feedback);
+    cli_actions(root, actions, feedback);
     // The human's direction is a control action with no receiving control; it exists whenever a
     // project has an intake path, which every project on this vintage has.
     actions.push(Action {
@@ -354,19 +386,6 @@ fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
             data: format!("logins: {}", deciders.keys().cloned().collect::<Vec<_>>().join(", ")),
             source: ".engine/contracts/github-actors.toml".to_string(),
         });
-    }
-    let remote = remote_rules(root);
-    if let Json::Obj(fields) = &remote {
-        if fields.iter().any(|(k, v)| k == "refusesForcePush" && matches!(v, Json::Bool(true))) {
-            actions.push(Action {
-                name: "remoteRefusesRewrite".to_string(),
-                title: "the remote refuses a history rewrite".to_string(),
-                issued_by: "remote",
-                acts_on: "main-ref",
-                data: "force-push and deletion rejected; requires no status check and no review unless the row says otherwise".to_string(),
-                source: "branch protection, fetched live".to_string(),
-            });
-        }
     }
     // The console's authority exists when `serve` does: the approve queue is where a human authorises
     // an ask-tier write (D0182), and the deck is where they judge.
@@ -400,7 +419,6 @@ fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
             source: ".engine/deliverable-manifest.txt".to_string(),
         });
     }
-    (actions, feedback, remote)
 }
 
 /// The authored decoration: process models and hazard -> process edges, from the model.

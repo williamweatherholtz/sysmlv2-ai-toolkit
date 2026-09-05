@@ -1466,6 +1466,114 @@ mod amendment_tests {
     }
 }
 
+// ── stpa-currency guard (D0313: the computed control structure says when STPA must run again) ────
+
+/// WARNING-tier: every computed control action (`keel show control-structure`, D0284) has been walked
+/// by at least one recorded `stpa-self` run, or the commit names the ones no run has looked at.
+///
+/// A run is a `Test` whose `procedureText` opens `ANALYSED: <name>, <name>, ...` - the computed action
+/// names it walked (stpa5, `.engine/processes/stpa-self.sysml`). The union over every recorded run is
+/// what counts as analysed: an analysis of `cmdRecord` does not lapse because a later run walked
+/// `cmdLand`. What DOES make it lapse is the structure growing a name - a new hook event, workflow
+/// step or write command - which is exactly the re-run trigger the process defines, and the only one
+/// a text model can compute (a changed body behind an unchanged name is the stated residual).
+///
+/// Why a warning and not a block (D0098): an unanalysed action is not dishonest state; it is work the
+/// structure has queued. Why it compares against the LOCAL structure only: the remote's
+/// branch-protection row is fetched live with `gh`, and a commit gate must not need the network - so
+/// `remoteRefusesRewrite` is never asked for here.
+///
+/// A project with no recorded run has not adopted the process and hears nothing (D0136: absence is
+/// a state, stated as a zero population).
+#[must_use]
+pub fn stpa_currency(root: &Path) -> GuardReport {
+    let (runs, analysed) = analysed_actions(root);
+    let computed = crate::view::control_structure::local_action_names(root);
+    let warnings = currency_warnings(runs, &analysed, &computed);
+    let scanned = if runs == 0 { 0 } else { computed.len() };
+    GuardReport { name: "stpa-currency", scanned, warnings, violations: Vec::new() }
+}
+
+/// Every `ANALYSED:` list under `.tracking`: how many runs, and the union of the names they walked.
+pub(crate) fn analysed_actions(root: &Path) -> (usize, HashSet<String>) {
+    let mut runs = 0usize;
+    let mut names = HashSet::new();
+    for path in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        for (i, _) in text.match_indices(":>> procedureText = \"ANALYSED:") {
+            runs += 1;
+            let rest = &text[i + ":>> procedureText = \"ANALYSED:".len()..];
+            names.extend(analysed_list(rest));
+        }
+    }
+    (runs, names)
+}
+
+/// The names in one `ANALYSED:` list - everything up to the first `.` or closing quote, comma-split.
+fn analysed_list(rest: &str) -> Vec<String> {
+    let end = rest.find(['.', '"']).unwrap_or(rest.len());
+    rest[..end].split(',').map(str::trim).filter(|n| !n.is_empty()).map(str::to_string).collect()
+}
+
+/// One warning naming every computed action no run has analysed; silence when there is no run.
+fn currency_warnings(runs: usize, analysed: &HashSet<String>, computed: &[String]) -> Vec<String> {
+    if runs == 0 {
+        return Vec::new();
+    }
+    let mut missing: Vec<&str> = computed.iter().map(String::as_str).filter(|n| !analysed.contains(*n)).collect();
+    missing.sort_unstable();
+    missing.dedup();
+    if missing.is_empty() {
+        return Vec::new();
+    }
+    vec![format!(
+        "stpa-currency: {} of {} computed control action(s) no stpa-self run has analysed: {} - run the stpa-self process and record the run's ANALYSED list (D0313)",
+        missing.len(),
+        computed.len(),
+        missing.join(", ")
+    )]
+}
+
+#[cfg(test)]
+mod stpa_currency_tests {
+    use super::{analysed_list, currency_warnings};
+    use std::collections::HashSet;
+
+    fn set(names: &[&str]) -> HashSet<String> {
+        names.iter().map(std::string::ToString::to_string).collect()
+    }
+
+    /// The run record's shape: names up to the first full stop; the FRAME sentence after it is prose.
+    #[test]
+    fn the_analysed_list_stops_at_the_first_sentence() {
+        assert_eq!(analysed_list(" cmdRecord, cmdLand. FRAME: EHZ1-EHZ9; CONSIDERED SAFE: cmdRecord notProvided"), vec!["cmdRecord", "cmdLand"]);
+        assert_eq!(analysed_list(" hookStop\";"), vec!["hookStop"]);
+    }
+
+    /// A structure that grew a name the runs never walked warns ONCE, naming every missing action.
+    #[test]
+    fn a_grown_structure_warns_once_and_names_the_gap() {
+        let computed: Vec<String> = ["cmdRecord", "cmdLand", "hookStop", "workflowCi"].iter().map(std::string::ToString::to_string).collect();
+        let w = currency_warnings(1, &set(&["cmdRecord", "cmdLand"]), &computed);
+        assert_eq!(w.len(), 1, "{w:?}");
+        assert!(w[0].contains("2 of 4") && w[0].contains("hookStop, workflowCi") && !w[0].contains("cmdRecord"), "{}", w[0]);
+    }
+
+    /// The union over runs is what counts: a second run walking the rest clears the first's gap.
+    #[test]
+    fn runs_accumulate_and_a_full_walk_is_silent() {
+        let computed: Vec<String> = ["cmdRecord", "hookStop"].iter().map(std::string::ToString::to_string).collect();
+        assert!(currency_warnings(2, &set(&["cmdRecord", "hookStop"]), &computed).is_empty());
+    }
+
+    /// No recorded run: the project never adopted the process; nothing is owed and nothing is said.
+    #[test]
+    fn a_project_with_no_run_hears_nothing() {
+        let computed: Vec<String> = vec!["cmdRecord".to_string()];
+        assert!(currency_warnings(0, &HashSet::new(), &computed).is_empty());
+    }
+}
+
 // ── doc-sync guard (D0113: the doc-sync discipline made a CONTROL — was pure vigilance) ────────────
 
 /// A staged path whose change is DEFINITIONAL and near-always carries doc implications: `.engine`
@@ -2764,8 +2872,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 61] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text"];
+pub const GUARD_NAMES: [&str; 62] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -4358,6 +4466,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "decision-amends-process" => Some(decision_amends_process(root)), // WARNING-tier (issue298/D0244)
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
+        "stpa-currency" => Some(stpa_currency(root)), // WARNING-tier (D0313) - the computed control structure says when STPA must run again
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),

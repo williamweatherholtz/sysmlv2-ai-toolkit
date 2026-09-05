@@ -105,5 +105,6 @@ package EngineGuardConstraints {
     constraint def decisionAmendsProcess;   // guard 59 (D0297), warning-tier
     constraint def unitExtrasPresent;       // guard 60 (D0300)
     constraint def acceptanceBindsToText;   // guard 61 (D0308): the text signed is the text carried
+    constraint def stpaCurrency;            // guard 62 (D0313), warning-tier: the computed control structure says when STPA must run again
 
 }

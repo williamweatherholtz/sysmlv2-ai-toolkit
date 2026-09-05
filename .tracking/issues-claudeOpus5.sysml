@@ -936,4 +936,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcPreBashSeesHeredocSource to issue372;
+
+    part issue373 : Issue {
+        :>> id = "227eb2d8-92df-42fe-804b-32952ba1e49b";
+        :>> title = "a fork written without OPTION markers auto-accepts under standing consent - fork detection is lexical and the author holds the lexicon";
+        :>> createdAt = "2026-09-05";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-05 by stpa-self run 1 (UCA-R1, ucaRecordForkDisguised): standing-consent auto-acceptance at record time (D0291) decides fork-or-not by ONE lexical shape - deck::fork_options reads OPTION X (label) enumerations - so a Decision that weighs alternatives in prose without that marker auto-accepts on the spot, and a direction the human owns is recorded as accepted by an AI (EHZ3). The author controls the lexicon that decides whether the human is asked. No control detects the disguised shape; D0303's clause detector counts (1)(2) enumerations for a different purpose. PREVENTING CHANGE: dcForkShapeIsDetected - a wider fork detector that holds the Decision proposed and asks the author to write it as a fork or to say it is not one, measured for precision over the accepted corpus first. Constraint CC-R1 (ccRecordForkShape) is bound to this Issue until then.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcForkShapeIsDetected to issue373;
+
+    part issue374 : Issue {
+        :>> id = "95eb87b3-0010-487a-94e3-0639f1cda8b9";
+        :>> title = "an append-result receipt proves a sentence was typed, not that the run happened - a suite count was written before the suite finished (2026-09-04) and no control saw it";
+        :>> createdAt = "2026-09-05";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-05 by stpa-self run 1 (UCA-A1, ucaResultReceiptIsTestimony): `append-result --evidence` satisfies guard 52 (attestation-substance, D0232) with WHATEVER the agent writes after `// RAN:`. The receipt proves a sentence was typed, not that a run happened or finished. It happened in this tree on 2026-09-04: I wrote a suite count into a receipt while the background suite was still running, and only my own read-back caught it - no control did. The pass then computes completion from evidence that did not yet exist (EHZ4). PREVENTING CHANGE: dcExternalFactGate - a result class that closes only on an external fact keel queries (a CI run id for the judged SHA, verified by CI on push), never on the agent's assertion; the fork D0312 decides how far that authority model extends to the other methods. Constraint CC-A1 (ccResultReceiptIsExternal) is bound to this Issue until then.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcExternalFactGate to issue374;
+
+    part issue375 : Issue {
+        :>> id = "66f65784-fae8-4e0f-8aab-ada90c5a1d5a";
+        :>> title = "a DoD pass is judged against the commit BEFORE the work lands - judgedAgainst names a tree that does not contain what was verified";
+        :>> createdAt = "2026-09-05";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-05 by stpa-self run 1 (UCA-A2, ucaResultBoundToTheWrongTree): the ordinary DoD pass is recorded with `append-result --sha HEAD` while the verified work is still uncommitted, so judgedAgainst names a commit whose tree does not contain the work. Every reader that dereferences the SHA - deliverable-drift suspicion in orient, reverify, the attestation census - reads the claim against a tree where it is false, and drift is measured from the wrong baseline (EHZ4). This is the result-side twin of issue341, which D0308 closed for acceptances with the introducing-commit fallback. PREVENTING CHANGE: dcResultBindsToItsLandingCommit - the same fallback for results, and `append-result` naming the tree the pass will read against when the working tree is dirty. Constraint CC-A2 (ccResultBindsToLandingTree) is bound to this Issue until then.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcResultBindsToItsLandingCommit to issue375;
 }
