@@ -791,6 +791,19 @@ fn bash_classify(root: &Path, cmd: &str) -> BashVerdict {
 
 fn hook_pre_bash(payload: &serde_json::Value, root: &Path, session: &str) -> i32 {
     let cmd = payload.pointer("/tool_input/command").and_then(serde_json::Value::as_str).unwrap_or_default();
+    // D0309 / issue372: a heredoc whose body carries a backslash is DENIED in every profile - the one
+    // pre-bash verdict that blocks. The harness collapses `\\` before bash runs, so source written
+    // through a heredoc is silently rewritten; this recurred eight-plus times in a week after being
+    // tracked, which is the proof that an advisory and a memory were not controls (D0047).
+    if let Some((tag, line)) = keel_cli::shellcheck::heredoc_with_backslash(cmd) {
+        println!(
+            "{}",
+            serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": format!("[keel] heredoc <<{tag} carries a backslash (`{line}`) - this harness collapses backslash pairs before bash runs, so source written this way is silently rewritten (D0309/issue372, recurred 8+ times). Write the file with the Write tool and run it by path; a heredoc is for prose without backslashes.")}})
+        );
+        ledger_advisory(root, session, "heredoc-backslash denied");
+        return 0;
+    }
     // D0176/D0178 tiering first: unambiguous bypass patterns and the never-exempt set.
     let profile = adoption_profile(root);
     match bash_classify(root, cmd) {

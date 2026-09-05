@@ -925,4 +925,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcAcceptanceBindsToTheText to issue371;
+
+    part issue372 : Issue {
+        :>> id = "5a332da7-13ca-4bca-9ffb-efdf62bba8bd";
+        :>> title = "already tracked was accepted eight times while the tracked item sat below the fold - the retro process flagged the heredoc defect and nothing made the flag escalate";
+        :>> createdAt = "2026-09-05";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-05 when the human asked why the heredoc defect was still occurring and whether retros were flagging issues. THEY WERE: dcPreBashSeesHeredocSource was created 2026-09-03 (sprint 531) as the resolver of a recurring heredoc failure, a memory said the same, and every retro afterwards wrote 'no new item - already tracked: dcPreBashSeesHeredocSource' - which the retro-backlog guard accepted, because D0294's fourth shape checks that a justification NAMES an existing item and nothing checks that the named item is being worked. The item had been placed below the High-issue resolvers to quiet a priority-inversion warning, and the defect recurred at least eight times in two days (sprints 540-550), each time caught by a wrong test result or an unparsable file rather than prevented. MECHANISM: 'already tracked' is a valid justification the FIRST time; the second time the same open item is named, the finding has recurred, and an item that keeps absorbing recurrences without moving is a reminder in an item's clothes (D0047) - and no control computed the count. CONSEQUENCE: the process that exists to turn recurring defects into controls accepted eight recurrences as tracked, and the human saw the defect keep happening. PREVENTING CHANGE: guard recurrence-escalates (D0310) - two or more retro citations of an open item is a violation unless the item is in the next three ready items or blocked on a proposed Decision; and the heredoc defect itself is closed by D0309's deny, which is dcPreBashSeesHeredocSource's delivery. Resolver: dcPreBashSeesHeredocSource, the item whose stasis is the defect.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPreBashSeesHeredocSource to issue372;
 }

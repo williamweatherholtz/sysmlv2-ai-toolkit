@@ -188,6 +188,44 @@ fn powershell_call_operator(cmd: &str) -> Option<String> {
     None
 }
 
+/// A heredoc body carrying a BACKSLASH (D0309 / issue372): the one shell shape this harness rewrites.
+///
+/// Measured 2026-09-05 with `cat <<'EOF'`: `\\` collapses to `\` even inside a
+/// quoted heredoc, so Python source meant to emit a Rust escape (`"\\r\\n"`) arrives as `"\r\n"`,
+/// Python turns that into a real CR LF, and the Rust file gains literal newlines inside a string
+/// literal - which happened at least eight times in one week after the first Issue named it, each time
+/// excused by "already tracked". Returns the first offending heredoc's tag and the line, so the refusal
+/// can point at it.
+#[must_use]
+pub fn heredoc_with_backslash(command: &str) -> Option<(String, String)> {
+    let lines: Vec<&str> = command.lines().collect();
+    let mut i = 0usize;
+    while let Some(line) = lines.get(i) {
+        let Some(pos) = line.find("<<") else {
+            i += 1;
+            continue;
+        };
+        let after = line[pos + 2..].trim_start_matches('-').trim_start();
+        let tag: String = after.trim_start_matches(['\'', '"']).chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if tag.is_empty() {
+            i += 1;
+            continue;
+        }
+        let mut j = i + 1;
+        while let Some(body) = lines.get(j) {
+            if body.trim() == tag {
+                break;
+            }
+            if body.contains('\\') {
+                return Some((tag, body.trim().chars().take(90).collect()));
+            }
+            j += 1;
+        }
+        i = j + 1;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::inspect;
@@ -267,5 +305,26 @@ mod scratch_path_tests {
     #[test]
     fn pure_bash_tmp_use_stays_silent() {
         assert!(inspect("echo hi > /tmp/x && cat /tmp/x").is_empty(), "no Windows program involved");
+    }
+}
+
+#[cfg(test)]
+mod heredoc_tests {
+    use super::heredoc_with_backslash;
+
+    /// D0309: a backslash inside a heredoc body is refused; prose heredocs (commit messages) and
+    /// backslashes OUTSIDE a heredoc are not the shape and pass.
+    #[test]
+    fn a_heredoc_body_with_a_backslash_is_named_and_prose_is_not() {
+        let src = "python - <<'PY'\nimport io\ns = s.replace(\"\\\\r\\\\n\", \"x\")\nPY\necho done";
+        let hit = heredoc_with_backslash(src).expect("the Python source carries backslashes");
+        assert_eq!(hit.0, "PY");
+        assert!(hit.1.contains("replace"), "{}", hit.1);
+        let prose = "cat > msg.txt <<'EOF'\nCR: a message with `backticks` and \"quotes\" but no backslash\nEOF\ngit commit -F msg.txt";
+        assert!(heredoc_with_backslash(prose).is_none(), "prose heredocs stay allowed");
+        let outside = "sed -i 's/a\\.b/c/' file.txt";
+        assert!(heredoc_with_backslash(outside).is_none(), "a backslash outside a heredoc is ordinary shell");
+        let dashed = "cat <<-EOF\n\tpath C:\\Users\\x\n\tEOF";
+        assert!(heredoc_with_backslash(dashed).is_some(), "the <<- form and a quoted tag are heredocs too");
     }
 }

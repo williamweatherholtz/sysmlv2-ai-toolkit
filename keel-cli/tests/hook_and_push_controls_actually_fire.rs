@@ -146,6 +146,25 @@ fn config_change_refuses_and_restores_the_settings_file() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// D0309: a heredoc body with a backslash is DENIED by pre-bash in a GUIDED project (every other
+/// pre-bash verdict is advisory); a prose heredoc and a backslash outside a heredoc pass.
+#[test]
+fn pre_bash_denies_a_heredoc_with_a_backslash_and_allows_prose() {
+    let root = std::env::temp_dir().join(format!("keel-heredoc-hook-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+    std::fs::write(root.join(".tracking").join("seed.sysml"), "package Seed {\n}\n").expect("seed");
+    let cmd = |c: &str| serde_json::json!({"session_id": "probe", "tool_name": "Bash", "tool_input": {"command": c}}).to_string();
+    let (out, _) = run_hook(&root, "pre-bash", &cmd("python - <<'PY'\nimport re\nre.sub(r\"\\\\s+\", \" \", x)\nPY\n"));
+    assert!(out.contains(r#""permissionDecision":"deny""#) || out.contains(r#""permissionDecision": "deny""#), "source with a backslash in a heredoc must be DENIED: {out}");
+    assert!(out.contains("<<PY") && out.contains("Write tool"), "the refusal names the heredoc and the remedy: {out}");
+    let (out, _) = run_hook(&root, "pre-bash", &cmd("cat > msg.txt <<'EOF'\nCR: prose with `backticks` and no backslash\nEOF\ngit commit -F msg.txt"));
+    assert!(!out.contains(r#""deny""#), "a prose heredoc is the sanctioned path and passes: {out}");
+    let (out, _) = run_hook(&root, "pre-bash", &cmd("sed -i 's/a\\.b/c/' x.txt"));
+    assert!(!out.contains(r#""deny""#), "a backslash outside a heredoc is ordinary shell: {out}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 // ── ctlPreWriteTiers ──────────────────────────────────────────────────────────────────────────────
 
 #[test]

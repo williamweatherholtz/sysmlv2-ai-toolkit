@@ -276,7 +276,7 @@ edit, and when that tier is clean it adds a **non-blocking** proactive advisory 
 what the edit broke downstream — a typed edge whose endpoint no longer resolves, or a verified criterion
 the edit changed while its pass result stands; `keel hook stop` runs validate + all guards at the turn boundary and blocks while the model is
 dishonest; `keel hook pre-bash` advises on host/shell adaptation before a Bash call (issue094) —
-**advisory, never blocking**, and silent unless it has something to say; `keel hook pre-write` guards
+**advisory, never blocking**, and silent unless it has something to say - with ONE deny: a heredoc body carrying a backslash (D0309); `keel hook pre-write` guards
 the protected fact surfaces (deny in strict-profile projects, advisory here until P1 lands the tiered
 model — the pure-shell fallback denies when the binary is absent; a Write/Edit that sets `disableAllHooks` in a repo-scope settings file is DENIED in every profile, issue365/D0296); `keel hook subagent-stop` gates a
 subagent only when the tree changed during its lifetime. `keel hook config-change` (D0296) REFUSES a repo-scope settings change that sets `disableAllHooks` or alters a keel-owned hook entry and RESTORES the file in place - Claude Code does not revert a blocked change, and a key left on disk kills every hook at the next launch; it runs in every profile, and a file it cannot parse is reported, never blocked on. Every hook fire appends one line to the
@@ -307,6 +307,11 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   is active and what the target program expects. Path separators, env-var syntax (`$VAR` vs `$env:VAR`),
   null device, quoting, and backtick behaviour are all shell-specific. If a shell tool errors or hangs,
   switch tools rather than re-issuing the same form. This host: **Windows + PowerShell + git-bash**.
+- **A heredoc body may not carry a backslash - the hook DENIES it (D0309).** This harness collapses `\\` to `\`
+  before bash runs, even inside a quoted heredoc, so any source written through a heredoc (Python with escapes,
+  regexes, Windows paths) is silently rewritten - it broke Rust files with literal newlines eight times in two days
+  after being "already tracked". Write the file with the **Write tool** and run it by path; a heredoc is for prose
+  (commit messages, drafts) with no backslashes. The pre-bash hook refuses the other shape in every profile.
 - **`conda` is not on `PATH`** in Claude Code shells. Use the full miniforge3 path (above). Installation
   root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, not miniconda3).
 - **`keel serve` holds `target/release/keel.exe`, so it blocks every rebuild (issue150).** Serve a COPY
