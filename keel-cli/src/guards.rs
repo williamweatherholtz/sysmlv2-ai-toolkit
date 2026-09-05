@@ -1245,6 +1245,11 @@ fn field_of(text: &str, key: &str) -> Option<String> {
 
 /// The latest `{dec}AcceptR<n>` result's `judgedAgainst` - the SHA the acceptance currently binds to.
 fn latest_acceptance_sha(text: &str, dec: &str) -> Option<String> {
+    latest_acceptance(text, dec).map(|(_, s)| s)
+}
+
+/// The latest `{dec}AcceptR<n>` result: its part name and its `judgedAgainst`.
+fn latest_acceptance(text: &str, dec: &str) -> Option<(String, String)> {
     let prefix = format!("part {dec}AcceptR");
     let mut best: Option<(u32, String)> = None;
     for (i, _) in text.match_indices(&prefix) {
@@ -1256,7 +1261,18 @@ fn latest_acceptance_sha(text: &str, dec: &str) -> Option<String> {
             best = Some((n, sha));
         }
     }
-    best.map(|(_, s)| s)
+    best.map(|(n, s)| (format!("{dec}AcceptR{n}"), s))
+}
+
+/// The commit that first carried `part <result>` in `rel`, if any is committed yet (D0329).
+///
+/// A re-binding is recorded against HEAD, then lands in the SAME commit as the corrected text (a
+/// commit gate cannot let the edit through alone), so its `judgedAgainst` names the tree BEFORE the
+/// edit and the text it vouches for is the tree that carried it - the same shape the introducing-commit
+/// fallback already covers for a first acceptance. One `git log -S` per drifted Decision, which is rare.
+fn result_landing_commit(root: &Path, rel: &str, result: &str) -> Option<String> {
+    let out = git_stdout(root, &["log", "--format=%h", "-S", &format!("part {result} "), "--", rel]);
+    out.lines().map(str::trim).rfind(|l| !l.is_empty()).map(str::to_string)
 }
 
 /// Pure core: which of the accepted fields differ between the text at acceptance and the text at HEAD,
@@ -1338,7 +1354,25 @@ pub fn acceptance_binds_to_text(root: &Path) -> GuardReport {
             continue;
         };
         scanned += 1;
-        let drift = drifted_fields(&base, text);
+        let mut drift = drifted_fields(&base, text);
+        if !drift.is_empty() {
+            // D0329: a re-binding that LANDED WITH the corrected text vouches for the tree that carried
+            // it. Compare against the commit where the latest result first appeared; if that text is
+            // HEAD's, the binding holds. An uncommitted re-binding is pending, not drift.
+            if let Some((result, _)) = latest_acceptance(text, dec) {
+                if let Some(landing) = result_landing_commit(root, rel, &result) {
+                    let key = format!("{landing}:{rel}");
+                    if let Some(Some(at_landing)) = crate::orient::batch_cat_blobs(root, std::slice::from_ref(&key)).get(&key) {
+                        if drifted_fields(at_landing, text).is_empty() {
+                            drift.clear();
+                        }
+                    }
+                } else {
+                    warnings.push(format!("{dec}: its latest acceptance ({result}) is not committed yet - the binding is checked at the commit that lands it (D0329)"));
+                    drift.clear();
+                }
+            }
+        }
         if !drift.is_empty() {
             violations.push(format!(
                 "{dec}: {} changed since the acceptance bound at {base_sha} - the text at {head} (HEAD) is not the text the human signed (issue341/D0308). If the words still hold, re-bind with `keel accept {dec} --rebind --note \"<what changed, why it still holds>\"`; never edit the acceptance.",
@@ -2605,6 +2639,13 @@ pub fn retro_backlog(root: &Path) -> GuardReport {
         .iter()
         .filter(|p| p.contains(".tracking/delivery/sprint") && std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
         .filter_map(|p| std::fs::read_to_string(root.join(p)).ok().map(|t| (p.clone(), t)))
+        // A staged sprint whose RETRO text is unchanged from HEAD is not this commit's retro (D0331):
+        // correcting a past sprint's receipt (issue283) re-staged sprint469 and the guard judged a
+        // 2026-08-29 retro by a rule written afterwards. Only a retro that moved is this commit's to answer for.
+        .filter(|(p, t)| {
+            let at_head = git_stdout(root, &["show", &format!("HEAD:{p}")]);
+            at_head.is_empty() || retro_texts(&at_head) != retro_texts(t)
+        })
         .collect();
     let scanned = sprint_texts.len();
     let added = staged_added_items(root);

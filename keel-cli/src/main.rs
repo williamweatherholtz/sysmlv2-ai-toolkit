@@ -196,7 +196,8 @@ fn cmd_validate(args: &[String]) -> i32 {
     // A real project holding zero tracking files still exits 0: that is a true statement about a
     // project that exists.
     if !keel_cli::workspace::is_project(&root) {
-        eprintln!("error: {} is not a keel project — it has no .engine/ (and .tracking/) directory.", root.display());
+        // NAME THE DIRECTORY THAT IS MISSING (issue283).
+        eprintln!("error: {} is not a keel project — it has no {} directory.", root.display(), keel_cli::workspace::missing_project_dirs(&root));
         let ws = keel_cli::workspace::discover(&root);
         if ws.is_multi() {
             eprintln!("  This repository holds {} projects. validate takes ONE project root:", ws.projects.len());

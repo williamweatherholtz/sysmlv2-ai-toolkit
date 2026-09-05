@@ -74,6 +74,16 @@ pub fn is_project(dir: &Path) -> bool {
     dir.join(".engine").is_dir() && dir.join(".tracking").is_dir()
 }
 
+/// Which of the two project directories `dir` lacks, named for a refusal message.
+///
+/// issue283: the message used to say `.engine/` whatever was absent, so a tree holding `.engine/`
+/// and no `.tracking/` was told the wrong thing.
+#[must_use]
+pub fn missing_project_dirs(dir: &Path) -> String {
+    let missing: Vec<&str> = [".engine/", ".tracking/"].into_iter().filter(|d| !dir.join(d.trim_end_matches('/')).is_dir()).collect();
+    if missing.is_empty() { "(both present)".to_string() } else { missing.join(" or ") }
+}
+
 /// Refuse to answer over nothing (issue281): the resolved `root` must actually be a keel project.
 ///
 /// # The false green this ends
@@ -98,7 +108,7 @@ pub fn require_project(root: &Path, usage: &str) -> Result<(), i32> {
     if is_project(root) {
         return Ok(());
     }
-    eprintln!("error: {} is not a keel project — it has no .engine/ (and .tracking/) directory.", root.display());
+    eprintln!("error: {} is not a keel project — it has no {} directory.", root.display(), missing_project_dirs(root));
     let ws = discover(root);
     if ws.projects.is_empty() {
         eprintln!("  No keel project was found in {} either.", ws.root.display());

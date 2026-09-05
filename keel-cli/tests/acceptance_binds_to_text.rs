@@ -82,5 +82,21 @@ fn editing_an_accepted_decisions_text_is_red_reverting_is_green_and_rebinding_cl
     assert!(text.contains("d0001AcceptR2") && text.contains(&c3) && text.contains("REBOUND"), "a second acceptance result bound to the edited text's SHA:\n{text}");
     assert!(text.contains("d0001AcceptR1"), "the first acceptance stands");
     assert_eq!(guard(&root).0, 0, "after re-binding the guard is green");
+
+    // D0329 (found while correcting D0234, issue283): in a gated repository the corrected text and
+    // its re-binding must land in ONE commit - the gate will not let the edit through alone - so the
+    // re-binding's judgedAgainst names the tree BEFORE the edit. Uncommitted: pending, not drift.
+    // Committed together: the binding is the commit that carried both.
+    let now = std::fs::read_to_string(&dec).expect("read");
+    std::fs::write(&dec, now.replace("and also that", "and also that, corrected")).expect("edit again, uncommitted");
+    let out = Command::new(keel_bin()).args(["accept", "d0001", "--rebind", "--note", "their words: 'yes, corrected as well'", "--date", "2026-09-05", "--by", "hum"]).current_dir(&root).env("KEEL_ACTOR", "hum").output().expect("rebind");
+    assert!(out.status.success(), "rebind: {}", String::from_utf8_lossy(&out.stderr));
+    let (code, out) = guard(&root);
+    assert_eq!(code, 0, "an uncommitted re-binding is PENDING, not drift: {out}");
+    assert!(out.contains("not committed yet"), "and the guard says so: {out}");
+    let c4 = commit_all(&root, "corrected text and its re-binding, one commit");
+    let (code, out) = guard(&root);
+    assert_eq!(code, 0, "the commit that carried text and re-binding together is the binding ({c4}): {out}");
+    assert!(!out.contains("not committed yet"), "{out}");
     let _ = std::fs::remove_dir_all(&root);
 }
