@@ -565,6 +565,19 @@ pub fn walk_longest(dir: &std::path::Path) -> usize {
     longest
 }
 
+/// A RUST-ONLY pre-commit gate scaffolded into a fresh project (`.githooks/pre-commit`).
+///
+/// In the library so `claude_surface` can hold the Claude hooks to the same binary-resolution order
+/// (issue348). Runs
+/// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
+/// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
+///
+/// FAILS LOUD without the binary (K2/P0.3, D0174): the previous version skipped with a printed
+/// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
+/// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
+/// path (D0175's fence). POSIX sh.
+pub const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\n# THE GATE IS WORKSPACE-SCOPED, ALWAYS (D0234/issue278). git allows ONE core.hooksPath per\n# repository, so a hook inside a project directory can never gate a sibling project - which is\n# why this hook is installed at the REPOSITORY ROOT. It used to branch on `[ ! -d .engine ]` to\n# decide whether it was at a workspace root; that test is wrong for the commonest layout, a repo\n# whose root is itself a project with peers beside it, where .engine exists and every peer\n# therefore rode out UNGATED. `keel gate --workspace` gates every project the commit touches and\n# is identical to the old single-project path when the repo holds exactly one project.\necho 'pre-commit: keel gate --workspace (every project this commit touches)'\n\"$KEEL\" gate --workspace . || { echo 'pre-commit: keel gate FAILED — commit aborted'; exit 1; }\n";
+
 #[cfg(test)]
 mod engine_instance_tests {
     use super::is_engine_instance_file;
@@ -585,4 +598,3 @@ mod engine_instance_tests {
         assert!(!is_engine_instance_file(Path::new(".engine/rules/rules.sysml")));
     }
 }
-

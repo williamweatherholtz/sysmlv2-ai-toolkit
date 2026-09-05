@@ -35,6 +35,20 @@ pub mod control_structure;
 pub fn note_quotes_human(text: &str) -> bool {
     checks::quotes_conversational_words(text)
 }
+
+/// The note `keel accept` records when the human typed it at an interactive terminal.
+///
+/// When their sentence carries no quote receipt of its own (D0315/issue359) the TTY IS the gesture,
+/// so the command cites it - the human is never asked to quote themself. A note that already quotes
+/// or cites a gesture is returned unchanged.
+#[must_use]
+pub fn note_with_tty_gesture(note: &str, gesture: &str, judge: &str, date: &str) -> String {
+    if note_quotes_human(note) {
+        return note.to_string();
+    }
+    debug_assert!(gesture.to_lowercase().contains(checks::TTY_GESTURE_MARK), "the gesture phrase must carry the mark the rule reads");
+    format!("{note} - {gesture} by {judge}, {date}")
+}
 mod critique;
 mod knowledge;
 mod reports;

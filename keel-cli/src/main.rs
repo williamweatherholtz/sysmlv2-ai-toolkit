@@ -57,15 +57,7 @@ const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which ve
 /// there'd be no `ProjectActors` to reference. Ships placeholder actors (a human + the AI) the newcomer
 /// edits to their real identities; the declared part name is the id that `createdBy`/`judgedBy` reference.
 const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry (INSTANCE data). EDIT to your real actors.\n// The declared part name is the id that createdBy/judgedBy reference (enforced by `keel guard actors`).\npackage ProjectActors {\n    private import EngineElement::*;\n\n    part you : Person { :>> name = \"Your Name\"; :>> email = \"you@example.com\"; }\n    part ai : Actor { :>> name = \"AI assistant\"; :>> kind = ActorKind::ai; }\n}\n";
-/// A RUST-ONLY pre-commit gate scaffolded into a fresh project (`.githooks/pre-commit`). Runs
-/// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
-/// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
-///
-/// FAILS LOUD without the binary (K2/P0.3, D0174): the previous version skipped with a printed
-/// notice, so an uninstalled downstream machine committed ungated while looking gated — the exact
-/// silent-pass class the proposal's §1.1 recorded. The remedy line names the documented install
-/// path (D0175's fence). POSIX sh.
-const PRECOMMIT_HOOK: &str = "#!/bin/sh\n# keel pre-commit gate (Rust-only; no JVM kernel) — scaffolded by `keel init` (D0048/D0093/D0174).\n# Enable: git config core.hooksPath .githooks   |   bypass once: SKIP_KEEL=1 git commit ...\n[ \"$SKIP_KEEL\" = \"1\" ] && { echo 'pre-commit: SKIP_KEEL=1 — keel gate skipped'; exit 0; }\n# BINARY RESOLUTION, pinned-first (D0230). A project that wants its gate DECOUPLED from whatever\n# keel happens to be on PATH drops a RELEASED binary at .keel/bin/keel - machine-local, so each\n# contributor installs their own - and it wins over PATH. That is the whole pin: no script, no\n# wrapper, nothing to keep in sync. Without it a sibling working tree on the same machine silently\n# decides this project's gate, which is how one project's gate came to run an unreleased build.\nKEEL=\"${KEEL_BIN:-}\"\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel ] && KEEL=./.keel/bin/keel\n[ -z \"$KEEL\" ] && [ -x .keel/bin/keel.exe ] && KEEL=./.keel/bin/keel.exe\nKEEL=\"${KEEL:-keel}\"\ncommand -v \"$KEEL\" >/dev/null 2>&1 || { echo \"pre-commit: keel binary NOT FOUND — commit BLOCKED (K2: an absent gate must not pass silently).\"; echo \"pre-commit: install keel from https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases and put it on PATH (or set KEEL_BIN).\"; exit 1; }\n# THE GATE IS WORKSPACE-SCOPED, ALWAYS (D0234/issue278). git allows ONE core.hooksPath per\n# repository, so a hook inside a project directory can never gate a sibling project - which is\n# why this hook is installed at the REPOSITORY ROOT. It used to branch on `[ ! -d .engine ]` to\n# decide whether it was at a workspace root; that test is wrong for the commonest layout, a repo\n# whose root is itself a project with peers beside it, where .engine exists and every peer\n# therefore rode out UNGATED. `keel gate --workspace` gates every project the commit touches and\n# is identical to the old single-project path when the repo holds exactly one project.\necho 'pre-commit: keel gate --workspace (every project this commit touches)'\n\"$KEEL\" gate --workspace . || { echo 'pre-commit: keel gate FAILED — commit aborted'; exit 1; }\n";
+use keel_cli::PRECOMMIT_HOOK;
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -4159,17 +4151,31 @@ fn cmd_record_issue(args: &[String]) -> i32 {
 /// `confirmation-authenticity` guard independently checks that the acceptance result is judged by a
 /// Person-typed actor, so an AI accepting its own proposal fails the gate rather than passing it —
 /// this command makes the honest path easy without making the dishonest one possible.
-fn cmd_accept(args: &[String]) -> i32 {
-    // Channel layer (D0178/P1.3, best-effort by recorded design): in a session bearing
-    // agent-environment markers, `keel accept` requires a TTY-interactive human or the console
-    // approve queue - the actor binding alone is agent-mutable state. The write layer (AI-kind
-    // refusal) and the tree-derived audit are the real controls; this is the friction layer.
+/// D0315/issue359: is the human at THEIR terminal? A real TTY, or the test's declared stand-in
+/// (`KEEL_TTY_GESTURE=1`) - which the record names as asserted rather than observed, so a reader
+/// can tell the two apart.
+fn tty_gesture() -> Option<&'static str> {
+    use std::io::IsTerminal as _;
+    if std::io::stdin().is_terminal() {
+        Some("TTY gesture: typed at an interactive terminal")
+    } else if std::env::var("KEEL_TTY_GESTURE").is_ok_and(|v| v == "1") {
+        Some("TTY gesture (asserted by KEEL_TTY_GESTURE, not observed): typed at a terminal")
+    } else {
+        None
+    }
+}
+
+/// Channel layer (D0178/P1.3, best-effort by recorded design): in a session bearing
+/// agent-environment markers, `keel accept` requires a TTY-interactive human or the console
+/// approve queue - the actor binding alone is agent-mutable state. The write layer (AI-kind
+/// refusal) and the tree-derived audit are the real controls; this is the friction layer.
+/// `Some(exit)` refuses; `None` lets the accept proceed.
+fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<i32> {
     {
-        use std::io::IsTerminal as _;
         let agent_marked = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_BRIDGE_SESSION_ID"]
             .iter()
             .any(|k| std::env::var(k).is_ok_and(|v| !v.is_empty()));
-        if agent_marked && !std::io::stdin().is_terminal() {
+        if agent_marked && tty_gesture.is_none() {
             // D0289: the channel layer HONOURS the declared recording delegation (D0192 option A). When
             // attestation-policy.toml delegates the RECORDING of acceptance to the agent, the human's
             // quoted words ARE the channel - the same quote receipt the substance rule demands after
@@ -4186,15 +4192,23 @@ fn cmd_accept(args: &[String]) -> i32 {
                 }
                 (Some(d), false) => {
                     eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but the note must QUOTE their words verbatim - a single-quoted span of at least ten characters, e.g. --note \"their words: 'yes, accept it'\" - or cite their deck/console/GitHub gesture (D0192/D0289).");
-                    return 1;
+                    return Some(1);
                 }
                 (None, _) => {
                     eprintln!("keel accept: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
                     eprintln!("  Acceptance is the human's own act: run `keel accept` from YOUR terminal, or accept from the console approve queue / the deck.");
-                    return 1;
+                    return Some(1);
                 }
             }
         }
+    }
+    None
+}
+
+fn cmd_accept(args: &[String]) -> i32 {
+    let tty_gesture = tty_gesture();
+    if let Some(exit) = accept_channel_refusal(args, tty_gesture) {
+        return exit;
     }
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
     let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
@@ -4252,6 +4266,15 @@ fn cmd_accept(args: &[String]) -> i32 {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_owned())
         .unwrap_or_default();
+    // D0315/issue359: the human at THEIR terminal is the gesture. Six acceptances typed at a TTY
+    // with a plain sentence went red at the gate for want of a single-quoted span (GH#53) - the
+    // rule accepts a cited gesture, and the command had not cited the one it could see. With stdin
+    // a terminal (or KEEL_TTY_GESTURE=1, the test's stand-in), the note cites it; an agent session
+    // has no TTY and is unchanged - its receipt is the human's quoted words (D0289).
+    let note = match tty_gesture {
+        Some(gesture) => keel_cli::view::note_with_tty_gesture(&note, gesture, &judged_by, &date),
+        None => note,
+    };
     // --rebind (D0308): the Decision is already accepted and its text moved since; record a new
     // acceptance result against the SHA whose text is current, with the note saying what changed.
     if args.iter().any(|a| a == "--rebind") {

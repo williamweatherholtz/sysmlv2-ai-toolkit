@@ -52,13 +52,30 @@ pub const PROTECTED_PATHS: [(&str, &str); 5] = [
 /// too, so with the binary absent a control-plane write is denied rather than silently allowed.
 pub const CONTROL_PLANE_PATHS: [&str; 3] = [".claude/settings.json", ".githooks/", "output-styles/keel.md"];
 
+/// The binary-resolution ORDER every keel surface agrees on (D0230; issue348/GH#43).
+///
+/// `KEEL_BIN`, then the project's PINNED binary at `.keel/bin/keel(.exe)`, then PATH. The scaffolded
+/// git hooks probe in this order; until D0316 the Claude hooks skipped the pin and a project pinned to
+/// 0.3.0 ran its turns on whatever PATH held - including an uncommitted build. One list, so the two
+/// surfaces cannot disagree again; `every_hook_command_resolves_the_pin_before_path_in_the_git_hooks_order`
+/// holds them equal.
+pub const RESOLUTION_ORDER: [&str; 3] = ["KEEL_BIN", ".keel/bin/keel", "command -v"];
+
+/// The POSIX-sh probe realising `RESOLUTION_ORDER` inside a hook command. The Claude hooks run with
+/// the project directory as cwd and `CLAUDE_PROJECT_DIR` set, so the pin is probed under both.
+fn pin_first_probe() -> String {
+    "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); ".to_string()
+}
+
 /// POSIX-sh binary resolution used by every scaffolded hook: `KEEL_BIN` (absolute, injected by the
-/// launcher) then PATH; missing → a VISIBLE warning naming the install path, exit 0 (D0134: a hook
-/// never fails a turn on infrastructure absence — the warning is the K2 visibility, and the
-/// hardening inventory lists this point's absent-behavior).
+/// launcher), then the pinned `.keel/bin` binary, then PATH (`RESOLUTION_ORDER`); missing → a VISIBLE
+/// warning naming the install path, exit 0 (D0134: a hook never fails a turn on infrastructure
+/// absence — the warning is the K2 visibility, and the hardening inventory lists this point's
+/// absent-behavior).
 fn resolver() -> String {
+    let pin_first = pin_first_probe();
     format!(
-        "K=\"${{KEEL_BIN:-}}\"; {{ [ -n \"$K\" ] && [ -x \"$K\" ]; }} || K=$(command -v keel 2>/dev/null); \
+        "{pin_first}\
          [ -n \"$K\" ] || {{ echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: {INSTALL_URL}' >&2; exit 0; }}; "
     )
 }
@@ -85,8 +102,9 @@ fn resolver() -> String {
 /// project that has declared it runs under keel. The alternative was an enforcement layer that
 /// disabled itself and reported nothing.
 fn gating_resolver() -> String {
+    let pin_first = pin_first_probe();
     format!(
-        "K=\"${{KEEL_BIN:-}}\"; {{ [ -n \"$K\" ] && [ -x \"$K\" ]; }} || K=$(command -v keel 2>/dev/null); \
+        "{pin_first}\
          [ -n \"$K\" ] || {{ printf '%s' '{{\"decision\":\"block\",\"reason\":\"[keel] The turn gate could not run: the keel binary is NOT FOUND. This project runs under keel, so a turn cannot end ungated. Set KEEL_BIN or install: {INSTALL_URL}\"}}'; exit 0; }}; "
     )
 }
@@ -114,9 +132,10 @@ fn protected_path_command() -> String {
         let _ = write!(pats, "*'{p}'*|*'{win}'*|");
     }
     let pats = pats.trim_end_matches('|');
+    let pin_first = pin_first_probe();
     format!(
         "IN=$(cat); case \"$IN\" in {pats}) \
-         K=\"${{KEEL_BIN:-}}\"; {{ [ -n \"$K\" ] && [ -x \"$K\" ]; }} || K=$(command -v keel 2>/dev/null); \
+         {pin_first}\
          if [ -n \"$K\" ]; then printf '%s' \"$IN\" | \"$K\" hook pre-write; \
          else echo '{{\"hookSpecificOutput\":{{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[keel] protected fact surface and the keel binary is ABSENT - refusing a blind write. Install: {INSTALL_URL} ; then use the sanctioned write commands (keel --help).\"}}}}'; fi;; \
          *) : ;; esac"
@@ -496,7 +515,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 mod tests {
     use super::{
         hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
-        sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS,
+        sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
     };
 
     /// D-P0a: six events (five, then `ConfigChange` under D0296), every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
@@ -517,6 +536,41 @@ mod tests {
         for step in ["keel validate .", "keel guard .", "keel rules . --enforce"] {
             assert!(t.contains(step), "gate step present: {step}");
         }
+    }
+
+    /// issue348 (GH#43): every generated hook command probes `KEEL_BIN`, then the PINNED `.keel/bin`
+    /// binary, then PATH - the order the scaffolded git hooks use - so a project's turns and its gates
+    /// run the same engine. Asserted per command, not once for the file, so a new hook cannot regress it.
+    #[test]
+    fn every_hook_command_resolves_the_pin_before_path_in_the_git_hooks_order() {
+        let h = keel_hooks();
+        let mut commands = 0usize;
+        for (_, groups) in h.as_object().expect("hooks object") {
+            for g in groups.as_array().expect("groups") {
+                for hk in g["hooks"].as_array().expect("hooks") {
+                    let cmd = hk["command"].as_str().expect("command");
+                    assert!(probes_in_order(cmd), "resolution order must be {RESOLUTION_ORDER:?} in: {cmd}");
+                    commands += 1;
+                }
+            }
+        }
+        assert!(commands >= 6, "every event's command was checked: {commands}");
+        // The scaffolded git hook probes in the same order (D0230) - the two surfaces agree.
+        assert!(probes_in_order(crate::PRECOMMIT_HOOK), "the git hook probes in the same order");
+        assert!(!probes_in_order("K=$(command -v keel); [ -x .keel/bin/keel ] && K=.keel/bin/keel; K=${KEEL_BIN:-$K}"), "a PATH-first script is refused by this check");
+    }
+
+    /// Does `script` probe the three resolution steps in `RESOLUTION_ORDER`, each AFTER the previous
+    /// (so a comment naming a path earlier does not count as the probe)?
+    fn probes_in_order(script: &str) -> bool {
+        let mut from = 0usize;
+        for tok in RESOLUTION_ORDER {
+            match script[from..].find(tok) {
+                Some(i) => from += i + tok.len(),
+                None => return false,
+            }
+        }
+        true
     }
 
     #[test]

@@ -257,9 +257,16 @@ fn latest_result_full(model: &Model, v: &str) -> Option<(String, String, String)
     best.map(|(_, o, at, by)| (o, at, by))
 }
 
-/// Does an acceptance record carry its channel evidence (D0192 OPTION A)? True on a single-quoted
-/// span of at least 10 characters (the human's verbatim conversational words) or a named human
-/// surface gesture (deck/console).
+/// The mark `keel accept` writes when the human typed the command at an interactive terminal.
+///
+/// The TTY is their gesture, and the note cites it the way a deck or console acceptance cites its
+/// surface (D0315/issue359).
+pub const TTY_GESTURE_MARK: &str = "tty gesture";
+
+/// Does an acceptance record carry its channel evidence (D0192 OPTION A)?
+///
+/// True on a single-quoted span of at least 10 characters (the human's verbatim conversational words)
+/// or a named human surface gesture (deck/console/GitHub comment/TTY).
 pub(super) fn quotes_conversational_words(text: &str) -> bool {
     let lower = text.to_lowercase();
     // Named human-surface gestures that ARE the channel evidence: the localhost deck/console, and a
@@ -267,7 +274,9 @@ pub(super) fn quotes_conversational_words(text: &str) -> bool {
     // and immutably event-logged — the D0205/D0201-B conclusion that it subsumes the device HMAC — so
     // citing one is a STRONGER gesture than the quoted words, and a one-letter fork answer ("A") is a
     // deliberate authenticated choice even though it is no 10-char span.
-    if lower.contains("deck") || lower.contains("console") || lower.contains("github comment") || lower.contains("github.com/") {
+    // The human's own terminal is a gesture too (D0315/issue359): `keel accept` run with stdin a TTY
+    // cites it in the fixed phrase below, written by the command and never by the note's author.
+    if lower.contains("deck") || lower.contains("console") || lower.contains("github comment") || lower.contains("github.com/") || lower.contains(TTY_GESTURE_MARK) {
         return true;
     }
     // A quote span closes at an apostrophe NOT followed by a letter — otherwise every contraction
@@ -613,6 +622,7 @@ mod tests {
         ));
         // A deck tap is a human gesture — no quote needed.
         assert!(quotes_conversational_words("signed via deck"));
+        assert!(quotes_conversational_words("looks right - TTY gesture: typed at an interactive terminal by hum, 2026-09-05"), "the human's terminal is a cited gesture (D0315)");
         assert!(quotes_conversational_words("accepted at the console review queue"));
         // issue235: a GitHub comment citation is the authenticated gesture — a bare option letter is enough.
         assert!(quotes_conversational_words("OPTION A - their words, verbatim: 'A' (GitHub comment https://github.com/o/r/issues/3#issuecomment-1, authenticated login williamweatherholtz)"));
