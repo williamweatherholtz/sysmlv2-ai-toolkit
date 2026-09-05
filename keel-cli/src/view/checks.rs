@@ -457,6 +457,74 @@ pub fn rule_violations_opt(root: &Path, rule_name: &str) -> Result<Option<(usize
     rule_violations(root, rule_name).map(Some)
 }
 
+/// The predicate terms that carry a forward-only CUTOFF date (issue068's shape): events judged before
+/// the date are grandfathered.
+const CUTOFF_TERMS: [&str; 2] = ["acceptQuotesDelegatedWords(", "confirmationQuotesOrAttested("];
+
+/// A forward-only rule's cutoff is the ADOPTING project's date, never only the engine's (D0319,
+/// issue352 / GH#47).
+///
+/// The shipped rule carries the date the rule came into force HERE (`acceptQuotesDelegatedWords(
+/// 2026-08-22)` - this repository's own adoption of D0192). A project that adopted the engine on day
+/// D never had the rule before D, so its events before D cannot have been recorded against it; a
+/// downstream project migrating into 0.3.1 was retro-failed on acceptances it made months earlier.
+/// The effective cutoff is therefore the LATER of the rule's own date and the project's declared
+/// adoption date (`adoption-profile.toml` `declaredAt`, written by `init` and stamped by `migrate`
+/// when it adds the file). For this repository the two coincide within a day and nothing moves.
+/// The literal stays in the rule text as the engine's own value; only the reading is raised.
+#[must_use]
+pub fn raise_cutoffs(predicate: &str, adopted: Option<&str>) -> String {
+    let Some(adopted) = adopted.filter(|d| d.len() == 10) else {
+        return predicate.to_string();
+    };
+    predicate
+        .split(" and ")
+        .map(|term| {
+            let t = term.trim();
+            for prefix in CUTOFF_TERMS {
+                if let Some(date) = predicate_args(t, prefix) {
+                    let date = date.trim();
+                    if date.len() == 10 && date < adopted {
+                        return format!("{prefix}{adopted})");
+                    }
+                }
+            }
+            t.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join(" and ")
+}
+
+/// The project's declared adoption date, from `.engine/contracts/adoption-profile.toml`.
+fn adoption_date(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".engine").join("contracts").join("adoption-profile.toml")).ok()?;
+    text.lines()
+        .map(str::trim)
+        .find_map(|l| l.strip_prefix("declaredAt"))
+        .and_then(|r| r.split('"').nth(1))
+        .map(str::to_string)
+}
+
+#[cfg(test)]
+mod cutoff_tests {
+    use super::raise_cutoffs;
+
+    /// GH#47: a project that adopted on 2026-09-03 reads the 2026-08-22 rule as cutting off at
+    /// 2026-09-03; this repository (declared 2026-08-21) reads it unchanged; a term with no cutoff and a
+    /// project with no declaration are left alone.
+    #[test]
+    fn the_cutoff_is_the_later_of_the_rules_date_and_the_projects_adoption() {
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", Some("2026-09-03")), "acceptQuotesDelegatedWords(2026-09-03)");
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", Some("2026-08-21")), "acceptQuotesDelegatedWords(2026-08-22)");
+        assert_eq!(
+            raise_cutoffs("nonBlank(rationale) and confirmationQuotesOrAttested(2026-08-23)", Some("2026-09-03")),
+            "nonBlank(rationale) and confirmationQuotesOrAttested(2026-09-03)"
+        );
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", None), "acceptQuotesDelegatedWords(2026-08-22)");
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", Some("garbage")), "acceptQuotesDelegatedWords(2026-08-22)");
+    }
+}
+
 /// Violations of a single declared rule, as `(scanned, violating element names)`.
 ///
 /// # Errors
@@ -482,7 +550,8 @@ pub fn rule_violations(root: &Path, rule_name: &str) -> Result<(usize, Vec<Strin
         }
         "ElementRule" => {
             let scanned = model.items.values().filter(|i| rc_matches_subject(i, &subject) && subject_in_scope(i, &scope).unwrap_or(false)).count();
-            let v = element_rule_violations(&model, &subject, &a("predicate"), &scope)
+            let predicate = raise_cutoffs(&a("predicate"), adoption_date(root).as_deref());
+            let v = element_rule_violations(&model, &subject, &predicate, &scope)
                 .ok_or_else(|| ViewError::Track(rule_name.to_string(), "unsupported predicate/scope term".to_string()))?;
             Ok((scanned, v))
         }

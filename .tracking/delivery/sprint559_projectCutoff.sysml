@@ -1,0 +1,29 @@
+// ProjectDeliveryS559 — Sprint 559: a forward-only rule's cutoff is the adopting project's own date - the engine's literal is its history, not everyone's. EXECUTE. 3 pts.
+package ProjectDeliveryS559 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from projectCutoffStory to d0319;
+
+    part projectCutoffStory : Story {
+        :>> id = "3300e97d-9c7c-4b35-ade7-3ef828078b39";
+        :>> title = "Sprint 559: a forward-only rule's cutoff is the adopting project's own date - the engine's literal is its history, not everyone's (3 pts)";
+        :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS559 {
+        action storyProjectCutoff;
+        verification storyProjectCutoffDoD : Test { :>> id = "2307d1c8-3335-47b7-8a60-3d9c2683dbb2"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcForwardOnlyCutoffIsTheProjectsOwn (D0319; resolves issue352 / GH#47). DONE: checks::raise_cutoffs raises acceptQuotesDelegatedWords and confirmationQuotesOrAttested to the later of the literal and adoption-profile declaredAt, applied in rule_violations for every ElementRule; migrate stamps declaredAt with the migration date when it ADDS the profile; rules.sysml untouched in text, its comments and guards.md's grandfathering paragraph say so. Unit tests on raise_cutoffs and stamp_declared_at; keel-cli/tests/forward_only_cutoff_is_the_projects_own.rs on a real scaffold."; }
+        // RAN: same suite receipt: 512/0 exit 0
+        part storyProjectCutoffDoDR1 : TestResult { :>> id = "cdfa0332-c6ef-4cc0-a1a9-1f45a1c5330a"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d9e250e71ab615c2cac2723b71ffeabfad85ddb0"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification projectCutoffRefineGate : Test { :>> id = "237832ed-5a0e-4cc0-87e7-38088889419b"; :>> title = "Sprint 559 refine gate (DoR)"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: the DoD named the mechanism (the project's own recorded date) and the constraint (this repository's cutoffs unchanged). The design question was where the date lives - adoption-profile declaredAt is the one adoption fact a project already declares (D0174), so no new fact is authored; the residual (a rule that arrives by a later migrate into a project whose profile predates it) is stated in D0319."; }
+    verification projectCutoffStandupGate : Test { :>> id = "b59fda31-8d4f-4519-aabe-3d8732c7c8ad"; :>> title = "Sprint 559 standup gate"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "ONE CHOICE: raise the READING, not the rule text. rules.sysml is resynced by migrate, so a per-project literal would be overwritten; a symbolic token would move the grandfather line out of the rule where a reader looks for it. The literal stays as when the rule came into force here."; }
+    verification projectCutoffImplementGate : Test { :>> id = "86eaef95-3947-4cfe-a832-31db5c10f0d9"; :>> title = "Sprint 559 implement gate"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: cargo test --lib cutoff_tests 1 passed (raised, unchanged for this repository's 2026-08-21, compound predicate, absent, malformed); section_merge_tests 3 passed incl. the migrate stamp; cargo test --test forward_only_cutoff_is_the_projects_own 2 passed (a 2026-08-30 unquoted delegated acceptance passes on a scaffold declared today; one judged today fails naming d0001 and the quote); clippy -D warnings clean; the full suite in the background to completion (receipt on the DoD result)."; }
+    verification projectCutoffReviewGate : Test { :>> id = "1e6ef55e-6e83-43ad-bf05-c71f8272e9ef"; :>> title = "Sprint 559 review gate — three passes per D0172"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) DOES THIS REPOSITORY MOVE: no - declaredAt 2026-08-21 precedes both literals, and the unit test holds that case. (2) CAN A PROJECT DODGE THE RULE BY EDITING declaredAt: the profile is a committed project-owned contract and a later date only grandfathers more history, never future events - the same trust the profile already carries for strict-vs-guided. (3) THE SCAFFOLD SHIPS THIS REPOSITORY'S POLICY: attestation-policy.toml with delegatedRecording d0192 travels to every init - noticed, not this item's; recorded in the retro."; }
+    verification projectCutoffCloseOutGate : Test { :>> id = "9df05446-50b6-4c22-83e6-b67321a54489"; :>> title = "Sprint 559 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. D0319 accepted under standing consent; issue352 resolved by computation."; }
+    verification projectCutoffRetroGate : Test { :>> id = "20d6ff8f-8ef1-4f57-bcb8-7d8eabf988dd"; :>> title = "Sprint 559 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-05"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: dcScaffoldShipsNoGrants is the item for the scaffold carrying this repository's own delegations and standing consent into a fresh project, which this sprint's fixture made visible again (the scaffold's attestation-policy.toml declares d0192 and d0207 for a project that never accepted either). The lesson: an engine's own history is not a default."; }
+}

@@ -122,6 +122,18 @@ fn is_project_owned_contract(mapped: &Path) -> bool {
         && mapped.file_name().and_then(|f| f.to_str()).is_some_and(|f| PROJECT_OWNED.contains(&f))
 }
 
+/// `declaredAt = "<date>"` rewritten to `today`; every other line untouched.
+fn stamp_declared_at(text: &str, today: &str) -> String {
+    let mut out: Vec<String> = text
+        .lines()
+        .map(|l| if l.trim_start().starts_with("declaredAt") { format!("declaredAt = \"{today}\"") } else { l.to_string() })
+        .collect();
+    if text.ends_with('\n') {
+        out.push(String::new());
+    }
+    out.join("\n")
+}
+
 /// Engine-shipped contracts whose `[section]`s a project may EXTEND with its own (issue349): the
 /// resync merges rather than overwrites them.
 fn is_sectioned_contract(mapped: &Path) -> bool {
@@ -179,7 +191,14 @@ fn merge_project_sections(shipped: &str, current: &str) -> Result<String, Vec<St
 
 #[cfg(test)]
 mod section_merge_tests {
-    use super::{merge_project_sections, project_sections};
+    use super::{merge_project_sections, project_sections, stamp_declared_at};
+
+    /// D0319: a profile the migration ADDS is dated by the migration, not by the engine's own history.
+    #[test]
+    fn an_added_adoption_profile_is_declared_today() {
+        let shipped = "# profile\nprofile = \"guided\"\ndeclaredAt = \"2026-08-21\"\n";
+        assert_eq!(stamp_declared_at(shipped, "2026-09-05"), "# profile\nprofile = \"guided\"\ndeclaredAt = \"2026-09-05\"\n");
+    }
 
     const ENGINE: &str = "# header\n# more\n[alpha]\nfiles = [\"a.yml\"]\n";
 
@@ -597,7 +616,12 @@ fn step_engine_resync(root: &Path, engine: &Dir) -> StepPlan {
         } else {
             None
         };
-        let new_content: &str = merged.as_deref().unwrap_or(new_content);
+        // A project that never had `adoption-profile.toml` adopts the rules TODAY (D0319, issue352):
+        // the engine's copy carries this repository's own declaredAt, and shipping that date would
+        // retro-fail the project's events on a rule it never had. The migration date is the adoption.
+        let stamped: Option<String> = (mapped == Path::new("contracts/adoption-profile.toml") && current.is_none())
+            .then(|| stamp_declared_at(new_content, &crate::scaffold::today()));
+        let new_content: &str = stamped.as_deref().or(merged.as_deref()).unwrap_or(new_content);
         if current.as_deref() == Some(new_content) {
             return;
         }

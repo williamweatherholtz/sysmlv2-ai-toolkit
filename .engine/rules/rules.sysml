@@ -123,7 +123,8 @@ package EngineRuleSet {
     // the declared recording delegation must EVIDENCE its channel - quote the human's conversational
     // words verbatim (a single-quoted span) or cite a human surface gesture (deck/console/GitHub comment,
     // or the TTY itself - `keel accept` typed at an interactive terminal cites it, D0315/issue359). Forward-only
-    // from D0192's acceptance date (issue068): earlier events are grandfathered. GATING - the
+    // from D0192's acceptance date (issue068): earlier events are grandfathered - and the cutoff READS as the
+    // later of this literal and the adopting project's adoption-profile declaredAt (D0319/issue352). GATING - the
     // `confirmation-authenticity` guard sources this rule alongside confirmationAuthenticityRule.
     // STATED LIMIT (from D0192 itself): an agent that fabricates a quote defeats this check; the
     // protections behind it are the human reading their own queue and the audit trail.
@@ -142,7 +143,8 @@ package EngineRuleSet {
     // D0198 OPTION A (quote receipts): a human-judged confirmation FLIP recorded on/after the
     // delegation date must carry its evidence - its own text quotes the human's words or cites
     // their gesture, OR a companion <test>Attest<N> record does. Acceptance events keep their own
-    // rule; companion records are the evidence, not subjects. Forward-only (issue068). GATING via
+    // rule; companion records are the evidence, not subjects. Forward-only (issue068; the cutoff reads as the
+    // later of the literal and the project's declaredAt, D0319). GATING via
     // the confirmation-authenticity guard. STATED LIMIT: a fabricated quote defeats it (D0192 family).
     part delegatedConfirmationSubstanceRule : ElementRule {
         :>> id = "7e348a2e-92f7-4bb0-a1c4-6d84f0b5c9e1";

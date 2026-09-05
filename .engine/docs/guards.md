@@ -97,7 +97,7 @@ is truthful. `assured` (D0079c composite readiness) · `critique` (coverage) · 
 **Forward-only grandfathering.** A new guard must never retro-fail items authored under the process in
 force at the time (the issue068 lesson). `duplicate-identity` has NO exemption list — the 18 bootstrap duplicates were
 re-identified by a D0067 migration (issue080 resolved), and the list was deleted rather than emptied; `attestation-substance` grandfathers 9 thin attestations. Both lists are
-visible every run and must not be extended — a new violation is a defect, not an exemption.
+visible every run and must not be extended — a new violation is a defect, not an exemption. A rule whose predicate carries a DATE cutoff (`acceptQuotesDelegatedWords(2026-08-22)`, `confirmationQuotesOrAttested(2026-08-23)`) reads the LATER of that date and the adopting project's `declaredAt` in `adoption-profile.toml` (D0319, GH#47): the literal is this repository's own adoption of the rule, and a project that adopted later never had the rule before its own date; `keel migrate` stamps `declaredAt` with the migration date when it adds the profile.
 
 **Hard vs warning is a property of the check, not the topic.** Exact checks (set membership, duplicate
 detection) block. Heuristics over prose warn. A guard that fires on ambiguity trains people to disable

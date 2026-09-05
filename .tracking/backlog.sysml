@@ -470,8 +470,12 @@ package EngineBacklog {
         part dcAdoptionCheckReportsTheRealVerdictDoDR1 : TestResult { :>> id = "b632e583-04ca-44f8-bd38-3e0fde64c64e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "88864053792a741b681bcee2fe202d2d1b14dffe"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
         action dcSurfaceDriftIgnoresLineEndings;
         verification dcSurfaceDriftIgnoresLineEndingsDoD : Test { :>> id = "c4ac2d6a-264b-480c-b011-d76a725f47a6"; :>> method = VerificationMethod::test; :>> procedureText = "DONE MEANS: guard claude-surface-drift compares the deployed .claude surface to the embedded contract with line endings normalised, so a Windows checkout (CRLF) of a file sync-claude wrote (LF) is not drift. GH#46 (st083): every fresh clone on Windows failed the guard on arrival. VERIFY: a fixture whose keel.md is CRLF passes; a fixture whose content actually differs still fails; the comparison helper has a unit test for both."; }
+        // RAN: same run: 512/0 exit 0 incl. claude_surface::line_endings_are_not_drift_but_content_is and a_crlf_checkout_of_the_output_style_is_not_drift_but_a_changed_word_is; clippy -D warnings clean
+        part dcSurfaceDriftIgnoresLineEndingsDoDR1 : TestResult { :>> id = "cbcfb0a5-2272-4205-9b88-383f52e30e93"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d9e250e71ab615c2cac2723b71ffeabfad85ddb0"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
         action dcForwardOnlyCutoffIsTheProjectsOwn;
         verification dcForwardOnlyCutoffIsTheProjectsOwnDoD : Test { :>> id = "a5162436-07b3-4e92-a0af-12054e1015f3"; :>> method = VerificationMethod::test; :>> procedureText = "DONE MEANS: a forward-only rule's cutoff is the ADOPTING project's date, never the engine's. GH#47 (st082): delegatedAcceptanceSubstanceRule and delegatedConfirmationSubstanceRule ship predicate = ...(2026-08-22) - this repository's adoption date baked into a shipped rule - so a downstream project migrating into 0.3.1 was retro-failed on acceptances it recorded before it ever had the rule. The general form of issue068. DO: the cutoff resolves from the project's own record - the date the rule (or its unit) was activated or migrated in, recorded in the project's contracts - with the literal kept only as this repository's own value. Touches rules.sysml (keystone) and checks.rs. VERIFY: a fixture migrated on day D with acceptances before D passes; an acceptance after D without a quote fails; this repository's own cutoffs are unchanged."; }
+        // RAN: cargo test --release: 512 passed, 0 failed, exit 0 (2026-09-05) incl. checks::cutoff_tests and tests/forward_only_cutoff_is_the_projects_own.rs (scaffold declared today: 2026-08-30 unquoted acceptance passes, today's fails)
+        part dcForwardOnlyCutoffIsTheProjectsOwnDoDR1 : TestResult { :>> id = "ebffb1fa-7f23-4cf2-ae38-c7867e6ca3a0"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d9e250e71ab615c2cac2723b71ffeabfad85ddb0"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
         action dcProcessStepsBindToChecks;
         action dcForkShapeIsDetected;   // resolves issue373 (High): ranked above the Medium work per the priority lens, D0311
         action dcExternalFactGate;   // resolves issue374 (High, stpa-self run 1): ranked with the High work, D0311
@@ -2485,4 +2489,6 @@ package EngineBacklog {
     #CharteredBy dependency from dcHooksResolveThePinFirst to d0316;
     #CharteredBy dependency from dcMigratePreservesProjectSections to d0317;
     #CharteredBy dependency from dcAdoptionCheckReportsTheRealVerdict to d0318;
+    #CharteredBy dependency from dcForwardOnlyCutoffIsTheProjectsOwn to d0319;
+    #CharteredBy dependency from dcSurfaceDriftIgnoresLineEndings to d0320;
 }

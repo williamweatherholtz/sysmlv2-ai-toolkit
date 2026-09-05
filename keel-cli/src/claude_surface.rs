@@ -401,6 +401,17 @@ fn registry_skills(root: &Path) -> Vec<(String, String)> {
     out
 }
 
+/// Is the deployed text the generated text, LINE ENDINGS ASIDE (issue351, GH#46)?
+///
+/// `sync-claude` writes LF; a Windows checkout with `core.autocrlf` reads the same file back as CRLF,
+/// and a byte comparison called every fresh clone drifted on arrival - a control that is always red is
+/// routed around (D0214). Line endings are the checkout's, not the content's; nothing else is
+/// normalised, so a changed word is still drift.
+#[must_use]
+pub fn same_text(deployed: &str, generated: &str) -> bool {
+    deployed.replace("\r\n", "\n") == generated.replace("\r\n", "\n")
+}
+
 /// Write (or merge into) the keel-owned `.claude/` surface at `root`.
 ///
 /// `check_only`: compute drift and report, write nothing — this IS the `claude-surface-drift`
@@ -443,7 +454,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     // output style
     let style_path = claude.join("output-styles").join("keel.md");
     let style_current = std::fs::read_to_string(&style_path).unwrap_or_default();
-    if style_current != OUTPUT_STYLE {
+    if !same_text(&style_current, OUTPUT_STYLE) {
         drift.push("output-styles/keel.md differs from the embedded response contract".to_string());
     }
     // skills: one .claude/skills/<name>/SKILL.md per registry entry
@@ -452,7 +463,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     for (title, loc) in &registry {
         let dst = claude.join("skills").join(title).join("SKILL.md");
         let src_text = std::fs::read_to_string(root.join(loc)).unwrap_or_default();
-        if std::fs::read_to_string(&dst).unwrap_or_default() != src_text {
+        if !same_text(&std::fs::read_to_string(&dst).unwrap_or_default(), &src_text) {
             missing_skills += 1;
         }
     }
@@ -463,7 +474,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     // the plugin rendering (D0296): every file byte-equal to this binary's generator
     let mut plugin_stale = Vec::new();
     for (rel, want) in plugin_files() {
-        if std::fs::read_to_string(root.join(&rel)).unwrap_or_default().replace("\r\n", "\n") != want {
+        if !same_text(&std::fs::read_to_string(root.join(&rel)).unwrap_or_default(), &want) {
             plugin_stale.push(rel);
         }
     }
@@ -515,7 +526,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 mod tests {
     use super::{
         hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
-        sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
+        same_text, sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
     };
 
     /// D-P0a: six events (five, then `ConfigChange` under D0296), every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
@@ -571,6 +582,15 @@ mod tests {
             }
         }
         true
+    }
+
+    /// GH#46: a CRLF checkout of an LF-written surface file is not drift; a changed word still is.
+    #[test]
+    fn line_endings_are_not_drift_but_content_is() {
+        assert!(same_text("# keel\r\n\r\nrule one\r\n", "# keel\n\nrule one\n"));
+        assert!(same_text("# keel\n", "# keel\r\n"), "either side may carry the CRLF");
+        assert!(!same_text("# keel\r\nrule two\r\n", "# keel\nrule one\n"), "a changed word is drift");
+        assert!(!same_text("# keel\n", "# keel\n\n"), "a changed line count is drift");
     }
 
     #[test]
@@ -656,6 +676,28 @@ mod tests {
         assert!(!after.drift.iter().any(|d| d.starts_with("plugin rendering")), "written plugin = no plugin drift: {:?}", after.drift);
         assert!(root.join(PLUGIN_DIR).join("hooks").join("hooks.json").exists());
         assert!(root.join(MARKETPLACE_MANIFEST).exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// GH#46 (issue351), on the real check: a written surface re-read as CRLF (a Windows checkout with
+    /// autocrlf) is NOT drift; the same file with a changed word still is.
+    #[test]
+    fn a_crlf_checkout_of_the_output_style_is_not_drift_but_a_changed_word_is() {
+        const LF: char = '\n';
+        const CRLF: &str = "\r\n";
+        let root = std::env::temp_dir().join(format!("keel-crlf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+        std::fs::write(root.join(".claude").join("settings.json"), merge_settings(&serde_json::json!({})).to_string()).expect("clean");
+        sync_claude(&root, false).expect("write");
+        let style = root.join(".claude").join("output-styles").join("keel.md");
+        let lf = std::fs::read_to_string(&style).expect("written");
+        std::fs::write(&style, lf.replace(LF, CRLF)).expect("crlf checkout");
+        let report = sync_claude(&root, true).expect("check");
+        assert!(!report.drift.iter().any(|d| d.starts_with("output-styles")), "CRLF is the checkout's, not drift: {:?}", report.drift);
+        std::fs::write(&style, lf.replacen("Parsed", "Parsde", 1)).expect("changed word");
+        let report = sync_claude(&root, true).expect("check");
+        assert!(report.drift.iter().any(|d| d.starts_with("output-styles")), "a changed word is still drift: {:?}", report.drift);
         let _ = std::fs::remove_dir_all(&root);
     }
 
