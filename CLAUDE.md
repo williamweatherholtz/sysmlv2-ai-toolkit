@@ -156,7 +156,7 @@ frozen (modify it only by out-of-band Decision).
   historical data. Moving a project onto an **engine that changed underneath it** is
   **`project-migration`** (D0275) — different actor, different failure modes: preflight to a recorded
   green SHA, check what the engine REMOVES not what it adds, let `keel migrate` refuse and roll back
-  rather than hand-repairing; gate every unit with `keel adoption-check --vintage <prior release>` too (D0302) - the current scaffold is keel adopting keel, and the defects an older adopter meets (issue263/259) show only against a real prior release's binary, prove the project's own pin comment / adoption / project-owned contracts
+  rather than hand-repairing; gate every unit with `keel adoption-check --vintage <prior release>` too (D0302) - the current scaffold is keel adopting keel, and the defects an older adopter meets (issue263/259) show only against a real prior release's binary, prove the project's own pin comment / adoption / project-owned contracts / its own `unit-extras.toml` sections (D0317)
   survived the resync, read the project's OWN CI, and report the cost upstream. That last step is
   load-bearing: `check_preconditions` refuses any tree holding `keel-cli/Cargo.toml` as a self-build,
   so **the engine cannot migrate itself** — seven defects in this path (issue301/310/314/323/324/326/327)

@@ -23,7 +23,7 @@ report** — that rule is general in keel and load-bearing here.
 2. **Check what is REMOVED.** Additions are safe; renames and removals break whatever named the old
    thing.
 3. **Apply.** `keel migrate .` — let it refuse, let it roll back, never hand-repair a partial run.
-4. **Reconcile.** Prove the project's own choices survived: pin, adoption, project-owned contracts,
+4. **Reconcile.** Prove the project's own choices survived: pin, adoption, project-owned contracts, its own `[unit]` sections in `unit-extras.toml` (merged, never overwritten; a colliding section blocks by name, D0317),
    customised files. Then gate.
 5. **Prove it remotely.** A local green is one machine and one binary. Read the project's own CI.
 6. **Report upstream.** The engine is blind here; your report is the only channel.

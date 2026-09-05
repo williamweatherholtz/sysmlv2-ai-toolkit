@@ -179,3 +179,29 @@ fn a_lived_in_projects_own_ci_survives_migration_and_installs_the_pin() {
     cleanup(&root);
 }
 
+/// (5) The project PUBLISHED a unit of its own and declared its extras in the engine-shipped
+/// `unit-extras.toml` (issue349, GH#44): the resync used to rewrite the file wholesale and the
+/// section vanished with nothing reported. The section must ride through, and the run must say so.
+/// The conflicting-section refusal is exercised in `migrate::section_merge_tests` - the engine's
+/// copy carries no section today, so a fixture cannot collide with one.
+#[test]
+fn a_projects_own_unit_extras_section_survives_the_resync_and_is_reported() {
+    let (root, _) = realistic_project("extr");
+    let extras = root.join(".engine/contracts/unit-extras.toml");
+    let shipped = std::fs::read_to_string(&extras).expect("the engine ships unit-extras.toml");
+    std::fs::write(&extras, format!("{shipped}\n[ours]\nfiles = [\"tools/ours.py\"]\nrequires = [\"gate\"]\n")).expect("declare our unit");
+    assert!(git(&root, &["add", "-A"]) && git(&root, &["-c", "commit.gpgsign=false", "commit", "-q", "-m", "our unit's extras"]), "commit");
+
+    let (ok, text) = run(&root, &["migrate", "."]);
+    assert!(ok, "migrate: {text}");
+    let after = std::fs::read_to_string(&extras).expect("unit-extras.toml still exists");
+    assert!(
+        after.contains("[ours]") && after.contains("files = [\"tools/ours.py\"]") && after.contains("requires = [\"gate\"]"),
+        "the project's own section is data, not engine content - it must survive the resync intact:\n{after}"
+    );
+    assert!(text.contains("PRESERVED") && text.contains("issue349"), "and the run must SAY it preserved it, so the reader knows to look:\n{text}");
+    let (gate_ok, gate) = run(&root, &["gate", "--fast", "."]);
+    assert!(gate_ok, "the migrated project gates green: {gate}");
+    cleanup(&root);
+}
+

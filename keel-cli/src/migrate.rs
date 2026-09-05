@@ -122,6 +122,90 @@ fn is_project_owned_contract(mapped: &Path) -> bool {
         && mapped.file_name().and_then(|f| f.to_str()).is_some_and(|f| PROJECT_OWNED.contains(&f))
 }
 
+/// Engine-shipped contracts whose `[section]`s a project may EXTEND with its own (issue349): the
+/// resync merges rather than overwrites them.
+fn is_sectioned_contract(mapped: &Path) -> bool {
+    mapped.parent().is_some_and(|p| p.ends_with("contracts")) && mapped.file_name().and_then(|f| f.to_str()) == Some("unit-extras.toml")
+}
+
+/// The `[name]` sections of a TOML-shaped contract as (name, body) in file order; text before the
+/// first header is the preamble and is not a section.
+fn project_sections(text: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some(name) = t.strip_prefix('[').and_then(|r| r.strip_suffix(']')).filter(|_| !t.starts_with("[[")) {
+            out.push((name.to_string(), String::new()));
+        } else if let Some((_, body)) = out.last_mut() {
+            body.push_str(line);
+            body.push('\n');
+        }
+    }
+    out
+}
+
+/// Merge the engine's shipped copy with the project's current one: every section the engine does not
+/// carry is appended verbatim after the engine's text. A section both carry with a different body
+/// (comments and blank lines aside) is a conflict, returned by name; the caller blocks on it.
+fn merge_project_sections(shipped: &str, current: &str) -> Result<String, Vec<String>> {
+    let engine = project_sections(shipped);
+    let normal = |body: &str| body.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect::<Vec<_>>().join("\n");
+    let mut conflicts = Vec::new();
+    let mut extra = String::new();
+    for (name, body) in project_sections(current) {
+        match engine.iter().find(|(n, _)| *n == name) {
+            Some((_, eb)) if normal(eb) != normal(&body) => conflicts.push(name),
+            Some(_) => {}
+            None => {
+                extra.push('[');
+                extra.push_str(&name);
+                extra.push_str("]\n");
+                extra.push_str(&body);
+            }
+        }
+    }
+    if !conflicts.is_empty() {
+        return Err(conflicts);
+    }
+    if extra.is_empty() {
+        return Ok(shipped.to_string());
+    }
+    let mut out = shipped.trim_end_matches('\n').to_string();
+    out.push_str("\n\n# ── project-authored sections, preserved through `keel migrate` (issue349) ──\n");
+    out.push_str(extra.trim_end_matches('\n'));
+    out.push('\n');
+    Ok(out)
+}
+
+#[cfg(test)]
+mod section_merge_tests {
+    use super::{merge_project_sections, project_sections};
+
+    const ENGINE: &str = "# header\n# more\n[alpha]\nfiles = [\"a.yml\"]\n";
+
+    /// GH#44: the project's own [unit] section rides through the resync; the engine's own text is
+    /// otherwise the engine's.
+    #[test]
+    fn a_project_authored_section_is_appended_and_the_engine_text_wins_elsewhere() {
+        let current = "# stale header\n[alpha]\nfiles = [\"a.yml\"]\n[ours]\nfiles = [\"tools/ours.py\"]\nrequires = [\"x\"]\n";
+        let merged = merge_project_sections(ENGINE, current).expect("no conflict");
+        assert!(merged.starts_with("# header\n# more\n[alpha]"), "the engine's text leads: {merged}");
+        assert!(merged.contains("[ours]\nfiles = [\"tools/ours.py\"]\nrequires = [\"x\"]"), "the project's section is intact: {merged}");
+        assert!(merged.contains("issue349"), "and says why it is there");
+        assert_eq!(project_sections(&merged).len(), 2);
+    }
+
+    /// A section both carry with a different body is nobody's to decide: named, so the run blocks.
+    #[test]
+    fn a_conflicting_section_is_named_not_resolved() {
+        let current = "[alpha]\nfiles = [\"a.yml\", \"b.yml\"]\n";
+        assert_eq!(merge_project_sections(ENGINE, current), Err(vec!["alpha".to_string()]));
+        // the same body with a comment and spacing difference is NOT a conflict
+        let same = "[alpha]\n# a note\n\nfiles = [\"a.yml\"]\n";
+        assert_eq!(merge_project_sections(ENGINE, same).expect("same"), ENGINE);
+    }
+}
+
 /// Engine-DEV-only embedded paths EXCLUDED from the scaffold (D0093 boundary): the kernel/Python
 /// toolchain and any compiled-Python cache. Downstream projects use the Rust path (D0048).
 ///
@@ -489,16 +573,43 @@ fn step_engine_resync(root: &Path, engine: &Dir) -> StepPlan {
         let new_content: &str = &remap_engine_content(rel, shipped_text)
             .unwrap_or_else(|| shipped_text.to_owned());
         let current = std::fs::read_to_string(&dst).ok();
+        // SECTIONED CONTRACTS MERGE, NEVER OVERWRITE (issue349, GH#44). `unit-extras.toml` is
+        // engine-shipped but a project PUBLISHING its own unit adds a `[unit]` section of its own;
+        // the resync rewrote the file wholesale and a published unit's declared payload vanished
+        // with nothing reported. A section the engine's copy does not carry is the project's and
+        // travels through; a section BOTH carry with different bodies is a conflict this step cannot
+        // decide, so it BLOCKS naming the section (the issue314 shape: refuse, never hand-repair).
+        let merged: Option<String> = if is_sectioned_contract(&mapped) {
+            current.as_deref().and_then(|cur| match merge_project_sections(new_content, cur) {
+                Ok(m) => Some(m),
+                Err(conflicts) => {
+                    for sec in conflicts {
+                        plan.blockers.push(Blocker {
+                            path: dst.clone(),
+                            line: 0,
+                            reason: format!("section [{sec}] differs between the engine's copy and this project's, and both claim it"),
+                            advice: format!("a section the engine ships is the engine's; if [{sec}] is YOUR unit, rename it (or its id) so the two do not collide, then re-run"),
+                        });
+                    }
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let new_content: &str = merged.as_deref().unwrap_or(new_content);
         if current.as_deref() == Some(new_content) {
             return;
         }
         let verb = if current.is_some() { "update" } else { "add" };
-        plan.files.push(FileEdit {
-            path: dst,
-            new_content: new_content.to_string(),
-            edits: 1,
-            detail: vec![format!("{verb} {}", mapped.display())],
-        });
+        let mut detail = vec![format!("{verb} {}", mapped.display())];
+        if merged.is_some() {
+            let kept = project_sections(new_content).len().saturating_sub(project_sections(&remap_engine_content(rel, shipped_text).unwrap_or_else(|| shipped_text.to_owned())).len());
+            if kept > 0 {
+                detail.push(format!("{kept} project-authored section(s) PRESERVED through the resync (issue349)"));
+            }
+        }
+        plan.files.push(FileEdit { path: dst, new_content: new_content.to_string(), edits: 1, detail });
     });
 
     // Files under .engine/ that this binary does not ship. Never deleted — deleting a project's

@@ -74,14 +74,63 @@ fn keel_with(exe: &Path, args: &[&str], cwd: Option<&Path>) -> Result<String, St
     } else {
         // The FAILING lines are the reason, not the last four: `guard all` prints every guard's verdict
         // and the last four are almost always PASS lines from guards that came after the failure - which
-        // is what the first vintage run reported, a "failure" made of passes.
-        let failing: Vec<&str> = text.lines().filter(|l| l.contains("ERROR") || l.contains("FAIL")).take(4).collect();
+        // is what the first vintage run reported, a "failure" made of passes (GH#45, issue350).
+        let failing = failing_lines(&text);
         if !failing.is_empty() {
             return Err(failing.join(" | "));
         }
         let mut tail: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).rev().take(4).collect();
         tail.reverse();
         Err(tail.join(" | "))
+    }
+}
+
+/// The lines of a gate's output that ARE the failure, by the shape of the line and never by substring
+/// (issue350 / GH#45; the issue329 class): a guard verdict line `[guard:<name>] <VERDICT> — ...` whose
+/// verdict token is FAIL, and a detail line whose first token is `ERROR` (a violation, or a
+/// validate/check-engine error). A PASS or WARN verdict is never a reason, whatever its text says -
+/// a warning that mentions a FAILED sprint gate is a passing guard talking. The `[guard] FAILED` total
+/// is a count, not a reason, and is left out. At most four, in output order.
+fn failing_lines(text: &str) -> Vec<&str> {
+    text.lines().filter(|l| line_is_failure(l)).take(4).collect()
+}
+
+fn line_is_failure(line: &str) -> bool {
+    let t = line.trim_start();
+    if let Some(rest) = t.strip_prefix("[guard:") {
+        // `[guard:name] VERDICT — ...` - the verdict is the first token after the bracket.
+        return rest.split_once("] ").is_some_and(|(_, after)| after.split_whitespace().next() == Some("FAIL"));
+    }
+    if t.starts_with("[guard]") {
+        return false;
+    }
+    let first = t.split(|c: char| c.is_whitespace() || c == ':').next().unwrap_or("");
+    first == "ERROR"
+}
+
+#[cfg(test)]
+mod verdict_tests {
+    use super::{failing_lines, line_is_failure};
+
+    /// GH#45: a PASS line is never the reason, even when its warning text says FAIL; a FAIL verdict
+    /// and an ERROR detail are; the total line is a count.
+    #[test]
+    fn a_pass_line_mentioning_fail_is_not_a_failure_and_a_fail_verdict_is() {
+        assert!(!line_is_failure("[guard:sprint-closure] PASS — 12 scanned, 1 warning(s), 0 violation(s)"));
+        assert!(!line_is_failure("  WARN  sprint gate FAILED for storyX - unstamped (D0260)"));
+        assert!(!line_is_failure("[guard] FAILED — 3 warning(s) across 2 guard(s), NOT violations"));
+        assert!(line_is_failure("[guard:claude-surface-drift] FAIL — 47 scanned, 0 warning(s), 1 violation(s)"));
+        assert!(line_is_failure("  ERROR 1 skill(s) missing or stale under .claude/skills/"));
+        assert!(line_is_failure("ERROR: .tracking/x.sysml:4 — unresolved type reference `Person`"));
+        assert!(!line_is_failure("everything is fine, no errors here"));
+    }
+
+    /// The reason reported is the failing lines in order, capped, and never a pass.
+    #[test]
+    fn the_reason_is_the_failing_lines_in_order() {
+        let text = "[guard:a] PASS — 1 scanned, 0 warning(s), 0 violation(s)\n  ERROR x is wrong\n[guard:b] FAIL — 1 scanned, 0 warning(s), 1 violation(s)\n[guard:c] PASS — 2 scanned, 1 warning(s), 0 violation(s)\n[guard] FAILED — 1 warning(s) across 1 guard(s)";
+        assert_eq!(failing_lines(text), vec!["  ERROR x is wrong", "[guard:b] FAIL — 1 scanned, 0 warning(s), 1 violation(s)"]);
+        assert!(failing_lines("[guard:a] PASS — 1 scanned, 0 warning(s), 0 violation(s)\n[guard] ALL PASS").is_empty());
     }
 }
 
