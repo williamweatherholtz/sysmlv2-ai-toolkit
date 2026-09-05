@@ -989,6 +989,173 @@ pub fn process_change(root: &Path) -> GuardReport {
 }
 
 
+// ── acceptance-binds-to-text (issue341 / D0308): the text signed is the text carried ─────────────
+
+/// The three fields an acceptance is a judgment OF.
+const ACCEPTED_FIELDS: [&str; 3] = ["decision", "rationale", "consequences"];
+
+/// The VALUE of a string attribute: every quoted segment of `:>> key = "a" + "b";` concatenated.
+/// The early Decisions write long fields as `+`-joined segments across lines, and the indentation
+/// between segments is source formatting, not signed text - comparing raw source read ten of them as
+/// drifted on whitespace alone.
+fn field_of(text: &str, key: &str) -> Option<String> {
+    let start = text.find(&format!(":>> {key} = "))? + key.len() + 7;
+    let rest = &text[start..];
+    let mut value = String::new();
+    let mut in_str = false;
+    let mut saw_any = false;
+    for c in rest.chars() {
+        if in_str {
+            if c == '"' {
+                in_str = false;
+            } else {
+                value.push(c);
+            }
+        } else if c == '"' {
+            in_str = true;
+            saw_any = true;
+        } else if c == ';' {
+            break;
+        } else if !(c.is_whitespace() || c == '+') {
+            break; // not a string attribute
+        }
+    }
+    saw_any.then_some(value)
+}
+
+/// The latest `{dec}AcceptR<n>` result's `judgedAgainst` - the SHA the acceptance currently binds to.
+fn latest_acceptance_sha(text: &str, dec: &str) -> Option<String> {
+    let prefix = format!("part {dec}AcceptR");
+    let mut best: Option<(u32, String)> = None;
+    for (i, _) in text.match_indices(&prefix) {
+        let after = &text[i + prefix.len()..];
+        let n: u32 = after.chars().take_while(char::is_ascii_digit).collect::<String>().parse().ok()?;
+        let ja = after.find("judgedAgainst = \"")? + 17;
+        let sha: String = after[ja..].chars().take_while(char::is_ascii_hexdigit).collect();
+        if best.as_ref().is_none_or(|(bn, _)| n > *bn) {
+            best = Some((n, sha));
+        }
+    }
+    best.map(|(_, s)| s)
+}
+
+/// Pure core: which of the accepted fields differ between the text at acceptance and the text at HEAD,
+/// compared as string VALUES (see `field_of`).
+fn drifted_fields(accepted: &str, head: &str) -> Vec<&'static str> {
+    ACCEPTED_FIELDS.iter().copied().filter(|k| field_of(accepted, k) != field_of(head, k)).collect()
+}
+
+/// Guard (hard, D0308 / issue341): the text a human signed is the text the tree carries.
+///
+/// An accepted Decision's decision, rationale and consequences at HEAD must equal its text at the
+/// SHA its latest acceptance result binds to - the file at `judgedAgainst`, or,
+/// when the acceptance was recorded in the same commit as the Decision (every standing-consent
+/// auto-accept), the commit that introduced the file. A difference is a violation naming the Decision,
+/// both SHAs and the fields; the remedy is `keel accept <d> --rebind` on a human judgment that the
+/// words still hold, never an edit of history. Measured before the guard existed: 17 of 301 accepted
+/// Decisions had drifted, all editorially (PROPOSED->ACCEPTED wording inside the text, rollout notes,
+/// guard-count renumbering) - recorded as issue371, re-bound, not allowlisted.
+#[must_use]
+pub fn acceptance_binds_to_text(root: &Path) -> GuardReport {
+    let dir = root.join(".engine").join("decisions");
+    let files = crate::collect_sysml(&dir);
+    if files.is_empty() {
+        return GuardReport { name: "acceptance-binds-to-text", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    }
+    // Every accepted Decision with a result: (rel path, decision, sha, head text).
+    let mut accepted: Vec<(String, String, String, String)> = Vec::new();
+    for f in &files {
+        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        if !text.contains("DecisionStatus::accepted") {
+            continue;
+        }
+        let Some(i) = text.find("part d0") else { continue };
+        let dec: String = text[i + 5..].chars().take_while(|c| c.is_alphanumeric()).collect();
+        let Some(sha) = latest_acceptance_sha(&text, &dec) else { continue };
+        let rel = relpath(root, f);
+        accepted.push((rel, dec, sha, text));
+    }
+    // One batch for the texts at the binding SHAs; one `git log` for every file's introducing commit.
+    let keys: Vec<String> = accepted.iter().map(|(rel, _, sha, _)| format!("{sha}:{rel}")).collect();
+    let blobs = crate::orient::batch_cat_blobs(root, &keys);
+    let intro_log = git_stdout(root, &["log", "--diff-filter=A", "--format=%h", "--name-only", "--", ".engine/decisions"]);
+    let mut introducing: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut current = String::new();
+    for line in intro_log.lines() {
+        let l = line.trim();
+        if l.is_empty() {
+            continue;
+        }
+        if std::path::Path::new(l).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")) {
+            introducing.entry(l.replace('\\', "/")).or_insert_with(|| current.clone());
+        } else {
+            current = l.to_string();
+        }
+    }
+    let intro_keys: Vec<String> = accepted
+        .iter()
+        .filter(|(rel, _, sha, _)| blobs.get(&format!("{sha}:{rel}")).cloned().flatten().is_none())
+        .filter_map(|(rel, _, _, _)| introducing.get(rel).map(|c| format!("{c}:{rel}")))
+        .collect();
+    let intro_blobs = crate::orient::batch_cat_blobs(root, &intro_keys);
+    let head = git_stdout(root, &["rev-parse", "--short", "HEAD"]).trim().to_string();
+    let mut violations = Vec::new();
+    let mut warnings = Vec::new();
+    let mut scanned = 0usize;
+    for (rel, dec, sha, text) in &accepted {
+        let at_binding = blobs.get(&format!("{sha}:{rel}")).cloned().flatten();
+        let (base_sha, base) = at_binding.map_or_else(
+            || {
+                introducing.get(rel).map_or_else(
+                    || (sha.clone(), None),
+                    |c| (format!("{c} (the commit that introduced the file; the acceptance at {sha} predates it)"), intro_blobs.get(&format!("{c}:{rel}")).cloned().flatten()),
+                )
+            },
+            |b| (sha.clone(), Some(b)),
+        );
+        let Some(base) = base else {
+            warnings.push(format!("{dec}: no text found at its acceptance SHA {sha} or at any introducing commit - the binding cannot be checked yet (not yet committed, a shallow clone, or a file renamed since); it will be, at the first commit that holds it"));
+            continue;
+        };
+        scanned += 1;
+        let drift = drifted_fields(&base, text);
+        if !drift.is_empty() {
+            violations.push(format!(
+                "{dec}: {} changed since the acceptance bound at {base_sha} - the text at {head} (HEAD) is not the text the human signed (issue341/D0308). If the words still hold, re-bind with `keel accept {dec} --rebind --note \"<what changed, why it still holds>\"`; never edit the acceptance.",
+                drift.join(", ")
+            ));
+        }
+    }
+    violations.sort();
+    GuardReport { name: "acceptance-binds-to-text", scanned, warnings, violations }
+}
+
+#[cfg(test)]
+mod binds_to_text_tests {
+    use super::{drifted_fields, latest_acceptance_sha};
+
+    /// D0308: the LATEST acceptance result is the binding; the three accepted fields are compared;
+    /// a re-binding to the current text clears the drift while the first acceptance stays in place.
+    #[test]
+    fn the_latest_acceptance_binds_and_drift_is_per_field() {
+        let at_accept = r#"part d1 : Decision { :>> decision = "do X"; :>> rationale = "because"; :>> consequences = "Y"; }
+    part d1AcceptR1 : TestResult { :>> judgedAgainst = "aaa1111"; }"#;
+        let head = r#"part d1 : Decision { :>> decision = "do X"; :>> rationale = "because"; :>> consequences = "Y. ROLLOUT: landed."; }
+    part d1AcceptR1 : TestResult { :>> judgedAgainst = "aaa1111"; }"#;
+        assert_eq!(drifted_fields(at_accept, head), vec!["consequences"]);
+        assert_eq!(latest_acceptance_sha(head, "d1"), Some("aaa1111".to_string()));
+        let rebound = format!("{head}
+    part d1AcceptR2 : TestResult {{ :>> judgedAgainst = \"bbb2222\"; :>> notes = \"REBOUND\"; }}");
+        assert_eq!(latest_acceptance_sha(&rebound, "d1"), Some("bbb2222".to_string()), "the re-binding is the new baseline");
+        assert!(drifted_fields(head, head).is_empty());
+        // formatting between `+`-joined segments is not signed text
+        let joined_a = ":>> consequences = \"Pros: a, \"\n        + \"b.\";";
+        let joined_b = ":>> consequences = \"Pros: a, \"\r\n            + \"b.\";";
+        assert!(drifted_fields(joined_a, joined_b).is_empty(), "indentation and line endings between segments are formatting");
+        assert_eq!(super::field_of(joined_a, "consequences").as_deref(), Some("Pros: a, b."));
+    }
+}
+
 // ── unit-extras-present (issue290 / D0300): a unit's declared mechanism is in the tree ──────────
 
 /// Every `[unit]` section of `unit-extras.toml` with its declared `files`, in file order.
@@ -1231,6 +1398,13 @@ pub fn decision_amends_process(root: &Path) -> GuardReport {
         .iter()
         .filter(|p| is_decision_file(p))
         .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        // A staged Decision whose PROSE is unchanged from HEAD - an appended acceptance result, a
+        // re-binding (D0308) - amends nothing; the first re-bind of seventeen Decisions produced
+        // twenty-five citation warnings, all noise. Only text that moved can amend.
+        .filter(|(p, staged_text)| {
+            let at_head = git_stdout(root, &["show", &format!("HEAD:{p}")]);
+            at_head.is_empty() || ["decision", "rationale", "consequences", "context"].iter().any(|k| field_of(&at_head, k) != field_of(staged_text, k))
+        })
         .collect();
     let anchors = process_anchors(root);
     let warnings = amendment_warnings(&decision_texts, &staged, &anchors);
@@ -2590,8 +2764,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 60] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present"];
+pub const GUARD_NAMES: [&str; 61] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -4183,6 +4357,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "cli-surface-declared" => Some(cli_surface_declared(root)),
         "decision-amends-process" => Some(decision_amends_process(root)), // WARNING-tier (issue298/D0244)
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
+        "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),
         "process-change" => Some(process_change(root)),
@@ -5838,3 +6013,4 @@ mod accept_transform_tests {
         assert!(!is_accept_transform(&old, &old), "no change is not a transform");
     }
 }
+

@@ -1643,6 +1643,67 @@ fn accept_decision_locked(
     Ok(u1)
 }
 
+/// RE-BIND an accepted Decision's acceptance to the text it carries NOW (D0308 / issue341).
+///
+/// An acceptance binds to a commit SHA, and `acceptance-binds-to-text` fails when the Decision's text
+/// at HEAD differs from its text at that SHA. When the change was legitimate - a migration renamed a
+/// command inside the text, a rollout note was appended - the remedy is not to edit history but to
+/// record a NEW acceptance result `{decision}AcceptR<n+1>` judged against the SHA whose text is
+/// current, with `notes` saying what changed and why the words still hold. The guard reads the
+/// latest result; `governing-version` keeps reading R1, because WHEN a Decision took effect is the
+/// first acceptance, not the last re-binding.
+///
+/// # Errors
+/// The Decision must exist, be ACCEPTED and carry an `{decision}Accept` event; an AI judge is refused.
+pub fn rebind_acceptance(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    recorded_by: &str,
+    note: &str,
+) -> Result<String, WriteError> {
+    // issue185: the whole read-modify-write under one lock, in the shape the source scan holds.
+    with_file_lock(path, || rebind_acceptance_locked(path, decision, sha, judged_at, judged_by, recorded_by, note))
+}
+
+fn rebind_acceptance_locked(
+    path: &Path,
+    decision: &str,
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    recorded_by: &str,
+    note: &str,
+) -> Result<String, WriteError> {
+    refuse_ai_judgment(path, judged_by, "re-binding a Decision's acceptance")?;
+    let content = std::fs::read_to_string(path)?;
+    if !content.contains(&format!("part {decision} : Decision")) {
+        return Err(WriteError::TaskNotFound(decision.to_owned()));
+    }
+    if !content.contains("DecisionStatus::accepted") || !content.contains(&format!("verification {decision}Accept ")) {
+        return Err(WriteError::TaskNotFound(format!("{decision} (not an accepted Decision with an acceptance event - re-binding follows acceptance, it does not replace it)")));
+    }
+    let prefix = format!("part {decision}AcceptR");
+    let next = content
+        .match_indices(&prefix)
+        .filter_map(|(i, _)| content[i + prefix.len()..].chars().take_while(char::is_ascii_digit).collect::<String>().parse::<u32>().ok())
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let close = content.rfind('}').ok_or_else(|| WriteError::TaskNotFound(format!("{decision} (no package close)")))?;
+    let u = gen_uuid();
+    let note_c = sanitize_field(note);
+    let recorded_by_c = sanitize_field(recorded_by);
+    let line = format!(
+        "    part {decision}AcceptR{next} : TestResult {{ :>> id = \"{u}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; :>> createdBy = \"{recorded_by_c}\"; :>> notes = \"REBOUND (D0308): {note_c}\"; }}\n"
+    );
+    let new_content = format!("{}{}{}", &content[..close], line, &content[close..]);
+    write_atomic(path, new_content)?;
+    Ok(u)
+}
+
 /// Reject a PROPOSED Decision (D0121/D0122 human review loop).
 ///
 /// Flips `status = DecisionStatus::proposed` to `rejected` and appends the rejection judgment — a

@@ -1,0 +1,27 @@
+// D0308 (status: the `status` field below is the truth) — An acceptance binds to the text it signed: guard acceptance-binds-to-text fails an accepted Decision whose signed fields differ from their text at the binding SHA, and keel accept --rebind is the only remedy
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0308Accept event on sign-off.
+package Decision0308 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #SafetyChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #SafetyChange part d0308 : Decision {
+        :>> id = "583c378a-6c9c-4ed7-8884-3f30b704fd4a";
+        :>> title = "An acceptance binds to the text it signed: guard acceptance-binds-to-text fails an accepted Decision whose signed fields differ from their text at the binding SHA, and keel accept --rebind is the only remedy";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "issue341, from the landscape spike (D0282): acceptance bound to a commit SHA and nothing compared the Decision's body at that SHA with the body at HEAD, so the text a human signed and the text the tree carried could diverge silently - the rug-pull class, and the same failure keel already refused for evidence (judgedAgainst must resolve) and confirmations (the quote receipt). Measured before building: 17 of 301 accepted Decisions had drifted, every one editorially - rollout notes appended, PROPOSED changed to ACCEPTED inside the text, acceptance-state sentences removed, guard counts renumbered - and ten more read as drifted on the guard's first draft because the early Decisions write long fields as plus-joined segments and only the indentation between segments differed.";
+        :>> decision = "Guard 61, acceptance-binds-to-text, hard: for every accepted Decision with an acceptance result, the decision, rationale and consequences at HEAD must equal their VALUES at the SHA the latest AcceptR result binds to - the file at judgedAgainst, or the commit that introduced the file when the acceptance was recorded in the same commit as the Decision (every standing-consent auto-accept). Values are compared as concatenated string segments, so formatting is not drift. A difference is a violation naming the Decision, both SHAs, the fields and the remedy. The remedy is keel accept <d> --rebind --note, which appends AcceptR<n+1> judged against the SHA whose text is current with notes saying what changed and why the words still hold; the acceptance event and its first result stand, and governing-version keeps reading R1 because when a Decision took effect is its first acceptance. The 17 are re-bound under the standing consent that covers non-fork acceptances, each note naming the commit and the change (issue371); none is allowlisted.";
+        :>> rationale = "WHY THE LATEST RESULT: a re-binding is itself an acceptance of the current words, and reading the first result forever would make every legitimate edit a permanent violation or an edit of history. WHY THE INTRODUCING COMMIT AS FALLBACK: an auto-accept at record time binds to HEAD before its own commit, where the file does not exist; the text it accepted is the text the commit introduced. WHY VALUES NOT SOURCE: signed words are the words, not the whitespace between quoted segments - ten false violations proved it. WHY RE-BIND UNDER STANDING CONSENT: the human's standing words cover non-fork acceptances and post-fact change; re-binding an editorial change is the smallest such acceptance, and each carries the recorder, the judge and the changing commit so it can be undone by their word. WHAT IT CANNOT SEE: a Decision edited and re-bound by an agent claiming an editorial change that was substantive - the same limit as every quote receipt (D0192); the notes name the commit so a reader can diff it.";
+        :>> consequences = "dcAcceptanceBindsToTheText is delivered; issue341 resolves; issue371 records the 17 and is resolved by the same item. decision-amends-process now ignores a staged Decision whose prose is unchanged from HEAD, because the first re-bind produced 25 citation warnings for appended result lines. The suspect view does not yet carry acceptance drift as the DoD's second clause asked; the guard is the hard control and orient's suspect list remains the task-level one - stated, not built, and the smaller of the two halves.";
+    }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0308Accept : Test { :>> id = "46eb9a71-f96a-4a3b-8577-58e2f3a17ffc"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289)."; }
+    part d0308AcceptR1 : TestResult { :>> id = "6c2f5825-6c4e-47ab-81d5-ec67a4bbbfb1"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "eb0adcf"; :>> judgedAt = "2026-09-04"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeOpus5"; }
+}

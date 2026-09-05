@@ -4221,6 +4221,20 @@ fn cmd_accept(args: &[String]) -> i32 {
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_owned())
         .unwrap_or_default();
+    // --rebind (D0308): the Decision is already accepted and its text moved since; record a new
+    // acceptance result against the SHA whose text is current, with the note saying what changed.
+    if args.iter().any(|a| a == "--rebind") {
+        return match keel_cli::write::rebind_acceptance(&path, decision, &sha, &date, &judged_by, &recorded_by, &note) {
+            Ok(_) => {
+                println!("re-bound {decision}'s acceptance to {sha} (judged by {judged_by} at {date}; the first acceptance stands as when it took effect)");
+                0
+            }
+            Err(e) => {
+                eprintln!("keel accept --rebind: {e}");
+                1
+            }
+        };
+    }
     match keel_cli::write::accept_decision(&path, decision, &sha, &date, &judged_by, &recorded_by, &note) {
         Ok(_) => {
             println!("accepted {decision} (judged by {judged_by} at {date}, against {sha})");

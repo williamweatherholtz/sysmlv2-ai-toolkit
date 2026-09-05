@@ -914,4 +914,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcVintageFixture to issue370;
+
+    part issue371 : Issue {
+        :>> id = "c8ae66e8-f272-4ca6-9a6c-bb6643d550e2";
+        :>> title = "seventeen accepted Decisions carried text edited after acceptance - all editorial, none silently: found by the guard on its first run";
+        :>> createdAt = "2026-09-04";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-04 by the first run of guard acceptance-binds-to-text (D0308): 17 of 301 accepted Decisions carry decision, rationale or consequences text that differs from the text at the SHA their acceptance binds to. Every one is editorial, read by diff: rollout notes appended to consequences after acceptance (d0092 21a3c5f, d0093 90b29b8, d0095 e33148b, d0222 43a7b10); the acceptance-state sentence replaced or the word PROPOSED changed to ACCEPTED inside the text (d0112 a642269, d0130 7740eb0, d0131 ee2512d, d0132 d6f9da5, d0146 d0147 d0148 a6b7123, d0149 01fce65, d0151 1ba3c5c, d0153 8507239); guard counts renumbered when a guard was removed (d0263 6583e08, d0265 2ca2acb, d0266 429fc87). None changes what was agreed - and that is a judgment, which is why each is RE-BOUND with a recorded acceptance result naming the commit and the change, under the standing consent that covers non-fork acceptances, rather than allowlisted. Ten further Decisions read as drifted on the guard's first draft and were formatting only (indentation between plus-joined string segments) - the comparison now reads string values. PREVENTING CHANGE: dcAcceptanceBindsToTheText - the guard itself, hard, and keel accept --rebind as the only remedy path.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcAcceptanceBindsToTheText to issue371;
 }

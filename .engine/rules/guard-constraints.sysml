@@ -104,5 +104,6 @@ package EngineGuardConstraints {
     constraint def cliSurfaceDeclared;      // guard 58 (D0271/D0283)
     constraint def decisionAmendsProcess;   // guard 59 (D0297), warning-tier
     constraint def unitExtrasPresent;       // guard 60 (D0300)
+    constraint def acceptanceBindsToText;   // guard 61 (D0308): the text signed is the text carried
 
 }
