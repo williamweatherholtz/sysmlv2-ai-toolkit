@@ -34,6 +34,15 @@ import subprocess
 import time
 from pathlib import Path
 
+def _env():
+    """A clean environment plus any KEEL_RECALL_* experiment knob the caller set (the mechanism is
+    chosen on the 50-case set with these before it is hardcoded)."""
+    import os
+    env = {"PATH": "/usr/bin:/bin", "SYSTEMROOT": "C:\\Windows"}
+    env.update({k: v for k, v in os.environ.items() if k.startswith("KEEL_RECALL_")})
+    return env
+
+
 KEEL = "./target/release/keel.exe"
 SEED = 20260828
 N_CASES = 50
@@ -131,7 +140,7 @@ def recall(query):
     t0 = time.time()
     r = subprocess.run([KEEL, "recall", "--prompt", "-", "--budget", "4000"],
                        input=query, capture_output=True, text=True,
-                       env={"PATH": "/usr/bin:/bin", "SYSTEMROOT": "C:\\Windows"})
+                       env=_env())
     ms = int((time.time() - t0) * 1000)
     shown, corpus = [], None
     for line in r.stdout.splitlines():
@@ -232,8 +241,12 @@ def main():
             precisions.append(sum(1 for s in shown if s in relevant) / len(shown))
         if h_kg:
             kg_pos.append(shown.index(name) + 1)
+        # where the SOURCE (the linked record whose words formed the query) landed: if it is shown and the
+        # target is not, the ranker found the neighbour and failed to follow the edge - the diagnostic
+        # that separates a lexical miss from a traversal miss
+        src_pos = shown.index(src) + 1 if src in shown else 0
         print(f"{i:3d} {name[:30]:30s} <- {src[:22]:22s} kg={'Y' if h_kg else '.'} grep={'Y' if h_b else '.'} "
-              f"rows={len(shown):<3} p={precisions[-1] if shown else 0:.2f} {ms}ms")
+              f"src@{src_pos:<3} rows={len(shown):<3} p={precisions[-1] if shown else 0:.2f} {ms}ms")
 
     n = len(cases)
     print("\n" + "=" * 78)

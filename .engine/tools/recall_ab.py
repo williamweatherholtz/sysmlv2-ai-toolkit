@@ -13,6 +13,15 @@ import time
 KEEL = "./target/release/keel.exe"
 BUDGET = "4000"
 
+def _env():
+    """A clean environment plus any KEEL_RECALL_* experiment knob the caller set (the mechanism is
+    chosen on the 50-case set with these before it is hardcoded)."""
+    import os
+    env = {"PATH": "/usr/bin:/bin", "SYSTEMROOT": "C:\\Windows"}
+    env.update({k: v for k, v in os.environ.items() if k.startswith("KEEL_RECALL_")})
+    return env
+
+
 CASES = [
     ("why must we never rebase or force-push?", "d0129"),
     ("what stops two contributors allocating the same decision number?", "d0129"),
@@ -26,7 +35,8 @@ CASES = [
 
 
 def run(prompt, off=False):
-    env = {"PATH": "/usr/bin:/bin", "SYSTEMROOT": "C:\\Windows", "KEEL_ACTOR": "claudeOpus5"}
+    env = _env()
+    env["KEEL_ACTOR"] = "claudeOpus5"
     if off:
         env["KEEL_RECALL"] = "off"
     payload = '{"prompt": %s}' % _json_str(prompt)

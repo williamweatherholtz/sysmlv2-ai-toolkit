@@ -39,6 +39,26 @@ const TRAVERSAL_SEEDS: usize = 30;
 const BM25_K1: f64 = 1.2;
 /// Share of an adjacent seed's score a reached element receives (before degree normalisation).
 const LIFT: f64 = 0.5;
+
+/// THE TOP SEEDS' NEIGHBOURS INHERIT THE SEED'S SCORE (recallRanksLinkedRecordsAsWellAsGrepDoes,
+/// issue367). Chosen on the 50-case linked-record set, not on the hand set: the degree-normalised
+/// half-share above lifted a neighbour of the best seed below 29 other seeds' own lexical scores, so
+/// the ranker found the record the words named (the source sat at position 1-3 in every miss) and
+/// failed to follow its edges - 37/50 against the grep-plus-one-hop control's 48/50. A neighbour of
+/// one of the top `INHERIT_SEEDS` seeds now inherits that seed's score, decayed by rank: measured
+/// top-1 44/50, top-2 48/50, top-3 49/50 (48/50 within the 13-row cap), top-5 no better; decay 0.7
+/// vs 1.0 indistinguishable on hits, one more top-3 placement. Two-hop variants (a decayed second
+/// hop along the same seeds, or a second hop off the general lift) were measured on the same set:
+/// neutral at small factors, 45-46/50 at large ones, so none is taken. Read against the eight
+/// hand-written questions only afterwards: 5/8, unchanged from before this change; the two d0129
+/// questions sit two hops from every lexical match and stay unreached (recorded on the `DoD` result).
+const INHERIT_SEEDS: usize = 3;
+const INHERIT_DECAY: f64 = 0.7;
+
+/// How many rows a payload shows at most. The grep-plus-one-hop control's candidate set is a mean
+/// 13 records on the 50-case set; a ranked payload that shows more than an unranked list has not
+/// earned its ranking. Measured with the inheritance above: 48/50 within 13 rows, median position 2.
+const PUSH_ROWS: usize = 13;
 const BM25_B: f64 = 0.75;
 
 /// Characters held back for the always-appended `recall:` summary and any truncation note, so the
@@ -603,6 +623,26 @@ pub fn knowledge_wellformedness(root: &Path) -> Result<(usize, Vec<String>), Vie
 /// budget" and "a budget narrows the answer, never erases it" - and a budget small enough to erase the
 /// single most relevant fact is a budget set wrong, not an answer worth suppressing. Every row after
 /// the first is inside the budget, footer included.
+/// Each neighbour of the best `INHERIT_SEEDS` seeds, with the largest decayed seed score it may inherit.
+fn inherit_from_top_seeds<'a>(model: &'a Model, seed_names: &[String], score: &HashMap<String, f64>) -> HashMap<&'a str, f64> {
+    let mut top_seeds: Vec<(&String, f64)> = seed_names.iter().map(|n| (n, score.get(n).copied().unwrap_or(0.0))).collect();
+    top_seeds.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)));
+    let mut inherited: HashMap<&str, f64> = HashMap::new();
+    for (rank, (seed, sc)) in top_seeds.iter().take(INHERIT_SEEDS).enumerate() {
+        let share = sc * INHERIT_DECAY.powi(i32::try_from(rank).unwrap_or(i32::MAX));
+        for e in &model.edges {
+            let other = if &e.from == *seed { Some(e.to.as_str()) } else if &e.to == *seed { Some(e.from.as_str()) } else { None };
+            if let Some(o) = other {
+                let cur = inherited.entry(o).or_insert(0.0);
+                if share > *cur {
+                    *cur = share;
+                }
+            }
+        }
+    }
+    inherited
+}
+
 fn brief_from_seeds(
     model: &Model,
     header: &str,
@@ -650,12 +690,17 @@ fn brief_from_seeds(
             }
         }
     }
+    // INHERITANCE FROM THE TOP SEEDS (issue367): the neighbours of the best `INHERIT_SEEDS` seeds
+    // take that seed's score (decayed by the seed's rank), so the record the words named carries its
+    // linked records with it - the way a searcher who opened the hit and followed its edges would.
+    let inherited = inherit_from_top_seeds(model, &seed_names, score);
     let final_score: HashMap<String, f64> = reached
         .keys()
         .map(|n| {
             let own = score.get(n).copied().unwrap_or(0.0);
             let lift = lifted.get(n).copied().unwrap_or(0.0) * LIFT / degree.get(n.as_str()).copied().unwrap_or(1.0).sqrt();
-            (n.clone(), own + lift)
+            let inherit = inherited.get(n.as_str()).copied().unwrap_or(0.0);
+            (n.clone(), own + lift.max(inherit))
         })
         .collect();
     let score = &final_score;
@@ -713,11 +758,12 @@ fn brief_from_seeds(
         // RESERVE the footer. The summary line is always appended, so counting only the rows made a
         // 1,500-char budget produce 1,539 - a small overshoot, but the DoD says the payload FITS the
         // budget and a claim is either true or it is not.
-        if out.len() + line.len() + FOOTER_RESERVE > budget && written > 0 {
+        if (out.len() + line.len() + FOOTER_RESERVE > budget || written >= PUSH_ROWS) && written > 0 {
             let _ = writeln!(
                 out,
-                "  ... {} more reached, not shown (budget {budget} chars)",
-                sorted.len().saturating_sub(written)
+                "  ... {} more reached, not shown ({})",
+                sorted.len().saturating_sub(written),
+                if written >= PUSH_ROWS { format!("{PUSH_ROWS} rows is the payload's cap") } else { format!("budget {budget} chars") }
             );
             break;
         }
