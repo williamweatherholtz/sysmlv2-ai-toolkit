@@ -55,6 +55,13 @@ const LIFT: f64 = 0.5;
 const INHERIT_SEEDS: usize = 3;
 const INHERIT_DECAY: f64 = 0.7;
 
+/// A prompt pushes only when at least one of its words is DISTINCTIVE - in fewer than this share of
+/// the model - or it names an identifier (shortDomainWordsCanSeed / issue294). Four-letter domain words
+/// (gate 45%, view 8%, hook 3%, land 2%, push 2% of the corpus) seed on frequency like any other;
+/// `that this with` (14-18% each) pushes nothing. The alternative - naming the four-letter function
+/// words as filler - was measured and rejected: it took the eight-case set from 5/8 to 3/8.
+const DISTINCTIVE_DF_SHARE: f64 = 0.10;
+
 /// How many rows a payload shows at most. The grep-plus-one-hop control's candidate set is a mean
 /// 13 records on the 50-case set; a ranked payload that shows more than an unranked list has not
 /// earned its ranking. Measured with the inheritance above: 48/50 within 13 rows, median position 2.
@@ -127,7 +134,7 @@ fn is_identifier_token(tok: &str) -> bool {
         t.strip_prefix(prefix)
             .is_some_and(|r| !r.is_empty() && r.chars().all(|c| c.is_ascii_digit()))
     };
-    if numeric_tail("d") || numeric_tail("issue") || numeric_tail("sprint") || numeric_tail("D") {
+    if numeric_tail("d") || numeric_tail("issue") || numeric_tail("sprint") || numeric_tail("D") || numeric_tail("DeliveryRunS") {
         return true;
     }
     // camelCase / mixed case with an internal uppercase — how every element in this corpus is named.
@@ -177,6 +184,56 @@ fn idf(corpus: usize, hits: usize) -> f64 {
     ((n - df + 0.5) / (df + 0.5)).ln_1p()
 }
 
+/// The prompt's tokens with the NATURAL SPELLINGS of an identifier joined into the compact form the
+/// corpus mints (identifierMatchingAcceptsNaturalSpellings / issue297): `issue 294` -> `issue294`,
+/// `D-0242` -> `d0242`, `decision 242` -> `d0242`, `sprint 480` -> `sprint480`. Measured by the panel
+/// and reconfirmed on the binary: the compact forms seeded and three of six natural spellings pushed
+/// nothing, because `is_identifier_token` wanted the digits abutting the prefix. A bare number or a
+/// year is never joined - only a number directly after one of the four prefixes - so `2026` stays a
+/// word and never becomes a phantom identifier.
+fn join_natural_identifiers(prompt: &str) -> Vec<String> {
+    let raw: Vec<&str> = prompt.split(|c: char| !c.is_alphanumeric() && c != '-').filter(|t| !t.is_empty()).collect();
+    let mut out: Vec<String> = Vec::with_capacity(raw.len());
+    let mut i = 0usize;
+    while let Some(&tok) = raw.get(i) {
+        // `D-0242` / `issue-294`: a hyphen between prefix and digits
+        if let Some((pre, digits)) = tok.split_once('-') {
+            if let Some(joined) = compact_identifier(pre, digits) {
+                out.push(joined);
+                i += 1;
+                continue;
+            }
+        }
+        // `issue 294` / `decision 242`: the prefix as its own token, the number as the next
+        if let Some(next) = raw.get(i + 1) {
+            if let Some(joined) = compact_identifier(tok, next) {
+                out.push(joined);
+                i += 2;
+                continue;
+            }
+        }
+        out.push(tok.to_string());
+        i += 1;
+    }
+    out
+}
+
+/// `prefix` + all-digit `digits` -> the corpus's compact identifier, or `None` if the pair is not one.
+/// A Decision is `d` + four digits, so `decision 242` and `d 242` pad to `d0242`.
+fn compact_identifier(prefix: &str, digits: &str) -> Option<String> {
+    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    match prefix.to_lowercase().as_str() {
+        "issue" => Some(format!("issue{digits}")),
+        // a sprint's element is the delivery run the scaffold names `DeliveryRunS<n>`; `sprint480` itself
+        // names nothing in the corpus (measured: the compact form pushed nothing before this)
+        "sprint" => Some(format!("DeliveryRunS{digits}")),
+        "d" | "decision" if digits.len() <= 4 => Some(format!("d{digits:0>4}")),
+        _ => None,
+    }
+}
+
 /// The query terms of a free-form PROMPT: identifiers, and every word of three letters or more that
 /// is not English filler. No rarity ceiling and no cap on count (issue295): BM25's IDF weights a common
 /// word near zero instead of deleting it, and a word that matches nothing scores nothing. Returned with
@@ -185,11 +242,13 @@ fn query_terms(prompt: &str) -> (Vec<(String, &'static str)>, Vec<String>) {
     let mut seen: HashSet<String> = HashSet::new();
     let mut kept: Vec<(String, &'static str)> = Vec::new();
     let mut dropped: Vec<String> = Vec::new();
-    for raw in prompt.split(|c: char| !c.is_alphanumeric() && c != '-') {
+    for raw in join_natural_identifiers(prompt) {
         let tok = raw.trim_matches('-');
         if tok.chars().count() < 3 {
             continue;
         }
+        let sprint_run = tok.to_lowercase().strip_prefix("sprint").filter(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())).map(|d| format!("DeliveryRunS{d}"));
+        let tok: &str = sprint_run.as_deref().unwrap_or(tok);
         if is_identifier_token(tok) {
             if seen.insert(tok.to_lowercase()) {
                 kept.push((tok.to_string(), "identifier"));
@@ -846,9 +905,15 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
             how.entry(n).or_insert_with(|| format!("word `{tok}` / {}", field.label()));
         }
     }
-    if score.is_empty() {
+    if score.is_empty() || !has_distinctive_term(&index, corpus, &terms) {
         // SAYING SO is the point: a silent empty recall is indistinguishable from a broken one.
-        let mut msg = String::from("recall: no term of this prompt matches the model — nothing pushed.\n");
+        let mut msg = if score.is_empty() {
+            String::from("recall: no term of this prompt matches the model — nothing pushed.\n")
+        } else {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let pct = (DISTINCTIVE_DF_SHARE * 100.0) as u32;
+            format!("recall: every term of this prompt is common (in {pct}% of the model or more) — nothing distinctive to push.\n")
+        };
         if !unknown.is_empty() {
             let _ = writeln!(msg, "  unknown to the model: {}", unknown.join(", "));
         }
@@ -881,6 +946,13 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
         let _ = write!(header, " [ignored as filler: {}]", dropped.join(", "));
     }
     Ok(brief_from_seeds(&model, &header, &seeds, &score, budget))
+}
+
+/// Does the prompt carry an identifier, or any word in fewer than `DISTINCTIVE_DF_SHARE` of the model?
+fn has_distinctive_term(index: &Index, corpus: usize, terms: &[(String, &'static str)]) -> bool {
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let floor = (corpus as f64 * DISTINCTIVE_DF_SHARE) as usize;
+    terms.iter().any(|(tok, kind)| *kind == "identifier" || (index.df(tok) > 0 && index.df(tok) < floor.max(1)))
 }
 
 /// Is this recall confident enough to PUSH unasked?
@@ -959,9 +1031,13 @@ mod tests {
         assert!(kept.iter().any(|(t, _)| t == "ceremony"), "a plain word is KEPT for weighting: {kept:?}");
         // MEASURED: a dedupe on the raw token silently dropped every plain word and kept only the
         // segmented ones - a 14-word query recalled on two terms. Both shapes must survive together.
-        for seg in ["force", "push", "what", "ceremony"] {
+        for seg in ["force", "push", "ceremony"] {
             assert!(kept.iter().any(|(t, _)| t == seg), "segment `{seg}` must be a query term: {kept:?}");
         }
+        // `what` stays a seed: dropping question words cost two hand-set answers (issue294's
+        // measurement), and even `the` is kept for weighting - the DISTINCTIVENESS floor, not the
+        // filler list, is what keeps a prompt of only common words from pushing
+        assert!(kept.iter().any(|(t, _)| t == "what"), "{kept:?}");
         assert!(kept.contains(&("closeOut".to_string(), "identifier")), "a camelCase token is an identifier, matched by name: {kept:?}");
         assert_eq!(kept.iter().filter(|(t, _)| t == "ceremony").count(), 1, "deduped once, not dropped");
         let index = Index::build(&model);
@@ -997,6 +1073,42 @@ mod tests {
         // A multi-word needle is matched as a phrase over the segments.
         assert!(matches_term("theWriteApiIsSanctioned", "write api"));
         assert!(!matches_term("theWriteApiIsSanctioned", "api write"));
+    }
+
+    /// issue297 (identifierMatchingAcceptsNaturalSpellings): the spellings a person actually types
+    /// reach the same identifier as the compact form; a bare number or a year is never joined.
+    #[test]
+    fn natural_spellings_of_an_identifier_seed_the_compact_form() {
+        let ids = |p: &str| query_terms(p).0.into_iter().filter(|(_, k)| *k == "identifier").map(|(t, _)| t).collect::<Vec<_>>();
+        assert_eq!(ids("what does issue 294 say"), vec!["issue294"]);
+        assert_eq!(ids("D-0242"), vec!["d0242"]);
+        assert_eq!(ids("decision 242 and d0242"), vec!["d0242"], "the two spellings collapse to one seed");
+        assert_eq!(ids("sprint 480 and sprint480"), vec!["DeliveryRunS480"], "a sprint's element is its delivery run");
+        assert!(ids("in 2026 we shipped 294 things").is_empty(), "a bare number or a year is not an identifier");
+        assert_eq!(ids("the trade-off is real"), Vec::<String>::new(), "a hyphenated word is not a prefix-digit pair");
+    }
+
+    /// issue294 (shortDomainWordsCanSeed): four-letter DOMAIN words seed, and a prompt whose every
+    /// word is COMMON (df at or above the distinctiveness floor) pushes nothing - decided by frequency,
+    /// not by a longer filler list. Measured: naming the four-letter function words as filler took the
+    /// eight-case set from 5/8 to 3/8 (`who` IS what d0219 is about) and 4/8 without question words.
+    #[test]
+    fn short_domain_words_seed_and_a_prompt_of_only_common_words_pushes_nothing() {
+        let (kept, dropped) = query_terms("gate hook land push view");
+        let words: Vec<&str> = kept.iter().map(|(t, _)| t.as_str()).collect();
+        assert_eq!(words, vec!["gate", "hook", "land", "push", "view"]);
+        assert!(dropped.is_empty());
+        // a corpus where `that` and `this` are in most bodies and `hook` in one
+        let mut model = Model { items: HashMap::new(), edges: Vec::new() };
+        for i in 0..100u32 {
+            let mut attrs = HashMap::new();
+            attrs.insert("title".to_string(), format!("thing {i}"));
+            attrs.insert("description".to_string(), if i == 3 { "that this hook fired".to_string() } else { "that this ran".to_string() });
+            model.items.insert(format!("t{i}"), ItemInfo { type_name: "Test".to_string(), attrs, marker: None, file: String::new() });
+        }
+        let index = Index::build(&model);
+        assert!(!has_distinctive_term(&index, 100, &query_terms("that this with").0), "only common words: nothing to push");
+        assert!(has_distinctive_term(&index, 100, &query_terms("that this hook").0), "one four-letter domain word is enough");
     }
 
     /// D0243 rule 1: an identifier is the strongest seed and bypasses rarity entirely.
