@@ -87,6 +87,26 @@ engine, team scale.
 7. **Depth panic** — treating hop count as the scaling limit. *Detection:* effort spent capping hops.
    *Resolution:* six hops is six edges; the real axes are density, size, vagueness and ambiguity.
 
+## For a keel project: the engine's steps and the optional ones (D0332)
+
+When the corpus IS a keel model, most of the eight steps above are already the engine's, and the skill
+must not send a project off to rebuild them:
+
+| Step | Who does it | What a project does |
+|---|---|---|
+| 1-3 vocabulary, shapes | **the engine** - seeding is corpus-derived (D0243): names, titles, bodies, typed edges | nothing |
+| 4-5 identity, seed + walk | **the engine** - `keel recall` / `keel why` over the model (D0161, D0243) | nothing |
+| 6 inject before the model | **the engine** - `keel init` and `keel sync-claude` wire the UserPromptSubmit hook (claude_surface.rs) | run `keel sync-claude` after an engine update |
+| 7 verify on a trap | the engine's own benches (recall_bench.py, recall_ab.py) are THIS repository's | measure on your own model if you change the ranker |
+| declare questions | **optional** - `.knowledge/questions` makes `keel knowledge question-coverage` computable | declare them if you want coverage measured |
+| declare aliases | **optional** - `.knowledge/lexicon` routes words your people use that the corpus does not | declare them if seeding misses your vocabulary |
+
+`.knowledge/` is INSTANCE data: `keel init` ships none of it, and this repository's questions never
+travel to another project (the issue243 class). A fresh project therefore recalls over its own model with
+an empty `.knowledge/` and the hook already wired - verified on a scaffold: the hook is present,
+`keel recall` answers over the scaffold's 326 items, no question of this repository is present, and
+`sync-claude --check` is clean.
+
 ## What this process does NOT bring
 
 **No guards.** A keel process unit is definition + deploying skill + declared rules/guards + metadata,

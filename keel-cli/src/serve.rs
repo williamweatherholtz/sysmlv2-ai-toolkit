@@ -2951,6 +2951,38 @@ mod tests {
         );
     }
 
+    /// issue286 (dcComputedViewsRenderAndLink): the generic viewpoint panel renders a computed payload as
+    /// tables with live item links, never as a bare `JSON.stringify` blob, and keeps the raw payload
+    /// reachable in a collapsed block. Text-level over the asset (D0160), like its siblings: it pins the
+    /// mechanism's presence, not the browser's behaviour.
+    #[test]
+    fn the_generic_panel_renders_tables_links_items_and_keeps_the_raw_payload() {
+        for needle in ["function renderComputed(", "function renderRows(", "function looksLikeItem(", "const ITEM_RE=", "itemLink(v)", "<summary class=muted", "raw payload", "renderComputed(d)"] {
+            assert!(CONSOLE_HTML.contains(needle), "the generic renderer is missing `{needle}`");
+        }
+        // the ONLY JSON.stringify of a computed payload left in the panel is the collapsed raw block
+        let blob_renders = CONSOLE_HTML.matches("'<pre class=j>'+esc(JSON.stringify(d,null,1))+'</pre>").count();
+        assert_eq!(blob_renders, 1, "one raw-payload block, inside <details>, and no bare blob rendering");
+        assert!(CONSOLE_HTML.contains("<details style=\"margin-top:14px\"><summary class=muted"), "the raw payload sits in a collapsed details block");
+        // a name that is not an item says so rather than failing silently
+        assert!(CONSOLE_HTML.contains("openItem"), "item links resolve through openItem at click time");
+    }
+
+    /// issue288 (dcTabsFlagWhatNeedsTheHuman): a tab badge counts items waiting on the HUMAN, renders
+    /// NOTHING at zero (a zero badge is noise), renders `?` for a class with no bound counter (never 0),
+    /// and renders `?` on every tab when the obligations fetch fails - an absent badge would be a false
+    /// all-clear. The viewpoint count moves to the tooltip.
+    #[test]
+    fn tab_badges_count_the_humans_work_and_never_render_a_false_zero() {
+        assert!(CONSOLE_HTML.contains("function oblFlag("), "the badge function exists");
+        assert!(CONSOLE_HTML.contains("if(n>0)return '<span class=oblflag"), "a badge renders only when something is waiting");
+        assert!(CONSOLE_HTML.contains("return '';"), "and nothing at zero");
+        assert!(CONSOLE_HTML.contains("if(unknown)return '<span class=oblunk") && CONSOLE_HTML.contains("NOT zero, unknown"), "an uncountable class renders ?, never 0");
+        assert!(CONSOLE_HTML.contains("oblFailed?'<span class=oblunk title=\"obligations could not be computed"), "a failed obligations fetch renders ? on every tab");
+        assert!(CONSOLE_HTML.contains("' viewpoint(s)'"), "the viewpoint count lives in the tooltip");
+        assert!(!CONSOLE_HTML.contains("+' ('+(s.count||0)+')'"), "and is no longer the tab's number");
+    }
+
     #[test]
     fn cors_reflects_localhost_origins_only() {
         // viewerKeelApi (D0114 shape B): a separate local viewer (any port) is allowed; remote is not.
