@@ -193,7 +193,7 @@ frozen (modify it only by out-of-band Decision).
   it per session, or pass `--judged-by`/`--author`/`--by`. Otherwise the write **refuses**. Actor KIND is
   asked, never inferred: an AI is `Actor` with `kind = ActorKind::ai`, never a `Person`.
 - **Multi-contributor work (D0108/D0129).** Each item is owned by its `createdBy`; only the owner edits
-  its fields. A non-owner may ADD items and typed edges, or SUPERSEDE — never overwrite in place.
+  its fields. Editing a DONE task's own DoD after its pass makes it SUSPECT (D0307: the text at HEAD is compared with the text the pass judged), the same as a dependency's drift - the thing verified must be the thing agreed. A non-owner may ADD items and typed edges, or SUPERSEDE — never overwrite in place.
   `git fetch` before a shared-region edit. Conflicting conclusions → record an `Issue`; the human
   adjudicates. Run a multi-contributor session through the **`distributed-collaboration`** skill; enroll a
   contributor with **`actor-enrollment`**.

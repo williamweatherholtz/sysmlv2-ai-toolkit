@@ -342,6 +342,11 @@ fn criterion_suspects(
             continue;
         }
         let Some(ct) = verified_at.get(name.as_str()) else { continue };
+        // The task's OWN criterion too (dcOwnDoDDriftIsSuspect): the thing verified must be the thing
+        // agreed, and the owner may otherwise rewrite it after the pass with the pass still standing.
+        if let Some(file) = dod_files.get(name.as_str()) {
+            keys.insert(format!("{ct}:{file}"));
+        }
         for dep in &data.deps {
             if !ordering_only.contains(&(dep.clone(), name.clone())) {
                 if let Some(file) = dod_files.get(dep) {
@@ -352,6 +357,12 @@ fn criterion_suspects(
     }
     let key_vec: Vec<String> = keys.into_iter().collect();
     let blobs = batch_cat_blobs(repo, &key_vec);
+    let head = crate::gitx::git()
+        .arg("-C")
+        .arg(repo)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .map_or_else(|_| "HEAD".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
     // Pass 2: compare each dep's historical criterion (from the batch) to its current text.
     let mut out: Vec<(String, String)> = Vec::new();
     for (name, data) in tasks {
@@ -359,6 +370,20 @@ fn criterion_suspects(
             continue;
         }
         let Some(ct) = verified_at.get(name.as_str()) else { continue };
+        // OWN criterion first. Compared the same way a dependency's is: the text at the verified SHA
+        // against the text at HEAD. A criterion that did not yet exist at that SHA (a DoD recorded in
+        // the same commit as its result) has no historical text and is not judged - stated, not hidden:
+        // that is the limit of comparing against the verified commit, and the sibling helper for
+        // acceptances (issue341) shares it.
+        let own_cur = data.dod_text.as_deref().unwrap_or("");
+        let own_old = dod_files
+            .get(name.as_str())
+            .and_then(|file| blobs.get(&format!("{ct}:{file}")).cloned().flatten())
+            .and_then(|content| extract_dod_criterion(&content, name));
+        if own_old.as_deref().is_some_and(|old| old != own_cur) {
+            out.push((name.clone(), format!("OWN criterion of '{name}' changed: the text at {head} (HEAD) is not the text the pass judged at {ct} (dcOwnDoDDriftIsSuspect) - re-verify against the new criterion or restore it")));
+            continue;
+        }
         for dep in &data.deps {
             if ordering_only.contains(&(dep.clone(), name.clone())) {
                 continue;
