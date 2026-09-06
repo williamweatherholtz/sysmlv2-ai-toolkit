@@ -3133,8 +3133,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 63] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint"];
+pub const GUARD_NAMES: [&str; 64] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3889,6 +3889,109 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 64: every workflow that runs the gate supplies the SAME environment (issue385).
+///
+/// release.yml ran `cargo test --workspace --release` with no env block; ci.yml ran the same command
+/// with `GH_TOKEN`. The federation suite reaches the real repository through `gh`, which refuses
+/// inside Actions without a token - so the v0.4.0 release gated RED on a test that is green on every
+/// push, the build matrix was skipped, and the tag published nothing. Releases are rare, so the
+/// divergence lived until it fired: the issue260 class, one workflow over.
+///
+/// The expectation is derived from the tree, never hardcoded. A variable supplied to the gate in ANY
+/// workflow is one the gate is known to need; a sibling gating workflow that omits it is running the
+/// same command in a different world. A project whose gate needs nothing declares nothing and is
+/// never accused.
+///
+/// STATED LIMITATION: file-level, like `gating-workflow-history`, because there is no YAML parser
+/// here - a variable set on a non-gating job counts as present. It catches the real class (a gating
+/// workflow with the variable nowhere in it) and nothing finer.
+fn gate_environment_parity(root: &Path) -> GuardReport {
+    let dir = root.join(".github").join("workflows");
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return GuardReport { name: "gate-environment-parity", scanned, warnings: Vec::new(), violations };
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|x| x.to_str()).is_some_and(|e| e == "yml" || e == "yaml"))
+        .collect();
+    files.sort();
+
+    // the gating surfaces: those that actually run the test suite
+    let mut gating: Vec<(std::path::PathBuf, String)> = Vec::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        if text.contains("cargo test") {
+            gating.push((path.clone(), text));
+        }
+    }
+    if gating.len() < 2 {
+        return GuardReport { name: "gate-environment-parity", scanned, warnings: Vec::new(), violations };
+    }
+
+    // what any one of them supplies is what the gate is known to need
+    let mut expected: Vec<String> = Vec::new();
+    for (_, text) in &gating {
+        for name in env_names(text) {
+            if !expected.contains(&name) {
+                expected.push(name);
+            }
+        }
+    }
+    expected.sort();
+    for (path, text) in &gating {
+        scanned += 1;
+        let missing: Vec<&String> = expected.iter().filter(|n| !text.contains(n.as_str())).collect();
+        if missing.is_empty() {
+            continue;
+        }
+        let names: Vec<&str> = missing.iter().map(|n| n.as_str()).collect();
+        violations.push(format!(
+            "{}: runs `cargo test` without {} - a sibling gating workflow supplies it, so these two run the same suite in different environments and the rarer one fails on a test the other passes (issue385)",
+            relpath(root, path),
+            names.join(", ")
+        ));
+    }
+    GuardReport { name: "gate-environment-parity", scanned, warnings: Vec::new(), violations }
+}
+
+/// The environment variable names a workflow supplies, read as `NAME: value` under an `env:` key.
+///
+/// Deliberately narrow: `SCREAMING_SNAKE` keys only, which is what an environment variable looks like
+/// and what a YAML step key does not.
+fn env_names(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut in_env = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed == "env:" {
+            in_env = true;
+            continue;
+        }
+        if !in_env {
+            continue;
+        }
+        let Some((key, _)) = trimmed.split_once(':') else {
+            in_env = false;
+            continue;
+        };
+        let key = key.trim();
+        let looks_like_a_variable = !key.is_empty()
+            && key.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+            && key.chars().any(|c| c.is_ascii_uppercase());
+        if looks_like_a_variable {
+            if !out.contains(&key.to_string()) {
+                out.push(key.to_string());
+            }
+        } else {
+            in_env = false;
+        }
+    }
+    out
 }
 
 /// Guard 50: every declared process states the SITUATION in which a project needs it (D0225).
@@ -4728,6 +4831,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
         "stpa-currency" => Some(stpa_currency(root)), // WARNING-tier (D0313) - the computed control structure says when STPA must run again
+        "gate-environment-parity" => Some(gate_environment_parity(root)), // hard (issue385) - a gating workflow that supplies less than its twin gates on a different environment
         "untrusted-taint" => Some(untrusted_taint(root)), // hard (issue347/D0314) - the untrusted label travels through derivation
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),

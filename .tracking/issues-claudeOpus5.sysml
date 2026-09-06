@@ -1068,4 +1068,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcMigrateReportsTheFailingLines to issue384;
+
+    part issue385 : Issue {
+        :>> id = "f865aed2-beb0-43c4-8330-a0988d461a58";
+        :>> title = "the release gate has no GitHub token, so the v0.4.0 tag published nothing";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The release gate is the one gating workflow that does not get a GitHub token, so the release for v0.4.0 gated red on a test that passes everywhere else and published nothing. WHAT HAPPENED: the tag v0.4.0 was pushed at 2c288d8. The release workflow's gate job ran cargo test --workspace --release with no env block. The federation suite's live-upstream claim shells out to gh api against this repository; gh refuses inside GitHub Actions without GH_TOKEN and prints 'To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable'. The test failed 10 passed 1 failed, the gate concluded failure, the build matrix was skipped by needs: gate, and no release object exists for v0.4.0 - gh release view v0.4.0 returns 'release not found'. The same test passes on every push because ci.yml supplies github.token, with a comment explaining that the alternative, declaring the path offline, is strictly weaker. WHY IT SURVIVED: releases are rare. This is the issue260 class one workflow over - guard 51 was built after the release gate had been red for a whole release cycle undetected, and it checks that every gating workflow runs the guard set, not that the two gating workflows agree on the environment they run the same tests in. A test whose precondition is supplied in one workflow and not the other is green in the surface that runs constantly and red only in the surface nobody watches. WHY IT MATTERS BEYOND ONE TAG: the project's own engine pin was already committed as 0.4.0, and keelw resolves that pin to a release asset. A pin naming a version whose release does not exist means a fresh clone of this repository cannot obtain the binary its own gates require. PREVENTING CHANGE: the release gate gets the same token, with the reason recorded beside it as ci.yml does. The deeper control - that two gating workflows running the same command must supply the same environment - is a guard-51 extension and is proposed, not assumed, in the accompanying Decision.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcReleaseGateHasTheToken to issue385;
+
+    part issue386 : Issue {
+        :>> id = "aafdd184-2394-40b5-9a9a-c04fbfdb3648";
+        :>> title = "keel suite reports fail over a file lock: it rebuilds the binary running it";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel suite rebuilds the binary that is running it, so on Windows it reports 'fail - 0 passed, 0 failed' over a file lock and writes that verdict into the receipt. WHAT HAPPENED: run as ./target/release/keel.exe suite . against a tree whose Rust sources had changed, the command shelled out to cargo test --release --no-fail-fast. cargo tried to relink target/release/keel.exe, which was the executing image, and Windows refused: 'error: failed to remove file ... Access is denied. (os error 5)'. No test ever ran. The command printed 'keel suite: fail - 0 passed, 0 failed' and wrote .keel/metrics/suite-receipt.toml over the deliverable fingerprint recording that outcome. Re-running from a copy - cp target/release/keel.exe target/release/keel-suite.exe - works, which is the same remedy CLAUDE.md already documents for keel serve (issue150). WHY IT MATTERS: this is not a false green, the verdict is fail, and D0356 already withdrew the push gate so no push is blocked by it. What is wrong is the KIND of the verdict. A run that never compiled the tests is recorded in the same field, with the same shape, as a run where the code is broken; the receipt claims the deliverable at that fingerprint was measured and found failing when it was not measured at all. The only evidence of the real cause is one line inside a log file the command names but does not read back. An operator who trusts the printed line concludes the code is red. THE FAMILY: issue150 is the same shape one command over - keel serve holds target/release/keel.exe and blocks every rebuild, which is why the handbook says to serve a copy. The generalisation neither has yet: a command that builds the deliverable must not be running from inside the directory the build writes. PREVENTING CHANGE: keel suite handles its own image - runs the tests from a copy, or detects that the executing binary sits in the target directory the build will write to and refuses with that named cause and the remedy, writing no receipt. A receipt is a claim that a measurement happened; a run that could not start has nothing to record.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSuiteSurvivesItsOwnImage to issue386;
 }

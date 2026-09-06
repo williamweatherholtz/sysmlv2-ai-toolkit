@@ -32,6 +32,12 @@ jobs:
       - name: clippy (deny warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: cargo test
+        # The federation suite's live-upstream claim calls `gh api` against this repository, and gh
+        # REFUSES inside Actions without a token - so without this the release gate fails on a test
+        # that passes everywhere else, and it fails only at release time, which is why it survived
+        # (issue385, the issue260 class one workflow over). CI already supplies the same token.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: cargo test --workspace --release
       - name: keel gate (validate + guards)
         run: |
