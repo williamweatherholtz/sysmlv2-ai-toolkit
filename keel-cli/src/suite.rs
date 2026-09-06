@@ -1,20 +1,19 @@
-//! `keel suite [-- <cargo test args>]` and the receipt `keel land` demands (D0353,
-//! dcLandRequiresASuiteReceipt).
+//! `keel suite [ROOT] [-- <cargo test args>]` — run the full suite and record what that run cost.
 //!
-//! On 2026-09-02 sprint 521 landed on validate plus guards alone; the full suite had last run at
-//! sprint 520; CI went red for twenty minutes on a test the suite would have caught locally. CI is
-//! DETECTIVE - the computed control structure says so - and the commit was already on main. The
-//! preventive control is the one place a push originates: `land` refuses a tree whose DELIVERABLE
-//! changed since the last green suite run, unless the suite ran at this tree.
+//! IT NO LONGER GATES ANYTHING (D0356). For one day a green receipt was required before any push.
+//! Measured honestly the run costs about eleven wall minutes every time the code moves, against
+//! roughly one bad push in twenty-five it could catch — and two of the three most recent failures
+//! were platform faults this machine cannot reproduce. The owner withdrew it. What stays is the
+//! measurement: the receipt is how anyone knows what a full run costs, which is the number that
+//! decided the question.
 //!
 //! THE RECEIPT is machine-local (`.keel/metrics/suite-receipt.toml`, beside the hook fire-ledger):
 //! the fingerprint of the deliverable as it was tested, the HEAD it was tested near, when, and the
-//! counts. It is evidence about THIS machine's run and never travels - CI reruns the suite itself.
+//! counts. It is evidence about THIS machine's run and never travels — CI reruns the suite itself.
 //!
 //! THE FINGERPRINT is over the deliverable's CONTENT ON DISK, tracked or not: `keel-cli/`, the
-//! embedded `.engine/`, `keelw`, and the two Cargo manifests - what the binary is built from and what
-//! the tests read. A docs-only or `.tracking/` change leaves it unchanged, so a receipt taken before
-//! such a change still covers the tree; a source edit after the receipt is exactly what must refuse.
+//! embedded `.engine/`, `keelw`, and the two Cargo manifests. It still answers "was this exact tree
+//! tested", which is worth knowing even when nothing refuses on the answer.
 
 use sha2::{Digest as _, Sha256};
 use std::path::{Path, PathBuf};
@@ -89,7 +88,7 @@ pub fn parse_receipt(text: &str) -> Option<Receipt> {
 
 fn render_receipt(r: &Receipt, log: &Path) -> String {
     format!(
-        "# suite receipt (D0353): the deliverable as the full suite last saw it ON THIS MACHINE. `keel land`\n# refuses a tree whose deliverable fingerprint differs from this one, or whose run was not green.\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nlog = \"{}\"\n",
+        "# suite receipt: the deliverable as the full suite last saw it ON THIS MACHINE, and what that run\n# cost. Nothing refuses on it (D0356) - it is a measurement, not a gate.\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nlog = \"{}\"\n",
         r.fingerprint, r.head, r.at, r.passed, r.failed, r.outcome, log.to_string_lossy().replace('\\', "/")
     )
 }
@@ -119,9 +118,12 @@ pub fn count_results(output: &str) -> (u64, u64) {
     (passed, failed)
 }
 
-/// Why `land` may not push this tree, or `None` when the receipt covers it (or there is no suite).
+/// Whether the last suite run covers the tree as it stands — `None` when it does (or there is no
+/// suite), otherwise the reason it does not.
 ///
-/// The receipt must exist, be green, and name the fingerprint of the deliverable AS IT IS NOW.
+/// NOT WIRED TO ANYTHING SINCE D0356: `land` no longer consults it. Kept because "is this tree
+/// tested" is a real question a human or a later control may want answered, and the answer is
+/// cheap; deleting it would also delete the only place that knows what staleness looks like.
 #[must_use]
 pub fn land_refusal(repo: &Path) -> Option<String> {
     if !is_self_build(repo) {
@@ -147,6 +149,13 @@ fn now_secs() -> u64 {
 /// cargo did. Always `--no-fail-fast`, so the receipt's counts are the whole population.
 #[must_use]
 pub fn cmd(args: &[String], repo: &Path) -> i32 {
+    // --help must not RUN the suite. It did, once, and cost 185 seconds to discover.
+    if args.iter().take_while(|a| *a != "--").any(|a| a == "--help" || a == "-h") {
+        println!("usage: keel suite [ROOT] [-- <cargo test args>]");
+        println!("  runs the full suite (--release --no-fail-fast), logs under .keel/metrics/, and writes");
+        println!("  {RECEIPT}: the deliverable fingerprint, counts and outcome of that run.");
+        return 0;
+    }
     if !is_self_build(repo) {
         eprintln!("keel suite: {} holds no keel-cli/Cargo.toml - there is no suite to run here (a downstream project's gate is `keel gate`)", repo.display());
         return 2;

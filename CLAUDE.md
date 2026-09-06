@@ -188,13 +188,13 @@ frozen (modify it only by out-of-band Decision).
   a push carries the whole repository, issue280) and, on rejection, merges and **gates the MERGED tree**
   before retrying — two contributions that pass alone can fail together. `orient` reports
   its own `sync` position, so every computed answer states the tree it was computed against.
-  **In this self-build, `land` also demands a suite receipt (D0353):** `keel suite` runs the full
-  `cargo test --no-fail-fast` and writes `.keel/metrics/suite-receipt.toml` over the deliverable's
-  fingerprint (`keel-cli/`, `.engine/`, `keelw`, the Cargo manifests — content on disk, so an uncommitted
-  edit counts); `land` refuses a tree with no receipt, a red one, or one whose deliverable has moved,
-  naming which — a docs-only or `.tracking/` change needs none. Run the suite THROUGH `keel suite`, never
-  bare `cargo test`: the bare run leaves no receipt. `KEEL_LAND_UNTESTED=1` pushes anyway and records
-  a `land-untested` obligation in the working tree, never silently.
+  **`keel suite` runs the full suite and records what it cost; it gates NOTHING (D0356).** It writes
+  `.keel/metrics/suite-receipt.toml` over the deliverable's fingerprint (`keel-cli/`, `.engine/`, `keelw`,
+  the Cargo manifests — content on disk, so an uncommitted edit counts) with the counts and outcome. For
+  one day `land` refused a push whose deliverable had moved since the last green run; measured, that run
+  costs ~11 wall minutes every time code moves against roughly one catchable bad push in twenty-five, and
+  the human withdrew it. Run the suite through `keel suite` when you want the receipt — CI remains the
+  check that a push must survive.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by the local hooks

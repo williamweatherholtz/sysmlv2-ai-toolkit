@@ -1,6 +1,6 @@
 ---
 name: asi-templates
-description: Use whenever a deliverable should reach a reader as a DOCUMENT rather than terminal text. Two surfaces. (1) An interactive exec-summary decision page — "make me an html", "exec summary", "show me the options", "report this graphically", or any findings/proposal/sign-off request terminal prose would bury. (2) A formal requirements-doc PDF — a specification, interface document, or anything that will be baselined and cited clause by clause. Also carries the brand-drift check ("brand watch", "has marketing changed anything", "recheck branding") that must run before building against the brand tokens. Deploys .engine/processes/asi-templates.sysml; supersedes the standalone exec-summary unit.
+description: Use whenever a deliverable should reach a reader as a DOCUMENT rather than terminal text. Two surfaces. (1) An EXECUTIVE BRIEF — "make me an html", "exec summary", "show me the options", "report this graphically", or any findings/proposal/sign-off request terminal prose would bury. Answer first, everything needed to decide on one page, NO record ids in anything the reader reads, every number computed rather than typed, and per ask two mandatory logic exhibits: how it works today versus changed, and what lands downstream. (2) A formal requirements-doc PDF — a specification, interface document, or anything that will be baselined and cited clause by clause. Also carries the brand-drift check ("brand watch", "has marketing changed anything", "recheck branding") that must run before building against the brand tokens. Deploys .engine/processes/asi-templates.sysml; supersedes the standalone exec-summary unit.
 ---
 
 # asi-templates — the ASI document kit
@@ -10,7 +10,7 @@ reader must DO**, never from preference:
 
 | Reader must… | Surface | Source template |
 |---|---|---|
-| **Decide** — findings, options, a sign-off request | exec-summary HTML | `templates/exec-summary/exec-summary.html` |
+| **Decide** — findings, courses, a sign-off request | executive brief (HTML) | `templates/exec-summary/exec-summary.html` |
 | **Cite** — a stable statement, baselined, reviewed clause by clause | requirements-doc PDF | `templates/requirements-doc/requirements-doc.typ` |
 
 A decision request rendered as a formal PDF buries the ask. A specification rendered as tabs
@@ -69,109 +69,111 @@ issue003; the refusal is the fix.
 
 ---
 
-## 2. Surface A — the exec-summary decision page
+## 2. Surface A — the executive brief
 
-The author's standing direction: AI feedback arrives as a graphical page — extremely concise,
-recommendation-first, tabbed, diagrammed, one-click copyable back into an AI conversation.
+The author's standing direction, verbatim: *"I need all information critical to making the decision in
+one place, no references, high amounts of visuals to illustrate ideas, and strong logical
+recommendation to guide decision making."* And, on what the diagrams must carry: *"we're making
+logical decisions here, so I want diagrams relating to the logic. how do things works today and how
+would the change affect them? I don't want administrative changes ... I want downstream impact."*
 
-1. **Start from `templates/exec-summary/exec-summary.html`** — the source template, a clean
-   skeleton of `<!-- REPLACE -->` marks. A worked instance sits beside it as
-   `example-icd-panel.html`: read it for tone and density, **never** edit it as a starting point.
-   The template is self-demonstrating and every structural piece is load-bearing and TESTED — keep
-   the machinery (tabs JS, copy JS, theme tokens, viewport meta), replace the content. **Never
-   regress:** sync-first copy (async-first ordering breaks one-tap Safari), the viewport meta
-   (without it mobile taps mis-register), 44px targets.
-2. **Name the source project — in the tab and in the digest.** The author reads these with many
-   pages open at once, and a signature given against the wrong project's claims is the failure this
-   prevents. Three carriers, all gated:
-   - the `data-digest="project"` badge in the header (`<b>Project</b>` is the label; the project
-     name and `owner/repo` are the content — `<b>` content is stripped as a label everywhere else
-     in this template, so putting the name inside it deletes it from the field);
-   - the `<title>`, as `<Name> · <project>` — the browser tab is where it is actually read;
-   - the **first line of the digest**, `**Source project:** …`, because a paste arrives in a
-     session that cannot see which tree produced it.
-   `scripts/check_templates.py` fails on all three, and asserts the digest *emits* the project
-   rather than merely querying it.
-3. **One tab per DECISION** (3–6). Rename tab ids/labels; keep `role`, `aria-*` and each panel's
-   `data-digest-tab`. A tab that asks nothing is an appendix, not a tab.
-4. **Inside every tab, in this order, within these budgets.** Every budget is ONE LINE and is
-   enforced by `test_prose_stays_within_executive_budgets` — a report whose prose grows paragraphs
-   fails the suite. Write to the budget, not to the topic.
-   - **The question** (`legend`) — what this tab decides, as a question.
-   - **What rides on it** (`data-d="stake"`, ≤ 20 words) — what goes wrong, and *when* it lands.
-   - **The choices** (`data-d="choices"`) — 2–4 cards sharing one radio `name`. Recommended
-     first, chipped, **never pre-selected** (a pre-selection fabricates a decision the reader
-     never made). Every card carries both:
-     - `data-d="steel"` — **Strongest case**, ≤ 18 words, as that option's best advocate would put it.
-     - `data-d="cost"` — **Why not**, ≤ 14 words, the real cost. Never "none", *including for the
-       recommendation* — an option with no downside is an option nobody analyzed.
-   - **Note** (`data-d="note"`) — a textarea; flows into the digest.
-   - **The reasoning chain** — four one-liners; the report is not finished without them:
-     - `data-d="driver"` — **What decides it** (≤ 20): the single criterion the options are scored
-       against. Name it before comparing, or the comparison has no referee.
-     - `data-d="why"` — **Why this wins** (≤ 32): how the recommendation beats *the strongest
-       alternative by name* on that criterion. Compare; never assert. The one place worth a longer
-       line — it carries the whole argument.
-     - `data-d="flip"` — **What would change this** (≤ 20): the concrete condition that would make
-       a different option correct. If nothing could, say so — but say it.
-     - `data-d="conf"` — **Confidence** (≤ 16): high/medium/low plus the unverified thing named.
-   - **Pros/cons table** (`data-d="proscons"`) — ≤ 6 rows, fragments not sentences.
+**The rule the whole surface hangs on: the brief is a pyramid whose nodes are exhibit titles.** Delete
+every graphic and the remaining sentences still decide it. Delete every sentence and the graphics say
+nothing. If either half fails, the brief is not finished.
 
-   Depth belongs in the choice of words, not the count of them. If a line will not fit its budget,
-   the thinking is not finished — find the sentence that makes the others unnecessary.
+**Why the shape changed (2026-09-06).** The previous surface was tabbed and IBIS-shaped — one position
+with pro/con arguments hanging off it — which affords the reader exactly two acts, accept and defer.
+That is a property of the notation, not of the writing: no amount of care inside it produces a
+reviewable document. The author's verdict on a page built that way was *"mostly just administrative
+justification for the decision"*, and it was the second time the same complaint landed. It is
+QOC-shaped now: courses crossed with the forces that bear on them, each independently disputable.
 
-   **The steelman rule.** Write each alternative as its intelligent advocate would — the version a
-   person who chose it would recognize and endorse. A one-line dismissal is a strawman and makes
-   the whole report untrustworthy: if the alternatives are obviously bad, the reader learns nothing
-   from your recommendation winning. Test each: *would someone who prefers this option feel fairly
-   represented?* If not, rewrite it. **Corollary: if steelmanning an alternative makes it look
-   better than your recommendation, change the recommendation.**
+### 2.1 The section order
 
-   **Citation is not reasoning.** "The panel converged", "best practice", "the docs say" tell the
-   reader who believes something, not why it is true. Every claim gets its mechanism: what happens,
-   to what, with what consequence. Provenance goes *after* the mechanism, never instead of it.
-5. **Diagram wherever it helps — and it usually helps.** One diagram minimum when the subject has
-   structure (a flow, a hierarchy, a boundary). Inline SVG taking every colour from the CSS tokens
-   (`var(--accent)`) so both themes work; `role="img"` and a real `aria-label`; wide diagrams live
-   in the `figure.diagram` scroll container. Draw the MECHANISM (what connects to what, where the
-   gate sits), never decoration.
-6. **Copy-for-AI is the product's point.** `buildDigest` emits the question, the stakes, every
-   choice with its steelman and cost, the reasoning chain, the reader's selections as checkbox
-   markdown (`- [x] chosen`), their notes, and a trailing `My notes: `. Pasted back to an AI that
-   is a decision record complete with the reasoning, so the receiving session can argue with the
-   logic rather than just read a verdict. Selections persist in `localStorage`. **Add a section ⇒
-   extend the digest builder**, or the page and the copy drift. Buttons stay at top AND bottom.
-7. **Test before delivering** (§4).
-8. **Deliver** as a claude.ai artifact (private by default) or send the file. Title is a short
-   noun-phrase name; the footer states who generated it, when, and from which source template.
+Answer first, always. A reader who reads only the title has the recommendation; one who reads only the
+exhibit titles has the argument.
 
-### Wording rules (the "extremely concise" contract)
+| # | Section | What it must carry | Budget |
+|---|---|---|---|
+| 0 | **Title** | The recommendation itself, verb-led. Never the topic. | ≤ 18 words |
+| 1 | **The ask** | The verdict, then one line per ask with its response options and its reversibility | ≤ 70 words |
+| 2 | **Why now** | Situation, then the one thing that changed and put a clock on it. If nothing has a clock, say so. | ≤ 60 words |
+| 3 | **The decision rule** | The criteria, ranked, stated BEFORE any option is defended | ≤ 40 words |
+| 4 | **Per ask: today → changed → downstream** | Two logic exhibits minimum (§2.3), then the courses table | — |
+| 5 | **Courses** | 2–4 including a do-nothing, each with places-to-change and a quantified cost | table |
+| 6 | **Why this wins / when the runner-up wins** | Beats the named alternative on the stated criterion; the runner-up as a conditional, not a rival | ≤ 90 words |
+| 7 | **What would change my mind** | One falsifiable condition per ask | ≤ 30 words each |
+| 8 | **Provenance strip** | How every number was measured, by whom, when, against which tree | ≤ 60 words |
 
-Verdict first, evidence second, never the reverse. Fragments beat sentences in tables; full
-sentences beat fragments everywhere else. No filler, no hedging stacked on hedging, no restating
-the question. Numbers get units.
+### 2.2 Self-containment — the no-references rule
 
-Concise means **dense**, not thin. Cut adjectives and throat-clearing, never the mechanism:
-"Roboto Condensed for headings (brand practice)" is thin; "condensed headings survive long
-document titles without wrapping, which the brand's own manual already does" is dense and the same
-length. The reader should be able to **disagree with a specific claim** after reading — if they can
-only defer to your authority, the writing failed.
+- **No record id, task name, issue number or process name appears in anything the reader reads.** An id
+  is a pointer that costs a lookup; the fact it stands for is what the sentence should have said.
+  "This resolves the migrate defect" is administrative; "an upgrade silently puts back controls the
+  project switched off" is the same fact, told.
+- **Identity rides in the copy-for-AI digest, never in the prose.** Each ask declares what it decides
+  in `data-records`; the digest emits it beneath the reader's choice. That is what lets a pasted answer
+  be attached to a record without an id ever facing the human — and without it, an answer cannot be
+  recorded at all (the failure that produced this clause).
+- **Every number is computed, never typed.** The builder reads a facts file produced by running
+  commands against the tree; a fact that cannot be computed is emitted as null and the page refuses to
+  assert it. Three of five figures in one hand-typed diagram were wrong within a day of publishing.
+- **Numbers in one sentence come from one scope.** Pairing a top-level count with a whole-surface count
+  published "72 of 69". The scope is part of the fact, so it belongs in the fact's own name.
+- **State whether the change already ships.** Half of one queue was already running, so the only act
+  left was revert — and no revert was priced. An ask that is really a ratification says so.
 
-### Baked in, deliberately
+### 2.3 The visual playbook — logic, not decoration
 
-- **BLUF everywhere** — the page, each tab, and the digest all lead with the recommendation.
-- **Decision-ready** — every tab ends with the specific ask; the reader never wonders what response
-  is wanted.
-- **The copy loop IS the interactivity** — a static page whose copy output is structured FOR an AI
-  beats a fragile app: the human annotates in their own words, the AI gets clean context.
-- **Glanceable semantics** — verdict/severity colours are separate tokens from the accent, so
-  scanning works before reading.
-- **Both themes, always** — the page is read on phones at night as often as desks at noon.
-- **Self-contained** — no CDN scripts, no external images; Google Fonts is the one allowed host.
-- **Provenance and honesty** — generation date, source of findings, and open questions on the page.
-  A summary that hides its uncertainty is a worse summary.
+**Two forms are mandatory per ask.** Both are generated from data by `scratchpad`-side chart helpers,
+never hand-placed, so a figure cannot drift from the tree.
 
----
+1. **Today → changed.** The same causal chain twice, identical geometry, the changed link highlighted.
+   Reads: *condition → mechanism → outcome*. A single-state diagram cannot show a change and is a
+   defect on a decision page.
+2. **What lands downstream.** A fan from the change to each thing it hits, every branch carrying its
+   own magnitude. This is the exhibit that answers "what does this do to everything else", and it is
+   usually where the real argument turns out to live.
+
+Supporting forms, chosen by what the claim says, never by preference:
+
+| The claim says | Form |
+|---|---|
+| "costs N times more than" | proportional bars, sorted, zero baseline, value at the bar end |
+| "is made of these parts, one dominates" | one 100% stacked bar, ≤4 segments |
+| "has been true for N days" / "grows" | timeline with both ends labelled, or a line with the decision date marked |
+| "N of M are X" | unit dots, one per item, so the proportion is counted rather than estimated |
+| "the reader must verify individual values" | a table — verification is a symbolic task and a chart makes it harder |
+
+**Every figure carries a message title that is a full sentence with a verb**, and the title must be
+falsifiable by the figure beneath it. A title that names its contents ("CLI surface today") is
+decoration; one that states what the figure proves is an argument. Untitled figures are worse than
+none: the reader installs their own conclusion.
+
+**Every label is a thing that happens or a thing that exists.** Never a record id, never a bare
+command standing in for a behaviour. One accent per figure; quantities in the boxes, not the caption.
+
+**Look at the rendered figure before shipping it.** Screenshot the page and read it. This is not
+optional politeness — doing it caught a colliding legend, "1 sites", a timeline with no scale, and a
+box overrunning the canvas, all of which passed every text-level check.
+
+**When NOT to draw:** a counting or threshold decision (a table beats it), a single-clause
+ratification with no branch, a change that alters a value rather than a path, and anything whose
+diagram would need three ids to be legible — that last one means the mechanism is not understood yet.
+
+### 2.4 Recommendation craft
+
+- **Imperative, single clause, named actor.** Passive voice deletes the actor, and a recommendation
+  with no actor is not one.
+- **Criteria before verdict**, or the criteria read as rationalisation.
+- **A do-nothing course, scored like the others.** The status quo always competes and wins by default
+  when it is not priced.
+- **Refute the strongest objection on the page.** Raising a downside without answering it is worse
+  than not raising it.
+- **Publish the falsifier**: the condition that would flip the recommendation, stated so it can be
+  observed. A flip condition nothing in the tree can observe is not a flip condition.
+- **If the measurement turns against the recommendation, change the recommendation and say that you
+  did.** A brief that reverses its own advice on new measurement is the only kind worth reading twice.
 
 ## 3. Surface B — the requirements-doc PDF
 

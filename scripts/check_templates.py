@@ -195,6 +195,105 @@ def check_file(path: Path, template_fields: dict[str, list[str]] | None) -> list
     return bad
 
 
+
+# ── the EXECUTIVE BRIEF contract (D0355) ──────────────────────────────────────────────────────────
+# A brief is answer-first, self-contained and diagram-led. These are the rules a regex can hold; the
+# skill names the rest as judgment rather than faking a check for them.
+
+# Any record id in text the READER reads. Identity is allowed only inside the copy-for-AI digest.
+BRIEF_ID = re.compile(r"\b(?:[Dd]0\d{3}|issue\d{3}|GH#\d+|st\d{3}|us\d{3}|dc[A-Z][A-Za-z]{4,}|sr[A-Z][A-Za-z]{4,})\b")
+# A message title must be a sentence: a finite verb somewhere in it. Cheap, catches "CLI surface today".
+BRIEF_VERB = re.compile(r"\b(is|are|was|were|has|have|had|does|do|did|costs?|moves?|lands?|changes?|"
+                        r"breaks?|wins?|shortens?|catches?|waits?|accepts?|stops?|runs?|rewrites?|"
+                        r"touches?|grows?|takes?|needs?|gets?|makes?|leaves?|sits?|says?|shows?|"
+                        r"would|will|can|cannot)\b", re.I)
+
+
+def check_brief(path: Path) -> list[str]:
+    """The brief contract. Returns one string per violation, each naming the file."""
+    raw = path.read_text(encoding="utf-8")
+    bad: list[str] = []
+    rel = path.name
+
+    def fail(msg: str) -> None:
+        bad.append(f"{rel}: {msg}")
+
+    markup = markup_only(raw)          # style/script stripped: what the reader actually reads
+    prose = re.sub(r"<[^>]+>", " ", markup)
+
+    # 1. no references in the reader's text
+    ids = sorted(set(BRIEF_ID.findall(prose)))
+    if ids:
+        fail(f"record id(s) in reader-facing text - state the fact, not the pointer: {', '.join(ids[:6])}")
+
+    # 2. answer first: a title, and it must be the recommendation (a verb), not a topic
+    title = re.search(r'data-digest="title"[^>]*>([^<]+)<', markup)
+    if not title:
+        fail('no data-digest="title" - the brief has no headline recommendation')
+    elif not BRIEF_VERB.search(title.group(1)):
+        fail(f'the headline is a topic, not a recommendation (no verb): "{title.group(1)[:60]}"')
+
+    # 3. the ask, with response options that declare what they decide
+    if 'class="ask"' not in markup:
+        fail("no ask block - a brief states what is being asked before it argues")
+    opt_groups = re.findall(r'<div class="opts"([^>]*)>([\s\S]*?)</div>', markup)
+    if not opt_groups:
+        fail("no response options - a brief the reader cannot answer is a report")
+    for attrs, body in opt_groups:
+        names = re.findall(r'name="([^"]+)"', body)
+        if len(names) < 2 or len(set(names)) != 1:
+            fail("an ask offers fewer than 2 options, or its options do not share one name")
+        if "data-records" not in attrs:
+            fail("an ask does not declare what it decides (data-records) - a pasted answer cannot "
+                 "then be attached to any record, which is how one answer was lost")
+        if " checked" in body:
+            fail("an option is pre-selected, which fabricates a decision the reader never made")
+
+    # 4. figures: message titles that are sentences, and labels that are not ids
+    figs = re.findall(r"<figure[^>]*>([\s\S]*?)</figure>", raw)
+    if len(figs) < 2:
+        fail(f"{len(figs)} figure(s) - a brief carries at least the two logic exhibits per ask "
+             "(today versus changed, and what lands downstream)")
+    for i, fig in enumerate(figs, start=1):
+        msg = re.search(r'class="msg"[^>]*>([^<]+)<', fig)
+        if not msg:
+            fail(f"figure {i} has no message title - an untitled figure lets the reader install "
+                 "their own conclusion")
+        elif not BRIEF_VERB.search(msg.group(1)):
+            fail(f'figure {i} title states no claim (no verb): "{msg.group(1)[:60]}"')
+        elif " and " in msg.group(1).lower() and msg.group(1).count(",") == 0:
+            pass  # two clauses joined by "and" is a smell, not a defect; the skill says split it
+        labels = re.findall(r"<text[^>]*>([^<]*)</text>", fig)
+        fig_ids = sorted({m for lab in labels for m in BRIEF_ID.findall(lab)})
+        if fig_ids:
+            fail(f"figure {i} labels carry record id(s): {', '.join(fig_ids[:4])} - a label must be "
+                 "a thing that happens or a thing that exists")
+        if not re.search(r'role="img"', fig) or not re.search(r'aria-label="[^"]{25,}"', fig):
+            fail(f"figure {i} has no role=img with a real aria-label")
+
+    # 5. provenance instead of citations
+    prov = re.search(r'data-digest="provenance"[^>]*>([\s\S]{0,1600}?)</', markup)
+    if not prov:
+        fail("no provenance strip - a brief with no references must say how its numbers were measured")
+    elif not re.search(r"\d{4}-\d{2}-\d{2}", prov.group(1)):
+        fail("the provenance strip carries no ISO date")
+
+    # 6. the machinery the reader needs
+    if raw.count("data-copy") < 2:
+        fail("copy-for-AI control missing at top or bottom")
+    if "data-records" in raw and "answers: " not in raw:
+        fail("the digest does not emit what each ask decides, so a pasted answer stays unattachable")
+    if 'name="viewport"' not in raw:
+        fail("no viewport meta - taps mis-register on a phone")
+    if "prefers-color-scheme" not in raw or 'data-theme="dark"' not in raw:
+        fail("both themes must be defined (media query AND the explicit stamp)")
+    for m in re.finditer(r'<a\s[^>]*href="https?://[^"]+"[^>]*>', raw):
+        if 'target="_blank"' not in m.group(0):
+            fail("an external link does not open a new tab; sandboxed hosts block same-frame navigation")
+    if re.search(r"REPLACE", raw) and "template" not in path.name:
+        fail("instance still carries REPLACE marks")
+    return bad
+
 def check_tree(root: Path) -> list[str]:
     """Every family directory under root: one template, N instances checked against it."""
     problems: list[str] = []
@@ -216,6 +315,24 @@ def check_tree(root: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
+    # `--brief FILE ...` applies the executive-brief contract (D0355) instead of the template-family
+    # checks: a brief is a rendered deliverable, not a member of a template family.
+    if argv[1:2] == ["--brief"]:
+        problems: list[str] = []
+        for a in argv[2:]:
+            p = Path(a)
+            p = p if p.is_absolute() else (ROOT / p)
+            if not p.exists():
+                print(f"check_templates: no such path: {p}", file=sys.stderr)
+                return 2
+            problems += check_brief(p)
+        if problems:
+            print(f"brief contract: {len(problems)} violation(s)", file=sys.stderr)
+            for pr in problems:
+                print(f"  {pr}", file=sys.stderr)
+            return 1
+        print("brief contract: clean")
+        return 0
     targets = [Path(a) for a in argv[1:]] or [ROOT / "templates"]
     problems: list[str] = []
     for t in targets:
