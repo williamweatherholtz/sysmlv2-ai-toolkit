@@ -969,4 +969,70 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcResultBindsToItsLandingCommit to issue375;
+
+    part issue376 : Issue {
+        :>> id = "f3c5dbfd-2053-4618-b732-b982bfbbdcc7";
+        :>> title = "Standing-consent auto-accept quotes this repository's human and ships its grants to every adopter (GH#57)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#57 (st094, us093; untrusted tier, filed by the declared decider - D0314). The engine's standing-consent path fabricates an attestation in any project but this one. VERIFIED on main: keel record decision builds the AUTO-ACCEPTED note from a string literal of THIS repository's human's words (main.rs cmd_record, the D0291 arm); keel init ships attestation-policy.toml verbatim with standingConsent = d0207 and delegatedRecording = d0192 (the file is not an instance contract); keel migrate resyncs it wholesale (not in PROJECT_OWNED). A fresh project with one declared decider therefore auto-accepts every non-fork Decision in its decider's name, quoting consent that decider never gave - the D0106 / confirmation-authenticity class, produced by the tool. The library unit decision-channel v6 has the same defect in record_decision.sh (--by wweatherholtz, the quote inline), routed to dcLibraryUnitRetirement. Resolver: dcStandingWordsAreProjectLocal.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcStandingWordsAreProjectLocal to issue376;
+
+    part issue377 : Issue {
+        :>> id = "5c603b85-3e2e-42c4-b951-57faccbdfc1c";
+        :>> title = "migrate's removed-type scanner reads string literals as schema; a quoted Rust path blocks a healthy project (GH#59)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#59 (st092, us091; untrusted tier, decider-filed). keel migrate refuses a healthy downstream project because a removed type is named in PROSE: types_as (migrate.rs) treats text ending in a colon before the name as a typing colon, so the Rust path separator in ureq::Agent passes, and step_removed_types scans whole lines including quoted string literals; REMOVED_ENUMS uses line.contains the same way. VERIFIED by reading the functions. There is no override surface, and the three workarounds (edit the critic's words, re-add a dead type, skip migrate) each corrupt something. Blast radius: every REMOVED_TYPES name that is an ordinary word (Task, Risk, Role). The reporter implemented and falsified the fix locally against d82c512. Resolver: dcRemovedTypeScannerReadsSchemaNotProse.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRemovedTypeScannerReadsSchemaNotProse to issue377;
+
+    part issue378 : Issue {
+        :>> id = "8e46cf98-63f1-4a6e-b2b3-d0f72825d772";
+        :>> title = "pre-commit and Claude hooks probe a cache path init never writes, then fall back to PATH silently (GH#55)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#55 (st096, us095; untrusted tier, decider-filed). Three surfaces enforce one pin and each resolves the binary differently: keelw and keel init write .keel/bin/<version>/<asset>; PRECOMMIT_HOOK (lib.rs) and claude_surface RESOLUTION_ORDER probe .keel/bin/keel(.exe) - a path nothing writes - and then fall back to PATH with no line saying which binary gated. VERIFIED on main. Measured downstream: the same tree passed under keelw (release) and failed 14 viewpoint-renderer violations under the hook (+dirty PATH build); the mirror case produced a false green. D0316 (this week) fixed the ORDER of the Claude hooks' probes and left the layout mismatch - the hooks now correctly prefer a file init never creates. The K2 comment in the hook says an absent gate must not pass silently; a wrong gate that passes silently is the same failure. Resolver: dcOneBinaryResolutionForEverySurface.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcOneBinaryResolutionForEverySurface to issue378;
+
+    part issue379 : Issue {
+        :>> id = "c97accbf-d57b-43bd-936c-3b77b53a5924";
+        :>> title = "init seeds the wrapper cache from whatever binary ran it, and keelw never verifies a cache hit (GH#54)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#54 (st097, us096; untrusted tier, decider-filed). init_wrapper (main.rs) copies std::env::current_exe into .keel/bin/<CARGO_PKG_VERSION>/<asset> unconditionally, so a +dirty local build is filed as the pinned release for the project's life; keelw execs a cache hit without comparing it to keel-wrapper.toml, so the committed release checksum was in the tree and nothing ever checked the cached file against it. VERIFIED by reading both. Measured downstream: two binaries both answering 0.3.1, 900 KB apart, one spelling lenses keel show <lens> and one keel <lens>; the same tree gated clean on one and 14 violations on the other, and the project's CI (which downloads by tag) was the only honest signal. The wrapper's own header says trust-on-first-use is no verification; a seeded cache is trust-on-first-use by another route. Resolver: dcSeededCacheIsVerified.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSeededCacheIsVerified to issue379;
+
+    part issue380 : Issue {
+        :>> id = "75f228d9-80d7-4dda-b965-1402898d3872";
+        :>> title = "onboard asserts a charter whose Decision the project does not hold; the overwrite behind it is fixed on main but unreleased (GH#56)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#56 (st095, us094; untrusted tier, decider-filed). A v0.3.1 keel migrate rewrote a downstream project's chartered activation.toml with the engine's own - re-arming two processes the project had declined for stated reasons - and keel onboard then reported the set CHARTERED by d0226, a Decision the project does not hold. Two facts: (1) the overwrite is the issue314 class and is FIXED on main since 6583e08 (2026-08-30: activation.toml is in migrate's PROJECT_OWNED set), which is not an ancestor of v0.3.1 (c4d5dbf, 2026-08-29) - adopters on the release still have it until a release ships the fix; (2) the dangling charter is NOT fixed anywhere: nothing checks that charteredBy resolves in the project's own decisions, so onboard prints a provenance claim it cannot read as fact. The reporter's aside that engine-shipped viewpoint-registry.sysml carries this repository's owner ids is a real observation and is not resolved here. Resolver: dcCharterMustResolve.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCharterMustResolve to issue380;
+
+    part issue381 : Issue {
+        :>> id = "a9a871d6-f20e-4294-8a3d-6d9ba360efd9";
+        :>> title = "the published decision-channel unit dies on its first run in a new repo: the keel-standing label is never bootstrapped (GH#58)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#58 (st093, us092; untrusted tier, decider-filed). keel-lib's published decision-channel unit v6 ships decision-issue.yml, which bootstraps the labels blocks-work and decision, and open_decision_issues.py, which creates the standing thread with a third label keel-standing under check=True - so the channel's first run in any new repository dies inside gh issue create with a CalledProcessError that names no cause. VERIFIED: git ls-tree origin/main in the library shows both files under decision-channel/.github. It is masked by two earlier blockers (org allowlist, cargo build) and never reproduces in the origin repository, where the label exists. This repository deleted the channel in sprint 527 (D0291) and cannot republish the unit from a landed tree (library-stewardship rule 1); the same unit carries GH#57's fabricated-attestation script. Resolver: dcLibraryUnitRetirement - the unit is retired in the library with both reasons and its replacement, rather than patched in place.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLibraryUnitRetirement to issue381;
 }

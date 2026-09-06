@@ -65,4 +65,90 @@ package ProjectIntake20260906 {
         :>> sourceUrl = "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/54";
         :>> sourceTrust = SourceTrust::untrusted;
     }
+
+    part us091 : UserStory {
+        :>> id = "f8025e8c-6863-4c50-9067-120acf20bd44";
+        :>> title = "GH#59: migrate reads a removed type named in prose as a declaration, and Rust :: satisfies its typing test";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a downstream keel project (reporter: williamweatherholtz)";
+        :>> iWant = "the removed-type and removed-enum scanners to read SCHEMA, not the text inside string literals";
+        :>> soThat = "a quoted foreign symbol (ureq::Agent, std::task) in an authored description cannot block migration of a healthy project";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). VERIFIED against main: types_as (migrate.rs) accepts text ending in : before the name, so a Rust path separator passes, and step_removed_types scans whole lines including quoted prose; REMOVED_ENUMS uses line.contains. The three workarounds the reporter lists all corrupt the record or the schema. RECOMMEND: blank double-quoted literals before scanning in step_removed_types only, regression test with both arms (prose must not block; a real : Agent annotation still must). High - one quoted word permanently blocks a project from moving vintage, with no override surface.";
+    }
+    #DerivedFrom dependency from us091 to st092;
+
+    part us092 : UserStory {
+        :>> id = "fb6e8f19-dfde-4cf2-b790-2b800f244a58";
+        :>> title = "GH#58: the published decision-channel unit never bootstraps the keel-standing label its script requires";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a project importing decision-channel from the library (reporter: williamweatherholtz)";
+        :>> iWant = "the channel workflow to create every label its script uses, or refuse at start-up naming the missing one";
+        :>> soThat = "the first run in a new repository does not die inside gh issue create with a CalledProcessError that names no cause";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). VERIFIED: keel-lib origin/main decision-channel v6 ships .github/workflows/decision-issue.yml and .github/scripts/open_decision_issues.py; this repository deleted both in sprint 527 (D0291 - the channel is disconnected upstream) so the unit cannot be republished from a landed tree (library-stewardship rule 1). The defect is real and third in a chain each of which masks the next. RECOMMEND: route with GH#57 - the unit is RETIRED in the library with its reason and replacement (record-time standing consent in the binary, D0291) rather than patched, because the same unit carries a fabricated-attestation path. Medium on its own.";
+    }
+    #DerivedFrom dependency from us092 to st093;
+
+    part us093 : UserStory {
+        :>> id = "94773ce1-4690-447f-817d-f08a3ea4d204";
+        :>> title = "GH#57: standing-consent auto-accept quotes one specific human and names one hardcoded actor, in any project that runs it";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a project whose own supervisor declared its deciders (reporter: williamweatherholtz)";
+        :>> iWant = "an auto-acceptance to name the projects declared decider and quote standing words that decider actually gave, or stay proposed";
+        :>> soThat = "no acceptance is recorded in a humans name citing consent they never gave - the guard:confirmation-authenticity / D0106 class arriving through the tool itself";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). VERIFIED WIDER THAN FILED: the library unit script hardcodes --by wweatherholtz and the quote (keel-lib decision-channel v6, record_decision.sh), AND the binary has the same class at record time - main.rs cmd_record decision builds the AUTO-ACCEPTED note from a string literal of this repositorys humans words, while init ships attestation-policy.toml verbatim with standingConsent = d0207 and migrate resyncs it (not in PROJECT_OWNED). So a fresh project with one declared decider auto-accepts every non-fork Decision in that deciders name quoting words they never said. The reporters third candidate (marker Decisions outside consent) is already D0337. RECOMMEND: the standing words are project-local data - a standingWords line beside standingConsent, quoted from there or the Decision stays proposed saying why; init resets the two grant lines; migrate treats attestation-policy.toml as project-owned; the library unit is retired. CRITICAL - a fabricated attestation produced by the engine.";
+    }
+    #DerivedFrom dependency from us093 to st094;
+
+    part us094 : UserStory {
+        :>> id = "ec9c4185-645d-4eeb-a3b7-4dd76b3cf73f";
+        :>> title = "GH#56: migrate overwrote a chartered activation.toml with the engines, and onboard then cited a Decision the project does not hold";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a project that chartered its process set (reporter: williamweatherholtz)";
+        :>> iWant = "migrate to leave my activation set alone, and onboard to refuse a charteredBy that does not resolve in my tree";
+        :>> soThat = "a recorded human decision about which controls apply is never silently discarded, and a dangling provenance claim is never printed as fact";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). PARTLY FIXED ON MAIN, UNRELEASED: activation.toml has been in migrates PROJECT_OWNED set since 6583e08 (2026-08-30, issue314), which is NOT an ancestor of v0.3.1 (c4d5dbf, 2026-08-29) - so every adopter on the release still has the defect until a release ships it. RESIDUAL, real on main: nothing checks that charteredBy resolves, so onboard asserts a charter it cannot read; and attestation-policy.toml is still resynced wholesale (routed under GH#57). RECOMMEND: a guard/onboard refusal for a dangling charteredBy, and a release carrying the issue314 fix. High.";
+    }
+    #DerivedFrom dependency from us094 to st095;
+
+    part us095 : UserStory {
+        :>> id = "dc0ca7ea-b752-4f72-a69f-a8a132e26997";
+        :>> title = "GH#55: pre-commit, keelw and the Claude hooks resolve the binary three different ways, two falling back to PATH silently";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a contributor on a pinned project (reporter: williamweatherholtz)";
+        :>> iWant = "every gating surface to find the same pinned binary, and to print which binary gated";
+        :>> soThat = "a commit or a turn is never gated by a build the project does not pin, and a skew is visible in the output when it happens";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). VERIFIED: keelw and init write .keel/bin/<version>/<asset>; PRECOMMIT_HOOK (lib.rs) and claude_surface RESOLUTION_ORDER (D0316, this week) probe .keel/bin/keel(.exe) - a path nothing writes - then PATH. D0316 fixed the ORDER and left the mismatch: both hooks probe a file init never creates. RECOMMEND: one probe list in one place shared by the hook text and the Claude hooks - KEEL_BIN, .keel/bin/keel(.exe), the pins cache .keel/bin/<pin>/<asset> read from engine-version.toml, then PATH - and every surface prints the binary it gated with and its build commit, so the fallback is loud. High - a false green from the wrong engine on the two surfaces every commit and turn go through.";
+    }
+    #DerivedFrom dependency from us095 to st096;
+
+    part us096 : UserStory {
+        :>> id = "b6c5351f-cb94-44cb-9a04-477676fc2370";
+        :>> title = "GH#54: init seeds the wrapper cache with whatever binary ran it, under the pins name, and keelw never verifies a cache hit";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "a project initialised by a local build (reporter: williamweatherholtz)";
+        :>> iWant = "keelw to verify a cache hit against the committed checksum when one exists, and init never to seed from an unreleased build";
+        :>> soThat = "the pin names an artifact another machine can obtain, and a seeded binary cannot pass as the release for the projects whole life";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "UNTRUSTED tier, decider-filed (D0314). VERIFIED: init_wrapper (main.rs) copies current_exe into .keel/bin/<CARGO_PKG_VERSION>/<asset> unconditionally; keelw execs a cache hit without comparing it to keel-wrapper.toml. build.rs bakes KEEL_BUILD_COMMIT with +dirty for a modified tree, so init can tell. RECOMMEND: keelw checks a cache hits SHA-256 against the committed entry when one exists and refuses on mismatch naming both hashes; init seeds only from a clean (non-dirty) build and prints what it did either way, never writing a hash it made up. High - a false green in the direction nobody investigates.";
+    }
+    #DerivedFrom dependency from us096 to st097;
+
+    // Routing of the six downstream issues on the decider's own report (D0339, D0314): story -> Issue, story -> the routing Decision.
+    #Implicates dependency from us091 to issue377;
+    #Implicates dependency from us091 to d0339;
+    #Implicates dependency from us092 to issue381;
+    #Implicates dependency from us092 to d0339;
+    #Implicates dependency from us093 to issue376;
+    #Implicates dependency from us093 to d0339;
+    #Implicates dependency from us094 to issue380;
+    #Implicates dependency from us094 to d0339;
+    #Implicates dependency from us095 to issue378;
+    #Implicates dependency from us095 to d0339;
+    #Implicates dependency from us096 to issue379;
+    #Implicates dependency from us096 to d0339;
 }
