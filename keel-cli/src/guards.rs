@@ -5053,7 +5053,19 @@ fn activation_manifest(root: &Path) -> GuardReport {
             ));
         }
     }
-    GuardReport { name: "activation-manifest", scanned, warnings, violations: act.errors }
+    let mut violations = act.errors;
+    // issue380 / GH#56: a `charteredBy` that names no Decision in THIS project's decisions is a
+    // provenance claim the tree cannot back - the silent form of an engine resync writing another
+    // project's charter. Loud, so the set is re-chartered rather than read as chartered.
+    if let Some(charter) = crate::onboard::chartered_by(root) {
+        if !crate::onboard::charter_resolves(root, &charter) {
+            violations.push(format!(
+                "activation.toml: charteredBy = \"{charter}\" does not resolve - no .engine/decisions/{}-*.sysml in this project, so the process set is NOT chartered here (issue380/GH#56); re-run project-onboarding or restore your own activation.toml",
+                charter.trim_start_matches('d')
+            ));
+        }
+    }
+    GuardReport { name: "activation-manifest", scanned, warnings, violations }
 }
 
 // ── engine-lint guard (D0112 phase 1: the mechanical .engine instance lints, ported kernel-free) ──

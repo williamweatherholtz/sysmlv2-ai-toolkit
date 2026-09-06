@@ -63,6 +63,21 @@ pub fn chartered_by(root: &Path) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// Does `charter` (`dNNNN`) name a Decision file in THIS project's `.engine/decisions/`?
+///
+/// issue380 / GH#56: a v0.3.1 `migrate` wrote the engine's own `activation.toml` over a project's, and
+/// `onboard` then printed `CHARTERED by d0226` - a Decision that project did not hold. A provenance claim
+/// the tree cannot back is stated as such, never as fact.
+#[must_use]
+pub fn charter_resolves(root: &Path, charter: &str) -> bool {
+    let Some(num) = charter.strip_prefix('d').filter(|n| n.len() == 4 && n.chars().all(|c| c.is_ascii_digit())) else {
+        return false;
+    };
+    let prefix = format!("{num}-");
+    std::fs::read_dir(root.join(".engine").join("decisions"))
+        .is_ok_and(|rd| rd.flatten().any(|e| e.file_name().to_string_lossy().starts_with(&prefix) && e.path().extension().is_some_and(|x| x == "sysml")))
+}
+
 /// Every declared process with its applicability and current state, computed.
 #[must_use]
 pub fn rows(root: &Path) -> Vec<Applicability> {
@@ -109,9 +124,10 @@ pub fn cmd(args: &[String]) -> i32 {
                 )
             })
             .collect();
+        let resolves = charter.as_deref().is_some_and(|c| charter_resolves(&root, c));
         println!(
-            "{{\"chartered\":{},\"charteredBy\":{},\"declared\":{},\"undeclaredApplicability\":{},\"processes\":[{}]}}",
-            charter.is_some(),
+            "{{\"chartered\":{},\"charteredBy\":{},\"charterResolves\":{resolves},\"declared\":{},\"undeclaredApplicability\":{},\"processes\":[{}]}}",
+            charter.is_some() && resolves,
             charter.as_ref().map_or_else(|| "null".to_string(), |c| format!("\"{}\"", esc(c))),
             rows.len(),
             undeclared,
@@ -121,7 +137,11 @@ pub fn cmd(args: &[String]) -> i32 {
     }
 
     if let Some(d) = &charter {
-        println!("process set: CHARTERED by {d} ({} process(es) declared)", rows.len());
+        if charter_resolves(&root, d) {
+            println!("process set: CHARTERED by {d} ({} process(es) declared)", rows.len());
+        } else {
+            println!("process set: UNRESOLVED CHARTER {d} - activation.toml names a Decision this project does not hold, so the set is NOT chartered here ({} process(es) declared). issue380/GH#56: an engine resync can write another project's charter; re-run the project-onboarding skill or restore your own activation.toml from history.", rows.len());
+        }
     } else {
         println!("process set: NOT CHARTERED - nobody has recorded WHY these processes and not others.");
         println!("  Not a violation: an undeclared project runs everything by default (D0138).");
