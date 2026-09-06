@@ -207,7 +207,14 @@ fn a_cache_hit_with_no_committed_entry_runs_and_says_it_is_unverified() {
     std::fs::remove_file(proj.join("keel-wrapper.toml")).expect("rm - nothing to verify against");
     let cache = proj.join(".keel").join("bin").join("9.9.3");
     std::fs::create_dir_all(&cache).expect("cache dir");
-    std::fs::write(cache.join(asset_name()), fake_binary("HIT")).expect("a cached binary");
+    let cached = cache.join(asset_name());
+    std::fs::write(&cached, fake_binary("HIT")).expect("a cached binary");
+    // a cached binary is executable (the download path chmods it; a seeded one is a copied executable)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&cached, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
     let (ok, text) = run_keelw(&proj, "file:///nonexistent-origin", &["version"]);
     assert!(ok && text.contains("FAKE-KEEL-HIT"), "with no entry the hit runs, as before: {text}");
     assert!(text.contains("UNVERIFIED"), "and SAYS it ran on trust, so the skew is visible: {text}");
