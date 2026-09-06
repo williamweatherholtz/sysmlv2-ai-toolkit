@@ -4067,6 +4067,12 @@ viewpoints ({} declared):", vps.len());
 /// `.engine/`, which from inside a downstream project's subdirectory is right, but from anywhere in
 /// the self-build repo would point this at the engine SOURCE. `migrate` refuses the self-build repo
 /// anyway, but a command that rewrites authored facts should take its target explicitly.
+/// `keel currency [ROOT] ...` (D0338): a trailing ROOT is honoured only when it is a keel project.
+fn cmd_currency(rest: &[String]) -> i32 {
+    let root = rest.iter().find(|a| !a.starts_with("--") && Path::new(a.as_str()).join(".tracking").is_dir()).map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
+    keel_cli::currency::cmd(rest, &root)
+}
+
 fn cmd_migrate(args: &[String]) -> i32 {
     let dry_run = args.iter().any(|a| a == "--dry-run");
     // D0336: verified-or-reverted is the default; `--no-verify` writes an UNVERIFIED tree and says so.
@@ -4719,6 +4725,7 @@ fn main() {
                 |root| keel_cli::status::cmd(&root),
             )
         }),
+        Some("currency") => cmd_currency(rest), // D0338: the unattended pass - pull, library, drift
         Some("github-pull") => {
             let root = resolve_guard_root(
                 rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),

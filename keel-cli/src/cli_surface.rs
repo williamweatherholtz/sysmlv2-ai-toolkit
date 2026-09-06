@@ -20,10 +20,10 @@
 //! point. A unit declaring a name the post-collapse engine no longer has is exactly what must refuse.
 
 /// Every command this binary dispatches, sorted. Kept equal to `main.rs`'s dispatch by test.
-pub const COMMAND_NAMES: [&str; 67] = [
+pub const COMMAND_NAMES: [&str; 68] = [
     "accept", "activate", "activation", "actor", "actor-trace", "add-task",
     "adoption-check", "advance", "append-gate-result", "append-result", "apply-review", "arch",
-    "assured", "attestation", "audit", "audit-adherence", "audit-ci-runs", "audit-history", "check",
+    "assured", "attestation", "audit", "audit-adherence", "audit-ci-runs", "audit-history", "check", "currency",
     "check-engine", "claim", "claude", "deactivate", "decision-card", "deck", "diagram",
     "enforcement-report", "enroll", "gate", "github-decider", "github-decision-id", "github-gesture",
     "github-ingest", "github-pull", "governing-version", "guard", "hook", "init",

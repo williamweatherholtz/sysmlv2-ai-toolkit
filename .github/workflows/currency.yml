@@ -1,0 +1,69 @@
+# The UNATTENDED CURRENCY PASS (D0338, dcScheduledCurrency; nUnattendedCurrency / srUnattendedPullIsIdempotent).
+#
+# One declared, REMOVABLE schedule (D0163: delete this file and the schedule is gone) that runs ONE
+# command - `keel currency` - which pulls the repository's open issues as VERBATIM Statements (idempotent
+# on the issue URL; the trust tier recorded on each; NEVER triaged - D0264), syncs the unit library
+# (an unreachable remote is stated as stale, never treated as up to date), reads the drift back, and
+# prints one report. New Statements are committed to main by the recording actor after the project's
+# own gate passes; nothing else is written.
+#
+# INERT UNTIL THE HUMAN ACCEPTS D0338 (D0337: a change to the process surface is outside standing
+# consent). The first step reads the Decision's acceptance from the tree; until it is there the job
+# says so and exits 0 without pulling.
+name: currency
+on:
+  schedule:
+    - cron: "17 6 * * *"   # daily, 06:17 UTC
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  issues: read
+jobs:
+  currency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: is D0338 accepted? (D0337 - the schedule is inert until the human's word)
+        id: gate
+        run: |
+          if grep -q "d0338AcceptR1" .engine/decisions/0338-*.sysml 2>/dev/null; then
+            echo "accepted=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "accepted=no" >> "$GITHUB_OUTPUT"
+            echo "D0338 is not accepted yet - the currency schedule is declared but INERT (D0337). Nothing pulled."
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.gate.outputs.accepted == 'yes'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.gate.outputs.accepted == 'yes'
+      - name: build
+        if: steps.gate.outputs.accepted == 'yes'
+        run: cargo build --release -p keel-cli
+      - name: currency pass (pull as verbatim Statements, library sync, drift; one report)
+        if: steps.gate.outputs.accepted == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEL_ACTOR: githubRecorder
+        run: |
+          ./target/release/keel currency . --repo "${{ github.repository }}" --by githubRecorder | tee currency-report.txt
+          echo '## currency pass' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat currency-report.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: gate, then commit the new Statements (words only - nothing is triaged)
+        if: steps.gate.outputs.accepted == 'yes'
+        env:
+          KEEL_ACTOR: githubRecorder
+        run: |
+          if git status --porcelain -- .tracking/intake | grep -q .; then
+            ./target/release/keel gate --workspace .
+            git config user.name "githubRecorder (keel currency)"
+            git config user.email "keel-currency@users.noreply.github.com"
+            git add .tracking/intake
+            git commit -m "currency: verbatim Statements pulled from open issues (D0338; untriaged, D0264)" -m "Recorded by the scheduled currency pass. What each implicates is a judgment for a session to make."
+            git push origin HEAD:main
+          else
+            echo "no new Statements - nothing to commit"
+          fi

@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 104] = [
+pub const CLI_FACTS: [CliFact; 105] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
@@ -79,6 +79,7 @@ pub const CLI_FACTS: [CliFact; 104] = [
     CliFact { name: "activate", family: "distribution", effect: "writes", stability: "stable", invocation: "<process|viewpoint> [ROOT]", synopsis: "adopt a process or viewpoint as a unit" },
     CliFact { name: "deactivate", family: "distribution", effect: "writes", stability: "stable", invocation: "<process|viewpoint> [ROOT]", synopsis: "drop a process or viewpoint as a unit" },
     CliFact { name: "github-pull", family: "channel", effect: "writes", stability: "stable", invocation: "--repo O/N --by ACTOR --at DATE [--limit N] [--trust T]", synopsis: "pull open issues and ingest the new ones as verbatim Statements; autonomy follows repository visibility" },
+    CliFact { name: "currency", family: "channel", effect: "writes", stability: "stable", invocation: "[ROOT] --repo OWNER/NAME --by ACTOR [--at DATE] [--skip-pull]", synopsis: "the unattended currency pass: pull open issues as verbatim Statements, sync the library, read drift back - one report, never a triage (D0338)" },
     CliFact { name: "github-ingest", family: "channel", effect: "writes", stability: "stable", invocation: "--repo O/N --issue N --by ACTOR --at DATE [--from FILE]", synopsis: "one GitHub issue becomes a verbatim Statement, idempotent on its URL" },
     CliFact { name: "github-decider", family: "channel", effect: "reads", stability: "deprecated", invocation: "[<login>]", synopsis: "who may decide on the channel; an unmapped login is refused, never defaulted" },
     CliFact { name: "github-gesture", family: "channel", effect: "reads", stability: "deprecated", invocation: "(env: COMMENT_BODY ...)", synopsis: "parse a channel comment into a JSON verdict; called by the workflow" },

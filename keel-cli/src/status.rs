@@ -203,6 +203,12 @@ fn installed(root: &Path) -> Option<Vec<(String, u32)>> {
     Some(out)
 }
 
+/// The library section's lines alone - the drift report the currency pass (D0338) reads back.
+#[must_use]
+pub fn library_lines(root: &Path) -> Vec<String> {
+    library_section(root).lines
+}
+
 /// LIBRARY — what the shared library holds versus what this project installed: units BEHIND, and
 /// units AVAILABLE that the project has never imported (the human's "library update new processes").
 fn library_section(root: &Path) -> Section {
