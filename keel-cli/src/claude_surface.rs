@@ -52,19 +52,35 @@ pub const PROTECTED_PATHS: [(&str, &str); 5] = [
 /// too, so with the binary absent a control-plane write is denied rather than silently allowed.
 pub const CONTROL_PLANE_PATHS: [&str; 3] = [".claude/settings.json", ".githooks/", "output-styles/keel.md"];
 
-/// The binary-resolution ORDER every keel surface agrees on (D0230; issue348/GH#43).
+/// The binary-resolution ORDER every keel surface agrees on (D0230; issue348/GH#43; issue378/GH#55).
 ///
-/// `KEEL_BIN`, then the project's PINNED binary at `.keel/bin/keel(.exe)`, then PATH. The scaffolded
-/// git hooks probe in this order; until D0316 the Claude hooks skipped the pin and a project pinned to
-/// 0.3.0 ran its turns on whatever PATH held - including an uncommitted build. One list, so the two
+/// `KEEL_BIN`, then a binary dropped at `.keel/bin/keel(.exe)`, then the PIN's own cache
+/// `.keel/bin/<engine pin>/<asset>` - the layout `keelw` and `keel init` actually write - then PATH.
+/// Until D0316 the Claude hooks skipped the pin; after it both hook surfaces probed `.keel/bin/keel`,
+/// a path nothing writes, and still fell through to PATH on every fresh project (GH#55). One list and
+/// ONE probe (`pin_probe_sh`) shared by the scaffolded git hook and every generated Claude hook, so the
 /// surfaces cannot disagree again; `every_hook_command_resolves_the_pin_before_path_in_the_git_hooks_order`
 /// holds them equal.
-pub const RESOLUTION_ORDER: [&str; 3] = ["KEEL_BIN", ".keel/bin/keel", "command -v"];
+pub const RESOLUTION_ORDER: [&str; 4] = ["KEEL_BIN", ".keel/bin/keel", "engine-version.toml", "command -v"];
 
-/// The POSIX-sh probe realising `RESOLUTION_ORDER` inside a hook command. The Claude hooks run with
-/// the project directory as cwd and `CLAUDE_PROJECT_DIR` set, so the pin is probed under both.
+/// The POSIX-sh probe realising `RESOLUTION_ORDER`, leaving the resolved binary in `$K`.
+///
+/// `$K` is empty when nothing resolved. `root` is the shell expression for the project directory -
+/// `.` in a git hook, `${CLAUDE_PROJECT_DIR:-.}` in a Claude hook. The pin's cache is found by reading
+/// the version out of `engine-version.toml` and globbing the release-asset name under it.
+#[must_use]
+pub fn pin_probe_sh(root: &str) -> String {
+    format!(
+        "K=\"${{KEEL_BIN:-}}\"; {{ [ -n \"$K\" ] && [ -x \"$K\" ]; }} || {{ K=; for c in \"{root}/.keel/bin/keel\" \"{root}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && {{ K=\"$c\"; break; }}; done; }}; \
+         [ -n \"$K\" ] || {{ P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"{root}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"{root}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && {{ K=\"$c\"; break; }}; done; }}; \
+         [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); "
+    )
+}
+
+/// The probe as the Claude hooks embed it: they run with the project directory as cwd and
+/// `CLAUDE_PROJECT_DIR` set, so the pin is probed under both.
 fn pin_first_probe() -> String {
-    "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); ".to_string()
+    pin_probe_sh("${CLAUDE_PROJECT_DIR:-.}")
 }
 
 /// POSIX-sh binary resolution used by every scaffolded hook: `KEEL_BIN` (absolute, injected by the
@@ -525,7 +541,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 #[cfg(test)]
 mod tests {
     use super::{
-        hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
+        hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, pin_probe_sh, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
         same_text, sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
     };
 
@@ -566,9 +582,41 @@ mod tests {
             }
         }
         assert!(commands >= 6, "every event's command was checked: {commands}");
-        // The scaffolded git hook probes in the same order (D0230) - the two surfaces agree.
-        assert!(probes_in_order(crate::PRECOMMIT_HOOK), "the git hook probes in the same order");
+        // The scaffolded git hook probes in the same order (D0230) - the two surfaces agree, because
+        // both embed the SAME probe text (issue378: two probe texts drifted into two layouts).
+        let hook = crate::precommit_hook();
+        assert!(probes_in_order(&hook), "the git hook probes in the same order");
+        assert!(hook.contains(&pin_probe_sh(".")), "the git hook embeds the shared probe verbatim");
         assert!(!probes_in_order("K=$(command -v keel); [ -x .keel/bin/keel ] && K=.keel/bin/keel; K=${KEEL_BIN:-$K}"), "a PATH-first script is refused by this check");
+    }
+
+    /// issue378 / GH#55: the probe finds the binary where `keelw` and `keel init` PUT it -
+    /// `.keel/bin/<pin>/<asset>` - with nothing at `.keel/bin/keel` and nothing on PATH. Run through
+    /// `sh` against a real directory; skipped where no `sh` exists.
+    #[test]
+    fn the_probe_resolves_the_pins_own_cache_before_path() {
+        if std::process::Command::new("sh").arg("-c").arg("true").output().is_err() {
+            eprintln!("no sh on this machine - probe test skipped");
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("keel-probe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".engine/contracts")).expect("mkdir");
+        std::fs::create_dir_all(dir.join(".keel/bin/9.9.9")).expect("mkdir");
+        std::fs::write(dir.join(".engine/contracts/engine-version.toml"), "engine = \"9.9.9\"\n").expect("pin");
+        let asset = dir.join(".keel/bin/9.9.9/keel-linux-x86_64");
+        std::fs::write(&asset, "#!/bin/sh\necho pinned\n").expect("asset");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&asset, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        }
+        let script = format!("{}printf %s \"$K\"", pin_probe_sh("."));
+        // a PATH with the shell utilities the probe uses (sed, head) and no keel install
+        let out = std::process::Command::new("sh").arg("-c").arg(&script).current_dir(&dir).env("PATH", "/usr/bin:/bin").env_remove("KEEL_BIN").output().expect("sh runs");
+        let k = String::from_utf8_lossy(&out.stdout).to_string();
+        assert!(k.ends_with("/.keel/bin/9.9.9/keel-linux-x86_64"), "the pin's cache resolves (stderr: {}): {k:?}", String::from_utf8_lossy(&out.stderr));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Does `script` probe the three resolution steps in `RESOLUTION_ORDER`, each AFTER the previous

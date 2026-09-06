@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook config-change",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook config-change",
             "shell": "bash",
             "statusMessage": "hook kill-switch guard",
             "timeout": 30,
@@ -18,7 +18,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook post-edit",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook post-edit",
             "shell": "bash",
             "statusMessage": "keel fast gate",
             "timeout": 60,
@@ -32,7 +32,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook pre-bash",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook pre-bash",
             "shell": "bash",
             "statusMessage": "shell adaptation advisory",
             "timeout": 30,
@@ -44,7 +44,7 @@
       {
         "hooks": [
           {
-            "command": "IN=$(cat); case \"$IN\" in *'.tracking/issues'*|*'.tracking\\\\issues'*|*'.tracking/backlog.sysml'*|*'.tracking\\\\backlog.sysml'*|*'.tracking/critiques'*|*'.tracking\\\\critiques'*|*'.tracking/delivery/'*|*'.tracking\\\\delivery\\\\'*|*'.engine/decisions/'*|*'.engine\\\\decisions\\\\'*|*'.claude/settings.json'*|*'.claude\\\\settings.json'*|*'.githooks/'*|*'.githooks\\\\'*|*'output-styles/keel.md'*|*'output-styles\\\\keel.md'*) K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); if [ -n \"$K\" ]; then printf '%s' \"$IN\" | \"$K\" hook pre-write; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[keel] protected fact surface and the keel binary is ABSENT - refusing a blind write. Install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases ; then use the sanctioned write commands (keel --help).\"}}'; fi;; *) : ;; esac",
+            "command": "IN=$(cat); case \"$IN\" in *'.tracking/issues'*|*'.tracking\\\\issues'*|*'.tracking/backlog.sysml'*|*'.tracking\\\\backlog.sysml'*|*'.tracking/critiques'*|*'.tracking\\\\critiques'*|*'.tracking/delivery/'*|*'.tracking\\\\delivery\\\\'*|*'.engine/decisions/'*|*'.engine\\\\decisions\\\\'*|*'.claude/settings.json'*|*'.claude\\\\settings.json'*|*'.githooks/'*|*'.githooks\\\\'*|*'output-styles/keel.md'*|*'output-styles\\\\keel.md'*) K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); if [ -n \"$K\" ]; then printf '%s' \"$IN\" | \"$K\" hook pre-write; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[keel] protected fact surface and the keel binary is ABSENT - refusing a blind write. Install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases ; then use the sanctioned write commands (keel --help).\"}}'; fi;; *) : ;; esac",
             "shell": "bash",
             "statusMessage": "protected-path check",
             "timeout": 30,
@@ -58,7 +58,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { printf '%s' '{\"decision\":\"block\",\"reason\":\"[keel] The turn gate could not run: the keel binary is NOT FOUND. This project runs under keel, so a turn cannot end ungated. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases\"}'; exit 0; }; \"$K\" hook stop",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { printf '%s' '{\"decision\":\"block\",\"reason\":\"[keel] The turn gate could not run: the keel binary is NOT FOUND. This project runs under keel, so a turn cannot end ungated. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases\"}'; exit 0; }; \"$K\" hook stop",
             "shell": "bash",
             "statusMessage": "keel turn gate",
             "timeout": 180,
@@ -71,7 +71,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook subagent-stop",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook subagent-stop",
             "shell": "bash",
             "statusMessage": "subagent tree gate",
             "timeout": 120,
@@ -84,7 +84,7 @@
       {
         "hooks": [
           {
-            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook user-prompt",
+            "command": "K=\"${KEEL_BIN:-}\"; { [ -n \"$K\" ] && [ -x \"$K\" ]; } || { K=; for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel\" \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/keel.exe\"; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || { P=$(sed -n 's/^engine *= *\"\\(.*\\)\"/\\1/p' \"${CLAUDE_PROJECT_DIR:-.}/.engine/contracts/engine-version.toml\" 2>/dev/null | head -n1); [ -n \"$P\" ] && for c in \"${CLAUDE_PROJECT_DIR:-.}/.keel/bin/$P\"/keel-*; do [ -x \"$c\" ] && { K=\"$c\"; break; }; done; }; [ -n \"$K\" ] || K=$(command -v keel 2>/dev/null); [ -n \"$K\" ] || { echo '[keel] keel binary NOT FOUND - this gate did not run. Set KEEL_BIN or install: https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases' >&2; exit 0; }; \"$K\" hook user-prompt",
             "shell": "bash",
             "statusMessage": "route-first checklist",
             "timeout": 30,

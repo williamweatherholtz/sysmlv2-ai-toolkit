@@ -72,6 +72,17 @@ const fn managed_settings_path() -> &'static str {
 /// HOOKS — which hosts carry the keel hook set for this project, and whether anything silences them
 /// (D0296). An out-of-hook check on purpose: a silenced hook cannot report itself (D0296 run 5), so
 /// the one place that can say "your hooks are off" is a command the human runs by hand.
+/// The last fire-ledger line's binary and build, when the ledger records them (issue378).
+fn last_hook_fire(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).ok()?;
+    let last = text.lines().rev().find(|l| !l.trim().is_empty())?;
+    let v: serde_json::Value = serde_json::from_str(last).ok()?;
+    let bin = v.get("bin")?.as_str().filter(|b| !b.is_empty())?;
+    let build = v.get("build").and_then(serde_json::Value::as_str).unwrap_or("?");
+    let event = v.get("event").and_then(serde_json::Value::as_str).unwrap_or("?");
+    Some(format!("last hook fire: {event} ran as {bin} (build {build})"))
+}
+
 fn hooks_section(root: &Path) -> Section {
     use crate::claude_surface::{hooks_silenced, merge_settings, PLUGIN_DIR, REPO_SCOPE_SETTINGS};
     let mut lines = Vec::new();
@@ -122,6 +133,11 @@ fn hooks_section(root: &Path) -> Section {
     } else {
         "managed settings: none (optional, admin-deployed)".to_string()
     });
+    // issue378 / GH#55: which binary the LAST hook fire ran as, from the fire-ledger - the one place
+    // the turn-boundary surface says what gated it.
+    if let Some(last) = last_hook_fire(root) {
+        lines.push(last);
+    }
     if !declared && !plugin {
         state = State::Attention;
         lines.insert(0, "NO hook host: neither repo settings nor a plugin rendering - only the commit gate and CI gate this project; `keel sync-claude` creates both".to_string());

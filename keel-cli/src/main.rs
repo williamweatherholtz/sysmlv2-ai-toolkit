@@ -57,7 +57,7 @@ const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which ve
 /// there'd be no `ProjectActors` to reference. Ships placeholder actors (a human + the AI) the newcomer
 /// edits to their real identities; the declared part name is the id that `createdBy`/`judgedBy` reference.
 const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry (INSTANCE data). EDIT to your real actors.\n// The declared part name is the id that createdBy/judgedBy reference (enforced by `keel guard actors`).\npackage ProjectActors {\n    private import EngineElement::*;\n\n    part you : Person { :>> name = \"Your Name\"; :>> email = \"you@example.com\"; }\n    part ai : Actor { :>> name = \"AI assistant\"; :>> kind = ActorKind::ai; }\n}\n";
-use keel_cli::PRECOMMIT_HOOK;
+use keel_cli::precommit_hook;
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
 /// project, it is state that is TRUE OF ONE CLONE and false of every other.
@@ -399,7 +399,10 @@ fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
     let decision = if exit == 0 { "allow" } else { "block" };
     let line = format!(
         "{}\n",
-        serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": u64::try_from(ms).unwrap_or(u64::MAX)})
+        // issue378 / GH#55: WHICH binary ran this hook, and which build - the turn-boundary surface's
+        // answer to "did the pinned engine gate this", readable from `keel status`.
+        serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": u64::try_from(ms).unwrap_or(u64::MAX),
+            "bin": std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(), "build": env!("KEEL_BUILD_COMMIT")})
     );
     let appended = std::fs::OpenOptions::new()
         .create(true)
@@ -3434,7 +3437,7 @@ fn install_commit_gate(repo_root: &Path, project: &Path) -> Result<(), i32> {
             println!("  Add `keel gate --workspace .` to it, or this project is not gated at commit.");
         }
     } else {
-        if let Err(e) = std::fs::write(&hook_path, PRECOMMIT_HOOK) {
+        if let Err(e) = std::fs::write(&hook_path, precommit_hook()) {
             eprintln!("error writing {}: {e}", hook_path.display());
             return Err(1);
         }
