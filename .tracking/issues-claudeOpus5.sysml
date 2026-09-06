@@ -1057,4 +1057,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcDecisionReportIsArguable to issue383;
+
+    part issue384 : Issue {
+        :>> id = "e81ecd9f-fb0b-4024-9a9a-4b4dc2f8b5dd";
+        :>> title = "migrate printed 40 passing lines and hid the violation that reverted the update";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel migrate reported the first 40 lines of a failed gate, which are all PASS, so the violation that caused the revert was invisible - in the printed report AND in the recorded attempt, which stored the same clipped text. Found 2026-09-06 on the 0.4.0 version bump: ten migration tests failed, every printed guard read PASS, and the actual cause (claude-surface-drift: the plugin rendering was stale because the manifest stamps the engine version and the version had just changed) sat below the cut. Diagnosis took four extra passes and a --no-verify apply to see a line the tool already had. This is the red-yield truncation class one command over: a diagnostic clipped by POSITION rather than by RELEVANCE. Fixed here: migrate::gate_failure_lines selects the lines naming a failure, violation, error or refusal, caps at 20 with a count of the rest, and falls back to the tail when nothing names itself; the recorded attempt stores the same selection.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcMigrateReportsTheFailingLines to issue384;
 }

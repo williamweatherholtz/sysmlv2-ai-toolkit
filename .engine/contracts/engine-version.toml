@@ -1,4 +1,4 @@
 # engine-version - the BINDING engine pin: the version whose writes and gates this project accepts
 # (D0190 stamped it; D0251 made it bite). Written by `keel init`, re-stamped by `keel migrate`; a
 # mismatched binary refuses writes and gates, warns on reads. keelw resolves this pin (D0251 B).
-engine = "0.3.1"
+engine = "0.4.0"

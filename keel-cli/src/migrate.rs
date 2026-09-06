@@ -1290,10 +1290,10 @@ fn finish_applied(root: &Path, p: &MigrationPlan, pre_sha: Option<&String>, writ
             }
             Err((gate, output)) => {
                 eprintln!("keel migrate: the update was written but this project's own gate went RED under {} - {gate}:", env!("CARGO_PKG_VERSION"));
-                for line in output.lines().take(40) {
+                for line in gate_failure_lines(&output) {
                     eprintln!("    {line}");
                 }
-                record_attempt(root, "reverted", &gate, &output);
+                record_attempt(root, "reverted", &gate, &gate_failure_lines(&output).join("\n"));
                 eprintln!("  REVERTING: verified-green or byte-for-byte as before - there is no third state (srUpdateIsVerifiedOrReverted).");
                 let code = rollback_after_failure(root, pre_sha, written);
                 eprintln!("  RECORDED in .keel/update-attempts.toml (`keel status` shows it): version {}, gate {gate}. A re-run will say this version was reverted here.", env!("CARGO_PKG_VERSION"));
@@ -1313,6 +1313,32 @@ fn finish_applied(root: &Path, p: &MigrationPlan, pre_sha: Option<&String>, writ
 
 /// The project's own gate under THIS binary: validate, every enforced guard, check-engine. `Err((gate,
 /// verbatim output))` on the first red.
+/// The lines of a gate run that EXPLAIN a failure, in order: anything failing, then the tail.
+///
+/// A gate prints one PASS per check, so `take(40)` showed forty passes and hid the violation that
+/// caused the revert - the 0.4.0 bump reverted on `claude-surface-drift` and neither the printed
+/// report nor the recorded attempt contained the word. Relevance, not position.
+fn gate_failure_lines(output: &str) -> Vec<String> {
+    let interesting: Vec<&str> = output
+        .lines()
+        .filter(|l| {
+            let u = l.to_uppercase();
+            (u.contains("FAIL") || u.contains("ERROR") || u.contains("VIOLATION") || u.contains("REFUSED"))
+                && !u.contains("0 VIOLATION(S)")
+        })
+        .collect();
+    if interesting.is_empty() {
+        // nothing named itself: the tail is where a crash or a summary lands
+        let all: Vec<&str> = output.lines().collect();
+        return all.iter().skip(all.len().saturating_sub(20)).map(|l| (*l).to_string()).collect();
+    }
+    let mut out: Vec<String> = interesting.iter().take(20).map(|l| (*l).to_string()).collect();
+    if interesting.len() > 20 {
+        out.push(format!("... and {} more failing line(s)", interesting.len() - 20));
+    }
+    out
+}
+
 fn project_gate(root: &Path) -> Result<(), (String, String)> {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("keel"));
     let r = root.to_string_lossy().to_string();
