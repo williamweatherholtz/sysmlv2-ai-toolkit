@@ -1,0 +1,29 @@
+// ProjectDeliveryS580 — Sprint 580: a library unit its upstream has abandoned can be retired, and the retirement reaches every consumer - decision-channel v6 is retired for GH#57 and GH#58. EXECUTE. 3 pts.
+package ProjectDeliveryS580 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from unitRetiredStory to d0345;
+
+    part unitRetiredStory : Story {
+        :>> id = "fedf7b4c-606c-4c0a-ae69-0d531bccc6f4";
+        :>> title = "Sprint 580: a library unit its upstream has abandoned can be retired, and the retirement reaches every consumer - decision-channel v6 is retired for GH#57 and GH#58 (3 pts)";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS580 {
+        action storyUnitRetired;
+        verification storyUnitRetiredDoD : Test { :>> id = "ddf3f07a-9d22-454d-88db-5cd2601d8e72"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcLibraryUnitRetirement (D0345 proposed, process-change - waits for the human under D0337; resolves issue381, GH#58, and the library half of issue376, GH#57). DONE: keel process retire <name> --why TEXT [--replaced-by TEXT] [--at DATE] writes retired/retiredAt/retiredWhy/replacedBy into the library unit.toml and commits in the clone (--why at least 20 characters, a second retirement refused); import --from-library refuses a retired unit naming the why and the replacement; library list marks it; keel status marks an installed retired unit and never offers one, so the currency pass's drift lines carry it; library-stewardship rule 6; the process CLI fact names publish|retire in both homes. LIVE: decision-channel v6 retired in keel-lib (commit c619e28, pushed; main...origin/main in sync) with both reasons and record-time standing consent as the replacement; keel library list reads RETIRED 2026-09-06 and keel status here offers 10 units instead of 11."; }
+        // RAN: dcLibraryUnitRetirement DoD pass on suite580 549/0; the implement section names each run and the live push
+        part storyUnitRetiredDoDR1 : TestResult { :>> id = "8e99416a-761e-4711-86a3-fba5a26000c8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "d5334b27a1bdfe5195b229155eccf6ef8642701b"; :>> judgedAt = "2026-09-06"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification unitRetiredRefineGate : Test { :>> id = "0102e990-8dfc-4f5d-adc1-dbb7903a4bd0"; :>> title = "Sprint 580 refine gate (DoR)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: rule 1 (publish from landed trees only) ruled out patching; deleting the unit would erase the history its consumers installed against; a retirement is a fact added. The one design point was refuse-versus-warn on import: a warning on an install path is the class that produced GH#57 downstream, so refuse."; }
+    verification unitRetiredStandupGate : Test { :>> id = "e2cdad67-b19f-445a-bef0-e921adc1f1d1"; :>> title = "Sprint 580 standup gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THE LIBRARY HAD NO WORD FOR ABANDONED. A unit whose upstream had walked away stayed on offer with a fabricated-attestation script inside it, because nothing could say otherwise."; }
+    verification unitRetiredImplementGate : Test { :>> id = "47086d69-7a22-4425-89cf-276687751597"; :>> title = "Sprint 580 implement gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: cargo test --test library_unit_retirement 3/3 on an isolated HOME (retire writes and commits once, list marks, import refuses naming why and replacement, second retirement refused; a short --why refused writing nothing; status marks the installed retired unit and never offers it); keel guard cli-surface-declared . PASS 105; clippy -D warnings clean; keel sync-claude; the live retirement and push above; full suite in suite580.txt."; }
+    verification unitRetiredReviewGate : Test { :>> id = "368e29ad-1d66-4ecd-947c-a050ec3f59d5"; :>> title = "Sprint 580 review gate — three passes per D0172"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) IS ANYTHING ERASED: the unit directory, its version and its files are untouched - four lines are appended. (2) CAN A CONSUMER STILL READ WHAT IT INSTALLED: yes, the clone holds it; only import refuses. (3) WAS THE PUSH DELIBERATE: routed by D0339 (accepted) and done by hand after reading the commit and the toml back."; }
+    verification unitRetiredCloseOutGate : Test { :>> id = "ab2cc9a7-09b9-4947-a840-6a673b5c466a"; :>> title = "Sprint 580 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. issue381 resolves on this pass; all six GH#54-59 resolvers are done; D0345 joins D0340, D0343 and D0344 on the human's queue."; }
+    verification unitRetiredRetroGate : Test { :>> id = "f8776424-6ddc-47e5-bf83-ea2efca86458"; :>> title = "Sprint 580 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: dcProcessRemoveCommand is the consumer's one-act path to drop a retired unit, and is on the frontier. The lesson: a catalogue needs a state for withdrawn as much as for published - publish-only vocabularies leave defects on offer."; }
+}

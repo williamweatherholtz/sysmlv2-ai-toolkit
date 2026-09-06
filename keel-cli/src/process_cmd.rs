@@ -852,6 +852,76 @@ fn cmd_publish(args: &[String], root: &Path) -> i32 {
     0
 }
 
+/// `keel process retire <name> --why TEXT [--replaced-by TEXT] [--at DATE]` (issue381): mark a
+/// library unit RETIRED in the clone and commit it there - not pushed, like `publish`.
+///
+/// WHY A RETIREMENT AND NOT A NEW VERSION. library-stewardship rule 1 publishes from landed trees
+/// only; a unit whose upstream deleted it (decision-channel, D0291) has no landed tree to publish
+/// from, and a unit that records acceptances in a hardcoded human's name (GH#57) must not stay
+/// importable while that is sorted. The unit stays in the library as the history its consumers
+/// installed against; `import --from-library` refuses it, `list`/`status` mark it.
+fn cmd_retire(args: &[String]) -> i32 {
+    const USAGE: &str = "usage: keel process retire <name> --why TEXT [--replaced-by TEXT] [--at YYYY-MM-DD]   (marks the unit RETIRED in the library clone and commits; push separately)";
+    let Some(name) = args.get(1).filter(|a| !a.starts_with("--")) else {
+        eprintln!("{USAGE}");
+        return 2;
+    };
+    let flag = |k: &str| args.iter().position(|a| a == k).and_then(|i| args.get(i + 1)).cloned();
+    let Some(why) = flag("--why").filter(|w| w.trim().len() >= 20) else {
+        eprintln!("{USAGE}\n  --why is required and is the record: at least 20 characters saying what a consumer is protected from.");
+        return 2;
+    };
+    let replaced_by = flag("--replaced-by");
+    let at = flag("--at").unwrap_or_else(crate::scaffold::today);
+    let Some(clone) = crate::library::clone_dir().filter(|d| d.join(".git").exists()) else {
+        eprintln!("library: not initialised on this machine — `keel library init <remote>` first");
+        return 2;
+    };
+    let unit = clone.join(name);
+    let toml_path = unit.join("unit.toml");
+    let Ok(text) = std::fs::read_to_string(&toml_path) else {
+        eprintln!("library: no unit named `{name}` in the clone at {} — `keel library list` shows what it holds", clone.display());
+        return 2;
+    };
+    if let Some(r) = crate::library::retirement(&unit) {
+        eprintln!("retire: `{name}` is already {} - a retirement is recorded once; to change the reason, edit the library deliberately", r.line());
+        return 2;
+    }
+    let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+    let mut out = text;
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    {
+        use std::fmt::Write as _;
+        let _ = write!(out, "\n# RETIRED by its upstream (keel process retire). Consumers keep what they installed; nothing new imports it.\nretired = true\nretiredAt = \"{}\"\nretiredWhy = \"{}\"\n", esc(&at), esc(&why));
+        if let Some(r) = &replaced_by {
+            let _ = writeln!(out, "replacedBy = \"{}\"", esc(r));
+        }
+    }
+    if let Err(e) = std::fs::write(&toml_path, out) {
+        eprintln!("retire: could not write {}: {e}", toml_path.display());
+        return 1;
+    }
+    let msg = format!("retire {name}: {}", why.chars().take(72).collect::<String>());
+    for step in [vec!["add", "-A", "--", name.as_str()], vec!["-c", "commit.gpgsign=false", "commit", "-q", "-m", &msg]] {
+        match crate::gitx::git().arg("-C").arg(&clone).args(&step).output() {
+            Ok(o) if o.status.success() => {}
+            Ok(o) => {
+                eprintln!("retire: git {step:?} failed: {}", String::from_utf8_lossy(&o.stderr).trim());
+                return 1;
+            }
+            Err(e) => {
+                eprintln!("retire: git failed to run: {e}");
+                return 1;
+            }
+        }
+    }
+    println!("retire: `{name}` marked RETIRED ({at}) in the library clone at {} — NOT pushed.", clone.display());
+    println!("  Push when ready: git -C {} push   (the push is the human-visible act, D0250 clause D)", clone.display());
+    0
+}
+
 fn cmd_export(args: &[String], root: &Path) -> i32 {
 
             let Some(name) = args.get(1) else {
@@ -1169,7 +1239,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
     0
 }
 
-/// `keel process <list|search|show|export|import>`.
+/// `keel process <list|search|show|export|import|publish|retire>`.
 #[must_use]
 /// `keel process audit` — would each unit land GREEN in a project that does not already have it?
 /// (D0222, after issue252.)
@@ -1496,9 +1566,10 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         }
         Some("export") => cmd_export(args, root),
         Some("publish") => cmd_publish(args, root),
+        Some("retire") => cmd_retire(args),
         Some("import") => cmd_import(args, root),
         Some(other) => {
-            eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir>)");
+            eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir> | publish <name> | retire <name> --why TEXT)");
             2
         }
     }

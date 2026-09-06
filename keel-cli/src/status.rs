@@ -236,11 +236,18 @@ fn library_section(root: &Path) -> Section {
         };
     };
     let mut available: Vec<(String, u32)> = Vec::new();
+    let mut retired: Vec<(String, crate::library::Retirement)> = Vec::new();
     if let Ok(rd) = std::fs::read_dir(&dir) {
         for e in rd.flatten() {
             let Ok(t) = std::fs::read_to_string(e.path().join("unit.toml")) else { continue };
+            let name = e.file_name().to_string_lossy().to_string();
+            // issue381: a unit its upstream retired is not on offer; if it is installed here, say so.
+            if let Some(r) = crate::library::retirement(&e.path()) {
+                retired.push((name, r));
+                continue;
+            }
             if let Some(v) = field(&t, "version").and_then(|v| v.parse().ok()) {
-                available.push((e.file_name().to_string_lossy().to_string(), v));
+                available.push((name, v));
             }
         }
     }
@@ -266,11 +273,17 @@ fn library_section(root: &Path) -> Section {
         .filter(|(n, _)| !mine.iter().any(|(m, _)| m == n))
         .map(|(n, v)| format!("  available, not installed: {n} v{v}   `keel process import --from-library {n}`"))
         .collect();
+    let mut retired_here: Vec<String> = retired
+        .iter()
+        .filter_map(|(n, r)| mine.iter().find(|(m, _)| m == n).map(|(_, have)| format!("  {n} v{have} installed here is {} - keep what you have or remove it; nothing new imports it", r.line())))
+        .collect();
     behind.sort();
     new_units.sort();
-    if !behind.is_empty() || !new_units.is_empty() {
+    retired_here.sort();
+    if !behind.is_empty() || !new_units.is_empty() || !retired_here.is_empty() {
         attention = true;
     }
+    lines.extend(retired_here);
     lines.extend(behind);
     lines.extend(new_units);
     if !attention {

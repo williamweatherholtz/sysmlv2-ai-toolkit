@@ -72,7 +72,7 @@ pub const CLI_FACTS: [CliFact; 105] = [
     CliFact { name: "sync-claude", family: "integration", effect: "both", stability: "stable", invocation: "[ROOT] [--check]", synopsis: "regenerate the keel-owned .claude/ surface; --check reports drift only" },
     CliFact { name: "projects", family: "integration", effect: "reads", stability: "stable", invocation: "[ROOT] [--json]", synopsis: "every keel project in this repository, and which one you are in" },
     CliFact { name: "version", family: "integration", effect: "tooling", stability: "stable", invocation: "[--json]  (also --version)", synopsis: "release version, build commit, guard inventory" },
-    CliFact { name: "process", family: "distribution", effect: "both", stability: "stable", invocation: "list|search|show|export|import ...", synopsis: "the process catalogue: import or export a unit" },
+    CliFact { name: "process", family: "distribution", effect: "both", stability: "stable", invocation: "list|search|show|export|import|publish|retire ...", synopsis: "the process catalogue: import or export a unit" },
     CliFact { name: "library", family: "distribution", effect: "both", stability: "stable", invocation: "init|sync|list", synopsis: "the machine-local cache of the portable-content repository" },
     CliFact { name: "onboard", family: "distribution", effect: "reads", stability: "stable", invocation: "[ROOT] [--json]", synopsis: "has this project chosen its processes, and on what basis" },
     CliFact { name: "activation", family: "distribution", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "which processes and viewpoints this project has adopted" },

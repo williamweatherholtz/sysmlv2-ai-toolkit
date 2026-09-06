@@ -28,6 +28,16 @@ Deploys `.engine/processes/library-stewardship.sysml` (D0259). The mechanics (`k
    number here is unrecoverable, because consumers have already compared against it — theirs would
    then report "nothing behind" over content that entirely differs.
 
+6. **A unit its upstream has abandoned is RETIRED, never left importable** (D0345/issue381).
+   `keel process retire <name> --why TEXT [--replaced-by TEXT]` writes `retired`/`retiredAt`/
+   `retiredWhy`/`replacedBy` into the library unit.toml and commits in the clone; push deliberately, as
+   for publish. The unit stays as the history its consumers installed against; `import --from-library`
+   refuses it naming the why and the replacement, `library list` and `keel status` mark it, and the
+   currency pass carries the mark. Use it when rule 1 cannot: the upstream deleted the unit (no landed
+   tree to publish from) or the published version carries a defect a consumer must be protected from —
+   decision-channel v6 was both (GH#57: a script recording acceptances in a hardcoded human's name;
+   GH#58: a label it never creates). `--why` is the record and must say what a consumer is protected from.
+
 ## Removal path
 
 Delete this skill + registry + the process file. The `keel library` commands keep working; only the

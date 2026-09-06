@@ -117,6 +117,41 @@ pub fn cmd_sync() -> i32 {
     1
 }
 
+/// A unit its upstream has RETIRED in the library (issue381 / GH#57, GH#58).
+///
+/// `keel process retire` writes `retired = true`, `retiredAt`, `retiredWhy` and optionally
+/// `replacedBy` into the unit's `unit.toml`. A retired unit stays in the library as history - its
+/// consumers can still read what they installed - but `import --from-library` refuses it, `list` and
+/// `status` mark it, and the currency pass carries the mark. The case that needed it: decision-channel
+/// v6 ships a script that records an acceptance in a hardcoded human's name, and its upstream deleted
+/// the channel (D0291), so the unit could neither be republished from a landed tree nor left as-is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Retirement {
+    pub at: String,
+    pub why: String,
+    pub replaced_by: Option<String>,
+}
+
+impl Retirement {
+    /// One line for a list, a status or a refusal.
+    #[must_use]
+    pub fn line(&self) -> String {
+        self.replaced_by.as_ref().map_or_else(|| format!("RETIRED {}: {}", self.at, self.why), |r| format!("RETIRED {}: {} Replaced by: {r}", self.at, self.why))
+    }
+}
+
+/// The retirement recorded in a unit's `unit.toml`, or `None` for a live unit.
+#[must_use]
+pub fn retirement(unit_dir: &Path) -> Option<Retirement> {
+    let text = std::fs::read_to_string(unit_dir.join("unit.toml")).ok()?;
+    let v = text.parse::<toml::Value>().ok()?;
+    if v.get("retired").and_then(toml::Value::as_bool) != Some(true) {
+        return None;
+    }
+    let s = |k: &str| v.get(k).and_then(toml::Value::as_str).map(str::to_owned);
+    Some(Retirement { at: s("retiredAt").unwrap_or_else(|| "?".into()), why: s("retiredWhy").unwrap_or_else(|| "(no reason recorded)".into()), replaced_by: s("replacedBy") })
+}
+
 /// `keel library list` — every unit in the cache, with its version, plus the cache's currency.
 #[must_use]
 pub fn cmd_list() -> i32 {
@@ -135,7 +170,8 @@ pub fn cmd_list() -> i32 {
                 .unwrap_or("?")
                 .trim()
                 .to_string();
-            rows.push((e.file_name().to_string_lossy().to_string(), version));
+            let mark = retirement(&e.path()).map_or_else(String::new, |r| format!("   {}", r.line()));
+            rows.push((e.file_name().to_string_lossy().to_string(), format!("{version}{mark}")));
         }
     }
     rows.sort();
@@ -158,6 +194,11 @@ pub fn resolve_unit(name: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| "library: not initialised on this machine — `keel library init <remote>` first".to_string())?;
     let unit = dir.join(name);
     if unit.join("unit.toml").exists() {
+        // issue381: a retired unit is history, not an offer - importing it would install the defect
+        // its upstream retired it for.
+        if let Some(r) = retirement(&unit) {
+            return Err(format!("library: `{name}` is {} - not imported. `keel library list` shows what is live.", r.line()));
+        }
         Ok(unit)
     } else {
         Err(format!(
