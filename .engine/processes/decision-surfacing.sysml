@@ -23,10 +23,10 @@ package ProcessDecisionSurfacing {
 
     action dsDetect : ProcessStep {
         :>> id = "d0269a01-0831-4d7e-9b2c-3e4f5a6b7c8e";
-        :>> title = "Notice that something is actually waiting on them";
-        :>> triggerCondition = "A turn is ending.";
-        :>> actionText = "A decision is PENDING when the work cannot honestly continue without their judgment, or when it continued under an assumption they have not confirmed. Concretely: a proposed Need or Decision with no acceptance, a fork where I picked a side and the other side is defensible, an accepted risk they have not seen, a priority order I chose. NOT pending: something I decided and can defend, or a question I can answer myself by reading the model - those get answered, not escalated. Manufacturing decisions to have something to surface is worse than burying one.";
-        :>> producedArtifact = "A yes/no on whether anything is genuinely waiting.";
+        :>> title = "Assess what is waiting, from the computed lens";
+        :>> triggerCondition = "Substantive work has reached a stopping point, or a Decision was just recorded or accepted.";
+        :>> actionText = "READ, do not remember: `keel show authority-queue ROOT` computes every obligation that only a human can discharge - each decisionAcceptance row carries the id, the short name of what it is about, and how long it has waited. That is the assessment; it is never re-derived in prose and never estimated from memory. Then apply the STATE TEST: compare that pending set with the set recorded in `.keel/decision-page.toml` from the last publish. Identical - the page already says everything true, so this process produces NOTHING this turn: no page, no link, no sentence. Different - continue. A decision belongs in the set when the work cannot honestly continue without their judgment, or continued under an assumption they never confirmed; it does NOT belong when I decided it and can defend it, or when the model answers it. Manufacturing an item to have something to publish is worse than burying one.";
+        :>> producedArtifact = "The pending set, and whether it differs from what is published.";
         :>> owner = Owner::ai;
     }
 
@@ -50,19 +50,19 @@ package ProcessDecisionSurfacing {
 
     action dsLead : ProcessStep {
         :>> id = "d0269a01-0831-4d7e-9b2c-3e4f5a6b7c90";
-        :>> title = "Lead with the link - the top of the message, not the end";
-        :>> triggerCondition = "The artifact is published or updated.";
-        :>> actionText = "The URL goes in the FIRST lines of the response, before the report of what was done. Name what is waiting in one line each so they can decide whether to open it. The report follows the link; it never precedes it. THE ANTI-PATTERN THIS FORBIDS is the one that caused this process: a thorough account of the work with the pending decisions honestly described at the bottom, which is indistinguishable from not asking.";
-        :>> producedArtifact = "A response whose first content is the decision link.";
+        :>> title = "Link it once, on the turn the page changed";
+        :>> triggerCondition = "The page was just published or republished because the pending set changed.";
+        :>> actionText = "Give the URL and one line naming what is new or answered - at the top, before the report of the work. Once. THE ANTI-PATTERN THIS ENDS is a per-turn restatement of an unchanged queue: for one day the turn boundary itself carried a count of outstanding decisions, and it was accurate every time, which is precisely why it stopped being read (D0359, the owner's instruction: 'I don't want stop says text anymore. remove'). A reader who has seen the link does not need it again to still have it; a reader who has answered part of it needs to know what changed, which is what this line says.";
+        :>> producedArtifact = "One line carrying the URL and the delta, on the turn there was one.";
         :>> owner = Owner::ai;
     }
 
     action dsCarry : ProcessStep {
         :>> id = "d0269a01-0831-4d7e-9b2c-3e4f5a6b7c91";
-        :>> title = "Keep carrying it until it is answered or withdrawn";
-        :>> triggerCondition = "A previously surfaced decision is still unanswered at the end of a later turn.";
-        :>> actionText = "Re-surface the link every turn while anything remains pending. Silence is not an answer and it is not consent - it usually means the message scrolled past. A decision may leave the page two ways: they answer it, or I withdraw it because the work moved and it no longer matters, which is stated rather than dropped. An unanswered decision that quietly stops being mentioned has been decided by default, by me, invisibly.";
-        :>> producedArtifact = "A pending set that shrinks only by answer or by stated withdrawal.";
+        :>> title = "Say nothing while the page is current";
+        :>> triggerCondition = "Items remain pending and the published page already carries exactly them.";
+        :>> actionText = "Silence here is a computed state, not forgetfulness: it means the published set equals the pending set, which the state test established this turn. Do not restate the queue, do not re-link the page, do not append a count to the work. What keeps the channel honest is that the page is REFRESHED whenever the set moves - including when it shrinks, so an item that was answered stops appearing, and when I withdraw one, which is stated on the page rather than done by quietly ceasing to mention it. STATED RESIDUAL: nothing can force this process to run - no gate reads conversational output (D0151) - and `.keel/decision-page.toml` is machine-local, so a different clone republishes to its own URL and forks the queue until the two are reconciled by hand.";
+        :>> producedArtifact = "A turn that adds no words about decisions, because the page already carries them.";
         :>> owner = Owner::ai;
     }
 

@@ -1101,4 +1101,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcReleaseRecordNamesItsTag to issue387;
+
+    part issue388 : Issue {
+        :>> id = "44e79606-df93-40ef-8fa8-6adfff739c22";
+        :>> title = "a test asserts on the source text of the code it polices, and broke for the second time when that code moved";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A test in main.rs asserts on the literal SOURCE TEXT of the code it polices, so deleting that code breaks the test rather than the property - and this is the second time the same test has broken that way. WHAT HAPPENED: the_turn_boundary_blocks_only_on_dishonest_state reads its own file with include_str!('main.rs') and asserts that the source contains the string 'return match keel_cli::view::pending_acceptances(root)'. When D0359 removed the Stop hook's outstanding-decisions line, the code that string described stopped existing and the test failed - not because the property it names had been violated, but because the mechanism it had memorised was gone. The property, that only dishonest state can reach the block and that a green turn returns before it, was true throughout. WHY IT IS A RECURRENCE: the test's own doc comment says it replaced a predecessor that failed the same way, in its words 'a test bound to a mechanism rather than to a property', when the D0270 oversight advisory was deleted. Two deletions, two breakages, one file. Each time the fix was to rewrite the assertion; neither time was the pattern itself addressed. WHY IT MATTERS: a test that greps source text is not merely brittle - it inverts what a test is for. It passes when the text is present regardless of whether the behaviour holds, and it fails when the text moves regardless of whether the behaviour broke. It cost a full suite run to discover here, and its failure mode is indistinguishable at a glance from a real regression, which is worse in a codebase where the suite is the thing consulted before a release. PREVENTING CHANGE, and it is NOT what I first said. I claimed in the retro that this could not be mechanically forbidden. It can be detected: a check over the test surface for a test that both reads program source (include_str! of a .rs file) and asserts on substrings of it. What needs deciding is not whether it is detectable but whether the rule should be a refusal or a warning, because some source-reading checks in this repository are legitimate controls - the doc-claim and catalogue tests read files on purpose. The resolver weighs that; a behavioural equivalent for this specific test already exists in stop_says_nothing_about_decisions, which runs the binary against a real scaffold and asserts the empty output.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTestsBindToPropertiesNotSource to issue388;
 }

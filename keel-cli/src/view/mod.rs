@@ -2181,24 +2181,6 @@ pub fn pending_acceptances(root: &Path) -> Result<Vec<String>, ViewError> {
     Ok(proposed_decisions(&Model::build(root)?))
 }
 
-/// A Decision's SHORT NAME: the part of its title before the first colon.
-///
-/// The `shortName: sentence` shape is D0303's; `None` when the Decision is not on disk. Read by the
-/// Stop hook's one-line advisory (GH#52 / D0351), which names what waits without quoting whole titles.
-#[must_use]
-pub fn decision_short_name(root: &Path, dec: &str) -> Option<String> {
-    for p in crate::collect_sysml(&root.join(".engine").join("decisions")) {
-        let Ok(text) = std::fs::read_to_string(&p) else { continue };
-        if !text.contains(&format!("part {dec} : Decision")) {
-            continue;
-        }
-        let key = ":>> title = \"";
-        let title = text.find(key).and_then(|i| text.get(i + key.len()..)).and_then(|r| r.split('"').next())?;
-        return Some(title.split_once(':').map_or(title, |(h, _)| h).trim().to_string());
-    }
-    None
-}
-
 /// Is `name` a declared item in the model?
 ///
 /// Exists so a write path can REFUSE before authoring rather than leave the `edge-endpoints` guard
@@ -4040,6 +4022,10 @@ const ESCALATE_AFTER_DAYS: i64 = 14;
 struct Awaiting {
     kind: String,
     item: String,
+    /// What the item is ABOUT, in words - the Decision's short name (its title before the colon), or
+    /// the Issue's title. An id cannot be a heading, and the decision page is built from this lens
+    /// (D0359), so a builder without it would go back to the source files for what the view knows.
+    short_name: String,
     origin: String,
     since: String,
     note: String,
@@ -4062,6 +4048,10 @@ fn collect_decision_and_finding_obligations(model: &Model, awaiting: &mut Vec<Aw
         awaiting.push(Awaiting {
             kind: "decisionAcceptance".to_owned(),
             item: d.clone(),
+            short_name: info
+                .and_then(|i| i.attrs.get("title"))
+                .map(|t| t.split(':').next().unwrap_or(t).trim().to_owned())
+                .unwrap_or_default(),
             origin: info.and_then(|i| i.attrs.get("createdBy")).cloned().unwrap_or_default(),
             since: info.and_then(|i| i.attrs.get("createdAt")).cloned().unwrap_or_default(),
             note: "an AI actor cannot supply this (D0106)".to_owned(),
@@ -4092,6 +4082,7 @@ fn collect_decision_and_finding_obligations(model: &Model, awaiting: &mut Vec<Aw
         awaiting.push(Awaiting {
             kind: "findingDisposition".to_owned(),
             item: f.clone(),
+            short_name: info.and_then(|i| i.attrs.get("title")).cloned().unwrap_or_default(),
             origin: info.and_then(|i| i.attrs.get("createdBy")).cloned().unwrap_or_default(),
             since,
             note: format!("in force from {disp_from} ({disp_dec})"),
@@ -4124,6 +4115,7 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
         awaiting.push(Awaiting {
             kind: "contentionAdjudication".to_owned(),
             item: "see `keel contentions`".to_owned(),
+            short_name: "conflicting conclusions, unadjudicated".to_owned(),
             origin: "multiple".to_owned(),
             since: String::new(),
             note: format!("{contention_rows} contention(s); no contributor may resolve one in favour of its own conclusion (D0108)"),
@@ -4147,6 +4139,7 @@ pub fn authority_queue(root: &Path) -> Result<String, ViewError> {
             Json::Obj(vec![
                 ("kind".to_owned(), Json::s(a.kind.clone())),
                 ("item".to_owned(), Json::s(a.item.clone())),
+                ("shortName".to_owned(), Json::s(a.short_name.clone())),
                 ("origin".to_owned(), Json::s(a.origin.clone())),
                 ("waitingSince".to_owned(), Json::s(a.since.clone())),
                 ("waitingDays".to_owned(), Json::Int(age)),

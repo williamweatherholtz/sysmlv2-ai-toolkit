@@ -2375,19 +2375,6 @@ pub fn obligations_json(root: &Path) -> Result<String, crate::view::ViewError> {
     .dump())
 }
 
-/// How many items are waiting on a human, or `None` when that cannot be computed.
-///
-/// Reads the TOTAL out of [`obligations_json`] rather than counting anything itself, so the number the
-/// hook advises on is the number the console shows. `None` is distinct from `Some(0)` and must stay so:
-/// "nothing is waiting" and "I could not tell what is waiting" are different answers, and reporting the
-/// second as the first is how a quiet failure becomes a false all-clear (N-C2).
-#[must_use]
-pub fn obligations_total(root: &Path) -> Option<i64> {
-    let json = obligations_json(root).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&json).ok()?;
-    v.get("total").and_then(serde_json::Value::as_i64)
-}
-
 async fn api_obligations(State(s): State<AppState>) -> Response {
     cached(&s, "obligations", obligations_json)
 }

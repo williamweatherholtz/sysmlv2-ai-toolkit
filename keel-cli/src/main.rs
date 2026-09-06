@@ -997,38 +997,6 @@ method=confirmation needs explicit human sign-off. Invoke the engine-triage skil
 }
 
 /// Emit a hook-protocol JSON object and exit 0 (the harness reads stdout).
-/// The Stop hook's exit-0 advisory, ONE line in the owner's format (GH#52 / D0351): the count, the
-/// id range, how to accept, and the short names - whole names, cut with an ellipsis count past a
-/// budget. The oversight nag it replaces prescribed a console or a deck every turn (gone under D0269).
-fn decisions_outstanding_line(root: &Path, pending: &[String]) -> String {
-    const NAME_BUDGET: usize = 160;
-    let mut ids: Vec<&String> = pending.iter().collect();
-    ids.sort();
-    let range = match (ids.first(), ids.last()) {
-        (Some(a), Some(b)) if a != b => format!("{a}..{b}"),
-        (Some(a), _) => (*a).clone(),
-        _ => String::new(),
-    };
-    let mut names = Vec::new();
-    let mut used = 0usize;
-    let mut cut = 0usize;
-    for d in &ids {
-        let short = keel_cli::view::decision_short_name(root, d).unwrap_or_else(|| (*d).clone());
-        if used + short.len() + 2 > NAME_BUDGET && !names.is_empty() {
-            cut += 1;
-            continue;
-        }
-        used += short.len() + 2;
-        names.push(short);
-    }
-    let covering = if cut > 0 { format!("{} ... (+{cut})", names.join(", ")) } else { names.join(", ") };
-    format!(
-        "{} decision{} outstanding ({range}) - accept with your quoted word in chat, or from your terminal: keel accept dNNNN --by <you>. Covering: {covering}",
-        pending.len(),
-        if pending.len() == 1 { "" } else { "s" }
-    )
-}
-
 fn hook_emit(v: &serde_json::Value) -> i32 {
     println!("{v}");
     0
@@ -1180,14 +1148,18 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // rather than a count appended to every turn.
 
     if problems.is_empty() {
-        // green -> silent, EXCEPT the one line the owner asked for (GH#52 / D0351): how many
-        // decisions await their word, which, and how to accept. Nothing when none.
-        return match keel_cli::view::pending_acceptances(root) {
-            Ok(pending) if !pending.is_empty() => {
-                hook_emit(&serde_json::json!({ "systemMessage": decisions_outstanding_line(root, &pending) }))
-            }
-            _ => 0,
-        };
+        // GREEN -> SILENT (D0359). For one day this branch emitted one line naming the Decisions
+        // awaiting the owner's word (GH#52/D0351). It was accurate every time, which is exactly why
+        // it stopped being read: a per-turn restatement of an unchanged fact trains the reader past
+        // it. Their instruction, 2026-09-06: "I don't want stop says text anymore. remove."
+        //
+        // Nothing is lost to automation - `keel orient` still answers pendingAcceptances - and
+        // nothing is lost to the human, PROVIDED the page is genuinely refreshed: the queue is
+        // surfaced as the published decision brief by the decision-surfacing post-analysis, which
+        // republishes on a CHANGE in the pending set and is silent otherwise. That the post-analysis
+        // runs at all is not enforceable here (no gate reads conversational output, D0151); what is
+        // enforceable is that this hook does not substitute a count for it.
+        return 0;
     }
     if already {
         // Second consecutive red: allow the stop (loop-avoidance stands, issue081) but the yield is
@@ -4925,8 +4897,8 @@ mod tests {
     /// deleted - a test bound to a mechanism rather than to a property.
     ///
     /// The property that survives: nothing but `problems` can reach the block, and a green turn
-    /// RETURNS before it - silent when nothing waits on the human, one line in the owner's format
-    /// when Decisions do (GH#52 / D0351; `stop_advisory_is_one_line` holds both behaviourally).
+    /// RETURNS before it - silently, whether or not Decisions wait on the human (D0359;
+    /// `stop_says_nothing_about_decisions` holds that behaviourally, against a real scaffold).
     #[test]
     fn the_turn_boundary_blocks_only_on_dishonest_state() {
         const MAIN_RS: &str = include_str!("main.rs");
@@ -4939,20 +4911,11 @@ mod tests {
             hook[..block].contains("if problems.is_empty() {"),
             "the block path must sit behind the problems check, so only dishonest state can reach it"
         );
+        let green = hook.find("if problems.is_empty() {").unwrap_or(0);
+        assert!(green > 0 && green < block, "the green branch must come first");
         assert!(
-            hook[..block].contains("return match keel_cli::view::pending_acceptances(root)") && hook[..block].contains("_ => 0,"),
-            "and a green turn must RETURN before the block - one line when Decisions wait, 0 and silence otherwise"
-        );
-    }
-
-    /// The advisory's count must come from the console's own obligation computation, not a second one.
-    #[test]
-    fn the_advisory_counts_what_the_console_shows() {
-        let total = keel_cli::serve::obligations_total(std::path::Path::new(".."));
-        assert!(total.is_some(), "obligations_total must be computable for this repository");
-        assert!(
-            total.unwrap_or(0) > 0,
-            "this repository has outstanding human obligations, so the reused count must be non-zero --              a zero here would mean the hook silently advises nothing while work waits"
+            hook[green..block].contains("return 0;"),
+            "and a green turn must RETURN before the block, saying nothing (D0359)"
         );
     }
 
