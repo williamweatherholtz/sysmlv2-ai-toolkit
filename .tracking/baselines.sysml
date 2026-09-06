@@ -137,7 +137,7 @@ package ProjectBaselines {
 
     part release040 : Release {
         :>> id = "6b1c40a7-58ee-4d3f-9b2a-70c9f5e8d214";
-        :>> title = "v0.4.0 - TAGGED BUT NEVER PUBLISHED: the release gate had no GitHub token (issue385); the payload shipped as v0.4.1";
+        :>> title = "v0.4.0 - TAGGED BUT NEVER PUBLISHED: the release gate had no GitHub token (issue385); the payload shipped one patch version later";
         :>> createdAt = "2026-09-06";
         :>> createdBy = "claudeOpus5";
         :>> commit = "2c288d8";  // the TAGGED commit - what v0.4.0 actually ships (issue311: the record lands one commit after the tag, so this names the tag rather than the recording)

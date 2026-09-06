@@ -1090,4 +1090,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSuiteSurvivesItsOwnImage to issue386;
+
+    part issue387 : Issue {
+        :>> id = "d39a21e9-34b9-415a-b035-518ddd7557c6";
+        :>> title = "release-recorded binds a tag to a Release record by substring-in-title and can name the wrong one";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "release-recorded binds a tag to a Release record by substring-in-title, so it can name the wrong record and did. WHAT HAPPENED: the v0.4.0 Release record was corrected to say it published nothing, and its title ended 'the payload shipped as v0.4.1'. The guard matches a tag to a record with title.contains(tag) and takes the FIRST match, so the tag v0.4.1 matched the v0.4.0 record and the guard warned that 'tag v0.4.1 points at b171cd7 but its Release item records commit 2c288d8 - the recorded release and the shipped tag disagree'. Both records were correct; the matcher was not. It was resolved by rewording the title, which fixes this instance and leaves the rule intact. THE DEFECT IS THE BINDING, NOT THE TITLE: a Release record identifies its tag by prose that happens to contain the tag string. That fails in two directions. A title mentioning any other version misroutes, as here - and a title is exactly where a release NOTE naturally mentions the previous or next version. And the containment is unanchored, so the tag v0.4.1 also matches a record titled v0.4.11, which will arrive on its own with no warning at all: the first matching record wins and the disagreement it reports will be about the wrong pair of commits. WHY IT MATTERS MORE THAN A WARNING: this guard is the one control asserting that what shipped is an authored fact (D0191). A control that can bind the wrong record produces two failure shapes, both bad: a spurious disagreement, which trains the reader to dismiss it, and a spurious AGREEMENT, where a record for one version silently vouches for another version's tag. PREVENTING CHANGE: bind the tag explicitly. A Release record should carry the tag it names as its own field, and the guard should match on that field rather than searching prose; a tag with no record naming it stays the violation it already is. Until then the containment should at least be anchored so one version string cannot match another's prefix.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcReleaseRecordNamesItsTag to issue387;
 }
