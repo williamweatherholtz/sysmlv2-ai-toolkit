@@ -119,6 +119,41 @@ fn publishing_an_unchanged_unit_is_a_stated_no_op_with_no_commit() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
+/// issue340 / D0347: a change to the MANIFEST alone (the exporter writing a line the library copy
+/// lacks) commits once, at the unchanged version, with a subject that says so - and a second run is
+/// the stated no-op. The library log then never reads as one version published twice.
+#[test]
+fn a_manifest_only_change_commits_once_saying_so_and_the_version_does_not_move() {
+    let (base, home, proj, clone) = fixture("manifest");
+    let (ok, _) = keel_home(&home, &proj, &["process", "publish", "tiny-process"]);
+    assert!(ok);
+    let manifest = clone.join("tiny-process").join("unit.toml");
+    let published = std::fs::read_to_string(&manifest).expect("manifest");
+    let version_line = published.lines().find(|l| l.trim().starts_with("version = ")).expect("version").to_string();
+    // Simulate an older exporter's copy in the library: the same files, a manifest missing one line.
+    let older: String = published.lines().filter(|l| !l.trim().starts_with("skills = ")).map(|l| format!("{l}\n")).collect();
+    assert_ne!(older, published, "the fixture removes a manifest line");
+    std::fs::write(&manifest, older).expect("write");
+    git(&clone, &["add", "-A"]);
+    git(&clone, &["-c", "commit.gpgsign=false", "commit", "-q", "-m", "older exporter's manifest"]);
+    let head_before = git(&clone, &["rev-parse", "HEAD"]);
+
+    let (ok, text) = keel_home(&home, &proj, &["process", "publish", "tiny-process"]);
+    assert!(ok, "{text}");
+    assert!(text.contains("MANIFEST ONLY"), "the output says what moved: {text}");
+    let subject = git(&clone, &["log", "-1", "--format=%s"]);
+    assert!(subject.contains("(manifest only)"), "the commit subject qualifies the version: {subject}");
+    assert_ne!(head_before, git(&clone, &["rev-parse", "HEAD"]), "exactly one commit landed");
+    let after = std::fs::read_to_string(&manifest).expect("manifest");
+    assert!(after.contains(&version_line), "the version did not move - no file changed: {after}");
+    // Second run: a stated no-op, no commit.
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    let (ok, text) = keel_home(&home, &proj, &["process", "publish", "tiny-process"]);
+    assert!(ok && text.contains("nothing to publish"), "{text}");
+    assert_eq!(head, git(&clone, &["rev-parse", "HEAD"]));
+    let _ = std::fs::remove_dir_all(&base);
+}
+
 #[test]
 fn publishing_a_unit_the_project_does_not_declare_refuses() {
     let (base, home, proj, _clone) = fixture("absent");

@@ -824,16 +824,24 @@ fn cmd_publish(args: &[String], root: &Path) -> i32 {
         .args(["status", "--porcelain", "--"])
         .arg(name)
         .output();
-    let dirty = status.as_ref().is_ok_and(|o| !String::from_utf8_lossy(&o.stdout).trim().is_empty());
-    if !dirty {
+    // What moved, by path: the unit's FILES (which advance the version, issue302) or only its
+    // MANIFEST (unit.toml - the version stays, and the commit must say so; issue340: a manifest-only
+    // change used to commit `publish X vN` at an unchanged N, reading as one version published twice).
+    let changed: Vec<String> = status
+        .as_ref()
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter_map(|l| l.get(3..)).map(|p| p.trim().trim_matches('"').to_string()).collect())
+        .unwrap_or_default();
+    if changed.is_empty() {
         println!("publish: `{name}` is UNCHANGED in the library — nothing to publish (a no-op version must not move, issue302).");
         return 0;
     }
+    let manifest_only = changed.iter().all(|p| p.ends_with("unit.toml"));
     let version = std::fs::read_to_string(dst.join("unit.toml"))
         .ok()
         .and_then(|t| t.lines().find_map(|l| l.trim().strip_prefix("version = ").map(str::to_string)))
         .unwrap_or_else(|| "?".to_string());
-    for step in [vec!["add", "-A", "--", name.as_str()], vec!["-c", "commit.gpgsign=false", "commit", "-q", "-m", &format!("publish {name} v{version}")]] {
+    let subject = if manifest_only { format!("publish {name} v{version} (manifest only)") } else { format!("publish {name} v{version}") };
+    for step in [vec!["add", "-A", "--", name.as_str()], vec!["-c", "commit.gpgsign=false", "commit", "-q", "-m", &subject]] {
         let out = crate::gitx::git().arg("-C").arg(&clone).args(&step).output();
         match out {
             Ok(o) if o.status.success() => {}
@@ -847,7 +855,11 @@ fn cmd_publish(args: &[String], root: &Path) -> i32 {
             }
         }
     }
-    println!("publish: `{name}` v{version} committed to the library clone at {} — NOT pushed.", clone.display());
+    if manifest_only {
+        println!("publish: `{name}` v{version} committed to the library clone at {} — MANIFEST ONLY: the unit's files did not move, so its version did not; the commit says so. NOT pushed.", clone.display());
+    } else {
+        println!("publish: `{name}` v{version} committed to the library clone at {} — NOT pushed.", clone.display());
+    }
     println!("  Push when ready: git -C {} push   (the push is the human-visible act, D0250 clause D)", clone.display());
     0
 }
