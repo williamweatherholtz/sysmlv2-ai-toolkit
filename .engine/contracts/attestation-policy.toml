@@ -45,6 +45,9 @@ delegatedRecording = "d0192"
 # judgment-request-quality guard prices the ask. TO WITHDRAW (D0290): a Decision that #Supersedes
 # d0207, and the line below deleted in the same commit; decisions return to individually-judged acceptance.
 standingConsent = "d0207"
+# THE WORDS THE ACCEPTANCE QUOTES (issue376): this project's human's, verbatim, 2026-08-23. The engine never
+# supplies them - with standingConsent declared and no standingWords, a Decision stays proposed.
+standingWords = "issues raised are automatically accepted. they can be customizedly changed post-fact."
 
 [findingDisposition]
 # Dispositioning a finding at or above the Medium threshold (D0092). D0080 permits an AI to disposition

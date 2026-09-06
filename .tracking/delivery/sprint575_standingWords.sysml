@@ -1,0 +1,29 @@
+// ProjectDeliveryS575 — Sprint 575: the standing words an acceptance quotes are the adopting project's own fact - the engine stops supplying another human's consent. EXECUTE. 3 pts.
+package ProjectDeliveryS575 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from standingWordsStory to d0340;
+
+    part standingWordsStory : Story {
+        :>> id = "d48474de-a7e5-4d08-9e11-b59274f51c07";
+        :>> title = "Sprint 575: the standing words an acceptance quotes are the adopting project's own fact - the engine stops supplying another human's consent (3 pts)";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS575 {
+        action storyStandingWords;
+        verification storyStandingWordsDoD : Test { :>> id = "f40bfff1-97c1-4313-988a-8834fbfc13df"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcStandingWordsAreProjectLocal (D0340 proposed, safety-change - waits for the human under D0337; resolves issue376, GH#57 Critical). DONE: activation::standing_words reads standingWords beside standingConsent; keel record decision quotes it or leaves the Decision proposed naming the missing line; activation::without_grants comments out the three grant lines at init under a GRANTS ARE NOT INHERITED note; attestation-policy.toml is project-owned in migrate; this repository records its human's words of 2026-08-23 as standingWords. VERIFIED: a fresh scaffold has no live grant and auto-accepts nothing; consent without words stays proposed and says why; consent with words quotes exactly them and never this repository's; F9 shows the policy surviving migrate byte-identically."; }
+        // RAN: dcStandingWordsAreProjectLocal DoD pass recorded on suite577 543/0; the sprint's implement section names each run
+        part storyStandingWordsDoDR1 : TestResult { :>> id = "be60654d-3755-4797-b286-07b3603b935c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "5e3a8285c6ad296313624db9da86390071ae94ab"; :>> judgedAt = "2026-09-06"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification standingWordsRefineGate : Test { :>> id = "d854ce79-0b28-4571-9bcb-7eb59b917fa1"; :>> title = "Sprint 575 refine gate (DoR)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: the reporter's finding was in the library script; reading the binary's own arm found the same literal one layer down, and reading init found it shipped to every project. Three homes for one fact - the engine string, the shipped policy, the resync - so the fix is three edits and the tests take each arm."; }
+    verification standingWordsStandupGate : Test { :>> id = "f96815aa-2426-4a34-a9a8-a4b63d44e1b6"; :>> title = "Sprint 575 standup gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THE CLASS, NOT THE INSTANCE: this repository's consent had become the engine's default because the file that records it is engine-shipped. github-actors.toml and activation.toml had already been made instance data for the same reason (D0219, issue314); attestation-policy.toml's grants are the third."; }
+    verification standingWordsImplementGate : Test { :>> id = "a1da098f-533b-4391-b277-4b2452e8666e"; :>> title = "Sprint 575 implement gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: cargo test standing_words_are_project_local 3/3; disguised_fork_stays_proposed 3/3 and standing_consent_at_record_time 3/3 with their fixtures now granting consent in their own words; federation 11/11 including F9's byte-identical policy; clippy -D warnings clean after extracting auto_accept_under_consent; full suite in suite575.txt."; }
+    verification standingWordsReviewGate : Test { :>> id = "ffd49a21-ccad-44e7-9180-69c4ca18c3ad"; :>> title = "Sprint 575 review gate — three passes per D0172"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) IS ANY WORD STILL SUPPLIED BY THE ENGINE: grep customizedly in keel-cli/src finds nothing. (2) DOES A FRESH PROJECT INHERIT A GRANT: the scaffold test reads the policy and finds every grant line commented. (3) DOES THIS REPOSITORY STILL AUTO-ACCEPT: D0339 was accepted at record time on this tree's words before the edit; after it, the words come from the policy line and the record-time test asserts the quote."; }
+    verification standingWordsCloseOutGate : Test { :>> id = "0a3caa85-f668-4ec6-b1ae-dc4b2bab81d5"; :>> title = "Sprint 575 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. issue376 resolves on this pass; D0340 is on the human's queue; the library script half stays open as issue381."; }
+    verification standingWordsRetroGate : Test { :>> id = "9cc92b87-c28f-4889-9227-5ac2c1f8d9d0"; :>> title = "Sprint 575 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: issue381 carries the library unit's copy of the same defect (dcLibraryUnitRetirement). The lesson is the D0219 lesson a third time - an engine-shipped contract that records a human's grant ships that human's grant to everyone - and the control is now the same for all three files: instance data at init, project-owned in migrate."; }
+}

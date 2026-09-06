@@ -503,6 +503,15 @@ fn f9_a_project_can_be_migrated_when_the_engine_moves_underneath_it() {
         !std::fs::read_to_string(root.join(".engine/contracts/activation.toml")).expect("activation").contains("\"render\""),
         "F9: precondition - the project actually deactivated something"
     );
+    // The project's human's GRANTS (issue376 / GH#57): standing consent in THEIR words. A resync that
+    // replaced this file with the engine's would swap in another project's human's consent.
+    let policy_path = root.join(".engine/contracts/attestation-policy.toml");
+    let policy = std::fs::read_to_string(&policy_path).expect("policy");
+    let policy = policy.replace("# standingConsent = \"d0207\"", "standingConsent = \"d0001\"");
+    let start = policy.find("# standingWords = ").expect("F9: the commented words line ships");
+    let end = start + policy[start..].find('\n').expect("line end");
+    let own_policy = format!("{}standingWords = \"our own words, given here\"{}", &policy[..start], &policy[end..]);
+    std::fs::write(&policy_path, &own_policy).expect("grant");
     assert!(git(&root, &["add", "-A"]), "F9: stage the choice");
     assert!(git(&root, &["-c", "commit.gpgsign=false", "commit", "-q", "-m", "our adoption"]), "F9: commit the choice");
 
@@ -517,6 +526,10 @@ fn f9_a_project_can_be_migrated_when_the_engine_moves_underneath_it() {
     assert!(
         !std::fs::read_to_string(root.join(".engine/contracts/activation.toml")).expect("activation").contains("\"render\""),
         "F9: a project's ADOPTION CHOICE must survive an engine upgrade (issue314) - reverting it          silently re-arms a control the project turned off, with no Decision anywhere"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&policy_path).expect("policy after"), own_policy,
+        "F9: the project's own grants survive the resync byte-identically (issue376)"
     );
     let gate = run_in(&root, &["gate", "--fast", "."]);
     assert!(gate.ok, "F9: the migrated tree must gate green — a migration that leaves a project \

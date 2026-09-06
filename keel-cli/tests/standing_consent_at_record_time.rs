@@ -36,9 +36,22 @@ fn shallow_root(tag: &str) -> PathBuf {
     root
 }
 
+/// issue376: a fresh scaffold ships the policy with its GRANT lines commented out - the project's human
+/// gives them. This fixture's human gives standing consent, in their own words.
+fn grant_standing_consent(root: &Path) {
+    let p = root.join(".engine/contracts/attestation-policy.toml");
+    let text = std::fs::read_to_string(&p).expect("policy");
+    let text = text.replace("# standingConsent = \"d0207\"", "standingConsent = \"d0207\"");
+    let start = text.find("# standingWords = ").expect("the commented words line ships");
+    let end = start + text[start..].find('\n').expect("line end");
+    let text = format!("{}standingWords = \"fine by me, keep recording\"{}", &text[..start], &text[end..]);
+    std::fs::write(&p, text).expect("grant");
+}
+
 fn project(tag: &str, with_decider: bool) -> PathBuf {
     let root = shallow_root(tag);
     assert!(run(&root, &["init", "."]).0, "scaffold");
+    grant_standing_consent(&root);
     if with_decider {
         let p = root.join(".engine/contracts/github-actors.toml");
         let text = std::fs::read_to_string(&p).expect("actors toml");
@@ -66,7 +79,7 @@ fn a_non_fork_is_accepted_at_record_time_under_standing_consent() {
     assert!(text.contains("accepted D0001 at record time under standing consent d0207"), "{text}");
     let d = decision_file(&root);
     assert!(d.contains("DecisionStatus::accepted"), "flipped:\n{d}");
-    assert!(d.contains("AUTO-ACCEPTED under standing consent (D0207)") && d.contains("issues raised are automatically accepted"), "the note quotes the standing words:\n{d}");
+    assert!(d.contains("AUTO-ACCEPTED under standing consent (D0207)") && d.contains("fine by me, keep recording") && !d.contains("customizedly"), "the note quotes THIS project's standing words, never the engine's (issue376):\n{d}");
     assert!(d.contains("judgedBy = \"you\""), "the declared decider is the judge:\n{d}");
     let _ = std::fs::remove_dir_all(&root);
 }

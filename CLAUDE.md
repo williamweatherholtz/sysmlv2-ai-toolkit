@@ -205,8 +205,10 @@ frozen (modify it only by out-of-band Decision).
   read as covered (issue331, d0252). From 2026-09-05 a Decision whose text enumerates `(1) ... (2)` clauses fails
   the guard; the ones before are grandfathered and counted, never re-split.
 - **Decisions auto-accept under standing consent (D0207), at record time (D0291).** `keel record decision`
-  accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words, the
-  judge is the single decider in `github-actors.toml`. **Consent is scoped to the existing processes it was promulgated under
+  accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words - the
+  PROJECT's `standingWords` in `attestation-policy.toml`, never a literal in the engine (D0340/issue376: with consent
+  declared and no words the Decision stays proposed; `init` ships the policy with every grant line commented out and
+  `migrate` leaves the file alone) - the judge is the single decider in `github-actors.toml`. **Consent is scoped to the existing processes it was promulgated under
   (the human's words, 2026-09-05; D0337):** a Decision carrying a `process-change` or `safety-change` marker is OUTSIDE it
   and stays proposed for the human - every guard, hook, process, workflow or contract change now waits for their word. A Decision that WEIGHS alternatives in prose without the OPTION marker
   (two fork signals - alternative/either/option/versus/trade-off/a lettered enumeration/recommend) is HELD proposed as a fork in substance

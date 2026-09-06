@@ -34,10 +34,23 @@ fn scaffold(tag: &str) -> PathBuf {
     assert!(run(&root, &["init", "."]).0, "scaffold");
     // one declared decider, so standing consent has a judge to bind
     std::fs::write(root.join(".engine/contracts/github-actors.toml"), "[logins]\nowner = \"you\"\n").expect("deciders");
+    grant_standing_consent(&root);
     git(&root, &["init", "-q", "."]);
     git(&root, &["add", "-A"]);
     git(&root, &["-c", "user.email=p@x", "-c", "user.name=p", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "seed"]);
     root
+}
+
+/// issue376: a fresh scaffold ships the policy with its GRANT lines commented out - the project's human
+/// gives them. This fixture's human gives standing consent, in their own words.
+fn grant_standing_consent(root: &Path) {
+    let p = root.join(".engine/contracts/attestation-policy.toml");
+    let text = std::fs::read_to_string(&p).expect("policy");
+    let text = text.replace("# standingConsent = \"d0207\"", "standingConsent = \"d0207\"");
+    let start = text.find("# standingWords = ").expect("the commented words line ships");
+    let end = start + text[start..].find('\n').expect("line end");
+    let text = format!("{}standingWords = \"fine by me, keep recording\"{}", &text[..start], &text[end..]);
+    std::fs::write(&p, text).expect("grant");
 }
 
 fn draft(root: &Path, decision: &str) -> PathBuf {

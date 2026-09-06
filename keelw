@@ -32,17 +32,9 @@ esac
 CACHE_DIR=".keel/bin/$VERSION"
 CACHED="$CACHE_DIR/$ASSET"
 
-# ── cache hit: exec, touching nothing else ────────────────────────────────────────────────────────
-if [ -x "$CACHED" ] || [ -f "$CACHED" ]; then
-  exec sh -c 'exec "$0" "$@"' "$CACHED" "$@"
-fi
-
-# ── cache miss: fetch EXACTLY the pin, verify, cache, exec ────────────────────────────────────────
-BASE="${KEELW_BASE_URL:-https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases/download}"
-URL="$BASE/v$VERSION/$ASSET"
-
-# The committed checksum contract. Absent entry = refuse: trust-on-first-use would make the first
-# download the authority on what the binary should be, which is no verification at all.
+# The committed checksum contract, read BEFORE the cache is consulted (issue379 / GH#54). Absent
+# entry = a download refuses: trust-on-first-use would make the first download the authority on what
+# the binary should be, which is no verification at all.
 WANT=""
 if [ -f "keel-wrapper.toml" ]; then
   WANT=$(awk -v ver="[\"$VERSION\"]" -v asset="\"$ASSET\"" '
@@ -51,6 +43,29 @@ if [ -f "keel-wrapper.toml" ]; then
     inv && index($0, asset) == 1 { gsub(/.*= *"/, ""); gsub(/".*/, ""); print; exit }
   ' keel-wrapper.toml)
 fi
+
+sha_of() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | awk '{print $1}'; }
+
+# ── cache hit: VERIFY against the committed checksum when there is one, then exec ─────────────────
+# issue379 / GH#54: `keel init` seeds this cache with whatever binary ran it, under the pin's name -
+# a +dirty dev build sat here as "the pinned release" while the release's own checksum sat in
+# keel-wrapper.toml and nothing compared them. A seeded cache is trust-on-first-use by another
+# route, so a hit is verified exactly as a download is; with no entry to verify against it runs and
+# SAYS it is unverified, so the skew is visible rather than silent.
+if [ -x "$CACHED" ] || [ -f "$CACHED" ]; then
+  if [ -n "$WANT" ]; then
+    GOT=$(sha_of "$CACHED")
+    [ "$GOT" = "$WANT" ] || die "SHA-256 checksum MISMATCH for the cached $CACHED: keel-wrapper.toml expects $WANT for keel $VERSION / $ASSET, the file is $GOT - the cache holds a binary this tree does not pin (a seeded or swapped build, issue379). Remove it and re-run, or install the release asset there yourself."
+  else
+    echo "keelw: cache hit UNVERIFIED - keel-wrapper.toml has no checksum for keel $VERSION / $ASSET, so $CACHED runs on trust; add the entry from the release page to verify it" >&2
+  fi
+  exec sh -c 'exec "$0" "$@"' "$CACHED" "$@"
+fi
+
+# ── cache miss: fetch EXACTLY the pin, verify, cache, exec ────────────────────────────────────────
+BASE="${KEELW_BASE_URL:-https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases/download}"
+URL="$BASE/v$VERSION/$ASSET"
+
 [ -n "$WANT" ] || die "no committed checksum for keel $VERSION / $ASSET in keel-wrapper.toml — a download that nothing verifies must not run (never trust-on-first-use). Add the entry from the release page, or install the binary into $CACHED yourself."
 
 TMP="$CACHE_DIR/.download.$$"
@@ -60,7 +75,7 @@ if ! curl -fsSL "$URL" -o "$TMP" 2>/dev/null; then
   die "cannot fetch keel $VERSION from $URL and the cache is empty — this wrapper NEVER falls back to a binary on PATH (that is the defect the pin ends, D0251). Get $ASSET for v$VERSION from the releases page and place it at $CACHED."
 fi
 
-GOT=$( (sha256sum "$TMP" 2>/dev/null || shasum -a 256 "$TMP") | awk '{print $1}')
+GOT=$(sha_of "$TMP")
 if [ "$GOT" != "$WANT" ]; then
   rm -f "$TMP"
   die "SHA-256 checksum MISMATCH for $URL: expected $WANT, got $GOT — the asset is not the one this tree pinned, and an unverified binary never runs and is never cached."

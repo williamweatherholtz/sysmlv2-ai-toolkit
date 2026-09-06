@@ -2618,6 +2618,31 @@ fn outside_standing_consent(marker: &str) -> i32 {
     0
 }
 
+/// The record-time acceptance under standing consent (D0291), for a NON-FORK with one declared
+/// decider. issue376 / GH#57: the words quoted are the PROJECT's declared `standingWords`, never a
+/// literal in the engine - with consent declared and no words the Decision stays proposed and says so.
+#[allow(clippy::too_many_arguments)]
+fn auto_accept_under_consent(root: &Path, path: &str, dname: &str, nnnn: &str, consent: &str, date: &str, author: &str) {
+    let deciders: Vec<String> = keel_cli::github::deciders(root).into_values().collect();
+    let Some(words) = keel_cli::activation::standing_words(root) else {
+        println!("standing consent {consent} is declared but attestation-policy.toml records no standingWords - the human's consent is quoted from the project's own policy, never from the engine (issue376); D{nnnn} stays proposed. Record their words verbatim as standingWords beside standingConsent, or accept with their quoted word (D0289).");
+        return;
+    };
+    if let [judge] = deciders.as_slice() {
+        let sha = keel_cli::gitx::git().arg("-C").arg(root).args(["rev-parse", "--short", "HEAD"]).output().ok()
+            .filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+        let note = format!("AUTO-ACCEPTED under standing consent ({}). Their standing words, verbatim: '{words}' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289).", consent.to_uppercase());
+        // Recorded by the actor running `record decision`, judged by the standing decider:
+        // a DELEGATED record by construction, so the substance rule reads its quote.
+        match keel_cli::write::accept_decision(Path::new(path), dname, &sha, date, judge, author, &note) {
+            Ok(_) => println!("accepted D{nnnn} at record time under standing consent {consent} (non-fork; judge {judge}; override by a superseding Decision or your quoted word)"),
+            Err(e) => eprintln!("standing consent {consent} declared but the acceptance could not be recorded: {e} - D{nnnn} stays proposed"),
+        }
+    } else {
+        println!("standing consent {consent} declared but github-actors.toml names {} decider(s), not one - D{nnnn} stays proposed; accept with your quoted word (D0289)", deciders.len());
+    }
+}
+
 fn cmd_record(args: &[String]) -> i32 {
     // D0236: intake had NO write path. Every Statement in this repo was hand-edited into a file,
     // which is the one record type where that matters most - D0216 requires the human's words
@@ -2718,22 +2743,7 @@ fn cmd_record(args: &[String]) -> i32 {
                         keel_cli::deck::NOT_A_FORK
                     );
                 }
-                (Some(consent), true, None) => {
-                    let deciders: Vec<String> = keel_cli::github::deciders(&root).into_values().collect();
-                    if let [judge] = deciders.as_slice() {
-                        let sha = keel_cli::gitx::git().arg("-C").arg(&root).args(["rev-parse", "--short", "HEAD"]).output().ok()
-                            .filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
-                        let note = format!("AUTO-ACCEPTED under standing consent ({}). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289).", consent.to_uppercase());
-                        // Recorded by the actor running `record decision`, judged by the standing decider:
-                        // a DELEGATED record by construction, so the substance rule reads its quote.
-                        match keel_cli::write::accept_decision(Path::new(&path), &dname, &sha, &date, judge, &author, &note) {
-                            Ok(_) => println!("accepted D{nnnn} at record time under standing consent {consent} (non-fork; judge {judge}; override by a superseding Decision or your quoted word)"),
-                            Err(e) => eprintln!("standing consent {consent} declared but the acceptance could not be recorded: {e} - D{nnnn} stays proposed"),
-                        }
-                    } else {
-                        println!("standing consent {consent} declared but github-actors.toml names {} decider(s), not one - D{nnnn} stays proposed; accept with your quoted word (D0289)", deciders.len());
-                    }
-                }
+                (Some(consent), true, None) => auto_accept_under_consent(&root, &path, &dname, &nnnn, &consent, &date, &author),
                 (Some(consent), false, _) => println!("a FORK (carries options): stays proposed under standing consent {consent} - the human chooses; surface it (decision-surfacing) and accept with their quoted word (D0289)."),
                 (None, _, _) => println!("accept later via an explicit human sign-off (a quoted word in chat under the D0192 delegation, the console, or your terminal)."),
             }
@@ -3329,6 +3339,11 @@ fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) 
     // to a starter so a fresh project passes manifest-coverage (D0093 engine/instance boundary).
     if rel == Path::new("deliverable-manifest.txt") {
         std::fs::write(&dst, STARTER_MANIFEST)?;
+    } else if rel == Path::new("contracts/attestation-policy.toml") {
+        // issue376 / GH#57: the policy ships, its GRANT lines do not - a standing consent or a recording
+        // delegation is the receiving project's human's to give, and an inherited one had every fresh
+        // project auto-accepting in its decider's name quoting words they never said.
+        std::fs::write(&dst, keel_cli::activation::without_grants(std::str::from_utf8(f.contents()).unwrap_or_default()))?;
     } else if is_instance_contract(rel) {
         // issue243: these three contracts are THIS project's instance data, not engine definition, and
         // shipping them verbatim made every new project inherit the self-build's choices. A fresh tree
@@ -3615,11 +3630,19 @@ fn enclosing_project(dir: &Path) -> Option<PathBuf> {
     None
 }
 
+/// Is a build commit one another machine can obtain - a clean SHA, not `+dirty` and not `unknown`?
+/// (issue379 / GH#54: the wrapper cache may be seeded only from such a build.)
+fn is_reproducible_build(commit: &str) -> bool {
+    !commit.is_empty() && commit != "unknown" && !commit.ends_with("+dirty")
+}
+
 /// D0251 clause B: ship the wrapper into a fresh project. `keelw` resolves the project's pin;
 /// `keel-wrapper.toml` is the committed checksum contract (entries come from the release page — the
-/// starter names the duty rather than inventing hashes). The cache is SEEDED with the running
-/// binary, so the fresh project's wrapper works immediately and offline: init itself just proved
-/// this binary runs.
+/// starter names the duty rather than inventing hashes). The cache is SEEDED with the running binary
+/// ONLY when that binary is a reproducible build (issue379 / GH#54): a `+dirty` build seeded under the
+/// pin's name became "the pinned release" for a project's whole life, and keelw never noticed because
+/// it verified downloads, not hits. Either way init says what it did; it never writes a checksum it
+/// made up.
 ///
 /// # Errors
 /// The CLI exit code when either committed file cannot be written. A failed cache SEED is a note,
@@ -3630,12 +3653,18 @@ fn init_wrapper(dir: &Path) -> Result<(), i32> {
         return Err(1);
     }
     let wrapper_toml = format!(
-        "# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies\n# against. NEVER trust-on-first-use: a version with no entry here refuses to\n# download. Entries come from the release page's published checksums; the seeded cache entry in\n# .keel/bin/ covers THIS machine until then.\n[\"{}\"]\n",
+        "# keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies\n# against. NEVER trust-on-first-use: a version with no entry here refuses to\n# download. Entries come from the release page's published checksums. A cache HIT is verified against the\n# entry for its version too (issue379): a binary seeded here by `keel init` runs UNVERIFIED until the\n# entry exists, and is refused if it then does not match.\n[\"{}\"]\n",
         env!("CARGO_PKG_VERSION")
     );
     if let Err(e) = std::fs::write(dir.join("keel-wrapper.toml"), wrapper_toml) {
         eprintln!("error writing keel-wrapper.toml: {e}");
         return Err(1);
+    }
+    let commit = env!("KEEL_BUILD_COMMIT");
+    let version = env!("CARGO_PKG_VERSION");
+    if !is_reproducible_build(commit) {
+        println!("wrapper cache NOT seeded: this binary is build `{commit}`, which no other machine can obtain, so it must not stand in for keel {version} (issue379) - keelw fetches the release asset for v{version} on first use, verified against keel-wrapper.toml");
+        return Ok(());
     }
     if let Ok(me) = std::env::current_exe() {
         let asset = if cfg!(windows) {
@@ -3645,10 +3674,11 @@ fn init_wrapper(dir: &Path) -> Result<(), i32> {
         } else {
             "keel-linux-x86_64"
         };
-        let cache = dir.join(".keel").join("bin").join(env!("CARGO_PKG_VERSION"));
+        let cache = dir.join(".keel").join("bin").join(version);
         let _ = std::fs::create_dir_all(&cache);
-        if let Err(e) = std::fs::copy(&me, cache.join(asset)) {
-            eprintln!("note: could not seed the wrapper cache ({e}) — keelw will need a checksum entry or a manual install");
+        match std::fs::copy(&me, cache.join(asset)) {
+            Ok(_) => println!("wrapper cache seeded from this binary (build {commit}) at .keel/bin/{version}/{asset} - UNVERIFIED until keel-wrapper.toml carries the release checksum for {version}, which keelw then checks on every hit"),
+            Err(e) => eprintln!("note: could not seed the wrapper cache ({e}) — keelw will need a checksum entry or a manual install"),
         }
     }
     Ok(())
@@ -4969,6 +4999,15 @@ mod tests {
         assert!(super::CLAUDE_MD.contains("tracked by keel"), "init CLAUDE.md must frame the project as tracked BY keel");
         assert!(!super::CLAUDE_MD.contains("is a work-tracking engine"), "init must NOT ship the self-build CLAUDE.md");
         assert!(super::CLAUDE_MD.contains("Parsed:"), "downstream CLAUDE.md must carry the D0106 parse-first discipline");
+    }
+
+    /// issue379 / GH#54: only a build another machine can obtain may seed the wrapper cache.
+    #[test]
+    fn only_a_reproducible_build_may_seed_the_wrapper_cache() {
+        assert!(super::is_reproducible_build("c4d5dbf"));
+        assert!(!super::is_reproducible_build("4674965+dirty"), "a modified tree is nobody else's binary");
+        assert!(!super::is_reproducible_build("unknown"), "off-git is not a version");
+        assert!(!super::is_reproducible_build(""));
     }
 
     /// THE CONTROL for issue243: `keel init` must not ship THIS project's instance data as if it were

@@ -30,12 +30,23 @@ fn decision(judged_at: &str) -> String {
     )
 }
 
+/// issue376: a fresh scaffold ships the policy with its GRANT lines commented out. This fixture's human
+/// delegates the RECORDING of their acceptance (D0192) - the grant the tests below exercise.
+fn grant_recording_delegation(root: &Path) {
+    let p = root.join(".engine/contracts/attestation-policy.toml");
+    let text = std::fs::read_to_string(&p).expect("policy");
+    let granted = text.replace("# delegatedRecording = \"d0192\"", "delegatedRecording = \"d0192\"");
+    assert_ne!(text, granted, "the commented delegation line ships");
+    std::fs::write(&p, granted).expect("grant");
+}
+
 fn scaffold(tag: &str) -> PathBuf {
     let base = if cfg!(windows) { PathBuf::from("C:\\kt") } else { std::env::temp_dir() };
     let root = base.join(format!("c{tag}{}", std::process::id() % 10_000));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).expect("mkdir");
     assert!(run(&root, &["init", "."]).0, "scaffold");
+    grant_recording_delegation(&root);
     let declared = std::fs::read_to_string(root.join(".engine/contracts/adoption-profile.toml")).expect("profile");
     assert!(declared.contains("declaredAt"), "init declares the adoption date: {declared}");
     root

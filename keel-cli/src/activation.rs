@@ -523,6 +523,48 @@ pub fn standing_consent(root: &Path) -> Option<String> {
     v.get("decisionAcceptance")?.get("standingConsent")?.as_str().map(str::to_owned)
 }
 
+/// The human's STANDING WORDS (issue376 / GH#57): the verbatim consent a record-time acceptance
+/// quotes, declared beside `standingConsent` as `standingWords = "..."`. `None` = not declared.
+///
+/// WHY A DECLARED VALUE. The note used to be built from a string literal of THIS repository's human's
+/// words, while `keel init` shipped `standingConsent = "d0207"` verbatim - so a fresh project with one
+/// declared decider auto-accepted every non-fork Decision in that decider's name, quoting consent they
+/// never gave. The words are the project's own fact; with consent declared and no words recorded the
+/// Decision stays proposed and the output says so.
+#[must_use]
+pub fn standing_words(root: &Path) -> Option<String> {
+    let path = root.join(".engine").join("contracts").join("attestation-policy.toml");
+    let text = std::fs::read_to_string(path).ok()?;
+    let v = text.parse::<toml::Value>().ok()?;
+    v.get("decisionAcceptance")?.get("standingWords")?.as_str().map(str::trim).filter(|w| !w.is_empty()).map(str::to_owned)
+}
+
+/// The policy with its GRANT lines commented out (issue376 / GH#57).
+///
+/// `delegatedRecording`, `standingConsent` and `standingWords` are a HUMAN's grants and belong to the
+/// project that received them. `keel init` ships the policy with each such line commented out and a
+/// note above it, so the rest of the policy (kinds, roles, the finding-disposition threshold) arrives
+/// intact and no grant is inherited - every fresh project used to inherit this repository's consent.
+#[must_use]
+pub fn without_grants(policy: &str) -> String {
+    const GRANTS: [&str; 3] = ["delegatedRecording", "standingConsent", "standingWords"];
+    let mut out = String::new();
+    let mut noted = false;
+    for line in policy.lines() {
+        let key = line.trim_start().split('=').next().map(str::trim).unwrap_or_default();
+        if GRANTS.contains(&key) {
+            if !noted {
+                out.push_str("# GRANTS ARE NOT INHERITED (issue376): the lines below are this project's human's to give. Uncomment\n# one only when that human gave it, in their words - a grant copied from another project is a fabricated\n# attestation the moment it is used.\n");
+                noted = true;
+            }
+            out.push_str("# ");
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 #[must_use]
 pub fn recording_delegation(root: &Path, class: &str) -> Option<String> {
     let path = root.join(".engine").join("contracts").join("attestation-policy.toml");

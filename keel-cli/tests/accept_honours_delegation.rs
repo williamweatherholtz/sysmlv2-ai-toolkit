@@ -41,9 +41,20 @@ fn shallow_root(tag: &str) -> PathBuf {
     root
 }
 
+/// issue376: a fresh scaffold ships the policy with its GRANT lines commented out. This fixture's human
+/// delegates the RECORDING of their acceptance (D0192) - the grant the tests below exercise.
+fn grant_recording_delegation(root: &Path) {
+    let p = root.join(".engine/contracts/attestation-policy.toml");
+    let text = std::fs::read_to_string(&p).expect("policy");
+    let granted = text.replace("# delegatedRecording = \"d0192\"", "delegatedRecording = \"d0192\"");
+    assert_ne!(text, granted, "the commented delegation line ships");
+    std::fs::write(&p, granted).expect("grant");
+}
+
 fn project_with_a_proposed_decision(tag: &str) -> PathBuf {
     let root = shallow_root(tag);
     assert!(agent(&root, &["init", "."]).0, "scaffold");
+    grant_recording_delegation(&root);
     let (ok, text) = agent(
         &root,
         &["record", "decision", "--slug", "probe", "--title", "t", "--context", "c", "--decision", "d", "--rationale", "r", "--consequences", "q", "--author", "ai", "--date", "2026-09-03"],

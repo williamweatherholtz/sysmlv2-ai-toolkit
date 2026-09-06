@@ -180,3 +180,36 @@ fn a_missing_checksum_entry_refuses() {
     assert!(!text.contains("FAKE-KEEL-UNPINNED"), "the unverifiable binary must not run: {text}");
     let _ = std::fs::remove_dir_all(proj.parent().unwrap());
 }
+
+// ── Scenario 6 (issue379 / GH#54): a cache HIT is verified against the committed checksum ─────────
+
+#[test]
+fn a_cached_binary_that_does_not_match_the_committed_checksum_refuses_naming_both() {
+    // The committed entry is the RELEASE's checksum; the cache holds a different (seeded) binary.
+    let release_sha = sha256_hex(&fake_binary("RELEASE"));
+    let (proj, _origin) = fixture("seeded", "9.9.4", &fake_binary("RELEASE"), Some(&release_sha));
+    let cache = proj.join(".keel").join("bin").join("9.9.4");
+    std::fs::create_dir_all(&cache).expect("cache dir");
+    std::fs::write(cache.join(asset_name()), fake_binary("SEEDED-DEV")).expect("seed a different binary under the pin's name");
+    let (ok, text) = run_keelw(&proj, "file:///nonexistent-origin", &["version"]);
+    assert!(!ok, "a cache hit whose hash is not the committed one must REFUSE (issue379): {text}");
+    assert!(!text.contains("FAKE-KEEL-SEEDED-DEV"), "the unpinned binary must never run: {text}");
+    assert!(
+        text.contains(&release_sha) && text.contains(&sha256_hex(&fake_binary("SEEDED-DEV"))),
+        "the refusal names BOTH hashes so the skew is legible: {text}"
+    );
+    let _ = std::fs::remove_dir_all(proj.parent().unwrap());
+}
+
+#[test]
+fn a_cache_hit_with_no_committed_entry_runs_and_says_it_is_unverified() {
+    let (proj, _origin) = fixture("tofu-hit", "9.9.3", &fake_binary("HIT"), None);
+    std::fs::remove_file(proj.join("keel-wrapper.toml")).expect("rm - nothing to verify against");
+    let cache = proj.join(".keel").join("bin").join("9.9.3");
+    std::fs::create_dir_all(&cache).expect("cache dir");
+    std::fs::write(cache.join(asset_name()), fake_binary("HIT")).expect("a cached binary");
+    let (ok, text) = run_keelw(&proj, "file:///nonexistent-origin", &["version"]);
+    assert!(ok && text.contains("FAKE-KEEL-HIT"), "with no entry the hit runs, as before: {text}");
+    assert!(text.contains("UNVERIFIED"), "and SAYS it ran on trust, so the skew is visible: {text}");
+    let _ = std::fs::remove_dir_all(proj.parent().unwrap());
+}

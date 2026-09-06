@@ -110,8 +110,12 @@ pub fn remap_engine_content(rel: &Path, contents: &str) -> Option<String> {
 /// `render` — silently re-arming a control the project had turned off, and equally able to disarm
 /// one it had on.
 fn is_project_owned_contract(mapped: &Path) -> bool {
-    const PROJECT_OWNED: [&str; 6] = [
+    const PROJECT_OWNED: [&str; 7] = [
         "activation.toml",
+        // issue376 / GH#57: the grants in the attestation policy (standing consent, recording
+        // delegation, the human's standing words) are the project's human's - a resync must not
+        // replace them with the engine's, which is another project's human's.
+        "attestation-policy.toml",
         "adoption-profile.toml",
         "engine-version.toml",
         "installed-units.toml",
@@ -719,13 +723,47 @@ fn step_release_as_occurrence(root: &Path, w: &mut Working) -> StepPlan {
 }
 
 /// Step 5 — types the engine REMOVED. Blockers only: there is no mechanical target to rewrite to.
+/// The line with its double-quoted string literals blanked (structure preserved), so the removed-type
+/// and removed-enum scanners read SCHEMA, not PROSE (issue377 / GH#59).
+///
+/// A critic's finding quoting Rust - `ureq::Agent` - inside an authored `description` satisfied
+/// `types_as`, because a path separator ends in a colon exactly as a typing colon does, and BLOCKED a
+/// healthy project from moving vintage with no override surface. A `SysML` type annotation never appears
+/// inside a string literal, so blanking the literals loses nothing the scanners are entitled to see;
+/// a qualified reference OUTSIDE quotes still matches. Escaped quotes inside a literal are honoured.
+fn without_string_literals(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut in_str = false;
+    let mut escaped = false;
+    for c in line.chars() {
+        if in_str {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_str = false;
+                out.push('"');
+            }
+            continue;
+        }
+        if c == '"' {
+            in_str = true;
+        }
+        out.push(c);
+    }
+    out
+}
+
 fn step_removed_types(root: &Path, w: &Working) -> StepPlan {
     let mut plan = StepPlan::empty("removed-types", "Instances of REMOVED engine types (no mechanical transform)");
     for path in authored_files(root) {
         let Some(content) = w.read(&path) else { continue };
         for (i, line) in content.lines().enumerate() {
+            // issue377: scan the line with its prose blanked; report the ORIGINAL line.
+            let scan = without_string_literals(line);
             for (ty, advice) in REMOVED_TYPES {
-                if types_as(line, ty) {
+                if types_as(&scan, ty) {
                     plan.blockers.push(Blocker {
                         path: path.clone(),
                         line: i + 1,
@@ -735,7 +773,7 @@ fn step_removed_types(root: &Path, w: &Working) -> StepPlan {
                 }
             }
             for (en, advice) in REMOVED_ENUMS {
-                if line.contains(&format!("{en}::")) {
+                if scan.contains(&format!("{en}::")) {
                     plan.blockers.push(Blocker {
                         path: path.clone(),
                         line: i + 1,
@@ -1373,7 +1411,7 @@ pub fn parse_attempts(text: &str) -> Vec<UpdateAttempt> {
 mod tests {
     use super::{
         drop_processstep_order, is_engine_dev_only, remap_engine_path, retype_instances, step_process_as_action,
-        step_processstep_order, step_release_as_occurrence, step_removed_types, strip_order_assignment, types_as,
+        step_processstep_order, step_release_as_occurrence, step_removed_types, strip_order_assignment, types_as, without_string_literals,
         Path, Working,
     };
 
@@ -1433,6 +1471,43 @@ mod tests {
         assert_eq!(remap_engine_path(Path::new("schema/core/element.sysml")), Path::new("schema/core/element.sysml"));
         assert!(is_engine_dev_only(Path::new("tools/validate/x.py")));
         assert!(!is_engine_dev_only(Path::new("schema/core/element.sysml")));
+    }
+
+    /// issue377 / GH#59: a removed type NAMED IN PROSE is not a declaration. A critic's quoted Rust
+    /// (`ureq::Agent`) inside a description blocked a healthy project; the same name as a real `: Agent`
+    /// annotation outside quotes must still block, so the fix cannot pass by never matching. The
+    /// removed-enum scan has the same two arms.
+    #[test]
+    fn a_removed_type_named_inside_a_string_literal_is_prose_not_schema() {
+        let dir = std::env::temp_dir().join(format!("keel-migrate-prose-{}", std::process::id()));
+        let tracking = dir.join(".tracking");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&tracking).unwrap();
+        std::fs::write(
+            tracking.join("i.sysml"),
+            "package I {\n    part i : Issue {\n        :>> description = \"get() uses a concrete ureq::Agent with no injection point, so the 429 arm has no executing test; std::task::Task is quoted too, and RiskLevel::high is named.\";\n    }\n}\n",
+        )
+        .unwrap();
+        let w = Working::new();
+        let prose = step_removed_types(&dir, &w);
+        assert!(
+            prose.blockers.is_empty(),
+            "a removed type NAMED IN PROSE must not block: {:?}",
+            prose.blockers.iter().map(|b| &b.reason).collect::<Vec<_>>()
+        );
+        // The other arm: the same names as REAL schema references outside quotes still block.
+        std::fs::write(
+            tracking.join("i.sysml"),
+            "package I {\n    part a : Agent { :>> description = \"quoted words\"; }\n    part r : Story { :>> level = RiskLevel::high; }\n}\n",
+        )
+        .unwrap();
+        let schema = step_removed_types(&dir, &w);
+        let reasons: Vec<&String> = schema.blockers.iter().map(|b| &b.reason).collect();
+        assert!(reasons.iter().any(|r| r.contains("`Agent`")), "a real `: Agent` annotation still blocks: {reasons:?}");
+        assert!(reasons.iter().any(|r| r.contains("`RiskLevel`")), "a real enum value still blocks: {reasons:?}");
+        // Escaped quotes inside a literal do not end it early.
+        assert_eq!(without_string_literals("a = \"x \\\" : Agent\" : Real"), "a = \"\" : Real");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The end-to-end shape on a real directory: an old-vintage tree plans edits and blockers, and
