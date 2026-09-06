@@ -175,4 +175,23 @@ package ProjectIntake20260906 {
     // The human directed the surface (st098); the Decision adopts it and the task delivers it.
     #Implicates dependency from us097 to d0354;
     #Implicates dependency from us097 to dcStandingSummaryUsesTheKit;
+
+    part st099 : Statement {
+        :>> id = "9575dd8a-d741-4039-ac91-ce7a241bf57f";
+        :>> title = "The decision report is administrative justification, not implications; the diagrams are weak";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> text = "context is very lacking. these decisions aren't grappling strongly enough with the implications of these decisions, mostly just administrative justification for the decision. I think the skill needs to be reworked - a decision isn't really to accept A decision or B decision - i need to understand the implications and real technical changes much better. and the diagrams are so weak today. I want the main logical reasons for the proposed changes. we have needs, use cases, etc. calling for different directions and I want better insight";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-06"; :>> channel = StatementChannel::chat;
+    }
+
+    part st100 : Statement {
+        :>> id = "dcd9ebcc-824b-48a3-8228-53592caff694";
+        :>> title = "Not a citing issue - a logical clarity issue; too many references already";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> text = "it's not a citing issue - it's a logical clarity issue. there are already too many things that are referenced";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-06"; :>> channel = StatementChannel::chat;
+    }
+
+    // The owner directed the rework and then corrected the diagnosis; the Decision carries both.
+    #DerivedFrom dependency from d0355 to st100;
 }

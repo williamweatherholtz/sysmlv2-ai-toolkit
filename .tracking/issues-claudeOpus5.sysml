@@ -1035,4 +1035,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcLibraryUnitRetirement to issue381;
+
+    part issue382 : Issue {
+        :>> id = "3a1d6e58-1c4b-41b6-ab38-74a64af0ab91";
+        :>> title = "The decision report's numbers were typed, not computed - three of five figures wrong within a day, and one claim simply false";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The standing decision report asserted numbers I typed rather than numbers the engine computed, and they were wrong within a day. Measured 2026-09-06 against the authored CLI facts: the page's diagram said 105 facts / 68 top-level / 34 read-only lenses; the tree says 106 / 69 / 33 - three of five figures wrong, because `keel suite` was added that morning. The page also asserted that the release workflow had not run since the last release and was unverified; `gh run list --workflow=release.yml` shows it ran 2026-08-29, succeeded in 4m56s, and cut that very release. It further priced the full suite at about four minutes, a number nothing records - suite.rs stamps only a wall-clock start, so the receipt has no duration. D0215 (accepted) states that a number the engine can compute may not be typed into the doc surface and that the enforcement is DELETION rather than reconciliation; the report is a doc surface and every number on it was typed. Resolver: dcDecisionReportIsArguable, whose contract requires the builder to emit a facts block and every digit-run in reader prose to trace to it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDecisionReportIsArguable to issue382;
+
+    part issue383 : Issue {
+        :>> id = "515e08ce-6a90-40ca-af8b-c9228230279b";
+        :>> title = "The report asked for ratification while framing it as a choice: half the queue already shipped, no panel offered a do-nothing option (recurrence of issue234)";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The standing decision report asked for ratification while presenting it as a decision. Measured over the five panels published 2026-09-06: 4 of the 8 items already ship in the binary - each Decision's own consequences says so in as many words ('the code ships because ...') - so the only act available to the reader on those four is REVERT, and no panel priced a revert; 0 of 5 panels offered a do-nothing option, so every choice set was a menu of the author's actions; and 2 of 12 option costs carried a quantity, the rest being adjectives. The owner's verdict (st099): 'mostly just administrative justification for the decision ... a decision isn't really to accept A decision or B decision'. THIS IS THE SECOND OCCURRENCE of the class: issue234 (2026-08-23) recorded the same complaint about decision cards, and its fix rendered the Decision's own context and decision text - more of the same prose inside the same frame - which is why it returned on a different surface. Per D0311 a finding named twice ranks High. Resolver: dcDecisionReportIsArguable, which requires a state chip (does this already ship, and what does the revert cost), a mandatory status-quo option, and a quantity in every cost.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcDecisionReportIsArguable to issue383;
 }
