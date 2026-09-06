@@ -64,6 +64,24 @@ fn a_decision_that_weighs_alternatives_without_the_marker_is_held_not_auto_accep
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// D0337 (the human's answer to D0324): a Decision that changes the process or enforcement surface -
+/// a process-change or safety-change marker - is OUTSIDE standing consent and stays proposed, with no
+/// acceptance result written; the unmarked Decision in the test below still auto-accepts.
+#[test]
+fn a_marker_decision_is_outside_standing_consent_and_stays_proposed() {
+    let root = scaffold("mark");
+    let f = root.join("draft.md");
+    let rationale = "r ".repeat(120);
+    std::fs::write(&f, format!("slug: probe\ndate: 2026-09-05\nmarker: process-change\n--- title\nprobe: a short title before the colon\n--- context\nc\n--- decision\nThe intake process gains a step that records the reporter's login.\n--- rationale\n{rationale}\n--- consequences\nq\n")).expect("draft");
+    let (ok, out) = run(&root, &["record", "decision", "--from", f.to_str().expect("utf8"), "--by", "ai", "--at", "2026-09-05"]);
+    assert!(ok, "the record itself succeeds: {out}");
+    assert!(out.contains("OUTSIDE standing consent") && out.contains("ProspectiveChange"), "and says why it is not accepted: {out}");
+    assert!(!out.contains("accepted D0001 at record time"), "{out}");
+    let text = std::fs::read_to_string(root.join(".engine/decisions/0001-probe.sysml")).expect("decision file");
+    assert!(text.contains("DecisionStatus::proposed") && !text.contains("AcceptR1"), "proposed, no acceptance result: {text}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 #[test]
 fn a_genuine_decision_naming_its_rejected_alternative_in_passing_still_auto_accepts() {
     let root = scaffold("plain");

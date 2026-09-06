@@ -23,6 +23,8 @@ report** — that rule is general in keel and load-bearing here.
 2. **Check what is REMOVED.** Additions are safe; renames and removals break whatever named the old
    thing.
 3. **Apply.** `keel migrate .` — let it refuse, let it roll back, never hand-repair a partial run.
+3b. **Verified or reverted (D0336).** `keel migrate` runs the project's own gate after applying - validate, every enforced guard, check-engine - under the new binary. Green retains and moves the pin; any red reverts .engine/ and .tracking/ to the pre-update commit, prints the gate's output verbatim and records the attempt (`.keel/update-attempts.toml`; `keel status` shows it; a re-run names it). There is no half-updated state to reconcile. `--no-verify` is the deliberate exception and says UNVERIFIED.
+
 4. **Reconcile.** Prove the project's own choices survived: pin, adoption, project-owned contracts, its own `[unit]` sections in `unit-extras.toml` (merged, never overwritten; a colliding section blocks by name, D0317),
    customised files. Then gate.
 5. **Prove it remotely.** A local green is one machine and one binary. Read the project's own CI.

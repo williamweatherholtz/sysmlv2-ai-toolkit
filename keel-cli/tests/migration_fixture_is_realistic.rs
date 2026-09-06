@@ -179,6 +179,53 @@ fn a_lived_in_projects_own_ci_survives_migration_and_installs_the_pin() {
     cleanup(&root);
 }
 
+/// (6) VERIFIED OR REVERTED (D0336; srUpdateIsVerifiedOrReverted, srUnprovenUpdateAsksRatherThanActs).
+/// Both outcomes, because a boundary exercised only on the happy path is a claim: a green update is
+/// RETAINED and recorded; a project whose gate goes red after the update is REVERTED - `git status
+/// --porcelain` over .engine and .tracking is EMPTY - and the attempt is recorded where `keel status`
+/// shows it, and a re-run says the version was reverted here. The red case is a committed
+/// duplicate-identity violation the resync does not touch: the gate under the new engine refuses it.
+#[test]
+fn a_green_update_is_retained_and_a_red_one_is_reverted_and_recorded() {
+    // GREEN: the lived-in project migrates, its gate passes, the pin moves, the attempt is retained.
+    let (root, _) = realistic_project("vok");
+    let (ok, text) = run(&root, &["migrate", "."]);
+    assert!(ok, "green: {text}");
+    assert!(text.contains("RETAINED") && text.contains("gate is GREEN"), "the run says the gate ran and the update stayed:\n{text}");
+    let pin = std::fs::read_to_string(root.join(".engine/contracts/engine-version.toml")).expect("pin");
+    assert!(!pin.contains("0.0.1"), "the pin moved: {pin}");
+    let attempts = std::fs::read_to_string(root.join(".keel/update-attempts.toml")).expect("attempt recorded");
+    assert!(attempts.contains("outcome = \"retained\""), "{attempts}");
+    cleanup(&root);
+
+    // RED: the same lived-in project carrying a committed duplicate-identity violation.
+    let (root, _) = realistic_project("vred");
+    std::fs::write(
+        root.join(".tracking/dup.sysml"),
+        "package Dup {\n    private import EngineElement::*;\n    private import EngineWork::*;\n    part dupA : Story { :>> id = \"11111111-1111-4111-9111-111111111111\"; :>> title = \"a\"; }\n    part dupB : Story { :>> id = \"11111111-1111-4111-9111-111111111111\"; :>> title = \"b\"; }\n}\n",
+    )
+    .expect("violation");
+    assert!(git(&root, &["add", "-A"]) && git(&root, &["-c", "commit.gpgsign=false", "commit", "-q", "-m", "a duplicate identity"]), "commit the red");
+    let before = Command::new("git").arg("-C").arg(&root).args(["rev-parse", "HEAD"]).output().expect("git").stdout;
+    let (ok, text) = run(&root, &["migrate", "."]);
+    assert!(!ok, "red: the run must fail:\n{text}");
+    assert!(text.contains("went RED") && text.contains("duplicate-identity") && text.contains("ROLLED BACK"), "the gate's own output is reported and the tree reverted:\n{text}");
+    let status = Command::new("git").arg("-C").arg(&root).args(["status", "--porcelain", "--", ".engine", ".tracking"]).output().expect("git");
+    assert!(String::from_utf8_lossy(&status.stdout).trim().is_empty(), "byte-for-byte as before over .engine and .tracking: {}", String::from_utf8_lossy(&status.stdout));
+    let after = Command::new("git").arg("-C").arg(&root).args(["rev-parse", "HEAD"]).output().expect("git").stdout;
+    assert_eq!(before, after, "no commit was made");
+    let pin = std::fs::read_to_string(root.join(".engine/contracts/engine-version.toml")).expect("pin");
+    assert!(pin.contains("0.0.1"), "the pin did NOT move on a reverted update: {pin}");
+    let attempts = std::fs::read_to_string(root.join(".keel/update-attempts.toml")).expect("the attempt is recorded even though the tree was reverted");
+    assert!(attempts.contains("outcome = \"reverted\"") && attempts.contains("gate = \"guard\""), "{attempts}");
+    // status shows it where the human looks; a re-run says so before trying again
+    let (_, st) = run(&root, &["status", "."]);
+    assert!(st.contains("REVERTED"), "keel status names the reverted attempt:\n{st}");
+    let (_, again) = run(&root, &["migrate", "--dry-run", "."]);
+    assert!(again.contains("was applied here on") && again.contains("REVERTED"), "a re-run says this version was reverted here:\n{again}");
+    cleanup(&root);
+}
+
 /// (5) The project PUBLISHED a unit of its own and declared its extras in the engine-shipped
 /// `unit-extras.toml` (issue349, GH#44): the resync used to rewrite the file wholesale and the
 /// section vanished with nothing reported. The section must ride through, and the run must say so.

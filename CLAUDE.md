@@ -157,7 +157,7 @@ frozen (modify it only by out-of-band Decision).
   historical data. Moving a project onto an **engine that changed underneath it** is
   **`project-migration`** (D0275) — different actor, different failure modes: preflight to a recorded
   green SHA, check what the engine REMOVES not what it adds, let `keel migrate` refuse and roll back
-  rather than hand-repairing; gate every unit with `keel adoption-check --vintage <prior release>` too (D0302) - the current scaffold is keel adopting keel, and the defects an older adopter meets (issue263/259) show only against a real prior release's binary, prove the project's own pin comment / adoption / project-owned contracts / its own `unit-extras.toml` sections (D0317)
+  rather than hand-repairing (and since D0336 migrate runs the project's OWN gate after applying: green is RETAINED and the pin moves, ANY red is REVERTED byte-for-byte with the gate's output reported and the attempt recorded in `.keel/update-attempts.toml` for `keel status` and the next run to name; `--no-verify` writes an UNVERIFIED tree and says so); gate every unit with `keel adoption-check --vintage <prior release>` too (D0302) - the current scaffold is keel adopting keel, and the defects an older adopter meets (issue263/259) show only against a real prior release's binary, prove the project's own pin comment / adoption / project-owned contracts / its own `unit-extras.toml` sections (D0317)
   survived the resync, read the project's OWN CI, and report the cost upstream. That last step is
   load-bearing: `check_preconditions` refuses any tree holding `keel-cli/Cargo.toml` as a self-build,
   so **the engine cannot migrate itself** — seven defects in this path (issue301/310/314/323/324/326/327)
@@ -206,7 +206,9 @@ frozen (modify it only by out-of-band Decision).
   the guard; the ones before are grandfathered and counted, never re-split.
 - **Decisions auto-accept under standing consent (D0207), at record time (D0291).** `keel record decision`
   accepts a NON-FORK on the spot: the note carries the AUTO-ACCEPTED token and quotes the standing words, the
-  judge is the single decider in `github-actors.toml`. A Decision that WEIGHS alternatives in prose without the OPTION marker
+  judge is the single decider in `github-actors.toml`. **Consent is scoped to the existing processes it was promulgated under
+  (the human's words, 2026-09-05; D0337):** a Decision carrying a `process-change` or `safety-change` marker is OUTSIDE it
+  and stays proposed for the human - every guard, hook, process, workflow or contract change now waits for their word. A Decision that WEIGHS alternatives in prose without the OPTION marker
   (two fork signals - alternative/either/option/versus/trade-off/a lettered enumeration/recommend) is HELD proposed as a fork in substance
   (D0322/issue373): write it as a fork, or say `NOT A FORK: <why>` in the text; override = a superseding Decision (D0290) or your quoted
   word (D0289). No GitHub issue is raised — the decision channel is disconnected. A FORK still reaches out - and must first pass

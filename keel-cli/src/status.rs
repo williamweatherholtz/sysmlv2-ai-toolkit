@@ -157,17 +157,25 @@ fn engine_section(root: &Path) -> Section {
             lines: vec![format!("binary {binary}; pin file present but declares no `engine =` line")],
         };
     };
-    if pinned == binary {
-        Section { label: "engine", state: State::Ok, lines: vec![format!("{binary} (binary and pin agree)")] }
-    } else {
-        Section {
-            label: "engine",
-            state: State::Attention,
-            lines: vec![
-                format!("binary {binary}, project PINS {pinned} — SKEW"),
-                "the pin is binding: writes and gates REFUSE under skew. `keel migrate` re-stamps it".into(),
-            ],
+    // D0336: the last unattended update attempt on this machine, where the human will see it.
+    let attempt_line = crate::migrate::last_attempt(root).map(|a| {
+        if a.outcome == "reverted" {
+            format!("last update attempt: {} on {} REVERTED - {} failed: {}", a.version, a.at, a.gate, a.output.lines().find(|l| !l.trim().is_empty()).unwrap_or("").chars().take(120).collect::<String>())
+        } else {
+            format!("last update attempt: {} on {} retained (gate green)", a.version, a.at)
         }
+    });
+    if pinned == binary {
+        let mut lines = vec![format!("{binary} (binary and pin agree)")];
+        lines.extend(attempt_line);
+        Section { label: "engine", state: State::Ok, lines }
+    } else {
+        let mut lines = vec![
+            format!("binary {binary}, project PINS {pinned} — SKEW"),
+            "the pin is binding: writes and gates REFUSE under skew. `keel migrate` re-stamps it".into(),
+        ];
+        lines.extend(attempt_line);
+        Section { label: "engine", state: State::Attention, lines }
     }
 }
 

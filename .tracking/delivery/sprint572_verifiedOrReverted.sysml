@@ -1,0 +1,29 @@
+// ProjectDeliveryS572 — Sprint 572: an engine update is verified-green or reverted - migrate runs the project's own gate after applying, and a reverted attempt is recorded where the human looks. EXECUTE. 3 pts.
+package ProjectDeliveryS572 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from verifiedOrRevertedStory to d0336;
+
+    part verifiedOrRevertedStory : Story {
+        :>> id = "ecfb250c-8c65-43ca-b615-0b662ed191ec";
+        :>> title = "Sprint 572: an engine update is verified-green or reverted - migrate runs the project's own gate after applying, and a reverted attempt is recorded where the human looks (3 pts)";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS572 {
+        action storyVerifiedOrReverted;
+        verification storyVerifiedOrRevertedDoD : Test { :>> id = "00f8bbca-2abe-49c1-97eb-57063461d8ec"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcAutoUpdateVerifiedOrReverted (D0336; verifies srUpdateIsVerifiedOrReverted and srUnprovenUpdateAsksRatherThanActs). DONE: after apply, re-plan and re-stamp, keel migrate runs validate + guard all + check-engine as subprocesses of the binary that wrote the tree; green retains and reports the pin; any red prints the gate's output, reverts .engine and .tracking to the pre-update commit, and records the attempt in .keel/update-attempts.toml; keel status shows the last attempt in its engine section; a re-run of a reverted version says so first; --no-verify writes and says UNVERIFIED. The realistic-fixture suite gains property six: both outcomes on the binary."; }
+        // RAN: same suite receipt: 534/0 exit 0
+        part storyVerifiedOrRevertedDoDR1 : TestResult { :>> id = "cdd22875-09d6-4805-a478-ca37ea55e16f"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "9a726d2f2ee58a2a9faf64f518871bdca4ca41c0"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification verifiedOrRevertedRefineGate : Test { :>> id = "3af99d83-dcfc-4097-a4cb-b4f97cfa78c7"; :>> title = "Sprint 572 refine gate (DoR)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: dcMigrationRollsBack had built the rollback and the DoD had already ruled out the vacuous gate (empty plan). The one design question was where a reverted attempt is recorded when the tree must be restored to a commit that cannot change - a machine-local record that status and the next run read."; }
+    verification verifiedOrRevertedStandupGate : Test { :>> id = "f6c47b2e-f3a3-4685-9bc9-0302a43fc5d5"; :>> title = "Sprint 572 standup gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "ONE CONSEQUENCE STATED, NOT HIDDEN: a project whose gate was already red before the update sees the update reverted with that red reported. That is the requirement's reading - there is no third outcome - and D0336 says so."; }
+    verification verifiedOrRevertedImplementGate : Test { :>> id = "d7f981a5-dfc2-4b4f-bcdc-6dc080ccfe2c"; :>> title = "Sprint 572 implement gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: cargo test --test migration_fixture_is_realistic 6 passed (green retained and recorded with the pin moved; a committed duplicate-identity violation reverted - gate output reported, git status --porcelain over .engine and .tracking empty, pin unmoved, status naming the attempt, a dry-run re-run naming it); clippy -D warnings clean after the finish_applied extraction; the full suite in the background to completion (receipt on the DoD result)."; }
+    verification verifiedOrRevertedReviewGate : Test { :>> id = "4112d4eb-3167-43aa-9a7f-0f661245a229"; :>> title = "Sprint 572 review gate — three passes per D0172"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) IS THE GATE THE PROJECT'S: three subprocesses of the same binary over the project root - the same commands the pre-commit hook runs. (2) CAN THE REVERT LEAVE A HALF STATE: rollback_after_failure restores and cleans both trees and says if it could not; the test asserts porcelain-empty. (3) IS THE RECORD DURABLE AND READ: machine-local TOML, read by status and by migrate; an Issue would have had to land in a tree the revert just restored."; }
+    verification verifiedOrRevertedCloseOutGate : Test { :>> id = "df2b5ec0-59ce-45e6-bbd0-1e9411b32aba"; :>> title = "Sprint 572 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. D0336 accepted under standing consent; dcAutoUpdateVerifiedOrReverted done; nUnattendedCurrency's verified-or-reverted half carried."; }
+    verification verifiedOrRevertedRetroGate : Test { :>> id = "600c00b7-fc1d-4ae9-9b4b-4274ec9f5949"; :>> title = "Sprint 572 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: dcScheduledCurrency is the unattended half that calls this path on a schedule, next on the frontier; the migrate-cannot-migrate-itself residual stays with dcMigrationFixtureIsRealistic. The lesson: a boundary is proven by its red case - the green case alone would have passed with the gate never running."; }
+}

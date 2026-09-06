@@ -1102,6 +1102,13 @@ fn restamp_pin(root: &Path, fresh: &str) -> std::io::Result<()> {
 /// possible outcome.
 #[must_use]
 pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
+    cmd_with(root, engine, dry_run, true)
+}
+
+/// `verify = false` skips the post-apply gate (`--no-verify`): the tree is written and NOT verified,
+/// and the run says so. The default is the D0336 shape - verified-green or reverted, no third state.
+#[must_use]
+pub fn cmd_with(root: &Path, engine: &Dir, dry_run: bool, verify: bool) -> i32 {
     // RECOVERY RUNS FIRST, before the preconditions. An interrupted migration leaves the tree
     // DIRTY, and the dirty-tree precondition would refuse — so a genuine interruption could never
     // be recovered by the very command that recovers it. Found by the interruption test, which is
@@ -1118,6 +1125,12 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
         }
     };
     let pre_sha = if dry_run { None } else { head_sha(root) };
+    // srUnprovenUpdateAsksRatherThanActs: a version that was reverted here before is not retried in
+    // silence - the attempt record names it and the gate that refused it.
+    if let Some(prior) = last_attempt(root).filter(|a| a.version == env!("CARGO_PKG_VERSION") && a.outcome == "reverted") {
+        println!("  NOTE: {} was applied here on {} and REVERTED - {} failed: {}", prior.version, prior.at, prior.gate, clip(&prior.output, 160));
+        println!("        Re-running because you asked; the same gate decides again.");
+    }
     let p = plan(root, engine);
     let active = p.active();
     if let Some(note) = &recovery {
@@ -1214,16 +1227,146 @@ pub fn cmd(root: &Path, engine: &Dir, dry_run: bool) -> i32 {
     if let Err(e) = restamp_pin(root, &stamp) {
         eprintln!("keel migrate: migration complete but the version re-stamp failed ({e}) - the parity warning will keep firing until engine-version.toml is updated.");
     }
-    // The run completed and verified: clear the marker so the NEXT run does not "recover" from a
-    // migration that finished. A marker left behind would restore a good tree to its pre-migration
-    // state on the next invocation — the rollback becoming the defect.
-    let _ = std::fs::remove_file(marker_path(root));
-    println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
-    report_written(&p, root);
-    println!();
-    println!("  NEXT: run this project's own gate — `keel validate . && keel guard && keel check-engine .` — then commit.");
-    println!("  That gate, not this command, is the test that matters: it is the state you are actually in.");
-    0
+    finish_applied(root, &p, pre_sha.as_ref(), written, verify)
+}
+
+/// VERIFIED OR REVERTED (D0336; srUpdateIsVerifiedOrReverted). The re-plan proves the transform did
+/// what it said; it does not prove the PROJECT still gates. So the project's own gate runs - validate,
+/// every enforced guard, check-engine - under the binary that just wrote the tree. Green retains and
+/// reports what moved including the pin; ANY red restores the pre-update commit and reports the gate's
+/// output verbatim. There is no third outcome: the tree is verified-green or it is byte-for-byte what
+/// it was. NOT gated on "empty plan": an empty plan returned before the re-stamp and never reaches
+/// here, and a real upgrade always plans at least the resync. `verify = false` writes and says UNVERIFIED.
+fn finish_applied(root: &Path, p: &MigrationPlan, pre_sha: Option<&String>, written: usize, verify: bool) -> i32 {
+    if verify {
+        match project_gate(root) {
+            Ok(()) => {
+                let _ = std::fs::remove_file(marker_path(root));
+                println!("  wrote {written} file(s). Re-plan is empty and the project's own gate is GREEN under {}: the update is RETAINED.", env!("CARGO_PKG_VERSION"));
+                report_written(p, root);
+                println!("  pin: engine-version.toml now reads {}", env!("CARGO_PKG_VERSION"));
+                record_attempt(root, "retained", "validate + guard + check-engine", "green");
+                println!();
+                println!("  NEXT: commit. The gate that matters has already run on the tree you are in.");
+                0
+            }
+            Err((gate, output)) => {
+                eprintln!("keel migrate: the update was written but this project's own gate went RED under {} - {gate}:", env!("CARGO_PKG_VERSION"));
+                for line in output.lines().take(40) {
+                    eprintln!("    {line}");
+                }
+                record_attempt(root, "reverted", &gate, &output);
+                eprintln!("  REVERTING: verified-green or byte-for-byte as before - there is no third state (srUpdateIsVerifiedOrReverted).");
+                let code = rollback_after_failure(root, pre_sha, written);
+                eprintln!("  RECORDED in .keel/update-attempts.toml (`keel status` shows it): version {}, gate {gate}. A re-run will say this version was reverted here.", env!("CARGO_PKG_VERSION"));
+                code
+            }
+        }
+    } else {
+        let _ = std::fs::remove_file(marker_path(root));
+        println!("  wrote {written} file(s). Re-plan is empty: the migration is complete and idempotent.");
+        report_written(p, root);
+        println!();
+        println!("  --no-verify: the project's own gate was NOT run. This tree is written and UNVERIFIED (D0336).");
+        println!("  Run `keel validate . && keel guard && keel check-engine .` yourself, then commit.");
+        0
+    }
+}
+
+/// The project's own gate under THIS binary: validate, every enforced guard, check-engine. `Err((gate,
+/// verbatim output))` on the first red.
+fn project_gate(root: &Path) -> Result<(), (String, String)> {
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("keel"));
+    let r = root.to_string_lossy().to_string();
+    for (gate, args) in [("validate", vec!["validate", r.as_str()]), ("guard", vec!["guard", "all", r.as_str()]), ("check-engine", vec!["check-engine", r.as_str()])] {
+        let out = std::process::Command::new(&exe).args(&args).output().map_err(|e| (gate.to_string(), format!("could not run keel {gate}: {e}")))?;
+        if !out.status.success() {
+            let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+            return Err((gate.to_string(), text));
+        }
+    }
+    Ok(())
+}
+
+/// One recorded update attempt (machine-local `.keel/update-attempts.toml`, D0336).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateAttempt {
+    pub version: String,
+    pub at: String,
+    pub outcome: String,
+    pub gate: String,
+    pub output: String,
+}
+
+fn attempts_path(root: &Path) -> PathBuf {
+    root.join(".keel").join("update-attempts.toml")
+}
+
+/// Append an attempt: the durable artefact srUnprovenUpdateAsksRatherThanActs requires, read back by
+/// `keel status` and by the next `keel migrate`.
+fn record_attempt(root: &Path, outcome: &str, gate: &str, output: &str) {
+    use std::fmt::Write as _;
+    let path = attempts_path(root);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let mut text = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        "# Engine update attempts on this machine (D0336): version, outcome, the gate that decided, its output.\n# `keel status` shows the latest; `keel migrate` names a version that was reverted here before retrying it.\n".to_string()
+    });
+    let clean = |s: &str| s.replace('"', "'").replace('\r', "").lines().take(40).collect::<Vec<_>>().join("\\n");
+    let _ = write!(
+        text,
+        "\n[[attempt]]\nversion = \"{}\"\nat = \"{}\"\noutcome = \"{outcome}\"\ngate = \"{}\"\noutput = \"{}\"\n",
+        env!("CARGO_PKG_VERSION"),
+        crate::scaffold::today(),
+        clean(gate),
+        clean(output)
+    );
+    let _ = std::fs::write(&path, text);
+}
+
+/// Every recorded attempt, oldest first.
+#[must_use]
+pub fn attempts(root: &Path) -> Vec<UpdateAttempt> {
+    let Ok(text) = std::fs::read_to_string(attempts_path(root)) else { return Vec::new() };
+    parse_attempts(&text)
+}
+
+/// The most recent attempt, if any.
+#[must_use]
+pub fn last_attempt(root: &Path) -> Option<UpdateAttempt> {
+    attempts(root).pop()
+}
+
+/// Pure parse of the attempts file.
+#[must_use]
+pub fn parse_attempts(text: &str) -> Vec<UpdateAttempt> {
+    let mut out = Vec::new();
+    let mut cur: Option<UpdateAttempt> = None;
+    for line in text.lines() {
+        let l = line.trim();
+        if l == "[[attempt]]" {
+            if let Some(a) = cur.take() {
+                out.push(a);
+            }
+            cur = Some(UpdateAttempt { version: String::new(), at: String::new(), outcome: String::new(), gate: String::new(), output: String::new() });
+            continue;
+        }
+        let (Some(a), Some((k, v))) = (cur.as_mut(), l.split_once('=')) else { continue };
+        let v = v.trim().trim_matches('"').replace("\\n", "\n");
+        match k.trim() {
+            "version" => a.version = v,
+            "at" => a.at = v,
+            "outcome" => a.outcome = v,
+            "gate" => a.gate = v,
+            "output" => a.output = v,
+            _ => {}
+        }
+    }
+    if let Some(a) = cur {
+        out.push(a);
+    }
+    out
 }
 
 #[cfg(test)]

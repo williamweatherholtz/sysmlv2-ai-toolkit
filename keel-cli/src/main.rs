@@ -2608,19 +2608,26 @@ fn decision_fields_from_file(path: &str) -> Result<std::collections::BTreeMap<St
     Ok(out)
 }
 
+/// D0337 (the human's answer to D0324, 2026-09-05: 'standing consent is scoped only to the existing
+/// processes under which it was promulgated'): a Decision that CHANGES the process or enforcement
+/// surface - a process-change or safety-change marker - is outside the ground the consent stands on and
+/// stays proposed for the human. Consent covers work WITHIN the existing processes; it does not cover
+/// rewriting them. Exit 0: the record itself succeeded.
+fn outside_standing_consent(marker: &str) -> i32 {
+    println!("OUTSIDE standing consent (D0337): this Decision carries a {marker} marker - it changes the process or enforcement surface, and standing consent is scoped to the existing processes it was promulgated under. Stays proposed; the human accepts it with their quoted word (D0289), the console, or their terminal.");
+    0
+}
+
 fn cmd_record(args: &[String]) -> i32 {
-    if args.first().map(String::as_str) == Some("issue") {
-        return cmd_record_issue(args);
-    }
     // D0236: intake had NO write path. Every Statement in this repo was hand-edited into a file,
     // which is the one record type where that matters most - D0216 requires the human's words
     // VERBATIM before any Need exists, and a hand-typed "verbatim" field is a paraphrase waiting
     // to happen.
-    if args.first().map(String::as_str) == Some("statement") {
-        return cmd_record_statement(args);
-    }
-    if args.first().map(String::as_str) == Some("story") {
-        return cmd_record_story(args);
+    match args.first().map(String::as_str) {
+        Some("issue") => return cmd_record_issue(args),
+        Some("statement") => return cmd_record_statement(args),
+        Some("story") => return cmd_record_story(args),
+        _ => {}
     }
     if args.first().map(String::as_str) != Some("decision") {
         eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
@@ -2699,6 +2706,10 @@ fn cmd_record(args: &[String]) -> i32 {
             // Two distinct signals in the decision text hold it proposed and say which words; the
             // author writes it as a fork or states `NOT A FORK` in the text.
             let disguised = keel_cli::deck::disguised_fork(&decision);
+            // D0337: a marker Decision is outside standing consent (see outside_standing_consent).
+            if let Some(m) = marker.filter(|_| keel_cli::activation::standing_consent(&root).is_some()) {
+                return outside_standing_consent(m);
+            }
             match (keel_cli::activation::standing_consent(&root), keel_cli::deck::fork_options(&root, &rel).is_empty(), disguised) {
                 (Some(consent), true, Some(signals)) => {
                     println!(
@@ -4058,11 +4069,13 @@ viewpoints ({} declared):", vps.len());
 /// anyway, but a command that rewrites authored facts should take its target explicitly.
 fn cmd_migrate(args: &[String]) -> i32 {
     let dry_run = args.iter().any(|a| a == "--dry-run");
-    let root = match root_arg(args, "keel migrate [--dry-run] [ROOT]", &["dry-run"], 0) {
+    // D0336: verified-or-reverted is the default; `--no-verify` writes an UNVERIFIED tree and says so.
+    let verify = !args.iter().any(|a| a == "--no-verify");
+    let root = match root_arg(args, "keel migrate [--dry-run] [--no-verify] [ROOT]", &["dry-run", "no-verify"], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
-    keel_cli::migrate::cmd(&root, &ENGINE_DIR, dry_run)
+    keel_cli::migrate::cmd_with(&root, &ENGINE_DIR, dry_run, verify)
 }
 
 /// `keel record issue` — the sanctioned path for D0108 clause 5, which mandates that conflicting
