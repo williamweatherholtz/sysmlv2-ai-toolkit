@@ -1,6 +1,8 @@
 // =====================================================================
 // EngineIndicatorMonitoring — declare + collect + interpret MONITORED MEASURES (D0089;
-// ISO-15939/PSM/SMM). An Indicator informs by DIRECTION (D0088), not a threshold. Data arrives by a
+// ISO-15939/PSM/SMM). An Indicator informs by DIRECTION (D0088), not a threshold - though a declared
+// TRIGGER (.engine/contracts/indicator-triggers.toml, D0333) may SURFACE work when a value is crossed;
+// it gates nothing, so the indicator stays an indicator. Data arrives by a
 // measurement METHOD: computed (repo-derived, no stored datapoints), pulled (external, recorded),
 // manual (subjective, recorded). Deployed by the indicator skill (D0059).
 // =====================================================================

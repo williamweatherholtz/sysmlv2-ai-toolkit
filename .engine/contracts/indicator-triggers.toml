@@ -1,0 +1,15 @@
+# Indicator TRIGGERS (D0333, dcUngroundedRatioTriggers) - a declared threshold per indicator that turns a
+# number someone must think to read into a signal `keel show indicators` (`triggered`) and `keel orient`
+# (burndown.triggers) show. Still indicators, never requirements (D0088): crossing a trigger SURFACES
+# work, it gates nothing. `above` fires when the live value exceeds it; `below` when it falls under.
+#
+# [indicatorName]
+# above = <number>        # or below = <number>; both may be given
+# surfaces = "<the work crossing it surfaces - a process, a skill, a Decision>"
+
+[ungroundedRatioIndicator]
+# D0249: at more than half the delivery Stories chartered by Decisions that reach no Need, the Need
+# set is not describing the work - derive the latent Needs (business-elicitation, D0216) before adding
+# more decision-chartered work. Sprint 483 sat at 86% with nothing raised.
+above = 50.0
+surfaces = "latent-need derivation (D0249): run business-elicitation / derive Needs the decision-chartered Stories imply, so the Need set describes the work"

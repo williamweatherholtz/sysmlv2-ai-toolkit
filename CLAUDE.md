@@ -70,7 +70,7 @@ a content gate (frozen schema, a direction Decision) or an empty frontier.
 Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
 gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
-`governing-version`, `open-issues`, `indicators`, `intake`, `control-structure` (D0284: STPA step 2 for
+`governing-version`, `open-issues`, `indicators` (with `triggered`: the indicators past a declared threshold in `indicator-triggers.toml`, surfacing work - never gating, D0333; `orient` repeats them in its burndown), `intake`, `control-structure` (D0284: STPA step 2 for
 this project's own workflow, computed from hook config, git hooks, workflow files, CLI facts and declared deciders — the
 `safety` viewpoint's renderer; draw it with the **`stpa-diagram`** skill, D0285 — authority descending, control down / feedback
 up, every edge labelled with what passes, ortholinear, hops at crossings, by construction from the JSON; the **`stpa-self`** skill, D0313, runs STPA on that computed structure and the `stpa-currency` guard warns when it grows an action no run has analysed), `attestation` (D0232: is a `pass` a receipt or a

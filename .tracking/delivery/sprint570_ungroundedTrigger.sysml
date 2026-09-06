@@ -1,0 +1,29 @@
+// ProjectDeliveryS570 — Sprint 570: the ungrounded ratio becomes an indicator with a trigger - the number nobody read now surfaces the derivation work on the frontier's own screen. EXECUTE. 3 pts.
+package ProjectDeliveryS570 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    #CharteredBy dependency from ungroundedTriggerStory to d0333;
+
+    part ungroundedTriggerStory : Story {
+        :>> id = "898f13ee-491c-4618-8da1-eb9f3330c25d";
+        :>> title = "Sprint 570: the ungrounded ratio becomes an indicator with a trigger - the number nobody read now surfaces the derivation work on the frontier's own screen (3 pts)";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> kind = WorkKind::code; :>> priority = WorkPriority::p0; :>> owner = "claudeOpus5"; :>> estimatedPoints = 3;
+    }
+
+    action def DeliveryRunS570 {
+        action storyUngroundedTrigger;
+        verification storyUngroundedTriggerDoD : Test { :>> id = "538dcadb-310c-4def-800a-fb77f6507d9f"; :>> method = VerificationMethod::test; :>> procedureText = "DELIVERED BACKLOG ITEMS: dcUngroundedRatioTriggers (D0333; D0249's last clause). DONE: ungroundedRatioIndicator (computed, collectionRef ungrounded_ratio_pct, minimize, informs d0249) in .tracking/indicators.sysml; .engine/contracts/indicator-triggers.toml declares above = 50 and the work it surfaces; keel show indicators reports each indicator's trigger and a top-level triggered list; keel orient's burndown carries ungrounded_ratio_pct and triggers. Live: 85 percent (486 of 569), crossed, the derivation work surfaced in both lenses. Both directions armed: unit tests on parse and crossing; an integration test on the binary - a fresh scaffold (0 percent) surfaces nothing, three decision-chartered Stories (100 percent) surface it by name. The indicator process header and CLAUDE.md §2 say what a trigger is and is not."; }
+        // RAN: same suite receipt: 528/0 exit 0
+        part storyUngroundedTriggerDoDR1 : TestResult { :>> id = "ee09d84b-5764-40ad-a8ed-f987845ff236"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c81f82ce739ae06c5fe5db950971e2dc92710b34"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
+    }
+
+    verification ungroundedTriggerRefineGate : Test { :>> id = "0cb21ca4-5c1a-4c19-a2da-06977de85c37"; :>> title = "Sprint 570 refine gate (DoR)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "READY: the DoD named the mechanism and the both-directions test. The one design question was where a threshold lives when the Indicator type is frozen and D0088 says an indicator has none - a contract, read by the two lenses, so the indicator stays an indicator and the threshold is a project-declared fact."; }
+    verification ungroundedTriggerStandupGate : Test { :>> id = "705cd4b6-1230-49a9-af3c-dbb8261ae487"; :>> title = "Sprint 570 standup gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "ONE NUMBER: 85 percent today, 86 through sprint 483. The trigger fires on this tree now, which is the honest state, and what it surfaces is business-elicitation deriving the Needs the decision-chartered Stories imply - surfaced, not scheduled (D0204)."; }
+    verification ungroundedTriggerImplementGate : Test { :>> id = "05096234-2fdf-476e-a94f-07a9c781eb6c"; :>> title = "Sprint 570 implement gate"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::test; :>> procedureText = "RAN: keel show indicators . (triggered: ungroundedRatioIndicator 85.00 above 50); keel orient . burndown (ungrounded_ratio_pct 85, triggers 1); cargo test --lib trigger_tests 1 passed; cargo test --test indicator_trigger_surfaces_work 1 passed (0 percent nothing; 100 percent surfaced by name); clippy -D warnings clean; the full suite in the background to completion (receipt on the DoD result)."; }
+    verification ungroundedTriggerReviewGate : Test { :>> id = "eac804a2-a2fa-47b7-a5c1-b3a116b1d23e"; :>> title = "Sprint 570 review gate — three passes per D0172"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "THREE PASSES. (1) IS IT STILL AN INDICATOR: yes - no guard reads the trigger; D0088's boundary is stated in the process header and the contract. (2) DOES A FRESH PROJECT INHERIT A FALSE ALARM: the contract ships, the scaffold has no Stories, the ratio is 0 and nothing fires - the test's first half. (3) IS THE COST ON ORIENT: the ratio is computed from the model orient already built; only a non-ungrounded trigger would call the metric registry."; }
+    verification ungroundedTriggerCloseOutGate : Test { :>> id = "3b491d31-5e3d-47b5-a828-f42ac96c2b4b"; :>> title = "Sprint 570 closeOut gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::inspect; :>> procedureText = "CLOSED. D0333 accepted under standing consent; dcUngroundedRatioTriggers done; d0249 fully carried."; }
+    verification ungroundedTriggerRetroGate : Test { :>> id = "db1f7794-cbc9-446c-9773-9ff4c1a3ba64"; :>> title = "Sprint 570 retro gate (autonomous, D0049)"; :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5"; :>> method = VerificationMethod::analyze; :>> procedureText = "no new item - already tracked: the work the trigger surfaces is the standing D0216 business-elicitation process and d0249's derivation clause, now visible on every orient rather than tracked as a task - a trigger is the control, a task would be a schedule. The lesson: an indicator with no trigger is a number in a lens nobody opens; the trigger is what turns it into a control without making it a gate."; }
+}

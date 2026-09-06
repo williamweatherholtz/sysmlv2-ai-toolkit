@@ -302,6 +302,13 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
             let (total, missing) = compute_attestation(&model);
             Some(f64::from(pct(total - missing.len(), total)))
         }
+        // D0249's unbuilt clause (dcUngroundedRatioTriggers): the rootedness ungrounded ratio - delivery
+        // Stories chartered by a Decision that reaches no Need, as a share of all delivery Stories. The
+        // number rootedness always held (415 of 482 in sprint 483) and no view ranked or raised.
+        "ungrounded_ratio_pct" => {
+            let (total, ungrounded) = super::checks::rootedness_counts(root).ok()?;
+            Some(f64::from(pct(ungrounded, total)))
+        }
         "volatility" => Some(cnt(model.edges.iter().filter(|e| e.kind == "supersede").count())),
         // D0200 clause 4: the human's override rate over READ sitting reviews (batch-acks excluded -
         // an acknowledgment cannot override). Sustained 0% is the ALARM, not the goal (the HITL
@@ -718,6 +725,8 @@ pub fn computed_indicator_keys(root: &Path) -> Result<Vec<(String, String)>, Vie
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
+    let triggers = indicator_triggers(root);
+    let mut triggered: Vec<Json> = Vec::new();
     let model = Model::build(root)?;
     let mut names: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Indicator").map(|(n, _)| n).collect();
     names.sort();
@@ -761,8 +770,28 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
             .iter()
             .map(|(at, v)| Json::Obj(vec![("at".to_string(), Json::s(at.clone())), ("value".to_string(), Json::s(format!("{v:.2}")))]))
             .collect();
+        // TRIGGER (D0333): a declared threshold in `.engine/contracts/indicator-triggers.toml` turns a
+        // number someone must think to read into a signal the reader is shown. Still an indicator, not
+        // a requirement (D0088): crossing it surfaces WORK, it gates nothing.
+        let trigger = triggers.get(name.as_str()).map(|t| {
+            let crossed = latest.is_some_and(|v| t.crossed(v));
+            if crossed {
+                triggered.push(Json::Obj(vec![
+                    ("indicator".to_string(), Json::s(name.clone())),
+                    ("latest".to_string(), fmt(latest)),
+                    ("threshold".to_string(), Json::s(t.describe())),
+                    ("surfaces".to_string(), Json::s(t.surfaces.clone())),
+                ]));
+            }
+            Json::Obj(vec![
+                ("threshold".to_string(), Json::s(t.describe())),
+                ("crossed".to_string(), Json::Bool(crossed)),
+                ("surfaces".to_string(), Json::s(t.surfaces.clone())),
+            ])
+        });
         out.push(Json::Obj(vec![
             ("indicator".to_string(), Json::s(name.clone())),
+            ("trigger".to_string(), trigger.unwrap_or(Json::Null)),
             ("measures".to_string(), Json::s(info.attrs.get("measures").cloned().unwrap_or_default())),
             ("method".to_string(), Json::s(method.to_string())),
             ("goal".to_string(), Json::s(goal.to_string())),
@@ -778,10 +807,92 @@ pub fn indicators(root: &Path, trend: bool) -> Result<String, ViewError> {
         ]));
     }
     Ok(Json::Obj(vec![
-        ("view".to_string(), Json::s("indicators (D0089/D0091): monitored measures + direction-aware status + the banked datapoint series. `latest` is CALCULATED (live recompute for computed indicators — authoritative, never stale; last datapoint otherwise); the bank stores value+timestamp only; `drift`=true when a computed indicator's live value has moved off its last snapshot (the bank is historical record, never overrides live).".to_string())),
+        ("view".to_string(), Json::s("indicators (D0089/D0091): monitored measures + direction-aware status + the banked datapoint series. `latest` is CALCULATED (live recompute for computed indicators — authoritative, never stale; last datapoint otherwise); the bank stores value+timestamp only; `drift`=true when a computed indicator's live value has moved off its last snapshot (the bank is historical record, never overrides live). `triggered` lists the indicators past a declared threshold (indicator-triggers.toml, D0333) and the work each surfaces.".to_string())),
+        ("triggered".to_string(), Json::Arr(triggered)),
         ("indicators".to_string(), Json::Arr(out)),
     ])
     .dump())
+}
+
+/// One declared indicator trigger (D0333): the threshold and the work crossing it surfaces.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndicatorTrigger {
+    pub above: Option<f64>,
+    pub below: Option<f64>,
+    pub surfaces: String,
+}
+
+impl IndicatorTrigger {
+    #[must_use]
+    pub fn crossed(&self, value: f64) -> bool {
+        self.above.is_some_and(|a| value > a) || self.below.is_some_and(|b| value < b)
+    }
+    #[must_use]
+    pub fn describe(&self) -> String {
+        match (self.above, self.below) {
+            (Some(a), Some(b)) => format!("above {a} or below {b}"),
+            (Some(a), None) => format!("above {a}"),
+            (None, Some(b)) => format!("below {b}"),
+            (None, None) => "(no threshold)".to_string(),
+        }
+    }
+}
+
+/// `.engine/contracts/indicator-triggers.toml`: `[indicatorName] above = 50.0  surfaces = "..."`. An
+/// absent file means no indicator triggers - the D0136 state, never an error.
+#[must_use]
+pub fn indicator_triggers(root: &Path) -> HashMap<String, IndicatorTrigger> {
+    let Ok(text) = std::fs::read_to_string(root.join(".engine").join("contracts").join("indicator-triggers.toml")) else {
+        return HashMap::new();
+    };
+    parse_indicator_triggers(&text)
+}
+
+/// Pure parse of the contract text (unit-tested).
+#[must_use]
+pub fn parse_indicator_triggers(text: &str) -> HashMap<String, IndicatorTrigger> {
+    let mut out: HashMap<String, IndicatorTrigger> = HashMap::new();
+    let mut current: Option<String> = None;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            current = Some(name.trim().to_string());
+            out.entry(name.trim().to_string()).or_insert(IndicatorTrigger { above: None, below: None, surfaces: String::new() });
+            continue;
+        }
+        let (Some(cur), Some((k, v))) = (current.as_ref(), l.split_once('=')) else { continue };
+        let Some(t) = out.get_mut(cur) else { continue };
+        let v = v.trim();
+        match k.trim() {
+            "above" => t.above = v.parse().ok(),
+            "below" => t.below = v.parse().ok(),
+            "surfaces" => t.surfaces = v.trim_matches('"').to_string(),
+            _ => {}
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod trigger_tests {
+    use super::{parse_indicator_triggers, IndicatorTrigger};
+
+    /// Both directions, as the `DoD` demands of a discriminating indicator: past the threshold triggers,
+    /// below it does not; a `below` trigger reads the other way; absent thresholds never trigger.
+    #[test]
+    fn a_trigger_fires_only_past_its_threshold_in_its_direction() {
+        let t = parse_indicator_triggers("# triggers\n[ungroundedRatioIndicator]\nabove = 50.0\nsurfaces = \"latent-need derivation (D0249)\"\n[overrideRate]\nbelow = 5\nsurfaces = \"the reviewer is not reviewing\"\n");
+        let u = &t["ungroundedRatioIndicator"];
+        assert!(u.crossed(85.0) && !u.crossed(50.0) && !u.crossed(12.0));
+        assert_eq!(u.surfaces, "latent-need derivation (D0249)");
+        assert_eq!(u.describe(), "above 50");
+        let o = &t["overrideRate"];
+        assert!(o.crossed(0.0) && !o.crossed(5.0) && !o.crossed(40.0));
+        assert!(!IndicatorTrigger { above: None, below: None, surfaces: String::new() }.crossed(99.0));
+    }
 }
 
 fn governance_cards(model: &Model) -> Vec<Json> {

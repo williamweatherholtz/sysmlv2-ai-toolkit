@@ -613,6 +613,18 @@ pub fn check(root: &Path) -> Result<String, ViewError> {
     .dump())
 }
 
+/// `(total delivery Stories, decision-ungrounded)` - the two numbers the ungrounded ratio indicator
+/// reads (D0333); one computation, shared with the `rootedness` lens.
+///
+/// # Errors
+/// Propagates model-build failures.
+pub fn rootedness_counts(root: &Path) -> Result<(usize, usize), ViewError> {
+    let model = Model::build(root)?;
+    let stories: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
+    let ungrounded = stories.iter().filter(|s| rd_charter_class(&model, s) == "decision_ungrounded").count();
+    Ok((stories.len(), ungrounded))
+}
+
 /// Requirement-rootedness view (D0098/D0099, issue047): the charter-source BURNDOWN (need-rooted vs
 /// decision-driven vs orphan) over all delivery Stories, plus the `#Capability` gate set.
 ///

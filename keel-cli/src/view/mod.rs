@@ -3361,13 +3361,38 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
     let mut stories: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Story").map(|(n, _)| n).collect();
     stories.sort();
     let orphan_stories = stories.iter().filter(|s| rd_charter_class(&model, s) == "orphan").count();
+    let ungrounded = stories.iter().filter(|s| rd_charter_class(&model, s) == "decision_ungrounded").count();
     let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
+    // INDICATOR TRIGGERS (D0333): every declared trigger whose live value is past its threshold, with the
+    // work it surfaces - in the burndown, because that is the screen the ranked frontier is read from.
+    // The ungrounded ratio is computed here from the same model so orient does not pay for the whole
+    // indicators view; any other triggered indicator is read through the view's own compute.
+    let triggers = reports::indicator_triggers(root);
+    let mut triggered: Vec<Json> = Vec::new();
+    for (name, t) in &triggers {
+        let live: Option<f64> = if name == "ungroundedRatioIndicator" {
+            Some(f64::from(pct(ungrounded, stories.len())))
+        } else {
+            model.items.get(name).and_then(|i| i.attrs.get("collectionRef")).and_then(|k| reports::metric_value(root, k))
+        };
+        if let Some(v) = live.filter(|v| t.crossed(*v)) {
+            triggered.push(Json::Obj(vec![
+                ("indicator".to_string(), Json::s(name.clone())),
+                ("latest".to_string(), Json::s(format!("{v:.1}"))),
+                ("threshold".to_string(), Json::s(t.describe())),
+                ("surfaces".to_string(), Json::s(t.surfaces.clone())),
+            ]));
+        }
+    }
+    triggered.sort_by_key(Json::dump);
     Ok(Json::Obj(vec![
         ("need_decomposed_pct".to_string(), Json::Int(i64::from(pct_of(need)))),
         ("sr_verified_pct".to_string(), Json::Int(i64::from(pct_of(sr)))),
         ("unrooted_capabilities".to_string(), n(unrooted_caps)),
         ("orphan_stories".to_string(), n(orphan_stories)),
-        ("detail".to_string(), Json::s("keel tier-satisfaction | rootedness | assured | critique-coverage")),
+        ("ungrounded_ratio_pct".to_string(), Json::Int(i64::from(pct(ungrounded, stories.len())))),
+        ("triggers".to_string(), Json::Arr(triggered)),
+        ("detail".to_string(), Json::s("keel tier-satisfaction | rootedness | assured | critique-coverage | show indicators (triggers)")),
     ])
     .dump())
 }

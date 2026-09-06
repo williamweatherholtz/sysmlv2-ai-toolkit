@@ -120,6 +120,25 @@ package ProjectIndicators {
         :>> collectionRef = "conda run -n sysml python .engine/tools/validate/conformance_lane.py (kernel-side; redirect, never pipe)";
     }
     #Informs dependency from conformanceIndicator to d0132;
+
+    // UNGROUNDED RATIO (D0249's unbuilt clause, D0333). The share of delivery Stories chartered by a
+    // Decision that reaches no Need. Sprint 483's retro: the Need set was inverted relative to the code
+    // for months and NO VIEW SAID SO - tier-satisfaction read 100% while rootedness held 415 of 482
+    // ungrounded and nothing ranked or raised it. A number only readable by someone who already suspects
+    // the answer is not a control (D0047). COMPUTED, so `latest` is live; a TRIGGER in
+    // .engine/contracts/indicator-triggers.toml surfaces the latent-need derivation when it is crossed.
+    // Still an INDICATOR (D0088): crossing it surfaces work, it gates nothing.
+    part ungroundedRatioIndicator : Indicator {
+        :>> id = "1d1c0333-0333-4333-9333-516273840333";
+        :>> createdAt = "2026-09-05";
+        :>> createdBy = "claudeOpus5";
+        :>> measures = "Delivery Stories chartered by a Decision that reaches no Need (%) - the rootedness ungrounded ratio";
+        :>> goal = IndicatorGoal::minimize;
+        :>> unit = "%";
+        :>> method = MeasurementMethod::computed;
+        :>> collectionRef = "ungrounded_ratio_pct";
+    }
+    #Informs dependency from ungroundedRatioIndicator to d0249;
     part conformanceIndicatorM1 : Measurement { :>> id = "1d1c0109-0109-4109-9109-5162738400b1"; :>> value = "100.0"; :>> measuredAt = "2026-08-14"; :>> source = "conformance_lane.py at 1cb73e4 — 470/470 instance files, no construct rejected"; :>> createdBy = "claudeOpus5"; }
     #Measures dependency from conformanceIndicatorM1 to conformanceIndicator;
 
