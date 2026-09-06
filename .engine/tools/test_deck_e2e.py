@@ -64,15 +64,33 @@ def main(repo: Path) -> int:
     srv = subprocess.Popen(
         [str(exe_copy), "serve", str(work), "--port", str(PORT)],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        # stderr carries the PAIRING CODE (D0201 B): the deck's taps must be signed by a paired device
+        stderr=subprocess.PIPE, text=True,
         # the deck runs on the human machine where the actor binding exists; the copy has none, so the
         # env supplies it - the same mechanism a real session uses.
         env={**__import__(chr(111)+chr(115)).environ, 'KEEL_ACTOR': 'claudeOpus5'},
     )
     failures = []
+
+    # DEVICE-BOUND TAPS (D0201 B). Every human tap below is signed the way the browser signs it: the
+    # pairing code read from the serving terminal, a device key, HMAC-SHA256 over the canonical text.
+    import hashlib, hmac as _hmac, secrets, threading
+    pairing = {"code": None}
+    def _read_code():
+        for line in srv.stderr:
+            if "PAIRING CODE" in line and pairing["code"] is None:
+                pairing["code"] = line.split("PAIRING CODE ")[1].split()[0]
+    threading.Thread(target=_read_code, daemon=True).start()
+    DEV_ID = "e2e-device-0001"
+    DEV_KEY = secrets.token_bytes(32)
+    def signed(kind, target, judged_at, judged_by, note, body):
+        text = f"{kind}|{target}|{judged_at}|{judged_by}|{note}"
+        body["device_id"] = DEV_ID
+        body["hmac"] = _hmac.new(DEV_KEY, text.encode(), hashlib.sha256).hexdigest()
+        return body
     try:
         base = f"http://127.0.0.1:{PORT}"
-        c = httpx.Client(base_url=base, timeout=30.0)
+        c = httpx.Client(base_url=base, timeout=180.0)  # GET /deck walks the governance graph: ~45s on this tree (D0265)
         for _ in range(40):
             try:
                 if c.get("/api/version").status_code == 200:
@@ -87,6 +105,17 @@ def main(repo: Path) -> int:
             print(("  ok   " if cond else "  FAIL ") + name + (f"  [{detail}]" if detail and not cond else ""))
             if not cond:
                 failures.append(name)
+
+        # ── 0. device pairing (D0201 B) ────────────────────────────────────────────────────────
+        for _ in range(50):
+            if pairing["code"]:
+                break
+            time.sleep(0.1)
+        check("serve printed a pairing code", bool(pairing["code"]))
+        r0 = c.post("/api/decision/accept", json={"decision": "d9998", "file": ".engine/decisions/9998-e2e-throwaway.sysml", "note": "unsigned", "judged_at": "2026-08-21", "judged_by": "wweatherholtz"})
+        check("an UNSIGNED tap is refused (401) and writes nothing", r0.status_code == 401, r0.text[:120])
+        r0 = c.post("/api/device/enroll", json={"code": pairing["code"] or "", "device_id": DEV_ID, "key": DEV_KEY.hex(), "label": "e2e"})
+        check("the device pairs with the printed code", r0.status_code == 200, r0.text[:120])
 
         # ── 1. the page ────────────────────────────────────────────────────────────────────────
         page = c.get("/deck")
@@ -109,12 +138,13 @@ def main(repo: Path) -> int:
             target = undis[0]
             r = c.post(
                 "/api/disposition",
-                json={
+                json=signed("disposition-act", target, "2026-08-21", "wweatherholtz", "e2e: deck save loop", {
                     "finding": target,
                     "verdict": "act",
                     "rationale": "e2e: deck save loop",
                     "judged_at": "2026-08-21",
-                },
+                    "judged_by": "wweatherholtz",
+                }),
             )
             check("POST /api/disposition is 200", r.status_code == 200, r.text[:120])
             # The first GET after a write may serve the PREVIOUS value labelled `stale` while the
@@ -138,13 +168,13 @@ def main(repo: Path) -> int:
         )
         r = c.post(
             "/api/decision/accept",
-            json={
+            json=signed("accept", "d9998", "2026-08-21", "wweatherholtz", "e2e: signed via deck", {
                 "decision": "d9998",
                 "file": ".engine/decisions/9998-e2e-throwaway.sysml",
                 "note": "e2e: signed via deck",
                 "judged_at": "2026-08-21",
                 "judged_by": "wweatherholtz",
-            },
+            }),
         )
         check("POST /api/decision/accept is 200", r.status_code == 200, r.text[:120])
         ok = False
@@ -164,13 +194,13 @@ def main(repo: Path) -> int:
             story = due[0]
             r = c.post(
                 "/api/deck/sitting",
-                json={
+                json=signed("sitting-accept", story, "2026-08-21", "wweatherholtz", "e2e: reviewed via deck", {
                     "story": story,
                     "verdict": "accept",
                     "note": "e2e: reviewed via deck",
                     "by": "wweatherholtz",
                     "judged_at": "2026-08-21",
-                },
+                }),
             )
             check("POST /api/deck/sitting (human) is 200", r.status_code == 200, r.text[:120])
             ok = False
@@ -187,9 +217,9 @@ def main(repo: Path) -> int:
         # ── 4. the human gate refuses an AI ────────────────────────────────────────────────────
         r = c.post(
             "/api/deck/sitting",
-            json={"story": "anyStory", "verdict": "accept", "note": "", "by": "claudeOpus5", "judged_at": "2026-08-21"},
+            json=signed("sitting-accept", "anyStory", "2026-08-21", "claudeOpus5", "", {"story": "anyStory", "verdict": "accept", "note": "", "by": "claudeOpus5", "judged_at": "2026-08-21"}),
         )
-        check("POST /api/deck/sitting as an AI is REFUSED (400)", r.status_code == 400, r.text[:120])
+        check("POST /api/deck/sitting as an AI is REFUSED (400) even when device-signed", r.status_code == 400, r.text[:120])
 
         # ── 5. the tree still validates ────────────────────────────────────────────────────────
         v = subprocess.run([str(exe_copy), "validate", str(work)], capture_output=True, text=True)

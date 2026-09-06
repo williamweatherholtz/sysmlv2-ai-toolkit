@@ -89,7 +89,7 @@ fn editing_an_accepted_decisions_text_is_red_reverting_is_green_and_rebinding_cl
     // Committed together: the binding is the commit that carried both.
     let now = std::fs::read_to_string(&dec).expect("read");
     std::fs::write(&dec, now.replace("and also that", "and also that, corrected")).expect("edit again, uncommitted");
-    let out = Command::new(keel_bin()).args(["accept", "d0001", "--rebind", "--note", "their words: 'yes, corrected as well'", "--date", "2026-09-05", "--by", "hum"]).current_dir(&root).env("KEEL_ACTOR", "hum").output().expect("rebind");
+    let out = Command::new(keel_bin()).args(["accept", "d0001", "--rebind", "--note", "their words: 'yes, and also that, corrected'", "--date", "2026-09-05", "--by", "hum"]).current_dir(&root).env("KEEL_ACTOR", "hum").output().expect("rebind");
     assert!(out.status.success(), "rebind: {}", String::from_utf8_lossy(&out.stderr));
     let (code, out) = guard(&root);
     assert_eq!(code, 0, "an uncommitted re-binding is PENDING, not drift: {out}");

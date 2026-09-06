@@ -19,6 +19,8 @@ path = "src/main.rs"
 keel-parser = { path = "../keel-parser" }
 # OS CSPRNG for UUID v4 identity (issue075/D0129) — already in the lock tree transitively.
 getrandom = "0.3"
+# HMAC-SHA256 for device-bound deck taps (D0201 B) - already in the lock tree via keel-parser.
+sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"

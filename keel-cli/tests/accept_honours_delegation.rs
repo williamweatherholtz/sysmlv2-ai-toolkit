@@ -61,11 +61,18 @@ fn decision_text(root: &Path) -> String {
 #[test]
 fn a_quoted_note_records_the_acceptance_under_the_declared_delegation() {
     let root = project_with_a_proposed_decision("q");
+    // D0335 (D0201 B read-back): a quote that names NO decision is a generic yes an agent could attach
+    // to anything - refused, nothing written, the remedy named.
     let (ok, text) = agent(&root, &["accept", "d0001", "--note", "their words in chat: 'yes, accept it and keep going'", "--by", "you", "--date", "2026-09-03"]);
-    assert!(ok, "delegation declared + quote present must record: {text}");
+    assert!(!ok, "a quote naming no decision is refused under read-back ratification: {text}");
+    assert!(text.contains("read-back") && text.contains("d0001"), "the refusal names the remedy: {text}");
+    assert!(!decision_text(&root).contains("AcceptR1"), "nothing written");
+    // The human's words naming the decision: recorded under the delegation, carrying the quote.
+    let (ok, text) = agent(&root, &["accept", "d0001", "--note", "their words in chat: 'yes, accept d0001 and keep going'", "--by", "you", "--date", "2026-09-03"]);
+    assert!(ok, "delegation declared + a quote naming the decision must record: {text}");
     assert!(text.contains("delegation d0192"), "the record cites the delegation it acts under: {text}");
     let d = decision_text(&root);
-    assert!(d.contains("DecisionStatus::accepted") && d.contains("yes, accept it and keep going"), "the acceptance event carries the quote:\n{d}");
+    assert!(d.contains("DecisionStatus::accepted") && d.contains("yes, accept d0001 and keep going"), "the acceptance event carries the quote:\n{d}");
     let _ = std::fs::remove_dir_all(&root);
 }
 

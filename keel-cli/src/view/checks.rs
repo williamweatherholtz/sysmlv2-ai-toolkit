@@ -267,6 +267,36 @@ pub const TTY_GESTURE_MARK: &str = "tty gesture";
 ///
 /// True on a single-quoted span of at least 10 characters (the human's verbatim conversational words)
 /// or a named human surface gesture (deck/console/GitHub comment/TTY).
+/// Every single-quoted span of ten or more characters in `text` (an apostrophe followed by a letter is
+/// part of the words, not a closing quote - the same rule `quotes_conversational_words` reads by).
+pub(super) fn quoted_spans(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes.get(i) == Some(&b'\'') {
+            let mut j = i + 1;
+            while j < bytes.len() {
+                if bytes.get(j) == Some(&b'\'') && !bytes.get(j + 1).is_some_and(u8::is_ascii_alphabetic) {
+                    break;
+                }
+                j += 1;
+            }
+            if j < bytes.len() {
+                if let Some(span) = text.get(i + 1..j) {
+                    if span.chars().count() >= 10 {
+                        out.push(span.to_string());
+                    }
+                }
+            }
+            i = j + 1;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
 pub(super) fn quotes_conversational_words(text: &str) -> bool {
     let lower = text.to_lowercase();
     // Named human-surface gestures that ARE the channel evidence: the localhost deck/console, and a

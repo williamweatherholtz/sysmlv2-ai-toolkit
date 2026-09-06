@@ -36,6 +36,35 @@ pub fn note_quotes_human(text: &str) -> bool {
     checks::quotes_conversational_words(text)
 }
 
+/// READ-BACK RATIFICATION (D0201 B, the chat half): do the human's quoted words name THIS decision?
+///
+/// A delegated acceptance quotes the human (D0289), but a bare `'yes, do it'` can be attached to any
+/// Decision the agent chooses. Ratification means the words the human said refer to the thing being
+/// accepted: the decision's id in any spelling (`d0312`, `D0312`, `decision 312`), one of its OPTION
+/// letters when it is a fork, or three consecutive words of its title or decision text. `'d0312 B'`,
+/// `'i do like C the best'` and `'yes, do exactly this'` (the decision's own words) ratify; `'yes,
+/// accept it'` does not. Read on the quoted spans only, never the agent's framing around them.
+#[must_use]
+pub fn read_back_names(note: &str, dname: &str, option_letters: &[String], title: &str) -> bool {
+    let spans = checks::quoted_spans(note);
+    if spans.is_empty() {
+        // a cited gesture (deck/console/GitHub/TTY) carries its own binding to the item
+        return note_quotes_human(note);
+    }
+    let digits: String = dname.chars().filter(char::is_ascii_digit).collect();
+    let number = digits.trim_start_matches('0');
+    let title_words: Vec<String> = title.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(str::to_lowercase).collect();
+    spans.iter().any(|span| {
+        let lower = span.to_lowercase();
+        let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+        let names_id = words.iter().any(|w| *w == dname.to_lowercase() || (!number.is_empty() && w.starts_with('d') && w.trim_start_matches('d').trim_start_matches('0') == number))
+            || words.windows(2).any(|p| matches!(p, [a, b] if (*a == "decision" || *a == "d") && b.trim_start_matches('0') == number));
+        let names_option = option_letters.iter().any(|l| words.iter().any(|w| w.eq_ignore_ascii_case(l)));
+        let names_title = title_words.windows(3).any(|t| words.windows(3).any(|w| w.iter().zip(t.iter()).all(|(a, b)| *a == b.as_str())));
+        names_id || names_option || names_title
+    })
+}
+
 /// The note `keel accept` records when the human typed it at an interactive terminal.
 ///
 /// When their sentence carries no quote receipt of its own (D0315/issue359) the TTY IS the gesture,
@@ -4939,6 +4968,21 @@ mod tests {
         assert!(out.contains("\"grandfathered_unreviewed\": 0"), "{out}");
         assert!(out.contains("GRANDFATHER LINE UNRESOLVED"), "the basis must SAY why it could not scope: {out}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_back_names_the_decision_or_refuses() {
+        // D0201 B, read-back ratification: the human's quoted words must name the decision - its id in
+        // any spelling, one of its option letters, or three words of its title; a bare yes names nothing.
+        let letters = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let title = "verificationByAuthority: what a passing verification MEANS by authority and method";
+        assert!(super::read_back_names("their words: 'd0312 B / d0321 A'", "d0312", &letters, title), "today's real answer");
+        assert!(super::read_back_names("OPTION C chosen. their words: 'i do like C the best'", "d0303", &letters, "x"), "an option letter");
+        assert!(super::read_back_names("their words: 'yes, decision 312 as written'", "d0312", &[], title), "the id in words");
+        assert!(super::read_back_names("their words: 'go with what a passing verification means'", "d0312", &[], title), "three words of the title");
+        assert!(!super::read_back_names("their words: 'yes, accept it please'", "d0312", &letters, title), "a bare yes names nothing");
+        assert!(!super::read_back_names("their words: 'd0313 looks fine'", "d0312", &[], title), "another decision's id is not this one");
+        assert!(super::read_back_names("accepted at the console review queue", "d0312", &[], title), "a cited gesture carries its own binding");
     }
 
     #[test]

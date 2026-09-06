@@ -620,6 +620,31 @@ function initInbox(){
   }).catch(function(e){setHow('transport: NONE - tell Claude your verdicts');dbg('use(mcp): '+e);});
 }
 
+// DEVICE-BOUND TAPS (D0201 B): this browser holds a device key, pairs once with the code the serving
+// terminal printed, and signs every tap; the server refuses an unsigned or unpaired tap, writing nothing.
+// Binds the tap to the DEVICE, not to a person. Single-quoted, ASCII: this lives in a Rust raw string.
+var DEV_KEY='keel.device.key',DEV_ID='keel.device.id',DEV_PAIRED='keel.device.paired';
+function devHex(a){var o='',i;for(i=0;i<a.length;i++){o+=('0'+a[i].toString(16)).slice(-2);}return o;}
+function devId(){var id=localStorage.getItem(DEV_ID);if(!id){var b=new Uint8Array(6);crypto.getRandomValues(b);id='browser-'+devHex(b);localStorage.setItem(DEV_ID,id);}return id;}
+function devKeyHex(){var k=localStorage.getItem(DEV_KEY);if(!k){var b=new Uint8Array(32);crypto.getRandomValues(b);k=devHex(b);localStorage.setItem(DEV_KEY,k);}return k;}
+function devBytes(h){var a=new Uint8Array(h.length/2),i;for(i=0;i<a.length;i++){a[i]=parseInt(h.substr(i*2,2),16);}return a;}
+function devSign(kind,target,at,by,note){
+  return devEnsure(by).then(function(ok){
+    if(!ok){throw new Error('this browser is not paired - nothing was sent (D0201 B)');}
+    return crypto.subtle.importKey('raw',devBytes(devKeyHex()),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  }).then(function(key){
+    return crypto.subtle.sign('HMAC',key,new TextEncoder().encode(kind+'|'+target+'|'+at+'|'+by+'|'+(note||'')));
+  }).then(function(sig){return {device_id:devId(),hmac:devHex(new Uint8Array(sig))};});}
+function devPair(code,label){
+  return fetch('/api/device/enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,device_id:devId(),key:devKeyHex(),label:label||''})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){if(!res.ok){throw new Error(res.j&&res.j.error||'pairing failed');}localStorage.setItem(DEV_PAIRED,'1');return res.j;});}
+function devEnsure(by){
+  if(localStorage.getItem(DEV_PAIRED)){return Promise.resolve(true);}
+  var code=prompt('Pair this browser (D0201 B): type the PAIRING CODE printed by the keel serve terminal');
+  if(!code){return Promise.resolve(false);}
+  return devPair(code.trim(),by||'').then(function(){return true;});}
+
 function say(card,msg){var sv=card.querySelector('.sv');if(sv)sv.setAttribute('data-local-sv',msg);}
 
 function saveLocal(card,verdict,opt){
@@ -645,7 +670,14 @@ function saveLocal(card,verdict,opt){
     body={story:name,verdict:verdict,note:note,by:HUMAN,judged_at:today};
   }
   say(card,'saving to keel...');
-  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  // the signed canonical text mirrors the server's: kind | target | date | judge | the note the record carries
+  var kind, target, note2;
+  if(cls==='finding'){kind='disposition-'+body.verdict;target=name;note2=body.rationale;}
+  else if(cls==='acceptance'){kind=(verdict==='accept')?'accept':'reject';target=name;note2=(verdict==='accept')?body.note:body.rationale;}
+  else {kind='sitting-'+verdict;target=name;note2=note;}
+  devSign(kind,target,today,HUMAN,note2).then(function(sig){
+    body.device_id=sig.device_id;body.hmac=sig.hmac;
+    return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});})
     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
     .then(function(res){
       if(res.ok){say(card,'saved to keel');}

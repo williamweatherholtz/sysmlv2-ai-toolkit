@@ -217,6 +217,33 @@ function statusBanner(d){
  return ''}
 
 function list(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';const s=arr.slice(0,n||8).join(', ');return esc(s)+(arr.length>(n||8)?` <span class=muted>…+${arr.length-(n||8)} more</span>`:'')}
+// DEVICE-BOUND TAPS (D0201 OPTION B, the human's choice of 2026-08-23). This browser generates a device
+// key once (localStorage) and pairs it by typing the PAIRING CODE the keel serve terminal printed; every
+// human tap is then signed with HMAC-SHA256 over its canonical content and the server refuses a tap with
+// no paired device or a wrong signature, writing nothing. This binds a tap to the DEVICE, not to a
+// person's identity - the trust that the paired browser is the human's rests on the code reaching them
+// through the serving terminal.
+var DEV_KEY='keel.device.key',DEV_ID='keel.device.id',DEV_PAIRED='keel.device.paired';
+function devHex(a){return Array.from(a).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');}
+function devId(){var id=localStorage.getItem(DEV_ID);if(!id){var b=new Uint8Array(6);crypto.getRandomValues(b);id='browser-'+devHex(b);localStorage.setItem(DEV_ID,id);}return id;}
+function devKeyHex(){var k=localStorage.getItem(DEV_KEY);if(!k){var b=new Uint8Array(32);crypto.getRandomValues(b);k=devHex(b);localStorage.setItem(DEV_KEY,k);}return k;}
+function devBytes(h){var a=new Uint8Array(h.length/2);for(var i=0;i<a.length;i++)a[i]=parseInt(h.substr(i*2,2),16);return a;}
+async function devSign(kind,target,at,by,note){
+  if(!(await devEnsure(by)))throw new Error('this browser is not paired - nothing was sent (D0201 B)');
+  var key=await crypto.subtle.importKey('raw',devBytes(devKeyHex()),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  var sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(kind+'|'+target+'|'+at+'|'+by+'|'+(note||'')));
+  return {device_id:devId(),hmac:devHex(new Uint8Array(sig))};}
+async function devPair(code,label){
+  var r=await fetch('/api/device/enroll',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:code,device_id:devId(),key:devKeyHex(),label:label||''})});
+  var j=await r.json().catch(function(){return {};});
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  localStorage.setItem(DEV_PAIRED,'1');return j;}
+async function devEnsure(by){
+  if(localStorage.getItem(DEV_PAIRED))return true;
+  var code=prompt('Pair this browser (D0201 B): type the PAIRING CODE printed by the keel serve terminal');
+  if(!code)return false;
+  await devPair(code.trim(),by||'');return true;}
+function TODAY(){return new Date().toISOString().slice(0,10);}
 function itemLink(name){return name?`<span class=il data-i="${esc(name)}">${esc(name)}</span>`:'<span class=muted>—</span>'}
 function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>—</span>';n=n||12;const sh=arr.slice(0,n).map(itemLink).join(' · ');return sh+(arr.length>n?` <span class=muted>…+${arr.length-n} more</span>`:'')}
 
@@ -295,7 +322,7 @@ async function runAgentModal(action,target,section,boundary){
 async function addTestResult(task){
  const v=(document.getElementById('trv')||{}).value||'pass';
  const by=judgedBy();if(!by)return;
- try{const r=await fetch('/api/testresult',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,verdict:v,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+ try{const r=await fetch('/api/testresult',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({task,verdict:v,judged_at:TODAY(),judged_by:by},await devSign('testresult-'+v,task,TODAY(),by,'')))});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   mlog('recorded TestResult '+j.name+' ('+j.verdict+') on '+task+'\n');
  }catch(e){mlog('error: '+e.message+'\n')}
@@ -368,7 +395,7 @@ async function disposition(finding,verdict){
  const by=judgedBy();if(!by)return;
  status.textContent='recording disposition…';
  try{
-  const r=await fetch('/api/disposition',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({finding,verdict,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+  const r=await fetch('/api/disposition',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({finding,verdict,rationale,judged_at:TODAY(),judged_by:by},await devSign('disposition-'+verdict,finding,TODAY(),by,rationale)))});
   const j=await r.json().catch(()=>({}));
   if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   status.textContent='recorded '+j.name+' ('+j.verdict+')';
@@ -388,7 +415,7 @@ async function acceptDecision(name,file){
  if(note===null)return;
  const by=judgedBy();if(!by)return;
  status.textContent='recording acceptance…';
- try{const r=await fetch('/api/decision/accept',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+ try{const r=await fetch('/api/decision/accept',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({decision:name,file,note,judged_at:TODAY(),judged_by:by},await devSign('accept',name,TODAY(),by,note)))});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   status.textContent='accepted '+name+' ✓ (recorded)';render();
  }catch(e){status.textContent='accept error: '+e.message}
@@ -398,7 +425,7 @@ async function acceptGate(name,file){
  if(note===null)return;
  const by=judgedBy();if(!by)return;
  status.textContent='recording acceptance…';
- try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'pass',note,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+ try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({gate:name,file,verdict:'pass',note,judged_at:TODAY(),judged_by:by},await devSign('gate-pass',name,TODAY(),by,note||'')))});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   status.textContent='accepted gate '+name+' ✓ (recorded)';render();
  }catch(e){status.textContent='accept error: '+e.message}
@@ -408,7 +435,7 @@ async function rejectDecision(name,file){
  if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
  const by=judgedBy();if(!by)return;
  status.textContent='recording rejection…';
- try{const r=await fetch('/api/decision/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:name,file,rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+ try{const r=await fetch('/api/decision/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({decision:name,file,rationale,judged_at:TODAY(),judged_by:by},await devSign('reject',name,TODAY(),by,rationale)))});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   status.textContent='rejected '+name+' ✓ (recorded)';render();
  }catch(e){status.textContent='reject error: '+e.message}
@@ -418,7 +445,7 @@ async function rejectGate(name,file){
  if(rationale===null)return; if(!rationale.trim()){status.textContent='reject needs a rationale';return}
  const by=judgedBy();if(!by)return;
  status.textContent='recording rejection…';
- try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({gate:name,file,verdict:'fail',note:rationale,judged_at:new Date().toISOString().slice(0,10),judged_by:by})});
+ try{const r=await fetch('/api/gate-result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({gate:name,file,verdict:'fail',note:rationale,judged_at:TODAY(),judged_by:by},await devSign('gate-fail',name,TODAY(),by,rationale||'')))});
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
   status.textContent='rejected gate '+name+' ✓ (recorded)';render();
  }catch(e){status.textContent='reject error: '+e.message}

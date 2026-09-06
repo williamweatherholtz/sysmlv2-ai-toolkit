@@ -4201,7 +4201,18 @@ fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<
             let note_quotes = flag(args, "note").is_some_and(|n| keel_cli::view::note_quotes_human(&n));
             match (delegation, note_quotes) {
                 (Some(d), true) => {
-                    eprintln!("keel accept: recording the human's acceptance under delegation {d} - the note quotes their words (D0289).");
+                    // D0201 B, the chat half: READ-BACK RATIFICATION. The quoted words must name THIS
+                    // decision (its id, one of its option letters, or three words of its title), or a
+                    // bare 'yes' could be attached to any Decision the agent picks. Forward-only by
+                    // construction: it binds new records, never re-reads old ones.
+                    if let (Some(dec), Some(note)) = (args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
+                        let (letters, title) = decision_options_and_title(&root, dec);
+                        if !keel_cli::view::read_back_names(&note, dec, &letters, &title) {
+                            eprintln!("keel accept: the quoted words do not name {dec} - read-back ratification (D0201 B) needs the human's words to refer to the decision they are accepting: its id ('{dec} B', 'decision {}'), one of its option letters, or words of its title; a bare 'yes' can be attached to anything. Nothing written.", dec.trim_start_matches(|c: char| !c.is_ascii_digit()).trim_start_matches('0'));
+                            return Some(1);
+                        }
+                    }
+                    eprintln!("keel accept: recording the human's acceptance under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
                 }
                 (Some(d), false) => {
                     eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but the note must QUOTE their words verbatim - a single-quoted span of at least ten characters, e.g. --note \"their words: 'yes, accept it'\" - or cite their deck/console/GitHub gesture (D0192/D0289).");
@@ -4216,6 +4227,29 @@ fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<
         }
     }
     None
+}
+
+/// A decision's OPTION letters (a fork) and its title plus decision text, for read-back ratification (D0201 B).
+fn decision_options_and_title(root: &Path, dec: &str) -> (Vec<String>, String) {
+    let mut letters = Vec::new();
+    let mut title = String::new();
+    for p in keel_cli::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = std::fs::read_to_string(&p) else { continue };
+        if !text.contains(&format!("part {dec} : Decision")) {
+            continue;
+        }
+        let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().replace('\\', "/");
+        letters = keel_cli::deck::fork_options(root, &rel).into_iter().map(|(l, _)| l).collect();
+        // the title AND the decision text: quoting the decision's own words is a read-back of it
+        for key in [":>> title = \"", ":>> decision = \""] {
+            if let Some(i) = text.find(key) {
+                title.push_str(text.get(i + key.len()..).and_then(|r| r.split('"').next()).unwrap_or(""));
+                title.push(' ');
+            }
+        }
+        break;
+    }
+    (letters, title)
 }
 
 fn cmd_accept(args: &[String]) -> i32 {

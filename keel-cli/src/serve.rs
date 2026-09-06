@@ -72,7 +72,7 @@ const KEEL_API_READ_ENDPOINTS: &[&str] = &[
 /// goes through the write API + guards; none auto-commits (the human commits). `/api/decision` scaffolds
 /// a `status=proposed` Decision — acceptance stays a separate explicit human gate (D0106).
 const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
-    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item", "/api/item/attr",
+    "/api/decision", "/api/decision/accept", "/api/decision/reject", "/api/gate-result", "/api/disposition", "/api/testresult", "/api/resolver", "/api/edge", "/api/item", "/api/item/attr", "/api/device/enroll",
     // issue178: a POST outside the declared write contract - the one that mattered, because the
     // write contract is how an automation consumer discovers what it is allowed to change (D0093).
     "/api/project",
@@ -133,6 +133,9 @@ struct AppState {
     /// firing eight requests against a changed fingerprint would start eight recomputes of the same view
     /// - a stampede that makes the first interaction after every commit slower, not faster.
     refreshing: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// The pairing code this serve printed at start (D0201 B): a browser that types it once becomes a
+    /// paired DEVICE, and every human tap must carry that device's HMAC or it is refused.
+    pairing: Arc<String>,
 }
 
 /// Run the console server on `127.0.0.1:port` over `root`. Blocks until interrupted.
@@ -266,7 +269,10 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     let root = root.canonicalize().unwrap_or(root);
     // Captured before `root` moves into the shared state, so the banner can name the tree.
     let served = display_path(&root);
-    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), asks: Arc::new(Mutex::new(AskQueue::new())), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())) };
+    let pairing = crate::device::pairing_code();
+    let pairing_banner = pairing.clone();
+    let paired_at_start = crate::device::load(&root).len();
+    let state = AppState { root: Arc::new(Mutex::new(root)), agents: Arc::new(AtomicUsize::new(0)), asks: Arc::new(Mutex::new(AskQueue::new())), cache: view_store(), changes: tokio::sync::watch::Sender::new(0), refreshing: Arc::new(Mutex::new(std::collections::HashSet::new())), pairing: Arc::new(pairing) };
     spawn_watcher(&state);
 
     let app = Router::new()
@@ -348,6 +354,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/decision", post(api_decision))
         // review queue (D0121) — record human acceptance/rejection as fact: accept/reject a Decision, accept/reject a gate
         .route("/api/decision/accept", post(api_decision_accept))
+        .route("/api/device/enroll", post(api_device_enroll))
         .route("/api/decision/reject", post(api_decision_reject))
         .route("/api/gate-result", post(api_gate_result))
         .route("/api/edge", post(api_edge))
@@ -370,6 +377,10 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
     // Name the PROJECT first (issue268). The banner listed the port and every endpoint and never
     // said which tree it was serving, so two consoles on one machine were told apart by nothing.
     println!("Keel console for {served}");
+    // D0201 B: the pairing code reaches the human through THIS terminal - the device that types it
+    // into the console becomes the paired device every tap must be signed by. Printed to stderr so a
+    // log capture of stdout does not carry it by accident.
+    eprintln!("serve: PAIRING CODE {pairing_banner} - type it once in the console to pair this browser (D0201 B); {paired_at_start} device(s) paired on this machine");
     println!("Keel console (D0094 m1+m2+m3) on http://{addr}  \u{2014} Ctrl-C to stop");
     println!("  api:   /api/version (committed read API v{KEEL_API_VERSION}, viewerKeelApi/D0114 shape B)");
     println!("  read:  / · /api/{{orient,decisions,dispositions,processes,report/<name>,history}}");
@@ -541,6 +552,10 @@ struct DispReq {
     rationale: String,
     judged_at: String,
     judged_by: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// GET /deck — the obligation review deck (issue192): the same page the artifact publishes, served
@@ -565,6 +580,10 @@ struct DeckSittingReq {
     note: String,
     by: String,
     judged_at: String,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// POST /api/deck/sitting — a sitting review recorded as a HUMAN critique on the sprint story.
@@ -589,6 +608,10 @@ async fn api_deck_sitting(
             ),
         )
             .into_response();
+    }
+    // D0201 B: a sitting-review tap is a human attestation too - signed by a paired device or refused.
+    if let Err(r) = require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("sitting-{}", b.verdict), &b.story, &b.judged_at, &b.by, &b.note)) {
+        return *r;
     }
     let severity = match b.verdict.as_str() {
         "accept" | "batch-ack" => None,
@@ -675,12 +698,17 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the actor is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let judged_by = judged_by.to_string();
+    let device = match require_device(&s, body.device_id.as_deref(), body.hmac.as_deref(), &crate::device::canonical(&format!("disposition-{verdict}"), &body.finding, &body.judged_at, &judged_by, &body.rationale)) {
+        Ok(d) => d,
+        Err(r) => return *r,
+    };
     // issue210: the disposition lands in the JUDGE's per-actor file.
     let critiques = match crate::write::per_actor_file(&s.rootpath(), "critiques", &judged_by) {
         Ok(p) => p,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     };
-    let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &body.rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
+    let rationale = format!("{}{}", body.rationale, device_tag(&device));
+    let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
@@ -721,12 +749,47 @@ async fn api_decision(State(s): State<AppState>, axum::Json(b): axum::Json<Decis
 }
 
 #[derive(serde::Deserialize)]
+struct DeviceEnrollReq {
+    code: String,
+    device_id: String,
+    key: String,
+    #[serde(default)]
+    label: String,
+}
+
+/// POST /api/device/enroll (D0201 B) - pair this browser: the human types the pairing code the serving
+/// terminal printed; the browser's own key is stored machine-locally; every later tap is signed by it.
+async fn api_device_enroll(State(s): State<AppState>, axum::Json(b): axum::Json<DeviceEnrollReq>) -> Response {
+    match crate::device::enroll(&s.rootpath(), &s.pairing, &b.code, &b.device_id, &b.key, &b.label, &crate::scaffold::today()) {
+        Ok(()) => ok_json(format!("{{\"ok\":true,\"device\":\"{}\",\"binds\":\"this DEVICE, not a person's identity (D0201 B)\"}}", b.device_id.replace('"', "'"))),
+        Err(e) => (StatusCode::UNAUTHORIZED, format!("{{\"error\":\"{}\"}}", e.replace('"', "'"))).into_response(),
+    }
+}
+
+/// The device tag appended to a tap's recorded note: which paired device signed it (D0201 B).
+fn device_tag(device_id: &str) -> String {
+    format!(" [device {} HMAC-verified]", device_id.chars().take(12).collect::<String>())
+}
+
+/// Refuse a human tap that is not signed by a paired device (D0201 B). `Ok(device id)` lets the write
+/// proceed; `Err(response)` is the 401 with the reason, and NOTHING has been written.
+fn require_device(s: &AppState, device_id: Option<&str>, hmac: Option<&str>, canonical: &str) -> Result<String, Box<Response>> {
+    crate::device::verify(&s.rootpath(), device_id, hmac, canonical)
+        .map_err(|e| Box::new((StatusCode::UNAUTHORIZED, format!("{{\"error\":\"{}\",\"binds\":\"a tap is bound to the paired DEVICE that made it, not to a person (D0201 B)\"}}", e.replace('"', "'"))).into_response()))
+}
+
+#[derive(serde::Deserialize)]
 struct DecisionAcceptReq {
     decision: String,
     file: String,
     note: String,
     judged_at: String,
     judged_by: Option<String>,
+    /// D0201 B: the paired device and its HMAC-SHA256 over `canonical(accept, decision, judged_at, judged_by, note)`.
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// POST /api/decision/accept (D0121 review queue) — ACCEPT a proposed Decision: flip status + append
@@ -753,10 +816,15 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     // party it must never bind. The rule already accepts a cited human surface gesture, so the console
     // now says so in the record. Appended, never substituted: the human's own words are left exactly
     // as they wrote them, and this is a factual statement about the channel, not a paraphrase of them.
+    // D0201 B: the tap must be signed by a paired device, or nothing is written.
+    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("accept", &b.decision, &b.judged_at, judged_by, &b.note)) {
+        Ok(d) => d,
+        Err(r) => return *r,
+    };
     let note = if b.note.contains(CONSOLE_GESTURE.trim()) {
         b.note.clone()
     } else {
-        format!("{}{CONSOLE_GESTURE}", b.note)
+        format!("{}{CONSOLE_GESTURE}{}", b.note, device_tag(&device))
     };
     // The human recorded this themselves: recorder == judge, which is what lets the substance rule
     // scope itself to genuinely delegated records (issue287).
@@ -773,6 +841,10 @@ struct DecisionRejectReq {
     rationale: String,
     judged_at: String,
     judged_by: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// POST /api/decision/reject (D0121/D0122 review queue) — REJECT a proposed Decision: flip status to
@@ -789,8 +861,13 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
     let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
+    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("reject", &b.decision, &b.judged_at, judged_by, &b.rationale)) {
+        Ok(d) => d,
+        Err(r) => return *r,
+    };
     let sha = git_head(&s.rootpath());
-    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &b.rationale) {
+    let rationale = format!("{}{}", b.rationale, device_tag(&device));
+    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
@@ -804,6 +881,10 @@ struct GateResultReq {
     verdict: Option<String>,
     note: Option<String>,
     judged_by: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// POST /api/gate-result (D0121 review queue) — ACCEPT a pending confirmation gate: append a passing
@@ -820,12 +901,17 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let judged_by = judged_by.to_string();
-    let sha = git_head(&s.rootpath());
-    let note = b.note.as_deref().filter(|t| !t.is_empty());
     let verdict = match b.verdict.as_deref() {
         Some("fail") => "fail",
         _ => "pass",
     };
+    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("gate-{verdict}"), &b.gate, &b.judged_at, &judged_by, b.note.as_deref().unwrap_or(""))) {
+        Ok(d) => d,
+        Err(r) => return *r,
+    };
+    let sha = git_head(&s.rootpath());
+    let tagged = format!("{}{}", b.note.as_deref().unwrap_or(""), device_tag(&device));
+    let note = Some(tagged.as_str());
     match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note, None) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
@@ -2581,6 +2667,10 @@ struct TrReq {
     /// an AI-judged result. Governance binds the AI, never the human.
     #[serde(default)]
     evidence: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
 }
 
 /// POST /api/testresult (D0094 serveItemActions) — append a `TestResult` downstream of an action task via
@@ -2599,8 +2689,13 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
+    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("testresult-{verdict}"), &b.task, &b.judged_at, &by, b.evidence.as_deref().unwrap_or(""))) {
+        Ok(d) => d,
+        Err(r) => return *r,
+    };
     let sha = git_head(&s.rootpath());
-    match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by, b.evidence.as_deref()) {
+    let evidence = format!("{}{}", b.evidence.as_deref().unwrap_or("recorded in the keel console"), device_tag(&device));
+    match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by, Some(&evidence)) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
