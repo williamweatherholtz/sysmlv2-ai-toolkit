@@ -1112,4 +1112,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcTestsBindToPropertiesNotSource to issue388;
+
+    part issue389 : Issue {
+        :>> id = "472fdbbe-f5e4-4771-9c3b-352240617bc8";
+        :>> title = "the computed-facts script typed the release tag it measures against";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The computed-facts script TYPED the release tag it measures against, so every 'since the last release' number would have described a superseded release the moment a new one shipped. WHAT HAPPENED: facts.py asked git about one tag BY NAME in seven places - the tag date, the commit count, the day count, and the CI-run filter all named the same literal. While that tag was the newest release the numbers were right. v0.4.1 shipped this morning; the next run of the script would have reported the commits, days and CI runs since a release two versions back, and reported them with a `how` string that reads as authoritative precisely because it names a real git command anyone can run. Caught before publication only because I read the facts table and noticed the tag was stale. WHY IT IS THE DEFECT THE FILE EXISTS TO PREVENT: the script's own docstring says 'Nothing is ever guessed, and no answer is hardcoded', and the whole reason the standing brief is built from it is D0215 - a computable number may not be typed into a doc surface. A typed IDENTIFIER is the same failure one level up: the number is computed honestly, against the wrong thing, and nothing in the output says so. THE FIX: the tag is derived - `git describe --tags --abbrev=0 --match v*` - and emitted as its own fact, so a reader sees which release the numbers are about instead of trusting that the script and the repository agree. Each dependent fact carries the derived tag in its unit. THE CONTROL, and its own first failure: facts.py now refuses to run while its source contains a version literal. This is the one place where reading source text is the right implementation, because the property IS about source text. The first version of that check scanned only the source ABOVE itself - and the release facts sit below it, so it passed over exactly the defect it was written for. A deliberate probe caught it. The rule is now phrased without naming any version, so the whole file is scanned with nothing to exclude; verified clean, then failing on an injected literal, then clean again.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcFactsNameNoVersion to issue389;
 }

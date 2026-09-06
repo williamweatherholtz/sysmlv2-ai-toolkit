@@ -395,26 +395,64 @@ else:
     fact("guardsEnforced", int(mg.group(1)) if mg else None, "enforced forward guards",
          S_HOW + "'N guards' in the model line.")
 
+# ---------------------------------------------------------------- the control (issue389)
+# This file measures "since the last release" and once TYPED the tag it measured against, so every
+# such fact silently described a superseded release after a newer one shipped - with a `how` string
+# that still read as authoritative because it named a real command. The rule is about SOURCE TEXT,
+# which is why this check reads source text: nothing else can express "no version is typed here".
+#
+# It scans the WHOLE file, with no self-exclusion. The first version of this check scanned only what
+# sat above it - and the release facts sit below, so it passed over exactly the defect it was written
+# for. A deliberate probe caught that; the rule is now phrased without naming any version, so there
+# is nothing to exclude and nothing to get wrong.
+def _no_version_is_typed_here():
+    src = open(__file__, encoding="utf-8").read()
+    typed = sorted(set(re.findall(r"v\d+\.\d+\.\d+", src)))
+    if typed:
+        sys.exit(
+            "facts.py names " + ", ".join(typed) + " literally. The release these facts measure against is "
+            "DERIVED (`git describe --tags --abbrev=0 --match v*`); typing one makes every since-the-release "
+            "fact describe that release forever, including after a newer one ships (issue389)."
+        )
+
+
+_no_version_is_typed_here()
+
 # ================================================================ 8. release + git
-ok, tagiso = run(["git", "log", "-1", "--format=%cI", "v0.3.1"])
-tagiso = tagiso.strip() if ok else None
-G_HOW = "`git log -1 --format=%cI v0.3.1` "
+# WHICH release: derived, never typed (issue389). Naming a version here makes every fact below
+# describe that version forever, including after a newer one ships - and the `how` string still
+# reads as authoritative because it names a real command.
+ok, tag = run(["git", "describe", "--tags", "--abbrev=0", "--match", "v*"])
+TAG = tag.strip() if ok and tag.strip() else None
+fact("releaseTag", TAG, "the newest v* tag reachable from HEAD",
+     "`git describe --tags --abbrev=0 --match v*` - the release these since-the-release facts are measured against."
+     + ("" if TAG else " FAILED: " + str(tag)))
+
+if TAG:
+    ok, tagiso = run(["git", "log", "-1", "--format=%cI", TAG])
+    tagiso = tagiso.strip() if ok else None
+else:
+    tagiso = None
+G_HOW = f"`git log -1 --format=%cI {TAG}` " if TAG else "no v* tag found, so "
 if not tagiso:
-    fact("releaseTagDate", None, "ISO date", G_HOW + "failed (tag missing?): " + str(tagiso))
+    fact("releaseTagDate", None, "ISO date", G_HOW + "produced no date: " + str(tagiso))
     tag_dt = None
 else:
     tag_dt = datetime.fromisoformat(tagiso)
-    fact("releaseTagDate", tagiso, "ISO-8601 commit date of tag v0.3.1",
+    fact("releaseTagDate", tagiso, f"ISO-8601 commit date of tag {TAG}",
          G_HOW + "- the commit date of the tagged commit, not the tag object's own date.")
 
-ok, out = run(["git", "rev-list", "--count", "v0.3.1..HEAD"])
-fact("commitsSinceRelease", int(out.strip()) if ok and out.strip().isdigit() else None,
-     "commits on this branch since v0.3.1",
-     "`git rev-list --count v0.3.1..HEAD`" + ("" if ok else " failed: " + out))
+if TAG:
+    ok, out = run(["git", "rev-list", "--count", f"{TAG}..HEAD"])
+    fact("commitsSinceRelease", int(out.strip()) if ok and out.strip().isdigit() else None,
+         f"commits on this branch since {TAG}",
+         f"`git rev-list --count {TAG}..HEAD`" + ("" if ok else " failed: " + out))
+else:
+    fact("commitsSinceRelease", None, "commits", "no v* tag to count from.")
 
 if tag_dt:
     fact("daysSinceRelease", (NOW - tag_dt.astimezone(timezone.utc)).days,
-         "whole days since v0.3.1 was committed",
+         f"whole days since {TAG} was committed",
          G_HOW + "differenced against now (UTC), floored to whole days.")
 else:
     fact("daysSinceRelease", None, "days", G_HOW + "no tag date, so nothing to difference.")
@@ -424,11 +462,11 @@ CI_CMD = ["gh", "run", "list", "--workflow=ci.yml", "--branch=main", "--limit", 
           "--json", "conclusion,createdAt,updatedAt"]
 ok, out = run(CI_CMD, timeout=60)
 runs = as_json(out) if ok else None
-CI_HOW = "`" + " ".join(CI_CMD) + "`, filtered to runs whose createdAt >= the v0.3.1 tag date. "
+CI_HOW = "`" + " ".join(CI_CMD) + f"`, filtered to runs whose createdAt >= the {TAG} tag date. "
 
 if runs is None or tag_dt is None:
     reason = CI_HOW + ("gh failed: " + str(out)[:200] if runs is None
-                       else "no v0.3.1 tag date to filter against")
+                       else f"no {TAG} tag date to filter against")
     for n in ("ciRunsSinceRelease", "ciFailuresSinceRelease", "ciMeanMinutes"):
         fact(n, None, "runs", reason)
 else:
@@ -446,7 +484,7 @@ else:
               "complete." % oldest) if not saturated else \
              ("WARNING: the 200-run window's oldest run is %s, AFTER the tag - the window is "
               "saturated and these are LOWER BOUNDS." % oldest)
-    fact("ciRunsSinceRelease", len(since), "ci.yml runs on main since v0.3.1",
+    fact("ciRunsSinceRelease", len(since), "ci.yml runs on main since " + str(TAG),
          CI_HOW + window, as_of=NOW.date().isoformat())
     fact("ciFailuresSinceRelease", len(fails),
          "of those, concluded non-success (failure/cancelled/timed_out)",
@@ -455,7 +493,7 @@ else:
                   % (len(since) - len(concluded), window), as_of=NOW.date().isoformat())
     mins = [iso_min(r["createdAt"], r["updatedAt"]) for r in concluded]
     fact("ciMeanMinutes", round(sum(mins) / len(mins), 1) if mins else None,
-         "mean wall minutes per concluded ci.yml run since v0.3.1",
+         f"mean wall minutes per concluded ci.yml run since {TAG}",
          CI_HOW + "mean of (updatedAt - createdAt) over the %d CONCLUDED runs. This is queue+run "
                   "time as GitHub records it, not billable compute." % len(concluded),
          as_of=NOW.date().isoformat())
