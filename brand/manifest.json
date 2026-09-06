@@ -1,0 +1,29 @@
+{
+  "$comment": "brand-watch baseline (D0233). Snapshot of the watched ASI marketing sources on SharePoint. Regenerate via the brand-watch skill; compare with check_manifest.py. A folder's size is a cheap recursive change signal: it moves when anything inside it changes.",
+  "generatedAt": "2026-08-25",
+  "site": "autonomoussolutions.sharepoint.com (root site)",
+  "driveId": "b!e3aGjJh__EGdpXzcGM92ZyWMsGZDQQhDu2czA4OcxXj1UXE4hnR0TKH-emewLNee",
+  "watchedRoots": [
+    "Shared Documents/Marketing/Branding",
+    "Shared Documents/Marketing/Templates",
+    "Shared Documents/Marketing/Logos"
+  ],
+  "entries": [
+    {"type": "folder", "path": "Marketing", "id": "017AMQC3XHSODZP6XGCFEYBIOPOIKJLCAJ", "size": null, "lastModified": "2025-07-07T17:11:33Z"},
+    {"type": "folder", "path": "Marketing/Branding", "id": "017AMQC3VNZAFEGZ5UKVDYTTFOQTZI5FRG", "size": 2890191, "lastModified": "2025-07-15T17:56:34Z"},
+    {"type": "folder", "path": "Marketing/Branding/Brand Field Manual", "id": "017AMQC3QKJLEBOESQI5B2WN6SWPJH6UUJ", "size": 1296839, "lastModified": null},
+    {"type": "file", "path": "Marketing/Branding/Brand Field Manual/ASI_Brand_Field_Manual_version_1.2.pdf", "id": "017AMQC3RFAG7QH6ZXZVH2RSZ75ONR7EEM", "size": 1296839, "lastModified": null, "textSha256": null},
+    {"type": "folder", "path": "Marketing/Branding/Icon Sets", "id": "017AMQC3UCN6CJN2GH35D3D5DM2YF4OFCK", "size": 1593352, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Templates", "id": "017AMQC3RSXUS2KSCVDRAK3H3VDONCN6GB", "size": 232387772, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Templates/ASI General Powerpoint Template", "id": "017AMQC3XSKNM6XT6XZNHIPV52S7NLKPRU", "size": 13889392, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Templates/ASI Master Powerpoint Deck Template", "id": "017AMQC3R7OFPS7T2JTVHJM6HP4YYNQB57", "size": 217234097, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Templates/Email Signature Templates", "id": "017AMQC3WG6CG6IOF7KVDYUQJEHSMVUZGS", "size": 289282, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Templates/Letter Head Template", "id": "017AMQC3WZHWVXIGXH6ZEKCZD6QYN5OBWT", "size": 975001, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Logos", "id": "017AMQC3SW3BVCP4LPBNAJSER4BKDUPAUA", "size": 2192681, "lastModified": "2025-07-07T17:28:56Z"},
+    {"type": "folder", "path": "Marketing/Logos/ASI 25+ Years Logo", "id": "017AMQC3RNSLZMIEUGGZDKQ7OAVOFIQZDZ", "size": 942216, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Logos/ASI Gear Compass Only Logo", "id": "017AMQC3UPSBEYNM7Z5NCIDI66DN65AWM3", "size": 155227, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Logos/ASI Logo + Tagline", "id": "017AMQC3UUL6OMLTEZZZDKFQTSZUYY2Y4O", "size": 785480, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Logos/ASI Logo + URL", "id": "017AMQC3SLNO4P7MZ6P5BJ65LVT4GCEWM3", "size": 264310, "lastModified": null},
+    {"type": "folder", "path": "Marketing/Logos/ASI Main Logo", "id": "017AMQC3VX4JATNOFLS5C3ARVH6DYJFSM7", "size": 45448, "lastModified": "2026-04-16T21:00:22Z"}
+  ]
+}

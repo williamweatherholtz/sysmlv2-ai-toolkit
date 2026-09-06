@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "title": "Awkward-Character Regression Instance",
+    "docType": "Requirements Document",
+    "docId": "ASI-RD-TEST-AWKWARD",
+    "version": "1.0",
+    "date": "2026-08-25",
+    "author": "Regression Suite",
+    "recipient": "Nobody (harness input)",
+    "classification": "Test Data - Not a Deliverable"
+  },
+  "content": "This instance carries every character class issue001 demonstrated corrupting or crashing the eval path: dollar signs, hashes, at-signs, angle brackets, asterisks. Emphasis works: *italic* and **bold**, a [link](https://example.com), and a literal star \\*escaped\\*.\n\n- list item one\n- list item two",
+  "requirements": [
+    {
+      "id": "AWK-001",
+      "statement": "The unit price shall not exceed $500 per assembly, and totals like $1,234.56 shall render verbatim.",
+      "priority": "must",
+      "verification": "test",
+      "rationale": "Dollar signs crashed the eval path with *unclosed delimiter*; this asserts the literal survives."
+    },
+    {
+      "id": "AWK-002",
+      "statement": "Position reports @10Hz shall include payloads #1 through #4 in every frame.",
+      "priority": "must",
+      "verification": "test",
+      "notes": "The `@` and `#` classes: eval swallowed hashes silently and crashed on at-references."
+    },
+    {
+      "id": "AWK-003",
+      "statement": "Latency shall stay under <200ms> at P99, and markup-like text such as <config> or *emphasis* shall render as typed.",
+      "priority": "must",
+      "verification": "test",
+      "rationale": "The silently-deleted-bound case: eval rendered this statement WITHOUT its performance bound."
+    },
+    {
+      "id": "AWK-004",
+      "statement": "Injected directives such as #read(\"/brand/style-tokens.json\") shall appear as literal text, never execute.",
+      "priority": "must",
+      "verification": "test",
+      "notes": "The code-execution case from issue001."
+    }
+  ]
+}

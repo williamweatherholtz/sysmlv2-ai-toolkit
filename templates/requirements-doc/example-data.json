@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "title": "Vehicle Telemetry Interface Requirements",
+    "docType": "Requirements Document",
+    "docId": "ASI-RD-0001",
+    "version": "0.1",
+    "date": "2026-08-25",
+    "author": "W. Weatherholtz",
+    "recipient": "Example Customer, Inc.",
+    "classification": "Proprietary & Confidential"
+  },
+  "content": "This document conveys the requirements for the vehicle telemetry interface between the Mobius® autonomous fleet management system and the customer's fleet vehicles. It is an *example instance* used to exercise every field of the requirements-document template: metadata autopopulation, header and footer composition, page numbering, the requirements table, and per-requirement detail.",
+  "requirements": [
+    {
+      "id": "TEL-001",
+      "statement": "The vehicle shall report position at a rate of no less than 10 Hz while in autonomous operation.",
+      "priority": "must",
+      "verification": "test",
+      "rationale": "Downstream path-tracking consumers assume a 100 ms position budget.",
+      "notes": "Rate may degrade to 1 Hz in manual mode."
+    },
+    {
+      "id": "TEL-002",
+      "statement": "The telemetry link shall deliver safety-state transitions to the operator console within 200 ms end to end.",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "TEL-003",
+      "statement": "The interface shall expose battery state of charge as a percentage with a resolution of 1% or finer.",
+      "priority": "should",
+      "verification": "inspection"
+    },
+    {
+      "id": "TEL-004",
+      "statement": "The telemetry payload should remain parseable by consumers one major version behind the current schema.",
+      "priority": "should",
+      "verification": "analysis",
+      "rationale": "Customers upgrade consoles on a slower cadence than vehicles."
+    },
+    {
+      "id": "TEL-005",
+      "statement": "The interface may provide an operator-configurable reporting profile for bandwidth-constrained sites.",
+      "priority": "may",
+      "verification": "demonstration"
+    }
+  ]
+}

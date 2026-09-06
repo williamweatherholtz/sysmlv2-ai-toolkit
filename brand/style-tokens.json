@@ -1,0 +1,154 @@
+{
+  "$comment": "ASI style tokens, extracted 2026-08-25 from observed sources with per-token provenance. AUTHORED OBSERVATIONS, not yet an adjudicated design system: the three sources disagree on the primary blue, and the conflict is recorded rather than resolved (see conflicts[]). Templates must consume tokens from `canonical` only; `observed` is evidence.",
+  "extractedAt": "2026-08-25",
+  "sources": {
+    "brandManual": {
+      "title": "ASI Brand Field Manual v1.2 (UPDATED OCT 7th, 2025) — the brand authority",
+      "location": "SharePoint: Shared Documents/Marketing/Branding/Brand Field Manual/ASI_Brand_Field_Manual_version_1.2.pdf",
+      "note": "Text extracted via Microsoft 365 connector. The color-palette page (pg. 22) is a graphic; its hex values are NOT text-extractable and have not been visually read — only #23A2D7 appears in the manual's text (pg. 15, Mobius emphasis, called 'ASI primary blue')."
+    },
+    "asiColorsScheme": {
+      "title": "OOXML clrScheme 'ASI Colors' — the broadly-enacted machine palette",
+      "locations": [
+        "ingest/QP-06 Design and Development Procedure (1).docx (word/theme/theme1.xml, doc dated 2026-08)",
+        "ingest/Logistics - Commercializaton TD 2-0 2026 Deck.pptx (ppt/theme/theme1.xml, theme 'TITLE SLIDES')"
+      ]
+    },
+    "q4_2025Theme": {
+      "title": "OOXML theme 'ASI_THEME_Q4_2025' — a newer variant seen in one deck",
+      "locations": [
+        "ingest/Distribution Center Feature and Capability Dashboard.pptx (ppt/theme/theme1.xml)"
+      ]
+    }
+  },
+  "canonical": {
+    "$comment": "Only tokens the sources AGREE on, or that the manual states in text. Everything else waits on conflict resolution.",
+    "identity": {
+      "company": "Autonomous Solutions, Inc. (ASI)",
+      "tagline": "The People-Building Robot Company",
+      "positioning": "Worldwide Leader of Industrial Vehicle Automation",
+      "website": "asirobots.com",
+      "productMention": "Mobius(R) autonomous fleet management system — (R) on first use per document/page; text-only, never a standalone logo; ASI logo must appear first/larger"
+    },
+    "typography": {
+      "externalDocuments": {
+        "family": "Roboto",
+        "source": "brandManual pg. 23: 'WHEN TO USE ROBOTO: any external facing document, slide decks, brochures, one-pagers'"
+      },
+      "approvedAlternates": {
+        "families": [
+          "Arial",
+          "Helvetica"
+        ],
+        "constraint": "internal use; external only with Marketing approval (brandManual pg. 23)"
+      },
+      "observedWeightPractice": "headings in a condensed/thin cut (Roboto Condensed in QP-06 major, Roboto Thin in Logistics deck major), body in Roboto Light (minor font in both)"
+    },
+    "colors": {
+      "primaryBlueTextStated": {
+        "hex": "#23A2D7",
+        "source": "brandManual pg. 15 (the only hex in the manual's extractable text)"
+      },
+      "white": {
+        "hex": "#FFFFFF"
+      }
+    },
+    "documentStructure": {
+      "presentationRequired": [
+        "ASI Anchor Bar",
+        "Slide Footer (date, brand mark, source clarity)"
+      ],
+      "footerPatternObserved": "COMPANY | tagline | vX.Y – UPDATED <date> – PG. <n> (brandManual's own every-page footer)",
+      "logoColorRules": [
+        "blue gear/compass + navy text on light backgrounds",
+        "all black for single-color printing",
+        "white gear/compass + white text on dark backgrounds",
+        "all white for reverse applications"
+      ],
+      "prohibitions": [
+        "no stretching or recoloring logos",
+        "no custom color combinations",
+        "no emojis or unapproved icon sets",
+        "gear compass only after the full logo has been shown"
+      ]
+    },
+    "voice": {
+      "is": [
+        "Professional",
+        "Human-centric",
+        "Clear"
+      ],
+      "isNot": [
+        "Overly Technical",
+        "Corporate & Cold",
+        "Buzzword-heavy"
+      ],
+      "say": "force multiplier; job augmentation",
+      "avoid": "disruptive robotic ecosystems; job replacement"
+    }
+  },
+  "observed": {
+    "asiColorsScheme": {
+      "dk2": "#00011E",
+      "lt2": "#DBE5EB",
+      "accent1": "#00ADEF",
+      "accent2": "#002340",
+      "accent3": "#91D300",
+      "accent4": "#FDD000",
+      "accent5": "#FF8000",
+      "accent6": "#EC2838",
+      "hlink": "#09BBEE",
+      "folHlink": "#0094CD",
+      "majorFont": "Roboto Thin (Logistics deck) / Roboto Condensed (QP-06)",
+      "minorFont": "Roboto Light"
+    },
+    "q4_2025Theme": {
+      "dk1": "#001E2A",
+      "lt1": "#FFFFFF",
+      "dk2": "#105F7E",
+      "lt2": "#F3F3F3",
+      "accent1": "#2EBEFC",
+      "accent2": "#007EAE",
+      "accent3": "#003366",
+      "accent4": "#108CBF",
+      "accent5": "#283333",
+      "accent6": "#D39E00",
+      "hlink": "#2EBEFC",
+      "majorFont": "Arial",
+      "minorFont": "Arial"
+    }
+  },
+  "conflicts": [
+    {
+      "token": "primary blue",
+      "candidates": {
+        "brandManual (text, pg. 15)": "#23A2D7",
+        "asiColorsScheme accent1 (QP-06 + Logistics deck)": "#00ADEF",
+        "ASI_THEME_Q4_2025 accent1": "#2EBEFC"
+      },
+      "resolutionPath": "read the palette page (pg. 22) of the Brand Field Manual visually, or extract theme1.xml from the official template in SharePoint Templates/ASI General Powerpoint Template (binary not fetchable via the connector — needs a local download); marketing adjudicates if those still disagree"
+    },
+    {
+      "token": "heading typeface",
+      "candidates": {
+        "asiColorsScheme": "Roboto Thin / Roboto Condensed",
+        "q4_2025Theme": "Arial"
+      },
+      "resolutionPath": "manual pg. 23 makes Roboto the external-facing rule, so Arial in the Q4 deck is likely the approved-alternate path, not a brand change; confirm against the official template"
+    }
+  ],
+  "gaps": [
+    "Brand Field Manual pg. 22 palette hexes: page is a graphic; not read (no local copy, no visual render available this session)",
+    "ingest/ASI HECP LOTO Training Program.pdf and PPE_Assessment_Fillable_v2.pdf: not visually inspected (pdftoppm unavailable on this machine); their text carries no hex values",
+    "Official template theme (SharePoint Templates/): binary not fetchable via connector; download locally and diff its theme1.xml against `observed`"
+  ],
+  "documentDefaults": {
+    "$comment": "AI-PROPOSED non-brand document colors (D0235 A1 hex-lint: templates read every color from this file). Ratified by the author with D0235; replace freely.",
+    "ink": "#1A1A1A",
+    "priorityMustAccent": "#B00020"
+  },
+  "assets": {
+    "$comment": "Approved brand asset files (never redrawn - manual pg. 19: use only approved logo files). mainLogoNavy activates the header logo when its bytes exist locally: the M365 connector serves the PNG visually but not as a file, so download 'Shared Documents/Marketing/Logos/ASI Main Logo/ASI Main Logo - Navy.png' to brand/logo/asi-main-logo-navy.png and set the path here.",
+    "mainLogoNavy": null
+  }
+}

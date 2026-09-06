@@ -1,0 +1,9 @@
+{
+  "$comment": "Pinned toolchain (D0235 A3): scripts/render.py refuses to run when the live toolchain disagrees. The winget-upgrade-silently-bumps-typst failure is the named enemy. Python packages are pinned in requirements.lock (the venv is machine-local, the lockfile is truth).",
+  "typst": "0.15.1",
+  "pythonMajorMinor": "3.14",
+  "typstPackages": {"cmarker": "0.1.6"},
+  "pipLockfile": "requirements.lock",
+  "creationTimestamp": 1787616000,
+  "fontsDir": "fonts"
+}

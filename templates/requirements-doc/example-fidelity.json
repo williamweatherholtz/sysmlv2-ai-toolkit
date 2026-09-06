@@ -1,0 +1,94 @@
+{
+  "meta": {
+    "title": "Character Transfer Fidelity Regression",
+    "docType": "Requirements Document",
+    "docId": "ASI-RD-TEST-FIDELITY",
+    "version": "3.0",
+    "date": "2026-08-26",
+    "author": "Fidelity Suite",
+    "recipient": "Nobody (harness input)",
+    "classification": "Test Data - Not a Deliverable"
+  },
+  "content": "Each statement carries one character class the vendored fonts cover; the harness asserts verbatim survival (srCharFidelity). Prose fields also carry contract-v2 constructs: inline math $x^2 + sqrt(y_i) / 2$ and $Delta v <= 0.5$, a literal \\$500 dollar, *emphasis*, and a [link](https://example.com). Contract-v2 expressiveness: a dollar in code `$PATH` needs no escape, escaped angle brackets \\<config\\> render literally, and math coexists: $sqrt(2)$.",
+  "requirements": [
+    {
+      "id": "FID-001",
+      "statement": "Latin extended: naïve façade Größe œuvre señor Ångström çedilla",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-002",
+      "statement": "Greek and Cyrillic: αβγδ ΩΘΣ Кириллица тест",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-003",
+      "statement": "Math and symbols: ± × ÷ ≤ ≥ ≠ ∞ µ ° √ ∑ ∫ ‰ Δx ∂y",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-004",
+      "statement": "LaTeX source as literal text: \\alpha^2 + \\beta_{ij}, \\frac{x}{y}, $E=mc^2$, \\begin{align}",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-005",
+      "statement": "Typst markup as literal text: #emph[x] *bold* _under_ @ref <label> $integral$ // comment",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-006",
+      "statement": "Quotes and punctuation: «guillemets» „low\" – dash — emdash … ellipsis 'curly' \"double\"",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-007",
+      "statement": "Currency: € euro £ pound ¥ yen ₹ rupee ¢ cent",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-011",
+      "statement": "Combining and compatibility: é (decomposed é), ﬁ ligature char, ½ ¼ fractions, ⁰¹² superscripts",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-012",
+      "statement": "Arrows and symbols: A → B, X ⇒ Y, warn ⚠, ballot ☑",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "FID-013",
+      "statement": "Emoji (monochrome by D0236): 🚀 ✅ and enclosed ①②③",
+      "priority": "must",
+      "verification": "test",
+      "rationale": "These classes were refused before D0236 vendored the Noto fallbacks; math renders here too: $E = m c^2$."
+    },
+    {
+      "id": "CRT-001",
+      "statement": "Kern-heavy id class one: extraction must survive the T-hyphen kern pair.",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "AVT-002",
+      "statement": "Kern-heavy id class two: V-hyphen kerning.",
+      "priority": "must",
+      "verification": "test"
+    },
+    {
+      "id": "TXT-003",
+      "statement": "Operating range 10–20 Hz uses an en-dash, which some extractors map to the replacement character.",
+      "priority": "must",
+      "verification": "test"
+    }
+  ]
+}

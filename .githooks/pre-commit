@@ -123,4 +123,22 @@ if [ -n "$rust_staged" ] && [ -f "Cargo.toml" ]; then
     fi
 fi
 
+# ASI DOCUMENT KIT (D0354, asi-templates unit v3). The unit declares NO guard, so this hook is its
+# only enforcement in this project: a template or a rendered report that breaks the contract - an
+# unreplaced placeholder, a decision with no steel-manned alternative, a missing reasoning chain, a
+# prose budget blown - must not land. Missing python BLOCKS rather than skipping, the shape the rust
+# step already uses: a check that cannot run must never pass silently (K2).
+templates_staged=$(echo "$all_staged" | grep -E '^(templates/|scripts/check_templates\.py)' || true)
+if [ -n "$templates_staged" ]; then
+    if command -v python >/dev/null 2>&1; then
+        echo "pre-commit: python scripts/check_templates.py"
+        python scripts/check_templates.py || {
+            echo "pre-commit: TEMPLATE CONTRACT FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
+    else
+        echo "pre-commit: GATE CANNOT RUN — template files staged but python not found."
+        echo "pre-commit:   REMEDY: install python 3. Explicit bypass: SKIP_VALIDATE=1"
+        exit 1
+    fi
+fi
+
 exit 0

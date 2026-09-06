@@ -151,4 +151,28 @@ package ProjectIntake20260906 {
     #Implicates dependency from us095 to d0339;
     #Implicates dependency from us096 to issue379;
     #Implicates dependency from us096 to d0339;
+
+    part st098 : Statement {
+        :>> id = "7ccf0041-fad6-4304-9001-e2b9346ea2cc";
+        :>> title = "Use the ASI template skill for the standing executive summary";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> text = "use the asi template skill for this standing executive summary process.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-06"; :>> channel = StatementChannel::chat;
+    }
+
+    part us097 : UserStory {
+        :>> id = "8821d868-e4e5-40ac-a151-ed906723da05";
+        :>> title = "The standing executive summary is rendered from the ASI exec-summary surface, not hand-authored HTML";
+        :>> createdAt = "2026-09-06"; :>> createdBy = "claudeOpus5";
+        :>> asA = "the human reading what waits on them";
+        :>> iWant = "the standing summary built by the asi-templates skill - tabs, steel-manned choices, the reasoning chain, Copy-for-AI";
+        :>> soThat = "every ask arrives in the format I asked for, and the page can be argued with rather than deferred to";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "TRUSTED: the human's own direction in chat (D0314), so it is acted on under the ordinary process. The unit is in the library and not installed here; importing it is a process-surface change, so it carries a Decision with a process-change marker, accepted on these words under the D0192/D0289 delegation with the read-back naming the process. RECOMMEND: import asi-templates v3, render the queue from templates/exec-summary/exec-summary.html, wire the contract checker into pre-commit (the unit declares no guard), publish to the standing URL.";
+    }
+    #DerivedFrom dependency from us097 to st098;
+
+    // The human directed the surface (st098); the Decision adopts it and the task delivers it.
+    #Implicates dependency from us097 to d0354;
+    #Implicates dependency from us097 to dcStandingSummaryUsesTheKit;
 }

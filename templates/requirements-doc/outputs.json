@@ -1,0 +1,31 @@
+{
+  "$comment": "Declared outputs for requirements-doc (D0235 A3: declared = built and checked). An output may appear under `declared` ONLY when its generator and its read-back checks exist and pass in scripts/render.py — which LOADS this file and derives its A5.2 assertions from fieldMap (issue005). readback: 'text' = asserted in extracted text on every render; 'golden' = covered by the pixel baseline (runs under --check/--update-golden for baselined instances only); 'none' = declared omission.",
+  "docType": "Requirements Document",
+  "declared": {
+    "pdf": {
+      "renderer": "typst (reference renderer, decision-bound; templates/requirements-doc/requirements-doc.typ)",
+      "checks": "scripts/render.py: schema validation; token-level content-contract gate; glyph coverage; zero-warnings compile; fieldMap-driven text read-back; golden visual diff (--check/--update-golden, baselined instances); hex lint",
+      "fieldMap": [
+        {"field": "meta.docId", "surfaces": ["metadata-table", "header"], "readback": "text", "transform": "verbatim"},
+        {"field": "meta.title", "surfaces": ["title-block", "pdf-document-title"], "readback": "text", "transform": "verbatim"},
+        {"field": "meta.docType", "surfaces": ["title-block-eyebrow"], "readback": "text", "transform": "upper"},
+        {"field": "meta.version", "surfaces": ["metadata-table", "footer"], "readback": "text", "transform": "verbatim"},
+        {"field": "meta.date", "surfaces": ["metadata-table", "footer"], "readback": "text", "transform": "verbatim"},
+        {"field": "meta.author", "surfaces": ["metadata-table", "pdf-document-author"], "readback": "text", "transform": "verbatim"},
+        {"field": "meta.classification", "surfaces": ["metadata-table", "header"], "readback": "text", "transform": "upper"},
+        {"field": "meta.recipient", "surfaces": ["metadata-table"], "readback": "text", "transform": "verbatim", "note": "optional; row omitted entirely when absent (author ruling 2026-08-27); asserted only when present"},
+        {"field": "requirements[].id", "surfaces": ["requirements-table", "detail-headings"], "readback": "text", "transform": "verbatim"},
+        {"field": "requirements[].statement", "surfaces": ["requirements-table", "detail-sections"], "readback": "text", "transform": "verbatim"},
+        {"field": "requirements[].priority", "surfaces": ["requirements-table-badge"], "readback": "text", "transform": "upper"},
+        {"field": "requirements[].verification", "surfaces": ["requirements-table"], "readback": "text", "transform": "verbatim"},
+        {"field": "content", "surfaces": ["introduction-section"], "readback": "golden", "transform": "markdown+math"},
+        {"field": "requirements[].rationale", "surfaces": ["detail-sections"], "readback": "golden", "transform": "markdown+math"},
+        {"field": "requirements[].notes", "surfaces": ["detail-sections"], "readback": "golden", "transform": "markdown+math"}
+      ]
+    }
+  },
+  "pending": {
+    "xlsx": "requirements-matrix via openpyxl (task xlsxMatrixGenerator); content field downgrades to plain text - declared here, per CONTENT-FORMAT.md",
+    "docx": "letter-style via python-docx; after xlsx per D0235 A3 (author may reorder)"
+  }
+}
