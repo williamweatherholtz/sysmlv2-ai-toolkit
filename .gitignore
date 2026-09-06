@@ -79,3 +79,5 @@ architect-sure-*.png
 .keel-write-lock
 *.keel-lock
 *.keel-tmp
+scripts/exec_brief/decision-facts.json
+scripts/exec_brief/__pycache__/
