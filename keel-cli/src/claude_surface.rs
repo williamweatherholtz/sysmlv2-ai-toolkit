@@ -26,6 +26,45 @@ use std::path::Path;
 /// The generator version stamped into the sidecar — the binary's own version.
 pub const SURFACE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The build commit baked into this binary (`build.rs`; `+dirty` from a modified tree).
+///
+/// Stamped beside the version in the sidecar (GH#51 / D0349): two 0.3.1 builds generated different
+/// surfaces and the drift report named no binary, so the version alone could not say which generator
+/// wrote the surface.
+pub const SURFACE_BUILD: &str = env!("KEEL_BUILD_COMMIT");
+
+/// The sidecar stamp: `<version> <build>` on one line. Read back by `stamp_parts`.
+#[must_use]
+pub fn surface_stamp() -> String {
+    format!("{SURFACE_VERSION} {SURFACE_BUILD}")
+}
+
+/// `(version, build)` from a sidecar line; a pre-D0349 sidecar carries the version alone and reads
+/// back with an `unknown` build.
+#[must_use]
+pub fn stamp_parts(line: &str) -> (String, String) {
+    let mut it = line.split_whitespace();
+    (it.next().unwrap_or("unstamped").to_string(), it.next().unwrap_or("unknown").to_string())
+}
+
+/// The text a skill is DEPLOYED as (GH#49 / D0348).
+///
+/// A skill whose process this project has DEACTIVATED is deployed with its inactive state written
+/// FIRST, so an agent reading its skill list learns the channel is closed before acting; the file is
+/// not removed, because a removed file reads as drift (GH#46) and a stated state teaches the model.
+/// `process` is the skill directory's name; when it names no deactivated process the text is the
+/// source, unchanged.
+#[must_use]
+pub fn deployed_skill_text(process: &str, src: &str, inactive: &[String]) -> String {
+    if inactive.iter().any(|p| p == process) {
+        format!(
+            "> **INACTIVE in this project.** The process `{process}` this skill deploys is DEACTIVATED (`.engine/contracts/activation.toml`, D0138): its guards do not run here and the skill is not to be followed. `keel activate {process}` re-arms it; `keel activation` lists the set.\n\n{src}"
+        )
+    } else {
+        src.to_string()
+    }
+}
+
 /// The documented install path (D-P0b fence: this URL and the docs, nothing else — no package
 /// managers, no auto-update, no install scripts).
 pub const INSTALL_URL: &str = "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/releases";
@@ -389,6 +428,13 @@ pub struct SyncReport {
 
 /// Registry entries: `(title, location)` from `skills-registry.sysml` — the count the scaffold must
 /// match (P0.1 "counts asserted equal").
+/// The process a skill deploys: the directory under `.engine/skills/` that holds it (skills and
+/// processes share a name; the process-skill guard holds that pairing).
+fn skill_process(loc: &str) -> String {
+    let norm = loc.replace('\\', "/");
+    norm.strip_prefix(".engine/skills/").and_then(|r| r.split('/').next()).unwrap_or_default().to_string()
+}
+
 fn registry_skills(root: &Path) -> Vec<(String, String)> {
     // D0222: a skill may declare itself BESIDE itself, so every `.sysml` under `.engine/skills/` is
     // a registry — not just the central file. Reading only the central one made `sync-claude` report
@@ -459,32 +505,36 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     if existing != merged && !hooks_silenced(&existing) {
         drift.push("settings.json: keel-owned entries differ from this binary's generator".to_string());
     }
-    // sidecar version stamp
+    // sidecar stamp: version, and since D0349 the build too
     let sidecar = claude.join(".keel-surface");
-    let recorded = std::fs::read_to_string(&sidecar).ok().map(|s| s.trim().to_string());
-    let version_skew = match recorded {
-        Some(v) if v != SURFACE_VERSION => Some((v, SURFACE_VERSION.to_string())),
-        None => Some(("unstamped".to_string(), SURFACE_VERSION.to_string())),
-        _ => None,
-    };
+    let recorded = std::fs::read_to_string(&sidecar).ok().map(|s| stamp_parts(s.trim()));
+    let (stamped_version, stamped_build) = recorded.unwrap_or_else(|| ("unstamped".to_string(), "unknown".to_string()));
+    let version_skew = (stamped_version != SURFACE_VERSION).then(|| (stamped_version.clone(), SURFACE_VERSION.to_string()));
     // output style
     let style_path = claude.join("output-styles").join("keel.md");
     let style_current = std::fs::read_to_string(&style_path).unwrap_or_default();
     if !same_text(&style_current, OUTPUT_STYLE) {
         drift.push("output-styles/keel.md differs from the embedded response contract".to_string());
     }
-    // skills: one .claude/skills/<name>/SKILL.md per registry entry
+    // skills: one .claude/skills/<name>/SKILL.md per registry entry, deployed as `deployed_skill_text`
     let registry = registry_skills(root);
+    let inactive = crate::activation::Activation::load(root).inactive_processes();
     let mut missing_skills = 0usize;
     for (title, loc) in &registry {
         let dst = claude.join("skills").join(title).join("SKILL.md");
         let src_text = std::fs::read_to_string(root.join(loc)).unwrap_or_default();
-        if !same_text(&std::fs::read_to_string(&dst).unwrap_or_default(), &src_text) {
+        let want = deployed_skill_text(&skill_process(loc), &src_text, &inactive);
+        if !same_text(&std::fs::read_to_string(&dst).unwrap_or_default(), &want) {
             missing_skills += 1;
         }
     }
     if missing_skills > 0 {
         drift.push(format!("{missing_skills} skill(s) missing or stale under .claude/skills/"));
+    }
+    // GH#51 / D0349: when anything drifted, name the generator that stamped the surface and the one
+    // running - two builds of one version generated different surfaces and the report named neither.
+    if !drift.is_empty() && stamped_build != SURFACE_BUILD {
+        drift.push(format!("surface stamped by build {stamped_build}; this binary is build {SURFACE_BUILD} - a different generator wrote what is on disk"));
     }
 
     // the plugin rendering (D0296): every file byte-equal to this binary's generator
@@ -525,7 +575,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
             .map_err(|e| format!("registry names {loc}, which cannot be read: {e} - the tool-reference guard should have caught a missing file"))?;
         let dst_dir = claude.join("skills").join(title);
         std::fs::create_dir_all(&dst_dir).map_err(|e| e.to_string())?;
-        crate::write::write_atomic(&dst_dir.join("SKILL.md"), &src_text).map_err(|e| e.to_string())?;
+        crate::write::write_atomic(&dst_dir.join("SKILL.md"), deployed_skill_text(&skill_process(loc), &src_text, &inactive)).map_err(|e| e.to_string())?;
         skills_written += 1;
     }
     if skills_written != registry.len() {
@@ -534,7 +584,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
             registry.len()
         ));
     }
-    crate::write::write_atomic(&sidecar, format!("{SURFACE_VERSION}\n")).map_err(|e| e.to_string())?;
+    crate::write::write_atomic(&sidecar, format!("{}\n", surface_stamp())).map_err(|e| e.to_string())?;
     Ok(SyncReport { wrote_settings: true, skills_written, registry_count: registry.len(), version_skew: None, drift: Vec::new() })
 }
 

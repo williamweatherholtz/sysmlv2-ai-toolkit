@@ -65,6 +65,7 @@ pub mod adherence;
 pub mod ci_runs;
 pub mod cursor;
 pub mod currency;
+pub mod suite;
 pub mod github;
 pub mod github_ingest;
 pub mod adoption_check;

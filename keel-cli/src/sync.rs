@@ -234,6 +234,33 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
         eprintln!("  the one you are standing in. Fix the tree, commit, and re-run. Nothing was pushed.");
         return 1;
     }
+    // THE SUITE RECEIPT (D0353 / dcLandRequiresASuiteReceipt). Sprint 521 landed on validate plus
+    // guards alone and CI went red for twenty minutes on a test the suite would have caught here. CI is
+    // detective; this is the preventive half: the deliverable's fingerprint must be the one the last
+    // GREEN suite run on this machine saw. A docs-only or .tracking change leaves it unchanged.
+    // KEEL_LAND_UNTESTED=1 pushes anyway and RECORDS the fact as a tracked obligation - never silently.
+    // Checked AFTER the gate: the obligation is an untriaged Issue, so recording it before the gate would
+    // make the gate refuse the very push it authorises; recorded here it lands in the working tree for the
+    // next commit to carry and triage.
+    if let Some(why) = crate::suite::land_refusal(repo) {
+        if std::env::var("KEEL_LAND_UNTESTED").is_ok_and(|v| v == "1") {
+            let noted = crate::actor::resolve(repo, None).map_err(crate::write::WriteError::Parse).and_then(|actor| {
+                crate::write::record_obligation(repo, "land-untested", "a push landed without a green suite receipt for its deliverable", &format!("KEEL_LAND_UNTESTED=1 overrode the suite receipt at land (D0353). Refusal that was overridden: {why} Discharge: run keel suite green on this tree and triage this obligation with a #Resolves edge."), &actor)
+            });
+            match noted {
+                Ok(p) => println!("keel land: suite receipt OVERRIDDEN (KEEL_LAND_UNTESTED=1) - obligation recorded at {} (uncommitted: commit and triage it with a #Resolves edge)", p.display()),
+                Err(e) => {
+                    eprintln!("keel land: KEEL_LAND_UNTESTED=1 set but the obligation could not be recorded ({e}) - REFUSING: an untested push must leave a tracked fact behind");
+                    return 1;
+                }
+            }
+        } else {
+            eprintln!("keel land: {why}");
+            eprintln!("  REFUSING to push (D0353): CI would catch it, but CI is detective and the commit would already be on main.");
+            eprintln!("  KEEL_LAND_UNTESTED=1 keel land ... pushes anyway and records an obligation.");
+            return 1;
+        }
+    }
     for attempt in 1..=max_attempts {
         println!("keel land: pushing {branch} -> origin (attempt {attempt}/{max_attempts})");
         if git(repo, &["push", "origin", &branch]).is_ok() {

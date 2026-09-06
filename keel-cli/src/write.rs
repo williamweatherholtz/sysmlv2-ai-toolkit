@@ -1304,6 +1304,36 @@ pub(crate) fn sanitize_field(v: &str) -> String {
     v.replace('"', "'").replace('\\', "/").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Captured output for a record: WHOLE when it fits `max_chars`, otherwise cut at a LINE boundary
+/// with a `(N more lines)` marker (GH#50 / D0350, dcRedYieldKeepsTheDiagnostic).
+///
+/// The red-yield obligation used `chars().take(500)`, so three obligations carried exactly 726
+/// characters each, cut mid-token - losing the first problem at yield, the one fact the field exists
+/// to preserve. A line is atomic: the first line is kept whole even when it alone exceeds the budget,
+/// and the marker counts what was left out so the reader knows there was more.
+#[must_use]
+pub fn clip_at_line_boundary(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    let mut kept = Vec::new();
+    let mut used = 0usize;
+    for (i, l) in lines.iter().enumerate() {
+        let cost = l.chars().count() + usize::from(i > 0);
+        if i > 0 && used + cost > max_chars {
+            break;
+        }
+        used += cost;
+        kept.push(*l);
+    }
+    let left = lines.len() - kept.len();
+    if left == 0 {
+        return kept.join("\n");
+    }
+    format!("{}\n({left} more line{})", kept.join("\n"), if left == 1 { "" } else { "s" })
+}
+
 /// Does this prose field carry captured TOOL OUTPUT rather than authored text? (issue255/D0223)
 ///
 /// Recording D0223, a backtick inside a double-quoted shell argument was command substitution: the
@@ -1502,6 +1532,83 @@ pub fn record_decision(
     marker: Option<&str>,
     research: Option<&str>,
 ) -> Result<(String, String), WriteError> {
+    record_decision_with_links(root, slug, title, date, author, context, decision, rationale, consequences, marker, research, &DecisionLinks::default())
+}
+
+/// The typed edges a Decision is recorded WITH (D0352, dcRecordDecisionDeclaresSupersedes): the
+/// Decisions it supersedes and the Statement/UserStory it derives from.
+///
+/// Found 2026-09-03: D0289 reversed D0178 and carried no `#Supersede` edge to it; the human noticed,
+/// not a guard, because `decision-requirement-link` warns only when prose names an item by id and
+/// D0289's text did not. A reversal authored WITH its edge cannot land edgeless.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct DecisionLinks {
+    pub supersedes: Vec<String>,
+    pub derived_from: Vec<String>,
+}
+
+impl DecisionLinks {
+    /// Every target must exist: a `#Supersede` target is a Decision on disk (`dNNNN`), a
+    /// `#DerivedFrom` target is a declared item (a `Statement` or `UserStory`, `stNNN`/`usNNN`).
+    ///
+    /// # Errors
+    /// Names the first target that does not resolve, before anything is written.
+    pub fn check(&self, root: &Path) -> Result<(), WriteError> {
+        for d in &self.supersedes {
+            if !decision_on_disk(root, d) {
+                return Err(WriteError::Parse(format!("--supersedes {d}: no Decision `{d}` is on disk under .engine/decisions/ - a #Supersede edge to nothing is worse than none (every reader would treat it as present)")));
+            }
+        }
+        for t in &self.derived_from {
+            let ok = (t.starts_with("st") || t.starts_with("us")) && crate::view::item_exists(root, t).unwrap_or(false);
+            if !ok {
+                return Err(WriteError::Parse(format!("--derived-from {t}: not a declared Statement or UserStory (stNNN/usNNN) - the source of a Decision must be a recorded utterance or story (D0216)")));
+            }
+        }
+        Ok(())
+    }
+
+    fn edge_lines(&self, dname: &str) -> String {
+        let mut out = String::new();
+        for d in &self.supersedes {
+            let _ = writeln!(out, "    #Supersede dependency from {dname} to {d};");
+        }
+        for t in &self.derived_from {
+            let _ = writeln!(out, "    #DerivedFrom dependency from {dname} to {t};");
+        }
+        out
+    }
+}
+
+/// Is `d` (`dNNNN`) a Decision declared under `.engine/decisions/`? A READ-ONLY existence check made
+/// before a `#Supersede` edge is authored - not a read-modify-write, so it sits outside the lock.
+fn decision_on_disk(root: &Path, d: &str) -> bool {
+    d.strip_prefix('d').is_some_and(|n| n.len() == 4 && n.chars().all(|c| c.is_ascii_digit()))
+        && crate::collect_sysml(&root.join(".engine").join("decisions"))
+            .iter()
+            .any(|p| std::fs::read_to_string(p).is_ok_and(|t| t.contains(&format!("part {d} : Decision"))))
+}
+
+/// `record_decision`, authoring its typed edges in the same write (D0352).
+///
+/// # Errors
+/// A link target that does not resolve refuses before anything is written; otherwise as `record_decision`.
+#[allow(clippy::too_many_arguments)]
+pub fn record_decision_with_links(
+    root: &Path,
+    slug: &str,
+    title: &str,
+    date: &str,
+    author: &str,
+    context: &str,
+    decision: &str,
+    rationale: &str,
+    consequences: &str,
+    marker: Option<&str>,
+    research: Option<&str>,
+    links: &DecisionLinks,
+) -> Result<(String, String), WriteError> {
+    links.check(root)?;
     // issue255: a governance record must state what someone actually WROTE.
     reject_injected_output(&[
         ("title", title),
@@ -1549,7 +1656,8 @@ pub fn record_decision(
          \x20       :>> rationale = \"{rationale_c}\";\n\
          \x20       :>> consequences = \"{consequences_c}\";\n\
          \x20   }}\n\
-         }}\n",
+         {edge_lines}}}\n",
+        edge_lines = links.edge_lines(&format!("d{nnnn}")),
         title_c = s(title),
         marker_lines = marker_lines,
         plain_indent = plain_indent,
@@ -2026,6 +2134,23 @@ mod tests {
         let json = dir.join("probe.json");
         super::write_atomic(&json, "{ not sysml, not checked").expect("non-sysml targets are not parsed");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// GH#50 / D0350: captured output is kept whole or cut on a line with the cut counted.
+    #[test]
+    fn clipping_keeps_whole_output_or_cuts_on_a_line_boundary_and_counts_the_cut() {
+        use super::clip_at_line_boundary;
+        assert_eq!(clip_at_line_boundary("a\nb\nc", 100), "a\nb\nc", "fits: whole");
+        let long = (1..=10).map(|i| format!("line {i} is here")).collect::<Vec<_>>().join("\n");
+        let cut = clip_at_line_boundary(&long, 50);
+        assert!(cut.ends_with("(7 more lines)"), "{cut}");
+        let body = cut.trim_end_matches("\n(7 more lines)");
+        assert!(body.lines().all(|l| l.starts_with("line ") && l.ends_with(" is here")), "every kept line is whole: {body}");
+        assert!(body.chars().count() <= 50);
+        // one giant first line: kept whole, the rest counted
+        let giant = format!("{}\nsecond", "x".repeat(900));
+        let cut = clip_at_line_boundary(&giant, 500);
+        assert!(cut.starts_with(&"x".repeat(900)) && cut.ends_with("(1 more line)"), "{}", cut.len());
     }
 
     #[test]

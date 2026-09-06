@@ -997,6 +997,38 @@ method=confirmation needs explicit human sign-off. Invoke the engine-triage skil
 }
 
 /// Emit a hook-protocol JSON object and exit 0 (the harness reads stdout).
+/// The Stop hook's exit-0 advisory, ONE line in the owner's format (GH#52 / D0351): the count, the
+/// id range, how to accept, and the short names - whole names, cut with an ellipsis count past a
+/// budget. The oversight nag it replaces prescribed a console or a deck every turn (gone under D0269).
+fn decisions_outstanding_line(root: &Path, pending: &[String]) -> String {
+    const NAME_BUDGET: usize = 160;
+    let mut ids: Vec<&String> = pending.iter().collect();
+    ids.sort();
+    let range = match (ids.first(), ids.last()) {
+        (Some(a), Some(b)) if a != b => format!("{a}..{b}"),
+        (Some(a), _) => (*a).clone(),
+        _ => String::new(),
+    };
+    let mut names = Vec::new();
+    let mut used = 0usize;
+    let mut cut = 0usize;
+    for d in &ids {
+        let short = keel_cli::view::decision_short_name(root, d).unwrap_or_else(|| (*d).clone());
+        if used + short.len() + 2 > NAME_BUDGET && !names.is_empty() {
+            cut += 1;
+            continue;
+        }
+        used += short.len() + 2;
+        names.push(short);
+    }
+    let covering = if cut > 0 { format!("{} ... (+{cut})", names.join(", ")) } else { names.join(", ") };
+    format!(
+        "{} decision{} outstanding ({range}) - accept with your quoted word in chat, or from your terminal: keel accept dNNNN --by <you>. Covering: {covering}",
+        pending.len(),
+        if pending.len() == 1 { "" } else { "s" }
+    )
+}
+
 fn hook_emit(v: &serde_json::Value) -> i32 {
     println!("{v}");
     0
@@ -1148,15 +1180,23 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // rather than a count appended to every turn.
 
     if problems.is_empty() {
-        // green -> silent. The turn boundary speaks only when the model is dishonest.
-        return 0;
+        // green -> silent, EXCEPT the one line the owner asked for (GH#52 / D0351): how many
+        // decisions await their word, which, and how to accept. Nothing when none.
+        return match keel_cli::view::pending_acceptances(root) {
+            Ok(pending) if !pending.is_empty() => {
+                hook_emit(&serde_json::json!({ "systemMessage": decisions_outstanding_line(root, &pending) }))
+            }
+            _ => 0,
+        };
     }
     if already {
         // Second consecutive red: allow the stop (loop-avoidance stands, issue081) but the yield is
         // now a TRACKED obligation visible in orient, surviving console downtime (D0176/P1.7) — a
         // yield that lives only in a hook message evaporates with the transcript.
         let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("");
-        let first = problems.first().map(|p| p.chars().take(500).collect::<String>()).unwrap_or_default();
+        // GH#50 / D0350: the first problem is the fact this record exists to preserve - whole, or cut on
+        // a line with the cut counted; `chars().take(500)` used to cut it mid-token.
+        let first = problems.first().map(|p| keel_cli::write::clip_at_line_boundary(p, 2000)).unwrap_or_default();
         // An unresolvable actor goes straight to the ledger: a tracked fact with a fabricated
         // createdBy would deepen the red it records (the actors guard would fire on it).
         let recorded = keel_cli::actor::resolve(root, None).map_err(keel_cli::write::WriteError::Parse).and_then(|actor| {
@@ -2066,10 +2106,10 @@ fn cmd_sync_claude(args: &[String]) -> i32 {
                 }
             } else {
                 println!(
-                    "claude-surface synced: settings.json merged (keel-owned entries only), output style, {}/{} skill(s), version {} stamped.",
+                    "claude-surface synced: settings.json merged (keel-owned entries only), output style, {}/{} skill(s), stamped {} (version and build).",
                     r.skills_written,
                     r.registry_count,
-                    keel_cli::claude_surface::SURFACE_VERSION
+                    keel_cli::claude_surface::surface_stamp()
                 );
                 0
             }
@@ -2718,9 +2758,19 @@ fn cmd_record(args: &[String]) -> i32 {
         None
     };
     let research = req("research");
-    match w::record_decision(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref()) {
+    // D0352: the edges a Decision is recorded WITH - `--supersedes d0001,d0002` / a `supersedes:` line,
+    // `--derived-from st001` / a `derived-from:` line - so a reversal cannot land edgeless.
+    let list = |name: &str| -> Vec<String> { req(name).map(|v| v.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default() };
+    let links = w::DecisionLinks { supersedes: list("supersedes"), derived_from: list("derived-from") };
+    match w::record_decision_with_links(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref(), &links) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
+            for d in &links.supersedes {
+                println!("  #Supersede d{nnnn} -> {d} authored with it (D0352)");
+            }
+            for t in &links.derived_from {
+                println!("  #DerivedFrom d{nnnn} -> {t} authored with it (D0352)");
+            }
             // D0291: standing consent (D0207) is applied HERE, at record time, for a NON-FORK - the
             // GitHub channel that used to do it at issue creation (and notify the human every time) is
             // disconnected. A fork (a Decision carrying OPTIONS) stays proposed for the human; the
@@ -4082,6 +4132,15 @@ viewpoints ({} declared):", vps.len());
         );
     }
     println!("{mode}d `{target}`. Active: {}", if set.is_empty() { "(none)".to_string() } else { set.join(", ") });
+    // D0348 / GH#49: a deactivated process's skill is deployed saying so, so the activation set and
+    // the deployed surface are one fact - regenerate the surface here, where the fact changed, rather
+    // than leave claude-surface-drift to report the stale skill at the next gate.
+    if root.join(".claude").is_dir() {
+        match keel_cli::claude_surface::sync_claude(&root, false) {
+            Ok(r) => println!("claude surface regenerated: {}/{} skill(s) - a deactivated process's skill now opens with its INACTIVE state (D0348)", r.skills_written, r.registry_count),
+            Err(e) => eprintln!("claude surface NOT regenerated ({e}) - run `keel sync-claude` so the deployed skills follow the active set"),
+        }
+    }
     println!("Read it back: keel activation | keel guard");
     0
 }
@@ -4101,6 +4160,26 @@ viewpoints ({} declared):", vps.len());
 /// the self-build repo would point this at the engine SOURCE. `migrate` refuses the self-build repo
 /// anyway, but a command that rewrites authored facts should take its target explicitly.
 /// `keel currency [ROOT] ...` (D0338): a trailing ROOT is honoured only when it is a keel project.
+/// `keel status [ROOT]`: a mistyped flag is never a root (issue133).
+fn cmd_status(rest: &[String]) -> i32 {
+    refuse_flag_as_path(rest.first(), "status").unwrap_or_else(|| {
+        resolve_guard_root(rest.first()).map_or_else(
+            || {
+                eprintln!("error: no .engine/ directory found. usage: keel status [ROOT]");
+                2
+            },
+            |root| keel_cli::status::cmd(&root),
+        )
+    })
+}
+
+/// `keel suite [ROOT] [-- <cargo test args>]` (D0353): everything after `--` is cargo's, so the ROOT
+/// is looked for only before it.
+fn cmd_suite(rest: &[String]) -> i32 {
+    let own: Vec<String> = rest.iter().take_while(|a| *a != "--").cloned().collect();
+    keel_cli::suite::cmd(rest, &repo_arg(&own))
+}
+
 fn cmd_currency(rest: &[String]) -> i32 {
     let root = rest.iter().find(|a| !a.starts_with("--") && Path::new(a.as_str()).join(".tracking").is_dir()).map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
     keel_cli::currency::cmd(rest, &root)
@@ -4749,16 +4828,9 @@ fn main() {
             keel_cli::ci_runs::cmd(rest, &root)
         }),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
-        Some("status") => refuse_flag_as_path(rest.first(), "status").unwrap_or_else(|| {
-            resolve_guard_root(rest.first()).map_or_else(
-                || {
-                    eprintln!("error: no .engine/ directory found. usage: keel status [ROOT]");
-                    2
-                },
-                |root| keel_cli::status::cmd(&root),
-            )
-        }),
+        Some("status") => cmd_status(rest),
         Some("currency") => cmd_currency(rest), // D0338: the unattended pass - pull, library, drift
+        Some("suite") => cmd_suite(rest), // D0353: the full suite, with the receipt land demands
         Some("github-pull") => {
             let root = resolve_guard_root(
                 rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
@@ -4852,8 +4924,9 @@ mod tests {
     /// asserted the existence of the thing it was policing, so it failed the moment the thing was
     /// deleted - a test bound to a mechanism rather than to a property.
     ///
-    /// The property that survives: nothing but `problems` can reach the block, and a green turn is
-    /// silent.
+    /// The property that survives: nothing but `problems` can reach the block, and a green turn
+    /// RETURNS before it - silent when nothing waits on the human, one line in the owner's format
+    /// when Decisions do (GH#52 / D0351; `stop_advisory_is_one_line` holds both behaviourally).
     #[test]
     fn the_turn_boundary_blocks_only_on_dishonest_state() {
         const MAIN_RS: &str = include_str!("main.rs");
@@ -4867,8 +4940,8 @@ mod tests {
             "the block path must sit behind the problems check, so only dishonest state can reach it"
         );
         assert!(
-            hook[..block].contains("return 0;"),
-            "and a green turn must return silently - the boundary speaks only when something is wrong"
+            hook[..block].contains("return match keel_cli::view::pending_acceptances(root)") && hook[..block].contains("_ => 0,"),
+            "and a green turn must RETURN before the block - one line when Decisions wait, 0 and silence otherwise"
         );
     }
 

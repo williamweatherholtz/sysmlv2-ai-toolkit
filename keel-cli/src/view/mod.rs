@@ -2181,6 +2181,24 @@ pub fn pending_acceptances(root: &Path) -> Result<Vec<String>, ViewError> {
     Ok(proposed_decisions(&Model::build(root)?))
 }
 
+/// A Decision's SHORT NAME: the part of its title before the first colon.
+///
+/// The `shortName: sentence` shape is D0303's; `None` when the Decision is not on disk. Read by the
+/// Stop hook's one-line advisory (GH#52 / D0351), which names what waits without quoting whole titles.
+#[must_use]
+pub fn decision_short_name(root: &Path, dec: &str) -> Option<String> {
+    for p in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = std::fs::read_to_string(&p) else { continue };
+        if !text.contains(&format!("part {dec} : Decision")) {
+            continue;
+        }
+        let key = ":>> title = \"";
+        let title = text.find(key).and_then(|i| text.get(i + key.len()..)).and_then(|r| r.split('"').next())?;
+        return Some(title.split_once(':').map_or(title, |(h, _)| h).trim().to_string());
+    }
+    None
+}
+
 /// Is `name` a declared item in the model?
 ///
 /// Exists so a write path can REFUSE before authoring rather than leave the `edge-endpoints` guard

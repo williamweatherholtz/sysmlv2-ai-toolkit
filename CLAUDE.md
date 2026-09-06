@@ -124,7 +124,9 @@ frozen (modify it only by out-of-band Decision).
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
   refused, D0232/issue266; a receipt of the form `ci-run id=<run id> workflow=<name>` is the EXTERNAL-FACT kind - CI verifies the run
   itself, D0323/issue374; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
-  `record decision` (`--from FILE`), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
+  `record decision` (`--from FILE`; `--supersedes dNNNN[,..]` / `--derived-from stNNN|usNNN` or the draft's `supersedes:` /
+  `derived-from:` lines author the `#Supersede` / `#DerivedFrom` edges WITH the Decision and refuse a target that does not
+  exist, D0352 — a reversal never lands edgeless), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
   **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
   has now happened FOUR times (D0224/issue256, then issue315, which also ran `keel deactivate` against
   this repo, then issue322 — the fix had been applied per-command, so the one path left unfixed was
@@ -169,7 +171,9 @@ frozen (modify it only by out-of-band Decision).
   that never adopted a control has not violated it. `keel activation` reports both; `keel activate` /
   `keel deactivate` take a process or a viewpoint name. Deactivating a viewpoint removes the LENS (it
   leaves the surfaces and its renderer stops being gated) but `concern-coverage` still reports the
-  concern — otherwise coverage could be raised by switching off what it was failing.
+  concern — otherwise coverage could be raised by switching off what it was failing. Deactivating a
+  process leaves its skill deployed with its INACTIVE state written first (D0348/GH#49) — the agent
+  learns the channel is closed before acting, and the file's absence never reads as drift.
 - **A repo may hold SEVERAL projects (D0234).** A *workspace* is one git repo containing one or more
   keel projects, discovered as any directory with both `.engine/` and `.tracking/`; `keel projects`
   lists them. Four things are repo-scoped because git makes them so: git allows one
@@ -184,6 +188,13 @@ frozen (modify it only by out-of-band Decision).
   a push carries the whole repository, issue280) and, on rejection, merges and **gates the MERGED tree**
   before retrying — two contributions that pass alone can fail together. `orient` reports
   its own `sync` position, so every computed answer states the tree it was computed against.
+  **In this self-build, `land` also demands a suite receipt (D0353):** `keel suite` runs the full
+  `cargo test --no-fail-fast` and writes `.keel/metrics/suite-receipt.toml` over the deliverable's
+  fingerprint (`keel-cli/`, `.engine/`, `keelw`, the Cargo manifests — content on disk, so an uncommitted
+  edit counts); `land` refuses a tree with no receipt, a red one, or one whose deliverable has moved,
+  naming which — a docs-only or `.tracking/` change needs none. Run the suite THROUGH `keel suite`, never
+  bare `cargo test`: the bare run leaves no receipt. `KEEL_LAND_UNTESTED=1` pushes anyway and records
+  a `land-untested` obligation in the working tree, never silently.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by the local hooks
@@ -292,10 +303,8 @@ subagent only when the tree changed during its lifetime. `keel hook config-chang
 machine-local fire-ledger (`.keel/metrics/hooks.jsonl`, D0180) — the single instrumentation path the
 hooks-actually-fired checks read. The whole `.claude/` surface is engine-generated: `keel sync-claude`
 regenerates the keel-owned subset in place (user entries survive), and `sync-claude --check` is the
-`claude-surface-drift` guard. The same generator renders the hook set a SECOND time as a Claude Code **plugin** at `.engine/claude-plugin/` (manifest + `hooks/hooks.json`, published by `.claude-plugin/marketplace.json` at the repo root, D0296): a launch passing `--plugin-dir .engine/claude-plugin` gets every keel hook with no repo-scope settings file at all, and hook lists merge across scopes so a settings edit cannot remove it; `sync-claude --check` reports drift in either rendering. **Launch through `keel claude [args...]`** (and the console's runs do the same): it passes `--plugin-dir` at that rendering and `--settings .keel/launch-settings.json` carrying `disableAllHooks: false` ABOVE project scope, with `KEEL_BIN` = the launching binary - so a kill switch already on disk at launch is overridden (D0296 run 6), which is the one case the ConfigChange handler cannot reach. Every hook command and the scaffolded pre-commit hook embed ONE probe (`claude_surface::pin_probe_sh`) - `KEEL_BIN`, then a binary dropped at `.keel/bin/keel(.exe)`, then the pin's own cache `.keel/bin/<engine pin>/<asset>` that `keelw`/`init` write, then PATH (D0230/D0316/D0343; GH#43 ran a 0.3.0-pinned project's turns on whatever PATH held, and GH#55 found both hook surfaces probing a path nothing writes) - so a project's turns and its gates run the same engine; the pre-commit hook prints which binary gated and every hook fire records its `bin` and `build` in the ledger (`keel status` shows the last). When the model is GREEN, `hook stop` also advises
-(never blocks) if items are waiting on the human and no console answers on 127.0.0.1:7777 — the human's
-oversight lens being down is not dishonest state, but leaving it down while their queue fills is a
-failure the turn boundary can see and I cannot be trusted to remember (issue150). All live in the binary — no extra runtime.
+`claude-surface-drift` guard. The same generator renders the hook set a SECOND time as a Claude Code **plugin** at `.engine/claude-plugin/` (manifest + `hooks/hooks.json`, published by `.claude-plugin/marketplace.json` at the repo root, D0296): a launch passing `--plugin-dir .engine/claude-plugin` gets every keel hook with no repo-scope settings file at all, and hook lists merge across scopes so a settings edit cannot remove it; `sync-claude --check` reports drift in either rendering. **Launch through `keel claude [args...]`** (and the console's runs do the same): it passes `--plugin-dir` at that rendering and `--settings .keel/launch-settings.json` carrying `disableAllHooks: false` ABOVE project scope, with `KEEL_BIN` = the launching binary - so a kill switch already on disk at launch is overridden (D0296 run 6), which is the one case the ConfigChange handler cannot reach. Every hook command and the scaffolded pre-commit hook embed ONE probe (`claude_surface::pin_probe_sh`) - `KEEL_BIN`, then a binary dropped at `.keel/bin/keel(.exe)`, then the pin's own cache `.keel/bin/<engine pin>/<asset>` that `keelw`/`init` write, then PATH (D0230/D0316/D0343; GH#43 ran a 0.3.0-pinned project's turns on whatever PATH held, and GH#55 found both hook surfaces probing a path nothing writes) - so a project's turns and its gates run the same engine; the pre-commit hook prints which binary gated and every hook fire records its `bin` and `build` in the ledger (`keel status` shows the last). When the model is GREEN, `hook stop` says ONE line
+(never blocks), in the owner's format (GH#52/D0351): `N decisions outstanding (dAAAA..dBBBB) - accept with your quoted word in chat, or from your terminal: keel accept dNNNN --by <you>. Covering: <short names>` — and nothing at all when nothing waits. The console/bridge nag it replaced is gone (D0269). A second consecutive red yields with a tracked obligation whose first problem is kept whole or cut on a line boundary with `(N more lines)` (GH#50/D0350). All live in the binary — no extra runtime.
 
 The JVM **kernel** validators are the deeper SysML oracle for the type-conformance residual, and are
 **opt-in** (`KEEL_KERNEL_VALIDATE=1`, D0132/issue081) — the per-file instance validator was demoted
