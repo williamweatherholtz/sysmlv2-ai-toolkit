@@ -17,6 +17,18 @@ use super::*;
 /// step 7): a two-hop cap would make every trap question fail structurally rather than semantically.
 const MAX_HOPS: usize = 3;
 
+/// EXPERIMENT KNOBS (D0325 left both harnesses passing `KEEL_RECALL_*` through with nothing reading
+/// them). Every ranking constant below is the DEFAULT; an environment variable of the same name
+/// overrides it for a sweep, so a mechanism can be chosen on the 50-case set without a rebuild per
+/// configuration. A malformed value is IGNORED rather than silently taken as zero — a sweep that
+/// reads a typo as "off" reports the wrong configuration's numbers.
+fn knob_usize(key: &str, default: usize) -> usize {
+    std::env::var(key).ok().and_then(|v| v.trim().parse().ok()).unwrap_or(default)
+}
+fn knob_f64(key: &str, default: f64) -> f64 {
+    std::env::var(key).ok().and_then(|v| v.trim().parse().ok()).unwrap_or(default)
+}
+
 /// A node with more edges than this is a HUB (a Story every gate verifies, a Decision everything
 /// charters to): it is still REACHED and reported, but never EXPANDED - expanding hubs made a
 /// 3-hop walk reach effectively the whole model on the first live run, which turns the answer into
@@ -687,8 +699,10 @@ fn inherit_from_top_seeds<'a>(model: &'a Model, seed_names: &[String], score: &H
     let mut top_seeds: Vec<(&String, f64)> = seed_names.iter().map(|n| (n, score.get(n).copied().unwrap_or(0.0))).collect();
     top_seeds.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)));
     let mut inherited: HashMap<&str, f64> = HashMap::new();
-    for (rank, (seed, sc)) in top_seeds.iter().take(INHERIT_SEEDS).enumerate() {
-        let share = sc * INHERIT_DECAY.powi(i32::try_from(rank).unwrap_or(i32::MAX));
+    let n_seeds = knob_usize("KEEL_RECALL_INHERIT_SEEDS", INHERIT_SEEDS);
+    let decay = knob_f64("KEEL_RECALL_INHERIT_DECAY", INHERIT_DECAY);
+    for (rank, (seed, sc)) in top_seeds.iter().take(n_seeds).enumerate() {
+        let share = sc * decay.powi(i32::try_from(rank).unwrap_or(i32::MAX));
         for e in &model.edges {
             let other = if &e.from == *seed { Some(e.to.as_str()) } else if &e.to == *seed { Some(e.from.as_str()) } else { None };
             if let Some(o) = other {
@@ -724,7 +738,11 @@ const CONVERGE_FACTOR: f64 = 1.0;
 
 fn converge_bonus(model: &Model, seed_names: &[String], score: &HashMap<String, f64>) -> HashMap<String, f64> {
     let mut out: HashMap<String, f64> = HashMap::new();
-    let (top_n, min_agree, factor) = (CONVERGE_SEEDS, CONVERGE_MIN, CONVERGE_FACTOR);
+    let (top_n, min_agree, factor) = (
+        knob_usize("KEEL_RECALL_CONVERGE_SEEDS", CONVERGE_SEEDS),
+        knob_usize("KEEL_RECALL_CONVERGE_MIN", CONVERGE_MIN),
+        knob_f64("KEEL_RECALL_CONVERGE_FACTOR", CONVERGE_FACTOR),
+    );
 
     // adjacency, both directions
     let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -772,6 +790,174 @@ fn converge_bonus(model: &Model, seed_names: &[String], score: &HashMap<String, 
     out
 }
 
+/// SOURCE-THEN-NEIGHBOURS WHEN ONE ROW DOMINATES (recallRanksLinkedRecordsAsWellAsGrepDoes, issue367).
+///
+/// The third mechanism the criterion names, and the only one left untried. Every lift above is keyed
+/// to the SEED ranking - the elements the prompt's words matched - so it cannot reach a target whose
+/// path runs through an element the words did not name. Measured on the failing case: for "why must we
+/// never rebase or force-push?" the payload's top row scores 31.5 against the second's 17.1, and the
+/// governing Decision sits two hops behind it (requirement --satisfy--> need <--derivedFrom-- decision)
+/// at rank 63, because the requirement is only the FOURTH seed by raw lexical score and the one-hop
+/// inheritance reaches the top three.
+///
+/// So: when one row dominates the ranked payload, that row is the SOURCE, and the payload becomes what
+/// a searcher who opened the hit and followed its edges would have - the source, then its neighbours,
+/// then theirs. The dominance test is what keeps this from being the blanket second hop already
+/// measured and rejected (neutral at small factors, 45-46/50 at large): a second hop is taken only
+/// where there is one record the payload is clearly about, never across a flat field of near-equal
+/// candidates.
+///
+/// Degree normalisation is deliberately NOT applied to the source's own neighbours - the point is that
+/// they come with the source - but the two-hop ring is divided by the root of the intermediate's degree,
+/// so a hub one hop out does not hand its whole neighbourhood the source's score.
+///
+/// CHOSEN ON A GENERATED TWO-HOP SET, by a rule fixed before the sweep: the highest hit count on
+/// `recall_bench.py --hops 2` subject to NO regression on the default one-hop set (hits, median
+/// position and mean rows all held). The 1-hop set could not choose this at all - 49/50 and median 3
+/// at every setting, because every one of its cases draws its query from a one-hop neighbour and so
+/// contains no case the mechanism applies to. Measured, 2-hop then 1-hop: off 15/50 median 8, then
+/// 49/50 median 3; DOMINANCE 1.25 -> 22/50 median 5, then 49/50 median 3 (TAKEN); 1.1 -> 27/50, but
+/// 48/50 and median 4; 1.0 -> 36/50, but 45/50 and median 5 - the last two buy the far set with the
+/// near one and the rule refuses them. `DOM_HOP2` was indifferent on the deciding set (22/50 at 0.4,
+/// 0.7 and 1.0), so it keeps the middle value and nothing is claimed for it; `DOM_HOP1` below 1.0 cost
+/// top-3 placements (9/22 -> 4/22) and stays at the full share.
+const DOMINANCE: f64 = 1.25;
+const DOM_HOP1: f64 = 1.0;
+const DOM_HOP2: f64 = 0.7;
+
+fn dominant_source_bonus<'a>(
+    model: &'a Model,
+    final_score: &HashMap<String, f64>,
+    degree: &HashMap<&str, f64>,
+) -> HashMap<&'a str, f64> {
+    let ratio = knob_f64("KEEL_RECALL_DOMINANCE", DOMINANCE);
+    let (h1, h2) = (knob_f64("KEEL_RECALL_DOM_HOP1", DOM_HOP1), knob_f64("KEEL_RECALL_DOM_HOP2", DOM_HOP2));
+    let mut out: HashMap<&str, f64> = HashMap::new();
+    if ratio <= 0.0 {
+        return out; // the knob's off position, for the sweep's control arm
+    }
+    let mut ranked: Vec<(&String, f64)> = final_score.iter().map(|(n, s)| (n, *s)).collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)));
+    let (Some((source, top)), Some((_, second))) = (ranked.first(), ranked.get(1)) else { return out };
+    if *top < ratio * *second || *second <= 0.0 {
+        return out; // no single record the payload is about
+    }
+    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+    for e in &model.edges {
+        adj.entry(e.from.as_str()).or_default().push(e.to.as_str());
+        adj.entry(e.to.as_str()).or_default().push(e.from.as_str());
+    }
+    let src: &str = source.as_str();
+    for one in adj.get(src).map_or(&[][..], Vec::as_slice) {
+        let e = out.entry(one).or_insert(0.0);
+        *e = e.max(top * h1);
+        let share = top * h2 / degree.get(one).copied().unwrap_or(1.0).sqrt();
+        for two in adj.get(one).map_or(&[][..], Vec::as_slice) {
+            if *two == src {
+                continue;
+            }
+            let e2 = out.entry(two).or_insert(0.0);
+            *e2 = e2.max(share);
+        }
+    }
+    out.remove(src);
+    out
+}
+
+/// The score components, kept together so one function folds them and the debug dump can print each
+/// one beside the total — a sweep that sees only the total cannot tell which mechanism moved a row.
+struct Components<'a> {
+    degree: HashMap<&'a str, f64>,
+    lifted: HashMap<String, f64>,
+    inherited: HashMap<&'a str, f64>,
+    converged: HashMap<String, f64>,
+}
+
+/// Every reached element's final score: its own lexical score plus the strongest of the graph signals.
+fn rank_reached<'a>(
+    model: &'a Model,
+    seed_names: &[String],
+    reached: &HashMap<String, (usize, String)>,
+    score: &HashMap<String, f64>,
+) -> (HashMap<String, f64>, Components<'a>) {
+    // THE GRAPH LIFTS WHAT THE WORDS POINT AT (issue295). Before this, a neighbour reached by the walk
+    // kept only its own lexical score, so the walk could only APPEND: for "why must we never rebase",
+    // the requirement and DoD derived from d0129 led and d0129 itself sat 47th, although half the top
+    // seeds link to it. An element that many high-scoring seeds link to is what those seeds are ABOUT.
+    // Each reached element receives a share of every adjacent seed's score, divided by the square root
+    // of its own degree so a hub every gate verifies does not collect the whole payload.
+    let mut degree: HashMap<&str, f64> = HashMap::new();
+    for e in &model.edges {
+        *degree.entry(e.from.as_str()).or_default() += 1.0;
+        *degree.entry(e.to.as_str()).or_default() += 1.0;
+    }
+    let seed_set: HashSet<&str> = seed_names.iter().map(String::as_str).collect();
+    let mut lifted: HashMap<String, f64> = HashMap::new();
+    for e in &model.edges {
+        for (from, to) in [(&e.from, &e.to), (&e.to, &e.from)] {
+            if seed_set.contains(from.as_str()) && reached.contains_key(to) && !seed_set.contains(to.as_str()) {
+                *lifted.entry(to.clone()).or_insert(0.0) += score.get(from).copied().unwrap_or(0.0);
+            }
+        }
+    }
+    // INHERITANCE FROM THE TOP SEEDS (issue367): the neighbours of the best `INHERIT_SEEDS` seeds
+    // take that seed's score (decayed by the seed's rank), so the record the words named carries its
+    // linked records with it - the way a searcher who opened the hit and followed its edges would.
+    let inherited = inherit_from_top_seeds(model, seed_names, score);
+    let converged = converge_bonus(model, seed_names, score);
+    let folded: HashMap<String, f64> = reached
+        .keys()
+        .map(|n| {
+            let own = score.get(n).copied().unwrap_or(0.0);
+            let lift = lifted.get(n).copied().unwrap_or(0.0) * LIFT / degree.get(n.as_str()).copied().unwrap_or(1.0).sqrt();
+            let inherit = inherited.get(n.as_str()).copied().unwrap_or(0.0);
+            let converge = converged.get(n.as_str()).copied().unwrap_or(0.0);
+            (n.clone(), own + lift.max(inherit).max(converge))
+        })
+        .collect();
+    // SOURCE-THEN-NEIGHBOURS WHEN ONE ROW DOMINATES. This one reads the FOLDED ranking rather than the
+    // seed ranking, which is the whole point: the row a payload is about is often not the best lexical
+    // match, and every mechanism above is keyed to the words.
+    let dominant = dominant_source_bonus(model, &folded, &degree);
+    let final_score = folded
+        .iter()
+        .map(|(n, s)| {
+            let own = score.get(n).copied().unwrap_or(0.0);
+            (n.clone(), s.max(own + dominant.get(n.as_str()).copied().unwrap_or(0.0)))
+        })
+        .collect();
+    (final_score, Components { degree, lifted, inherited, converged })
+}
+
+/// A SWEEP NEEDS TO SEE PAST THE CAP. `KEEL_RECALL_DEBUG=1` prints the whole ranking to stderr with
+/// each component broken out, so a miss can be read as "ranked 63rd, own score only" rather than as
+/// "not shown" — the difference between a mechanism that never reached the target and one that reached
+/// it and was outbid. That distinction is what chose the mechanism above; without it the next sweep
+/// starts from guesses again.
+fn dump_ranking(
+    sorted: &[(&String, &(usize, String))],
+    score: &HashMap<String, f64>,
+    raw: &HashMap<String, f64>,
+    parts: &Components,
+) {
+    if !std::env::var("KEEL_RECALL_DEBUG").is_ok_and(|v| v == "1") {
+        return;
+    }
+    for (i, (name, (hops, via))) in sorted.iter().enumerate() {
+        let own = raw.get(*name).copied().unwrap_or(0.0);
+        let lift =
+            parts.lifted.get(*name).copied().unwrap_or(0.0) * LIFT / parts.degree.get(name.as_str()).copied().unwrap_or(1.0).sqrt();
+        let inh = parts.inherited.get(name.as_str()).copied().unwrap_or(0.0);
+        let cvg = parts.converged.get(name.as_str()).copied().unwrap_or(0.0);
+        eprintln!(
+            "rank {:3} {:7.4} own {own:7.4} lift {lift:7.4} inh {inh:7.4} cvg {cvg:7.4} {} ({hops} hops, via {via})",
+            i + 1,
+            score.get(*name).unwrap_or(&0.0),
+            name
+        );
+    }
+}
+
 fn brief_from_seeds(
     model: &Model,
     header: &str,
@@ -799,41 +985,8 @@ fn brief_from_seeds(
         .map(|(n, _)| n.as_str())
         .collect();
     let (reached, hubs) = traverse(model, &seed_names);
-    // THE GRAPH LIFTS WHAT THE WORDS POINT AT (issue295). Before this, a neighbour reached by the walk
-    // kept only its own lexical score, so the walk could only APPEND: for "why must we never rebase",
-    // the requirement and DoD derived from d0129 led and d0129 itself sat 47th, although half the top
-    // seeds link to it. An element that many high-scoring seeds link to is what those seeds are ABOUT.
-    // Each reached element receives a share of every adjacent seed's score, divided by the square root
-    // of its own degree so a hub every gate verifies does not collect the whole payload.
-    let mut degree: HashMap<&str, f64> = HashMap::new();
-    for e in &model.edges {
-        *degree.entry(e.from.as_str()).or_default() += 1.0;
-        *degree.entry(e.to.as_str()).or_default() += 1.0;
-    }
-    let seed_set: HashSet<&str> = seed_names.iter().map(String::as_str).collect();
-    let mut lifted: HashMap<String, f64> = HashMap::new();
-    for e in &model.edges {
-        for (from, to) in [(&e.from, &e.to), (&e.to, &e.from)] {
-            if seed_set.contains(from.as_str()) && reached.contains_key(to) && !seed_set.contains(to.as_str()) {
-                *lifted.entry(to.clone()).or_insert(0.0) += score.get(from).copied().unwrap_or(0.0);
-            }
-        }
-    }
-    // INHERITANCE FROM THE TOP SEEDS (issue367): the neighbours of the best `INHERIT_SEEDS` seeds
-    // take that seed's score (decayed by the seed's rank), so the record the words named carries its
-    // linked records with it - the way a searcher who opened the hit and followed its edges would.
-    let inherited = inherit_from_top_seeds(model, &seed_names, score);
-    let converged = converge_bonus(model, &seed_names, score);
-    let final_score: HashMap<String, f64> = reached
-        .keys()
-        .map(|n| {
-            let own = score.get(n).copied().unwrap_or(0.0);
-            let lift = lifted.get(n).copied().unwrap_or(0.0) * LIFT / degree.get(n.as_str()).copied().unwrap_or(1.0).sqrt();
-            let inherit = inherited.get(n.as_str()).copied().unwrap_or(0.0);
-            let converge = converged.get(n.as_str()).copied().unwrap_or(0.0);
-            (n.clone(), own + lift.max(inherit).max(converge))
-        })
-        .collect();
+    let (final_score, parts) = rank_reached(model, &seed_names, &reached, score);
+    let raw_score = score;
     let score = &final_score;
     let mut sorted: Vec<(&String, &(usize, String))> = reached.iter().collect();
     sorted.sort_by(|a, b| {
@@ -850,6 +1003,8 @@ fn brief_from_seeds(
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| (ka.1, &ka.2).cmp(&(kb.1, &kb.2)))
     });
+    dump_ranking(&sorted, score, raw_score, &parts);
+    let push_rows = knob_usize("KEEL_RECALL_ROWS", PUSH_ROWS);
     let mut out = String::with_capacity(budget.min(8192));
     out.push_str(header);
     out.push('\n');
@@ -889,12 +1044,12 @@ fn brief_from_seeds(
         // RESERVE the footer. The summary line is always appended, so counting only the rows made a
         // 1,500-char budget produce 1,539 - a small overshoot, but the DoD says the payload FITS the
         // budget and a claim is either true or it is not.
-        if (out.len() + line.len() + FOOTER_RESERVE > budget || written >= PUSH_ROWS) && written > 0 {
+        if (out.len() + line.len() + FOOTER_RESERVE > budget || written >= push_rows) && written > 0 {
             let _ = writeln!(
                 out,
                 "  ... {} more reached, not shown ({})",
                 sorted.len().saturating_sub(written),
-                if written >= PUSH_ROWS { format!("{PUSH_ROWS} rows is the payload's cap") } else { format!("budget {budget} chars") }
+                if written >= push_rows { format!("{push_rows} rows is the payload's cap") } else { format!("budget {budget} chars") }
             );
             break;
         }
@@ -1132,6 +1287,46 @@ mod tests {
         let index = Index::build(&model);
         let scored: HashMap<String, f64> = index.score_term("hook", 1.0).into_iter().collect();
         assert!(scored["ceremonyLong"] < scored["ceremonyThing7"], "longer document, same tf, lower score: {scored:?}");
+    }
+
+    /// THE SECOND HOP IS TAKEN ONLY WHERE ONE ROW DOMINATES (issue367).
+    ///
+    /// The shape this pins is the one the hand-set miss had: a chain source --> mid --> target where
+    /// the target carries none of the prompt's words, so every seed-keyed lift above leaves it on its
+    /// own score. The mechanism must reach it when the payload is clearly ABOUT the source, and must
+    /// stay out of the way when it is not - the blanket second hop was measured and rejected, and the
+    /// dominance test is the whole of the difference.
+    #[test]
+    fn the_dominant_source_carries_its_two_hop_neighbourhood_and_a_flat_field_gets_nothing() {
+        let mut model = Model { items: HashMap::new(), edges: Vec::new() };
+        for n in ["source", "mid", "target", "unrelated"] {
+            model.items.insert(
+                n.to_string(),
+                ItemInfo { type_name: "Decision".to_string(), attrs: HashMap::new(), marker: None, file: String::new() },
+            );
+        }
+        model.edges.push(Edge { kind: "satisfy".to_string(), from: "source".to_string(), to: "mid".to_string() });
+        model.edges.push(Edge { kind: "derivedfrom".to_string(), from: "mid".to_string(), to: "target".to_string() });
+        let mut degree: HashMap<&str, f64> = HashMap::new();
+        degree.insert("source", 1.0);
+        degree.insert("mid", 2.0);
+        degree.insert("target", 1.0);
+
+        // DOMINATED: 30 against 10 is 3.0, past the 1.25 threshold.
+        let dominant: HashMap<String, f64> =
+            [("source", 30.0), ("unrelated", 10.0), ("mid", 1.0), ("target", 0.0)].into_iter().map(|(n, s)| (n.to_string(), s)).collect();
+        let bonus = dominant_source_bonus(&model, &dominant, &degree);
+        assert!((bonus["mid"] - 30.0).abs() < 1e-9, "the source's own neighbour comes with it undiminished: {bonus:?}");
+        let two_hop = bonus["target"];
+        assert!(two_hop > 10.0, "the target two hops out must outrank the flat field it was losing to: {bonus:?}");
+        assert!(two_hop < 30.0, "and it must not outrank the source's own neighbour: {bonus:?}");
+        assert!(!bonus.contains_key("source"), "the source does not lift itself: {bonus:?}");
+        assert!(!bonus.contains_key("unrelated"), "nothing off the source's path is touched: {bonus:?}");
+
+        // FLAT: 30 against 27 is 1.11, short of the threshold - nothing fires at all.
+        let flat: HashMap<String, f64> =
+            [("source", 30.0), ("unrelated", 27.0), ("mid", 1.0), ("target", 0.0)].into_iter().map(|(n, s)| (n.to_string(), s)).collect();
+        assert!(dominant_source_bonus(&model, &flat, &degree).is_empty(), "no single record the payload is about, no second hop");
     }
 
     /// D0243 rule 2: segments, not substrings. Every case here is measured from the real corpus.

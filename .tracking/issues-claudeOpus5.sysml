@@ -1288,4 +1288,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcGuardWarningsAreActionable to issue404;
+
+    part issue405 : Issue {
+        :>> id = "04136303-da1e-4cc5-9fe6-75b7264f0ee0";
+        :>> title = "A sweep on an arm that cannot exercise the mechanism returns neutrality, and neutrality reads as a verdict";
+        :>> createdAt = "2026-09-07";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-07 while satisfying recallRanksLinkedRecordsAsWellAsGrepDoes. CHECK: six configurations of the dominant-source second hop were run on recall_bench.py's default 50-case arm - DOMINANCE 1.5 and 2.0, DOM_HOP2 0.4, 0.7 and 1.0, DOM_HOP1 0.6 - and every one returned 49/50 hits at median position 3, byte-identical on those two statistics to the arm with the mechanism switched off. MECHANISM: every case in that arm draws its query from a record ONE edge from the target (recall_bench.py builds the query source as the first bodied element of adj[target]), so the arm contains no case a second hop applies to and cannot distinguish any setting of it from off. CONSEQUENCE: neutrality of that kind is not a measurement and must not be read as one, but the criterion that governs this work says the mechanism is to be CHOSEN on that arm, which leaves only two moves and both are wrong - choose by the eight hand-written questions, the fitting the criterion forbids, or reject the mechanism, which is precisely what D0325 did to the rare-term narrowing on this same evidence and recorded as neutral at every threshold so that set could not choose one. The second reading discards working mechanisms; the first corrupts the arbiter. D0364 built the two-hop arm and it resolved this instance - the same mechanism moved 15/50 to 22/50 there - but nothing prevents the next mechanism from being swept on an arm that cannot see it and the neutrality being read again as a verdict. PREVENTING CHANGE: dcSweepSaysWhenItCouldNotChoose - a sweep reports whether the set discriminated, derived from the numbers it measured, so COULD NOT CHOOSE is a stated outcome rather than a silence the reader fills in.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSweepSaysWhenItCouldNotChoose to issue405;
+
+    part issue406 : Issue {
+        :>> id = "23252f4b-2321-4cfc-beda-31dccff7db46";
+        :>> title = "A recall measurement does not name the binary that produced it, so a mid-relink run reads as a regression";
+        :>> createdAt = "2026-09-07";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-07 in sprint 593. CHECK: recall_ab.py was run immediately after a cargo build --release returned, while the linker was still settling target/release/keel.exe, and printed 6/8 with a mean prompt-path cost of 5282ms against the usual ~1050ms. Three consecutive runs after that read 7/8 at ~1050ms. MECHANISM: the harness shells out to the binary by path 16 times per run and reports whatever those invocations produce; an invocation against a partially written or locked image returns a degraded payload, and the harness has no way to notice because it never asks which binary answered. CONSEQUENCE: the wrong number is indistinguishable from a real regression. In this case it arrived one step after a refactor of the very function being measured, so the obvious reading was that the refactor had broken the mechanism - a reading that would have sent the next hour into bisecting a change that was correct. Only the latency line, and re-running, told the truth. This is the issue386 family reaching the measurement harnesses: an instrument reporting confidently over a file whose state it does not control, the same shape as keel suite printing a verdict over a locked image and as a failed script leaving its previous artefact readable as current. A measurement that cannot name the image that produced it is not attributable, and an unattributable number recorded on a Decision is worse than no number. PREVENTING CHANGE: dcRecallMeasurementNamesItsBinary - both harnesses print the build commit of the binary they are about to interrogate, and refuse to print a score at all if they cannot get one.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecallMeasurementNamesItsBinary to issue406;
 }
