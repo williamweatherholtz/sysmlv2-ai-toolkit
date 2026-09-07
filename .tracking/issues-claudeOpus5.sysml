@@ -1123,4 +1123,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcFactsNameNoVersion to issue389;
+
+    part issue390 : Issue {
+        :>> id = "ddc0fc38-b148-406c-8170-883b9dc7db28";
+        :>> title = "an exhibit legend overprinted itself and a note was cut mid-word, both silently";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Two exhibit builders lost text without saying so: a legend overprinted itself and a note was cut mid-word at the canvas edge. WHAT HAPPENED, both found by rendering the standing brief and looking at it rather than by any check: (1) The stacked-bar legend placed its entries at even intervals - W divided by the number of segments - which assumes every label is the same width. The first real label set was not: 'already running, needs your signature' ran under its own count and under the swatch beside it, so two of the four categories were unreadable. (2) A logic exhibit's note is one SVG <text> element. SVG does not wrap, and a line longer than the viewBox is simply not drawn past the edge - no error, no ellipsis, no visual cue. The note ended '...rather than to a list someone m' and a reader would take that as the whole sentence. WHY THIS CLASS MATTERS MORE THAN ITS SEVERITY SUGGESTS: the entire argument for building these pages from data is that a figure cannot drift from the facts the way a hand-drawn one does. That guarantee covers the NUMBERS and stops at the LAYOUT - a figure can carry perfectly correct data and still tell the reader something false by hiding half of it. Silent truncation is the worse of the two, because an overlap looks broken and a truncation looks finished. FIXED: the legend advances by each entry's measured width and wraps to a second row rather than overrunning; the note is broken on word boundaries and the figure grows to fit the lines it needs. Both fixes are in the shared modules, so every future brief inherits them. WHAT IS NOT FIXED, and is the reason this is tracked rather than closed silently: nothing CHECKS that a rendered exhibit fits its canvas. The brief contract checks titles, labels and ids; it does not measure. A probe written during this fix - sum each text element's rendered length against the viewBox width - reported five false positives on right-anchored labels, so the naive version of that check is worse than none. Doing it properly means measuring in a browser, which the contract checker does not currently do; whether that is worth its cost is the resolver's question.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcExhibitsDoNotHideText to issue390;
 }

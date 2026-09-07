@@ -79,13 +79,19 @@ def stacked(message, segments, aria=None, total_label=""):
             body.append(f'<text class="big" x="{x + 8}" y="{y + 26}" fill="var(--paper)">{count}</text>')
         legend.append((x, label, count, tone))
         x += w
-    step = W // max(len(legend), 1)
-    for i, (_lx, label, count, tone) in enumerate(legend):
-        lx = i * step
-        body.append(f'<rect x="{lx}" y="{y + h + 10}" width="9" height="9" fill="{TONE[tone]}"/>')
-        body.append(f'<text class="sm" x="{lx + 13}" y="{y + h + 19}">{escape(label)} ({count})</text>')
+    # Laid out by MEASURED width, not at even intervals: an even step assumes every label is the same
+    # length, and the first real label set that was not overprinted its neighbour.
+    lx, ly, rows = 0, y + h + 10, 1
+    for _lx, label, count, tone in legend:
+        text = f"{label} ({count})"
+        wide = 13 + int(len(text) * 6.0) + 18  # swatch + glyphs at the .sm size + a gutter
+        if lx and lx + wide > W:               # wrap rather than overrun the canvas
+            lx, ly, rows = 0, ly + 17, rows + 1
+        body.append(f'<rect x="{lx}" y="{ly}" width="9" height="9" fill="{TONE[tone]}"/>')
+        body.append(f'<text class="sm" x="{lx + 13}" y="{ly + 9}">{escape(text)}</text>')
+        lx += wide
     txt = ", ".join(f"{s[0]}: {s[1]}" for s in segments)
-    return _wrap(y + h + 30, aria or f"{message}. Of {total}: {txt}", "".join(body), message)
+    return _wrap(y + h + 13 + rows * 17, aria or f"{message}. Of {total}: {txt}", "".join(body), message)
 
 
 def timeline(message, days_total, marks, aria=None, axis_label=""):

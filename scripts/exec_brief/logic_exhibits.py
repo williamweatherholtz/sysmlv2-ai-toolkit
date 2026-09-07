@@ -23,6 +23,22 @@ def _box(x, y, w, h, title, sub, tone, sub2=""):
     return "".join(out)
 
 
+def _wrap_words(text, width):
+    """Break a note on word boundaries. SVG does not wrap, so an unbroken line is silently CUT at the
+    canvas edge - the reader sees a sentence that stops mid-word and nothing says it was truncated."""
+    words, lines, line = text.split(), [], ""
+    for w in words:
+        candidate = f"{line} {w}".strip()
+        if len(candidate) > width and line:
+            lines.append(line)
+            line = w
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    return lines
+
+
 def logic_lanes(message, today, after, aria=None, note=""):
     """Two causal chains, same shape, so the eye finds the changed link.
 
@@ -51,11 +67,13 @@ def logic_lanes(message, today, after, aria=None, note=""):
                 if lab:
                     body.append(f'<text class="sm" x="{x0e + (gap / 2) + 2}" y="{lane_y + h / 2 - 8}" '
                                 f'text-anchor="middle">{escape(_fit(lab))}</text>')
-    if note:
-        body.append(f'<text class="sm" x="6" y="{y1 + h + 24}">{escape(note)}</text>')
+    note_lines = _wrap_words(note, 104) if note else []
+    for i, line in enumerate(note_lines):
+        body.append(f'<text class="sm" x="6" y="{y1 + h + 24 + i * 15}">{escape(line)}</text>')
     aria_txt = (f"{message}. Today: " + " then ".join(f"{s[0]}, {s[1]}" for s in today[1]) +
                 ". After the change: " + " then ".join(f"{s[0]}, {s[1]}" for s in after[1]) + ".")
-    return _wrap(y1 + h + (34 if note else 12), aria or aria_txt, STYLE + DEFS + "".join(body), message)
+    return _wrap(y1 + h + (19 + 15 * len(note_lines) if note_lines else 12), aria or aria_txt,
+                 STYLE + DEFS + "".join(body), message)
 
 
 def downstream(message, source, effects, aria=None, foot=""):
