@@ -433,8 +433,25 @@ fn find_result_insertion(lines: &[&str], task_name: &str) -> Result<usize, Write
 fn braces_in(line: &str) -> (i32, i32) {
     let (mut opens, mut closes) = (0i32, 0i32);
     let mut in_str = false;
+    let mut escaped = false;
     let mut prev = ' ';
     for ch in line.chars() {
+        // AN ESCAPED QUOTE IS NOT A TERMINATOR (issue407). Without this the scan desynchronises on
+        // the first `\"` in a field's prose and counts the rest of the line's braces as structure:
+        // measured on .tracking/backlog.sysml line 1793, whose procedureText quotes an escaped quote,
+        // `action def NextWork` never returned to depth 0 and `add-task --def NextWork` wrote the task
+        // past the def's closing brace at package level - green on every gate, because the parser
+        // accepts an `action` there.
+        if escaped {
+            escaped = false;
+            prev = ch;
+            continue;
+        }
+        if in_str && ch == '\\' {
+            escaped = true;
+            prev = ch;
+            continue;
+        }
         if in_str {
             if ch == '"' {
                 in_str = false;
@@ -1262,6 +1279,39 @@ fn add_task_locked(
         "{indent}verification {task_name}DoD : Test {{ :>> id = \"{uuid}\"; :>> method = VerificationMethod::{method}; :>> procedureText = \"{dod_text}\"; }}"
     );
 
+    // THE WRITE CHECKS ITS OWN EFFECT BEFORE MAKING IT (issue407). The escape fix above removes the
+    // cause of one misplacement; this removes the CLASS. `def_close` comes from a line scan, and a
+    // scan that goes wrong does not announce itself - it returns a plausible line number, the task
+    // lands outside every action def at package level, the parser accepts it there, and validate,
+    // guard and the whole gate stay green over a backlog whose declaration order no longer means what
+    // `whats-next` says it means. So the landing site is checked against the def it was asked for: if
+    // the insertion point is not inside `def_start..def_close` with the def's own body indentation,
+    // the write REFUSES. A refused write is recoverable; a silently mis-filed one is found weeks later
+    // by someone wondering why an item never appeared on the frontier.
+    // AN EMPTY DEF IS NOT A LOST ONE. A first version of this check also refused
+    // `def_close == def_start + 1`, reasoning that a def with no body meant the scan had gone wrong -
+    // and the suite immediately failed three tests that add the FIRST task to an empty def, which is
+    // exactly what `keel init` scaffolds. The emptiness carries no information about whether the scan
+    // landed correctly; the indentation does.
+    //
+    // A def that opens at one indentation closes at the SAME one. This is the check that catches the
+    // measured failure: the scan ran past `action def NextWork`'s own `    }` and returned the
+    // PACKAGE's `}` at column 0, which is a perfectly plausible line number and the wrong block.
+    // Comparing the two indentations distinguishes them without needing to know why the scan drifted.
+    let def_indent = |l: &str| l.len() - l.trim_start().len();
+    let (Some(open_line), Some(close_line)) = (lines.get(def_start), lines.get(def_close)) else {
+        return Err(WriteError::ActionDefNotFound(def_name.to_owned()));
+    };
+    let (open_col, close_col) = (def_indent(open_line), def_indent(close_line));
+    if open_col != close_col || close_line.trim() != "}" {
+        return Err(WriteError::ActionDefNotFound(format!(
+            "{def_name}: opens at line {} column {open_col} but its closing brace scanned to line {} column {close_col} (`{}`) - that is a different block, so the task would land outside the def; refusing to write",
+            def_start + 1,
+            def_close + 1,
+            close_line.trim()
+        )));
+    }
+
     // Insert both lines before the closing `}` (i.e., after def_close - 1).
     let insert_after = def_close - 1;
 
@@ -2050,6 +2100,42 @@ mod tests {
     /// after its opening line. `add-task` writes one-liners, so most results never met this; a human
     /// who reflowed a `DoD` did, and the result landed inside the block with validate's error naming the
     /// wrong construct.
+    /// issue407: an escaped quote in a field's prose desynchronised the brace scan, so the SECOND
+    /// action def in a file closed at the package's brace and `add-task` wrote the task outside every
+    /// def - at package level, where the parser accepts it and every gate stays green over a backlog
+    /// whose declaration order no longer matches what `whats-next` reports. Measured on
+    /// .tracking/backlog.sysml line 1793, whose procedureText quotes an escaped quote while being
+    /// ABOUT escaped-quote handling. Both halves are pinned here: the scan no longer drifts, and if it
+    /// ever drifts again the write refuses instead of landing somewhere plausible.
+    #[test]
+    fn an_escaped_quote_does_not_move_a_task_out_of_its_def() {
+        assert_eq!(super::braces_in("x = \"he said \\\"hi\\\" then {\";").0, 0, "an escaped quote is not a terminator");
+        let dir = std::env::temp_dir().join(format!("keel-esc-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("backlog.sysml");
+        // The first def carries the escaped quote; the second is the one a task is added to.
+        let seed = concat!(
+            "package B {\n",
+            "    action def First {\n",
+            "        action dcOne;\n",
+            "        verification dcOneDoD : Test { :>> id = \"0d800000-0000-4000-8000-0000000000ab\"; :>> method = VerificationMethod::test; :>> procedureText = \"critique d0076 (escaped \\\" content) counts { now }\"; }\n",
+            "    }\n",
+            "    action def Second {\n",
+            "        action dcTwo;\n",
+            "    }\n",
+            "}\n"
+        );
+        std::fs::write(&path, seed).expect("seed");
+        super::add_task(&path, "Second", "dcThree", "a criterion", "test").expect("the task is added");
+        let text = std::fs::read_to_string(&path).expect("read");
+        let lines: Vec<&str> = text.lines().collect();
+        let second = lines.iter().position(|l| l.contains("action def Second")).expect("Second");
+        let close = lines.iter().skip(second).position(|l| *l == "    }").expect("its close") + second;
+        let added = lines.iter().position(|l| l.trim() == "action dcThree;").expect("dcThree");
+        assert!(second < added && added < close, "the task lands INSIDE Second (line {added}, def {second}..{close}):\n{text}");
+    }
+
     #[test]
     fn a_result_lands_after_a_multi_line_dod_block_closes() {
         let dir = std::env::temp_dir().join(format!("keel-mldod-{}", std::process::id()));
