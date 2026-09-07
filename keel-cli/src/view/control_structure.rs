@@ -400,69 +400,78 @@ fn propriety_of(model: &Model, name: &str) -> Json {
     )
 }
 
-/// The declared instruments as FEEDBACK paths (`.engine/contracts/instruments.toml`, D0361).
+/// The `mechanism` path of every declared `Sensor` - what guard 65 holds the tree against (D0363).
 ///
-/// WHY THIS SOURCE EXISTS. Feedback here is otherwise derived from `CliCommand` facts and workflow
-/// statuses, so an instrument that is not a CLI command could not appear - measured 2026-09-06, none
-/// of twenty did, while six defects in one day landed in exactly those channels. Declaring them was
-/// not enough on its own: a control loop needs both ends, so the manifest carries `sensedFrom` (the
-/// process observed) beside `reportsTo` (the controller that believes it).
+/// An accessor rather than a public `Model`: the guard needs one field of one type, and widening the
+/// model's visibility so a guard can walk it would trade encapsulation for one caller.
+#[must_use]
+pub fn declared_sensor_mechanisms(root: &Path) -> Vec<String> {
+    let Ok(model) = Model::build(root) else { return Vec::new() };
+    let mut out: Vec<String> = model
+        .items
+        .values()
+        .filter(|i| i.type_name == "Sensor")
+        .filter_map(|i| i.attrs.get("mechanism").cloned())
+        .collect();
+    out.sort();
+    out
+}
+
+/// The authored measures as FEEDBACK paths and SENSORS (D0363, Route A of issue395).
 ///
-/// The instrument's DETERMINISM travels with the row, because "one run of this is a measurement" and
-/// "one run of this is a sample" are different facts about a number and a reader cannot tell by
-/// looking (issue392).
-fn instrument_feedback(root: &Path, model: &Model, feedback: &mut Vec<Fb>) -> Vec<Json> {
-    let path = root.join(".engine").join("contracts").join("instruments.toml");
-    let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
-    let mut sensors = Vec::new();
-    let (mut name, mut fields) = (String::new(), std::collections::BTreeMap::new());
-
-    let flush = |name: &str, f: &std::collections::BTreeMap<String, String>, sensors: &mut Vec<Json>, feedback: &mut Vec<Fb>| {
-        if name.is_empty() || name == "notInstruments" {
-            return;
-        }
-        let Some(sensed) = f.get("sensedFrom") else { return };
-        let sensed_role = PROCESSES.iter().find(|(r, _, _)| r == sensed).map(|(r, _, _)| *r);
-        let reports_role = ROLES.iter().find(|(r, _, _)| Some(*r) == f.get("reportsTo").map(String::as_str)).map(|(r, _, _)| *r);
-        let (Some(sensed_from), Some(reports_to)) = (sensed_role, reports_role) else { return };
-        let measures = f.get("measures").cloned().unwrap_or_default();
-        let determinism = f.get("determinism").cloned().unwrap_or_else(|| "undeclared".to_string());
-        let tool = f.get("path").cloned().unwrap_or_default();
-        feedback.push(Fb {
-            name: name.to_string(),
-            title: format!("{tool}: {measures}"),
-            sensed_from,
-            reports_to,
-            data: format!("{measures}; determinism: {determinism}"),
-            source: tool.clone(),
-        });
-        sensors.push(Json::Obj(vec![
-            ("name".to_string(), Json::s(name.to_string())),
-            ("mechanism".to_string(), Json::s(tool)),
-            ("producesFeedback".to_string(), Json::s(name.to_string())),
-            ("determinism".to_string(), Json::s(determinism)),
-            ("output".to_string(), Json::s(f.get("output").cloned().unwrap_or_default())),
-            ("propriety".to_string(), propriety_of(model, name)),
-        ]));
-    };
-
-    for line in text.lines() {
-        let t = line.trim();
-        if t.starts_with('#') {
+/// WHY THE MODEL AND NOT A FILE. Feedback here is otherwise derived from `CliCommand` facts and
+/// workflow statuses, so a measure that is not a CLI command could not appear - measured 2026-09-06,
+/// none of twenty did, while six defects in one day landed in exactly those channels. They were first
+/// declared in a contract file, which got them into this view and left them unverifiable: a verify
+/// edge needs an endpoint and a contract file holds none. They are now `Sensor` and `Feedback` items,
+/// so a verification case can point at one and `edge-endpoints` refuses a reference that does not
+/// resolve.
+///
+/// The sensor's DETERMINISM travels with the row, because "one run of this is a measurement" and "one
+/// run of this is a sample" are different facts about a number and nothing else says which (issue392).
+fn instrument_feedback(model: &Model, feedback: &mut Vec<Fb>) -> Vec<Json> {
+    let mut sensors: Vec<(String, Json)> = Vec::new();
+    for (name, item) in &model.items {
+        if item.type_name != "Sensor" {
             continue;
         }
-        if t.starts_with('[') && t.ends_with(']') {
-            flush(&name, &fields, &mut sensors, feedback);
-            name = t[1..t.len() - 1].to_string();
-            fields.clear();
-            continue;
+        let attr = |k: &str| item.attrs.get(k).cloned().unwrap_or_default();
+        let produces = attr("producesFeedback");
+        let (mut sensed, mut reports) = ("", "");
+        if let Some(fb) = model.items.get(&produces) {
+            let from = fb.attrs.get("sensedFrom").cloned().unwrap_or_default();
+            let to = fb.attrs.get("reportsTo").cloned().unwrap_or_default();
+            sensed = PROCESSES.iter().find(|(_, anchor, _)| *anchor == from).map_or("", |(r, _, _)| *r);
+            reports = ROLES.iter().find(|(_, anchor, _)| *anchor == to).map_or("", |(r, _, _)| *r);
         }
-        if let Some((k, v)) = t.split_once('=') {
-            fields.insert(k.trim().to_string(), v.trim().trim_matches('"').to_string());
+        let determinism = attr("determinism").rsplit("::").next().unwrap_or_default().to_string();
+        let measures = attr("measures");
+        if !sensed.is_empty() && !reports.is_empty() {
+            feedback.push(Fb {
+                name: item.attrs.get("title").cloned().unwrap_or_else(|| name.clone()),
+                title: format!("{}: {measures}", attr("mechanism")),
+                sensed_from: sensed,
+                reports_to: reports,
+                data: format!("{measures}; determinism: {determinism}"),
+                source: attr("mechanism"),
+            });
         }
+        let label = item.attrs.get("title").cloned().unwrap_or_else(|| name.clone());
+        sensors.push((
+            label.clone(),
+            Json::Obj(vec![
+                ("name".to_string(), Json::s(label.clone())),
+                ("item".to_string(), Json::s(name.clone())),
+                ("mechanism".to_string(), Json::s(attr("mechanism"))),
+                ("producesFeedback".to_string(), Json::s(produces)),
+                ("determinism".to_string(), Json::s(determinism)),
+                ("reading".to_string(), Json::s(attr("reading").rsplit("::").next().unwrap_or_default().to_string())),
+                ("propriety".to_string(), propriety_of(model, &label)),
+            ]),
+        ));
     }
-    flush(&name, &fields, &mut sensors, feedback);
-    sensors
+    sensors.sort_by(|a, b| a.0.cmp(&b.0));
+    sensors.into_iter().map(|(_, row)| row).collect()
 }
 
 fn gather_local(root: &Path, actions: &mut Vec<Action>, feedback: &mut Vec<Fb>) {
@@ -597,7 +606,7 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
     let (actions, mut feedback, remote) = gather(root);
     // The instruments: feedback paths the CLI facts cannot express, plus the sensors that produce
     // them - the first Sensor items this model has ever had (D0361, STPA Handbook pp.25-26).
-    let sensors = instrument_feedback(root, &model, &mut feedback);
+    let sensors = instrument_feedback(&model, &mut feedback);
     let (pmodels, hazard_rows) = decoration(&model);
     let controllers: Vec<Json> = ROLES
         .iter()
@@ -632,7 +641,7 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
         .collect();
     let inert: Vec<Json> = ROLES.iter().filter(|(r, _, _)| !actions.iter().any(|a| a.issued_by == *r)).map(|(r, _, _)| Json::s(*r)).collect();
     Ok(Json::Obj(vec![
-        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the declared instruments (.engine/contracts/instruments.toml - feedback paths and the sensors that produce them, with each sensor's determinism), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Authored anchors and process models decorate the roles when the project has authored them; the remote's rules are fetched live and never copied.")),
+        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the authored measures (Sensor and Feedback items - the mechanism, its determinism and the loop it closes), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Authored anchors and process models decorate the roles when the project has authored them; the remote's rules are fetched live and never copied.")),
         ("controllers".to_string(), Json::Arr(controllers)),
         ("processes".to_string(), Json::Arr(processes)),
         ("actions".to_string(), Json::Arr(actions.iter().map(action_row).collect())),

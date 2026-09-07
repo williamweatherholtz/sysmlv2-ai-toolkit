@@ -41,8 +41,45 @@ package EngineSafety {
         ref sensedFrom : ControlledProcess[0..1];
         ref reportsTo : Controller[0..1];
     }
-    part def Sensor :> Element;
+    // A SENSOR IS A MEASURE, and it carries what a reader of its number cannot otherwise see (D0363).
+    // Was `part def Sensor :> Element;` with no fields, so an instrument had no model identity and no
+    // verify edge could reach it - the owner's correction, 2026-09-07: assessment is not metadata, it
+    // is a verification case, and a verification case needs an endpoint.
+    part def Sensor :> Element {
+        attribute mechanism : String;              // what produces the feedback: a path, a command, a device
+        attribute measures : String;               // the question it answers, in a reader's words
+        attribute determinism : Determinism;       // whether ONE run of it is a measurement at all
+        attribute reading : SensorReading;         // the form its answer takes
+        ref producesFeedback : Feedback[0..1];
+    }
+
+    // Four kinds, because a single run of each means something different and nothing on the number
+    // says which (issue392: two of four verdicts flipped between identical runs of a stochastic one).
+    enum def Determinism {
+        tree;          // a function of the tree: same tree, same answer
+        seeded;        // random, but pinned - reproducible by anyone with the seed
+        stochastic;    // a model in the loop; ONE RUN IS A SAMPLE, never a measurement
+        external;      // an outside party answers, and can answer differently tomorrow
+    }
+    enum def SensorReading { number; verdict; figure; }
+
     part def Actuator :> Element;
+
+    // THE FIFTH ELEMENT TYPE (STPA Handbook p.25): a control structure "contains at least five types
+    // of elements: Controllers, Control Actions, Feedback, Other inputs to and outputs from components
+    // (neither control nor feedback), Controlled processes". This schema had four of the five, and our
+    // own SOP named four, so every run of the analysis produced four (issue394, D0362).
+    //
+    // It is not feedback - nobody controls it and it reports on nothing - and it is where "the
+    // measurement was taken against the wrong thing" lives (scenario S-F9: an instrument reads the
+    // working tree while the report cites a commit).
+    part def OtherInputOutput :> Element {
+        attribute direction : FlowDirection;
+        attribute externalParty : String;          // what outside the boundary sends or receives it
+        ref atController : Controller[0..1];
+        ref atProcess : ControlledProcess[0..1];
+    }
+    enum def FlowDirection { inbound; outbound; }
 
     // ---- Analytical outputs (STPA Steps 3-4) ------------------------
     enum def UcaType { provided; notProvided; wrongTimingOrder; stoppedTooSoonAppliedTooLong; }

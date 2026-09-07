@@ -1,13 +1,13 @@
-//! Guard 65 `instruments-declared` is SHOWN catching its defect (D0360, D0361, scenario S-F7).
+//! Guard 65 `instruments-declared` is SHOWN catching its defect (D0360, D0361, D0363, scenario S-F7).
 //!
-//! Written WITH the guard rather than after it, which is the whole point of D0360: the guard that
-//! preceded this one was probed by hand and its receipt went into a commit message, so the census
-//! counted it unproven and was right to.
+//! Rewritten when the measures moved from a contract file into the model (D0363): the defect is the
+//! same, the declaration is now a `Sensor` item, and the exclusion is argued in the file itself.
 //!
-//! The defect: an instrument that produces a number, verdict or figure while nothing declares it, so
-//! it sits outside the computed control structure and no analysis reaches it. That is how six defects
-//! in one day landed in channels the STPA self-analysis could not see. The mirror defect matters too -
-//! a declaration naming a path that no longer exists claims something is being watched that is not.
+//! The defect: something that produces a number, verdict or figure while nothing declares it, so it
+//! sits outside the computed control structure, no analysis reaches it, and - since D0363 - no
+//! verification case can verify it. That is how six defects in one day landed in channels the STPA
+//! self-analysis could not see. The mirror defect matters too: a Sensor naming a mechanism that does
+//! not exist claims something is watched when it is not.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -48,70 +48,76 @@ fn scaffold(tag: &str) -> PathBuf {
     root
 }
 
-fn declare(root: &Path, body: &str) {
-    let dir = root.join(".engine").join("contracts");
-    std::fs::create_dir_all(&dir).expect("contracts dir");
-    std::fs::write(dir.join("instruments.toml"), body).expect("write manifest");
+/// Author one `Sensor` declaring `mechanism`, the way a project would.
+fn declare_sensor(root: &Path, name: &str, mechanism: &str) {
+    let body = format!(
+        "package ProbeInstruments {{\n    private import EngineElement::*;\n    private import EngineSafety::*;\n\
+         \n    part {name} : Sensor {{\n        :>> id = \"1f0c9a2b-4d5e-4a6f-8b70-{:012x}\";\n        \
+         :>> title = \"{name}\";\n        :>> createdAt = \"2026-09-07\"; :>> createdBy = \"ai\";\n        \
+         :>> mechanism = \"{mechanism}\";\n        :>> measures = \"a probe\";\n        \
+         :>> determinism = Determinism::tree;\n        :>> reading = SensorReading::number;\n    }}\n}}\n",
+        name.len() * 7717
+    );
+    let dir = root.join(".tracking");
+    std::fs::create_dir_all(&dir).expect("tracking dir");
+    std::fs::write(dir.join(format!("{name}.sysml")), body).expect("write sensor");
 }
 
 #[test]
 fn an_undeclared_instrument_in_the_tree_is_a_violation() {
     let root = scaffold("undecl");
     std::fs::write(root.join("scripts").join("coverage_number.py"), "print(42)\n").expect("script");
-    declare(&root, "# nothing declared\n");
+    // one declared Sensor, so the guard is active, but it names something else
+    declare_sensor(&root, "snOther", "scripts/other_measure.py");
+    std::fs::write(root.join("scripts").join("other_measure.py"), "print(1)\n").expect("script");
     let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
     assert!(
         out.contains("FAIL") && out.contains("coverage_number.py"),
-        "the guard must NAME the undeclared instrument: {out}"
+        "the guard must NAME the undeclared measure: {out}"
     );
     let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
-fn a_declaration_whose_path_is_gone_is_a_violation() {
-    // The mirror defect: a stale entry is a claim that something is watched when it is not.
+fn a_sensor_whose_mechanism_is_gone_is_a_violation() {
+    // The mirror defect: a stale measure claims something is watched when it is not.
     let root = scaffold("stale");
-    declare(
-        &root,
-        "[gone]\npath = \"scripts/deleted_probe.py\"\nkind = \"instrument\"\n",
-    );
+    declare_sensor(&root, "snGone", "scripts/deleted_probe.py");
     let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
     assert!(
         out.contains("FAIL") && out.contains("deleted_probe.py"),
-        "a declaration must resolve, or the inventory lies in the other direction: {out}"
+        "a Sensor's mechanism must exist, or the inventory lies in the other direction: {out}"
     );
     let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
-fn a_declared_instrument_is_clean_and_an_argued_exclusion_is_clean() {
+fn a_declared_measure_is_clean_and_an_exclusion_argued_in_the_file_is_clean() {
     let root = scaffold("clean");
     std::fs::write(root.join("scripts").join("coverage_number.py"), "print(42)\n").expect("script");
-    std::fs::write(root.join("scripts").join("cleanup.py"), "pass\n").expect("script");
-    declare(
-        &root,
-        "[coverage]\npath = \"scripts/coverage_number.py\"\nkind = \"instrument\"\n\n\
-         [notInstruments]\ncleanup = \"deletes temporary files - not a measure\"\n",
-    );
+    std::fs::write(
+        root.join("scripts").join("cleanup.py"),
+        "# not-an-instrument: deletes temporary files - it measures nothing.\npass\n",
+    )
+    .expect("script");
+    declare_sensor(&root, "snCoverage", "scripts/coverage_number.py");
     let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
     assert!(
         out.contains("0 violation(s)"),
-        "a declared instrument and an argued exclusion are both clean: {out}"
+        "a declared measure and an exclusion argued in the file are both clean: {out}"
     );
     let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
-fn a_project_with_no_manifest_is_never_accused() {
+fn a_project_with_no_sensors_is_never_accused() {
     // The activation convention: a project that never adopted this control has not violated it.
     let root = scaffold("none");
     std::fs::write(root.join("scripts").join("coverage_number.py"), "print(42)\n").expect("script");
-    let manifest = root.join(".engine").join("contracts").join("instruments.toml");
-    let _ = std::fs::remove_file(&manifest);
     let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
     assert!(
         out.contains("0 violation(s)") && out.contains("0 scanned"),
-        "no manifest means nothing declared and nothing accused: {out}"
+        "no Sensor items means nothing declared and nothing accused: {out}"
     );
     let _ = std::fs::remove_dir_all(&root);
 }

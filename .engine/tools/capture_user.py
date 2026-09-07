@@ -1,3 +1,4 @@
+# not-an-instrument: captures a human's words verbatim - a WRITE path, not a measure.
 """Capture the acting USER and register them in the project actor registry.
 
 Source order (git is REQUIRED by this workflow, so it's canonical):

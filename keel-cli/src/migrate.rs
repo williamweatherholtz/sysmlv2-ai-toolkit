@@ -260,13 +260,12 @@ pub fn is_engine_dev_only(rel: &Path) -> bool {
     if is_portable_engine_tool(rel) {
         return false;
     }
-    // The ENGINE's instrument inventory (D0361) names the engine's own instruments, nearly all of
-    // which are dev-only and never shipped. Migrating it gave every adopter seventeen dead references
-    // and turned `tool-reference` red across 18 scaffold and migration tests. An adopting project's
-    // instruments are its own; with no manifest it declares nothing and guard 65 is inert.
-    if rel.ends_with(Path::new("contracts").join("instruments.toml")) {
-        return true;
-    }
+    // HISTORICAL (D0361 -> D0363): the engine's instrument inventory was briefly a contract file, and
+    // migrating it gave every adopter seventeen dead references - `tool-reference` went red across 18
+    // scaffold and migration tests. The inventory is model items now, which are .tracking data and
+    // therefore never shipped, so no exclusion is needed. The line is gone rather than kept as a
+    // tombstone; this comment is here because the next person to see that test failure should know
+    // what caused it.
     rel.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();
         s == "tools" || s == "__pycache__"

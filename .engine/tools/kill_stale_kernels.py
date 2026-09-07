@@ -1,3 +1,4 @@
+# not-an-instrument: kills leaked JVM kernels - cleanup, and it measures nothing.
 """Sweep orphaned pilot-kernel JVMs (CR-11). Interrupted tool runs (timeouts,
 sandbox kills, pipe hangs) never reach teardown and each leaks a JVM — 75 were
 found during the 2026-06-11 critique. Safe: matches only the ISysML kernel class.

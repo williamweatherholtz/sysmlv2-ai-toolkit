@@ -3891,47 +3891,28 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
     GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
 }
 
-/// Guard 65: every measurement instrument in the tree is DECLARED, and every declaration resolves
-/// (D0361, scenario S-F7).
+/// Guard 65: every measurement instrument in the tree is a declared `Sensor`, and every Sensor's
+/// mechanism exists (D0361/D0363, scenario S-F7).
 ///
 /// The feedback half of this project's control structure is derived from `CliCommand` facts, so an
-/// instrument that is not a CLI command is invisible to it: measured 2026-09-06, none of the twelve
-/// out-of-band instruments appeared in `keel show control-structure`, and six defects in one day
-/// landed in exactly those channels. `.engine/contracts/instruments.toml` closes that by declaring
-/// them - and a declared list is a snapshot unless something holds it against the tree.
+/// instrument that is not a CLI command is invisible to it: measured 2026-09-06, none of twenty
+/// appeared in `keel show control-structure`, and six defects in one day landed in those channels.
 ///
-/// Two-way, like `cli-surface-declared`: a script under a watched directory with no entry is
-/// UNDECLARED; an entry whose `path` does not exist is a stale claim that something is watched.
-/// Deliberate exclusions are argued in the file's `notInstruments` section, never omitted.
+/// They are now MODEL ITEMS rather than a contract file (the owner's correction: assessment is a
+/// verification case, and a verification case needs an endpoint), so this guard joins the tree against
+/// `Sensor.mechanism`. Two-way, like `cli-surface-declared`: a script under a watched directory with
+/// no Sensor is UNDECLARED; a Sensor naming a path that does not exist is a stale claim.
 ///
-/// A project with no such file declares nothing and is not accused - the activation convention.
+/// A deliberate exclusion is ARGUED IN THE FILE ITSELF: a first line containing
+/// `not-an-instrument:` followed by the reason. A project with no Sensor items declares nothing and
+/// is not accused - the activation convention.
 fn instruments_declared(root: &Path) -> GuardReport {
-    let manifest = root.join(".engine").join("contracts").join("instruments.toml");
     let mut violations = Vec::new();
-    let Ok(text) = std::fs::read_to_string(&manifest) else {
+    let declared = crate::view::control_structure::declared_sensor_mechanisms(root);
+    if declared.is_empty() {
         return GuardReport { name: "instruments-declared", scanned: 0, warnings: Vec::new(), violations };
-    };
-
-    // declared paths, and the names excused in the notInstruments section
-    let mut declared: Vec<String> = Vec::new();
-    let mut excused: Vec<String> = Vec::new();
-    let mut in_excused = false;
-    for line in text.lines() {
-        let t = line.trim();
-        if t.starts_with('[') {
-            in_excused = t == "[notInstruments]";
-            continue;
-        }
-        if let Some(rest) = t.strip_prefix("path = ") {
-            declared.push(rest.trim_matches(|c| c == '"' || c == ' ').to_owned());
-        } else if in_excused {
-            if let Some((key, _)) = t.split_once('=') {
-                excused.push(key.trim().to_owned());
-            }
-        }
     }
 
-    // the tree: python under the instrument-bearing directories, excluding private helpers and tests
     let mut found: Vec<String> = Vec::new();
     for dir in [".engine/tools", ".engine/tools/validate", "scripts", "scripts/exec_brief"] {
         let Ok(entries) = std::fs::read_dir(root.join(dir)) else { continue };
@@ -3944,30 +3925,33 @@ fn instruments_declared(root: &Path) -> GuardReport {
             if stem.starts_with('_') {
                 continue; // a private helper is not a channel
             }
-            // A project declares the instruments IT wrote. Accusing it of the tools the ENGINE shipped
-            // it is a false refusal, and this guard's own test caught it doing exactly that on a fresh
-            // scaffold. The shipped set has one home, in the code that decides what a scaffold gets.
-            if crate::migrate::is_portable_engine_tool(std::path::Path::new(&format!("{dir}/{stem}.py"))) {
+            let rel = format!("{dir}/{stem}.py");
+            // A project declares the instruments IT wrote; the tools the ENGINE ships are not its
+            // to declare, and this guard's own test caught it accusing a fresh scaffold of them.
+            if crate::migrate::is_portable_engine_tool(std::path::Path::new(&rel)) {
                 continue;
             }
-            found.push(format!("{dir}/{stem}.py"));
+            // An exclusion argued in the file itself, where a reader of the file can see it.
+            let head = std::fs::read_to_string(&p).unwrap_or_default();
+            if head.lines().take(3).any(|l| l.contains("not-an-instrument:")) {
+                continue;
+            }
+            found.push(rel);
         }
     }
 
     let scanned = found.len();
     for path in &found {
-        let stem = path.rsplit('/').next().unwrap_or(path).trim_end_matches(".py");
-        if declared.iter().any(|d| d == path) || excused.iter().any(|x| x == stem) {
-            continue;
+        if !declared.iter().any(|d| d == path) {
+            violations.push(format!(
+                "{path}: produces a number, verdict or figure but no `Sensor` item declares it - an undeclared measure is outside the computed control structure, so no analysis reaches it and no verification case can verify it (D0361/D0363). Author a Sensor, or argue the exclusion with a `not-an-instrument:` line in the file"
+            ));
         }
-        violations.push(format!(
-            "{path}: produces a number, verdict or figure but is NOT declared in .engine/contracts/instruments.toml - an undeclared instrument is outside the computed control structure, so no analysis reaches it (D0361/S-F7). Declare it, or argue the exclusion in the file's `notInstruments` section"
-        ));
     }
     for d in &declared {
         if !root.join(d).exists() {
             violations.push(format!(
-                "instruments.toml declares `{d}`, which does not exist - a stale entry claims something is being watched that is not"
+                "a Sensor declares mechanism `{d}`, which does not exist - a stale measure claims something is being watched that is not"
             ));
         }
     }

@@ -1,3 +1,4 @@
+# not-an-instrument: a RUNNER for the five declared kernel-lane measures; its verdict is their conjunction, so declaring it as a Sensor would count the same readings twice.
 """Validate EVERY layer on ONE kernel (CR-11): schema -> workflows -> instances ->
 tracking, in dependency order. One ~20s JVM startup instead of four.
 

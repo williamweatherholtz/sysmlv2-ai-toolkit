@@ -615,6 +615,36 @@ fact("decisionNeedEdges", len(hits),
      "in two old clusters (d0094 -> the serve Needs, and the keel-viewer Needs); the claim is right "
      "in spirit for RECENT Decisions and wrong as written.")
 
+# ================================================================ 9. instruments and control proofs
+# The measures, and whether the controls have ever been shown to catch anything (D0360/D0361).
+cs = as_json(run([KEEL, "show", "control-structure", "."])[1]) or {}
+fact("instrumentsDeclared", len(cs.get("sensors") or []) or None, "declared measures (Sensor items)",
+     "`keel show control-structure`: length of the sensors array. The measures were briefly declared in a "
+     "contract file; they are model items now (D0363), so this counts what the model holds rather than what "
+     "a manifest claimed - one source, and a stale entry cannot survive `edge-endpoints`.")
+fact("feedbackChannels", len(cs.get("feedback") or []) or None, "computed feedback channels",
+     "`keel show control-structure`: length of the feedback array - the upward half of the control structure.")
+sensors = cs.get("sensors") or []
+fact("sensorsComputed", len(sensors) or None, "computed sensors",
+     "`keel show control-structure`: length of the sensors array. Zero before 2026-09-06: none had ever existed.")
+assessed = [x for x in sensors if not str(x.get("propriety", "")).startswith("UNASSESSED")]
+fact("instrumentsAssessed", len(assessed), "instruments with a propriety finding",
+     "`keel show control-structure`: sensors whose computed `propriety` is not UNASSESSED - a JOIN against "
+     "ProprietyFinding targets, never a stored flag (the owner's correction, 2026-09-07).")
+
+ok, census = run(["python", ".engine/tools/guard_proof_census.py"])
+proven = unnamed = None
+for line in (census or "").splitlines():
+    if "asserts a FAILURE" in line:
+        proven = int(line.split(":")[-1].strip())
+    elif "named nowhere in any test body" in line:
+        unnamed = int(line.split(":")[-1].strip())
+fact("guardsProven", proven, "guards named in a test that asserts a failure",
+     "`python .engine/tools/guard_proof_census.py`: a DEMONSTRATED CATCH, distinct from declared and armed "
+     "(D0360)." + ("" if ok else " census failed: " + str(census)[:80]))
+fact("guardsUnnamed", unnamed, "guards named in no test body at all",
+     "`python .engine/tools/guard_proof_census.py`: neither a demonstrated catch nor a demonstrated pass.")
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
@@ -622,6 +652,10 @@ DOC = {
     "facts": FACTS,
 }
 
+# A FAILED RUN MUST NOT LEAVE A CURRENT-LOOKING FILE. This script wrote decision-facts.json on an
+# earlier run, then raised on a later one, and the stale file sat there reading as fresh - the only
+# thing that noticed was a reader checking for keys the new section should have added. A missing file
+# is an honest answer; a stale one is scenario S-F4 with a timestamp.
 blob = json.dumps(DOC, indent=2, sort_keys=False)
 out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decision-facts.json")
 try:
@@ -633,3 +667,4 @@ except Exception as exc:
     print("WARN: could not write %s: %s" % (out_path, exc), file=sys.stderr)
 
 print(blob)
+
