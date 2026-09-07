@@ -1145,4 +1145,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRecallHitDefinitionIsStated to issue391;
+
+    part issue392 : Issue {
+        :>> id = "a0dde85f-ab25-466c-a0a1-fe83d9e364cc";
+        :>> title = "a single routing probe run is not a measurement: two of four verdicts flipped between runs";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A single routing probe run is not a measurement: two of four verdicts flipped between two runs of the same prompts. WHAT WAS OBSERVED, on identical prompts, same repository, same turn budget, minutes apart: release run 1: WRONG (invoked intake) run 2: ROUTED doc-sync run 1: ROUTED run 2: none (no skill invoked) view run 1: not in the set run 2: ROUTED actor-enrollment / stpa-diagram / decision-authoring: ROUTED in both Two of the four cases common to both runs changed verdict. The only differences between the runs were (a) the turn-boundary gate was silenced for the second - a change that cannot make a skill call DISAPPEAR, since it fires after the turn - and (b) four sessions ran concurrently rather than one. Neither explains a route becoming a non-route; model sampling does. WHY IT MATTERS MORE THAN THE NUMBER IT SPOILS: the criterion asks the rig to report a coverage number per skill, and a number assembled from one sample per skill would have looked authoritative and moved by five or ten points on a re-run. Worse, it would have been actionable in the wrong direction: a skill scored 'not routing' on one sample invites rewriting a description that was fine, and the rewrite would then appear to fix it. WHAT A REAL MEASURE COSTS, measured on this host: $0.47-0.59 and 25-70s per run sequentially, 31s per run at four-way parallelism with per-run wall time inflating to 74-125s under contention. One sample per skill over 47 skills is ~$25. Three samples, enough to report a rate with a majority verdict, is ~$70 and around an hour. That is the actual price of the metric, and it is a spend decision rather than an implementation detail - which is why this is recorded and the sweep is NOT running. WHAT IS NOT AT FAULT: the rig reads verdicts from tool_use blocks in the transcript, so it is not mis-parsing a self-report; the four cases above are ordinary skills, not edge cases; and the prompts are unchanged between the runs (they are authored facts in a committed file). OPEN, for the human: whether to pay for a repeated sweep and report a rate with its variance, or to sample a stratified subset, or to keep the rig for one-off diagnosis and record no standing number at all. The rig supports all three; what it must not do is publish a one-sample number as if it were stable.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRoutingNumberIsStable to issue392;
 }

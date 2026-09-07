@@ -1,0 +1,219 @@
+# Routing prompts: one realistic request per DEPLOYED SKILL, for the behavioural routing probe
+# (dcSkillsRouteBehaviourally). AUTHORED FACTS - reviewable, diffable, and deliberately NOT generated
+# from the skill descriptions.
+#
+# WHY THEY ARE WRITTEN BY HAND. The obvious shortcut is to build each prompt from the skill's own
+# `description:` or its process's `// APPLIES-WHEN:` line. That measures nothing: a prompt made of the
+# router's own vocabulary routes on string overlap, which is the leakage the recall benchmark already
+# learned to avoid (issue296). Each prompt is a paraphrase of the SITUATION in a user's voice, with
+# the skill's name and its distinctive terms removed - so what is measured is whether the situation
+# reaches the skill, not whether the words do.
+#
+# WHY KEYED BY SKILL, NOT BY PROCESS. The skill is what routes. The two sets are not 1:1: the deploy
+# process is deployed as `release`, the agile-workflow process as six sprint-ceremony skills, and two
+# active processes (definition-of-done, definition-of-ready) have no deployed skill at all - which the
+# probe reports rather than hides.
+#
+# `expect` MAY NAME SEVERAL SKILLS, and that is a claim about the request, not a loosening: "what
+# should I do next" is legitimately served by orienting OR by planning, and a probe that insists on
+# one of two correct answers measures the author's preference. Where only one skill is right, only one
+# is named.
+#
+# WHAT A PROMPT MUST NOT DO: name the skill, name the process, name a keel command, or lean on a term
+# that appears nowhere else in the corpus. If a prompt needs one of those to route, the skill's
+# description is what needs fixing - and that is the finding, not a reason to reword the prompt.
+#
+# STATED LIMITATION: one prompt per skill measures ONE phrasing. A skill that routes on this sentence
+# and misses five others reads as routed here. The number is a floor on reachability, never a coverage
+# claim - which is why it is tracked as an indicator rather than gated (D0088).
+
+[[case]]
+name = "actor-enrollment"
+prompt = "Someone else is going to start recording work in this repo from their own laptop. What do we need to do first so their entries are actually attributable to them?"
+
+[[case]]
+name = "adversarial-panel-review"
+prompt = "I'm about to commit us to a public interface that would be painful to change later. Before I do, I want it properly attacked rather than nodded through."
+
+[[case]]
+name = "architectural-critique"
+prompt = "This thing makes a lot of claims about itself that people are going to rely on. I want those claims stress-tested, not affirmed."
+
+[[case]]
+name = "asi-templates"
+prompt = "I need to hand a written decision request to someone outside the team - something they can read on their own and answer."
+
+[[case]]
+name = "backlog-refinement"
+prompt = "Half the items in our list are one-liners nobody could pick up and start. I want to go through them and get them into a state someone could actually work."
+
+[[case]]
+name = "brand-watch"
+prompt = "Marketing changed the visual identity again and I have no idea whether the documents we generate still match it."
+
+[[case]]
+name = "build"
+prompt = "Take the next thing off the list and actually build it, start to finish."
+
+[[case]]
+name = "business-architecture"
+prompt = "The people who'll live with this can't write requirements, but they can tell me what hurts. How do I turn that into something we can build against?"
+
+[[case]]
+name = "control-defect"
+prompt = "One of our checks just passed something it should have caught. Not noisy - actually wrong."
+
+[[case]]
+name = "control-propriety"
+prompt = "We assert that our checks are sound but I don't think we've ever argued it. I want that examined."
+
+[[case]]
+name = "decision-authoring"
+prompt = "We agreed on something important in conversation this morning and I want it written down properly, not left in chat."
+
+[[case]]
+name = "decision-surfacing"
+prompt = "There are several judgments sitting with me that I haven't made, and I keep losing track of them between sessions."
+
+[[case]]
+name = "diagram"
+prompt = "The model has outgrown what I can hold in my head. I need to see what connects to what."
+
+[[case]]
+name = "distributed-collaboration"
+prompt = "Two of us are going to work the same records at the same time, on different machines, with no live channel between us."
+
+[[case]]
+name = "doc-sync"
+prompt = "Our docs make claims about the thing, and I'm fairly sure some of them stopped being true when we changed it."
+
+[[case]]
+name = "element-critique"
+prompt = "An individual requirement being quietly wrong is expensive here. I want each one argued with on its own."
+
+[[case]]
+name = "engine-triage"
+prompt = "I have a mixed bag of things to ask for and I don't know which of them are the same kind of request."
+
+[[case]]
+name = "github-intake"
+prompt = "Someone outside the team filed a problem report against the repository. What happens to it now?"
+
+[[case]]
+name = "indicator"
+prompt = "There are a few numbers I want to watch, but I don't trust any threshold I'd set on them - gating would just corrupt them."
+
+[[case]]
+name = "intake"
+prompt = "Requests reach me as speech - meetings, chat, corridor conversations - and we act on them without their words ever being written down."
+
+[[case]]
+name = "introduction"
+prompt = "A new person is joining and nobody will be sitting next to them. They need to get to something useful on their own."
+
+[[case]]
+name = "issue-resolution"
+prompt = "Snags and findings are accumulating and whether one is still open is currently whatever somebody remembers."
+
+[[case]]
+name = "knowledge-graph-memory"
+prompt = "I need to answer questions from a large body of material and be able to show where each answer came from."
+
+[[case]]
+name = "library-stewardship"
+prompt = "We hold a shared copy of the reusable parts, and other projects pull from it. How is that supposed to be kept straight?"
+
+[[case]]
+name = "migration"
+prompt = "A field we use in hundreds of places has to change shape, and losing or inventing history while doing it would be unacceptable."
+
+[[case]]
+name = "obligation-review"
+prompt = "Things are waiting on me and I only ever find out because someone asks. I'd rather they surfaced on their own."
+
+[[case]]
+name = "project-migration"
+prompt = "This project is pinned to an older engine than the binary it's being asked to run."
+
+[[case]]
+name = "project-onboarding"
+prompt = "We're standing up a new project and I don't know which of these procedures it should actually adopt."
+
+[[case]]
+name = "release"
+prompt = "Time to make this obtainable by someone outside this machine, with a version that actually means something."
+
+[[case]]
+name = "render"
+prompt = "A stakeholder needs to see the model without learning any commands, and I don't want to hand them a screenshot that's stale by tomorrow."
+
+[[case]]
+name = "repo-push"
+prompt = "I've got a few commits sitting here that nobody else can see yet."
+
+[[case]]
+name = "report"
+prompt = "Someone outside the work is asking how it's going, and I'd rather the answer came from the record than from whoever happens to reply."
+
+[[case]]
+name = "requirement-quality"
+prompt = "Some of what we've written as requirements reads more like a wish than something you could ever check."
+
+[[case]]
+name = "sprint-closeout"
+prompt = "The work in this cycle is finished and I want it closed off properly rather than just abandoned."
+
+[[case]]
+name = "sprint-planning"
+prompt = "Work is piling up faster than we finish it and I keep picking whatever looks urgent. Set up the next stretch of work."
+expect = "sprint-planning, backlog-refinement"
+
+[[case]]
+name = "sprint-retro"
+prompt = "That last stretch had two avoidable problems in it and I don't want them to happen a third time."
+
+[[case]]
+name = "sprint-review"
+prompt = "Before we call this cycle finished I want the work in it actually examined rather than waved through."
+expect = "sprint-review, review-critique"
+
+[[case]]
+name = "sprint-standup"
+prompt = "Quick check partway through: what's moving, what's stuck, and is anything blocked on me?"
+
+[[case]]
+name = "status-report"
+prompt = "Put together where things stand for the weekly."
+expect = "status-report, report"
+
+[[case]]
+name = "stpa"
+prompt = "I want to know how this system could hurt someone or lose something valuable, and what would have to fail for that to happen."
+
+[[case]]
+name = "stpa-diagram"
+prompt = "I want to see our own control structure drawn - what controls what, and what information comes back."
+
+[[case]]
+name = "stpa-self"
+prompt = "Our control structure has changed since anyone last analysed it for how it could fail."
+
+[[case]]
+name = "test-design"
+prompt = "We have a criterion nobody has worked out how to check yet. I need the actual procedure for checking it."
+
+[[case]]
+name = "test-result"
+prompt = "I ran the check and it passed. Write that down where it counts."
+
+[[case]]
+name = "test-verify"
+prompt = "Several things we call verified were judged a while ago against code that has moved since. Re-establish whether they still hold."
+
+[[case]]
+name = "traceability-audit"
+prompt = "I want to know whether everything we said we needed is actually covered by something, and where the holes are."
+
+[[case]]
+name = "view"
+prompt = "I want a table of the current state of one part of the model, computed rather than typed."
