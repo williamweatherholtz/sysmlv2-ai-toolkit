@@ -28,8 +28,17 @@
 # being written down. Roles are the view's own: model, main-ref, enforcement-surface, deliverable,
 # work, agent-turn.
 #
-# `assessed` tracks the propriety state (D0361): `no` until a round covers it under the five lenses.
-# Silence is a gap, never a clean bill.
+# ASSESSMENT IS NOT A FIELD HERE, deliberately. Whether an instrument has been assessed under the five
+# propriety lenses is COMPUTED by joining these names against the `target` of each ProprietyFinding
+# (`instrument:<name>`, the same namespaced convention the guard findings use). A stored `assessed`
+# flag was written here first and removed on the owner's correction: a status field can contradict the
+# findings it summarises, and when it does the field wins, because the field is what a reader sees.
+# An instrument with no findings computes as UNASSESSED - silence is a gap, never a clean bill.
+#
+# STATED LIMITATION, and it is the reason issue395 exists: a ProprietyFinding names its target by
+# STRING, so nothing checks that the string resolves to anything. A typed `#Verify` edge from a
+# verification case would - and cannot, because an instrument declared in a contract file has no model
+# identity to point at.
 
 [recallBench]
 path = ".engine/tools/recall_bench.py"
@@ -41,7 +50,6 @@ sensedFrom = "model"
 determinism = "seeded"
 publishedTo = "a DoD criterion, and the standing brief when retrieval is the subject"
 knownFailureModes = "issue296 (a query built from the target's own body scores ~100% and discriminates nothing); issue391 (an element that answers the question is scored a miss because ground truth names one record)"
-assessed = "no"
 
 [recallAb]
 path = ".engine/tools/recall_ab.py"
@@ -53,7 +61,6 @@ sensedFrom = "model"
 determinism = "tree"
 publishedTo = "a DoD criterion"
 knownFailureModes = "issue391 (the hit definition); the set is small enough that one case moves the number by 12 points"
-assessed = "no"
 
 [routingProbe]
 path = ".engine/tools/routing_probe.py"
@@ -65,7 +72,6 @@ sensedFrom = "enforcement-surface"
 determinism = "stochastic"
 publishedTo = "an indicator, once issue392 settles what shape is bought"
 knownFailureModes = "issue392 (two of four verdicts flipped between identical runs, so one sample per skill is not a measurement)"
-assessed = "no"
 
 [guardProofCensus]
 path = ".engine/tools/guard_proof_census.py"
@@ -77,7 +83,6 @@ sensedFrom = "enforcement-surface"
 determinism = "tree"
 publishedTo = "D0360's evidence, pending dcControlProofStateIsComputed moving it into the binary"
 knownFailureModes = "its own first version returned a false 64/64 by matching its own registry; textual, so a guard exercised by a fixture that never names it counts as unnamed"
-assessed = "no"
 
 [conformanceLane]
 path = ".engine/tools/validate/conformance_lane.py"
@@ -89,7 +94,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "conformanceIndicator (keel show indicators)"
 knownFailureModes = "a rejection may be the pilot kernel's gap rather than ours, which is why it is an indicator and never a gate (D0132/issue081)"
-assessed = "no"
 
 [execBriefFacts]
 path = "scripts/exec_brief/facts.py"
@@ -101,7 +105,6 @@ sensedFrom = "work"
 determinism = "tree"
 publishedTo = "the standing decision brief — straight to the human, with no gate between"
 knownFailureModes = "issue389 (it typed the release tag it measured against, so every since-the-release number would have described a superseded release behind a provenance string naming a real command)"
-assessed = "no"
 
 [execBriefCharts]
 path = "scripts/exec_brief/charts.py"
@@ -113,7 +116,6 @@ sensedFrom = "work"
 determinism = "tree"
 publishedTo = "the standing decision brief"
 knownFailureModes = "issue390 (the legend spaced entries evenly so a long label overprinted its neighbour: correct data, unreadable picture)"
-assessed = "no"
 
 [execBriefLogicExhibits]
 path = "scripts/exec_brief/logic_exhibits.py"
@@ -125,7 +127,6 @@ sensedFrom = "work"
 determinism = "tree"
 publishedTo = "the standing decision brief"
 knownFailureModes = "issue390 (a note longer than the canvas was CUT mid-word: SVG does not wrap, so the reader saw a sentence that looked finished)"
-assessed = "no"
 
 [templateContract]
 path = "scripts/check_templates.py"
@@ -137,7 +138,6 @@ sensedFrom = "deliverable"
 determinism = "tree"
 publishedTo = "a DoD criterion; it gates no commit"
 knownFailureModes = "it checks structure, not truth — a brief can pass while every number on it is wrong, which is exactly what issue389 would have produced"
-assessed = "no"
 
 [docRender]
 path = "scripts/render.py"
@@ -149,7 +149,6 @@ sensedFrom = "deliverable"
 determinism = "tree"
 publishedTo = "a DoD criterion"
 knownFailureModes = "none recorded; UNPROVEN in the D0360 sense — no test constructs a render defect and shows this catching it"
-assessed = "no"
 
 [statusDashboard]
 path = ".engine/tools/report.py"
@@ -161,7 +160,6 @@ sensedFrom = "work"
 determinism = "tree"
 publishedTo = "a materialised view, marked as one"
 knownFailureModes = "none recorded; a materialised view is stale the moment the tree moves, which EHZ8 names as a hazard"
-assessed = "no"
 
 [stpaDiagram]
 path = ".engine/tools/stpa_diagram.py"
@@ -173,7 +171,6 @@ sensedFrom = "enforcement-surface"
 determinism = "tree"
 publishedTo = "the safety viewpoint's rendering"
 knownFailureModes = "it can only draw what the computed structure contains, and that structure omits every instrument in this file — the omission is invisible in the picture"
-assessed = "no"
 
 # ---- The JVM kernel lane: found by guard 65 on its first run, not by me ----------------------
 # All five ask the SysML v2 pilot kernel a question, so their determinism is EXTERNAL: the answer can
@@ -190,7 +187,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "it BLOCKS a schema change (CLAUDE.md section 5)"
 knownFailureModes = "an external verdict can flip without a change here; the kernel's own gaps are indistinguishable from ours (D0132/issue081)"
-assessed = "no"
 
 [validateWorkflows]
 path = ".engine/tools/validate/validate_workflows.py"
@@ -202,7 +198,6 @@ sensedFrom = "enforcement-surface"
 determinism = "external"
 publishedTo = "it BLOCKS a workflow change"
 knownFailureModes = "as validateSchema"
-assessed = "no"
 
 [validateInstances]
 path = ".engine/tools/validate/validate_instances.py"
@@ -214,7 +209,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "opt-in only (KEEL_KERNEL_VALIDATE=1)"
 knownFailureModes = "DEMOTED because it fails CORRECT files, which forced an all-or-nothing bypass that disabled every other layer (D0132/issue081) - the sharpest instance of an instrument's false verdict costing more than its true ones"
-assessed = "no"
 
 [validateTracking]
 path = ".engine/tools/validate/validate_tracking.py"
@@ -226,7 +220,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "the kernel lane"
 knownFailureModes = "as validateInstances"
-assessed = "no"
 
 [validateProbes]
 path = ".engine/tools/validate/validate_probes.py"
@@ -238,7 +231,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "schema design decisions"
 knownFailureModes = "a cell FAILS iff the kernel emits a line containing ERROR, which is a text match on another program's output"
-assessed = "no"
 
 [importProbe]
 path = ".engine/tools/validate/import_probe.py"
@@ -250,7 +242,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "schema design decisions"
 knownFailureModes = "as validateProbes"
-assessed = "no"
 
 [structureProbe]
 path = ".engine/tools/validate/structure_probe.py"
@@ -262,7 +253,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "schema design decisions"
 knownFailureModes = "as validateProbes"
-assessed = "no"
 
 [spikeMetamodel]
 path = ".engine/tools/validate/spike_metamodel.py"
@@ -274,7 +264,6 @@ sensedFrom = "model"
 determinism = "external"
 publishedTo = "a foundation decision, when it was run"
 knownFailureModes = "a one-off measurement whose answer is still cited; nothing re-runs it, so it is a claim about a kernel version nobody records"
-assessed = "no"
 
 # ---- NOT instruments: recorded so the boundary is arguable rather than implied ----
 [notInstruments]

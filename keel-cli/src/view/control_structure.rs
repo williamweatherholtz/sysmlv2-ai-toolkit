@@ -361,6 +361,45 @@ fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
 }
 
 /// Every control action and feedback path computable from the TREE alone.
+/// The propriety lenses that have a finding for `instrument:<name>`, with their verdicts.
+///
+/// COMPUTED, replacing a stored `assessed` field the manifest carried for one day. The owner's
+/// correction: a status field can contradict the findings it summarises, and when it does the field
+/// wins because it is what a reader sees. This cannot drift - it IS the findings.
+///
+/// STATED LIMITATION: `ProprietyFinding::target` is a String, so an assessment naming an instrument
+/// that no longer exists still counts here. A typed `#Verify` edge would refuse that, and cannot
+/// reach a target declared in a contract file (issue395).
+fn propriety_of(model: &Model, name: &str) -> Json {
+    let key = format!("instrument:{name}");
+    let mut rows: Vec<(String, String)> = model
+        .items
+        .values()
+        .filter(|i| i.type_name == "ProprietyFinding")
+        .filter(|i| i.attrs.get("target").is_some_and(|t| t == &key))
+        .map(|i| {
+            (
+                i.attrs.get("lens").cloned().unwrap_or_default(),
+                i.attrs.get("verdict").cloned().unwrap_or_default(),
+            )
+        })
+        .collect();
+    rows.sort();
+    if rows.is_empty() {
+        return Json::s("UNASSESSED - no propriety finding names this instrument");
+    }
+    Json::Arr(
+        rows.into_iter()
+            .map(|(lens, verdict)| {
+                Json::Obj(vec![
+                    ("lens".to_string(), Json::s(lens)),
+                    ("verdict".to_string(), Json::s(verdict)),
+                ])
+            })
+            .collect(),
+    )
+}
+
 /// The declared instruments as FEEDBACK paths (`.engine/contracts/instruments.toml`, D0361).
 ///
 /// WHY THIS SOURCE EXISTS. Feedback here is otherwise derived from `CliCommand` facts and workflow
@@ -372,7 +411,7 @@ fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
 /// The instrument's DETERMINISM travels with the row, because "one run of this is a measurement" and
 /// "one run of this is a sample" are different facts about a number and a reader cannot tell by
 /// looking (issue392).
-fn instrument_feedback(root: &Path, feedback: &mut Vec<Fb>) -> Vec<Json> {
+fn instrument_feedback(root: &Path, model: &Model, feedback: &mut Vec<Fb>) -> Vec<Json> {
     let path = root.join(".engine").join("contracts").join("instruments.toml");
     let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
     let mut sensors = Vec::new();
@@ -403,7 +442,7 @@ fn instrument_feedback(root: &Path, feedback: &mut Vec<Fb>) -> Vec<Json> {
             ("producesFeedback".to_string(), Json::s(name.to_string())),
             ("determinism".to_string(), Json::s(determinism)),
             ("output".to_string(), Json::s(f.get("output").cloned().unwrap_or_default())),
-            ("assessed".to_string(), Json::s(f.get("assessed").cloned().unwrap_or_else(|| "unknown".to_string()))),
+            ("propriety".to_string(), propriety_of(model, name)),
         ]));
     };
 
@@ -558,7 +597,7 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
     let (actions, mut feedback, remote) = gather(root);
     // The instruments: feedback paths the CLI facts cannot express, plus the sensors that produce
     // them - the first Sensor items this model has ever had (D0361, STPA Handbook pp.25-26).
-    let sensors = instrument_feedback(root, &mut feedback);
+    let sensors = instrument_feedback(root, &model, &mut feedback);
     let (pmodels, hazard_rows) = decoration(&model);
     let controllers: Vec<Json> = ROLES
         .iter()
