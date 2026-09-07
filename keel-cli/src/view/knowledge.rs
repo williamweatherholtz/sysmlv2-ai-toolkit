@@ -702,6 +702,76 @@ fn inherit_from_top_seeds<'a>(model: &'a Model, seed_names: &[String], score: &H
     inherited
 }
 
+/// AGREEMENT, APPLIED TO THE GRAPH (recallRanksLinkedRecordsAsWellAsGrepDoes, issue367): an element
+/// that several independent high-scoring seeds all reach within TWO hops takes their mean score.
+///
+/// Why this and not a second hop. Every other mechanism here lifts elements ADJACENT to a seed, so a
+/// target two hops out keeps only its own lexical score and is swamped - which is exactly the shape
+/// of the miss: for "why must we never rebase", the top seed is the requirement that says precisely
+/// that, and the governing Decision sits behind it as requirement --satisfy--> need <--derivedFrom--
+/// decision. A blanket second hop was measured and rejected earlier (neutral at small factors,
+/// 45-46/50 at large). This is the narrower signal the file already trusts for tokens: one seed
+/// reaching an element is a coincidence, three independent seeds converging on it is evidence.
+///
+/// CHOSEN ON THE 50-CASE SET, by a rule fixed before the sweep - the strongest setting that leaves
+/// hits and median position unchanged: (10,2,0.3) neutral, (10,2,0.6) 48/50, (10,3,0.6) neutral,
+/// (10,3,1.0) neutral at 49/50 and median 3, (10,3,1.5) 47/50, (20,3,1.0) 48/50. Read against the
+/// eight hand-written questions only afterwards: 6/8, up from 5/8, with one of the two d0129
+/// questions arriving at position 3. The criterion asks for 7/8 and is NOT met - see the result.
+const CONVERGE_SEEDS: usize = 10;
+const CONVERGE_MIN: usize = 3;
+const CONVERGE_FACTOR: f64 = 1.0;
+
+fn converge_bonus(model: &Model, seed_names: &[String], score: &HashMap<String, f64>) -> HashMap<String, f64> {
+    let mut out: HashMap<String, f64> = HashMap::new();
+    let (top_n, min_agree, factor) = (CONVERGE_SEEDS, CONVERGE_MIN, CONVERGE_FACTOR);
+
+    // adjacency, both directions
+    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+    for e in &model.edges {
+        adj.entry(e.from.as_str()).or_default().push(e.to.as_str());
+        adj.entry(e.to.as_str()).or_default().push(e.from.as_str());
+    }
+
+    // the top seeds by their own score, each walking two hops independently
+    let mut top: Vec<&String> = seed_names.iter().collect();
+    top.sort_by(|a, b| {
+        score
+            .get(*b)
+            .unwrap_or(&0.0)
+            .partial_cmp(score.get(*a).unwrap_or(&0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    top.truncate(top_n);
+
+    let seed_set: HashSet<&str> = seed_names.iter().map(String::as_str).collect();
+    let mut reach_count: HashMap<String, (usize, f64)> = HashMap::new();
+    for seed in &top {
+        let seed_score = score.get(*seed).copied().unwrap_or(0.0);
+        let mut two_hop: HashSet<&str> = HashSet::new();
+        for one in adj.get(seed.as_str()).map_or(&[][..], Vec::as_slice) {
+            for two in adj.get(one).map_or(&[][..], Vec::as_slice) {
+                if *two != seed.as_str() && !seed_set.contains(two) {
+                    two_hop.insert(two);
+                }
+            }
+        }
+        for n in two_hop {
+            let entry = reach_count.entry(n.to_owned()).or_insert((0, 0.0));
+            entry.0 += 1;
+            entry.1 += seed_score;
+        }
+    }
+    for (name, (agree, sum_score)) in reach_count {
+        if agree >= min_agree {
+            #[allow(clippy::cast_precision_loss)]
+            let mean = sum_score / agree as f64;
+            out.insert(name, mean * factor);
+        }
+    }
+    out
+}
+
 fn brief_from_seeds(
     model: &Model,
     header: &str,
@@ -753,13 +823,15 @@ fn brief_from_seeds(
     // take that seed's score (decayed by the seed's rank), so the record the words named carries its
     // linked records with it - the way a searcher who opened the hit and followed its edges would.
     let inherited = inherit_from_top_seeds(model, &seed_names, score);
+    let converged = converge_bonus(model, &seed_names, score);
     let final_score: HashMap<String, f64> = reached
         .keys()
         .map(|n| {
             let own = score.get(n).copied().unwrap_or(0.0);
             let lift = lifted.get(n).copied().unwrap_or(0.0) * LIFT / degree.get(n.as_str()).copied().unwrap_or(1.0).sqrt();
             let inherit = inherited.get(n.as_str()).copied().unwrap_or(0.0);
-            (n.clone(), own + lift.max(inherit))
+            let converge = converged.get(n.as_str()).copied().unwrap_or(0.0);
+            (n.clone(), own + lift.max(inherit).max(converge))
         })
         .collect();
     let score = &final_score;
@@ -926,6 +998,12 @@ pub fn recall_for_prompt(root: &Path, prompt: &str, budget: usize) -> Result<Str
     // scored is still ranked, so a strong lexical match outside the seed set is not lost.
     let mut ranked: Vec<(&String, &f64)> = score.iter().collect();
     ranked.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)));
+    // A NARROWER SEED SET WHEN A TERM IS RARE WAS MEASURED AND REJECTED (issue367). Adding every
+    // element matching the prompt's rarest term to the seed set was neutral on the 50-case set at
+    // every threshold from 40 to 800 - so that set could not choose one - and taking the threshold
+    // from the corpus instead (1% of items) it scored 5/8 on the eight hand-written questions against
+    // convergence's 6/8: the extra seeds diluted the agreement signal below. Neutral where it could be
+    // chosen, harmful where it could not.
     let seeds: Vec<(String, String)> = ranked
         .iter()
         .enumerate()
