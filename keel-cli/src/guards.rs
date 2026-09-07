@@ -3133,8 +3133,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 64] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity"];
+pub const GUARD_NAMES: [&str; 65] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3889,6 +3889,89 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 65: every measurement instrument in the tree is DECLARED, and every declaration resolves
+/// (D0361, scenario S-F7).
+///
+/// The feedback half of this project's control structure is derived from `CliCommand` facts, so an
+/// instrument that is not a CLI command is invisible to it: measured 2026-09-06, none of the twelve
+/// out-of-band instruments appeared in `keel show control-structure`, and six defects in one day
+/// landed in exactly those channels. `.engine/contracts/instruments.toml` closes that by declaring
+/// them - and a declared list is a snapshot unless something holds it against the tree.
+///
+/// Two-way, like `cli-surface-declared`: a script under a watched directory with no entry is
+/// UNDECLARED; an entry whose `path` does not exist is a stale claim that something is watched.
+/// Deliberate exclusions are argued in the file's `notInstruments` section, never omitted.
+///
+/// A project with no such file declares nothing and is not accused - the activation convention.
+fn instruments_declared(root: &Path) -> GuardReport {
+    let manifest = root.join(".engine").join("contracts").join("instruments.toml");
+    let mut violations = Vec::new();
+    let Ok(text) = std::fs::read_to_string(&manifest) else {
+        return GuardReport { name: "instruments-declared", scanned: 0, warnings: Vec::new(), violations };
+    };
+
+    // declared paths, and the names excused in the notInstruments section
+    let mut declared: Vec<String> = Vec::new();
+    let mut excused: Vec<String> = Vec::new();
+    let mut in_excused = false;
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_excused = t == "[notInstruments]";
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("path = ") {
+            declared.push(rest.trim_matches(|c| c == '"' || c == ' ').to_owned());
+        } else if in_excused {
+            if let Some((key, _)) = t.split_once('=') {
+                excused.push(key.trim().to_owned());
+            }
+        }
+    }
+
+    // the tree: python under the instrument-bearing directories, excluding private helpers and tests
+    let mut found: Vec<String> = Vec::new();
+    for dir in [".engine/tools", ".engine/tools/validate", "scripts", "scripts/exec_brief"] {
+        let Ok(entries) = std::fs::read_dir(root.join(dir)) else { continue };
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|x| x.to_str()) != Some("py") {
+                continue;
+            }
+            let stem = p.file_stem().and_then(|x| x.to_str()).unwrap_or_default().to_owned();
+            if stem.starts_with('_') {
+                continue; // a private helper is not a channel
+            }
+            // A project declares the instruments IT wrote. Accusing it of the tools the ENGINE shipped
+            // it is a false refusal, and this guard's own test caught it doing exactly that on a fresh
+            // scaffold. The shipped set has one home, in the code that decides what a scaffold gets.
+            if crate::migrate::is_portable_engine_tool(std::path::Path::new(&format!("{dir}/{stem}.py"))) {
+                continue;
+            }
+            found.push(format!("{dir}/{stem}.py"));
+        }
+    }
+
+    let scanned = found.len();
+    for path in &found {
+        let stem = path.rsplit('/').next().unwrap_or(path).trim_end_matches(".py");
+        if declared.iter().any(|d| d == path) || excused.iter().any(|x| x == stem) {
+            continue;
+        }
+        violations.push(format!(
+            "{path}: produces a number, verdict or figure but is NOT declared in .engine/contracts/instruments.toml - an undeclared instrument is outside the computed control structure, so no analysis reaches it (D0361/S-F7). Declare it, or argue the exclusion in the file's `notInstruments` section"
+        ));
+    }
+    for d in &declared {
+        if !root.join(d).exists() {
+            violations.push(format!(
+                "instruments.toml declares `{d}`, which does not exist - a stale entry claims something is being watched that is not"
+            ));
+        }
+    }
+    GuardReport { name: "instruments-declared", scanned, warnings: Vec::new(), violations }
 }
 
 /// Guard 64: every workflow that runs the gate supplies the SAME environment (issue385).
@@ -4831,7 +4914,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "unit-extras-present" => Some(unit_extras_present(root)), // hard (issue290/D0300) - a unit's declared mechanism is in the tree
         "acceptance-binds-to-text" => Some(acceptance_binds_to_text(root)), // hard (issue341/D0308) - the text signed is the text carried
         "stpa-currency" => Some(stpa_currency(root)), // WARNING-tier (D0313) - the computed control structure says when STPA must run again
-        "gate-environment-parity" => Some(gate_environment_parity(root)), // hard (issue385) - a gating workflow that supplies less than its twin gates on a different environment
+        "gate-environment-parity" => Some(gate_environment_parity(root)),
+        "instruments-declared" => Some(instruments_declared(root)), // hard (D0361) - an undeclared instrument is outside every analysis // hard (issue385) - a gating workflow that supplies less than its twin gates on a different environment
         "untrusted-taint" => Some(untrusted_taint(root)), // hard (issue347/D0314) - the untrusted label travels through derivation
         "ceremony" => Some(ceremony(root)),
         "charter" => Some(charter(root)),

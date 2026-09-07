@@ -1156,4 +1156,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRoutingNumberIsStable to issue392;
+
+    part issue393 : Issue {
+        :>> id = "af767117-f6d1-46b1-a031-153dd065b01b";
+        :>> title = "a deployed skill instructs the agent to read a reference file sync-claude never deploys";
+        :>> createdAt = "2026-09-06";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A deployed skill instructs the agent to read a reference file that sync-claude does not deploy, so following the skill leads to a missing path. WHAT HAPPENED: the stpa skill's first line of instruction is 'Full SOP, per-element data fields, and per-step completeness gates are in `references/sop.md` - read it before running a step.' Invoking the skill and following that instruction produced 'No such file or directory': `.claude/skills/stpa/` contains SKILL.md and nothing else, while `.engine/skills/stpa/` contains SKILL.md, registry.sysml and references/sop.md. The generator deploys the skill body and not the directory beside it. The 121-line SOP - the four steps, the data fields per element, the per-step completeness gates - is the substance the skill defers to, and an agent that followed the deployed instruction without knowing the engine layout would have had to invent it or skip the gates. WHY IT MATTERS MORE THAN A MISSING FILE: this is the failure mode of a process whose text is enforced but whose REACHABILITY is not. keel has a guard that every declared process has a skill (process-skill) and one that the claude surface has not drifted from the generator (claude-surface-drift), and neither asks whether a path a deployed skill TELLS the agent to open exists. The routing probe built today measures whether a skill is reached; nothing measures whether what it points at is there. HOW MANY OTHERS: unknown at the time of writing, and that is part of the finding - the check does not exist, so the answer would be a hand count that goes stale. The resolver's first job is to compute it. PREVENTING CHANGE: the generator deploys a skill's reference directory with the skill, and a check reads every deployed SKILL.md for relative paths it instructs the agent to open, failing when one does not resolve. That check is cheap, mechanical, and would have caught this the day the SOP was added - which is the test of whether it is worth having.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSkillReferencesAreDeployed to issue393;
 }

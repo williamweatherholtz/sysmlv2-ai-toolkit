@@ -237,16 +237,35 @@ mod section_merge_tests {
 /// fails a fresh scaffold whose process references tools it never received — CI caught exactly that
 /// on the guard's first landing. Both are self-contained (httpx + stdlib), kernel-free, and carry no
 /// repo-specific state, so shipping them keeps D0048 intact.
+/// The tools a scaffold RECEIVES from the engine: stdlib-only, kernel-free, referenced by shipped
+/// processes. One home, because two lists of what the engine ships would drift and the drift would be
+/// invisible until a follower found a dead path.
+const PORTABLE_TOOLS: [&str; 3] = ["test_deck_e2e.py", "deck_inbox_record.py", "stpa_diagram.py"];
+
+/// Is this one of the tools the engine ships into every project?
+///
+/// Read by guard 65: a project must declare the instruments IT wrote, and accusing it of the ones the
+/// engine handed it is a false refusal - the guard went red on a fresh adoption before this existed.
+#[must_use]
+pub fn is_portable_engine_tool(rel: &Path) -> bool {
+    rel.parent().is_some_and(|p| p.ends_with("tools"))
+        && rel.file_name().is_some_and(|f| PORTABLE_TOOLS.iter().any(|t| f == *t))
+}
+
 #[must_use]
 pub fn is_engine_dev_only(rel: &Path) -> bool {
     // stpa_diagram.py (D0285): stdlib-only, referenced by the shipped stpa-diagram process - a scaffold
     // that ships the process without the tool hands a follower a dead path (tool-reference went red on
     // CI's foreign-tree check the day the process landed without this line).
-    const PORTABLE_TOOLS: [&str; 3] = ["test_deck_e2e.py", "deck_inbox_record.py", "stpa_diagram.py"];
-    if rel.parent().is_some_and(|p| p.ends_with("tools"))
-        && rel.file_name().is_some_and(|f| PORTABLE_TOOLS.iter().any(|t| f == *t))
-    {
+    if is_portable_engine_tool(rel) {
         return false;
+    }
+    // The ENGINE's instrument inventory (D0361) names the engine's own instruments, nearly all of
+    // which are dev-only and never shipped. Migrating it gave every adopter seventeen dead references
+    // and turned `tool-reference` red across 18 scaffold and migration tests. An adopting project's
+    // instruments are its own; with no manifest it declares nothing and guard 65 is inert.
+    if rel.ends_with(Path::new("contracts").join("instruments.toml")) {
+        return true;
     }
     rel.components().any(|c| {
         let s = c.as_os_str().to_string_lossy();

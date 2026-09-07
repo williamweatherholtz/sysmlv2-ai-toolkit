@@ -1,0 +1,259 @@
+# INSTRUMENTS — the measures this project acts on that are NOT CLI commands (D0361, st-instruments).
+#
+# WHY THIS FILE EXISTS. The safety viewpoint computes the feedback half of this project's control
+# structure from `CliCommand` facts (D0271: effect=reads -> feedback) and CI workflow statuses — 77
+# channels, all derived, none authored. Measured 2026-09-06: NOT ONE of the instruments declared below
+# appears in that computed structure - and eight of them were found by guard 65 rather than by the
+# author of this file, whose hand-written inventory was short by a third on its first pass. `keel show control-structure` cannot see them, so
+# `stpa-self` could never analyse them and `stpa-currency` could never notice them missing — which is
+# why six defects in one day (issue384, issue386, issue389, issue390, issue391, issue392) all landed in
+# instruments and none was caught by the analysis that exists to catch exactly this.
+#
+# WHAT IS AND IS NOT IN HERE. Only the NON-DERIVABLE ones. The CLI channels stay computed and are
+# cited, never copied (D0105: one home per fact). A tool that transforms, captures or cleans up is not
+# an instrument: an instrument produces a NUMBER, a VERDICT or a FIGURE that this project publishes or
+# acts on. The classification is recorded per entry so the boundary is arguable rather than implied.
+#
+# `determinism` IS THE FIELD THAT WAS MISSING. A deterministic instrument re-run on the same tree gives
+# the same answer, so one run is a measurement. A stochastic one does not, and a single run of it reads
+# exactly like a single run of the other — which is how a routing number that flips on two of four
+# cases nearly got published as coverage (issue392). Values: `tree` (a function of the tree), `seeded`
+# (random but pinned), `stochastic` (a model in the loop — a single run is NOT a measurement),
+# `external` (an outside party answers; the answer can change under you).
+#
+# `assessed` tracks the propriety state (D0361): `no` until a round covers it under the five lenses.
+# Silence is a gap, never a clean bill.
+
+[recallBench]
+path = ".engine/tools/recall_bench.py"
+kind = "instrument"
+measures = "whether ranked recall beats a keyword search at putting the answering record in front of the model"
+output = "number"
+reportsTo = "agent"
+determinism = "seeded"
+publishedTo = "a DoD criterion, and the standing brief when retrieval is the subject"
+knownFailureModes = "issue296 (a query built from the target's own body scores ~100% and discriminates nothing); issue391 (an element that answers the question is scored a miss because ground truth names one record)"
+assessed = "no"
+
+[recallAb]
+path = ".engine/tools/recall_ab.py"
+kind = "instrument"
+measures = "whether injection puts the answering element in front of the model on eight hand-written questions"
+output = "number"
+reportsTo = "agent"
+determinism = "tree"
+publishedTo = "a DoD criterion"
+knownFailureModes = "issue391 (the hit definition); the set is small enough that one case moves the number by 12 points"
+assessed = "no"
+
+[routingProbe]
+path = ".engine/tools/routing_probe.py"
+kind = "instrument"
+measures = "whether a skill's prose actually causes a real model to invoke the process"
+output = "number"
+reportsTo = "agent"
+determinism = "stochastic"
+publishedTo = "an indicator, once issue392 settles what shape is bought"
+knownFailureModes = "issue392 (two of four verdicts flipped between identical runs, so one sample per skill is not a measurement)"
+assessed = "no"
+
+[guardProofCensus]
+path = ".engine/tools/guard_proof_census.py"
+kind = "instrument"
+measures = "how many enforced guards have a test that constructs their defect and asserts they report it"
+output = "number"
+reportsTo = "agent"
+determinism = "tree"
+publishedTo = "D0360's evidence, pending dcControlProofStateIsComputed moving it into the binary"
+knownFailureModes = "its own first version returned a false 64/64 by matching its own registry; textual, so a guard exercised by a fixture that never names it counts as unnamed"
+assessed = "no"
+
+[conformanceLane]
+path = ".engine/tools/validate/conformance_lane.py"
+kind = "instrument"
+measures = "which authored constructs the SysML v2 pilot kernel rejects"
+output = "number"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "conformanceIndicator (keel show indicators)"
+knownFailureModes = "a rejection may be the pilot kernel's gap rather than ours, which is why it is an indicator and never a gate (D0132/issue081)"
+assessed = "no"
+
+[execBriefFacts]
+path = "scripts/exec_brief/facts.py"
+kind = "instrument"
+measures = "every number the standing decision brief asserts, each with the command or parse rule that produced it"
+output = "number"
+reportsTo = "human"
+determinism = "tree"
+publishedTo = "the standing decision brief — straight to the human, with no gate between"
+knownFailureModes = "issue389 (it typed the release tag it measured against, so every since-the-release number would have described a superseded release behind a provenance string naming a real command)"
+assessed = "no"
+
+[execBriefCharts]
+path = "scripts/exec_brief/charts.py"
+kind = "instrument"
+measures = "nothing itself — it RENDERS measured values as figures, and a figure is what the human actually reads"
+output = "figure"
+reportsTo = "human"
+determinism = "tree"
+publishedTo = "the standing decision brief"
+knownFailureModes = "issue390 (the legend spaced entries evenly so a long label overprinted its neighbour: correct data, unreadable picture)"
+assessed = "no"
+
+[execBriefLogicExhibits]
+path = "scripts/exec_brief/logic_exhibits.py"
+kind = "instrument"
+measures = "nothing itself — it renders the today-versus-changed and downstream exhibits the brief argues from"
+output = "figure"
+reportsTo = "human"
+determinism = "tree"
+publishedTo = "the standing decision brief"
+knownFailureModes = "issue390 (a note longer than the canvas was CUT mid-word: SVG does not wrap, so the reader saw a sentence that looked finished)"
+assessed = "no"
+
+[templateContract]
+path = "scripts/check_templates.py"
+kind = "instrument"
+measures = "whether a document meets the brand and executive-brief contracts"
+output = "verdict"
+reportsTo = "agent"
+determinism = "tree"
+publishedTo = "a DoD criterion; it gates no commit"
+knownFailureModes = "it checks structure, not truth — a brief can pass while every number on it is wrong, which is exactly what issue389 would have produced"
+assessed = "no"
+
+[docRender]
+path = "scripts/render.py"
+kind = "instrument"
+measures = "whether a document renders and matches its golden output"
+output = "verdict"
+reportsTo = "agent"
+determinism = "tree"
+publishedTo = "a DoD criterion"
+knownFailureModes = "none recorded; UNPROVEN in the D0360 sense — no test constructs a render defect and shows this catching it"
+assessed = "no"
+
+[statusDashboard]
+path = ".engine/tools/report.py"
+kind = "instrument"
+measures = "nothing itself — it materialises project state as an HTML dashboard"
+output = "figure"
+reportsTo = "human"
+determinism = "tree"
+publishedTo = "a materialised view, marked as one"
+knownFailureModes = "none recorded; a materialised view is stale the moment the tree moves, which EHZ8 names as a hazard"
+assessed = "no"
+
+[stpaDiagram]
+path = ".engine/tools/stpa_diagram.py"
+kind = "instrument"
+measures = "nothing itself — it draws the computed control structure"
+output = "figure"
+reportsTo = "human"
+determinism = "tree"
+publishedTo = "the safety viewpoint's rendering"
+knownFailureModes = "it can only draw what the computed structure contains, and that structure omits every instrument in this file — the omission is invisible in the picture"
+assessed = "no"
+
+# ---- The JVM kernel lane: found by guard 65 on its first run, not by me ----------------------
+# All five ask the SysML v2 pilot kernel a question, so their determinism is EXTERNAL: the answer can
+# change when the kernel does, with no change here. Two of them BLOCK, which makes them controls as
+# well as instruments - a thing this inventory should say out loud rather than let a reader infer.
+
+[validateSchema]
+path = ".engine/tools/validate/validate_schema.py"
+kind = "instrument+control"
+measures = "whether the schema packages parse and type-check against the pilot kernel"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "it BLOCKS a schema change (CLAUDE.md section 5)"
+knownFailureModes = "an external verdict can flip without a change here; the kernel's own gaps are indistinguishable from ours (D0132/issue081)"
+assessed = "no"
+
+[validateWorkflows]
+path = ".engine/tools/validate/validate_workflows.py"
+kind = "instrument+control"
+measures = "whether the process-as-data workflow files parse and type-check against the pilot kernel"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "it BLOCKS a workflow change"
+knownFailureModes = "as validateSchema"
+assessed = "no"
+
+[validateInstances]
+path = ".engine/tools/validate/validate_instances.py"
+kind = "instrument"
+measures = "whether each instance file types against the flat schema in the kernel"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "opt-in only (KEEL_KERNEL_VALIDATE=1)"
+knownFailureModes = "DEMOTED because it fails CORRECT files, which forced an all-or-nothing bypass that disabled every other layer (D0132/issue081) - the sharpest instance of an instrument's false verdict costing more than its true ones"
+assessed = "no"
+
+[validateTracking]
+path = ".engine/tools/validate/validate_tracking.py"
+kind = "instrument"
+measures = "whether tracking instances type against the full schema in the kernel"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "the kernel lane"
+knownFailureModes = "as validateInstances"
+assessed = "no"
+
+[validateProbes]
+path = ".engine/tools/validate/validate_probes.py"
+kind = "instrument"
+measures = "which exact SysML v2 patterns the kernel accepts, cell by cell"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "schema design decisions"
+knownFailureModes = "a cell FAILS iff the kernel emits a line containing ERROR, which is a text match on another program's output"
+assessed = "no"
+
+[importProbe]
+path = ".engine/tools/validate/import_probe.py"
+kind = "instrument"
+measures = "whether the kernel resolves imports the way the schema assumes"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "schema design decisions"
+knownFailureModes = "as validateProbes"
+assessed = "no"
+
+[structureProbe]
+path = ".engine/tools/validate/structure_probe.py"
+kind = "instrument"
+measures = "whether the kernel accepts the structural constructs the schema relies on"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "schema design decisions"
+knownFailureModes = "as validateProbes"
+assessed = "no"
+
+[spikeMetamodel]
+path = ".engine/tools/validate/spike_metamodel.py"
+kind = "instrument"
+measures = "whether SysML v2 can express the process-as-data meta-model at all"
+output = "verdict"
+reportsTo = "agent"
+determinism = "external"
+publishedTo = "a foundation decision, when it was run"
+knownFailureModes = "a one-off measurement whose answer is still cited; nothing re-runs it, so it is a claim about a kernel version nobody records"
+assessed = "no"
+
+# ---- NOT instruments: recorded so the boundary is arguable rather than implied ----
+[notInstruments]
+capture_user = "captures a human's words verbatim — a write path, not a measure"
+deck_inbox_record = "records a tap from the deck — a write path"
+test_deck_e2e = "a test, not a standing measure"
+kill_stale_kernels = "cleanup"
+_kernel = "kernel lifecycle helper"
+validate_all = "runs the JVM validators; its VERDICT is the instrument and it is the opt-in kernel lane (D0132), reported through keel"
