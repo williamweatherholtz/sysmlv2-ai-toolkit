@@ -361,6 +361,71 @@ fn gather(root: &Path) -> (Vec<Action>, Vec<Fb>, Json) {
 }
 
 /// Every control action and feedback path computable from the TREE alone.
+/// The declared instruments as FEEDBACK paths (`.engine/contracts/instruments.toml`, D0361).
+///
+/// WHY THIS SOURCE EXISTS. Feedback here is otherwise derived from `CliCommand` facts and workflow
+/// statuses, so an instrument that is not a CLI command could not appear - measured 2026-09-06, none
+/// of twenty did, while six defects in one day landed in exactly those channels. Declaring them was
+/// not enough on its own: a control loop needs both ends, so the manifest carries `sensedFrom` (the
+/// process observed) beside `reportsTo` (the controller that believes it).
+///
+/// The instrument's DETERMINISM travels with the row, because "one run of this is a measurement" and
+/// "one run of this is a sample" are different facts about a number and a reader cannot tell by
+/// looking (issue392).
+fn instrument_feedback(root: &Path, feedback: &mut Vec<Fb>) -> Vec<Json> {
+    let path = root.join(".engine").join("contracts").join("instruments.toml");
+    let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
+    let mut sensors = Vec::new();
+    let (mut name, mut fields) = (String::new(), std::collections::BTreeMap::new());
+
+    let flush = |name: &str, f: &std::collections::BTreeMap<String, String>, sensors: &mut Vec<Json>, feedback: &mut Vec<Fb>| {
+        if name.is_empty() || name == "notInstruments" {
+            return;
+        }
+        let Some(sensed) = f.get("sensedFrom") else { return };
+        let sensed_role = PROCESSES.iter().find(|(r, _, _)| r == sensed).map(|(r, _, _)| *r);
+        let reports_role = ROLES.iter().find(|(r, _, _)| Some(*r) == f.get("reportsTo").map(String::as_str)).map(|(r, _, _)| *r);
+        let (Some(sensed_from), Some(reports_to)) = (sensed_role, reports_role) else { return };
+        let measures = f.get("measures").cloned().unwrap_or_default();
+        let determinism = f.get("determinism").cloned().unwrap_or_else(|| "undeclared".to_string());
+        let tool = f.get("path").cloned().unwrap_or_default();
+        feedback.push(Fb {
+            name: name.to_string(),
+            title: format!("{tool}: {measures}"),
+            sensed_from,
+            reports_to,
+            data: format!("{measures}; determinism: {determinism}"),
+            source: tool.clone(),
+        });
+        sensors.push(Json::Obj(vec![
+            ("name".to_string(), Json::s(name.to_string())),
+            ("mechanism".to_string(), Json::s(tool)),
+            ("producesFeedback".to_string(), Json::s(name.to_string())),
+            ("determinism".to_string(), Json::s(determinism)),
+            ("output".to_string(), Json::s(f.get("output").cloned().unwrap_or_default())),
+            ("assessed".to_string(), Json::s(f.get("assessed").cloned().unwrap_or_else(|| "unknown".to_string()))),
+        ]));
+    };
+
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('#') {
+            continue;
+        }
+        if t.starts_with('[') && t.ends_with(']') {
+            flush(&name, &fields, &mut sensors, feedback);
+            name = t[1..t.len() - 1].to_string();
+            fields.clear();
+            continue;
+        }
+        if let Some((k, v)) = t.split_once('=') {
+            fields.insert(k.trim().to_string(), v.trim().trim_matches('"').to_string());
+        }
+    }
+    flush(&name, &fields, &mut sensors, feedback);
+    sensors
+}
+
 fn gather_local(root: &Path, actions: &mut Vec<Action>, feedback: &mut Vec<Fb>) {
     hook_actions(root, actions);
     githook_actions(root, actions);
@@ -490,7 +555,10 @@ fn fb_row(f: &Fb) -> Json {
 /// absent source (no hooks, no workflows, no CLI facts) contributes nothing and the role reads inert.
 pub fn control_structure(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
-    let (actions, feedback, remote) = gather(root);
+    let (actions, mut feedback, remote) = gather(root);
+    // The instruments: feedback paths the CLI facts cannot express, plus the sensors that produce
+    // them - the first Sensor items this model has ever had (D0361, STPA Handbook pp.25-26).
+    let sensors = instrument_feedback(root, &mut feedback);
     let (pmodels, hazard_rows) = decoration(&model);
     let controllers: Vec<Json> = ROLES
         .iter()
@@ -525,11 +593,12 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
         .collect();
     let inert: Vec<Json> = ROLES.iter().filter(|(r, _, _)| !actions.iter().any(|a| a.issued_by == *r)).map(|(r, _, _)| Json::s(*r)).collect();
     Ok(Json::Obj(vec![
-        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Authored anchors and process models decorate the roles when the project has authored them; the remote's rules are fetched live and never copied.")),
+        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the declared instruments (.engine/contracts/instruments.toml - feedback paths and the sensors that produce them, with each sensor's determinism), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Authored anchors and process models decorate the roles when the project has authored them; the remote's rules are fetched live and never copied.")),
         ("controllers".to_string(), Json::Arr(controllers)),
         ("processes".to_string(), Json::Arr(processes)),
         ("actions".to_string(), Json::Arr(actions.iter().map(action_row).collect())),
         ("feedback".to_string(), Json::Arr(feedback.iter().map(fb_row).collect())),
+        ("sensors".to_string(), Json::Arr(sensors)),
         ("processModels".to_string(), Json::Arr(pmodels)),
         ("hazardsByProcess".to_string(), Json::Arr(hazard_rows)),
         ("remote".to_string(), remote),

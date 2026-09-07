@@ -1,6 +1,10 @@
 # STPA Standard Operating Procedure
 
 Source of record: STPA Handbook, Leveson & Thomas, MIT PSAS, March 2018, Ch. 2.
+Last compared against that source: **2026-09-07** by claudeOpus5 (D0362). That
+comparison found this summary naming FOUR of the five element types page 25
+lists, and no mention of the control algorithm - corrected below. Re-compare
+when the handbook edition changes, or yearly.
 STPA is iterative and worst-case. Four steps: Purpose → Control Structure →
 UCAs → Loss Scenarios.
 
@@ -31,6 +35,18 @@ constraints are solution-free.
 ## STEP 2 — Model the Control Structure
 A functional model of feedback control loops. Not physical, not executable,
 assumes no obedience.
+0. **The five element types** (Handbook p.25 - a control structure "contains at
+   least five types of elements"): **Controllers**, **Control Actions**,
+   **Feedback**, **Other inputs to and outputs from components (neither control
+   nor feedback)**, **Controlled processes**. The fourth is the one summaries
+   drop, including this one until 2026-09-07: an instrument reading a file, a
+   clock, a rate limit, an outside party's answer. It is not feedback - nobody
+   controls it and it reports on nothing - and it is where "the measurement was
+   taken against the wrong thing" lives.
+   Inside a controller sit TWO things (p.22-23): the **control algorithm** (its
+   decision-making process, which for a human is an operating procedure) and the
+   **process model** (its beliefs, updated in part by feedback). Both are named
+   because step 4's causes refer to them by name.
 1. Conventions: vertical = authority; **downward arrows = control actions,
    upward = feedback**; horizontal = peer coordination; arrows = info that CAN be
    sent (not guaranteed/obeyed). No required 1:1 controller↔process mapping.
@@ -47,8 +63,11 @@ assumes no obedience.
 **Step-2 gate:** ≥1 controller, ≥1 control action, ≥1 controlled process; arrows
 labeled functionally (no "Command/Status/Computer"); each physical process has
 ≥1 controller (or justified); responsibilities traced to SCs; process-model
-variables identified with the feedback to maintain them; sensors/actuators
-deliberately deferred; supporting docs recorded.
+variables identified with the feedback to maintain them; **every controller has
+a process model, or its absence is justified**; **the fourth element type - other
+inputs and outputs, neither control nor feedback - is enumerated or explicitly
+declared empty with a reason**; sensors/actuators deliberately deferred;
+supporting docs recorded.
 
 ## STEP 3 — Identify Unsafe Control Actions
 1. For EVERY control action, evaluate all four guideword classes:
@@ -74,7 +93,12 @@ the actual state (not belief, not outcome); every UCA traces to ≥1 hazard; eac
 UCA inverted into a `C-n`.
 
 ## STEP 4 — Identify Loss Scenarios
-First, **add Sensors and Actuators** to the control structure.
+First, **add Sensors and Actuators** to the control structure. These are the
+MECHANISMS on the two paths (p.26): an actuator is how a controller acts on the
+process, a sensor is how it observes it. A sensor's own properties belong on the
+item, not in prose - for a measurement instrument, whether one run of it is a
+measurement or a sample is the property a reader of its number cannot otherwise
+see. Zero sensors in a model that has run step 4 means step 4 was not finished.
 - **Type (a) — why a UCA occurs.** Causes: (1) controller failure; (2) inadequate
   control algorithm (flawed impl / flawed spec / degrades over time; common:
   assumes a prior action succeeded with no confirming feedback); (3) unsafe
