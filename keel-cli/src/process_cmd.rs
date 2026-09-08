@@ -934,6 +934,188 @@ fn cmd_retire(args: &[String]) -> i32 {
     0
 }
 
+/// A path relative to the root, forward-slashed - the form every contract and doc writes it in, so a
+/// reference scan on Windows compares like with like.
+fn relpath_fwd(root: &Path, p: &Path) -> String {
+    p.strip_prefix(root).unwrap_or(p).display().to_string().replace('\\', "/")
+}
+
+/// Every file under `dir`, recursively. `walk` in this file returns the same thing but takes no
+/// accumulator; this shape lets one call gather several roots.
+fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            collect_files(&p, out);
+        } else {
+            out.push(p);
+        }
+    }
+}
+
+/// Strip a `key = "..."` line, or a whole `[section]`, from one of the contract files a unit's
+/// install writes. Returns whether anything was removed, so the caller can report per contract
+/// rather than assert a clean sweep it did not check.
+fn strip_contract(path: &Path, line_key: Option<&str>, section: Option<&str>) -> bool {
+    let Ok(text) = std::fs::read_to_string(path) else { return false };
+    let mut out = String::with_capacity(text.len());
+    let mut skipping = false;
+    let mut removed = false;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            skipping = section.is_some_and(|s| l == format!("[{s}]"));
+            if skipping {
+                removed = true;
+            }
+        } else if !skipping && line_key.is_some_and(|k| l.starts_with(&format!("{k} =")) || l.starts_with(&format!("{k}="))) {
+            removed = true;
+            continue;
+        }
+        if !skipping {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if removed {
+        let _ = std::fs::write(path, out);
+    }
+    removed
+}
+
+/// `keel process remove <name>` — take an installed unit out as ONE act (dcProcessRemoveCommand).
+///
+/// # Why this is a command and not a checklist
+///
+/// Twice a unit was removed by hand: exec-summary (sprint 524) and decision-channel (sprint 527).
+/// Both times the process file and its skill went and a contract entry stayed, because `keel process`
+/// listed, exported and imported while `deactivate` only flips a switch — removal existed nowhere, so
+/// it was performed from memory against five files. What a hand removal misses is never the obvious
+/// file; it is the install record or the minted id, which nothing reads until the next import.
+///
+/// # The refusal is the point
+///
+/// Removing the files is easy. The failure mode is removing them while something still POINTS at
+/// them, which turns four guards red at commit time with no indication of which removal caused it.
+/// So the surviving tree is scanned for references to every path about to be deleted, and to the
+/// unit's own name in the contract surfaces, BEFORE anything is written: if any exist, the removal
+/// refuses and names each one by file and line, so the remover rewrites those first. Nothing is
+/// half-removed.
+///
+/// The Decision is not checked here and must not be: `.engine/processes/` is inside the D0209
+/// keystone lock, so the commit that carries this removal already needs a co-committed
+/// `#ProspectiveChange` Decision or the pre-commit hook refuses it. Re-checking it here would be a
+/// second, weaker copy of a control that already exists — this only SAYS so, so the remover is not
+/// surprised at commit time.
+fn cmd_remove(args: &[String], root: &Path) -> i32 {
+    const USAGE: &str = "usage: keel process remove <name> [--dry-run]   (removes an INSTALLED unit from this project; the library copy is untouched)";
+    let Some(name) = args.get(1).filter(|a| !a.starts_with("--")) else {
+        eprintln!("{USAGE}");
+        return 2;
+    };
+    let dry = args.iter().any(|a| a == "--dry-run");
+    let all = rows(root);
+    let Some(row) = all.iter().find(|r| &r.name == name) else {
+        eprintln!("remove: this project has no process `{name}` — `keel process list` shows what it holds");
+        return 2;
+    };
+
+    let files = unit_files(root, row);
+    let rel_of = |p: &Path| relpath_fwd(root, p);
+    let doomed: Vec<String> = files.iter().map(|p| rel_of(p)).collect();
+
+    // WHAT SURVIVES is what gets scanned - the unit's own files may reference each other freely.
+    let doomed_set: std::collections::HashSet<&str> = doomed.iter().map(String::as_str).collect();
+    let mut survivors: Vec<PathBuf> = Vec::new();
+    for base in ["processes", "skills", "docs", "contracts", "workflows", "rules", "cli"] {
+        collect_files(&root.join(".engine").join(base), &mut survivors);
+    }
+    for extra in [root.join("CLAUDE.md"), root.join("README.md")] {
+        if extra.exists() {
+            survivors.push(extra);
+        }
+    }
+    let mut refs: Vec<String> = Vec::new();
+    for path in &survivors {
+        let r = rel_of(path);
+        if doomed_set.contains(r.as_str()) {
+            continue; // it is going too
+        }
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        for (n, line) in text.lines().enumerate() {
+            for d in &doomed {
+                if line.contains(d.as_str()) {
+                    refs.push(format!("{r}:{}: references `{d}`", n + 1));
+                }
+            }
+        }
+    }
+    if !refs.is_empty() {
+        eprintln!("remove: `{name}` is still referenced by {} live surface(s) - rewrite these first, then remove:", refs.len());
+        for r in refs.iter().take(40) {
+            eprintln!("  {r}");
+        }
+        if refs.len() > 40 {
+            eprintln!("  ... {} more", refs.len() - 40);
+        }
+        eprintln!("  Nothing was removed. A removal that leaves references turns tool-reference, process-skill,");
+        eprintln!("  activation-manifest and control-map-reconciled red at commit time with no sign of which removal did it.");
+        return 1;
+    }
+
+    let unit_id = unit_id_for(root, name).ok();
+    let contracts = root.join(".engine").join("contracts");
+    if dry {
+        println!("remove --dry-run: `{name}` would be removed as one act. Nothing written.");
+        for d in &doomed {
+            println!("  delete  {d}");
+        }
+        println!("  contract  unit-ids.toml: `{name}`");
+        match &unit_id {
+            Some(id) => println!("  contract  installed-units.toml: [{id}]"),
+            None => println!("  contract  installed-units.toml: no unit id (pre-D0183 install) - nothing to strip"),
+        }
+        println!("  contract  unit-extras.toml: [{name}]");
+        println!("  contract  activation.toml: `{name}`");
+        println!("  no live surface references it; the library copy is untouched.");
+        return 0;
+    }
+
+    let mut deleted = 0usize;
+    for f in &files {
+        if std::fs::remove_file(f).is_ok() {
+            deleted += 1;
+        }
+    }
+    // A skill directory left behind as an empty shell reads as an installed skill to anyone looking.
+    for s in &row.skills {
+        let dir = root.join(".engine").join("skills").join(s);
+        if dir.read_dir().is_ok_and(|mut d| d.next().is_none()) {
+            let _ = std::fs::remove_dir(&dir);
+        }
+    }
+    let ids = strip_contract(&contracts.join("unit-ids.toml"), Some(name), None);
+    let installed = unit_id.as_ref().is_some_and(|id| strip_contract(&contracts.join("installed-units.toml"), None, Some(id)));
+    let extras = strip_contract(&contracts.join("unit-extras.toml"), None, Some(name));
+    let adoption = strip_contract(&contracts.join("activation.toml"), Some(name), None);
+
+    println!("removed `{name}`: {deleted} file(s) deleted.");
+    let said = |b: bool| if b { "stripped" } else { "no entry" };
+    println!(
+        "  contracts: unit-ids {}, installed-units {}, unit-extras {}, activation {}",
+        said(ids),
+        said(installed),
+        said(extras),
+        said(adoption)
+    );
+    println!("  the LIBRARY copy is untouched - this removes the unit from this project only.");
+    println!("  `.engine/processes/` is inside the keystone lock (D0209): the commit carrying this needs a");
+    println!("  co-committed #ProspectiveChange Decision saying why, or the pre-commit hook will refuse it.");
+    println!("  Run `keel sync-claude` to drop the generated skill copy under .claude/.");
+    0
+}
+
 fn cmd_export(args: &[String], root: &Path) -> i32 {
 
             let Some(name) = args.get(1) else {
@@ -1579,9 +1761,10 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         Some("export") => cmd_export(args, root),
         Some("publish") => cmd_publish(args, root),
         Some("retire") => cmd_retire(args),
+        Some("remove") => cmd_remove(args, root),
         Some("import") => cmd_import(args, root),
         Some(other) => {
-            eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir> | publish <name> | retire <name> --why TEXT)");
+            eprintln!("unknown: keel process {other} (expected list | audit | search <term> | show <name> | export <name> --out <dir> | import <dir> | publish <name> | retire <name> --why TEXT | remove <name>)");
             2
         }
     }

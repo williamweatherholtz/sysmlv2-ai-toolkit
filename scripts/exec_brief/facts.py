@@ -261,7 +261,15 @@ fact("decisionsPerDay7d", round(len(recent) / 7.0, 1), "Decisions per day (7-day
      WIN_HOW + "divided by 7.")
 
 # --- proposed Decisions that say, in their own consequences, that the change already ships
-SHIPPED_PHRASES = ["the code ships", "already ship", "ships now", "is built"]
+SHIPPED_PHRASES = ["the code ships", "already ship", "ships now", "is built",
+                   # WIDENED 2026-09-07, by the rule this fact's own `how` states: the list is fixed
+                   # by adding phrases, never by re-reading prose into a different answer. It read 0
+                   # against a queue where three of five had shipped - d0361 says "IMPLEMENTED
+                   # 2026-09-06", d0366 says "already in the tree", d0363 describes the move in the
+                   # present tense. A false ZERO here is the issue383 defect exactly: a brief that
+                   # frames already-shipped work as an open choice.
+                   "already in the tree", "implemented", "in the commit that carries",
+                   "landed", "is in the tree"]
 already = [d for d in proposed
            if any(p in d["consequences"].lower() for p in SHIPPED_PHRASES)]
 SHIP_HOW = (DEC_HOW + "of the PROPOSED Decisions, those whose own `consequences` string contains one "
