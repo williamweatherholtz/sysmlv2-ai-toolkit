@@ -340,6 +340,12 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   regexes, Windows paths) is silently rewritten - it broke Rust files with literal newlines eight times in two days
   after being "already tracked". Write the file with the **Write tool** and run it by path; a heredoc is for prose
   (commit messages, drafts) with no backslashes. The pre-bash hook refuses the other shape in every profile.
+- **A patch that cannot find its anchor FAILS (D0386/issue398).** Edit a file at an anchor through
+  `scripts/textpatch.py` (`replace_once`, `insert_after`, `insert_before`; `append` is its own named operation) -
+  it refuses an anchor that occurs zero times or more than once and writes nothing. A bare `str.replace` that
+  misses lands nowhere and says so nowhere, and "find the anchor, else append" put a computation AFTER the
+  serialisation while the script exited zero - three times in one session. `python scripts/textpatch.py --probe`
+  is its known-positive / known-negative cases; run it before trusting a change to the helper.
 - **`conda` is not on `PATH`** in Claude Code shells. Use the full miniforge3 path (above). Installation
   root: `C:\Users\WilliamWeatherholtz\miniforge3` (miniforge3, not miniconda3).
 - **A command running from `target/release/keel.exe` blocks the rebuild of that same file (issue150, issue386).** Serve a COPY
