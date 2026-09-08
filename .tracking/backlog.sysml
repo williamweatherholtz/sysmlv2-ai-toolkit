@@ -2744,6 +2744,8 @@ package EngineBacklog {
     #DerivedFrom dependency from dcRoutingVerdictQuotesItsEvidence to us103;
     #DerivedFrom dependency from dcProcessStepsAreHookGateOrMemory to us102;
     #DependsOn dependency from dcRoutingVerdictQuotesItsEvidence to d0381;
+    // D0382: the rig's repeated-run mode is an INVESTIGATION - findings, never a TestResult or a number.
+    #DependsOn dependency from dcRoutingNumberIsStable to d0382;
     #CharteredBy dependency from shortDomainWordsCanSeed to d0327;
     // D0329 was found while dcPanelRecordCorrections corrected D0234: the fix that let the correction land.
     #CharteredBy dependency from dcPanelRecordCorrections to d0329;

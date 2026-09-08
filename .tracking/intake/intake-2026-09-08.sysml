@@ -181,4 +181,24 @@ package ProjectIntake20260908 {
         :>> triageNote = "their words: make simple rubrics so lower-model agents can run them as necessary (e.g. user said X - is the user asking for a view? if so, quote the text indicating so)";
     }
     #DerivedFrom dependency from us103 to st111;
+
+    part st112 : Statement {
+        :>> id = "6cbd2ace-98a9-46a2-935c-a8cf312611d8";
+        :>> title = "Repeated sampling stays an option - as investigation, which is a different process from verification";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> text = "repeated sampling should be an option though.  sometimes i want AI agents to investigate a result, but it's a different process - ultimately they can't really verify";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-08"; :>> channel = StatementChannel::chat;
+    }
+
+    part us104 : UserStory {
+        :>> id = "1593f886-3771-4db6-88c4-bed4ce1884d4";
+        :>> title = "Repeated sampling as an investigation an agent may run, never as the verification";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "to be able to send AI agents to investigate a result by re-running it - repeated sampling stays available as a tool - while that investigation is a different process from verification, because an agent cannot verify";
+        :>> soThat = "a flaky or surprising result can be examined without the examination being mistaken for a verdict";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "their words: repeated sampling should be an option though ... it is a different process - ultimately they cannot really verify. Qualifies d0381, which said never re-sampled: re-sampling is allowed as investigation, whose output is findings, not a TestResult";
+    }
+    #DerivedFrom dependency from us104 to st112;
 }
