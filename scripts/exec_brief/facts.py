@@ -260,6 +260,62 @@ fact("decisionsMarked7d", sum(1 for d in recent if d["marked"]),
 fact("decisionsPerDay7d", round(len(recent) / 7.0, 1), "Decisions per day (7-day mean)",
      WIN_HOW + "divided by 7.")
 
+# --- the consent scope since D0337: who has been accepting, and how long each waited
+# D0337 (2026-09-05) scoped standing consent to the processes it was promulgated under, so a
+# process/safety-change Decision waits for the human. Read from each file's acceptance records:
+# AUTO if the acceptance Test's procedureText carries the AUTO-ACCEPTED token, HUMAN if a passing
+# AcceptR result exists without it, else still proposed. Wait = judgedAt of the first AcceptR minus
+# the Decision's createdAt, in days.
+SCOPE_FROM = "d0337"
+scope_auto, scope_human, scope_open, scope_waits = [], [], [], []
+for d in decisions:
+    if d["slug"] < SCOPE_FROM:
+        continue
+    text = read(os.path.join(DEC_DIR, d["file"])) or ""
+    is_auto = "AUTO-ACCEPTED" in text
+    r1 = re.search(r'part\s+' + d["slug"] + r'AcceptR1\s*:\s*TestResult\s*\{.*?judgedAt\s*=\s*"(\d{4}-\d{2}-\d{2})"', text, re.DOTALL)
+    if d["status"] != "accepted" or not r1:
+        scope_open.append(d["slug"])
+    elif is_auto:
+        scope_auto.append(d["slug"])
+    else:
+        scope_human.append(d["slug"])
+        if d["createdAt"]:
+            scope_waits.append((date.fromisoformat(r1.group(1)) - date.fromisoformat(d["createdAt"])).days)
+SCOPE_HOW = (DEC_HOW + "Decisions with slug >= %s (D0337, the consent-scope rule, 2026-09-05); AUTO if the "
+             "file carries the AUTO-ACCEPTED token, HUMAN if `<slug>AcceptR1` exists without it, OPEN otherwise. "
+             % SCOPE_FROM)
+fact("scopeDecisionsHumanAccepted", len(scope_human), "Decisions accepted on the human's own word since the consent-scope rule", SCOPE_HOW)
+fact("scopeDecisionsAutoAccepted", len(scope_auto), "Decisions auto-accepted under standing consent since the consent-scope rule", SCOPE_HOW)
+fact("scopeDecisionsOpen", len(scope_open), "Decisions since the consent-scope rule still proposed", SCOPE_HOW)
+fact("scopeDaysSinceRule", (TODAY - date(2026, 9, 5)).days, "calendar days since D0337 was recorded",
+     "today minus 2026-09-05, D0337's own createdAt.")
+fact("scopeHumanWaitMaxDays", max(scope_waits) if scope_waits else None, "days",
+     SCOPE_HOW + "for the HUMAN set, AcceptR1.judgedAt minus the Decision's createdAt; the maximum.")
+fact("scopeHumanWaitMeanDays", round(sum(scope_waits) / len(scope_waits), 1) if scope_waits else None, "days",
+     SCOPE_HOW + "for the HUMAN set, AcceptR1.judgedAt minus the Decision's createdAt; the mean.")
+
+# --- the consent-defect census (D0375). Two HAND-CLASSIFIED lists, fixed here so the number on the
+# page is the length of a list anyone can re-read, not a judgment re-made each run. Classified
+# 2026-09-08 from each Issue's title and description; the census script that surfaced the candidates
+# is textual (keyword over titles) and its class counts are NOT emitted as facts for that reason.
+CONSENT_TOO_WIDE = ["issue256", "issue373", "issue371", "issue341", "issue342", "issue347",
+                    "issue298", "issue238", "issue254"]
+CONSENT_REFUSED_REAL = ["issue287", "issue359", "issue397", "issue223", "issue234", "issue383",
+                       "issue396", "issue217"]
+CENSUS_HOW = ("hand-classified 2026-09-08 from .tracking/issues-*.sysml titles and descriptions; the ids are "
+              "listed in this script (CONSENT_TOO_WIDE / CONSENT_REFUSED_REAL) so the count is re-readable. ")
+fact("issuesConsentTooWide", len(CONSENT_TOO_WIDE), "Issues where an acceptance was recorded or kept that was not what was given",
+     CENSUS_HOW + ", ".join(CONSENT_TOO_WIDE))
+fact("issuesConsentRefusedReal", len(CONSENT_REFUSED_REAL), "Issues where a control refused or mis-framed a real acceptance",
+     CENSUS_HOW + ", ".join(CONSENT_REFUSED_REAL))
+_iss_total = 0
+_iss_dir = os.path.join(REPO, ".tracking")
+for fn in os.listdir(_iss_dir) if os.path.isdir(_iss_dir) else []:
+    if fn.startswith("issues-") and fn.endswith(".sysml"):
+        _iss_total += len(re.findall(r"part\s+issue\d+\s*:\s*Issue\s*\{", read(os.path.join(_iss_dir, fn)) or ""))
+fact("issuesTotal", _iss_total, "Issue records", "count of `part issueNNN : Issue {` across .tracking/issues-*.sysml")
+
 # --- proposed Decisions that say, in their own consequences, that the change already ships
 SHIPPED_PHRASES = ["the code ships", "already ship", "ships now", "is built",
                    # WIDENED 2026-09-07, by the rule this fact's own `how` states: the list is fixed
