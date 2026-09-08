@@ -931,6 +931,40 @@ fact("supersededWithoutEdge", len(_superseded_no_edge),
 fact("supersessionDisagreements", len(_accepted_with_edge) + len(_superseded_no_edge),
      "records where the two representations disagree", "acceptedWithSupersedeEdge + supersededWithoutEdge.")
 
+# ================================================================ 13. the recall cap (D0389 / D0390)
+# The hook latency distribution keel enforcement-report computes from the fire-ledger, and the over-cap
+# proxy for skips before recall-skipped existed. Every number is read from the report or the ledger.
+_er_ok, _er_raw = run([KEEL, "enforcement-report", REPO])
+ER_HOW = "keel enforcement-report (D0389): per-event nearest-rank latency over .keel/metrics/hooks.jsonl, machine-local; "
+try:
+    _er = json.loads(_er_raw) if _er_ok and _er_raw else {}
+except ValueError:
+    _er = {}
+_rows = {e.get("event"): e for e in _er.get("perEvent", [])}
+for _ev, _key in (("user-prompt", "userPrompt"), ("post-edit", "postEdit")):
+    _r = _rows.get(_ev) or {}
+    fact(_key + "Fires", _r.get("fires"), "fires", ER_HOW + "`perEvent[%s].fires`." % _ev)
+    for _f in ("msMedian", "msP90", "msP99", "msMax"):
+        fact(_key + _f[2:], _r.get(_f), "ms", ER_HOW + "`perEvent[%s].%s`." % (_ev, _f))
+_cap = 2500
+_over = None
+_ledger = read(os.path.join(REPO, ".keel", "metrics", "hooks.jsonl"))
+if _ledger:
+    _over = 0
+    for _l in _ledger.splitlines():
+        try:
+            _o = json.loads(_l)
+        except ValueError:
+            continue
+        if _o.get("event") == "user-prompt" and _o.get("ms", 0) > _cap:
+            _over += 1
+fact("userPromptOverCap", _over, "fires over the 2,500 ms recall cap",
+     "count of user-prompt lines in .keel/metrics/hooks.jsonl with ms > 2500 - the PROXY for a dropped payload before "
+     "recall-skipped existed (D0389); the check runs after the walk (main.rs recalled_facts), so every one of these paid "
+     "the walk and received nothing.")
+fact("recallSkippedCounted", (_er.get("recall") or {}).get("skipped"), "recall-skipped events since D0389",
+     ER_HOW + "`recall.skipped`.")
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
