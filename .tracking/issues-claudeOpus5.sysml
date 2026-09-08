@@ -1379,4 +1379,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSuiteReceiptDoesNotTurnOnPath to issue412;
+
+    part issue413 : Issue {
+        :>> id = "9400c842-cbda-4f2e-9268-ce415a915ecd";
+        :>> title = "The brief contract declares word budgets that no check holds: a 1334-word page passed clean";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The brief contract declares word budgets that nothing holds. The asi-templates skill's section table (section 2.1) sets the headline at 18 words, the ask at 70, the decision rule at 40, the provenance strip at 60 - and check_brief in scripts/check_templates.py (line 212 onward) checks ids, verbs, options, figures, provenance date, copy controls, viewport and themes, but not one word count; the BUDGETS loop at line 125 belongs to the template-family check and never runs on a brief. The page published on 2026-09-08 carried a 26-word headline and 1334 words of reader prose and reported `brief contract: clean`. The human, verbatim (st109): 'the decision brief is still far too verbose.' A budget that lives in a skill and not in the check is a reminder, and D0047 says a reminder is not a control. Resolver: check_brief holds the declared budgets and refuses over them, with a self-test fixture in both directions.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcBriefBudgetsAreHeld to issue413;
 }

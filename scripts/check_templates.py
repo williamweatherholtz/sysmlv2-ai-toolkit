@@ -209,9 +209,31 @@ BRIEF_VERB = re.compile(r"\b(is|are|was|were|has|have|had|does|do|did|costs?|mov
                         r"would|will|can|cannot)\b", re.I)
 
 
-def check_brief(path: Path) -> list[str]:
+# The section budgets of asi-templates 2.1, as (label, capture of the section's markup, words).
+BRIEF_BUDGETS = [
+    ("headline", r'data-digest="title"[^>]*>([^<]+)<', 18),
+    ("the ask", r'<div class="ask">([\s\S]*?)</div>', 70),
+    ("provenance strip", r'data-digest="provenance"[^>]*>([\s\S]*?)</footer>', 60),
+]
+# The whole-page ceiling of the terse register. It is a clause of D0377 and holds only once that
+# Decision is accepted: the check reads the decision file's status, so the control lands with the
+# human's word and not before it (D0337). None = no ceiling.
+TERSE_DECISION = ROOT / ".engine" / "decisions" / "0377-the-brief-is-terse-and-capped.sysml"
+TERSE_CEILING = 450
+
+
+def brief_page_ceiling() -> int | None:
+    try:
+        text = TERSE_DECISION.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    return TERSE_CEILING if "DecisionStatus::accepted" in text else None
+
+
+def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None) -> list[str]:
     """The brief contract. Returns one string per violation, each naming the file."""
-    raw = path.read_text(encoding="utf-8")
+    raw = path.read_text(encoding="utf-8") if raw is None else raw
+    ceiling = brief_page_ceiling() if ceiling is None else ceiling
     bad: list[str] = []
     rel = path.name
 
@@ -278,6 +300,21 @@ def check_brief(path: Path) -> list[str]:
     elif not re.search(r"\d{4}-\d{2}-\d{2}", prov.group(1)):
         fail("the provenance strip carries no ISO date")
 
+    # 5b. the budgets the contract's section table declares (asi-templates 2.1). Until issue413 they
+    # lived in the skill alone and a 1334-word page with a 26-word headline passed clean; a budget
+    # nothing holds is a reminder (D0047). The reader's prose is everything outside style, script
+    # and the copy-for-AI digest, figure labels included.
+    for label, pattern, limit in BRIEF_BUDGETS:
+        m = re.search(pattern, markup)
+        if m:
+            words = len(field_text(m.group(1)).split())
+            if words > limit:
+                fail(f"{label}: {words} words over its {limit}-word budget")
+    if ceiling is not None:
+        total = len(field_text(prose).split())
+        if total > ceiling:
+            fail(f"reader prose: {total} words over the {ceiling}-word page ceiling (terse register)")
+
     # 6. the machinery the reader needs
     if raw.count("data-copy") < 2:
         fail("copy-for-AI control missing at top or bottom")
@@ -314,7 +351,47 @@ def check_tree(root: Path) -> list[str]:
     return problems
 
 
+def _brief_fixture(title: str, ask: str, filler_words: int = 0) -> str:
+    """A minimal page that satisfies every brief clause, for the self-test to vary."""
+    fig = ('<figure><p class="msg">The page shows what waits.</p><svg role="img" '
+           'aria-label="a figure whose label is long enough to count as real"><text>a thing</text></svg></figure>')
+    filler = " ".join(["word"] * filler_words)
+    return (f'<title>Brief</title><meta name="viewport" content="width=device-width">'
+            f'<style>:root{{}} @media (prefers-color-scheme: dark){{}} [data-theme="dark"]{{}}</style>'
+            f'<h1 data-digest="title">{title}</h1><button data-copy></button>'
+            f'<div class="ask"><p>{ask}</p></div><p>{filler}</p>{fig}{fig}'
+            f'<div class="opts" data-records="d0000"><label><input type="radio" name="a" value="x">x</label>'
+            f'<label><input type="radio" name="a" value="y">y</label></div><button data-copy></button>'
+            f'<footer data-digest="provenance">Computed on 2026-09-08.</footer>'
+            f'<script>const s = "answers: ";</script>')
+
+
+def self_test() -> int:
+    """The budget clauses in both directions (issue413): a page over any declared budget is refused
+    naming the section; a page inside them passes; the whole-page ceiling refuses only when given."""
+    p = Path("fixture.html")
+    good = _brief_fixture("The page shows a receipt when nothing waits.", "Accept the receipt shape.")
+    long_title = " ".join(["word"] * 26) + " is"
+    long_ask = " ".join(["word"] * 80)
+    checks = [
+        ("in-budget page passes", check_brief(p, ceiling=450, raw=good), []),
+        ("27-word headline refused", check_brief(p, ceiling=None, raw=_brief_fixture(long_title, "Accept.")), ["headline: 27 words"]),
+        ("80-word ask refused", check_brief(p, ceiling=None, raw=_brief_fixture("The page waits.", long_ask)), ["the ask: 80 words"]),
+        ("ceiling refused when given", check_brief(p, ceiling=450, raw=_brief_fixture("The page waits.", "Accept.", 500)), ["reader prose: 5"]),
+        ("no ceiling when not given", check_brief(p, ceiling=None, raw=_brief_fixture("The page waits.", "Accept.", 500)), []),
+    ]
+    failed = 0
+    for name, got, want in checks:
+        ok = (not got) if not want else all(any(w in g for g in got) for w in want) and len(got) == len(want)
+        print(f"  {'ok  ' if ok else 'FAIL'} {name}" + ("" if ok else f": {got}"))
+        failed += not ok
+    print(f"check_templates --self-test: {'pass' if not failed else f'{failed} failed'}")
+    return 1 if failed else 0
+
+
 def main(argv: list[str]) -> int:
+    if argv[1:2] == ["--self-test"]:
+        return self_test()
     # `--brief FILE ...` applies the executive-brief contract (D0355) instead of the template-family
     # checks: a brief is a rendered deliverable, not a member of a template family.
     if argv[1:2] == ["--brief"]:

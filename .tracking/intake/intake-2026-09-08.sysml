@@ -85,4 +85,44 @@ package ProjectIntake20260908 {
         :>> sourceUrl = "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/60";
         :>> sourceTrust = SourceTrust::untrusted;
     }
+
+    part st109 : Statement {
+        :>> id = "e1b9d43f-b791-4fec-b89a-65e8520891b8";
+        :>> title = "the brief is still far too verbose";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> text = "the decision brief is still far too verbose.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-08"; :>> channel = StatementChannel::chat;
+    }
+
+    part st110 : Statement {
+        :>> id = "4695f3fd-33b3-4ec2-9c74-ec352a362c17";
+        :>> title = "make the brief use caveman";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> text = "make it use caveman?";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-08"; :>> channel = StatementChannel::chat;
+    }
+
+    part us098 : UserStory {
+        :>> id = "1ee95b35-83eb-4827-94ce-d735d2d28e26";
+        :>> title = "the brief reads in far fewer words";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "decider reading the published brief";
+        :>> iWant = "each page to state its ask and argument within the budgets the brief contract already declares";
+        :>> soThat = "I can answer it in one read";
+        :>> implication = ImplicationKind::bug;
+        :>> triageNote = "the contract table sets title 18 / ask 70 / provenance 60 words; check_brief (scripts/check_templates.py:212) holds none of them, and the page just published passed clean at 1334 words with a 26-word title";
+    }
+    #DerivedFrom dependency from us098 to st109;
+
+    part us099 : UserStory {
+        :>> id = "4fcce93c-5b27-4912-a43e-fe52c3804317";
+        :>> title = "the brief is written in caveman register";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "decider reading the published brief";
+        :>> iWant = "the brief written terse: no filler, no hedging, short synonyms, one idea per sentence, with a ceiling on the whole page";
+        :>> soThat = "the page costs one read";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "a register and a whole-page ceiling are new contract clauses, not a checker defect; they change what the surfacing process publishes, so they go through a Decision";
+    }
+    #DerivedFrom dependency from us099 to st110;
 }

@@ -105,6 +105,16 @@ exhibit titles has the argument.
 | 7 | **What would change my mind** | One falsifiable condition per ask | ≤ 30 words each |
 | 8 | **Provenance strip** | How every number was measured, by whom, when, against which tree | ≤ 60 words |
 
+**The budgets are held, not hoped (issue413, 2026-09-08).** `python scripts/check_templates.py --brief
+<page>` refuses a page whose headline, ask or provenance strip is over budget, naming the count. Three
+published pages had passed "clean" at 26 / 133 / 71 words against 18 / 70 / 60, and the author's verdict
+on the third was *"the decision brief is still far too verbose."* The remaining rows are measured by the
+exec-summary suite (§4). **Register (their words: *"make it use caveman?"*):** write the reader prose
+terse — no filler, no hedging, one idea per sentence, short words where a short word exists, articles
+and full sentences kept, every number and term exact. The whole-page ceiling (450 reader words, figure
+titles and chips included) is `TERSE_CEILING` in the checker and turns on when the decision that sets
+it is accepted; until then the checker holds the section budgets only.
+
 ### 2.2 Self-containment — the no-references rule
 
 - **No record id, task name, issue number or process name appears in anything the reader reads.** An id
