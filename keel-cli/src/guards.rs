@@ -98,7 +98,7 @@ fn record_date(line: &str) -> Option<String> {
 
 fn load_known_actors(root: &Path) -> HashSet<String> {
     let mut known = HashSet::new();
-    let Ok(text) = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")) else {
+    let Ok(text) = crate::corpus::read_to_string(root.join(".tracking").join("actors.sysml")) else {
         return known;
     };
     for line in text.lines() {
@@ -163,7 +163,7 @@ pub fn actors(root: &Path) -> GuardReport {
     let files = crate::collect_sysml(&root.join(".tracking"));
     let scanned = files.len();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         for (i, line) in text.lines().enumerate() {
             for val in scan_actor_refs(line) {
@@ -342,7 +342,7 @@ fn done_tasks(backlog: &str) -> HashSet<String> {
 fn delivery_blob(root: &Path) -> String {
     crate::collect_sysml(&root.join(".tracking").join("delivery"))
         .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .filter_map(|p| crate::corpus::read_to_string(p).ok())
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -351,7 +351,7 @@ fn delivery_blob(root: &Path) -> String {
 /// or is grandfathered. Mirrors `validate_sprint_coverage.py` (D0064/issue020).
 #[must_use]
 pub fn sprint_coverage(root: &Path) -> GuardReport {
-    let backlog = std::fs::read_to_string(root.join(".tracking").join("backlog.sysml")).unwrap_or_default();
+    let backlog = crate::corpus::read_to_string(root.join(".tracking").join("backlog.sysml")).unwrap_or_default();
     let done = done_tasks(&backlog);
     let blob = delivery_blob(root);
     let grandfathered: HashSet<&str> = GRANDFATHERED.iter().copied().collect();
@@ -421,7 +421,7 @@ pub fn sprint_closure(root: &Path) -> GuardReport {
     let mut violations = Vec::new();
     let mut scanned = 0usize;
     for path in &files {
-        let Ok(src) = std::fs::read_to_string(path) else { continue };
+        let Ok(src) = crate::corpus::read_to_string(path) else { continue };
         if !src.contains("action def ") {
             continue;
         }
@@ -460,7 +460,7 @@ pub fn sprint_closure(root: &Path) -> GuardReport {
 pub fn untrusted_routing(root: &Path) -> GuardReport {
     let blob = crate::collect_sysml(&root.join(".tracking"))
         .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .filter_map(|p| crate::corpus::read_to_string(p).ok())
         .collect::<Vec<_>>()
         .join("\n");
     // Statements whose recorded tier is `untrusted`.
@@ -555,7 +555,7 @@ pub(crate) enum Acceptance {
 pub fn untrusted_taint(root: &Path) -> GuardReport {
     let blob = crate::collect_sysml(&root.join(".tracking"))
         .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .filter_map(|p| crate::corpus::read_to_string(p).ok())
         .collect::<Vec<_>>()
         .join("\n");
     let deciders: HashSet<String> = crate::github::deciders(root).into_keys().collect();
@@ -611,7 +611,7 @@ pub(crate) fn taint_edges(blob: &str) -> Vec<(String, String, &'static str)> {
 fn decision_acceptances(root: &Path) -> HashMap<String, Acceptance> {
     let mut out = HashMap::new();
     for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         let Some(name) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.get(..4)).filter(|n| n.chars().all(|c| c.is_ascii_digit())) else { continue };
         let dname = format!("d{name}");
         if let Some(kind) = acceptance_kind(&text, &dname) {
@@ -884,7 +884,7 @@ pub fn ceremony(root: &Path) -> GuardReport {
     let mut violations = Vec::new();
     let grandfathered: HashSet<&str> = CEREMONY_GRANDFATHERED.iter().copied().collect();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let passed = gates_passed(&text);
         let mut defined = gates_defined(&text);
@@ -1301,7 +1301,7 @@ pub fn acceptance_binds_to_text(root: &Path) -> GuardReport {
     // Every accepted Decision with a result: (rel path, decision, sha, head text).
     let mut accepted: Vec<(String, String, String, String)> = Vec::new();
     for f in &files {
-        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(f) else { continue };
         if !text.contains("DecisionStatus::accepted") {
             continue;
         }
@@ -1414,7 +1414,7 @@ mod binds_to_text_tests {
 
 /// Every `[unit]` section of `unit-extras.toml` with its declared `files`, in file order.
 fn declared_extras(root: &Path) -> Vec<(String, Vec<String>)> {
-    let Ok(text) = std::fs::read_to_string(root.join(".engine/contracts/unit-extras.toml")) else {
+    let Ok(text) = crate::corpus::read_to_string(root.join(".engine/contracts/unit-extras.toml")) else {
         return Vec::new();
     };
     let mut out: Vec<(String, Vec<String>)> = Vec::new();
@@ -1462,7 +1462,7 @@ fn declared_extras(root: &Path) -> Vec<(String, Vec<String>)> {
 
 /// The process names `installed-units.toml` records as installed here.
 fn installed_unit_names(root: &Path) -> Vec<String> {
-    std::fs::read_to_string(root.join(".engine/contracts/installed-units.toml"))
+    crate::corpus::read_to_string(root.join(".engine/contracts/installed-units.toml"))
         .unwrap_or_default()
         .lines()
         .filter_map(|l| l.trim().strip_prefix("process = "))
@@ -1604,7 +1604,7 @@ fn process_anchors(root: &Path) -> Vec<ProcessAnchors> {
         if path.extension().is_none_or(|e| e != "sysml") {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let mut names = vec![stem];
         for line in text.lines() {
@@ -1792,7 +1792,7 @@ pub(crate) fn analysed_actions(root: &Path) -> (usize, HashSet<String>) {
     let mut runs = 0usize;
     let mut names = HashSet::new();
     for path in crate::collect_sysml(&root.join(".tracking")) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         for (i, _) in text.match_indices(":>> procedureText = \"ANALYSED:") {
             runs += 1;
             let rest = &text[i + ":>> procedureText = \"ANALYSED:".len()..];
@@ -2027,7 +2027,7 @@ pub fn stale_gate_prose(root: &Path) -> GuardReport {
     let mut scanned = 0;
     for dir in [".tracking", ".engine", ".knowledge"] {
         for f in crate::collect_sysml(&root.join(dir)) {
-            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
             let lines: Vec<&str> = text.lines().collect();
             for (i, line) in lines.iter().enumerate() {
                 // A passing acceptance RESULT: the record a nearby comment must not contradict.
@@ -2203,7 +2203,7 @@ fn declared_task_names(root: &Path) -> HashSet<String> {
         let base = root.join(".tracking").join(sub);
         let files = if base.is_dir() { crate::collect_sysml(&base) } else { vec![base] };
         for f in files {
-            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
             for line in text.lines() {
                 let t = line.trim_start();
                 if let Some(rest) = t.strip_prefix("action ") {
@@ -2249,7 +2249,7 @@ fn parse_manifest(text: &str) -> Vec<(String, Vec<String>)> {
 #[must_use]
 pub fn manifest_coverage(root: &Path) -> GuardReport {
     let path = root.join(".engine").join("deliverable-manifest.txt");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = crate::corpus::read_to_string(&path) else {
         return GuardReport { name: "manifest-coverage", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &path))] };
     };
     let entries = parse_manifest(&text);
@@ -2473,12 +2473,12 @@ pub fn marker_vocabulary(root: &Path) -> GuardReport {
     // frozen-schema (§2.5) change just to keep committing.
     let mut files = crate::collect_sysml(&root.join(".tracking"));
     files.extend(crate::collect_sysml(&root.join(".engine")));
-    let declared_texts: Vec<String> = files.iter().filter_map(|p| std::fs::read_to_string(p).ok()).collect();
+    let declared_texts: Vec<String> = files.iter().filter_map(|p| crate::corpus::read_to_string(p).ok()).collect();
     let declared = markers_declared(&declared_texts);
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         for (marker, line) in markers_used(&text) {
             scanned += 1;
@@ -2677,7 +2677,7 @@ pub fn retro_backlog(root: &Path) -> GuardReport {
     let sprint_texts: Vec<(String, String)> = changed
         .iter()
         .filter(|p| p.contains(".tracking/delivery/sprint") && std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
-        .filter_map(|p| std::fs::read_to_string(root.join(p)).ok().map(|t| (p.clone(), t)))
+        .filter_map(|p| crate::corpus::read_to_string(root.join(p)).ok().map(|t| (p.clone(), t)))
         // A staged sprint whose RETRO text is unchanged from HEAD is not this commit's retro (D0331):
         // correcting a past sprint's receipt (issue283) re-staged sprint469 and the guard judged a
         // 2026-08-29 retro by a rule written afterwards. Only a retro that moved is this commit's to answer for.
@@ -2869,7 +2869,7 @@ pub fn process_skill(root: &Path) -> GuardReport {
         .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(str::to_string))
         .collect();
     let reg_path = root.join(".engine").join("skills").join("skills-registry.sysml");
-    let Ok(central) = std::fs::read_to_string(&reg_path) else {
+    let Ok(central) = crate::corpus::read_to_string(&reg_path) else {
         return GuardReport { name: "process-skill", scanned: 0, warnings: Vec::new(), violations: vec![format!("cannot read {}", relpath(root, &reg_path))] };
     };
     // D0220: a skill may declare its deployment BESIDE ITSELF, in any `.sysml` under
@@ -2884,7 +2884,7 @@ pub fn process_skill(root: &Path) -> GuardReport {
         if f == reg_path {
             continue;
         }
-        if let Ok(extra) = std::fs::read_to_string(&f) {
+        if let Ok(extra) = crate::corpus::read_to_string(&f) {
             reg.push('\n');
             reg.push_str(&extra);
         }
@@ -2997,7 +2997,7 @@ pub fn duplicate_identity(root: &Path) -> GuardReport {
     let scanned = paths.len();
     let files: Vec<(String, String)> = paths
         .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok().map(|t| (relpath(root, p), t)))
+        .filter_map(|p| crate::corpus::read_to_string(p).ok().map(|t| (relpath(root, p), t)))
         .collect();
 
     let (warnings, mut violations) = duplicate_scan(&files);
@@ -3128,7 +3128,7 @@ pub fn doc_guard_count(root: &Path) -> GuardReport {
     let mut violations = Vec::new();
     let actual = GUARD_NAMES.len();
     for f in files {
-        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
         scanned += 1;
         let rel = f.strip_prefix(root).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         for (n, line) in text.lines().enumerate() {
@@ -3204,14 +3204,14 @@ pub const GUARD_NAMES: [&str; 65] =
 /// code rather than against a second hand-maintained list — which would be one more thing to drift.
 fn control_map_reconciled(root: &Path) -> GuardReport {
     let path = root.join(".engine").join("contracts").join("control-events.toml");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = crate::corpus::read_to_string(&path) else {
         // D0136: absence is a state, stated. A project that never adopted control events has nothing
         // to reconcile, and reporting a violation would fire on a project that opted out.
         return GuardReport { name: "control-map-reconciled", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
     };
     let declared: std::collections::HashSet<String> = crate::collect_sysml(&root.join(".tracking"))
         .iter()
-        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .filter_map(|p| crate::corpus::read_to_string(p).ok())
         .flat_map(|t| {
             t.match_indices("part ctl")
                 .filter_map(|(i, _)| {
@@ -3268,7 +3268,7 @@ fn control_map_reconciled(root: &Path) -> GuardReport {
     // does not hold is a receipt-shaped TESTIMONY — worse than no claim, in the very contract that
     // exists to separate the two (D0253). Existence is the objective half and is checked here; that
     // the named test EXERCISES the control stays with the panel, being judgment (pf35).
-    if let Ok(arming) = std::fs::read_to_string(root.join(".engine").join("contracts").join("control-arming.toml")) {
+    if let Ok(arming) = crate::corpus::read_to_string(root.join(".engine").join("contracts").join("control-arming.toml")) {
         for line in arming.lines() {
             let Some(v) = line.trim().strip_prefix("provenBy = ") else { continue };
             let rel = v.trim().trim_matches('"');
@@ -3308,7 +3308,7 @@ fn control_map_reconciled(root: &Path) -> GuardReport {
 /// every machine except the one that already got it right.
 fn manifest_key_portability(root: &Path) -> GuardReport {
     let path = root.join(".engine").join("contracts").join("installed-units.toml");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = crate::corpus::read_to_string(&path) else {
         // D0136: absence is a state, stated. A project with no installed units has no manifest.
         return GuardReport { name: "manifest-key-portability", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
     };
@@ -3382,7 +3382,7 @@ fn declared_type_name(line: &str) -> Option<&str> {
 pub fn type_collision(root: &Path) -> GuardReport {
     let mut engine: HashMap<String, String> = HashMap::new();
     for path in crate::collect_sysml(&root.join(".engine").join("schema")) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
         for (i, line) in text.lines().enumerate() {
             if let Some(n) = declared_type_name(line) {
@@ -3393,7 +3393,7 @@ pub fn type_collision(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in crate::collect_sysml(&root.join(".tracking")) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
         for (i, line) in text.lines().enumerate() {
             let Some(n) = declared_type_name(line) else { continue };
@@ -3536,7 +3536,7 @@ pub fn ownership(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     for path in &staged {
         let Some(before) = head_blob(root, path) else { continue }; // newly added file — all additions
-        let Ok(after) = std::fs::read_to_string(root.join(path)) else { continue };
+        let Ok(after) = crate::corpus::read_to_string(root.join(path)) else { continue };
         let old = items_with_attrs(&before, path);
         let new = items_with_attrs(&after, path);
         for (name, (owner, new_attrs)) in &new {
@@ -3656,7 +3656,7 @@ pub fn identity_present(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         let decls = id_bearing_decls(&text);
         for (name, ty, line, body) in decls {
@@ -3714,7 +3714,7 @@ pub fn identity_well_formed(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         for (n, raw) in text.lines().enumerate() {
             let line = raw.trim_start();
@@ -3775,7 +3775,7 @@ pub fn tool_reference(root: &Path) -> GuardReport {
     let mut violations = Vec::new();
     let mut reported = std::collections::BTreeSet::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         for (n, line) in text.lines().enumerate() {
             let mut rest = line;
@@ -3826,7 +3826,7 @@ fn evidence_cited(root: &Path) -> GuardReport {
     let files = crate::collect_sysml(&root.join(".tracking"));
     let mut method_of: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for f in &files {
-        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(f) else { continue };
         for cap in text.split("verification ").skip(1) {
             let Some(name) = cap.split([' ', ':']).next() else { continue };
             if let Some(m) = cap.split(":>> method = VerificationMethod::").nth(1) {
@@ -3837,7 +3837,7 @@ fn evidence_cited(root: &Path) -> GuardReport {
         }
     }
     for f in &files {
-        let Ok(text) = std::fs::read_to_string(f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(f) else { continue };
         let lines: Vec<&str> = text.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             if !line.contains(" : TestResult {") {
@@ -3911,7 +3911,7 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
         .collect();
     files.sort();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         // "Runs the gate" is judged by what the workflow actually invokes, not by its name.
         let gates = ["cargo test", "keel guard", "keel validate", "audit-history", "audit-adherence"]
             .iter()
@@ -3971,7 +3971,7 @@ fn instruments_declared(root: &Path) -> GuardReport {
                 continue;
             }
             // An exclusion argued in the file itself, where a reader of the file can see it.
-            let head = std::fs::read_to_string(&p).unwrap_or_default();
+            let head = crate::corpus::read_to_string(&p).unwrap_or_default();
             if head.lines().take(3).any(|l| l.contains("not-an-instrument:")) {
                 continue;
             }
@@ -4030,7 +4030,7 @@ fn gate_environment_parity(root: &Path) -> GuardReport {
     // the gating surfaces: those that actually run the test suite
     let mut gating: Vec<(std::path::PathBuf, String)> = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         if text.contains("cargo test") {
             gating.push((path.clone(), text));
         }
@@ -4134,7 +4134,7 @@ fn process_applicability(root: &Path) -> GuardReport {
         .collect();
     files.sort();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         // Only files that actually DECLARE a process are in scope - a helper or an include is not.
         if !text.contains(": Process {") {
             continue;
@@ -4163,7 +4163,7 @@ pub fn scaffold_placeholder(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         scanned += 1;
         let rel = relpath(root, path);
         for (n, line) in text.lines().enumerate() {
@@ -4228,7 +4228,7 @@ pub fn decision_scaffolding(root: &Path) -> GuardReport {
     files.extend(crate::collect_sysml(&root.join(".engine")));
     let mut texts: Vec<(String, String)> = Vec::new();
     for f in &files {
-        if let Ok(t) = std::fs::read_to_string(f) {
+        if let Ok(t) = crate::corpus::read_to_string(f) {
             texts.push((relpath(root, f), t));
         }
     }
@@ -4419,7 +4419,7 @@ pub fn release_recorded(root: &Path) -> GuardReport {
     // warning was unresolvable by construction and therefore permanent noise.
     let mut superseded: std::collections::HashSet<String> = std::collections::HashSet::new();
     for f in crate::collect_sysml(&root.join(".tracking")) {
-        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
         for line in text.lines() {
             let l = line.trim_start();
             if let Some(rest) = l.strip_prefix("#Supersede dependency from ") {
@@ -4432,7 +4432,7 @@ pub fn release_recorded(root: &Path) -> GuardReport {
     // Every authored Release block: (name, title, commit).
     let mut releases: Vec<(String, String, String)> = Vec::new(); // (name, title, commit)
     for f in crate::collect_sysml(&root.join(".tracking")) {
-        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
         let mut name = String::new();
         let mut title = String::new();
         let mut commit = String::new();
@@ -4495,14 +4495,14 @@ pub fn release_recorded(root: &Path) -> GuardReport {
 /// is per-machine and optional until a write needs an actor.
 #[must_use]
 pub fn enrollment_binding(root: &Path) -> GuardReport {
-    let Some(bound) = std::fs::read_to_string(root.join(crate::actor::BINDING_PATH))
+    let Some(bound) = crate::corpus::read_to_string(root.join(crate::actor::BINDING_PATH))
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
     else {
         return GuardReport { name: "enrollment-binding", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
     };
-    let actors = std::fs::read_to_string(root.join(".tracking").join("actors.sysml")).unwrap_or_default();
+    let actors = crate::corpus::read_to_string(root.join(".tracking").join("actors.sysml")).unwrap_or_default();
     let mut warnings = Vec::new();
     let decl = actors.lines().find_map(|line| {
         let l = line.trim_start();
@@ -4551,7 +4551,7 @@ pub fn judgment_request_quality(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         if !text.contains("status = DecisionStatus::proposed") {
             continue;
         }
@@ -4731,7 +4731,7 @@ pub fn control_event_coverage(root: &Path) -> GuardReport {
     ];
     const INVENTORY_POINTS: [(&str, &str); 2] = [("spec-pin-check", "build-time spec pin"), ("pre-push-behind", "pre-push .githooks")];
     let path = root.join(".engine").join("contracts").join("control-events.toml");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = crate::corpus::read_to_string(&path) else {
         return GuardReport {
             name: "control-event-coverage",
             scanned: EMITTED_LEDGER.len(),
@@ -4878,7 +4878,7 @@ fn hook_config_integrity(root: &Path) -> GuardReport {
 
     for rel in [".claude/settings.json", ".claude/settings.local.json"] {
         let path = root.join(rel);
-        let Ok(text) = std::fs::read_to_string(&path) else {
+        let Ok(text) = crate::corpus::read_to_string(&path) else {
             continue; // absent is fine — neither file is required
         };
         let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
@@ -5138,7 +5138,7 @@ fn base_first_justification(root: &Path) -> GuardReport {
             continue;
         }
         for path in crate::collect_sysml(&dir) {
-            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
             let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
             let lines: Vec<&str> = text.lines().collect();
             for (i, line) in lines.iter().enumerate() {
@@ -5233,7 +5233,7 @@ fn parser_coverage(root: &Path) -> GuardReport {
     // bound only ever tightens. Absent contract = ratchet not adopted, stated (D0136).
     let mut violations = Vec::new();
     let baseline_path = root.join(".engine").join("contracts").join("parser-coverage-baseline.toml");
-    match std::fs::read_to_string(&baseline_path) {
+    match crate::corpus::read_to_string(&baseline_path) {
         Ok(text) => match text.parse::<toml::Value>().ok().and_then(|v| v.get("skipped").and_then(toml::Value::as_integer)) {
             Some(baseline) => {
                 let baseline = usize::try_from(baseline).unwrap_or(0);
@@ -5380,7 +5380,7 @@ pub fn engine_lint(root: &Path) -> GuardReport {
     let decision_files = crate::collect_sysml(&decisions_dir);
     // (1) HARD: import-EngineWork on every decision file.
     for path in &decision_files {
-        if let Ok(text) = std::fs::read_to_string(path) {
+        if let Ok(text) = crate::corpus::read_to_string(path) {
             if !text.contains("import EngineWork") {
                 violations.push(format!(
                     "{}: Decision file missing 'import EngineWork' — the Decision type lives in EngineWork (D0112)",
@@ -5397,7 +5397,7 @@ pub fn engine_lint(root: &Path) -> GuardReport {
     inst_files.push(root.join(".engine").join("skills").join("skills-registry.sysml"));
     inst_files.push(root.join(".engine").join("docs").join("tracking-template.sysml"));
     for path in &inst_files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let inst = count_tracked_instances(&text);
         let ids = text.matches(":>> id =").count();
         if inst > ids {
@@ -5512,7 +5512,7 @@ pub fn cli_surface_violations(
 #[must_use]
 pub fn cli_surface_declared(root: &Path) -> GuardReport {
     let path = root.join(".engine").join("cli").join("commands.sysml");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = crate::corpus::read_to_string(&path) else {
         return GuardReport {
             name: "cli-surface-declared",
             scanned: 0,
@@ -5582,7 +5582,7 @@ mod guard_catalogue_tests {
     /// the file said all did - because nothing computed the two lists against each other.
     #[test]
     fn every_guard_has_a_constraint_def_identity() {
-        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../.engine/rules/guard-constraints.sysml")).expect("guard-constraints.sysml");
+        let text = crate::corpus::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../.engine/rules/guard-constraints.sysml")).expect("guard-constraints.sysml");
         let declared: std::collections::HashSet<String> = text
             .lines()
             .filter_map(|l| l.trim().strip_prefix("constraint def "))
@@ -5610,7 +5610,7 @@ mod guard_catalogue_tests {
     /// act on.
     #[test]
     fn every_guard_has_a_catalogue_row() {
-        let md = std::fs::read_to_string("../.engine/docs/guards.md").expect("guards.md ships with the engine");
+        let md = crate::corpus::read_to_string("../.engine/docs/guards.md").expect("guards.md ships with the engine");
         let missing: Vec<&str> = super::GUARD_NAMES.iter().copied().filter(|n| !md.contains(&format!("| `{n}` |"))).collect();
         assert!(missing.is_empty(), "guards with no row in .engine/docs/guards.md: {missing:?}");
     }
@@ -5661,7 +5661,7 @@ mod cli_surface_declared_tests {
 
     #[test]
     fn the_live_facts_mirror_and_dispatch_agree() {
-        let text = std::fs::read_to_string("../.engine/cli/commands.sysml").expect("the facts ship with the engine");
+        let text = crate::corpus::read_to_string("../.engine/cli/commands.sysml").expect("the facts ship with the engine");
         let authored = parse_cli_facts(&text);
         assert_eq!(authored.len(), crate::cli_facts::CLI_FACTS.len(), "every fact parsed");
         let v = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
@@ -5829,7 +5829,7 @@ mod scan_count_tests {
     /// `scanned` untrustworthy again and untrustworthy numbers get used.
     #[test]
     fn the_runner_flags_a_violation_against_an_empty_scan() {
-        let src = std::fs::read_to_string("src/guards.rs").expect("guards.rs is readable");
+        let src = crate::corpus::read_to_string("src/guards.rs").expect("guards.rs is readable");
         assert!(
             src.contains("self.scanned == 0 && !self.violations.is_empty()"),
             "the self-contradiction check must survive in GuardReport::print"
@@ -5921,7 +5921,7 @@ mod identity_form_tests {
     /// keyed its exemption on a DATE and thereby exempted the defect it existed to catch.
     #[test]
     fn the_grandfather_set_cannot_grow_quietly() {
-        let src = std::fs::read_to_string("src/guards.rs").expect("guards.rs is readable");
+        let src = crate::corpus::read_to_string("src/guards.rs").expect("guards.rs is readable");
         let body = src
             .split_once("const GRANDFATHERED: [&str; 15]")
             .expect("the set is declared with its size, so a 16th entry does not compile")
@@ -6096,7 +6096,7 @@ mod tests {
         collect(&src, &mut files);
         let mut uncovered = Vec::new();
         for f in files {
-            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
             if !text.contains("-> GuardReport") {
                 continue;
             }
@@ -6432,7 +6432,7 @@ pub fn attribute_vocabulary(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
     for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let rel = relpath(root, path);
         // The type of the element whose braces we are inside, with the depth it opened at.
         let mut stack: Vec<(String, String, i32)> = Vec::new();

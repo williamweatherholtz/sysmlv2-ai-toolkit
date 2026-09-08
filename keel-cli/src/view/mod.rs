@@ -373,19 +373,20 @@ fn edge_kind_from_marker(marker: &str) -> String {
 /// page-load burst fires ~8 views that each call `Model::build`; without this they each re-parse all
 /// ~260 files — slow on I/O-heavy hosts, e.g. Windows Defender scanning each read). Regenerable cache,
 /// never truth (§2.1) — invalidated automatically when any file changes.
-static MODEL_CACHE: std::sync::Mutex<Option<(u64, Model)>> = std::sync::Mutex::new(None);
+static MODEL_CACHE: std::sync::Mutex<Option<(u64, std::sync::Arc<Model>)>> = std::sync::Mutex::new(None);
 /// Serializes BUILDS so a concurrent cold burst does ONE parse (others wait, then hit the cache).
 static MODEL_BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 impl Model {
-    /// The cached model if its fingerprint matches `fp`.
-    fn cached_model(fp: u64) -> Option<Self> {
-        MODEL_CACHE.lock().ok().and_then(|g| g.as_ref().filter(|(c, _)| *c == fp).map(|(_, m)| m.clone()))
+    /// The cached model if its fingerprint matches `fp` - a shared handle, never a clone of the
+    /// graph (dcOneCorpusPerProcess: forty guards used to copy ~1,160 files' worth of items each).
+    fn cached_model(fp: u64) -> Option<std::sync::Arc<Self>> {
+        MODEL_CACHE.lock().ok().and_then(|g| g.as_ref().filter(|(c, _)| *c == fp).map(|(_, m)| std::sync::Arc::clone(m)))
     }
 
     /// Build the model, MEMOIZED by content fingerprint (see [`MODEL_CACHE`]). A burst of concurrent
     /// callers on an unchanged model shares one parse; the cache invalidates on any file change.
-    fn build(root: &Path) -> Result<Self, ViewError> {
+    fn build(root: &Path) -> Result<std::sync::Arc<Self>, ViewError> {
         crate::perf::add(&crate::perf::BUILD_CALLS, 1);
         let fp = crate::fingerprint::of(root);
         if let Some(m) = Self::cached_model(fp) {
@@ -397,9 +398,9 @@ impl Model {
             crate::perf::add(&crate::perf::CACHE_HITS, 1);
             return Ok(m); // another thread built it while we waited
         }
-        let model = crate::perf::timed(&crate::perf::PARSE_NANOS, || Self::build_uncached(root))?;
+        let model = std::sync::Arc::new(crate::perf::timed(&crate::perf::PARSE_NANOS, || Self::build_uncached(root))?);
         if let Ok(mut g) = MODEL_CACHE.lock() {
-            *g = Some((fp, model.clone()));
+            *g = Some((fp, std::sync::Arc::clone(&model)));
         }
         Ok(model)
     }
@@ -411,7 +412,7 @@ impl Model {
         let paths: Vec<_> = dirs.iter().flat_map(|d| crate::collect_sysml(d)).collect();
         for path in paths {
             let name = path.display().to_string();
-            let src = std::fs::read_to_string(&path).map_err(|e| ViewError::Io(name.clone(), e))?;
+            let src = crate::corpus::read_to_string(&path).map_err(|e| ViewError::Io(name.clone(), e))?;
             let tokens = tokenize(&src, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
             let pkg = parse(tokens, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
             // Repo-relative, forward-slashed path — matches `git diff --name-only` for `newlyAdded` scope.
@@ -759,7 +760,7 @@ pub(crate) fn snapshot_json(root: &Path, seed: &str, depth: usize, edges: &HashS
 
 /// Build the model AS OF a git `commit` by checking that commit out into a throwaway `git worktree`,
 /// building the model there, and removing the worktree. Used by baseline-compare (N-13).
-fn model_at_commit(root: &Path, commit: &str, tag: &str) -> Result<Model, ViewError> {
+fn model_at_commit(root: &Path, commit: &str, tag: &str) -> Result<std::sync::Arc<Model>, ViewError> {
     let root_s = root.to_string_lossy().to_string();
     let tmp = std::env::temp_dir().join(format!("keel-bl-{tag}-{}", commit.replace(|c: char| !c.is_alphanumeric(), "")));
     let tmp_s = tmp.to_string_lossy().to_string();
@@ -1002,7 +1003,7 @@ pub(crate) fn schema_json(root: &Path) -> Result<String, ViewError> {
         .iter()
         .flat_map(|(tn, attrs)| attrs.iter().map(move |(an, at)| ((tn.clone(), an.clone()), at.clone())))
         .collect();
-    let stats_json = attribute_stats(&Model::build(root)?, &decl, &enum_names);
+    let stats_json = attribute_stats(&*Model::build(root)?, &decl, &enum_names);
     let type_json: Vec<Json> = types
         .iter()
         .map(|(name, attrs)| {
@@ -1363,7 +1364,10 @@ fn section_subgraph_json(model: &Model, names: &HashSet<String>, seed: &str, kin
 /// Resolve a section seed to its bounded model + element set (sr18). Either a declared view's element
 /// set (`view`), or an element plus its 1-hop typed-edge neighbourhood (`element`); exactly one seed.
 /// Returns `(model, kind, seed, names)`.
-fn resolve_section(root: &Path, view: Option<&str>, element: Option<&str>) -> Result<(Model, &'static str, String, HashSet<String>), ViewError> {
+/// A resolved render section: the model, the section kind, its name, and the selected item names.
+type ResolvedSection = (std::sync::Arc<Model>, &'static str, String, HashSet<String>);
+
+fn resolve_section(root: &Path, view: Option<&str>, element: Option<&str>) -> Result<ResolvedSection, ViewError> {
     match (view, element) {
         (Some(v), None) => {
             let (_, model, result) = run_resolved(root, v)?;
@@ -1588,7 +1592,7 @@ pub fn run(root: &Path, view_name: &str) -> Result<String, ViewError> {
 /// # Errors
 /// Returns [`ViewError`] if the view file is missing, the TOML is invalid, a tracking/instance file
 /// fails to parse, or the view references an unknown edge kind.
-fn run_resolved(root: &Path, view_name: &str) -> Result<(ViewSpec, Model, HashSet<String>), ViewError> {
+fn run_resolved(root: &Path, view_name: &str) -> Result<(ViewSpec, std::sync::Arc<Model>, HashSet<String>), ViewError> {
     let path = root.join(".engine").join("views").join(format!("{view_name}.view.toml"));
     if !path.exists() {
         return Err(ViewError::NotFound(path.display().to_string()));
@@ -2178,7 +2182,7 @@ pub fn superseded_names(root: &Path) -> Result<HashSet<String>, ViewError> {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn pending_acceptances(root: &Path) -> Result<Vec<String>, ViewError> {
-    Ok(proposed_decisions(&Model::build(root)?))
+    Ok(proposed_decisions(&*Model::build(root)?))
 }
 
 /// Is `name` a declared item in the model?
@@ -2229,7 +2233,7 @@ fn proposed_decisions(model: &Model) -> Vec<String> {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn blocked_on_acceptance(root: &Path) -> Result<HashSet<String>, ViewError> {
-    Ok(blocked_by(&Model::build(root)?))
+    Ok(blocked_by(&*Model::build(root)?))
 }
 
 /// Pure core of [`blocked_on_acceptance`], for self-test.
@@ -3043,7 +3047,7 @@ fn capability_root_violations(model: &Model) -> Vec<String> {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn rootedness_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
-    Ok(capability_root_violations(&Model::build(root)?))
+    Ok(capability_root_violations(&*Model::build(root)?))
 }
 
 // ── tier-satisfaction comprehensiveness (D0098/issue047 — the DOWNWARD integrity burndown) ──────

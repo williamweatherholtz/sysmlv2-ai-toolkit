@@ -231,7 +231,7 @@ pub fn critique_gaps(root: &Path) -> Result<Vec<String>, ViewError> {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn critique_suspect(root: &Path) -> Result<Vec<String>, ViewError> {
-    Ok(critique_suspect_set(&Model::build(root)?))
+    Ok(critique_suspect_set(&*Model::build(root)?))
 }
 
 /// Pure core of [`critique_suspect`]: the sorted set of elements with an unresolved failing critique.
@@ -348,7 +348,7 @@ fn normalize_attestation(s: &str) -> String {
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn thin_attestations(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
-    Ok(thin_attestation_list(&Model::build(root)?))
+    Ok(thin_attestation_list(&*Model::build(root)?))
 }
 
 /// Pure core of [`thin_attestations`], for self-test.

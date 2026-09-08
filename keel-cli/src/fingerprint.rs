@@ -96,7 +96,7 @@ pub fn compute(root: &Path) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for base in [".tracking", ".engine", ".knowledge"] {
         crate::perf::add(&crate::perf::TREES_WALKED, 1);
-        let files = crate::collect_sysml(&root.join(base));
+        let files = crate::collect_sysml_uncached(&root.join(base));
         crate::perf::add(&crate::perf::FILES_STATTED, files.len() as u64);
         for f in files {
             if let Ok(m) = std::fs::metadata(&f) {

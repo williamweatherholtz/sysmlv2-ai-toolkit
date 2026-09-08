@@ -26,6 +26,12 @@ pub static PARSE_NANOS: AtomicU64 = AtomicU64::new(0);
 pub static FILES_STATTED: AtomicU64 = AtomicU64::new(0);
 /// Directory trees walked by `collect_sysml` — each one a recursive `read_dir` plus a sort.
 pub static TREES_WALKED: AtomicU64 = AtomicU64::new(0);
+/// Walks answered from the corpus memo because every directory's mtime still matched.
+pub static WALK_HITS: AtomicU64 = AtomicU64::new(0);
+/// Files actually opened by `corpus::read_to_string`. On a Defender host the open is the cost.
+pub static FILE_OPENS: AtomicU64 = AtomicU64::new(0);
+/// Reads answered from the corpus cache because the file's `(len, mtime)` still matched.
+pub static CORPUS_HITS: AtomicU64 = AtomicU64::new(0);
 
 /// `git` subprocesses spawned. A process spawn is the most expensive thing this program does on
 /// Windows, and it is invisible in a wall-clock number — hence a counter rather than another inference.
@@ -200,13 +206,16 @@ pub fn report() -> Option<String> {
     let hits = CACHE_HITS.load(Ordering::Relaxed);
     let fp_ns = FINGERPRINT_NANOS.load(Ordering::Relaxed);
     Some(format!(
-        "keel perf: Model::build x{calls} ({hits} cached, {} parsed) | fingerprint {}ms ({}ms/call) | parse {}ms | {} stat(s), {} tree walk(s) | git x{} in {}ms",
+        "keel perf: Model::build x{calls} ({hits} cached, {} parsed) | fingerprint {}ms ({}ms/call) | parse {}ms | {} stat(s), {} tree walk(s) ({} from memo) | {} file open(s) ({} from corpus) | git x{} in {}ms",
         calls - hits,
         ms(fp_ns),
         ms(fp_ns / calls),
         ms(PARSE_NANOS.load(Ordering::Relaxed)),
         FILES_STATTED.load(Ordering::Relaxed),
         TREES_WALKED.load(Ordering::Relaxed),
+        WALK_HITS.load(Ordering::Relaxed),
+        FILE_OPENS.load(Ordering::Relaxed),
+        CORPUS_HITS.load(Ordering::Relaxed),
         GIT_CALLS.load(Ordering::Relaxed),
         ms(GIT_NANOS.load(Ordering::Relaxed)),
     ) + &format!(" | grandfathered x{}", GF_CALLS.load(Ordering::Relaxed)) + &git_breakdown() + &phase_breakdown())

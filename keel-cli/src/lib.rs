@@ -81,6 +81,7 @@ pub mod launcher;
 pub mod library;
 pub mod enroll;
 pub mod gitx;
+pub mod corpus;
 pub mod gitfacts;
 pub mod govern;
 pub mod guards;
@@ -109,9 +110,18 @@ pub mod write;
 
 /// Recursively collect every `.sysml` file under `dir`, sorted by path.
 ///
-/// Returns an empty `Vec` if `dir` does not exist or is not readable.
+/// Returns an empty `Vec` if `dir` does not exist or is not readable. Served from the process's
+/// remembered walk while every directory it entered still carries the mtime it had
+/// ([`corpus::collect_sysml`]); the change detector uses [`collect_sysml_uncached`].
 #[must_use]
 pub fn collect_sysml(dir: &Path) -> Vec<PathBuf> {
+    corpus::collect_sysml(dir)
+}
+
+/// The walk itself, never memoized - what `fingerprint::compute` reads, because the thing that
+/// detects change must not read a memo (dcOneCorpusPerProcess).
+#[must_use]
+pub fn collect_sysml_uncached(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
         return out;
@@ -119,7 +129,7 @@ pub fn collect_sysml(dir: &Path) -> Vec<PathBuf> {
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            out.extend(collect_sysml(&p));
+            out.extend(collect_sysml_uncached(&p));
         } else if p.extension().and_then(|e| e.to_str()) == Some("sysml") {
             out.push(p);
         }
