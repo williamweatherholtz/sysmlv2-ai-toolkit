@@ -263,40 +263,56 @@ fn latest_result_full(model: &Model, v: &str) -> Option<(String, String, String)
 /// surface (D0315/issue359).
 pub const TTY_GESTURE_MARK: &str = "tty gesture";
 
-/// Does an acceptance record carry its channel evidence (D0192 OPTION A)?
+/// Every quoted span of ten or more characters in `text` - the human's verbatim words, bounded.
 ///
-/// True on a single-quoted span of at least 10 characters (the human's verbatim conversational words)
-/// or a named human surface gesture (deck/console/GitHub comment/TTY).
-/// Every single-quoted span of ten or more characters in `text` (an apostrophe followed by a letter is
-/// part of the words, not a closing quote - the same rule `quotes_conversational_words` reads by).
+/// Two kinds of boundary, in order of trust (D0375 / issue397):
+/// - DECLARED: a typographic pair, opening “ (U+201C) to the next closing ” (U+201D), or ‘ (U+2018) to
+///   ’ (U+2019). Nothing in ordinary prose produces these by accident, so the span is exactly what was
+///   quoted. `keel accept --words` records the human's words inside such a pair.
+/// - INFERRED: an ASCII single quote. It opens a span only when it is NOT inside a word - the byte
+///   before it is not alphanumeric - and it closes a span only when NOT followed by a letter. Both
+///   halves of that rule exist because the same character is the apostrophe: `brief's` opened a
+///   span from the possessive in the recorder's OWN framing and swallowed the real quote (issue397),
+///   and `let's` inside a quote used to close it early (the D0205 incident).
 pub(super) fn quoted_spans(text: &str) -> Vec<String> {
-    let bytes = text.as_bytes();
+    let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
     let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes.get(i) == Some(&b'\'') {
-            let mut j = i + 1;
-            while j < bytes.len() {
-                if bytes.get(j) == Some(&b'\'') && !bytes.get(j + 1).is_some_and(u8::is_ascii_alphabetic) {
-                    break;
-                }
-                j += 1;
-            }
-            if j < bytes.len() {
-                if let Some(span) = text.get(i + 1..j) {
-                    if span.chars().count() >= 10 {
-                        out.push(span.to_string());
-                    }
-                }
-            }
-            i = j + 1;
-        } else {
+    while let Some(&c) = chars.get(i) {
+        let in_word = i > 0 && chars.get(i - 1).is_some_and(|p| p.is_alphanumeric());
+        let closer = match c {
+            '\u{201C}' => Some('\u{201D}'),
+            '\u{2018}' => Some('\u{2019}'),
+            '\'' if !in_word => Some('\''),
+            _ => None,
+        };
+        let Some(closer) = closer else {
             i += 1;
+            continue;
+        };
+        // The first closer after the opener; for an ASCII quote, one not followed by a letter.
+        let close_at = (i + 1..chars.len()).find(|&j| {
+            chars.get(j) == Some(&closer)
+                && (closer != '\'' || !chars.get(j + 1).is_some_and(char::is_ascii_alphabetic))
+        });
+        match close_at {
+            Some(j) => {
+                if let Some(span) = chars.get(i + 1..j).filter(|s| s.len() >= 10) {
+                    out.push(span.iter().collect());
+                }
+                i = j + 1;
+            }
+            // unclosed: nothing after this point can be a span opened here
+            None => i += 1,
         }
     }
     out
 }
 
+/// Does an acceptance record carry its channel evidence (D0192 OPTION A)?
+///
+/// True on a quoted span of at least 10 characters (the human's verbatim conversational words, bounded
+/// by the rule `quoted_spans` states) or a named human surface gesture (deck/console/GitHub comment/TTY).
 pub(super) fn quotes_conversational_words(text: &str) -> bool {
     let lower = text.to_lowercase();
     // Named human-surface gestures that ARE the channel evidence: the localhost deck/console, and a
@@ -309,30 +325,9 @@ pub(super) fn quotes_conversational_words(text: &str) -> bool {
     if lower.contains("deck") || lower.contains("console") || lower.contains("github comment") || lower.contains("github.com/") || lower.contains(TTY_GESTURE_MARK) {
         return true;
     }
-    // A quote span closes at an apostrophe NOT followed by a letter — otherwise every contraction
-    // ("let's", "doesn't") truncates the span and an honest verbatim quote fails the check (found
-    // live: the D0205 acceptance quoting 'yep let's go' scanned as 7 chars). An apostrophe with a
-    // letter right after is part of the words, not the closing quote.
-    let bytes = text.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes.get(i) == Some(&b'\'') {
-            let mut j = i + 1;
-            while j < bytes.len() {
-                if bytes.get(j) == Some(&b'\'') && !bytes.get(j + 1).is_some_and(u8::is_ascii_alphabetic) {
-                    break;
-                }
-                j += 1;
-            }
-            if j < bytes.len() && text.get(i + 1..j).is_some_and(|s| s.chars().count() >= 10) {
-                return true;
-            }
-            i = j + 1;
-        } else {
-            i += 1;
-        }
-    }
-    false
+    // The span rule lives in `quoted_spans` so the substance guard and the accept read-back read the
+    // human's words by ONE boundary rule (issue397: two copies of it had drifted apart in comment only).
+    !quoted_spans(text).is_empty()
 }
 
 /// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) for item `name`. Returns `None`
@@ -744,5 +739,29 @@ mod tests {
         // A short quoted fragment is an apostrophe artifact, not conversational words.
         assert!(!quotes_conversational_words("they said 'ok' and moved on"));
         assert!(!quotes_conversational_words(""));
+    }
+
+    /// issue397 / D0375: the human's words are bounded by something prose cannot fake. Both directions
+    /// are constructed - the refusal that bit (a possessive in the framing swallowed the real quote) and
+    /// the one that matters (a spliced span carrying an id the human never typed must NOT pass).
+    #[test]
+    fn quoted_spans_are_bounded_and_an_in_word_apostrophe_never_opens_one() {
+        use super::quoted_spans;
+        // The live refusal: "brief's" used to open a span at the possessive, capturing
+        // "s own copy-for-AI digest, their words verbatim: " and demoting the real quote to prose.
+        let live = "recorded from the decision brief's own copy-for-AI digest, their words verbatim: '- [x] Accept the rule (answers: d0360)'";
+        assert_eq!(quoted_spans(live), vec!["- [x] Accept the rule (answers: d0360)".to_string()], "the possessive is in-word and opens nothing");
+        // The passing direction that matters: prose around a quote that does NOT name the decision,
+        // spliced so that the old rule's span would have carried the id. The human said 'looks fine';
+        // the id sits in the recorder's framing between two possessives.
+        let spliced = "the panel's view on d0360's text - their words: 'looks fine to me'";
+        assert_eq!(quoted_spans(spliced), vec!["looks fine to me".to_string()], "the id in the framing is never inside a span");
+        // Declared boundaries: a typographic pair is exact even when the words carry apostrophes and ids.
+        let declared = "their words, verbatim: \u{201C}c for d375, let's go with the plan's steps\u{201D} (chat)";
+        assert_eq!(quoted_spans(declared), vec!["c for d375, let's go with the plan's steps".to_string()]);
+        // A contraction inside an ASCII-quoted span still does not close it (the D0205 incident stays fixed).
+        assert_eq!(quoted_spans("Their words, verbatim: 'yep let's go now' (chat)"), vec!["yep let's go now".to_string()]);
+        // An unclosed opener yields nothing rather than swallowing the rest of the note.
+        assert!(quoted_spans("they said 'ok and moved on, no closing quote").is_empty());
     }
 }

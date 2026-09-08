@@ -27,7 +27,7 @@ pub mod control_structure;
 
 /// Does an acceptance note carry the human's words as a quote receipt (D0192)?
 ///
-/// A single-quoted span of at least ten characters, or a named human-surface gesture (deck, console,
+/// A quoted span of at least ten characters with a declared boundary (`checks::quoted_spans`), or a named human-surface gesture (deck, console,
 /// GitHub comment). The same
 /// predicate the `delegatedAcceptanceSubstanceRule` applies after the fact, exposed so `keel accept`
 /// can apply it BEFORE writing (D0289) instead of writing a record the gate will refuse.
@@ -4998,6 +4998,12 @@ mod tests {
         assert!(!super::read_back_names("their words: 'yes, accept it please'", "d0312", &letters, title), "a bare yes names nothing");
         assert!(!super::read_back_names("their words: 'd0313 looks fine'", "d0312", &[], title), "another decision's id is not this one");
         assert!(super::read_back_names("accepted at the console review queue", "d0312", &[], title), "a cited gesture carries its own binding");
+        // issue397 / D0375, both directions: the possessive in the recorder's framing no longer shifts
+        // the span, so the words that DO name the decision bind - and words that do not, spliced around
+        // an id in the framing, are still refused.
+        assert!(super::read_back_names("recorded from the decision brief's own copy-for-AI digest, their words verbatim: '- [x] Accept the rule (answers: d0360)'", "d0360", &[], "x"), "the live refusal of 2026-09-08 binds");
+        assert!(!super::read_back_names("the panel's view on d0360's text - their words: 'looks fine to me'", "d0360", &letters, "x"), "an id in the framing is not the human naming it");
+        assert!(super::read_back_names("their words, verbatim: \u{201C}c for d375\u{201D} (chat, 2026-09-08)", "d0375", &letters, "x"), "declared boundaries; the id in any spelling and the letter");
     }
 
     #[test]

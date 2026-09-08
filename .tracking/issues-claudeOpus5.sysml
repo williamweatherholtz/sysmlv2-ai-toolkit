@@ -1368,4 +1368,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcBriefDeliveredCountIsStructural to issue411;
+
+    part issue412 : Issue {
+        :>> id = "5061870a-3f23-4d6b-a1e5-0a2860986710";
+        :>> title = "keel suite from PowerShell reports seven red tests that are green from git-bash: a test shells to sh";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel suite launched from PowerShell reports seven red tests that are green from git-bash. Every test in keel-cli/tests/wrapper_resolves_only_the_pin.rs computes its fixture checksum by spawning `sh -c sha256sum` (line 41), and a PowerShell process on this host has no `sh` on PATH: the seven panic with `sha tool: Error { kind: NotFound, message: 'program not found' }` and the suite writes a `fail` receipt (fingerprint 37f6d8356120, 2026-09-08) over a deliverable that the same suite, launched from git-bash, passes 589/0. The verdict depends on the launching shell, which is the issue065 friction class reaching the suite receipt. Resolver: the test computes the checksum in Rust (sha2 is already a dependency of the wrapper's checksum path, or the test resolves `sh` through the same probe the wrapper uses and SKIPS with a named reason when no POSIX shell is present) - the suite's receipt must not turn on PATH.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSuiteReceiptDoesNotTurnOnPath to issue412;
 }

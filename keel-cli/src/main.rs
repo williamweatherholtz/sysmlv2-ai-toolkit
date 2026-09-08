@@ -4370,7 +4370,7 @@ fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<
                     eprintln!("keel accept: recording the human's acceptance under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
                 }
                 (Some(d), false) => {
-                    eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but the note must QUOTE their words verbatim - a single-quoted span of at least ten characters, e.g. --note \"their words: 'yes, accept it'\" - or cite their deck/console/GitHub gesture (D0192/D0289).");
+                    eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair - or cite their deck/console/GitHub gesture (D0192/D0289).");
                     return Some(1);
                 }
                 (None, _) => {
@@ -4407,7 +4407,31 @@ fn decision_options_and_title(root: &Path, dec: &str) -> (Vec<String>, String) {
     (letters, title)
 }
 
+/// `--words TEXT` (D0375/issue397): the human's verbatim words as their OWN argument, folded into the
+/// note inside a typographic quote pair so the boundary is declared, never inferred from an apostrophe
+/// in the recorder's framing. Returns the args with `--words` gone and `--note` carrying the pair.
+fn fold_words_into_note(args: &[String]) -> Vec<String> {
+    let Some(words) = flag(args, "words") else { return args.to_vec() };
+    let framing = flag(args, "note").unwrap_or_else(|| "recorded from chat".to_string());
+    let note = format!("{framing} - their words, verbatim: \u{201C}{}\u{201D}", words.trim());
+    let mut out = Vec::with_capacity(args.len());
+    let mut skip_value = false;
+    for a in args {
+        if skip_value {
+            skip_value = false;
+        } else if a == "--words" || a == "--note" {
+            skip_value = true;
+        } else {
+            out.push(a.clone());
+        }
+    }
+    out.push("--note".to_string());
+    out.push(note);
+    out
+}
+
 fn cmd_accept(args: &[String]) -> i32 {
+    let args = &fold_words_into_note(args);
     let tty_gesture = tty_gesture();
     if let Some(exit) = accept_channel_refusal(args, tty_gesture) {
         return exit;
@@ -4415,6 +4439,8 @@ fn cmd_accept(args: &[String]) -> i32 {
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
     let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
         eprintln!("usage: keel accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
+        eprintln!("       keel accept <decision> --words \"<their words, verbatim>\" [--note \"<framing>\"] --by <humanActor> --date YYYY-MM-DD");
+        eprintln!("         --words records the words inside a typographic quote pair, so an apostrophe in the framing can never shift the span (D0375/issue397).");
         eprintln!();
         eprintln!("Records a HUMAN's acceptance of a proposed Decision (D0106). The note must be what they");
         eprintln!("actually said — it IS the attestation, and `confirmation-authenticity` independently checks");
