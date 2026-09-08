@@ -12,6 +12,7 @@ a `how` that says why. Nothing is ever guessed, and no answer is hardcoded.
 Python 3 stdlib only; shells out to git, gh and ./target/release/keel.exe.
 """
 
+import glob
 import json
 import os
 import re
@@ -790,6 +791,56 @@ fact("guardsProven", proven, "guards named in a test that asserts a failure",
      "(D0360)." + ("" if ok else " census failed: " + str(census)[:80]))
 fact("guardsUnnamed", unnamed, "guards named in no test body at all",
      "`python .engine/tools/guard_proof_census.py`: neither a demonstrated catch nor a demonstrated pass.")
+
+# ================================================================ 10. the routing probe's price (D0378)
+# The numbers the routingNumber fork rests on. The prompt count is read from the rig's own table; the
+# costs are read from issue392's text - the one place they were recorded - never retyped here.
+_rp = read(os.path.join(REPO, ".engine", "tools", "routing_prompts.toml")) or ""
+fact("routingPrompts", _rp.count("[[case]]") or None, "prompts in the routing table",
+     "count of `[[case]]` tables in .engine/tools/routing_prompts.toml - one per deployed process.")
+_i392 = ""
+for _p in glob.glob(os.path.join(REPO, ".tracking", "issues-*.sysml")):
+    _t = read(_p) or ""
+    _m = re.search(r"part issue392 : Issue \{(.*?)\n    \}", _t, re.S)
+    if _m:
+        _i392 = _m.group(1)
+        break
+I392_HOW = "read from the description of issue392 (the probe's cost, measured on this host 2026-09-06): "
+_m = re.search(r"\$(\d+\.\d+)-(\d+\.\d+) and (\d+)-(\d+)s per run sequentially", _i392)
+fact("routingRunCostLowUsd", float(_m.group(1)) if _m else None, "USD per probe run (low)",
+     I392_HOW + "the `$a-b ... per run` span.")
+fact("routingRunCostHighUsd", float(_m.group(2)) if _m else None, "USD per probe run (high)",
+     I392_HOW + "the `$a-b ... per run` span.")
+fact("routingRunSecLow", int(_m.group(3)) if _m else None, "seconds per probe run (low)",
+     I392_HOW + "the `a-bs per run sequentially` span.")
+fact("routingRunSecHigh", int(_m.group(4)) if _m else None, "seconds per probe run (high)",
+     I392_HOW + "the `a-bs per run sequentially` span.")
+_m = re.search(r"One sample per skill over \d+ skills is ~\$(\d+)", _i392)
+fact("routingOneSampleUsd", int(_m.group(1)) if _m else None, "USD, one sample of every prompt",
+     I392_HOW + "the `One sample per skill ... is ~$N` sentence.")
+_m = re.search(r"Three samples[^$]*~\$(\d+) and around an hour", _i392)
+fact("routingThreeSamplesUsd", int(_m.group(1)) if _m else None, "USD, three samples of every prompt",
+     I392_HOW + "the `Three samples ... ~$N and around an hour` sentence.")
+fact("routingThreeSamplesMinutes", 60 if _m else None, "minutes, three samples of every prompt",
+     I392_HOW + "the same sentence's `around an hour`.")
+_m = re.search(r"(\w+) of the (\w+) cases common to both runs changed verdict", _i392)
+_words = {"one": 1, "two": 2, "three": 3, "four": 4}
+fact("routingVerdictsFlipped", _words.get((_m.group(1) if _m else "").lower()),
+     "verdicts that changed between two identical runs",
+     I392_HOW + "the `N of the M cases ... changed verdict` sentence.")
+fact("routingVerdictsCompared", _words.get((_m.group(2) if _m else "").lower()),
+     "verdicts compared across two identical runs", I392_HOW + "the same sentence.")
+_low = FACTS["routingRunCostLowUsd"]["value"]
+_high = FACTS["routingRunCostHighUsd"]["value"]
+fact("routingSubsetThreeSamplesUsd",
+     round(16 * 3 * (_low + _high) / 2.0) if _low and _high else None,
+     "USD, three samples of a 16-prompt subset",
+     "16 prompts x 3 samples x the midpoint of routingRunCostLowUsd..HighUsd. The subset size (12 fixed + 4 "
+     "rotated) is the shape proposed in D0378 option B, not a measured fact; the per-run cost is.")
+fact("routingSubsetThreeSamplesMinutes",
+     round(16 * 3 * 31 / 60.0) if "31s per run at four-way parallelism" in _i392 else None,
+     "minutes, three samples of a 16-prompt subset at four-way parallelism",
+     I392_HOW + "`31s per run at four-way parallelism`, times 48 runs. The subset size is D0378 option B's proposal.")
 
 # ================================================================ emit
 DOC = {
