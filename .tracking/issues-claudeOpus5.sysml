@@ -1412,4 +1412,16 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRoutingVerdictReadsTheWholeTurn to issue415;
+
+    part issue416 : Issue {
+        :>> id = "70377808-a1ac-4d04-8dcb-8f7a735fece4";
+        :>> title = "A module changed, its integration test was stale, the commit gate was green and CI was red - nothing between edit and push runs the tests that name the module";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 610 changed keel-cli/src/view/control_structure.rs and landed at f49684f with a green commit gate and a red CI: keel-cli/tests/control_structure_is_computed.rs, the integration test of that very view, asserted the shape the change replaced (the channel role reading inert) and had not been run. The implement gate's receipt named `cargo test --release control_structure`, which errors on the cucumber harness's filter argument, so the run that actually happened was `--lib` - the unit tests inside the module, eight green - and the receipt overstated it. The full suite exists (`keel suite`) and its land gate was withdrawn by the human as too costly for what it catches (D0356), so nothing between an edit and a push runs the integration tests that name the module being edited. That is a narrower and cheaper set than the suite: here, one file, four seconds. The class is a change to a module whose out-of-tree test is stale, found by CI after the push - a red main that the next contributor pulls.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "stpaStepTwoIsCompleteStory";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTouchedTestsRunBeforeLand to issue416;
 }

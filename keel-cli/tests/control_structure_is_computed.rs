@@ -46,6 +46,9 @@ fn names(v: &serde_json::Value, key: &str) -> Vec<String> {
 fn anchors(v: &serde_json::Value) -> Vec<Option<String>> {
     v["controllers"].as_array().expect("controllers").iter().map(|c| c["anchor"].as_str().map(str::to_string)).collect()
 }
+fn absent_roles(v: &serde_json::Value) -> Vec<String> {
+    v["absentRoles"].as_array().expect("absentRoles").iter().map(|x| x["role"].as_str().unwrap_or("").to_string()).collect()
+}
 
 #[test]
 fn a_fresh_project_computes_its_structure_with_no_authored_anchors() {
@@ -55,12 +58,15 @@ fn a_fresh_project_computes_its_structure_with_no_authored_anchors() {
     assert!(ok, "the view runs on a fresh project: {text}");
     let v = parse(&text);
     // Every role is derived: hooks from settings.json, commit gate from .githooks, ci from the scaffolded
-    // workflow, agent from the CLI facts, human from record statement, console from serve. Two roles may
-    // read inert on a scaffold, and both readings are TRUE: the remote's refusal is a live fetch (offline
-    // here), and the decision channel is a unit a project IMPORTS - a fresh scaffold has no channel.
+    // workflow, agent from the CLI facts, human from record statement, console from serve. The remote may
+    // read inert on a scaffold, and that reading is TRUE: its refusal is a live fetch (offline here). The
+    // decision channel is a unit a project IMPORTS - a fresh scaffold has none, so since sprint610 the role
+    // is ABSENT (named with what would wire it), never a controller drawn inert forever.
     let inert: Vec<&str> = v["inertControllers"].as_array().expect("inert").iter().filter_map(|x| x.as_str()).collect();
-    assert!(inert.iter().all(|r| *r == "remote" || *r == "channel"), "only remote/channel may be inert on a scaffold: {inert:?}");
-    assert!(inert.contains(&"channel"), "a scaffold has not imported the decision channel, and the view must say so: {inert:?}");
+    assert!(inert.iter().all(|r| *r == "remote"), "only remote may be inert on a scaffold: {inert:?}");
+    assert!(absent_roles(&v).contains(&"channel".to_string()), "a scaffold has not imported the decision channel, and the view must say so: {:?}", absent_roles(&v));
+    assert!(!v["controllers"].as_array().expect("controllers").iter().any(|c| c["role"] == "channel"), "an absent role is not a controller");
+    assert_eq!(v["stepTwoGate"].as_array().expect("gate").len(), 8, "the SOP's step-2 gate is decided clause by clause");
     let acts = names(&v, "actions");
     let fbs = names(&v, "feedback");
     assert!(acts.iter().any(|n| n == "hookStop"), "the Stop hook is a derived action: {acts:?}");
@@ -99,11 +105,13 @@ fn this_repository_decorates_the_roles_with_its_authored_residue() {
     for anchor in ["ctHuman", "ctAgent", "ctHooks", "ctCommitGate", "ctCI", "ctRemote", "ctConsole"] {
         assert!(found.iter().any(|a| a == anchor), "{anchor} decorates its role: {found:?}");
     }
-    // D0291: the decision channel is disconnected here, so its role has no anchor and is INERT - the
-    // view says so rather than inventing a controller this project no longer has.
+    // D0291: the decision channel is disconnected here, so its role has no anchor and nothing wires it -
+    // the view lists it ABSENT (sprint610) rather than inventing a controller this project no longer has.
     assert!(!found.iter().any(|a| a == "ctChannel"), "no channel anchor after D0291: {found:?}");
+    assert!(absent_roles(&v).contains(&"channel".to_string()), "the channel role is absent: {:?}", absent_roles(&v));
     let inert: Vec<&str> = v["inertControllers"].as_array().expect("inert").iter().filter_map(|x| x.as_str()).collect();
-    assert!(inert.contains(&"channel"), "the channel role reads inert: {inert:?}");
+    assert!(!inert.contains(&"channel"), "an absent role is not reported inert: {inert:?}");
+    assert!(v["stepTwoGate"].as_array().expect("gate").iter().all(|r| r["holds"] == true), "every step-2 clause holds on this project: {}", v["stepTwoGate"]);
     let pms = names(&v, "processModels");
     assert!(pms.iter().any(|n| n == "pmHuman"), "process models are read from the residue: {pms:?}");
     assert!(text.contains("issue343"), "a false belief cites the Issue that makes it false");
