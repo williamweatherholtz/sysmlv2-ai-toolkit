@@ -182,6 +182,17 @@ pub(crate) fn git_sha_valid(sha: &str, repo: &Path) -> bool {
 /// process-creation/AV tail-latency cost). `-h` yields the raw matched line(s), so the extraction below
 /// is IDENTICAL to the pre-change ls-tree+show path (a `DoD` is authored on one line in this model).
 fn git_criterion_at(sha: &str, task: &str, repo: &Path) -> Option<String> {
+    // A fact about an immutable commit: served from the content-addressed cache when `sha` is a full
+    // id (dcGitFactsAreContentAddressed); a short id runs the grep every time.
+    if let Some(cached) = crate::gitfacts::grep(repo, sha, task) {
+        return cached;
+    }
+    let found = git_criterion_at_uncached(sha, task, repo);
+    crate::gitfacts::remember_grep(repo, sha, task, found.as_deref());
+    found
+}
+
+fn git_criterion_at_uncached(sha: &str, task: &str, repo: &Path) -> Option<String> {
     let dod_pfx = format!("verification {task}DoD");
     let grep = crate::gitx::git()
         .arg("-C")
@@ -247,9 +258,24 @@ fn build_dod_files(repo: &Path) -> HashMap<String, String> {
 /// `sha -> is-commit`. Conservative on git failure (true) — matches `git_sha_valid`.
 fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
     let mut out: HashMap<String, bool> = HashMap::new();
+    // A full id already confirmed as a commit stays one (dcGitFactsAreContentAddressed); only the rest
+    // go to git. A negative is never remembered - a fetch can make it true.
+    let shas: Vec<String> = shas
+        .iter()
+        .filter(|s| {
+            if crate::gitfacts::commit_known(repo, s) {
+                out.insert((*s).clone(), true);
+                false
+            } else {
+                true
+            }
+        })
+        .cloned()
+        .collect();
     if shas.is_empty() {
         return out;
     }
+    let shas = &shas[..];
     let spawn = crate::gitx::git()
         .arg("-C").arg(repo)
         .args(["cat-file", "--batch-check"])
@@ -274,8 +300,18 @@ fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
     let text = String::from_utf8_lossy(&o.stdout);
     // --batch-check emits one line per input, in order: `<oid> <type> <size>` or `<input> missing`.
     for (s, line) in shas.iter().zip(text.lines()) {
-        out.insert(s.clone(), line.split_whitespace().nth(1) == Some("commit"));
+        let mut fields = line.split_whitespace();
+        let oid = fields.next().unwrap_or("");
+        let is_commit = fields.next() == Some("commit");
+        if is_commit {
+            // The batch line names the FULL oid: this is where a short anchor resolves for the process,
+            // so every later question about it keys the cache by the full id (gitfacts module doc).
+            crate::gitfacts::remember_resolution(repo, s, oid);
+            crate::gitfacts::remember_commit(repo, oid, true);
+        }
+        out.insert(s.clone(), is_commit);
     }
+    crate::gitfacts::flush(repo);
     out
 }
 
@@ -335,8 +371,8 @@ fn criterion_suspects(
     dod_files: &HashMap<String, String>,
 ) -> Vec<(String, String)> {
     let is_done = |n: &str| done_map.get(n).copied().unwrap_or(false);
-    // Pass 1: gather the distinct `<ct>:<file>` blob keys every (task, dep) comparison will need.
-    let mut keys: HashSet<String> = HashSet::new();
+    // Pass 1: gather the distinct (ct, file, task) criteria every (task, dep) comparison will need.
+    let mut wanted: HashSet<(String, String, String)> = HashSet::new();
     for (name, data) in tasks {
         if !is_done(name) {
             continue;
@@ -345,18 +381,48 @@ fn criterion_suspects(
         // The task's OWN criterion too (dcOwnDoDDriftIsSuspect): the thing verified must be the thing
         // agreed, and the owner may otherwise rewrite it after the pass with the pass still standing.
         if let Some(file) = dod_files.get(name.as_str()) {
-            keys.insert(format!("{ct}:{file}"));
+            wanted.insert((ct.clone(), file.clone(), name.clone()));
         }
         for dep in &data.deps {
             if !ordering_only.contains(&(dep.clone(), name.clone())) {
                 if let Some(file) = dod_files.get(dep) {
-                    keys.insert(format!("{ct}:{file}"));
+                    wanted.insert((ct.clone(), file.clone(), dep.clone()));
                 }
             }
         }
     }
+    // The criterion of `task` as `file` held it at `ct` is a fact about an immutable commit: answered
+    // from the content-addressed cache when `ct` is a full id (dcGitFactsAreContentAddressed), and only
+    // the misses cost the one batched blob fetch. `None` means the file at `ct` holds no such criterion.
+    let mut criteria: HashMap<(String, String, String), Option<String>> = HashMap::new();
+    let mut keys: HashSet<String> = HashSet::new();
+    let mut misses: Vec<(String, String, String)> = Vec::new();
+    for w in wanted {
+        if let Some(known) = crate::gitfacts::criterion(repo, &w.0, &w.1, &w.2) {
+            criteria.insert(w, known);
+        } else {
+            keys.insert(format!("{}:{}", w.0, w.1));
+            misses.push(w);
+        }
+    }
     let key_vec: Vec<String> = keys.into_iter().collect();
     let blobs = batch_cat_blobs(repo, &key_vec);
+    for w in misses {
+        let found = blobs
+            .get(&format!("{}:{}", w.0, w.1))
+            .cloned()
+            .flatten()
+            .and_then(|content| extract_dod_criterion(&content, &w.2));
+        crate::gitfacts::remember_criterion(repo, &w.0, &w.1, &w.2, found.as_deref());
+        criteria.insert(w, found);
+    }
+    let criterion_of = |ct: &str, task: &str| -> Option<String> {
+        dod_files
+            .get(task)
+            .and_then(|file| criteria.get(&(ct.to_string(), file.clone(), task.to_string())))
+            .cloned()
+            .flatten()
+    };
     let head = crate::gitx::git()
         .arg("-C")
         .arg(repo)
@@ -376,10 +442,7 @@ fn criterion_suspects(
         // that is the limit of comparing against the verified commit, and the sibling helper for
         // acceptances (issue341) shares it.
         let own_cur = data.dod_text.as_deref().unwrap_or("");
-        let own_old = dod_files
-            .get(name.as_str())
-            .and_then(|file| blobs.get(&format!("{ct}:{file}")).cloned().flatten())
-            .and_then(|content| extract_dod_criterion(&content, name));
+        let own_old = criterion_of(ct, name);
         if own_old.as_deref().is_some_and(|old| old != own_cur) {
             out.push((name.clone(), format!("OWN criterion of '{name}' changed: the text at {head} (HEAD) is not the text the pass judged at {ct} (dcOwnDoDDriftIsSuspect) - re-verify against the new criterion or restore it")));
             continue;
@@ -390,11 +453,7 @@ fn criterion_suspects(
             }
             let Some(dep_data) = tasks.get(dep.as_str()) else { continue };
             let cur = dep_data.dod_text.as_deref().unwrap_or("");
-            let old = dod_files
-                .get(dep)
-                .and_then(|file| blobs.get(&format!("{ct}:{file}")).cloned().flatten())
-                .and_then(|content| extract_dod_criterion(&content, dep))
-                .or_else(|| git_criterion_at(ct, dep, repo));
+            let old = criterion_of(ct, dep).or_else(|| git_criterion_at(ct, dep, repo));
             if let Some(old) = old {
                 if old != cur {
                     out.push((name.clone(), format!("criterion of dependency '{dep}' changed since verified at {ct}")));
@@ -403,6 +462,7 @@ fn criterion_suspects(
             }
         }
     }
+    crate::gitfacts::flush(repo);
     out
 }
 
@@ -535,14 +595,31 @@ fn changed_paths_since(repo: &Path, sha: &str) -> Vec<String> {
     if sha.is_empty() {
         return Vec::new();
     }
-    crate::gitx::git()
+    // The diff between two commits is a fact about them (dcGitFactsAreContentAddressed): keyed by
+    // `sha` and HEAD's FULL id, both of which must be full for the cache to answer or remember.
+    // A git failure returns empty (conservative: no drift) and is never remembered.
+    let head = crate::gitfacts::head_sha(repo);
+    if let Some(h) = head.as_deref() {
+        if let Some(cached) = crate::gitfacts::changed(repo, sha, h) {
+            return cached;
+        }
+    }
+    let diffed: Option<Vec<String>> = crate::gitx::git()
         .arg("-C").arg(repo)
         .args(["diff", "--name-only", &format!("{sha}..HEAD")])
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect())
-        .unwrap_or_default()
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect());
+    match (diffed, head.as_deref()) {
+        (Some(paths), Some(h)) => {
+            crate::gitfacts::remember_changed(repo, sha, h, &paths);
+            crate::gitfacts::flush(repo);
+            paths
+        }
+        (Some(paths), None) => paths,
+        (None, _) => Vec::new(),
+    }
 }
 
 /// True if a manifest `path` (file or directory) contains any `changed` repo-relative path.

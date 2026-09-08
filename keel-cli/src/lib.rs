@@ -81,6 +81,7 @@ pub mod launcher;
 pub mod library;
 pub mod enroll;
 pub mod gitx;
+pub mod gitfacts;
 pub mod govern;
 pub mod guards;
 pub mod hardening;
