@@ -871,6 +871,50 @@ fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed contro
      "`keel guard .`: the stpa-currency WARN line's first number" + (" of %s" % _m.group(2) if _m else " - line not found") +
      ". sprint610 added agentEditsDeliverable to the action set, which is the designed re-run trigger (D0313).")
 
+# ================================================================ 12. supersession census (issue396 / D0384)
+# The two representations of a retired Decision - `status = DecisionStatus::superseded` and an incoming
+# `#Supersede` edge - counted apart, and where they disagree. Edges are read from every .sysml the same
+# way section 11 reads DerivedFrom; a commented-out line is not an edge.
+_SUP_RE = re.compile(r"#Supersede\s+dependency\s+from\s+(\w+)\s+to\s+([\w, ]+);")
+_status = {}
+for _p in sysml_files:
+    if os.sep + "decisions" + os.sep not in _p:
+        continue
+    _t = read(_p) or ""
+    _n = re.search(r"part (d\d{4}) : Decision", _t)
+    _s = re.search(r"DecisionStatus::(\w+)", _t)
+    if _n:
+        _status[_n.group(1)] = _s.group(1) if _s else None
+_targets = set()
+_edges = 0
+for _p in sysml_files:
+    for _line in (read(_p) or "").splitlines():
+        if _line.lstrip().startswith("//"):
+            continue
+        for _m in _SUP_RE.finditer(_line):
+            _edges += 1
+            _targets.update(x.strip() for x in _m.group(2).split(","))
+_dec_targets = [t for t in _targets if t in _status]
+_accepted_with_edge = sorted(t for t in _dec_targets if _status[t] == "accepted")
+_superseded_no_edge = sorted(d for d, st in _status.items() if st == "superseded" and d not in _targets)
+SUP_HOW = "walk every .sysml under .tracking/ and .engine/ (the section-11 file list); "
+fact("decisionsTotal", len(_status) or None, "Decisions under .engine/decisions",
+     SUP_HOW + "count `part dNNNN : Decision` declarations in files under a decisions/ directory.")
+fact("decisionsStatusSuperseded", sum(1 for st in _status.values() if st == "superseded"),
+     "Decisions whose authored status reads superseded", SUP_HOW + "`DecisionStatus::superseded` per declaration.")
+fact("supersedeEdges", _edges, "#Supersede edges in the model",
+     SUP_HOW + "non-comment lines matching `#Supersede dependency from X to Y;` - Y may be a comma list.")
+fact("supersedeEdgesToDecisions", len(_dec_targets), "of those edges' targets that are Decisions",
+     SUP_HOW + "targets whose name is a declared Decision; the rest target Needs and requirements.")
+fact("acceptedWithSupersedeEdge", len(_accepted_with_edge),
+     "ACCEPTED Decisions carrying an incoming Supersede edge (the edge reverses a clause, the record stands)",
+     SUP_HOW + "status == accepted and name in the edge-target set: " + (", ".join(_accepted_with_edge) or "none") + ".")
+fact("supersededWithoutEdge", len(_superseded_no_edge),
+     "status=superseded Decisions with NO incoming Supersede edge",
+     SUP_HOW + "status == superseded and name not in the edge-target set: " + (", ".join(_superseded_no_edge) or "none") + ".")
+fact("supersessionDisagreements", len(_accepted_with_edge) + len(_superseded_no_edge),
+     "records where the two representations disagree", "acceptedWithSupersedeEdge + supersededWithoutEdge.")
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
