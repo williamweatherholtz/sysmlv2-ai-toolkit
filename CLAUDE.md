@@ -274,10 +274,17 @@ frozen (modify it only by out-of-band Decision).
 keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
 keel guard             # every enforced forward guard (count: `keel version`) — see .engine/docs/guards.md
-keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder (~0.35s)
+keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder
+keel enforcement-report # every hook event's fires, blocks and latency DISTRIBUTION from the fire-ledger, and the recall skip rate (D0389)
 keel gate --workspace  # the COMMIT tier for a repo holding several projects: every project the commit touches (D0234)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
+
+**A hook's cost is a distribution, read from the ledger (D0389/issue402).** Never document a tier at its best
+case: the per-edit tier once read "~0.35 s" here while the ledger held a median of 0 ms (the D0371 receipt) and a
+maximum of 54 s. `keel enforcement-report` gives median / p90 / p99 / max per event, and `recall` counts the turns
+whose facts were dropped past the recall cap - a `recall-skipped` ledger line per turn, identifiable by
+session and time, so the memory channel's degradation is a rate, not a transcript line.
 
 **A green gate answers from its receipt (D0371).** A green `keel guard`, `keel hook stop` or `keel gate` writes
 `.keel/metrics/guard-receipt.toml` keyed on every input a guard can read - HEAD, every path `git status` lists with its

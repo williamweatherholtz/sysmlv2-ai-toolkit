@@ -331,7 +331,7 @@ fn cmd_hook(args: &[String]) -> i32 {
     let code = match event {
         "post-edit" => hook_post_edit(&payload, &root),
         "stop" => hook_stop(&payload, &root),
-        "user-prompt" => hook_user_prompt(&root, &payload),
+        "user-prompt" => hook_user_prompt(&root, &payload, &session),
         "pre-bash" => hook_pre_bash(&payload, &root, &session),
         "pre-write" => hook_pre_write(&payload, &root),
         "subagent-stop" => hook_subagent_stop(&payload, &root, &session),
@@ -899,7 +899,7 @@ fn ledger_advisory(root: &Path, session: &str, spoken: &str) {
 ///
 /// FAIL-OPEN, always. Any error, any timeout, any absent store returns `None` and the turn proceeds:
 /// injection is an advantage, never a dependency, and a broken index must never cost a turn.
-fn recalled_facts(root: &Path, payload: &serde_json::Value) -> Option<String> {
+fn recalled_facts(root: &Path, payload: &serde_json::Value, session: &str) -> Option<String> {
     if std::env::var("KEEL_RECALL").is_ok_and(|v| v.eq_ignore_ascii_case("off")) {
         return None;
     }
@@ -923,6 +923,10 @@ fn recalled_facts(root: &Path, payload: &serde_json::Value) -> Option<String> {
     // and the reader is told, because a recall that silently doubles every turn's latency is the kind
     // of cost that gets discovered months later.
     if ms > RECALL_CAP_MS {
+        // D0389/issue402: the skip is COUNTED where it can be read back - a `recall-skipped` line in the
+        // fire-ledger carrying the turn's session and the time the walk took - not only said to a
+        // transcript nobody tallies. `keel enforcement-report` reports the rate and the tail.
+        ledger_emit(root, session, "recall-skipped", 0, ms);
         return Some(format!(
             "[keel recall] SKIPPED — recall took {ms}ms (cap {RECALL_CAP_MS}ms). Facts not pushed this turn.\n"
         ));
@@ -931,10 +935,10 @@ fn recalled_facts(root: &Path, payload: &serde_json::Value) -> Option<String> {
     Some(format!("[keel recall — pushed before the model, {ms}ms]\n{facts}"))
 }
 
-fn hook_user_prompt(root: &Path, payload: &serde_json::Value) -> i32 {
+fn hook_user_prompt(root: &Path, payload: &serde_json::Value, session: &str) -> i32 {
     // PUSH FIRST, then the routing contract: the facts have to be in front of the model when it wakes,
     // and the contract is what it should do with them.
-    if let Some(facts) = recalled_facts(root, payload) {
+    if let Some(facts) = recalled_facts(root, payload, session) {
         print!("{facts}");
     }
     // D0064/D0106: routing is structural, fired every turn rather than left to vigilance.

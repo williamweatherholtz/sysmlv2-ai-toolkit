@@ -23,6 +23,24 @@ use std::path::Path;
 /// The frozen field set — the schema test asserts emitted lines carry exactly these.
 pub const LEDGER_FIELDS: [&str; 6] = ["ts", "session", "event", "decision", "exit", "ms"];
 
+/// (median, p90, p99, max) of a sample, in ms; zeros for an empty sample. Nearest-rank percentiles,
+/// so every reported value is one that actually occurred (D0389: a documented cost is a distribution).
+#[must_use]
+pub fn latency(ms: &[u64]) -> (i64, i64, i64, i64) {
+    if ms.is_empty() {
+        return (0, 0, 0, 0);
+    }
+    let mut s = ms.to_vec();
+    s.sort_unstable();
+    let n = s.len();
+    // nearest rank in integer arithmetic: the ceil(p * n)-th value, 1-based, clamped into the sample
+    let rank = |pct: usize| -> i64 {
+        let i = (n * pct).div_ceil(100).clamp(1, n) - 1;
+        s.get(i).copied().and_then(|v| i64::try_from(v).ok()).unwrap_or(i64::MAX)
+    };
+    (rank(50), rank(90), rank(99), s.last().copied().and_then(|v| i64::try_from(v).ok()).unwrap_or(i64::MAX))
+}
+
 /// The tracked-side counters (`#ProcessDefect` marks, synced override obligations, run records) —
 /// extracted from [`enforcement_report`] for the line budget; behavior identical.
 fn tracked_counts(root: &Path) -> (usize, usize, usize) {
@@ -38,6 +56,58 @@ fn tracked_counts(root: &Path) -> (usize, usize, usize) {
     (process_defects, tracked_obligations, run_records)
 }
 
+/// One row per hook event: fires, blocks, and the latency DISTRIBUTION (D0389/issue402) - a documented
+/// cost is never the best case; the per-edit tier documented at ~0.35 s had a median of 0 ms and a
+/// maximum of 54 s in this ledger.
+fn event_rows(per_event: BTreeMap<String, (u64, u64)>, per_event_ms: &BTreeMap<String, Vec<u64>>) -> Vec<Json> {
+    per_event
+        .into_iter()
+        .map(|(ev, (fires, blocks))| {
+            let d = latency(per_event_ms.get(&ev).map_or(&[][..], Vec::as_slice));
+            Json::Obj(vec![
+                ("event".to_string(), Json::s(ev)),
+                ("fires".to_string(), Json::Int(i64::try_from(fires).unwrap_or(i64::MAX))),
+                ("blocks".to_string(), Json::Int(i64::try_from(blocks).unwrap_or(i64::MAX))),
+                ("msMedian".to_string(), Json::Int(d.0)),
+                ("msP90".to_string(), Json::Int(d.1)),
+                ("msP99".to_string(), Json::Int(d.2)),
+                ("msMax".to_string(), Json::Int(d.3)),
+            ])
+        })
+        .collect()
+}
+
+/// D0389/issue402: the memory channel's degradation, counted. A `recall-skipped` line is written by the
+/// user-prompt hook when the walk exceeded its cap and the turn went without facts; the rate is over
+/// user-prompt fires, and the turns that lost their facts are identifiable afterwards by ts + session.
+fn recall_degradation(skips: &[(u64, String, u64)], user_prompt_fires: u64) -> Json {
+    let turns: Vec<Json> = skips
+        .iter()
+        .rev()
+        .take(20)
+        .map(|(ts, session, ms)| {
+            Json::Obj(vec![
+                ("ts".to_string(), Json::Int(i64::try_from(*ts).unwrap_or(i64::MAX))),
+                ("session".to_string(), Json::s(session.clone())),
+                ("ms".to_string(), Json::Int(i64::try_from(*ms).unwrap_or(i64::MAX))),
+            ])
+        })
+        .collect();
+    let rate = if user_prompt_fires == 0 {
+        Json::Null
+    } else {
+        let s = f64::from(u32::try_from(skips.len()).unwrap_or(u32::MAX));
+        let f = f64::from(u32::try_from(user_prompt_fires).unwrap_or(u32::MAX));
+        Json::s(format!("{:.2}", s * 100.0 / f))
+    };
+    Json::Obj(vec![
+        ("skipped".to_string(), Json::Int(i64::try_from(skips.len()).unwrap_or(i64::MAX))),
+        ("skipRatePct".to_string(), rate),
+        ("skippedTurns".to_string(), Json::Arr(turns)),
+        ("note".to_string(), Json::s("recall-skipped is counted from 2026-09-08 (D0389); earlier skips exist only as transcript lines. Before that date a user-prompt fire whose ms exceeds the recall cap is the proxy, not the count.".to_string())),
+    ])
+}
+
 /// Compute the enforcement report.
 ///
 /// # Errors
@@ -47,6 +117,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
     let ledger = root.join(".keel").join("metrics").join("hooks.jsonl");
     let text = std::fs::read_to_string(&ledger).unwrap_or_default();
     let mut per_event: BTreeMap<String, (u64, u64)> = BTreeMap::new(); // (fires, blocks)
+    let mut per_event_ms: BTreeMap<String, Vec<u64>> = BTreeMap::new(); // D0389: the cost is a distribution
+    let mut recall_skips: Vec<(u64, String, u64)> = Vec::new(); // (ts, session, ms) - the turns that lost their facts
     let mut sessions: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut overrides = 0u64;
     let mut unsynced = 0u64;
@@ -69,7 +141,14 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
                 sessions.insert(s.to_string());
             }
         }
+        let ms = v.get("ms").and_then(serde_json::Value::as_u64).unwrap_or(0);
+        per_event_ms.entry(event.clone()).or_default().push(ms);
         match event.as_str() {
+            "recall-skipped" => recall_skips.push((
+                v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0),
+                v.get("session").and_then(serde_json::Value::as_str).unwrap_or("").to_string(),
+                ms,
+            )),
             "advisory-issued" => advisory_issued += 1,
             "advisory-repeated" => advisory_repeated += 1,
             ev if ev.starts_with("override-obligation") => {
@@ -89,16 +168,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         }
     }
     let (process_defects, tracked_obligations, run_records) = tracked_counts(root);
-    let events_json: Vec<Json> = per_event
-        .into_iter()
-        .map(|(ev, (fires, blocks))| {
-            Json::Obj(vec![
-                ("event".to_string(), Json::s(ev)),
-                ("fires".to_string(), Json::Int(i64::try_from(fires).unwrap_or(i64::MAX))),
-                ("blocks".to_string(), Json::Int(i64::try_from(blocks).unwrap_or(i64::MAX))),
-            ])
-        })
-        .collect();
+    let user_prompt_fires = per_event.get("user-prompt").map_or(0, |s| s.0);
+    let events_json = event_rows(per_event, &per_event_ms);
     let out = Json::Obj(vec![
         (
             "note".to_string(),
@@ -111,6 +182,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         ("malformedLines".to_string(), Json::Int(i64::try_from(malformed).unwrap_or(i64::MAX))),
         ("sessionsSeen".to_string(), Json::Int(i64::try_from(sessions.len()).unwrap_or(i64::MAX))),
         ("perEvent".to_string(), Json::Arr(events_json)),
+        ("recall".to_string(), recall_degradation(&recall_skips, user_prompt_fires)),
         ("redYields".to_string(), Json::Int(i64::try_from(red_yields).unwrap_or(i64::MAX))),
         // issue230: spoken advisories vs silent fires, and the repeat-as-ignore signal. APPROXIMATE
         // by stated design: heeded = issued without the same advice hash recurring in-session; a
@@ -145,7 +217,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
 
 #[cfg(test)]
 mod tests {
-    use super::{enforcement_report, LEDGER_FIELDS};
+    use super::{enforcement_report, latency, LEDGER_FIELDS};
 
     /// THE SCHEMA FREEZE, bound: a line emitted with exactly the frozen fields parses and counts;
     /// a malformed line is COUNTED as malformed, never silently skipped (K2 applied to evidence).
@@ -201,5 +273,49 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&report).expect("json");
         assert_eq!(d["overrideLedgerEvents"], 3, "consumed + unsynced both count as overrides");
         assert_eq!(d["overrideObligationsUnsynced"], 1, "only the failure path is unsynced");
+    }
+
+    /// D0389/issue402: a documented cost is a distribution, and every reported value is one that occurred.
+    #[test]
+    fn latency_is_nearest_rank_over_the_sample() {
+        assert_eq!(latency(&[]), (0, 0, 0, 0));
+        assert_eq!(latency(&[7]), (7, 7, 7, 7));
+        // the ledger's own shape: mostly zero, a long tail
+        let mut s = vec![0u64; 90];
+        s.extend([100, 200, 300, 400, 500, 600, 700, 800, 900, 54_439]);
+        let (med, p90, p99, max) = latency(&s);
+        assert_eq!((med, p90), (0, 0), "the best case is what the median and p90 read on this shape");
+        assert_eq!(p99, 900, "p99 is the 99th of 100 sorted values");
+        assert_eq!(max, 54_439, "the maximum is reported, not smoothed");
+    }
+
+    /// D0389/issue402: a recall skip is COUNTED, its rate is over user-prompt fires, and the turn that
+    /// lost its facts is identifiable afterwards by ts and session.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup
+    fn recall_skips_are_counted_with_the_turns_they_cost() {
+        let root = std::env::temp_dir().join("keel-pm-recall");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keel").join("metrics")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let lines = [
+            r#"{"ts":10,"session":"s1","event":"user-prompt","decision":"allow","exit":0,"ms":700}"#,
+            r#"{"ts":20,"session":"s1","event":"user-prompt","decision":"allow","exit":0,"ms":3300}"#,
+            r#"{"ts":20,"session":"s1","event":"recall-skipped","decision":"allow","exit":0,"ms":3300}"#,
+            r#"{"ts":30,"session":"s2","event":"user-prompt","decision":"allow","exit":0,"ms":0}"#,
+            r#"{"ts":40,"session":"s2","event":"user-prompt","decision":"allow","exit":0,"ms":800}"#,
+        ]
+        .join("\n");
+        std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), lines).expect("write ledger");
+        let report = enforcement_report(&root).expect("report");
+        let d: serde_json::Value = serde_json::from_str(&report).expect("json");
+        assert_eq!(d["recall"]["skipped"], 1);
+        assert_eq!(d["recall"]["skipRatePct"], "25.00", "one skip over four user-prompt fires");
+        let turns = d["recall"]["skippedTurns"].as_array().expect("turns");
+        assert_eq!(turns.len(), 1);
+        assert!(turns[0]["ts"] == 20 && turns[0]["session"] == "s1" && turns[0]["ms"] == 3300, "the turn is named: {turns:?}");
+        let up = d["perEvent"].as_array().expect("perEvent").iter().find(|e| e["event"] == "user-prompt").expect("user-prompt row").clone();
+        assert!(up["msMedian"] == 750 || up["msMedian"] == 700 || up["msMedian"] == 800, "a value from the sample: {up}");
+        assert_eq!(up["msMax"], 3300, "the tail is reported beside the count");
     }
 }

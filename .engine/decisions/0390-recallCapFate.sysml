@@ -1,0 +1,24 @@
+// D0390 (PROPOSED — NOT YET ACCEPTED) — recallCapFate: what the user-prompt hook does with recalled facts that arrive after the 2,500 ms cap - push them late, raise the cap, or keep dropping them
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0390Accept event on sign-off.
+package Decision0390 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // RESEARCH: The cap is checked AFTER the facts are computed (keel-cli/src/main.rs recalled_facts: has_pushable_facts, then recall_for_prompt, then `if ms > RECALL_CAP_MS` returns the SKIPPED line), so a drop saves no time - the turn has already paid the walk and then loses its facts. Ledger on this host, 941 user-prompt fires 2026-08-21 to 2026-09-08: median 760 ms, p90 1,385 ms, p99 12,225 ms, max 33,503 ms; 23 fires over 2,500 ms (2.44 percent), 14 over 5,000 ms, 10 over 10,000 ms; eight of the 23 on one day (2026-09-06), which is the load signature of a cargo build or suite running beside the session, not a corpus that grew - the median over the same period is unchanged. The recall hook is FAIL-OPEN by design (the doc comment above recalled_facts): injection is an advantage, never a dependency.
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0390 : Decision {
+        :>> id = "89c05ff8-e7f4-4eb4-9192-fe8ac3a01be3";
+        :>> title = "recallCapFate: what the user-prompt hook does with recalled facts that arrive after the 2,500 ms cap - push them late, raise the cap, or keep dropping them";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "issue402 and dcHookDegradationIsCounted: the memory channel is least available exactly when the machine is busiest, and the item asks that the ledger, not feel, decide whether the cap should rise, the walk should get faster, or the skip should be surfaced to the turn that lost its facts. D0389 counts the skips; this clause is what the hook does about them. It changes what a hook step produces, so it is a process change and waits for the human under D0337.";
+        :>> decision = "OPTION A (push late, count slow): past the cap the facts are pushed anyway with the latency named in the header line, and the fire is written to the ledger as recall-slow instead of recall-skipped; the cap becomes a reporting threshold. COST: the turn's prompt-path latency is unbounded by the hook - but it already is, because the check runs after the walk; the only new cost is that a 30-second recall now delivers a payload the reader must scroll past, roughly 4,000 characters, on the 2 percent of turns that were slow. OPTION B (raise the cap to 10,000 ms): the same drop, later. COST: 10 of 941 turns still lose their facts after paying for them; the number moves, the shape does not, and the next busy day moves it back. OPTION C (as it stands, now counted): keep dropping past 2,500 ms; D0389 makes the rate readable. COST: 2.44 percent of turns pay the walk and receive nothing, clustered on the days the machine is building - which are the days the session most needs to remember what it is in the middle of. A faster walk is not an option here: the median is 760 ms on a 16,700-item corpus and the tail is machine load, so no walk change reaches it.";
+        :>> rationale = "WHY NOT DECIDE THIS AUTONOMOUSLY: it changes what a hook step produces on the human's prompt path, which is the process surface standing consent is scoped away from (D0337). WHAT I RECOMMEND, AND WHAT WOULD CHANGE IT: OPTION A. The cap was written to bound a cost that grows with the corpus and to tell the reader when it was hit; the ledger shows the cost does not grow with the corpus and the drop does not bound it, so the cap's remaining effect is to discard work already done on the worst days. It would change to B or C if the human finds a late 4,000-character payload on a busy turn worse than no payload - a preference only they hold - or if a real deadline appears (a harness hook timeout), in which case the walk itself needs a budget, which is a different mechanism from a post-hoc drop.";
+        :>> consequences = "On A: recalled_facts pushes past the cap with the ms in its header, writes recall-slow, and the report's recall section counts slow beside skipped; the SKIPPED line and recall-skipped stop being written. On B: RECALL_CAP_MS becomes 10,000 and nothing else moves. On C: no code change; dcHookDegradationIsCounted is complete with D0389 alone. In every case the D0389 instrumentation stands.";
+    }
+}
