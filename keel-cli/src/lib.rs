@@ -86,6 +86,7 @@ pub mod receipt;
 pub mod gitfacts;
 pub mod govern;
 pub mod guards;
+pub mod hook_binary;
 pub mod hardening;
 pub mod indexer;
 pub mod migrate;

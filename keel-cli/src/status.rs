@@ -83,6 +83,26 @@ fn last_hook_fire(root: &Path) -> Option<String> {
     Some(format!("last hook fire: {event} ran as {bin} (build {build})"))
 }
 
+/// How far the last hook fire's build commit sits behind HEAD (D0391): `None` when the ledger has no
+/// build, the build is HEAD, or git cannot count.
+fn hook_binary_lag(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).ok()?;
+    let last = text.lines().rev().find(|l| !l.trim().is_empty())?;
+    let v: serde_json::Value = serde_json::from_str(last).ok()?;
+    let build = v.get("build")?.as_str()?;
+    let commit = build.trim_end_matches("+dirty");
+    let git = |args: &[&str]| -> Option<String> {
+        let out = crate::gitx::git().arg("-C").arg(root).args(args).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+    let head = git(&["rev-parse", "--short", "HEAD"])?;
+    if head.starts_with(commit) || commit.starts_with(&head) {
+        return None;
+    }
+    let behind = git(&["rev-list", "--count", &format!("{commit}..HEAD")])?;
+    Some(format!("hook binary build {build} is {behind} commit(s) behind HEAD {head} - the copy is refreshed at the first hook fire after the next build"))
+}
+
 fn hooks_section(root: &Path) -> Section {
     use crate::claude_surface::{hooks_silenced, merge_settings, PLUGIN_DIR, REPO_SCOPE_SETTINGS};
     let mut lines = Vec::new();
@@ -137,6 +157,17 @@ fn hooks_section(root: &Path) -> Section {
     // the turn-boundary surface says what gated it.
     if let Some(last) = last_hook_fire(root) {
         lines.push(last);
+    }
+    // D0391/issue408: on a self-build tree, which binary the hooks run and how far it lags the tree - a
+    // stable copy can be behind HEAD, and that is a fact to read here rather than infer from behaviour.
+    if let Some(line) = crate::hook_binary::describe(root) {
+        if !crate::hook_binary::stable_copy(root).is_file() {
+            state = State::Attention;
+        }
+        lines.push(line);
+        if let Some(lag) = hook_binary_lag(root) {
+            lines.push(lag);
+        }
     }
     if !declared && !plugin {
         state = State::Attention;

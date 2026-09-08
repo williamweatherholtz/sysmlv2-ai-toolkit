@@ -304,6 +304,18 @@ fn cmd_hook(args: &[String]) -> i32 {
     if !root.join(".tracking").is_dir() {
         return 0; // not a keel project -> silent no-op, correctly
     }
+    // D0391/issue408: on a self-build tree the hooks keep their own stable copy current from the build
+    // output, so cargo never has to unlink the file a hook is running. Best-effort: a failure is one
+    // stderr line and the hook proceeds on the image it has.
+    match keel_cli::hook_binary::refresh(&root) {
+        Ok(Some(r)) => {
+            let session = payload.get("session_id").and_then(serde_json::Value::as_str).unwrap_or("");
+            ledger_emit(&root, session, "hook-binary-refreshed", 0, 0);
+            eprintln!("[keel] hook binary refreshed: {} <- {}", r.copy.display(), r.from.display());
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("[keel] hook binary refresh failed ({e}); this fire runs the image it has"),
+    }
 
     // Fire-ledger + subagent baseline (D0174/P0.1, D0180): every fire leaves one machine-local
     // JSONL line keyed by session id and event — the SINGLE instrumentation path the
@@ -2139,6 +2151,16 @@ fn cmd_sync_claude(args: &[String]) -> i32 {
                     r.registry_count,
                     keel_cli::claude_surface::surface_stamp()
                 );
+                // D0391/issue408: the surface that writes the hook commands also says - and on a self-build
+                // tree places - the binary those commands will resolve to.
+                match keel_cli::hook_binary::refresh(&root) {
+                    Ok(Some(p)) => println!("hook binary: placed {} from {} (self-build stable copy, D0391)", p.copy.display(), p.from.display()),
+                    Ok(None) => {}
+                    Err(e) => println!("hook binary: could not place the self-build stable copy ({e})"),
+                }
+                if let Some(line) = keel_cli::hook_binary::describe(&root) {
+                    println!("{line}");
+                }
                 0
             }
         }

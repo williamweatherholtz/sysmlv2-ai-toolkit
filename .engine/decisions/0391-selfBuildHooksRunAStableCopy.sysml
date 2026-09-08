@@ -1,0 +1,26 @@
+// D0391 (status: the `status` field below is the truth) — selfBuildHooksRunAStableCopy: on a self-build tree the hooks run a stable copy at .keel/bin that they refresh from the build output themselves, and status names its build beside HEAD
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0391Accept event on sign-off.
+package Decision0391 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // RESEARCH: issue408, established from the fire-ledger: every hook fire in sprint 594 recorded bin = target/release/keel.exe, because the pin probe (KEEL_BIN, .keel/bin/keel.exe, the pin cache, PATH) found nothing at its second stop on a tree whose deliverable is the engine, and keel suite returned fail - 0 passed 0 failed three runs running over failed to remove file target/release/keel.exe while three real regressions hid. The hand-placed workaround from that sprint was still running today: .keel/metrics/hooks.jsonl showed every fire since as .keel/bin/keel.exe at build 7a61044+dirty, some thirty commits behind HEAD, with nothing saying so - the staleness the DoD names. Windows permits renaming a running image and refuses overwriting it (the same fact behind keel-serve.exe, issue150/386).
+    part d0391 : Decision {
+        :>> id = "f5440fb2-7034-43b4-8960-5f4c91fbc2f3";
+        :>> title = "selfBuildHooksRunAStableCopy: on a self-build tree the hooks run a stable copy at .keel/bin that they refresh from the build output themselves, and status names its build beside HEAD";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "dcSelfBuildHooksLeaveTheBuildTree asks that a self-build project's hooks not run the file its build is writing; that the surfaces writing hook commands place and refresh a stable copy and say which binary the hooks will run; that the refresh ride the build path rather than a human's memory; and that the staleness this trades for be visible in keel status. A non-self-build project has no build output and must be untouched.";
+        :>> decision = "NOT A FORK: the shape follows from the probe order that already exists and from what the platform permits. On a self-build tree - one holding keel-cli/Cargo.toml, the check the engine already makes - every hook fire first compares target/release/keel(.exe) against the stamp of the copy it last placed at .keel/bin/keel(.exe); when the output differs and is at least two seconds old it copies it beside itself through a .next file and a rename, records hook-binary-refreshed in the ledger, and proceeds; the pin probe's second stop then resolves to that copy on every later fire. keel sync-claude places the copy when absent and prints which binary the hooks will run; keel status prints the same line, marks Attention when a self-build has no copy, and names how many commits the last fire's build sits behind HEAD. No hook verdict changes: what a hook allows, denies or advises is as before; only the image it runs is kept current.";
+        :>> rationale = "The refresh rides the build path because the first hook fire after a build IS the build path's next event, and a hook that runs from its own copy can replace that copy by rename - so nothing depends on anyone remembering, and nothing depends on cargo, which has no post-link step. The two-second grace keeps a link in progress from being copied. The stamp is length plus mtime rather than a build id because reading a build id means running the binary, and a hook fire is the wrong place to pay that. The lag is named in status because a copy that can be behind the tree is a real cost and must be a fact a reader sees, not an inference from behaviour.";
+        :>> consequences = "keel-cli/src/hook_binary.rs with unit tests on the refresh decision and the stamp; the hook entry in main.rs calls refresh before dispatch; sync-claude and status carry the line; five integration tests construct a self-build-shaped tree and fire hooks against it. On this repository the stale hand copy was replaced by sync-claude at cafde85 and the next fire ran it. A hook binary that lags HEAD is now a status line, not a surprise; the pin probe, keelw and init are unchanged.";
+    }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0391Accept : Test { :>> id = "6100398d-2320-4693-bf25-aa562d0cbeed"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override by a superseding Decision (D0290) or the human's quoted word in chat (D0289)."; }
+    part d0391AcceptR1 : TestResult { :>> id = "9aa03249-7acc-4e3f-aa85-eb2afdf2323d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "cafde85"; :>> judgedAt = "2026-09-08"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeOpus5"; }
+}
