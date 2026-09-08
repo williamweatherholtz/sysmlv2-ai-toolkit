@@ -109,5 +109,7 @@ package EngineGuardConstraints {
     constraint def untrustedTaint;          // guard 63 (D0314): the untrusted label travels through derivation to every sink
     constraint def gateEnvironmentParity;   // guard 64 (D0358, issue385): two workflows running the same gate supply the same environment
     constraint def instrumentsDeclared;     // guard 65 (D0361): every measurement instrument is declared, and every declaration resolves
+    constraint def releaseChecksumsPublished; // guard 66 (D0385): a workflow that publishes release assets hashes them and publishes the hash
+    constraint def wrapperPinChecksummed;   // guard 67 (D0385), warning-tier: the pinned engine has a wrapper checksum for every asset keelw can download
 
 }

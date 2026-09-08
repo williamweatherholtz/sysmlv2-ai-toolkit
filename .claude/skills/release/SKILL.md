@@ -50,13 +50,17 @@ git tag -a vX.Y.Z -m "<one line>" && git push origin vX.Y.Z
 ```
 
 `.github/workflows/release.yml` builds natively for linux-x86_64, macOS-arm64 and windows-x86_64 and
-attaches all three. **Verify the run succeeded and the assets are attached** — a tag whose build failed
-is worse than no tag, because the version exists but is unobtainable.
+attaches all three, **each with its SHA-256** (`<asset>.sha256`, hashed by the job that built it) and one
+`SHA256SUMS` that the `checksums` job verified against the published binaries before attaching (D0385).
+**Verify the run succeeded and the assets are attached** — a tag whose build failed is worse than no tag,
+because the version exists but is unobtainable; a release with binaries and no `SHA256SUMS` is NOT
+complete, because its `checksums` job failed the verification and the published bytes are in question.
 
 **Then download a published asset and ask it what it is** (D0137/issue092):
 
 ```
-gh release download vX.Y.Z --pattern "keel-<platform>" --dir <tmp>
+gh release download vX.Y.Z --pattern "keel-<platform>" --pattern SHA256SUMS --dir <tmp>
+(cd <tmp> && sha256sum -c --ignore-missing SHA256SUMS)   # the bytes you hold are the bytes the build hashed
 <tmp>/keel-<platform> version     # must report vX.Y.Z and the tag's commit
 ```
 
@@ -69,6 +73,12 @@ re-tag; don't record it.
 
 This is what makes the portable-gate guarantee real for a distributed team (D0129): a contributor gets a
 matching gate by download, not by installing a Rust toolchain.
+
+**Then record the checksums where the wrapper reads them.** Copy the three `SHA256SUMS` lines into
+`keel-wrapper.toml` under a `["X.Y.Z"]` table — `keelw` refuses to download a version with no entry (never
+trust-on-first-use), so a pin that moves before this step refuses every fresh clone, which is what happened
+for two days at 0.4.1 (issue418). Guard `wrapper-pin-checksummed` warns while the pinned version has no entry;
+read `keel guard wrapper-pin-checksummed .` clean before step 4.
 
 **4. Record the `Release`.** Author it in `.tracking/baselines.sysml` with version, commit and purpose.
 A git tag is not a tracked fact — it cannot be traced to, queried, or asked as-of. Leave the release
@@ -84,6 +94,8 @@ is amended.
 | Hand-list what the release contained | Derivable from git — a stored copy drifts (§2.1) |
 | Release per sprint | Cadence is per-milestone; a tag per sprint means nothing |
 | Assume the workflow succeeded | Check the run and the attached assets |
+| Hash the download to make the wrapper entry | A hash of the download you are verifying proves nothing; copy the build's published `SHA256SUMS` (D0385) |
+| Move the engine pin before the wrapper entry exists | `keelw` refuses the version on every fresh clone (issue418) |
 | Verify a release by checking the assets exist | Files at a URL isn't the right build — download one and run `keel version` (D0137) |
 | Claim behaviour measured on a local build | Downstream runs the published asset; the two are only the same artifact once checked |
 | Make the crate and API versions equal | They are different contracts with different consumers |

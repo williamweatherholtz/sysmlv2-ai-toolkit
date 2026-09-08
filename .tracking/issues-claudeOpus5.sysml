@@ -1424,4 +1424,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcTouchedTestsRunBeforeLand to issue416;
+
+    part issue417 : Issue {
+        :>> id = "0c0b3c38-0e75-434f-9f2b-3b2806626bcc";
+        :>> title = "The release publishes binaries and no checksum, while the wrapper contract names one the release page never carried";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The release publishes three binaries and no checksum. `gh release download v0.4.1` returns keel-linux-x86_64, keel-macos-aarch64 and keel-windows-x86_64.exe and nothing else; .github/workflows/release.yml has no step that hashes an asset, and its publish step lists only the binary. Yet the wrapper contract says the opposite: keel-wrapper.toml's header reads 'Entries are computed from the PUBLISHED release assets', and `keel init` writes 'Entries come from the release page's published checksums' (keel-cli/src/main.rs:3733) - a checksum the release page has never carried. Every entry in keel-wrapper.toml was produced by downloading the asset and hashing it locally, which is a hand step nothing names and nothing checks, and it verifies the binary against itself: a swapped asset hashed after the swap yields a matching entry. The human's observation, 2026-09-08: 'looks like keel release doesn't have a checksum? it needs one' / 'make a normal part of process'. The checksum has to come out of the same workflow run that built the binary, beside it, and the release process has to name it as a step with a control that fails when the workflow drops it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcReleaseAssetsCarryChecksums to issue417;
+
+    part issue418 : Issue {
+        :>> id = "bab3d8b5-b505-43a3-9199-3836266ca220";
+        :>> title = "The engine pin moved to 0.4.1 with no wrapper checksum entry, so keelw has refused every fresh clone since the release";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The engine pin moved to 0.4.1 with no wrapper checksum for it, and nothing said so. .engine/contracts/engine-version.toml:4 reads `engine = '0.4.1'` since b171cd7 (2026-09-06); keel-wrapper.toml carries entries for 0.3.1 only, last edited 2026-08-29. keelw line 69 dies on that state - 'no committed checksum for keel 0.4.1 ... a download that nothing verifies must not run' - so every fresh clone that runs the wrapper has been refused since the v0.4.1 release two days ago, while every gate here stayed green: the release skill's four steps never mention the wrapper contract, and no guard reads the pin against the checksum table. The release recorded (release041 in .tracking/baselines.sysml) was verified by running a downloaded asset (D0137), which proves the asset, not the contract that lets a downstream project obtain it. Two gaps, one class: a release step that lives in nobody's process text and has no control.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcReleaseAssetsCarryChecksums to issue418;
 }

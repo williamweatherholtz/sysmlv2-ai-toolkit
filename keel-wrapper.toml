@@ -1,8 +1,14 @@
 # keel-wrapper — per-version, per-platform release-asset SHA-256s the keelw wrapper verifies against
 # (D0251 clause B). NEVER trust-on-first-use: a version with no entry refuses to download; a machine
-# with a seeded or hand-installed cache needs no entry. Entries are computed from the PUBLISHED
-# release assets after each tag's CI run completes.
+# with a seeded or hand-installed cache needs no entry. Entries are copied from the release's published
+# SHA256SUMS after each tag's run completes (release skill step 3, D0385); guard wrapper-pin-checksummed
+# warns when the pinned version has none. The 0.4.1 entries below were hashed from the published assets
+# on 2026-09-08, the last release to ship without its own checksum (issue417).
 ["0.3.1"]
 "keel-linux-x86_64" = "77982fe2f22bb91b06f241fffaa8f9848f1c9bbafecb023dfa8df8591a991dd0"
 "keel-macos-aarch64" = "29a5571e84292770c31bedb8a9f1327825a939c0a9743c5ee3ae3a1c612d08f6"
 "keel-windows-x86_64.exe" = "767140470bcfc87365c2d403c9ed54bfa460b016c07926fdb164c8c9d5f97f39"
+["0.4.1"]
+"keel-linux-x86_64" = "419c8ce5832c8804a131de1b2a05ec9138799a07f8ea346d83df60c424208443"
+"keel-macos-aarch64" = "2c712c7841b7123e6970880d0182f5ed0543257253bc3e3de9d7e4bc8075db57"
+"keel-windows-x86_64.exe" = "6037dcc0eb200dd8dbfe00b4ed4e4e2f8db932372a0f7baa0bd584fd689565f2"

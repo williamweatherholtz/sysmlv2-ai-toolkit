@@ -3172,8 +3172,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 65] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared"];
+pub const GUARD_NAMES: [&str; 67] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3928,6 +3928,118 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 66: a workflow that PUBLISHES release assets hashes them and publishes the hash (D0385/issue417).
+///
+/// The wrapper contract (`keel-wrapper.toml`, `keelw`) promises verification against "the release
+/// page's published checksums", and for three releases the release page carried none: `release.yml`
+/// attached the binary and nothing else, so every checksum entry was computed by downloading the
+/// asset and hashing it locally - a hash of the very download it was meant to verify, which proves
+/// nothing about the bytes the build produced. The checksum has to come out of the run that built
+/// the asset, beside it. The human's words, 2026-09-08: "keel release doesn't have a checksum? it
+/// needs one" / "make a normal part of process". This guard is what makes it a part of the process
+/// rather than a step someone remembers.
+///
+/// "Publishes release assets" is judged by what the workflow invokes: `softprops/action-gh-release`,
+/// `gh release upload` or `gh release create`. Such a workflow must contain a SHA-256 computation
+/// (`sha256sum`, `shasum -a 256`, `Get-FileHash`, `certutil -hashfile`) AND name a published hash
+/// file (`.sha256` or `SHA256SUMS`). A project with no publishing workflow declares nothing.
+///
+/// STATED LIMITATION: file-level, like `gating-workflow-history` - there is no YAML parser here, so
+/// a hash computed in one job and an upload in another that omits it would pass. It catches the
+/// failure class this project had - a publishing workflow with no hashing anywhere - and nothing finer.
+fn release_checksums_published(root: &Path) -> GuardReport {
+    let dir = root.join(".github").join("workflows");
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return GuardReport { name: "release-checksums-published", scanned, warnings: Vec::new(), violations };
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|x| x.to_str()).is_some_and(|e| e == "yml" || e == "yaml"))
+        .collect();
+    files.sort();
+    for path in &files {
+        let Ok(text) = crate::corpus::read_to_string(path) else { continue };
+        let publishes = ["action-gh-release", "gh release upload", "gh release create"]
+            .iter()
+            .any(|needle| text.contains(needle));
+        if !publishes {
+            continue;
+        }
+        scanned += 1;
+        let hashes = ["sha256sum", "shasum -a 256", "Get-FileHash", "certutil -hashfile"]
+            .iter()
+            .any(|needle| text.contains(needle));
+        let names_hash_file = text.contains(".sha256") || text.contains("SHA256SUMS");
+        if !hashes || !names_hash_file {
+            violations.push(format!(
+                "{}: publishes release assets but {} - a downstream project can only hash the download it is trying to verify. Hash each asset in the job that built it and attach the `.sha256` / `SHA256SUMS` beside it (D0385/issue417)",
+                relpath(root, path),
+                match (hashes, names_hash_file) {
+                    (false, false) => "computes no SHA-256 and publishes no hash file",
+                    (false, true) => "computes no SHA-256 (the hash file it names comes from nowhere)",
+                    _ => "publishes no `.sha256` / `SHA256SUMS` for what it hashes",
+                }
+            ));
+        }
+    }
+    GuardReport { name: "release-checksums-published", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 67 (WARNING-tier): the pinned engine version has a wrapper checksum for every asset keelw
+/// can download (D0385/issue418).
+///
+/// `keelw` reads the pin from `.engine/contracts/engine-version.toml` and refuses a download with
+/// no entry in `keel-wrapper.toml` - correctly (never trust-on-first-use). The consequence is that a
+/// pin can move without its entries and nothing says so until a fresh clone is refused: this
+/// project's pin moved to 0.4.1 on 2026-09-06 while the table carried 0.3.1 only, and every gate
+/// stayed green for two days. The asset names mirror `keelw`'s platform case, which is the one
+/// place they are declared.
+///
+/// A WARNING, not a violation: a project fresh from `keel init` has a seeded cache and an empty
+/// table for its version, and is not wrong until it copies the entries from the release's
+/// `SHA256SUMS` (the release skill's step 3). Absent `keel-wrapper.toml`, nothing is claimed.
+fn wrapper_pin_checksummed(root: &Path) -> GuardReport {
+    const ASSETS: [&str; 3] = ["keel-linux-x86_64", "keel-macos-aarch64", "keel-windows-x86_64.exe"];
+    let mut warnings = Vec::new();
+    let Ok(table) = crate::corpus::read_to_string(root.join("keel-wrapper.toml")) else {
+        return GuardReport { name: "wrapper-pin-checksummed", scanned: 0, warnings, violations: Vec::new() };
+    };
+    let pin = crate::corpus::read_to_string(root.join(".engine").join("contracts").join("engine-version.toml"))
+        .ok()
+        .and_then(|t| {
+            t.lines().find_map(|l| {
+                let l = l.trim();
+                let rest = l.strip_prefix("engine")?.trim_start().strip_prefix('=')?.trim();
+                let rest = rest.strip_prefix('"')?;
+                rest.split('"').next().map(str::to_string)
+            })
+        });
+    let Some(pin) = pin else {
+        return GuardReport { name: "wrapper-pin-checksummed", scanned: 0, warnings, violations: Vec::new() };
+    };
+    // the pin's table: from its `["<pin>"]` header to the next `[` header
+    let header = format!("[\"{pin}\"]");
+    let section: &str = table.find(&header).map_or("", |i| {
+        let body = &table[i + header.len()..];
+        body.find("\n[").map_or(body, |j| &body[..j])
+    });
+    let missing: Vec<&str> = ASSETS
+        .iter()
+        .copied()
+        .filter(|a| !section.lines().any(|l| l.trim_start().starts_with(&format!("\"{a}\""))))
+        .collect();
+    if !missing.is_empty() {
+        warnings.push(format!(
+            "keel-wrapper.toml: the pinned engine {pin} has no checksum for {} - keelw REFUSES to download it on any clone without a cache (never trust-on-first-use). Copy the entries from the release's SHA256SUMS (release skill, step 3; D0385/issue418)",
+            missing.join(", ")
+        ));
+    }
+    GuardReport { name: "wrapper-pin-checksummed", scanned: 1, warnings, violations: Vec::new() }
 }
 
 /// Guard 65: every measurement instrument in the tree is a declared `Sensor`, and every Sensor's
@@ -4958,6 +5070,8 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         // evidence; demanding a receipt from them would point the control at the wrong party.
         "evidence-cited" => Some(evidence_cited(root)),
         "gating-workflow-history" => Some(gating_workflow_history(root)),
+        "release-checksums-published" => Some(release_checksums_published(root)), // hard (D0385/issue417) - a published binary with no published hash
+        "wrapper-pin-checksummed" => Some(wrapper_pin_checksummed(root)), // WARNING-tier (D0385/issue418) - the pin moved, the wrapper table did not
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
