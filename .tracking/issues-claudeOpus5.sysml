@@ -1332,4 +1332,29 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSelfBuildHooksLeaveTheBuildTree to issue408;
+
+    part issue409 : Issue {
+        :>> id = "9c21ac2b-55a0-4e25-9089-83fb942b93fe";
+        :>> title = "The turn-boundary gate costs 25.5 s and orient 5 s over a 275 ms parse: serial guards, corpus re-reads, and untimed spawns";
+        :>> createdAt = "2026-09-07";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "MEASURED 2026-09-07 on this host (Windows 11, 20 cores, Defender on-access scanning, no exclusion), release binary at 018315a, warm file cache, KEEL_PERF=2 plus a measurement-only phase wrapper around run_all and orient::compute (reverted, not committed): parsing the whole corpus - 678 files, 11.6 MB - costs 275 ms, and the model is built ONCE per process (Model::build x41: 40 cached, 1 parsed). Yet `keel guard` takes 25.5 s wall and `keel orient` 5.1 s. WHERE IT GOES, guard: priority-inversion 6.3 s, which re-runs orient::compute in full; about twenty text-scanning guards at 0.4-1.8 s each, every one re-reading the corpus from disk because it scans lines rather than the model (39 collect_sysml and 61 read_to_string sites in guards.rs); 56 git spawns at about 79 ms each on this host, about 4.4 s; and 40 cache-hit clones of the Model at 1.57 s. orient: criterion_suspects 1.8 s, deliverable suspicion 0.95 s, narrowing 0.5 s, activation 0.34 s, the rest under 0.3 s each; 23 git spawns. The guards run SERIALLY on a 20-core host. Nothing here is a wrong algorithm - each guard is a linear scan and each git query is already batched - the cost is repetition across independent guards and process spawns, and the Stop hook pays the whole 25 s at every turn boundary on a tree that has usually not changed. THE HUMAN'S WORDS, 2026-09-07: 'Keel has become slow, which is a known tradeoff for a computed state ... I feel like we don't make a ton of changes all at once, so keel shouldn't have to take so long to compute state.' The check behind every number: KEEL_PERF=2 keel guard and keel orient with the phase wrappers, outputs kept in docs/reviews/perf-spike-2026-09-07.md.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGuardsRunInParallelAndTimed to issue409;
+    #Resolves dependency from dcGitFactsAreContentAddressed to issue409;
+    #Resolves dependency from dcOneCorpusPerProcess to issue409;
+    #Resolves dependency from dcGateAnswersFromItsReceipt to issue409;
+
+    part issue410 : Issue {
+        :>> id = "13d776e3-e28a-47e9-9df6-9880dbba97e9";
+        :>> title = "The perf line counts git spawns but times them as 0ms";
+        :>> createdAt = "2026-09-07";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-07 while attributing `keel guard`'s 25.5 s. gitx::git() counts every spawn (GIT_CALLS; the static test that forbids Command::new('git') elsewhere makes the count total), but GIT_NANOS is advanced only by govern.rs, so the perf line reads `git x56 in 0ms` while the 56 spawns cost about 4.4 s at the 79 ms per spawn measured on this host with a shell timer around `git rev-parse HEAD`. The count is right and the time is a lie of omission: a reader of the perf line concludes git is free. The module's own header says count-don't-time was that session's rule; the one number it withheld is the one this spike needed. CHECK: grep GIT_NANOS keel-cli/src - one add site, in govern.rs.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcGuardsRunInParallelAndTimed to issue410;
 }
