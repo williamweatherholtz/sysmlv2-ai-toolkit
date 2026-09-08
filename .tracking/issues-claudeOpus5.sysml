@@ -1390,4 +1390,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcBriefBudgetsAreHeld to issue413;
+
+    part issue414 : Issue {
+        :>> id = "7f269461-d8fb-402c-9571-7e7d971ca922";
+        :>> title = "A rejection given in chat has no CLI write path; the first one was a hand edit";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The human answered the 2026-09-08 brief with '[x] Reverse: do not republish when the queue is empty (answers: d0376)' - a REJECTION of a proposed Decision. keel has `keel accept` for the acceptance half of the review loop with delegation, quote receipt, read-back ratification and createdBy stamping, and NO CLI for the rejection half: write::reject_decision (keel-cli/src/write.rs:1875) is reachable only through the console's POST /api/decision/reject (serve.rs:851), which needs a paired device. So the first rejection in this project's history (d0376) was recorded by a hand edit that mirrors the writer's block, and no guard can tell that record from a fabricated one - the asymmetry D0122 named ('we have an accept button, but not a reject') now sits in the CLI. Found by: `keel --help | grep reject` (nothing) and `grep -n reject_decision keel-cli/src/*.rs` (serve.rs and write.rs only).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRejectHasACliPath to issue414;
 }

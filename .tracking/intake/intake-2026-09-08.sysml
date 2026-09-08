@@ -125,4 +125,60 @@ package ProjectIntake20260908 {
         :>> triageNote = "a register and a whole-page ceiling are new contract clauses, not a checker defect; they change what the surfacing process publishes, so they go through a Decision";
     }
     #DerivedFrom dependency from us099 to st110;
+
+    part st111 : Statement {
+        :>> id = "75610dae-5e28-425f-9651-311a7f1a039c";
+        :>> title = "Objective tests need no agent panel; the human validates the subjective; process hooks, checklists and rubrics for small agents";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> text = "for the process agent one - looks like some of these items are just poorly measured, and that the measurement itself should be critiqued.  We don't really need a panel of agents to perform the same test, especially if that test is objective.  Where it's not objective, I should probably be included in validating the result at some point, if it's genuinely subjective.  Otherwise, I don't see a necessity to constantly be running agents to double check a subjective assertion (e.g. interpreting my text).  Maybe we need a more determinstic way to track processes?  Maybe we provide githook-like hooks into processes.  Do they fire before the prompt (i don't think this is possible)?  before work is done (e.g. sprint planning)?  after as a post-processing (e.g. sprint retro)?  there's got to be a good way to make a simple checklist for these processes and to make simple rubrics so lower-model agents can run them as necessary (e.g. user said ''X'' - is the user asking for a view?  if so, quote the text indicating so.  Is the user asking to record? if so, quote the text indicating so, etc.).";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-08"; :>> channel = StatementChannel::chat;
+    }
+
+    part us100 : UserStory {
+        :>> id = "dd8a539e-b8c4-40a7-83e0-5a0084687bb6";
+        :>> title = "The measurement is critiqued before the measured";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "a check that is repeatedly disagreeing with itself to be treated as a poorly designed measurement and critiqued as such";
+        :>> soThat = "the project does not spend on rerunning a bad instrument to average its noise";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "their words: some of these items are just poorly measured, and that the measurement itself should be critiqued";
+    }
+    #DerivedFrom dependency from us100 to st111;
+
+    part us101 : UserStory {
+        :>> id = "8c9c8405-b7ba-47a0-9736-cd6b4e4e060f";
+        :>> title = "Objective tests run once; the human samples the subjective";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "an objective test run once and deterministically, never by a panel of agents, and a genuinely subjective verdict brought to me for validation at some point instead of re-run by more agents";
+        :>> soThat = "agent spend goes to work, not to double-checking interpretations of my text";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "their words: We don't really need a panel of agents to perform the same test, especially if that test is objective. Where it's not objective, I should probably be included in validating the result";
+    }
+    #DerivedFrom dependency from us101 to st111;
+
+    part us102 : UserStory {
+        :>> id = "df430c56-06f2-4921-8180-17c1b1f2bfd1";
+        :>> title = "Processes fire hooks like git does";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "processes tracked deterministically through hook points - before work such as sprint planning, and after as post-processing such as retro - the way git hooks fire around a commit";
+        :>> soThat = "a process runs because a hook fired, not because an agent remembered";
+        :>> implication = ImplicationKind::architecture;
+        :>> triageNote = "their words: Maybe we provide githook-like hooks into processes. before work is done (e.g. sprint planning)? after as a post-processing (e.g. sprint retro)?";
+    }
+    #DerivedFrom dependency from us102 to st111;
+
+    part us103 : UserStory {
+        :>> id = "c50d4154-8319-41b5-94fd-be3bd622169d";
+        :>> title = "Checklists and rubrics a small model can run, quoting its evidence";
+        :>> createdAt = "2026-09-08"; :>> createdBy = "claudeOpus5";
+        :>> asA = "project owner";
+        :>> iWant = "each process reduced to a simple checklist and a rubric that a lower-capability agent can run, where every verdict quotes the text that decided it - is the user asking for a view? quote it; asking to record? quote it";
+        :>> soThat = "process checks are cheap, repeatable and auditable from the quote rather than from an agent's judgment";
+        :>> implication = ImplicationKind::process;
+        :>> triageNote = "their words: make simple rubrics so lower-model agents can run them as necessary (e.g. user said X - is the user asking for a view? if so, quote the text indicating so)";
+    }
+    #DerivedFrom dependency from us103 to st111;
 }

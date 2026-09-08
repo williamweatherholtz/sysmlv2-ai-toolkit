@@ -42,7 +42,8 @@ and when).
 | Result | What this process does |
 |---|---|
 | Same set | **Nothing.** No page, no link, no sentence about decisions. |
-| Changed — added, answered, or withdrawn | Continue to step 3. |
+| Changed — added, answered, or withdrawn, and at least one still waits | Continue to step 3. |
+| Changed to EMPTY — the last ask was answered | **Nothing** (D0380, their words: *"do not republish when the queue is empty"*). The last page stands, the toml keeps its ids, and the next publish is the next ask. |
 
 Silence is a *computed state*, not forgetfulness: it means the published page already says
 everything true. That is the whole point of the change — **never** append a count to a turn.

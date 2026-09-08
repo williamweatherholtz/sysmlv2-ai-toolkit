@@ -463,6 +463,133 @@ fn registry_skills(root: &Path) -> Vec<(String, String)> {
     out
 }
 
+/// The files under a skill's source `references/` directory, as (`references/<rel>`, text) pairs -
+/// what `sync_claude` deploys BESIDE the SKILL.md (D0379/issue393). A skill with no such directory
+/// yields nothing. Paths use `/` so the deployed layout is the same on every host.
+fn skill_reference_files(skill_src: &Path) -> Vec<(String, String)> {
+    let Some(dir) = skill_src.parent() else { return Vec::new() };
+    let refs = dir.join("references");
+    let mut files = Vec::new();
+    collect_files_under(&refs, &mut files);
+    files.sort();
+    files
+        .into_iter()
+        .filter_map(|p| {
+            let rel = p.strip_prefix(dir).ok()?.to_string_lossy().replace('\\', "/");
+            let text = std::fs::read_to_string(&p).ok()?;
+            Some((rel, text))
+        })
+        .collect()
+}
+
+fn collect_files_under(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            collect_files_under(&p, out);
+        } else {
+            out.push(p);
+        }
+    }
+}
+
+/// The relative reference tokens a SKILL.md instructs the agent to open.
+///
+/// Every `references/<path>` not preceded by a path separator or a word character, so a repo-rooted
+/// `.engine/skills/stpa/references/sop.md`, which resolves on its own, is not one. Trailing
+/// punctuation and a closing backtick or bracket are not part of the path.
+#[must_use]
+pub fn relative_reference_tokens(skill_text: &str) -> Vec<String> {
+    const KEY: &str = "references/";
+    let bytes = skill_text.as_bytes();
+    let mut out: Vec<String> = Vec::new();
+    let mut from = 0usize;
+    while let Some(i) = skill_text[from..].find(KEY) {
+        let start = from + i;
+        let preceded = start > 0
+            && bytes
+                .get(start - 1)
+                .is_some_and(|c| matches!(c, b'/' | b'\\' | b'_' | b'-' | b'.') || c.is_ascii_alphanumeric());
+        let mut end = start + KEY.len();
+        while bytes.get(end).is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-' | b'.' | b'/')) {
+            end += 1;
+        }
+        let token = skill_text[start..end].trim_end_matches(['.', '/']).to_string();
+        if !preceded && token.len() > KEY.len() && !out.contains(&token) {
+            out.push(token);
+        }
+        from = end.max(start + KEY.len());
+    }
+    out
+}
+
+/// Every deployed skill whose SKILL.md names a relative reference that does not resolve under its
+/// own directory, as (skill, token) pairs.
+///
+/// The followability half of `claude-surface-drift` (D0379): the deployed surface is a contract with
+/// the agent, and an instruction it cannot follow is worse than none, because the agent proceeds as
+/// if it had (issue393: the stpa SOP). The count of affected skills is whatever this returns,
+/// computed on every run, never a hand count.
+#[must_use]
+pub fn unresolved_skill_references(skills_dir: &Path) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(skills_dir) else { return out };
+    let mut dirs: Vec<_> = entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    dirs.sort();
+    for dir in dirs {
+        let Ok(text) = std::fs::read_to_string(dir.join("SKILL.md")) else { continue };
+        let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        for token in relative_reference_tokens(&text) {
+            if !dir.join(&token).is_file() {
+                out.push((name.clone(), token));
+            }
+        }
+    }
+    out
+}
+
+/// The skill half of the check: stale or missing SKILL.md files, stale or missing reference files
+/// (D0379), and deployed instructions that name a reference which does not resolve (issue393).
+fn skill_drift(root: &Path, claude: &Path, registry: &[(String, String)], inactive: &[String]) -> Vec<String> {
+    let mut drift = Vec::new();
+    let mut missing_skills = 0usize;
+    let mut missing_refs = 0usize;
+    for (title, loc) in registry {
+        let dst_dir = claude.join("skills").join(title);
+        let src_text = std::fs::read_to_string(root.join(loc)).unwrap_or_default();
+        let want = deployed_skill_text(&skill_process(loc), &src_text, inactive);
+        if !same_text(&std::fs::read_to_string(dst_dir.join("SKILL.md")).unwrap_or_default(), &want) {
+            missing_skills += 1;
+        }
+        // D0379: the skill's references/ deploy beside it, byte for byte
+        for (rel, text) in skill_reference_files(&root.join(loc)) {
+            if !same_text(&std::fs::read_to_string(dst_dir.join(&rel)).unwrap_or_default(), &text) {
+                missing_refs += 1;
+            }
+        }
+    }
+    if missing_skills > 0 {
+        drift.push(format!("{missing_skills} skill(s) missing or stale under .claude/skills/"));
+    }
+    if missing_refs > 0 {
+        drift.push(format!("{missing_refs} skill reference file(s) missing or stale under .claude/skills/<skill>/references/ (D0379)"));
+    }
+    // D0379/issue393: is every instruction on the deployed surface followable where the agent stands?
+    let unresolved = unresolved_skill_references(&claude.join("skills"));
+    if !unresolved.is_empty() {
+        let mut skills: Vec<&str> = unresolved.iter().map(|(s, _)| s.as_str()).collect();
+        skills.dedup();
+        let named: Vec<String> = unresolved.iter().map(|(s, t)| format!("{s} -> {t}")).collect();
+        drift.push(format!(
+            "{} deployed skill(s) name a reference that does not resolve where the agent stands: {} (issue393 - the agent invents the procedure or skips its gates)",
+            skills.len(),
+            named.join(", ")
+        ));
+    }
+    drift
+}
+
 /// Is the deployed text the generated text, LINE ENDINGS ASIDE (issue351, GH#46)?
 ///
 /// `sync-claude` writes LF; a Windows checkout with `core.autocrlf` reads the same file back as CRLF,
@@ -519,18 +646,7 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
     // skills: one .claude/skills/<name>/SKILL.md per registry entry, deployed as `deployed_skill_text`
     let registry = registry_skills(root);
     let inactive = crate::activation::Activation::load(root).inactive_processes();
-    let mut missing_skills = 0usize;
-    for (title, loc) in &registry {
-        let dst = claude.join("skills").join(title).join("SKILL.md");
-        let src_text = std::fs::read_to_string(root.join(loc)).unwrap_or_default();
-        let want = deployed_skill_text(&skill_process(loc), &src_text, &inactive);
-        if !same_text(&std::fs::read_to_string(&dst).unwrap_or_default(), &want) {
-            missing_skills += 1;
-        }
-    }
-    if missing_skills > 0 {
-        drift.push(format!("{missing_skills} skill(s) missing or stale under .claude/skills/"));
-    }
+    drift.extend(skill_drift(root, &claude, &registry, &inactive));
     // GH#51 / D0349: when anything drifted, name the generator that stamped the surface and the one
     // running - two builds of one version generated different surfaces and the report named neither.
     if !drift.is_empty() && stamped_build != SURFACE_BUILD {
@@ -576,6 +692,13 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
         let dst_dir = claude.join("skills").join(title);
         std::fs::create_dir_all(&dst_dir).map_err(|e| e.to_string())?;
         crate::write::write_atomic(&dst_dir.join("SKILL.md"), deployed_skill_text(&skill_process(loc), &src_text, &inactive)).map_err(|e| e.to_string())?;
+        for (rel, text) in skill_reference_files(&root.join(loc)) {
+            let dst = dst_dir.join(&rel);
+            if let Some(parent) = dst.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            crate::write::write_atomic(&dst, &text).map_err(|e| e.to_string())?;
+        }
         skills_written += 1;
     }
     if skills_written != registry.len() {
@@ -592,8 +715,73 @@ pub fn sync_claude(root: &Path, check_only: bool) -> Result<SyncReport, String> 
 mod tests {
     use super::{
         hooks_silenced, keel_hooks, marketplace_manifest, merge_settings, pin_probe_sh, plugin_files, plugin_hooks, protected_path_command, resolver, restored_settings,
-        same_text, sync_claude, text_sets_kill_switch, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST, PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
+        relative_reference_tokens, same_text, sync_claude, text_sets_kill_switch, unresolved_skill_references, HOOK_KILL_SWITCH, MARKETPLACE_MANIFEST,
+        PLUGIN_DIR, PROTECTED_PATHS, RESOLUTION_ORDER,
     };
+
+    /// D0379/issue393: a deployed SKILL.md that tells the agent to open `references/<x>` which is not
+    /// deployed is drift - constructed, not described. A skill naming no reference is not scanned for
+    /// one, and a repo-rooted `.engine/skills/<s>/references/<x>` is not a relative token.
+    #[test]
+    fn a_deployed_instruction_that_cannot_be_followed_is_drift() {
+        assert_eq!(
+            relative_reference_tokens("read `references/sop.md` first; see references/ears.md (references/ruleset.md)."),
+            vec!["references/sop.md", "references/ears.md", "references/ruleset.md"]
+        );
+        assert!(relative_reference_tokens("the method is `.engine/skills/stpa/references/sop.md`").is_empty(), "a repo-rooted path resolves on its own");
+        assert!(relative_reference_tokens("no references/ here, and none there").is_empty(), "a bare directory is not a file the agent opens");
+
+        let root = std::env::temp_dir().join(format!("keel-skillrefs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let skills = root.join(".claude").join("skills");
+        std::fs::create_dir_all(skills.join("fixture")).expect("mkdir");
+        std::fs::create_dir_all(skills.join("quiet")).expect("mkdir");
+        std::fs::write(skills.join("fixture").join("SKILL.md"), "# fixture\n\nRead `references/missing.md` before step 1.\n").expect("write");
+        std::fs::write(skills.join("quiet").join("SKILL.md"), "# quiet\n\nNo reference here.\n").expect("write");
+        std::fs::write(root.join(".claude").join("settings.json"), merge_settings(&serde_json::json!({})).to_string()).expect("clean");
+        let found = unresolved_skill_references(&skills);
+        assert_eq!(found, vec![("fixture".to_string(), "references/missing.md".to_string())]);
+        let report = sync_claude(&root, true).expect("check");
+        let line = report.drift.iter().find(|d| d.contains("does not resolve where the agent stands")).expect("the scan reports in the drift list");
+        assert!(line.starts_with("1 deployed skill(s)") && line.contains("fixture -> references/missing.md") && !line.contains("quiet"), "{line}");
+        // deploy the file and the finding is gone
+        std::fs::create_dir_all(skills.join("fixture").join("references")).expect("mkdir");
+        std::fs::write(skills.join("fixture").join("references").join("missing.md"), "now present\n").expect("write");
+        assert!(unresolved_skill_references(&skills).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// D0379: a registry skill's `references/` directory deploys beside its SKILL.md, byte for byte,
+    /// and a missing or altered copy is drift; `sync-claude` writes it back.
+    #[test]
+    fn a_skills_references_deploy_beside_it() {
+        let root = std::env::temp_dir().join(format!("keel-skillrefdeploy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let src = root.join(".engine").join("skills").join("fx");
+        std::fs::create_dir_all(src.join("references").join("deep")).expect("mkdir");
+        std::fs::write(src.join("SKILL.md"), "# fx\n\nRead `references/sop.md` and `references/deep/notes.md`.\n").expect("write");
+        std::fs::write(src.join("references").join("sop.md"), "the SOP\n").expect("write");
+        std::fs::write(src.join("references").join("deep").join("notes.md"), "notes\n").expect("write");
+        std::fs::write(
+            src.join("registry.sysml"),
+            "package R {\n    part fx : Skill {\n        :>> title = \"fx\";\n        :>> location = \".engine/skills/fx/SKILL.md\";\n    }\n}\n",
+        )
+        .expect("write");
+        std::fs::create_dir_all(root.join(".claude")).expect("mkdir");
+        std::fs::write(root.join(".claude").join("settings.json"), merge_settings(&serde_json::json!({})).to_string()).expect("clean");
+        let before = sync_claude(&root, true).expect("check");
+        assert!(before.drift.iter().any(|d| d.starts_with("2 skill reference file(s) missing or stale")), "{:?}", before.drift);
+        sync_claude(&root, false).expect("write");
+        let deployed = root.join(".claude").join("skills").join("fx");
+        assert_eq!(std::fs::read_to_string(deployed.join("references").join("sop.md")).expect("deployed"), "the SOP\n");
+        assert_eq!(std::fs::read_to_string(deployed.join("references").join("deep").join("notes.md")).expect("deployed"), "notes\n");
+        let after = sync_claude(&root, true).expect("check again");
+        assert!(!after.drift.iter().any(|d| d.contains("reference")), "{:?}", after.drift);
+        std::fs::write(deployed.join("references").join("sop.md"), "altered\n").expect("write");
+        let altered = sync_claude(&root, true).expect("check altered");
+        assert!(altered.drift.iter().any(|d| d.starts_with("1 skill reference file(s) missing or stale")), "{:?}", altered.drift);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// D-P0a: six events (five, then `ConfigChange` under D0296), every command KEEL_BIN-then-PATH, never a cwd-relative target/ probe,
     /// and the missing-binary branch is loud and names the install path.
