@@ -32,6 +32,14 @@ if not os.path.exists(KEEL):
 TODAY = date.today()
 NOW = datetime.now(timezone.utc)
 
+# The artefact is CLAIMED before anything is computed (D0387/issue399): the previous answer is replaced
+# by a running stub now, an uncaught exception below rewrites it as failed, and only the last line
+# writes `complete: true`. A reader that does not go through artefact.require_complete is the defect.
+sys.path.insert(0, os.path.join(REPO, "scripts"))
+from artefact import begin_json, finish_json  # noqa: E402
+OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decision-facts.json")
+begin_json(OUT_PATH, "scripts/exec_brief/facts.py is running - this file is not an answer until complete is true")
+
 FACTS = {}
 NOTES = []
 
@@ -686,11 +694,19 @@ else:
 
     passed, failed = rget("passed"), rget("failed")
     at, head, logrel = rget("at"), rget("head"), rget("log")
+    running = rget("outcome") == "running"
+    if running:
+        # the stub `keel suite` writes at its START (D0387): a run in progress, or one that was killed -
+        # either way the counts are not an answer, and the `how` says which file said so
+        passed = failed = None
+    RUNNING_HOW = (RC_HOW + "`outcome = \"running\"` - the stub keel suite writes before cargo starts (D0387): "
+                  "a run in progress, or one that was killed at %s. No count until a run completes." % at)
     fact("suiteTests", int(passed) + int(failed) if passed and failed else None, "tests run",
+         RUNNING_HOW if running else
          RC_HOW + "`passed` + `failed`. The receipt counts the whole `cargo test --release "
                   "--no-fail-fast` run, unit + integration + doc tests.")
     fact("suiteFailed", int(failed) if failed else None, "failing tests",
-         RC_HOW + "`failed`.")
+         RUNNING_HOW if running else RC_HOW + "`failed`.")
     fact("suiteHead", head, "short SHA the suite last ran against", RC_HOW + "`head`.")
 
     # wall time: `at` is the run's START (suite.rs: `let started = now_secs(); ... at: started`)
@@ -922,19 +938,10 @@ DOC = {
     "facts": FACTS,
 }
 
-# A FAILED RUN MUST NOT LEAVE A CURRENT-LOOKING FILE. This script wrote decision-facts.json on an
-# earlier run, then raised on a later one, and the stale file sat there reading as fresh - the only
-# thing that noticed was a reader checking for keys the new section should have added. A missing file
-# is an honest answer; a stale one is scenario S-F4 with a timestamp.
-blob = json.dumps(DOC, indent=2, sort_keys=False)
-out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decision-facts.json")
-try:
-    tmp = out_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(blob + "\n")
-    os.replace(tmp, out_path)                  # atomic, so a re-run never leaves a half file
-except Exception as exc:
-    print("WARN: could not write %s: %s" % (out_path, exc), file=sys.stderr)
-
-print(blob)
+# A FAILED RUN MUST NOT LEAVE A CURRENT-LOOKING FILE (D0387/issue399). The file was claimed with a running
+# stub before section 1 ran; a raise above rewrote it as failed; this is the one place `complete` becomes
+# true, and the stdout copy carries the same field so a redirected copy is checked the same way.
+DOC["complete"] = True
+finish_json(OUT_PATH, DOC)
+print(json.dumps(DOC, indent=2, sort_keys=False))
 

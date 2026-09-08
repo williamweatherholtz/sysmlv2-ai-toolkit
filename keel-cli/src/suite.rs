@@ -88,7 +88,7 @@ pub fn parse_receipt(text: &str) -> Option<Receipt> {
 
 fn render_receipt(r: &Receipt, log: &Path) -> String {
     format!(
-        "# suite receipt: the deliverable as the full suite last saw it ON THIS MACHINE, and what that run\n# cost. Nothing refuses on it (D0356) - it is a measurement, not a gate.\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nlog = \"{}\"\n",
+        "# suite receipt: the deliverable as the full suite last saw it ON THIS MACHINE, and what that run\n# cost. Nothing refuses on it (D0356) - it is a measurement, not a gate. `outcome = \"running\"` is the\n# stub written before cargo starts (D0387): a run in progress, or one that was killed - not an answer.\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nlog = \"{}\"\n",
         r.fingerprint, r.head, r.at, r.passed, r.failed, r.outcome, log.to_string_lossy().replace('\\', "/")
     )
 }
@@ -135,6 +135,7 @@ pub fn land_refusal(repo: &Path) -> Option<String> {
     };
     match receipt(repo) {
         None => Some(format!("no suite receipt at {RECEIPT} - the full suite has not run on this machine since the receipt existed. Run `keel suite` (it writes the receipt), then land.")),
+        Some(r) if r.outcome == "running" => Some(format!("a suite run started at {} on this machine and has not completed (or was killed) - its receipt is a running stub, not a verdict. Wait for it or run `keel suite` again.", r.at)),
         Some(r) if !r.green() => Some(format!("the last suite run on this machine was RED ({} passed, {} failed; head {}). Fix, run `keel suite` to green, then land.", r.passed, r.failed, r.head)),
         Some(r) if r.fingerprint != now => Some(format!("the deliverable CHANGED since the last green suite run (receipt {} at head {}, {} passed; the tree now fingerprints {}). Run `keel suite`, then land.", &r.fingerprint[..12], r.head, r.passed, &now[..12])),
         Some(_) => None,
@@ -168,6 +169,17 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     }
     let started = now_secs();
     let log = metrics.join(format!("suite-{started}.log"));
+    // D0387/issue399: the previous receipt is REPLACED by a running stub before cargo starts, so a run
+    // that is killed leaves `outcome = "running"` - not green, not counted - rather than the last
+    // completed run's verdict standing over a tree it never saw. Same fingerprint as the final receipt
+    // will carry, so a reader comparing fingerprints is told the run is in progress, not stale.
+    let head = crate::gitx::git().arg("-C").arg(repo).args(["rev-parse", "--short", "HEAD"]).output().ok().filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+    if let Ok(fp) = fingerprint(repo) {
+        let stub = Receipt { fingerprint: fp, head: head.clone(), at: started, passed: 0, failed: 0, outcome: "running".to_string() };
+        if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), render_receipt(&stub, &log)) {
+            eprintln!("keel suite: running stub could not be written: {e}");
+        }
+    }
     println!("keel suite: cargo test --release --no-fail-fast (log -> {})", log.display());
     let mut cmd = std::process::Command::new("cargo");
     cmd.arg("test").arg("--release").arg("--manifest-path").arg(repo.join("keel-cli").join("Cargo.toml")).arg("--no-fail-fast");
@@ -185,7 +197,6 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     let _ = std::fs::write(&log, &text);
     let (passed, failed) = count_results(&text);
     let outcome = if out.status.success() && failed == 0 { "pass" } else { "fail" };
-    let head = crate::gitx::git().arg("-C").arg(repo).args(["rev-parse", "--short", "HEAD"]).output().ok().filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
     let fp = match fingerprint(repo) {
         Ok(f) => f,
         Err(e) => {
@@ -212,7 +223,8 @@ pub fn receipt_path(repo: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{count_results, parse_receipt};
+    use super::{count_results, parse_receipt, render_receipt, Receipt};
+    use std::path::Path;
 
     #[test]
     fn results_are_summed_across_every_test_binary() {
@@ -228,5 +240,17 @@ mod tests {
         let red = parse_receipt("fingerprint = \"abc\"\npassed = 9\nfailed = 1\noutcome = \"fail\"\n").expect("parses");
         assert!(!red.green());
         assert!(parse_receipt("nonsense = ").is_none());
+    }
+
+    #[test]
+    fn a_running_stub_is_not_green_and_a_killed_run_leaves_it() {
+        // D0387/issue399: the stub `cmd` writes before cargo starts is what a killed run leaves behind;
+        // it must read as no verdict, never as the previous run's pass.
+        let stub = Receipt { fingerprint: "abc".into(), head: "1234567".into(), at: 7, passed: 0, failed: 0, outcome: "running".into() };
+        let text = render_receipt(&stub, Path::new("x.log"));
+        let back = parse_receipt(&text).expect("parses");
+        assert_eq!(back, stub);
+        assert!(!back.green(), "a run in progress has no verdict");
+        assert!(text.contains("running"), "the file says so in its own text");
     }
 }

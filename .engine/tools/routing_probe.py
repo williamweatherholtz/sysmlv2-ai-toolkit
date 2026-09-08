@@ -226,6 +226,8 @@ def main():
     ap.add_argument("--jobs", type=int, default=4, help="probe sessions to run at once")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    if OUT.exists():
+        OUT.unlink()   # D0387: the previous investigation is gone before this one starts; a dead run leaves nothing
 
     if not args.investigate:
         sys.exit("refusing: name the case(s) to investigate with --investigate NAME[,NAME...]. "

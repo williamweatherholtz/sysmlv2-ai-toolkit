@@ -22,7 +22,7 @@ about a specific project: roles, processes and edges come from the JSON.
 
 Kernel-free, dependency-free (stdlib only). Deterministic: the same JSON draws the same picture.
 """
-import json, io, html, re, sys, subprocess
+import json, io, html, os, re, sys, subprocess
 from collections import defaultdict
 
 def load(argv):
@@ -294,6 +294,10 @@ def render(d):
     return "\n".join(svg)
 
 if __name__ == "__main__":
+    if "--out" in sys.argv:
+        # D0387: the previous drawing is removed before rendering, so a run that dies leaves no stale SVG
+        try: os.remove(sys.argv[sys.argv.index("--out") + 1])
+        except FileNotFoundError: pass
     svg = render(load(sys.argv))
     if "--out" in sys.argv:
         io.open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8").write(svg)

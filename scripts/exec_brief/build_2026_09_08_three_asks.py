@@ -16,9 +16,14 @@ from html import escape
 sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else __file__.rsplit("\\", 1)[0])
 from charts import bars                                # noqa: E402
 from logic_exhibits import downstream, logic_lanes     # noqa: E402
+sys.path.insert(0, "scripts")
+from artefact import claim, require_complete   # noqa: E402  (D0387: a stale answer is refused, a dead run leaves no page)
 
 facts_path, prev_path, out_path = sys.argv[1:4]
-J = json.load(open(facts_path, encoding="utf-8"))
+if prev_path == out_path:
+    sys.exit("refusing: the style source and the output are the same file - copy the previous page aside first")
+J = require_complete(facts_path)    # refuses a running, failed, or pre-D0387 facts file
+claim(out_path)                     # the previous page is gone before anything is built
 F = {k: v["value"] for k, v in J["facts"].items()}
 prev = open(prev_path, encoding="utf-8").read()
 style = re.search(r"<style>[\s\S]*?</style>", prev).group(0)

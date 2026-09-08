@@ -16,7 +16,12 @@ from charts import bars                       # noqa: E402
 from logic_exhibits import downstream, logic_lanes  # noqa: E402
 
 facts_path, in_path, out_path = sys.argv[1:4]
-F = {k: v["value"] for k, v in json.load(open(facts_path, encoding="utf-8"))["facts"].items()}
+sys.path.insert(0, "scripts")
+from artefact import claim, require_complete   # noqa: E402  (D0387: a stale answer is refused, a dead run leaves no page)
+if in_path == out_path:
+    sys.exit("refusing: the input page and the output are the same file - copy the previous page aside first")
+F = {k: v["value"] for k, v in require_complete(facts_path)["facts"].items()}
+claim(out_path)
 page = open(in_path, encoding="utf-8").read()
 
 
