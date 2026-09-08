@@ -838,7 +838,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
         // here an empty list is the benign reading. Reporting "nothing pending" when the model
         // could not be read would be the silent failure issue096 is about, so a failure surfaces
         // as a named sentinel the human will notice rather than as a clean zero.
-        sync: crate::sync::divergence(repo).to_json(),
+        sync: sync_state.to_json(),
         pending_acceptances: crate::view::pending_acceptances(repo)
             .unwrap_or_else(|_| vec!["<unreadable: could not compute pending acceptances>".to_owned()]),
     }
