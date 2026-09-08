@@ -842,6 +842,35 @@ fact("routingSubsetThreeSamplesMinutes",
      "minutes, three samples of a 16-prompt subset at four-way parallelism",
      I392_HOW + "`31s per run at four-way parallelism`, times 48 runs. The subset size is D0378 option B's proposal.")
 
+# ================================================================ 11. the STPA step-2 gate (D0363 / sprint610 / D0383)
+# The gate the SOP used to state in prose is a row set now; `cs` was read above in section 9.
+_g = cs.get("stepTwoGate") or []
+fact("stepTwoClauses", len(_g) or None, "clauses of the SOP's step-2 gate the view decides",
+     "`keel show control-structure`: length of the stepTwoGate array - one row per clause of the stpa SOP's "
+     "step-2 gate (sprint610). Zero before 2026-09-08: the gate was a paragraph.")
+fact("stepTwoHolds", sum(1 for r in _g if r.get("holds") is True) if _g else None, "of those clauses that hold",
+     "`keel show control-structure`: stepTwoGate rows with holds == true. Each row carries the evidence that "
+     "decided it; this counts, it does not re-judge.")
+fact("controllersPresent", len(cs.get("controllers") or []) or None, "controller roles this project wires",
+     "`keel show control-structure`: length of the controllers array (present roles only since sprint610).")
+fact("rolesAbsent", len(cs.get("absentRoles") or []), "controller roles nothing wires",
+     "`keel show control-structure`: length of absentRoles - " +
+     (", ".join(r.get("role", "?") for r in (cs.get("absentRoles") or [])) or "none") +
+     ". A role here is drawn nowhere; the diagram footnotes it with what would wire it.")
+fact("actuatorsComputed", len(cs.get("actuators") or []) or None, "actuators derived from the actions",
+     "`keel show control-structure`: length of the actuators array. Zero before sprint610.")
+fact("otherInputsOutputs", len(cs.get("otherInputsOutputs") or []) or None,
+     "authored OtherInputOutput items (the fifth element type, D0363)",
+     "`keel show control-structure`: length of otherInputsOutputs, joined from engine-control-structure.sysml.")
+fact("responsibilitiesComputed", len(cs.get("responsibilities") or []) or None,
+     "controller -> hazard responsibilities, one hierarchical level deep",
+     "`keel show control-structure`: length of the responsibilities array (actions x hazardsByProcess).")
+_ok, _gd = run([KEEL, "guard", "."], timeout=180)
+_m = re.search(r"stpa-currency: (\d+) of (\d+) computed control action", _gd or "")
+fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed control actions no stpa-self run has analysed",
+     "`keel guard .`: the stpa-currency WARN line's first number" + (" of %s" % _m.group(2) if _m else " - line not found") +
+     ". sprint610 added agentEditsDeliverable to the action set, which is the designed re-run trigger (D0313).")
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
