@@ -1357,4 +1357,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcGuardsRunInParallelAndTimed to issue410;
+
+    part issue411 : Issue {
+        :>> id = "14ad7ab2-6f98-4fbc-b1cc-87333fec795f";
+        :>> title = "the brief's already-in-the-tree count was typed as three while its instrument computed two - a phrase rule over prose stood in for a fact the model records as edges";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The standing decision brief published on 2026-09-07 stated that three of five pending Decisions were already in the tree, and its footnote said the instrument had been fixed to say so. The instrument said two. `pendingAlreadyShipped` is a phrase rule over each Decision's own consequences prose; after the 2026-09-07 widening it matched d0361 and d0366 and not d0363, whose consequences describe the schema move in the present tense with none of the listed phrases. The count on the page was therefore typed from the author's knowledge, not read from facts.json - the issue382 defect (numbers typed, not computed) recurring on the one number the issue383 correction had made load-bearing (whether an ask is a choice or a ratification). Found 2026-09-08 while rebuilding the page for three new asks: the fresh facts.json listed two, the page said three, and the page was right. A phrase rule over prose cannot be the instrument for a structural fact the model already records as typed edges: a delivery record names the Decision that chartered it (#CharteredBy, D0068) and records its DoD verdict as a TestResult. Reading those makes the count a function of the tree; the phrase rule stays beside it for the one case the edges cannot see, a Decision built outside any sprint.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcBriefDeliveredCountIsStructural to issue411;
 }

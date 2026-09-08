@@ -285,6 +285,88 @@ fact("pendingAlreadyShipped", len(already), "proposed Decisions whose code alrea
 fact("pendingAlreadyShippedList", ", ".join(d["slug"] for d in already) or None,
      "decision slugs", SHIP_HOW + " Slugs listed in file order.")
 
+# --- proposed Decisions whose chartered sprint is DONE - a structural reading, not a phrase rule
+# A sprint record names the Decision that chartered it (`#CharteredBy dependency from <story> to
+# dNNNN;`, D0068) and records its story's DoD verdict as a TestResult. Both are edges/results the
+# guards already validate, so this fact cannot be moved by rewording a consequences string.
+DELIV_HOW = ("walk .tracking/delivery/*.sysml; a proposed Decision is DELIVERED when one file holds "
+             "`#CharteredBy dependency from <x> to <its id>;` and the same file holds a "
+             "`story<Slug>DoDR<n> : TestResult` whose `outcome = VerdictKind::pass`. Reads typed "
+             "edges and recorded verdicts, never prose; a Decision built OUTSIDE a sprint is not "
+             "seen here, which is why the phrase rule above is kept beside it.")
+_charter_re = re.compile(r"#CharteredBy\s+dependency\s+from\s+\w+\s+to\s+(d\d{4})\s*;")
+_dod_pass_re = re.compile(r"part\s+story\w*DoDR\d+\s*:\s*TestResult\s*\{[^}]*VerdictKind::pass")
+delivered_ids = set()
+_deliv_dir = os.path.join(REPO, ".tracking", "delivery")
+if os.path.isdir(_deliv_dir):
+    for _fn in sorted(os.listdir(_deliv_dir)):
+        if not _fn.endswith(".sysml"):
+            continue
+        _txt = read(os.path.join(_deliv_dir, _fn))
+        if _dod_pass_re.search(_txt):
+            delivered_ids.update(_charter_re.findall(_txt))
+delivered = [d for d in proposed if d["slug"] in delivered_ids]
+fact("pendingDelivered", len(delivered),
+     "proposed Decisions whose chartered sprint records a passing DoD", DELIV_HOW)
+fact("pendingDeliveredList", ", ".join(d["slug"] for d in delivered) or None,
+     "decision slugs", DELIV_HOW + " Slugs listed in file order.")
+in_tree_slugs = [d["slug"] for d in proposed if d["slug"] in delivered_ids or d in already]
+IN_TREE_HOW = ("Union of pendingDeliveredList (structural: a finished sprint charters the Decision and its DoD "
+               "passed) and pendingAlreadyShippedList (the phrase rule, for a Decision built outside any sprint). "
+               "This is the ONE number the brief states as 'already in the tree'; the page builder reads it and "
+               "refuses if its own cross-check of the two lists disagrees.")
+fact("pendingInTree", len(in_tree_slugs), "proposed Decisions whose change is already in the tree", IN_TREE_HOW)
+fact("pendingInTreeList", ", ".join(in_tree_slugs) or None, "decision slugs", IN_TREE_HOW + " Slugs listed in file order.")
+
+# ================================================================ 3b. performance (D0367 asks)
+# The baseline is whatever D0367's context RECORDS - read by regex from the Decision file, so a
+# retyped number here cannot drift from the record. The current numbers are timed now, against the
+# binary this script already shells out to, so the page states what THIS tree costs today.
+_d0367 = ""
+for _fn in os.listdir(os.path.join(REPO, ".engine", "decisions")):
+    if _fn.startswith("0367-"):
+        _d0367 = read(os.path.join(REPO, ".engine", "decisions", _fn))
+_base = re.search(r"`keel orient` costs ([0-9.]+) s and `keel guard` ([0-9.]+) s", _d0367)
+BASE_HOW = ("regex `keel orient` costs N s and `keel guard` N s over the context string of "
+            ".engine/decisions/0367-*.sysml - the spike's own measured baseline (2026-09-07, this host), "
+            "quoted from the record, never retyped.")
+fact("perfBaselineOrientSec", float(_base.group(1)) if _base else None, "seconds", BASE_HOW)
+fact("perfBaselineGuardSec", float(_base.group(2)) if _base else None, "seconds", BASE_HOW)
+
+
+def _timed_ms(cmd, runs, stdin_text=None, warm=0):
+    """Median wall ms of `runs` runs after `warm` untimed warm-up runs; None if any run fails."""
+    samples = []
+    for i in range(warm + runs):
+        t0 = time.perf_counter()
+        try:
+            p = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=300,
+                               input=stdin_text, encoding="utf-8", errors="replace")
+        except Exception:
+            return None
+        ms = int((time.perf_counter() - t0) * 1000)
+        if i >= warm:
+            if p.returncode != 0 and cmd[1] != "hook":
+                return None
+            samples.append(ms)
+    samples.sort()
+    return samples[len(samples) // 2]
+
+
+_env_note = " (KEEL_NO_RECEIPT unset; a receipt from an earlier green run is honoured when its key is equal)"
+fact("perfTurnBoundaryIdleMs",
+     _timed_ms([KEEL, "hook", "stop"], runs=3, warm=1,
+               stdin_text='{"session_id":"exec-brief","stop_hook_active":false}'),
+     "milliseconds",
+     "wall time of `echo {hook json} | keel hook stop` in this tree, median of 3 after one untimed "
+     "warm-up run (the warm-up writes the receipt when the build changed)" + _env_note)
+fact("perfGuardFullMs", _timed_ms([KEEL, "guard", "--no-receipt"], runs=2),
+     "milliseconds",
+     "wall time of `keel guard --no-receipt` in this tree, median of 2 - every enforced guard runs, "
+     "the receipt is neither read nor written")
+fact("perfOrientMs", _timed_ms([KEEL, "orient", "."], runs=3),
+     "milliseconds", "wall time of `keel orient .` in this tree, median of 3")
+
 # ================================================================ 4. keel orient (one call)
 # `keel orient .` already emits JSON on stdout - there is no `--json` flag (it errors), so the
 # plain invocation IS the JSON lens.
