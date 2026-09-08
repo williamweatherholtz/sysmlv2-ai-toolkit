@@ -1508,6 +1508,45 @@ pub fn unit_extras_present(root: &Path) -> GuardReport {
 }
 
 #[cfg(test)]
+mod parallel_tests {
+    /// dcGuardsRunInParallelAndTimed: the reports come back in `GUARD_NAMES` order, one per enforced
+    /// guard, with every inactive one present as its NOT ACTIVE report - exactly what the serial loop
+    /// returned. Run against this repository, whose activation set is the real one; a thread finishing
+    /// order must never show through.
+    #[test]
+    fn run_all_reports_are_in_guard_names_order() {
+        let root = std::path::Path::new("..");
+        if !root.join(".tracking").is_dir() {
+            return; // not the self-build tree
+        }
+        let act = crate::activation::Activation::load(root);
+        let expected: Vec<&str> = super::GUARD_NAMES
+            .iter()
+            .copied()
+            .filter(|n| match act.guard_state(n) {
+                crate::activation::GuardState::Inactive(_) => true,
+                _ => super::run_one(n, root).is_some(),
+            })
+            .collect();
+        let got: Vec<&str> = super::run_all(root).iter().map(|r| r.name).collect();
+        assert_eq!(got, expected, "run_all must return reports in GUARD_NAMES order regardless of thread timing");
+    }
+
+    /// The same tree judged twice yields the same verdict per guard: a guard's answer is a function of
+    /// the tree, not of which thread ran it beside which.
+    #[test]
+    fn run_all_is_deterministic_across_two_runs() {
+        let root = std::path::Path::new("..");
+        if !root.join(".tracking").is_dir() {
+            return;
+        }
+        let a: Vec<(String, usize, usize)> = super::run_all(root).iter().map(|r| (r.name.to_string(), r.warnings.len(), r.violations.len())).collect();
+        let b: Vec<(String, usize, usize)> = super::run_all(root).iter().map(|r| (r.name.to_string(), r.warnings.len(), r.violations.len())).collect();
+        assert_eq!(a, b);
+    }
+}
+
+#[cfg(test)]
 mod extras_tests {
     use super::extras_violations;
 
@@ -4972,23 +5011,81 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
 #[must_use]
 pub fn run_all(root: &Path) -> Vec<GuardReport> {
     let act = crate::activation::Activation::load(root);
-    GUARD_NAMES
-        .iter()
-        .filter_map(|n| match act.guard_state(n) {
-            // A process the project has not adopted: SKIP the check, but say so. Silence here would be
-            // the issue090 defect inverted — instead of failing a project for a control it never
-            // adopted, we would be passing it while hiding that the control is off (D0138).
-            crate::activation::GuardState::Inactive(p) => Some(GuardReport {
+    // The activation filter runs first and serially: it decides WHICH guards run, and the answer for an
+    // inactive one is a report, not a computation.
+    let mut slots: Vec<Option<GuardReport>> = Vec::with_capacity(GUARD_NAMES.len());
+    let mut to_run: Vec<(usize, &'static str)> = Vec::new();
+    for n in GUARD_NAMES {
+        // A process the project has not adopted: SKIP the check, but say so. Silence here would be
+        // the issue090 defect inverted — instead of failing a project for a control it never
+        // adopted, we would be passing it while hiding that the control is off (D0138).
+        if let crate::activation::GuardState::Inactive(p) = act.guard_state(n) {
+            slots.push(Some(GuardReport {
                 name: n,
                 scanned: 0,
                 warnings: vec![format!(
                     "NOT ACTIVE — process `{p}` is not in this project's active set, so this control was NOT checked (D0138; `keel activate {p}` to adopt it)"
                 )],
                 violations: Vec::new(),
-            }),
-            _ => run_one(n, root),
-        })
-        .collect()
+            }));
+        } else {
+            to_run.push((slots.len(), n));
+            slots.push(None);
+        }
+    }
+    run_in_parallel(root, &to_run, &mut slots);
+    slots.into_iter().flatten().collect()
+}
+
+/// Run `to_run` across a fixed pool of OS threads, writing each guard's report into its slot
+/// (dcGuardsRunInParallelAndTimed, resolving the serial term of issue409).
+///
+/// WHY A POOL AND NOT ONE THREAD PER GUARD: 65 guards on a 20-core host would oversubscribe the model
+/// cache lock on a cold start; a pool the size of the host's parallelism does one parse and shares it.
+/// WHY SLOTS: the reports come back in `GUARD_NAMES` order exactly as the serial loop returned them -
+/// every consumer (the hook, `keel status`, the workspace gate, the history audit) prints or compares
+/// them positionally, and a thread finishing order is not a fact about the tree. Each guard is a
+/// `perf::phase("guard:<name>")` so `KEEL_PERF=2` attributes the run per guard in-process without the
+/// measurement patch the spike needed (docs/reviews/perf-spike-2026-09-07/phase_patch.py).
+/// Guards are pure reads of the tree (no guard writes a file or sets process state - the one
+/// `fs::write` in this module is in a test) so running them concurrently changes no answer.
+fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [Option<GuardReport>]) {
+    let workers = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get).min(to_run.len().max(1));
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let done: std::sync::Mutex<Vec<(usize, Option<GuardReport>)>> = std::sync::Mutex::new(Vec::with_capacity(to_run.len()));
+    std::thread::scope(|s| {
+        for _ in 0..workers {
+            let next = &next;
+            let done = &done;
+            // 16 MiB: a guard may parse the whole corpus on a cache miss, and a spawned thread's default
+            // stack is a quarter of the main thread's on some hosts.
+            let spawned = std::thread::Builder::new().stack_size(16 * 1024 * 1024).spawn_scoped(s, move || loop {
+                let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let Some(&(slot, name)) = to_run.get(i) else { break };
+                let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
+                if let Ok(mut d) = done.lock() {
+                    d.push((slot, report));
+                }
+            });
+            // A host that refuses a thread gets the guards run on this one - slower, same answer.
+            if spawned.is_err() {
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some(&(slot, name)) = to_run.get(i) else { break };
+                    let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
+                    if let Ok(mut d) = done.lock() {
+                        d.push((slot, report));
+                    }
+                }
+            }
+        }
+    });
+    let done = done.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+    for (slot, report) in done {
+        if let Some(cell) = slots.get_mut(slot) {
+            *cell = report;
+        }
+    }
 }
 
 /// Every `(name, attributes)` pair in a package, including those nested inside an `action def` body —

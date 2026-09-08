@@ -31,6 +31,9 @@ pub static TREES_WALKED: AtomicU64 = AtomicU64::new(0);
 /// Windows, and it is invisible in a wall-clock number — hence a counter rather than another inference.
 pub static GIT_CALLS: AtomicU64 = AtomicU64::new(0);
 /// Nanoseconds spent waiting on `git`.
+///
+/// Every run through `gitx::Git` plus the two batch waits in orient (dcGuardsRunInParallelAndTimed);
+/// before it only two helpers timed, and the line read 0 ms over 4.4 s of spawns (issue410).
 pub static GIT_NANOS: AtomicU64 = AtomicU64::new(0);
 
 /// Per-argv spawn tally, populated only at `KEEL_PERF=2`.

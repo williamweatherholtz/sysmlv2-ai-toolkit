@@ -57,9 +57,24 @@ pub fn new_epoch() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
 }
 
+/// Serialises the fingerprint COMPUTE so a parallel cold burst does one walk (see [`of`]).
+static COMPUTE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// The fingerprint of `root`, computed at most once per epoch.
 pub fn of(root: &Path) -> u64 {
     let epoch = EPOCH.load(Ordering::SeqCst);
+    if let Ok(g) = MEMO.lock() {
+        if let Some((e, r, fp)) = g.as_ref() {
+            if *e == epoch && r.as_path() == root {
+                return *fp;
+            }
+        }
+    }
+    // Serialise the COMPUTE, not just the memo: with the guards running in parallel
+    // (dcGuardsRunInParallelAndTimed) a cold burst of twenty callers used to compute twelve fingerprints
+    // - 36 tree walks and 6.3 s of thread time where the serial loop paid one. The second look under the
+    // lock is what turns the burst back into one walk.
+    let _cl = COMPUTE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Ok(g) = MEMO.lock() {
         if let Some((e, r, fp)) = g.as_ref() {
             if *e == epoch && r.as_path() == root {

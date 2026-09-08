@@ -267,7 +267,7 @@ fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
         }
         let _ = si.write_all(buf.as_bytes());
     }
-    let Ok(o) = child.wait_with_output() else {
+    let Ok(o) = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output()) else {
         for s in shas { out.insert(s.clone(), true); }
         return out;
     };
@@ -301,7 +301,7 @@ pub(crate) fn batch_cat_blobs(repo: &Path, keys: &[String]) -> HashMap<String, O
         }
         let _ = si.write_all(buf.as_bytes());
     }
-    let Ok(o) = child.wait_with_output() else { return out; };
+    let Ok(o) = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output()) else { return out; };
     let data = o.stdout;
     let mut pos = 0usize;
     for k in keys {

@@ -15,17 +15,129 @@
 //! unchanged and the count happens at construction — which equals spawns, because every site runs the
 //! command it builds.
 //!
-//! WHAT THIS DOES NOT COVER, stated so the numbers stay honest: `GIT_NANOS` (wall time) and `GIT_ARGV`
-//! (per-argv tally at `KEEL_PERF=2`) are still recorded only by the two rich helpers, so the TIME
-//! attribution remains partial while the COUNT is now total. Count-don't-time is this session's rule;
-//! the count is the number that settles arguments.
+//! TIME as well as COUNT (dcGuardsRunInParallelAndTimed, issue410). For a year the constructor counted
+//! and only the two rich helpers timed, so `keel guard` reported `git x56 in 100ms` over 4.4 s of spawns
+//! and a reader trusting the line concluded git was free. The constructor now returns [`Git`], a thin
+//! wrapper whose `output()`, `status()` and `spawn()` add their wall time to `GIT_NANOS` and note the argv
+//! shape at `KEEL_PERF=2` - so every site that builds a command through here is timed by construction,
+//! and the builder chains compile unchanged because the wrapper exposes the same methods. A `spawn()`
+//! times only the spawn; the site that waits on the child times the wait itself (orient's two batch
+//! reads do). The static test below still forbids a raw `Command::new("git")` anywhere else.
 
-/// A `git` command, counted. The only permitted constructor — a static test in this module fails the
-/// build on any `Command::new("git")` elsewhere in the crate.
+/// A `git` command, counted at construction and TIMED when it runs. The only permitted constructor — a
+/// static test in this module fails the build on any `Command::new("git")` elsewhere in the crate.
 #[must_use]
-pub fn git() -> std::process::Command {
+pub fn git() -> Git {
     crate::perf::add(&crate::perf::GIT_CALLS, 1);
-    std::process::Command::new("git")
+    Git(std::process::Command::new("git"))
+}
+
+/// Time `f` into `perf::GIT_NANOS` whether or not instrumentation is on: one `Instant` read is nothing
+/// beside a process spawn (~79 ms on the spike's host), and an always-on clock is what lets a test pin
+/// that the counter moves without racing the `KEEL_PERF` lazy read.
+fn clocked<T>(f: impl FnOnce() -> T) -> T {
+    let t0 = std::time::Instant::now();
+    let out = f();
+    crate::perf::GIT_NANOS.fetch_add(u64::try_from(t0.elapsed().as_nanos()).unwrap_or(u64::MAX), std::sync::atomic::Ordering::Relaxed);
+    out
+}
+
+/// A `git` [`std::process::Command`] whose runs are timed into `perf::GIT_NANOS`.
+///
+/// Exposes exactly the builder methods the crate's sites use; a site needing another one adds it here
+/// rather than reaching the inner `Command`, so no run can slip out of the timing.
+pub struct Git(std::process::Command);
+
+impl Git {
+    pub fn arg<S: AsRef<std::ffi::OsStr>>(&mut self, a: S) -> &mut Self {
+        self.0.arg(a);
+        self
+    }
+
+    pub fn args<I, S>(&mut self, a: I) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        self.0.args(a);
+        self
+    }
+
+    pub fn current_dir<P: AsRef<std::path::Path>>(&mut self, d: P) -> &mut Self {
+        self.0.current_dir(d);
+        self
+    }
+
+    pub fn env<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(&mut self, k: K, v: V) -> &mut Self {
+        self.0.env(k, v);
+        self
+    }
+
+    pub fn stdin<T: Into<std::process::Stdio>>(&mut self, s: T) -> &mut Self {
+        self.0.stdin(s);
+        self
+    }
+
+    pub fn stdout<T: Into<std::process::Stdio>>(&mut self, s: T) -> &mut Self {
+        self.0.stdout(s);
+        self
+    }
+
+    pub fn stderr<T: Into<std::process::Stdio>>(&mut self, s: T) -> &mut Self {
+        self.0.stderr(s);
+        self
+    }
+
+    /// The argv shape for the `KEEL_PERF=2` tally: the first two tokens after any `-C <dir>` pair, so
+    /// `-C <repo> cat-file --batch` tallies as `cat-file --batch` like the rich helpers always did.
+    fn note(&self) {
+        if !crate::perf::verbose() {
+            return;
+        }
+        let all: Vec<String> = self.0.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        let mut rest: Vec<&str> = Vec::new();
+        let mut skip = false;
+        for a in &all {
+            if skip {
+                skip = false;
+                continue;
+            }
+            if a == "-C" {
+                skip = true;
+                continue;
+            }
+            rest.push(a.as_str());
+        }
+        crate::perf::note_git(&rest);
+    }
+
+    /// Run to completion, timed.
+    ///
+    /// # Errors
+    /// Whatever [`std::process::Command::output`] returns.
+    pub fn output(&mut self) -> std::io::Result<std::process::Output> {
+        self.note();
+        clocked(|| self.0.output())
+    }
+
+    /// Run to completion inheriting stdio, timed.
+    ///
+    /// # Errors
+    /// Whatever [`std::process::Command::status`] returns.
+    pub fn status(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        self.note();
+        clocked(|| self.0.status())
+    }
+
+    /// Spawn, timing the spawn only - the caller owns the wait and times it with
+    /// `perf::timed(&perf::GIT_NANOS, ..)` around `wait_with_output`.
+    ///
+    /// # Errors
+    /// Whatever [`std::process::Command::spawn`] returns.
+    pub fn spawn(&mut self) -> std::io::Result<std::process::Child> {
+        self.note();
+        clocked(|| self.0.spawn())
+    }
 }
 
 /// Is the local commit gate ARMED — i.e. can git actually reach `.githooks/pre-commit`?
@@ -105,6 +217,18 @@ mod tests {
             offenders.is_empty(),
             "raw git spawn(s) outside gitx::git() - the count will understate again: {offenders:?}"
         );
+    }
+
+    /// issue410: the perf line reported `git x56 in 100ms` over 4.4 s of spawns because only two
+    /// helpers timed. Every run through `Git` now adds to `GIT_NANOS` - unconditionally, which is why this
+    /// holds without `KEEL_PERF`; the counter is process-global, so the assertion is that it moved, not by
+    /// how much.
+    #[test]
+    fn a_git_run_through_the_constructor_advances_git_nanos() {
+        let before = crate::perf::GIT_NANOS.load(std::sync::atomic::Ordering::Relaxed);
+        let _ = super::git().args(["--version"]).output();
+        let after = crate::perf::GIT_NANOS.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(after > before, "GIT_NANOS did not advance across a spawn");
     }
 
     /// THE CONTROL for issue240: an unreachable hooks path must read NOT ARMED. The old predicate

@@ -249,13 +249,8 @@ fn sampled_commits(root: &Path, n: usize) -> Vec<String> {
 
 /// Run `git -C root <args>` and capture stdout, or `None` on non-zero exit / failure.
 pub(super) fn git_out(root: &Path, args: &[&str]) -> Option<String> {
-    // The CALL count now happens in gitx::git() at construction; only the rich detail
-    // (argv tally, wall time) stays here, so the two layers never double-count.
-    crate::perf::note_git(args);
-    let out = crate::perf::timed(&crate::perf::GIT_NANOS, || {
-        crate::gitx::git().arg("-C").arg(root).args(args).output()
-    })
-    .ok()?;
+    // Count, argv tally and wall time all happen in gitx::Git (dcGuardsRunInParallelAndTimed).
+    let out = crate::gitx::git().arg("-C").arg(root).args(args).output().ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 

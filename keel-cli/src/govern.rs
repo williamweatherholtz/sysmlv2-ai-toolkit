@@ -44,12 +44,8 @@ fn governing_def_for(repo: &Path, item: &str) -> String {
 
 /// Run `git -C <repo> <args>`; return non-empty trimmed stdout lines, or `[]` on failure.
 fn git_lines(repo: &Path, args: &[&str]) -> Vec<String> {
-    // The CALL count now happens in gitx::git() at construction; only the rich detail
-    // (argv tally, wall time) stays here, so the two layers never double-count.
-    crate::perf::note_git(args);
-    let output = crate::perf::timed(&crate::perf::GIT_NANOS, || {
-        crate::gitx::git().arg("-C").arg(repo).args(args).output()
-    });
+    // Count, argv tally and wall time all happen in gitx::Git (dcGuardsRunInParallelAndTimed).
+    let output = crate::gitx::git().arg("-C").arg(repo).args(args).output();
     match output {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
             .lines()
@@ -144,13 +140,11 @@ fn descendants_from(children: &HashMap<String, Vec<String>>, marker: &str) -> Ha
 /// name appears. The log is newest-first, so the last sighting wins.
 fn intro_commits(repo: &Path, names: &HashSet<String>) -> HashMap<String, String> {
     const MARK: &str = "__keelcommit__";
-    let raw = crate::perf::timed(&crate::perf::GIT_NANOS, || {
-        crate::gitx::git()
-            .arg("-C")
-            .arg(repo)
-            .args(["log", &format!("--format={MARK}%H"), "-p", "-U0", "--", ".tracking/delivery"])
-            .output()
-    });
+    let raw = crate::gitx::git()
+        .arg("-C")
+        .arg(repo)
+        .args(["log", &format!("--format={MARK}%H"), "-p", "-U0", "--", ".tracking/delivery"])
+        .output();
     let Ok(out) = raw else { return HashMap::new() };
     let text = String::from_utf8_lossy(&out.stdout);
     let mut intro: HashMap<String, String> = HashMap::new();
