@@ -1401,4 +1401,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRejectHasACliPath to issue414;
+
+    part issue415 : Issue {
+        :>> id = "7382fe44-36f0-4139-9cf6-22358273b176";
+        :>> title = "The routing rig scores the first Skill call, and intake is declared to run first on every human direction - the release case split 1 routed / 2 wrong on that criterion";
+        :>> createdAt = "2026-09-08";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The routing rig's first investigation (2026-09-08, sprint609) found the release case disagreeing with itself: three samples of the prompt 'Time to make this obtainable by someone outside this machine, with a version that actually means something.' at three turns gave ROUTED once and WRONG twice, both wrong samples invoking intake first ($1.95 measured, 49s wall; .keel/metrics/routing-investigation.json). Under D0381 that disagreement is a defect of the CHECK, not a rate. WHAT THE CHECK DOES: it scores the FIRST Skill call of the turn, and only the first name was kept. WHAT COLLIDES WITH IT: the intake skill's own deployed description reads 'Use at the START of any turn where the human states direction' (.claude/skills/intake/SKILL.md:3), and the release prompt is phrased as a human's direction - so an agent that runs intake first and release second is following the process exactly as written, and the rig scores it WRONG. Sample 3 invoked Skill twice and the rig recorded neither the second name nor the order (fixed in the same sprint: skillsInvoked now holds every call). WHY IT MATTERS: every case in routing_prompts.toml is phrased as a person talking, so this is not one flaky prompt - the first-call criterion is wrong for the whole table whenever intake behaves as declared, and any before/after investigation of a skill rewrite would be reading intake's behaviour, not the skill's. WHAT WOULD SETTLE IT: the verdict reads the whole turn - the intended skill invoked within budget is a route; intake preceding it is recorded as a prefix, not a wrong route, because its description declares that position; a different skill first stays wrong - and the release case is re-run three times to read unanimous or to disagree again for a reason the samples show.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRoutingVerdictReadsTheWholeTurn to issue415;
 }

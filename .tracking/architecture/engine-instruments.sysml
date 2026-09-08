@@ -59,8 +59,8 @@ package EngineInstruments {
     }
 
     // routingProbe: .engine/tools/routing_probe.py
-    // KNOWN FAILURE MODES: issue392 (two of four verdicts flipped between identical runs, so one sample per skill is not a measurement)
-    // PUBLISHED TO: an indicator, once issue392 settles what shape is bought
+    // KNOWN FAILURE MODES: issue392 (two of four verdicts flipped between identical runs, so one sample per skill is not a measurement); issue415 (it scores the first Skill call, and intake is declared to run first on every human direction)
+    // PUBLISHED TO: nothing standing (D0378 C) - an investigation rig (D0382) whose per-case findings and measured spend are recorded as evidence on the item that motivated the run; .keel/metrics/routing-investigation.json is the last run, machine-local
     part fbRoutingProbe : Feedback {
         :>> id = "698145f8-cb19-57f8-998d-def7a57379f0";
         :>> title = "whether a skill's prose actually causes a real model to invoke the process";
