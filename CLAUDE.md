@@ -153,6 +153,14 @@ frozen (modify it only by out-of-band Decision).
   convention → grep the doc surface and fix every claim it invalidates **in the same commit**.
 - **Corrections become permanent guards (D0047).** A defect revealing a recurrable gap must become (a) a
   tracked `Issue` and (b) an automated control. Manual vigilance is not a control.
+- **A check is probed before its answer is stated (D0388/issue400).** Any check written to answer a question
+  is run first against one case known to be positive and one known to be negative - chosen BEFORE the real
+  tree is read - and the statement of its answer names them. Two first-run answers were stated wrong in one
+  session: a census scored 64 of 64 by matching its own registry, and a comparison read the human's process
+  model as missing by comparing `human` to `ctHuman`; `scripts/probes/issue400_reproduction.py` reproduces
+  both against their known cases. A check that is KEPT is a `Sensor` and carries its cases as `--probe`
+  (`scripts/textpatch.py`, `scripts/artefact.py`, `check_templates.py --self-test`); one that is discarded
+  leaves its two cases named in the receipt of what it answered.
 - **Two migrations, never conflated (D0067 / D0275).** Changing a project's OWN data at scale —
   rename/split/drop a field across many sites — is **`migration`** (D0067): gated expand/migrate/contract,
   a committed transform, a dry run reconciling control totals, green at every step, and never fabricate
