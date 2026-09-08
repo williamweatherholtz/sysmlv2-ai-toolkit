@@ -13,12 +13,24 @@
 //! | the remote's rules | branch protection, fetched LIVE via `gh api` — never copied into the tree |
 //!
 //! What is NOT derivable is read from the authored residue (`Controller`, `ControlledProcess`,
-//! `ProcessModel` instances, hazard→process edges) when the project has authored it, and reported
-//! as absent when it has not: a fresh project computes the same actions with no anchors.
+//! `ProcessModel`, `OtherInputOutput` instances, hazard→process edges) when the project has authored
+//! it, and reported as absent WITH THE REASON when it has not: a fresh project computes the same
+//! actions with no anchors, and its `stepTwoGate` rows say which clauses that leaves unmet.
 //!
 //! ROLES are the view's own, stable ids (`hooks`, `commit-gate`, `ci`, `channel`, `agent`, `human`,
 //! `remote`, `console`); an authored `Controller` named `ct<Role>` decorates the role with its title,
-//! id and process model. The structure never depends on the decoration existing.
+//! id and process model. The structure never depends on the decoration existing. A role that nothing
+//! wires and nothing anchors is not in the structure at all: it is listed under `absentRoles` with the
+//! source that would wire it (issue394: `channel` was drawn inert for a week after its workflows went).
+//!
+//! The handbook's remaining step-2 elements are COMPUTED from the actions (D0363, issue394):
+//! an ACTUATOR per action - the mechanism that carries the controller's action to its process
+//! (p.26) - and each controller's RESPONSIBILITIES - the hazards on the processes it acts on, one
+//! hierarchical level deep, since a controller acting on the agent's turn answers for what the agent
+//! can reach. The fifth element type, other inputs and outputs that are neither control nor feedback
+//! (p.25), is authored (`OtherInputOutput`): what enters from outside the boundary is a judgment.
+//! The SOP's step-2 gate is then read clause by clause into `stepTwoGate`, holds or not, with the
+//! evidence that decided it - so "step 2 is complete" is a row set, never a sentence.
 
 use super::{Json, Model, Path, ViewError};
 use std::path::PathBuf;
@@ -45,27 +57,152 @@ struct Fb {
 }
 
 /// The view's controller roles, in the order a change travels through them. `anchor` is the authored
-/// `Controller` name that decorates the role when present.
-const ROLES: [(&str, &str, &str); 8] = [
-    ("human", "ctHuman", "the human director"),
-    ("agent", "ctAgent", "the AI agent"),
-    ("hooks", "ctHooks", "keel at the Claude Code hook boundary"),
-    ("commit-gate", "ctCommitGate", "keel at the git hook boundary"),
-    ("ci", "ctCI", "GitHub Actions CI"),
-    ("channel", "ctChannel", "the decision channel workflows"),
-    ("remote", "ctRemote", "the GitHub remote"),
-    ("console", "ctConsole", "keel serve"),
+/// `Controller` name that decorates the role when present; the last field is what WIRES the role -
+/// the source its actions are computed from - reported for a role this project does not have.
+const ROLES: [(&str, &str, &str, &str); 8] = [
+    ("human", "ctHuman", "the human director", "an intake path (every project has one), or a declared decider in .engine/contracts/github-actors.toml"),
+    ("agent", "ctAgent", "the AI agent", "write commands in .engine/cli/commands.sysml"),
+    ("hooks", "ctHooks", "keel at the Claude Code hook boundary", "hook events in .claude/settings.json"),
+    ("commit-gate", "ctCommitGate", "keel at the git hook boundary", "hooks in .githooks/"),
+    ("ci", "ctCI", "GitHub Actions CI", "a workflow in .github/workflows/ not named decision-*"),
+    ("channel", "ctChannel", "the decision channel workflows", "a decision-*.yml workflow in .github/workflows/"),
+    ("remote", "ctRemote", "the GitHub remote", "branch protection on origin/main, fetched live"),
+    ("console", "ctConsole", "keel serve", "the serve command in the CLI facts"),
 ];
 
-/// The controlled processes, likewise: role id, authored anchor, what it is.
-const PROCESSES: [(&str, &str, &str); 6] = [
-    ("model", "cpModel", "the recorded model (.tracking + .engine instances)"),
-    ("main-ref", "cpMainRef", "the shared history (origin/main)"),
-    ("enforcement-surface", "cpEnforcementSurface", "guards, hooks, workflows, processes, skills, contracts"),
-    ("deliverable", "cpDeliverable", "the deliverable source and tests"),
-    ("work", "cpWork", "sprints, ceremonies, the frontier"),
-    ("agent-turn", "cpAgentTurn", "one Claude Code response"),
+/// The controlled processes, likewise: role id, authored anchor, what it is, and - when the process
+/// IS another controller's activity - the controller that enacts it. The agent's turn is the agent
+/// acting, so a controller acting on the turn (the hooks) is responsible, one level down, for every
+/// hazard the agent's own actions can reach. That is the hierarchy the handbook draws (pp.22-23).
+const PROCESSES: [(&str, &str, &str, Option<&str>); 6] = [
+    ("model", "cpModel", "the recorded model (.tracking + .engine instances)", None),
+    ("main-ref", "cpMainRef", "the shared history (origin/main)", None),
+    ("enforcement-surface", "cpEnforcementSurface", "guards, hooks, workflows, processes, skills, contracts", None),
+    ("deliverable", "cpDeliverable", "the deliverable source and tests", None),
+    ("work", "cpWork", "sprints, ceremonies, the frontier", None),
+    ("agent-turn", "cpAgentTurn", "one Claude Code response", Some("agent")),
 ];
+
+fn role_of_controller_anchor(anchor: &str) -> &'static str {
+    ROLES.iter().find(|(_, a, _, _)| *a == anchor).map_or("", |(r, _, _, _)| *r)
+}
+
+fn role_of_process_anchor(anchor: &str) -> &'static str {
+    PROCESSES.iter().find(|(_, a, _, _)| *a == anchor).map_or("", |(r, _, _, _)| *r)
+}
+
+/// One computed ACTUATOR: the mechanism that carries a controller's action to its process (Handbook
+/// p.26 - the control path's counterpart to a sensor). Derived from the action the way `actsOn` is: a
+/// judgment made once here, visible in the output so it can be argued with, never authored twice.
+struct Actuator {
+    name: &'static str,
+    title: &'static str,
+    mechanism: &'static str,
+    source: &'static str,
+}
+
+const ACT_HARNESS_VERDICT: Actuator = Actuator {
+    name: "actHarnessVerdict",
+    title: "Claude Code applies the hook's verdict",
+    mechanism: "the harness reads the hook's stdout JSON and blocks, denies or allows the tool call or the turn; the hook itself changes nothing",
+    source: ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+};
+const ACT_LAUNCH_SETTINGS: Actuator = Actuator {
+    name: "actLaunchSettings",
+    title: "the launch passes settings above project scope",
+    mechanism: "`keel claude` passes --settings and --plugin-dir; the harness's own precedence carries the pin, so a kill switch on disk is overridden (D0296 run 6)",
+    source: "keel claude",
+};
+const ACT_GIT_HOOK_DISPATCH: Actuator = Actuator {
+    name: "actGitHookDispatch",
+    title: "git runs the hook and honours its exit code",
+    mechanism: "core.hooksPath -> .githooks/<hook>; a non-zero exit refuses the commit or the push - git carries the refusal, keel only exits",
+    source: ".githooks/",
+};
+const ACT_CHECK_CONCLUSION: Actuator = Actuator {
+    name: "actCheckConclusion",
+    title: "the runner records the job's conclusion on the ref",
+    mechanism: "GitHub Actions executes the job; the red or green conclusion is all the action leaves on main - preventive only if branch protection requires it (see remote.reading)",
+    source: ".github/workflows/",
+};
+const ACT_CHANNEL_DELEGATION: Actuator = Actuator {
+    name: "actChannelDelegation",
+    title: "the channel workflow records on the model by delegation",
+    mechanism: "a decision-*.yml workflow parses the decider's comment and runs the write command under the delegated actor",
+    source: ".github/workflows/decision-*.yml",
+};
+const ACT_REF_UPDATE_REFUSAL: Actuator = Actuator {
+    name: "actRefUpdateRefusal",
+    title: "GitHub refuses the ref update",
+    mechanism: "branch protection is evaluated at receive-pack: a force-push or a deletion is rejected before the ref moves",
+    source: "branch protection, fetched live",
+};
+const ACT_SERVE_WRITE_API: Actuator = Actuator {
+    name: "actServeWriteApi",
+    title: "keel serve calls the write API",
+    mechanism: "HTTP on 127.0.0.1:7777 into the same write layer; a tap is signed by the paired device (D0334/D0335) and an unsigned one writes nothing",
+    source: "keel serve",
+};
+const ACT_WRITE_LAYER: Actuator = Actuator {
+    name: "actWriteLayer",
+    title: "the keel write layer lands the file",
+    mechanism: "temp-file-then-rename under .keel-write-lock; actor and date required or the write refuses (D0129, issue184/185)",
+    source: "keel-cli/src/write.rs",
+};
+const ACT_GIT_PUSH: Actuator = Actuator {
+    name: "actGitPush",
+    title: "git pushes after the gate",
+    mechanism: "keel sync / keel land gate every project in the workspace, then git pushes; what the ref accepts is the remote's rule",
+    source: "keel land; keel sync",
+};
+const ACT_SURFACE_REWRITE: Actuator = Actuator {
+    name: "actSurfaceRewrite",
+    title: "keel rewrites the generated surface in place",
+    mechanism: "init, migrate, sync-claude, activate and deactivate write the engine-owned files directly; sync-claude --check reports the drift afterwards",
+    source: "keel-cli/src (init, migrate, claude_surface, activation)",
+};
+const ACT_AGENT_ROUTING: Actuator = Actuator {
+    name: "actAgentRouting",
+    title: "the agent reads the direction and routes the turn",
+    mechanism: "prose enters the agent's context; the intake skill and the agent's own routing translate it - nothing mechanical carries it, and the routing rig investigates whether it arrives (D0382, issue415)",
+    source: ".claude/skills/intake/SKILL.md",
+};
+const ACT_HARNESS_FILE_TOOLS: Actuator = Actuator {
+    name: "actHarnessFileTools",
+    title: "the harness's Write, Edit and Bash tools change the source",
+    mechanism: "keel mediates none of it: pre-write advises on protected surfaces, and manifest drift makes done work suspect afterwards",
+    source: "Claude Code tools; .engine/deliverable-manifest.txt",
+};
+
+/// The actuator of one action, or the stated reason it has none. `channel_wired` is whether any
+/// decision-*.yml workflow exists: the human's decision on the channel has an actuator only then.
+fn actuator_for(a: &Action, channel_wired: bool) -> Result<&'static Actuator, String> {
+    if a.name == "launchPin" {
+        return Ok(&ACT_LAUNCH_SETTINGS);
+    }
+    if a.name.starts_with("hook") {
+        return Ok(&ACT_HARNESS_VERDICT);
+    }
+    if a.name.starts_with("githook") {
+        return Ok(&ACT_GIT_HOOK_DISPATCH);
+    }
+    match (a.issued_by, a.name.as_str()) {
+        ("ci", _) => Ok(&ACT_CHECK_CONCLUSION),
+        ("channel", _) => Ok(&ACT_CHANNEL_DELEGATION),
+        ("remote", _) => Ok(&ACT_REF_UPDATE_REFUSAL),
+        ("console", _) => Ok(&ACT_SERVE_WRITE_API),
+        (_, "humanDirects") => Ok(&ACT_AGENT_ROUTING),
+        (_, "humanDecidesOnChannel") if channel_wired => Ok(&ACT_CHANNEL_DELEGATION),
+        (_, "humanDecidesOnChannel") => Err("no actuator: the decision channel is disconnected - no .github/workflows/decision-*.yml carries a decider's comment to the model; an acceptance is recorded from their quoted words instead (D0289)".to_string()),
+        (_, "agentEditsDeliverable") => Ok(&ACT_HARNESS_FILE_TOOLS),
+        (_, n) if n.starts_with("cmd") => Ok(match a.acts_on {
+            "main-ref" => &ACT_GIT_PUSH,
+            "enforcement-surface" => &ACT_SURFACE_REWRITE,
+            _ => &ACT_WRITE_LAYER,
+        }),
+        _ => Err(format!("no actuator derived for {} - the view knows no mechanism for this action's shape", a.name)),
+    }
+}
 
 /// Commands whose WRITE the write layer refuses for an AI-kind actor, so the issuing authority is the
 /// human even though the agent's shell may type them. The claim is tested: see
@@ -441,8 +578,8 @@ fn instrument_feedback(model: &Model, feedback: &mut Vec<Fb>) -> Vec<Json> {
         if let Some(fb) = model.items.get(&produces) {
             let from = fb.attrs.get("sensedFrom").cloned().unwrap_or_default();
             let to = fb.attrs.get("reportsTo").cloned().unwrap_or_default();
-            sensed = PROCESSES.iter().find(|(_, anchor, _)| *anchor == from).map_or("", |(r, _, _)| *r);
-            reports = ROLES.iter().find(|(_, anchor, _)| *anchor == to).map_or("", |(r, _, _)| *r);
+            sensed = role_of_process_anchor(&from);
+            reports = role_of_controller_anchor(&to);
         }
         let determinism = attr("determinism").rsplit("::").next().unwrap_or_default().to_string();
         let measures = attr("measures");
@@ -521,8 +658,18 @@ fn gather_local(root: &Path, actions: &mut Vec<Action>, feedback: &mut Vec<Fb>) 
         });
     }
     // The deliverable is acted on by NO keel command - the agent edits source with its own tools - and
-    // that is a fact the view states rather than papers over. What keel has is feedback: manifest drift.
+    // that is a control action all the same (issue394: for a week the view said so only here, so the
+    // deliverable read as a process nobody acts on and EHZ9 had no responsible controller). What keel
+    // has of it is feedback: manifest drift.
     if root.join(".engine").join("deliverable-manifest.txt").is_file() {
+        actions.push(Action {
+            name: "agentEditsDeliverable".to_string(),
+            title: "the agent edits the deliverable source with its own tools".to_string(),
+            issued_by: "agent",
+            acts_on: "deliverable",
+            data: "Write, Edit and Bash on the paths the manifest names; keel mediates none of it - pre-write advises on protected surfaces, drift makes done work suspect afterwards".to_string(),
+            source: ".engine/deliverable-manifest.txt".to_string(),
+        });
         feedback.push(Fb {
             name: "deliverableDrift".to_string(),
             title: "deliverable drift makes done work suspect".to_string(),
@@ -534,9 +681,17 @@ fn gather_local(root: &Path, actions: &mut Vec<Action>, feedback: &mut Vec<Fb>) 
     }
 }
 
-/// The authored decoration: process models and hazard -> process edges, from the model.
-fn decoration(model: &Model) -> (Vec<Json>, Vec<Json>) {
-    let mut pmodels: Vec<Json> = Vec::new();
+/// One authored process model, with the role of the controller that holds it.
+struct Pm {
+    name: String,
+    role: &'static str,
+    row: Json,
+}
+
+/// The authored decoration: process models and hazard -> process edges (hazard name, process
+/// anchor), from the model.
+fn decoration(model: &Model) -> (Vec<Pm>, Vec<(String, String)>) {
+    let mut pmodels: Vec<Pm> = Vec::new();
     for (n, i) in &model.items {
         if i.type_name != "ProcessModel" {
             continue;
@@ -548,22 +703,252 @@ fn decoration(model: &Model) -> (Vec<Json>, Vec<Json>) {
             .filter(|w| w.starts_with("issue") && w.len() > 5 && w[5..].chars().all(|c| c.is_ascii_digit()))
             .map(Json::s)
             .collect();
-        pmodels.push(Json::Obj(vec![
-            ("name".to_string(), Json::s(n.clone())),
-            ("heldBy".to_string(), Json::s(held)),
-            ("beliefs".to_string(), Json::s(beliefs)),
-            ("falseBeliefsCite".to_string(), Json::Arr(cites)),
-        ]));
+        pmodels.push(Pm {
+            name: n.clone(),
+            role: role_of_controller_anchor(&held),
+            row: Json::Obj(vec![
+                ("name".to_string(), Json::s(n.clone())),
+                ("heldBy".to_string(), Json::s(held)),
+                ("beliefs".to_string(), Json::s(beliefs)),
+                ("falseBeliefsCite".to_string(), Json::Arr(cites)),
+            ]),
+        });
     }
-    pmodels.sort_by_key(Json::dump);
-    let mut hazard_rows: Vec<Json> = Vec::new();
+    pmodels.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut hazard_rows: Vec<(String, String)> = Vec::new();
     for e in &model.edges {
         if model.items.get(&e.from).is_some_and(|i| i.type_name == "Hazard") && model.items.get(&e.to).is_some_and(|i| i.type_name == "ControlledProcess") {
-            hazard_rows.push(Json::Obj(vec![("hazard".to_string(), Json::s(e.from.clone())), ("process".to_string(), Json::s(e.to.clone()))]));
+            hazard_rows.push((e.from.clone(), e.to.clone()));
         }
     }
-    hazard_rows.sort_by_key(Json::dump);
+    hazard_rows.sort();
+    hazard_rows.dedup();
     (pmodels, hazard_rows)
+}
+
+/// One authored other-input-or-output (the handbook's fifth element type, D0363), with the role it
+/// enters or leaves at.
+struct Oio {
+    role: &'static str,
+    inbound: bool,
+    row: Json,
+}
+
+fn other_inputs_outputs(model: &Model) -> Vec<Oio> {
+    let mut out: Vec<(String, Oio)> = Vec::new();
+    for (n, i) in &model.items {
+        if i.type_name != "OtherInputOutput" {
+            continue;
+        }
+        let attr = |k: &str| i.attrs.get(k).cloned().unwrap_or_default();
+        let direction = attr("direction").rsplit("::").next().unwrap_or_default().to_string();
+        let at_controller = attr("atController");
+        let at_process = attr("atProcess");
+        let role = role_of_controller_anchor(&at_controller);
+        out.push((
+            n.clone(),
+            Oio {
+                role,
+                inbound: direction == "inbound",
+                row: Json::Obj(vec![
+                    ("name".to_string(), Json::s(n.clone())),
+                    ("title".to_string(), Json::s(attr("title"))),
+                    ("direction".to_string(), Json::s(direction)),
+                    ("externalParty".to_string(), Json::s(attr("externalParty"))),
+                    ("atController".to_string(), if role.is_empty() { Json::Null } else { Json::s(role) }),
+                    ("atProcess".to_string(), if at_process.is_empty() { Json::Null } else { Json::s(role_of_process_anchor(&at_process)) }),
+                ]),
+            },
+        ));
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.into_iter().map(|(_, o)| o).collect()
+}
+
+/// One computed responsibility: a controller answers for a hazard because it acts on the process the
+/// hazard is a state of - directly, or through a process another controller enacts.
+struct Responsibility {
+    controller: &'static str,
+    process: &'static str,
+    hazard: String,
+    via: String,
+}
+
+fn responsibilities(actions: &[Action], hazard_rows: &[(String, String)]) -> Vec<Responsibility> {
+    let hazards_on = |process: &str| -> Vec<String> { hazard_rows.iter().filter(|(_, p)| role_of_process_anchor(p) == process).map(|(h, _)| h.clone()).collect() };
+    let mut out: Vec<Responsibility> = Vec::new();
+    let mut push = |controller: &'static str, process: &'static str, hazard: String, via: String| {
+        if !out.iter().any(|r| r.controller == controller && r.process == process && r.hazard == hazard) {
+            out.push(Responsibility { controller, process, hazard, via });
+        }
+    };
+    for a in actions {
+        for h in hazards_on(a.acts_on) {
+            push(a.issued_by, a.acts_on, h, format!("acts on {}", a.acts_on));
+        }
+        if let Some(enactor) = PROCESSES.iter().find(|(r, _, _, _)| *r == a.acts_on).and_then(|(_, _, _, e)| *e) {
+            for b in actions.iter().filter(|b| b.issued_by == enactor) {
+                for h in hazards_on(b.acts_on) {
+                    push(a.issued_by, b.acts_on, h, format!("acts on {}, which the {enactor} enacts", a.acts_on));
+                }
+            }
+        }
+    }
+    out.sort_by(|a, b| (a.controller, a.process, &a.hazard).cmp(&(b.controller, b.process, &b.hazard)));
+    out
+}
+
+fn gate_row(clause: &str, holds: bool, evidence: String) -> Json {
+    Json::Obj(vec![("clause".to_string(), Json::s(clause)), ("holds".to_string(), Json::Bool(holds)), ("evidence".to_string(), Json::s(evidence))])
+}
+
+fn join_or_none(v: &[String]) -> String {
+    if v.is_empty() {
+        "none".to_string()
+    } else {
+        v.join(", ")
+    }
+}
+
+/// The SOP's step-2 gate (`.engine/skills/stpa/references/sop.md`, STEP 2), one row per clause,
+/// each decided from the computed structure - never from prose. `present` is the roles in this
+/// project's structure; `wired` those with at least one action.
+#[allow(clippy::too_many_arguments)]
+fn step_two_gate(
+    present: &[&'static str],
+    wired: &[&'static str],
+    actions: &[Action],
+    feedback: &[Fb],
+    pmodels: &[Pm],
+    oios: &[Oio],
+    resp: &[Responsibility],
+    hazard_rows: &[(String, String)],
+    sensors: usize,
+    actuators: usize,
+) -> Vec<Json> {
+    let mut rows = Vec::new();
+    let processes_acted: Vec<&str> = PROCESSES.iter().filter(|(r, _, _, _)| actions.iter().any(|a| a.acts_on == *r)).map(|(r, _, _, _)| *r).collect();
+    rows.push(gate_row(
+        "at least one controller, one control action and one controlled process",
+        !wired.is_empty() && !actions.is_empty() && !processes_acted.is_empty(),
+        format!("{} controllers issue {} actions on {} processes", wired.len(), actions.len(), processes_acted.len()),
+    ));
+    let generic = ["command", "status", "computer", "data", "signal"];
+    let bare: Vec<String> = actions
+        .iter()
+        .map(|a| (&a.name, &a.title, &a.data))
+        .chain(feedback.iter().map(|f| (&f.name, &f.title, &f.data)))
+        .filter(|(_, t, d)| d.trim().is_empty() || t.split_whitespace().count() < 2 || generic.contains(&t.trim().to_ascii_lowercase().as_str()))
+        .map(|(n, _, _)| n.clone())
+        .collect();
+    rows.push(gate_row(
+        "every arrow is labelled functionally with what passes (no bare Command / Status / Computer)",
+        bare.is_empty(),
+        format!("{} actions and {} feedback paths carry a title and data; bare: {}", actions.len(), feedback.len(), join_or_none(&bare)),
+    ));
+    let unacted: Vec<String> = PROCESSES.iter().filter(|(r, _, _, _)| !processes_acted.contains(r)).map(|(r, _, _, _)| (*r).to_string()).collect();
+    rows.push(gate_row(
+        "every controlled process has at least one controller acting on it",
+        unacted.is_empty(),
+        format!("acted on: {}; with no controller: {}", processes_acted.join(", "), join_or_none(&unacted)),
+    ));
+    let without_resp: Vec<String> = wired.iter().filter(|r| !resp.iter().any(|x| x.controller == **r)).map(|r| (*r).to_string()).collect();
+    let orphan_hazards: Vec<String> = hazard_rows.iter().filter(|(h, _)| !resp.iter().any(|x| x.hazard == *h)).map(|(h, _)| h.clone()).collect();
+    rows.push(gate_row(
+        "responsibilities are traced: every acting controller answers for a hazard on a process it reaches, and every hazard has a controller that answers for it",
+        without_resp.is_empty() && orphan_hazards.is_empty(),
+        format!(
+            "{} responsibilities over {} hazards; controllers with none: {}; hazards nobody answers for: {}",
+            resp.len(),
+            hazard_rows.iter().map(|(h, _)| h).collect::<std::collections::BTreeSet<_>>().len(),
+            join_or_none(&without_resp),
+            join_or_none(&orphan_hazards)
+        ),
+    ));
+    let without_pm: Vec<String> = present.iter().filter(|r| !pmodels.iter().any(|p| p.role == **r)).map(|r| (*r).to_string()).collect();
+    rows.push(gate_row(
+        "every controller has a process model, or its absence is justified",
+        without_pm.is_empty(),
+        format!("{} process models for {} present controllers; without one: {}", pmodels.len(), present.len(), join_or_none(&without_pm)),
+    ));
+    let unmaintained: Vec<String> = pmodels
+        .iter()
+        .filter(|p| !feedback.iter().any(|f| f.reports_to == p.role) && !oios.iter().any(|o| o.inbound && o.role == p.role))
+        .map(|p| p.name.clone())
+        .collect();
+    rows.push(gate_row(
+        "each process model is maintained by feedback, or by an other-input, reaching its controller",
+        unmaintained.is_empty(),
+        format!("maintained by nothing: {}", join_or_none(&unmaintained)),
+    ));
+    let (inbound, outbound) = (oios.iter().filter(|o| o.inbound).count(), oios.iter().filter(|o| !o.inbound).count());
+    rows.push(gate_row(
+        "the fifth element type - other inputs and outputs, neither control nor feedback - is enumerated or declared empty with a reason",
+        !oios.is_empty(),
+        if oios.is_empty() {
+            "none authored: no OtherInputOutput item exists, and nothing declares the set empty".to_string()
+        } else {
+            format!("{inbound} inbound, {outbound} outbound, each with its external party")
+        },
+    ));
+    rows.push(gate_row(
+        "sensors and actuators are present or deliberately deferred to step 4",
+        true,
+        format!("{sensors} sensors authored, {actuators} actuators computed from the actions"),
+    ));
+    rows
+}
+
+/// The actuators: one per action (or the stated reason there is none), deduplicated by name into an
+/// array that names the controllers and processes each carries between.
+fn actuator_rows(actions: &[Action], channel_wired: bool) -> Vec<Json> {
+    let mut out: Vec<Json> = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
+    for a in actions {
+        let Ok(act) = actuator_for(a, channel_wired) else { continue };
+        if seen.contains(&act.name) {
+            continue;
+        }
+        seen.push(act.name);
+        let carried: Vec<&Action> = actions.iter().filter(|b| actuator_for(b, channel_wired).is_ok_and(|x| x.name == act.name)).collect();
+        let mut ctls: Vec<&str> = carried.iter().map(|b| b.issued_by).collect();
+        ctls.sort_unstable();
+        ctls.dedup();
+        let mut procs: Vec<&str> = carried.iter().map(|b| b.acts_on).collect();
+        procs.sort_unstable();
+        procs.dedup();
+        out.push(Json::Obj(vec![
+            ("name".to_string(), Json::s(act.name)),
+            ("title".to_string(), Json::s(act.title)),
+            ("mechanism".to_string(), Json::s(act.mechanism)),
+            ("source".to_string(), Json::s(act.source)),
+            ("controllers".to_string(), Json::Arr(ctls.into_iter().map(Json::s).collect())),
+            ("processes".to_string(), Json::Arr(procs.into_iter().map(Json::s).collect())),
+            ("carries".to_string(), Json::Arr(carried.iter().map(|b| Json::s(b.name.clone())).collect())),
+        ]));
+    }
+    out
+}
+
+/// One present controller's fields, minus the anchor decoration and the responsibilities the caller
+/// joins on. `processModelAbsent` carries the reason - the anchor a `ProcessModel.heldBy` would name.
+fn controller_row(role: &'static str, anchor_name: &str, what: &str, actions: &[Action], feedback: &[Fb], pmodels: &[Pm], channel_wired: bool) -> Vec<(String, Json)> {
+    let acts: Vec<Json> = actions.iter().filter(|a| a.issued_by == role).map(|a| Json::s(a.name.clone())).collect();
+    let fbs: Vec<Json> = feedback.iter().filter(|f| f.reports_to == role).map(|f| Json::s(f.name.clone())).collect();
+    let mut acts_of: Vec<&str> = actions.iter().filter(|a| a.issued_by == role).filter_map(|a| actuator_for(a, channel_wired).ok().map(|x| x.name)).collect();
+    acts_of.sort_unstable();
+    acts_of.dedup();
+    let pm = pmodels.iter().find(|p| p.role == role);
+    vec![
+        ("role".to_string(), Json::s(role)),
+        ("what".to_string(), Json::s(what)),
+        ("inert".to_string(), Json::Bool(acts.is_empty())),
+        ("actions".to_string(), Json::Arr(acts)),
+        ("feedback".to_string(), Json::Arr(fbs)),
+        ("actuators".to_string(), Json::Arr(acts_of.into_iter().map(Json::s).collect())),
+        ("processModel".to_string(), pm.map_or(Json::Null, |p| Json::s(p.name.clone()))),
+        ("processModelAbsent".to_string(), pm.map_or_else(|| Json::s(format!("no ProcessModel with heldBy = {anchor_name} is authored")), |_| Json::Null)),
+    ]
 }
 
 fn anchor_of(model: &Model, name: &str) -> (Json, Json) {
@@ -608,26 +993,50 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
     // them - the first Sensor items this model has ever had (D0361, STPA Handbook pp.25-26).
     let sensors = instrument_feedback(&model, &mut feedback);
     let (pmodels, hazard_rows) = decoration(&model);
+    let oios = other_inputs_outputs(&model);
+    let resp = responsibilities(&actions, &hazard_rows);
+    let channel_wired = actions.iter().any(|a| a.issued_by == "channel");
+    // A role is PRESENT when something wires it: an action it issues, a feedback path it receives, or
+    // an authored anchor. Anything else is not an inert controller - it is a controller this project
+    // does not have, reported once with what would wire it (issue394: `channel` sat inert for a week).
+    let present: Vec<&'static str> = ROLES
+        .iter()
+        .filter(|(role, anchor, _, _)| {
+            actions.iter().any(|a| a.issued_by == *role) || feedback.iter().any(|f| f.reports_to == *role) || model.items.get(*anchor).is_some_and(|i| i.type_name == "Controller")
+        })
+        .map(|(role, _, _, _)| *role)
+        .collect();
+    let wired: Vec<&'static str> = present.iter().copied().filter(|r| actions.iter().any(|a| a.issued_by == *r)).collect();
+    let absent: Vec<Json> = ROLES
+        .iter()
+        .filter(|(role, _, _, _)| !present.contains(role))
+        .map(|(role, _, what, wired_by)| Json::Obj(vec![("role".to_string(), Json::s(*role)), ("what".to_string(), Json::s(*what)), ("wiredBy".to_string(), Json::s(*wired_by))]))
+        .collect();
+    let actuators = actuator_rows(&actions, channel_wired);
+    let resp_row = |r: &Responsibility| {
+        Json::Obj(vec![
+            ("controller".to_string(), Json::s(r.controller)),
+            ("process".to_string(), Json::s(r.process)),
+            ("hazard".to_string(), Json::s(r.hazard.clone())),
+            ("hazardTitle".to_string(), model.items.get(&r.hazard).and_then(|i| i.attrs.get("title")).map_or(Json::Null, |t| Json::s(t.clone()))),
+            ("via".to_string(), Json::s(r.via.clone())),
+        ])
+    };
     let controllers: Vec<Json> = ROLES
         .iter()
-        .map(|(role, anchor_name, what)| {
-            let acts: Vec<Json> = actions.iter().filter(|a| a.issued_by == *role).map(|a| Json::s(a.name.clone())).collect();
-            let fbs: Vec<Json> = feedback.iter().filter(|f| f.reports_to == *role).map(|f| Json::s(f.name.clone())).collect();
+        .filter(|(role, _, _, _)| present.contains(role))
+        .map(|(role, anchor_name, what, _)| {
             let (anchor, title) = anchor_of(&model, anchor_name);
-            Json::Obj(vec![
-                ("role".to_string(), Json::s(*role)),
-                ("what".to_string(), Json::s(*what)),
-                ("anchor".to_string(), anchor),
-                ("anchorTitle".to_string(), title),
-                ("inert".to_string(), Json::Bool(acts.is_empty())),
-                ("actions".to_string(), Json::Arr(acts)),
-                ("feedback".to_string(), Json::Arr(fbs)),
-            ])
+            let mut fields = controller_row(role, anchor_name, what, &actions, &feedback, &pmodels, channel_wired);
+            fields.insert(2, ("anchor".to_string(), anchor));
+            fields.insert(3, ("anchorTitle".to_string(), title));
+            fields.push(("responsibilities".to_string(), Json::Arr(resp.iter().filter(|r| r.controller == *role).map(resp_row).collect())));
+            Json::Obj(fields)
         })
         .collect();
     let processes: Vec<Json> = PROCESSES
         .iter()
-        .map(|(role, anchor_name, what)| {
+        .map(|(role, anchor_name, what, enacted_by)| {
             let (anchor, title) = anchor_of(&model, anchor_name);
             let acted_on = actions.iter().filter(|a| a.acts_on == *role).count();
             Json::Obj(vec![
@@ -636,21 +1045,46 @@ pub fn control_structure(root: &Path) -> Result<String, ViewError> {
                 ("anchor".to_string(), anchor),
                 ("anchorTitle".to_string(), title),
                 ("actionsOnIt".to_string(), Json::Int(i64::try_from(acted_on).unwrap_or(0))),
+                ("enactedBy".to_string(), enacted_by.map_or(Json::Null, Json::s)),
             ])
         })
         .collect();
-    let inert: Vec<Json> = ROLES.iter().filter(|(r, _, _)| !actions.iter().any(|a| a.issued_by == *r)).map(|(r, _, _)| Json::s(*r)).collect();
+    let action_rows: Vec<Json> = actions
+        .iter()
+        .map(|a| {
+            let Json::Obj(mut fields) = action_row(a) else { unreachable!("action_row is an object") };
+            match actuator_for(a, channel_wired) {
+                Ok(x) => fields.push(("actuator".to_string(), Json::s(x.name))),
+                Err(why) => {
+                    fields.push(("actuator".to_string(), Json::Null));
+                    fields.push(("actuatorAbsent".to_string(), Json::s(why)));
+                }
+            }
+            Json::Obj(fields)
+        })
+        .collect();
+    let inert: Vec<Json> = present.iter().filter(|r| !wired.contains(r)).map(|r| Json::s(*r)).collect();
+    let gate = step_two_gate(&present, &wired, &actions, &feedback, &pmodels, &oios, &resp, &hazard_rows, sensors.len(), actuators.len());
+    let hazard_json: Vec<Json> = hazard_rows
+        .iter()
+        .map(|(h, p)| Json::Obj(vec![("hazard".to_string(), Json::s(h.clone())), ("process".to_string(), Json::s(p.clone()))]))
+        .collect();
     Ok(Json::Obj(vec![
-        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the authored measures (Sensor and Feedback items - the mechanism, its determinism and the loop it closes), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Authored anchors and process models decorate the roles when the project has authored them; the remote's rules are fetched live and never copied.")),
+        ("control-structure".to_string(), Json::s("STPA step 2 for this project's own workflow, COMPUTED from the authored measures (Sensor and Feedback items - the mechanism, its determinism and the loop it closes), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Actuators and responsibilities are derived from the actions; process models and the other inputs/outputs (the handbook's fifth element type, D0363) are authored and joined onto the roles; the step-2 gate is decided clause by clause from this structure; the remote's rules are fetched live and never copied.")),
         ("controllers".to_string(), Json::Arr(controllers)),
         ("processes".to_string(), Json::Arr(processes)),
-        ("actions".to_string(), Json::Arr(actions.iter().map(action_row).collect())),
+        ("actions".to_string(), Json::Arr(action_rows)),
         ("feedback".to_string(), Json::Arr(feedback.iter().map(fb_row).collect())),
         ("sensors".to_string(), Json::Arr(sensors)),
-        ("processModels".to_string(), Json::Arr(pmodels)),
-        ("hazardsByProcess".to_string(), Json::Arr(hazard_rows)),
+        ("actuators".to_string(), Json::Arr(actuators)),
+        ("processModels".to_string(), Json::Arr(pmodels.into_iter().map(|p| p.row).collect())),
+        ("otherInputsOutputs".to_string(), Json::Arr(oios.into_iter().map(|o| o.row).collect())),
+        ("responsibilities".to_string(), Json::Arr(resp.iter().map(resp_row).collect())),
+        ("hazardsByProcess".to_string(), Json::Arr(hazard_json)),
         ("remote".to_string(), remote),
         ("inertControllers".to_string(), Json::Arr(inert)),
+        ("absentRoles".to_string(), Json::Arr(absent)),
+        ("stepTwoGate".to_string(), Json::Arr(gate)),
     ])
     .dump())
 }
@@ -663,6 +1097,94 @@ mod tests {
     fn keel_commands_are_found_in_a_hook_body_and_unknown_tokens_are_not() {
         let text = "#!/bin/sh\nkeel validate . && keel guard\nkeel frobnicate\necho keel";
         assert_eq!(keel_commands_in(text), vec!["validate".to_string(), "guard".to_string()]);
+    }
+
+    fn act(name: &str, issued_by: &'static str, acts_on: &'static str) -> Action {
+        Action { name: name.to_string(), title: format!("{name} does a thing"), issued_by, acts_on, data: "what passes".to_string(), source: "test".to_string() }
+    }
+
+    /// The actuator is a judgment made once, by the shape of the action: hooks act through the harness's
+    /// verdict, git hooks through git's dispatch, a write command through the write layer unless it
+    /// pushes or rewrites a surface, and the human's channel decision has NO actuator while the channel
+    /// is disconnected - the reason travels with the row rather than a null.
+    #[test]
+    fn actuators_follow_the_action_shape_and_a_disconnected_channel_has_none() {
+        let a = |n, by, on| actuator_for(&act(n, by, on), false).map(|x| x.name);
+        assert_eq!(a("hookStop", "hooks", "agent-turn"), Ok("actHarnessVerdict"));
+        assert_eq!(a("launchPin", "hooks", "agent-turn"), Ok("actLaunchSettings"));
+        assert_eq!(a("githookPreCommit", "commit-gate", "main-ref"), Ok("actGitHookDispatch"));
+        assert_eq!(a("workflowCi", "ci", "main-ref"), Ok("actCheckConclusion"));
+        assert_eq!(a("remoteRefusesRewrite", "remote", "main-ref"), Ok("actRefUpdateRefusal"));
+        assert_eq!(a("consoleApprovesWrite", "console", "model"), Ok("actServeWriteApi"));
+        assert_eq!(a("humanDirects", "human", "work"), Ok("actAgentRouting"));
+        assert_eq!(a("cmdAddTask", "agent", "model"), Ok("actWriteLayer"));
+        assert_eq!(a("cmdLand", "agent", "main-ref"), Ok("actGitPush"));
+        assert_eq!(a("cmdSyncClaude", "agent", "enforcement-surface"), Ok("actSurfaceRewrite"));
+        assert_eq!(a("agentEditsDeliverable", "agent", "deliverable"), Ok("actHarnessFileTools"));
+        let why = a("humanDecidesOnChannel", "human", "model").expect_err("disconnected channel");
+        assert!(why.contains("disconnected") && why.contains("D0289"), "{why}");
+        assert_eq!(actuator_for(&act("humanDecidesOnChannel", "human", "model"), true).map(|x| x.name), Ok("actChannelDelegation"));
+        assert!(a("mystery", "agent", "model").is_err());
+    }
+
+    /// Responsibilities are computed one hierarchical level deep: a controller acting on a process
+    /// answers for its hazards; a controller acting on the AGENT'S TURN answers for what the agent's
+    /// own actions can reach, because the turn is the agent acting.
+    #[test]
+    fn responsibilities_descend_one_level_through_the_agent_turn() {
+        let actions = vec![act("hookStop", "hooks", "agent-turn"), act("cmdAddTask", "agent", "model"), act("humanDirects", "human", "work")];
+        let hazards = vec![("ehzModel".to_string(), "cpModel".to_string()), ("ehzWork".to_string(), "cpWork".to_string())];
+        let r = responsibilities(&actions, &hazards);
+        let has = |c: &str, h: &str| r.iter().any(|x| x.controller == c && x.hazard == h);
+        assert!(has("agent", "ehzModel") && has("hooks", "ehzModel") && has("human", "ehzWork"));
+        assert!(!has("hooks", "ehzWork"), "the hooks do not reach what the human acts on");
+        assert!(r.iter().find(|x| x.controller == "hooks").expect("hooks row").via.contains("agent enacts"));
+    }
+
+    fn gate_holds(rows: &[Json]) -> Vec<(String, bool)> {
+        rows.iter()
+            .map(|r| {
+                let Json::Obj(f) = r else { panic!("row") };
+                let clause = f.iter().find(|(k, _)| k == "clause").map(|(_, v)| v.dump()).unwrap_or_default();
+                let holds = f.iter().any(|(k, v)| k == "holds" && matches!(v, Json::Bool(true)));
+                (clause, holds)
+            })
+            .collect()
+    }
+
+    /// The step-2 gate decides each clause from the structure. A controller with no process model, a
+    /// process nobody acts on, a hazard nobody answers for, and an empty fifth element type each fail
+    /// exactly their own clause - and the evidence names the offender.
+    #[test]
+    fn the_step_two_gate_fails_the_clause_the_structure_breaks() {
+        let actions = vec![act("cmdAddTask", "agent", "model"), act("humanDirects", "human", "work")];
+        let feedback = vec![Fb { name: "readOrient".to_string(), title: "keel orient: where things stand".to_string(), sensed_from: "model", reports_to: "agent", data: "d".to_string(), source: "s".to_string() }];
+        let pm = |n: &str, role: &'static str| Pm { name: n.to_string(), role, row: Json::Null };
+        let pmodels = vec![pm("pmAgent", "agent"), pm("pmHuman", "human")];
+        let oio = |role: &'static str, inbound: bool| Oio { role, inbound, row: Json::Null };
+        let oios = vec![oio("human", true)];
+        let hazards = vec![("ehzModel".to_string(), "cpModel".to_string())];
+        let resp = responsibilities(&actions, &hazards);
+        let present = ["human", "agent"];
+        let rows = step_two_gate(&present, &present, &actions, &feedback, &pmodels, &oios, &resp, &hazards, 0, 1);
+        assert_eq!(rows.len(), 8);
+        let holds = gate_holds(&rows);
+        // the human acts on `work`, which carries no hazard, so the human answers for nothing
+        let failing: Vec<&str> = holds.iter().filter(|(_, h)| !h).map(|(c, _)| c.as_str()).collect();
+        assert_eq!(failing.len(), 2, "{failing:?}");
+        assert!(failing[0].contains("every controlled process has at least one controller"), "{failing:?}");
+        assert!(failing[1].contains("responsibilities are traced"), "{failing:?}");
+        let text = Json::Arr(rows).dump();
+        assert!(text.contains("controllers with none: human"), "{text}");
+        assert!(text.contains("with no controller: main-ref, enforcement-surface, deliverable, agent-turn"), "{text}");
+        // now break the process-model clauses and the fifth type
+        let rows = step_two_gate(&present, &present, &actions, &feedback, &pmodels[..1], &[], &resp, &hazards, 0, 1);
+        let text = Json::Arr(rows).dump();
+        assert!(text.contains("without one: human"), "{text}");
+        assert!(text.contains("maintained by nothing: none"), "the agent's model is fed by readOrient: {text}");
+        assert!(text.contains("none authored: no OtherInputOutput item exists"), "{text}");
+        let rows = step_two_gate(&present, &present, &actions, &[], &pmodels, &oios, &resp, &hazards, 0, 1);
+        assert!(Json::Arr(rows).dump().contains("maintained by nothing: pmAgent"), "no feedback and no inbound input reach the agent");
     }
 
     #[test]

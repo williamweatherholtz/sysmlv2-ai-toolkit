@@ -56,6 +56,11 @@ def render(d):
 
     ctl_info = {c["role"]: c for c in d["controllers"]}
     proc_info = {p["role"]: p for p in d["processes"]}
+    # A role the project does not have (absentRoles - nothing wires it) is drawn nowhere; the legend
+    # names it with what would wire it, so the diagram does not silently lose a controller either.
+    LEVELS = [[r for r in lv if r in ctl_info] for lv in LEVELS]
+    GAP_OF = {r: g for r, g in GAP_OF.items() if r in ctl_info}
+    absent = d.get("absentRoles", [])
 
     # ---------- what is passed
     def cmd_name(a):
@@ -118,6 +123,7 @@ def render(d):
         for v in k.get("other", []):
             if v == "remoteRefusesRewrite": L.append("REJECTED PUSH: force-push and deletion refused")
             elif v == "consoleApprovesWrite": L += ["APPROVAL of an ask-tier write", "{path, requesting run, approver} → an obligation record"]
+            elif v == "agentEditsDeliverable": L += ["SOURCE EDITS with the harness's own Write / Edit / Bash", "(no keel command mediates; drift makes done work suspect after)"]
         return L
 
     def fb_label(proc, recv, frags):
@@ -282,6 +288,8 @@ def render(d):
         return "\n".join(out)
     for e in ctl: svg.append(label_on(e, e["tx"], e["dx"], "ctl"))
     for f in fb: svg.append(label_on(f, f["ux"], f["rx"], "fb"))
+    for i, a in enumerate(absent):
+        svg.append(f'<text x="{X0}" y="{H - 10 - i * LH}" font-size="9.6" font-family="IBM Plex Mono,Consolas,monospace" fill="var(--muted)">not drawn - {E(a["role"])}: {E(a["what"])}; this project has none (wired by {E(a["wiredBy"])})</text>')
     svg.append("</svg>")
     return "\n".join(svg)
 

@@ -69,6 +69,15 @@ inputs and outputs, neither control nor feedback - is enumerated or explicitly
 declared empty with a reason**; sensors/actuators deliberately deferred;
 supporting docs recorded.
 
+**In a keel self-run the gate is computed, not asserted:** `keel show
+control-structure` emits a `stepTwoGate` row per clause above, `holds` true or
+false with the evidence that decided it. Actuators and responsibilities are
+derived from the computed actions (per action its actuator or the reason it has
+none; per controller the hazards on the processes it reaches, one hierarchical
+level deep); process models and the fourth type (`OtherInputOutput`, D0363) are
+authored in `engine-control-structure.sysml` and joined onto the roles; a role
+nothing wires sits in `absentRoles` with what would wire it, never inert.
+
 ## STEP 3 — Identify Unsafe Control Actions
 1. For EVERY control action, evaluate all four guideword classes:
    (1) **not providing** causes a hazard; (2) **providing** causes a hazard

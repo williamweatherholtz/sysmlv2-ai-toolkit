@@ -23,7 +23,11 @@ with two differences that matter:
 
 1. **Nothing is drawn or invented.** Losses and hazards exist (`.tracking/architecture/engine-safety.sysml`);
    the control structure is **computed** (`keel show control-structure`, D0284). The run analyses that
-   list, verbatim.
+   list, verbatim. Its `stepTwoGate` rows ARE the SOP's step-2 gate for this project - read them, do
+   not re-argue them: actuators and responsibilities are derived from the actions, process models
+   and the other inputs/outputs (`OtherInputOutput`, D0363) are authored in
+   `.tracking/architecture/engine-control-structure.sysml`, and a role nothing wires is in
+   `absentRoles`, not in the structure.
 2. **The structure says when to run again.** The run records the computed action names it analysed
    (`ANALYSED: ...`); the `stpa-currency` guard warns on any action no run has covered.
 
@@ -32,7 +36,7 @@ with two differences that matter:
 | Step | Do | Produce |
 |---|---|---|
 | stpa1 | Read EL/EHZ in `engine-safety.sysml`; add a Hazard only if a control action exposes a loss no hazard covers | the hazard ids used |
-| stpa2 | `keel show control-structure .` (and `stpa-diagram` if a human needs the picture) | the computed action list |
+| stpa2 | `keel show control-structure .` (and `stpa-diagram` if a human needs the picture); every `stepTwoGate` row must hold, or the run's first record is the clause that does not | the computed action list |
 | stpa3 | For each action, all four UCA types in worst case: `provided`, `notProvided`, `wrongTimingOrder`, `stoppedTooSoonAppliedTooLong`. Each that can lead to a hazard → `UnsafeControlAction` part (context names the action verbatim) + dependency edge to the hazard. Considered-and-safe → one line in the run record | UCA parts; the safe lines |
 | stpa4 | Each UCA → `ControllerConstraint` + edge to the enforcing control in `control-map.sysml`, or `keel record issue` + edge to the Issue | constraints bound to controls or Issues |
 | stpa5 | Run record: a `Test` (analyze) with `ANALYSED: <names>` + passing result at HEAD | the guard's trigger baseline |
