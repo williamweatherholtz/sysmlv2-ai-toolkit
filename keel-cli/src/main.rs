@@ -1086,6 +1086,17 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     let already = payload.get("stop_hook_active").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
+    // THE GUARD RECEIPT (dcGateAnswersFromItsReceipt, D0367 rank 4). A turn boundary whose tree, binary
+    // and .keel/ inputs are byte-for-byte the ones the last green run judged is the same question, and
+    // it gets the same answer without recomputing it - silently, as any green turn is (D0359). The key
+    // is what makes that honest (see receipt.rs); `KEEL_NO_RECEIPT=1` forces the run.
+    let receipt_key = if keel_cli::receipt::forced(&[]) { None } else { keel_cli::receipt::key(root) };
+    if let Some(k) = &receipt_key {
+        if keel_cli::receipt::read(root, k).is_some_and(|r| r.covers_all(&keel_cli::receipt::ALL_LAYERS)) {
+            return 0;
+        }
+    }
+
     let mut problems: Vec<String> = Vec::new();
     let report = keel_cli::validate_root(root);
     if !report.diagnostics.is_empty() || !report.errors.is_empty() {
@@ -1103,7 +1114,8 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // process this project deactivated no longer blocks turns (D0177/P1.5 fixing the guards.rs
     // bypass the proposal cited — hook_stop was the one caller that skipped the filter).
     let mut failing: Vec<String> = Vec::new();
-    for r in keel_cli::guards::run_all(root) {
+    let reports = keel_cli::guards::run_all(root);
+    for r in &reports {
         for v in r.violations.iter().take(5) {
             failing.push(format!("  [{}] {v}", r.name));
         }
@@ -1159,8 +1171,13 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         // republishes on a CHANGE in the pending set and is silent otherwise. That the post-analysis
         // runs at all is not enforceable here (no gate reads conversational output, D0151); what is
         // enforceable is that this hook does not substitute a count for it.
+        if let Some(k) = &receipt_key {
+            let _ = keel_cli::receipt::record_green(root, k, &keel_cli::receipt::ALL_LAYERS, &reports);
+        }
         return 0;
     }
+    // A red run leaves no receipt - the next boundary recomputes.
+    keel_cli::receipt::delete(root);
     if already {
         // Second consecutive red: allow the stop (loop-avoidance stands, issue081) but the yield is
         // now a TRACKED obligation visible in orient, surviving console downtime (D0176/P1.7) — a
@@ -1238,6 +1255,17 @@ fn cmd_gate(args: &[String]) -> i32 {
         return 2;
     }
 
+    // THE GUARD RECEIPT: a fast gate over the tree the last green full run judged is answered from
+    // that receipt (validate + every guard covers the fast tier's subset). The fast tier never WRITES
+    // a receipt - three guards are not the guard set.
+    if !keel_cli::receipt::forced(args) {
+        if let Some(r) = keel_cli::receipt::key(&root).and_then(|k| keel_cli::receipt::read(&root, &k)) {
+            if r.covers_all(&[keel_cli::receipt::VALIDATE, keel_cli::receipt::GUARDS]) {
+                println!("{}", r.line("gate: fast gate clean -"));
+                return 0;
+            }
+        }
+    }
     let report = keel_cli::validate_root(&root);
     let mut failed = false;
     for (path, d) in &report.diagnostics {
@@ -1557,7 +1585,8 @@ fn classify_guard_args(args: &[String]) -> (Option<&str>, Option<&str>) {
 
 fn cmd_guard(args: &[String]) -> i32 {
     // `keel guard` / `guard [ROOT]` / `guard all [ROOT]` → run all; `guard <name> [ROOT]` → run one.
-    let (name, root_arg) = classify_guard_args(args);
+    let bare: Vec<String> = args.iter().filter(|a| *a != "--no-receipt").cloned().collect();
+    let (name, root_arg) = classify_guard_args(&bare);
     // GH#14: a mistyped flag must not become the ROOT and turn every guard green over nothing.
     if let Some(code) = refuse_flag_as_path(root_arg.map(String::from).as_ref(), "guard") {
         return code;
@@ -1572,7 +1601,21 @@ fn cmd_guard(args: &[String]) -> i32 {
         return 2;
     }
     let Some(name) = name else {
-        let reports = keel_cli::guards::run_all(&root);
+        // THE GUARD RECEIPT (dcGateAnswersFromItsReceipt): an equal key means the same inputs, and the
+        // stored reports are printed as they were; one line names the receipt's age. `--no-receipt`
+        // forces the run. A red run deletes the receipt so nothing green is ever answered over it.
+        let receipt_key = if keel_cli::receipt::forced(args) { None } else { keel_cli::receipt::key(&root) };
+        let receipt = receipt_key
+            .as_ref()
+            .and_then(|k| keel_cli::receipt::read(&root, k))
+            .filter(|r| r.covers_all(&[keel_cli::receipt::GUARDS]));
+        let (reports, from_receipt) = match receipt {
+            Some(r) => {
+                let line = r.line("[guard]");
+                (r.guards, Some(line))
+            }
+            None => (keel_cli::guards::run_all(&root), None),
+        };
         // D0278: a control with a KNOWN defect says so beside its own verdict. Printed here rather
         // than inside `GuardReport::print` because the runner is what holds the root — and because
         // the note belongs to the reading, not to the report: the moment someone needs to know a
@@ -1604,6 +1647,15 @@ fn cmd_guard(args: &[String]) -> i32 {
             )
         };
         println!("[guard] {}{tail}", if all_ok { keel_cli::color::pass("ALL PASS") } else { keel_cli::color::fail("FAILED") });
+        if let Some(line) = from_receipt {
+            println!("{line}");
+        } else if let Some(k) = &receipt_key {
+            if all_ok {
+                let _ = keel_cli::receipt::record_green(&root, k, &[keel_cli::receipt::GUARDS], &reports);
+            } else {
+                keel_cli::receipt::delete(&root);
+            }
+        }
         return i32::from(!all_ok);
     };
     let Some(report) = keel_cli::guards::run_one(name, &root) else {

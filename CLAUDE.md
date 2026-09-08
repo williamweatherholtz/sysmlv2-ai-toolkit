@@ -268,6 +268,13 @@ keel gate --workspace  # the COMMIT tier for a repo holding several projects: ev
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
 ```
 
+**A green gate answers from its receipt (D0371).** A green `keel guard`, `keel hook stop` or `keel gate` writes
+`.keel/metrics/guard-receipt.toml` keyed on every input a guard can read - HEAD, every path `git status` lists with its
+(len, mtime), every file under `.keel/` outside `metrics/` and `bin/`, and the binary's build id - and the next run whose
+key is EQUAL answers from it in one line naming the receipt's age (idle turn boundary 5.2-5.4 s -> 0.2-0.3 s on this
+host). A red run deletes it; a path younger than two seconds is never written or honoured; `--no-receipt` /
+`KEEL_NO_RECEIPT=1` forces the run. CI has no `.keel/` and always runs everything.
+
 Verdicts are coloured on a terminal — PASS green, FAIL/ERROR red, WARN yellow, a registered control defect magenta
 (D0287); piped output is bare text, `NO_COLOR` turns it off, `KEEL_COLOR=1|0` forces it either way.
 

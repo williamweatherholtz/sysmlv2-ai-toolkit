@@ -392,6 +392,17 @@ pub fn cmd(args: &[String]) -> i32 {
 /// with a project tag. Formatting is the caller's; the BAR is not.
 #[must_use]
 pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
+    gate_outcome(project, tag).0
+}
+
+/// [`gate_problems`] plus, when the verdict came from the guard receipt, the one line that says so.
+///
+/// THE GUARD RECEIPT (dcGateAnswersFromItsReceipt): a project whose tree, binary and `.keel/` inputs
+/// equal the ones a green full run judged is answered from that run's receipt; a green run here writes
+/// one covering validate, guards and rules; a red run deletes it. The pin check is not in the key and
+/// runs every time - it is the one problem a binary can have over an unchanged tree.
+#[must_use]
+pub fn gate_outcome(project: &Path, tag: &str) -> (Vec<String>, Option<String>) {
     let mut problems = Vec::new();
     // THE PIN BITES HERE for verdicts, as it does in `with_file_lock` for writes (D0251 clause C).
     // One body means one check covers gate, sync, land and the pre-commit hook identically — and
@@ -402,6 +413,12 @@ pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
             "{tag}PIN: this project declares engine {declared} and this binary is {binary} — a verdict from an undeclared engine is not this project's verdict (D0251/srProjectPinsItsEngine). Run the pinned version, or `keel migrate` to bring the tree to this one"
         ));
     }
+    let receipt_key = if crate::receipt::forced(&[]) { None } else { crate::receipt::key(project) };
+    if let Some(r) = receipt_key.as_ref().and_then(|k| crate::receipt::read(project, k)) {
+        if r.covers_all(&crate::receipt::ALL_LAYERS) {
+            return (problems, Some(r.line(&format!("{tag}gate"))));
+        }
+    }
     let report = crate::validate_root(project);
     for (path, d) in &report.diagnostics {
         problems.push(format!("{tag}ERROR {}:{} — {}", path.display(), d.line, d.message));
@@ -411,7 +428,8 @@ pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
     }
     // Guards and rules are still evaluated when validate failed, because a caller aggregating across
     // a workspace wants the whole picture in one run rather than one layer per invocation.
-    for g in crate::guards::run_all(project) {
+    let reports = crate::guards::run_all(project);
+    for g in &reports {
         for v in &g.violations {
             problems.push(format!("{tag}VIOLATION {}: {v}", g.name));
         }
@@ -419,7 +437,14 @@ pub fn gate_problems(project: &Path, tag: &str) -> Vec<String> {
     for v in declared_rule_violations(project) {
         problems.push(format!("{tag}RULE {v}"));
     }
-    problems
+    if let Some(k) = &receipt_key {
+        if problems.is_empty() {
+            let _ = crate::receipt::record_green(project, k, &crate::receipt::ALL_LAYERS, &reports);
+        } else {
+            crate::receipt::delete(project);
+        }
+    }
+    (problems, None)
 }
 
 /// Blocking violations of this project's DECLARED rules (`.engine/rules/`), warnings excluded.
@@ -451,9 +476,12 @@ fn declared_rule_violations(project: &Path) -> Vec<String> {
 /// that failed. One body, printed here.
 fn gate_one(p: &Path, label: &str) -> Result<(), String> {
     println!("gate [{label}] validate + guard + rules");
-    let problems = gate_problems(p, "");
+    let (problems, from_receipt) = gate_outcome(p, "");
     if problems.is_empty() {
-        println!("  clean ({} file(s))", crate::validate_root(p).validated);
+        match from_receipt {
+            Some(line) => println!("  {line}"),
+            None => println!("  clean ({} file(s))", crate::validate_root(p).validated),
+        }
         return Ok(());
     }
     for v in problems.iter().take(10) {

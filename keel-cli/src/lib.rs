@@ -82,6 +82,7 @@ pub mod library;
 pub mod enroll;
 pub mod gitx;
 pub mod corpus;
+pub mod receipt;
 pub mod gitfacts;
 pub mod govern;
 pub mod guards;
