@@ -1793,7 +1793,7 @@ mod amendment_tests {
 #[must_use]
 pub fn stpa_currency(root: &Path) -> GuardReport {
     let (runs, analysed) = analysed_actions(root);
-    let computed = crate::view::control_structure::local_action_names(root);
+    let computed = crate::view::control_structure::local_actions(root);
     let warnings = currency_warnings(runs, &analysed, &computed);
     let scanned = if runs == 0 { 0 } else { computed.len() };
     GuardReport { name: "stpa-currency", scanned, warnings, violations: Vec::new() }
@@ -1820,32 +1820,77 @@ fn analysed_list(rest: &str) -> Vec<String> {
     rest[..end].split(',').map(str::trim).filter(|n| !n.is_empty()).map(str::to_string).collect()
 }
 
-/// One warning naming every computed action no run has analysed; silence when there is no run.
-fn currency_warnings(runs: usize, analysed: &HashSet<String>, computed: &[String]) -> Vec<String> {
+/// One warning a reader can act on (D0410, issue403): the remainder grouped by the edge each action
+/// sits on, the target stated (every edge walked in full; a tranche is one edge), and the NEXT tranche
+/// named - the open edge with the fewest unanalysed actions, ties broken by edge name - with the
+/// exact `ANALYSED:` list its run record will carry. Silence when there is no run or nothing is open.
+///
+/// The count stays in the message because it is the burndown; what changed is that the count is no
+/// longer the whole message. A standing "39 of 48" told the reader nothing about where to start, so
+/// nobody did (the D0359 failure in another surface: accurate every time, and therefore unread).
+fn currency_warnings(runs: usize, analysed: &HashSet<String>, computed: &[crate::view::control_structure::LocalAction]) -> Vec<String> {
+    // edges in structure order; each carries the names still open and the edge's total
+    struct Edge<'a> {
+        name: String,
+        open: Vec<&'a str>,
+        total: usize,
+    }
     if runs == 0 {
         return Vec::new();
     }
-    let mut missing: Vec<&str> = computed.iter().map(String::as_str).filter(|n| !analysed.contains(*n)).collect();
-    missing.sort_unstable();
-    missing.dedup();
-    if missing.is_empty() {
-        return Vec::new();
+    let mut edges: Vec<Edge<'_>> = Vec::new();
+    for a in computed {
+        let name = format!("{}->{}", a.issued_by, a.acts_on);
+        if !edges.iter().any(|e| e.name == name) {
+            edges.push(Edge { name: name.clone(), open: Vec::new(), total: 0 });
+        }
+        if let Some(e) = edges.iter_mut().find(|e| e.name == name) {
+            e.total += 1;
+            if !analysed.contains(&a.name) && !e.open.contains(&a.name.as_str()) {
+                e.open.push(a.name.as_str());
+            }
+        }
     }
+    let open: Vec<&Edge<'_>> = edges.iter().filter(|e| !e.open.is_empty()).collect();
+    let Some(next) = open.iter().min_by(|a, b| a.open.len().cmp(&b.open.len()).then_with(|| a.name.cmp(&b.name))) else {
+        return Vec::new();
+    };
+    let missing: usize = open.iter().map(|e| e.open.len()).sum();
+    let sorted = |names: &[&str]| {
+        let mut v = names.to_vec();
+        v.sort_unstable();
+        v.join(", ")
+    };
+    let groups: Vec<String> = open
+        .iter()
+        .map(|e| {
+            let count = if e.open.len() == e.total { e.open.len().to_string() } else { format!("{} of {} open", e.open.len(), e.total) };
+            format!("{} ({count}): {}", e.name, sorted(&e.open))
+        })
+        .collect();
     vec![format!(
-        "stpa-currency: {} of {} computed control action(s) no stpa-self run has analysed: {} - run the stpa-self process and record the run's ANALYSED list (D0313)",
-        missing.len(),
+        "stpa-currency: {} of {} computed control action(s) no stpa-self run has analysed. TARGET: every controller->process edge walked in full; a run's tranche is one edge. OPEN EDGES: {}. NEXT TRANCHE: {} - run the stpa-self process over it and record `ANALYSED: {}.` (D0313, D0410)",
+        missing,
         computed.len(),
-        missing.join(", ")
+        groups.join("; "),
+        next.name,
+        sorted(&next.open)
     )]
 }
 
 #[cfg(test)]
 mod stpa_currency_tests {
     use super::{analysed_list, currency_warnings};
+    use crate::view::control_structure::LocalAction;
     use std::collections::HashSet;
 
     fn set(names: &[&str]) -> HashSet<String> {
         names.iter().map(std::string::ToString::to_string).collect()
+    }
+
+    /// A structure of (name, `issued_by`, `acts_on`) rows in structure order.
+    fn structure(rows: &[(&str, &'static str, &'static str)]) -> Vec<LocalAction> {
+        rows.iter().map(|(n, by, on)| LocalAction { name: (*n).to_string(), issued_by: by, acts_on: on }).collect()
     }
 
     /// The run record's shape: names up to the first full stop; the FRAME sentence after it is prose.
@@ -1858,23 +1903,68 @@ mod stpa_currency_tests {
     /// A structure that grew a name the runs never walked warns ONCE, naming every missing action.
     #[test]
     fn a_grown_structure_warns_once_and_names_the_gap() {
-        let computed: Vec<String> = ["cmdRecord", "cmdLand", "hookStop", "workflowCi"].iter().map(std::string::ToString::to_string).collect();
+        let computed = structure(&[
+            ("cmdRecord", "agent", "model"),
+            ("cmdLand", "agent", "main-ref"),
+            ("hookStop", "hooks", "agent-turn"),
+            ("workflowCi", "ci", "main-ref"),
+        ]);
         let w = currency_warnings(1, &set(&["cmdRecord", "cmdLand"]), &computed);
         assert_eq!(w.len(), 1, "{w:?}");
-        assert!(w[0].contains("2 of 4") && w[0].contains("hookStop, workflowCi") && !w[0].contains("cmdRecord"), "{}", w[0]);
+        assert!(w[0].contains("2 of 4") && w[0].contains("hookStop") && w[0].contains("workflowCi") && !w[0].contains("cmdRecord"), "{}", w[0]);
+    }
+
+    /// The remainder is grouped by edge (D0410): a fully open edge shows its count, a partly walked
+    /// edge shows `k of n open`, and the `analysed` names are absent from every group.
+    #[test]
+    fn the_remainder_is_grouped_by_edge() {
+        let computed = structure(&[
+            ("cmdRecord", "agent", "model"),
+            ("cmdAddTask", "agent", "model"),
+            ("cmdNew", "agent", "model"),
+            ("hookStop", "hooks", "agent-turn"),
+            ("hookPreToolUse", "hooks", "agent-turn"),
+        ]);
+        let w = currency_warnings(1, &set(&["cmdRecord"]), &computed);
+        assert_eq!(w.len(), 1, "{w:?}");
+        assert!(w[0].contains("agent->model (2 of 3 open): cmdAddTask, cmdNew"), "{}", w[0]);
+        assert!(w[0].contains("hooks->agent-turn (2): hookPreToolUse, hookStop"), "{}", w[0]);
+        assert!(w[0].contains("TARGET: every controller->process edge walked in full"), "{}", w[0]);
+    }
+
+    /// The next tranche is the open edge with the fewest unanalysed actions, and the message carries
+    /// the exact `ANALYSED:` list the run record will need - a reader can act without deriving anything.
+    #[test]
+    fn the_next_tranche_is_the_smallest_open_edge_with_its_analysed_list() {
+        let computed = structure(&[
+            ("cmdRecord", "agent", "model"),
+            ("cmdAddTask", "agent", "model"),
+            ("cmdNew", "agent", "model"),
+            ("workflowCi", "ci", "main-ref"),
+            ("workflowRelease", "ci", "main-ref"),
+            ("hookStop", "hooks", "agent-turn"),
+            ("hookPreToolUse", "hooks", "agent-turn"),
+        ]);
+        let w = currency_warnings(1, &set(&["cmdRecord"]), &computed);
+        // agent->model has 2 open, ci->main-ref 2, hooks->agent-turn 2: the tie breaks on the edge name
+        assert!(w[0].contains("NEXT TRANCHE: agent->model - run the stpa-self process over it and record `ANALYSED: cmdAddTask, cmdNew.`"), "{}", w[0]);
+        // walk that edge and the next smallest is named
+        let w2 = currency_warnings(2, &set(&["cmdRecord", "cmdAddTask", "cmdNew", "hookStop"]), &computed);
+        assert!(w2[0].contains("NEXT TRANCHE: hooks->agent-turn - run the stpa-self process over it and record `ANALYSED: hookPreToolUse.`"), "{}", w2[0]);
+        assert!(!w2[0].contains("agent->model"), "a fully walked edge is not listed: {}", w2[0]);
     }
 
     /// The union over runs is what counts: a second run walking the rest clears the first's gap.
     #[test]
     fn runs_accumulate_and_a_full_walk_is_silent() {
-        let computed: Vec<String> = ["cmdRecord", "hookStop"].iter().map(std::string::ToString::to_string).collect();
+        let computed = structure(&[("cmdRecord", "agent", "model"), ("hookStop", "hooks", "agent-turn")]);
         assert!(currency_warnings(2, &set(&["cmdRecord", "hookStop"]), &computed).is_empty());
     }
 
     /// No recorded run: the project never adopted the process; nothing is owed and nothing is said.
     #[test]
     fn a_project_with_no_run_hears_nothing() {
-        let computed: Vec<String> = vec!["cmdRecord".to_string()];
+        let computed = structure(&[("cmdRecord", "agent", "model")]);
         assert!(currency_warnings(0, &HashSet::new(), &computed).is_empty());
     }
 }

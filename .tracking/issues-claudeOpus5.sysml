@@ -1523,4 +1523,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from storyBriefTabsNoDurationsNamedMembers to issue425;
+
+    part issue426 : Issue {
+        :>> id = "0fc6a6fe-575b-4ae4-9602-9a1e6d042391";
+        :>> title = "A gesture citation in an acceptance note is free text the recorder writes, not a receipt the command writes";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by stpa-self run 2 (UCA-AC1, cmdAccept provided from an agent session) by code read, 2026-09-09. The acceptance channel refusal (keel-cli/src/main.rs verdict_channel_refusal) accepts a note from an agent-marked session with delegation declared when either the note quotes the human or quotes_conversational_words (keel-cli/src/view/checks.rs, the substrings deck, console, github comment, github.com/, tty gesture) returns true; read_back_names (keel-cli/src/view/mod.rs) returns the same answer when the note has no quoted span. So keel accept <d> --note 'approved at the console' --by <human>, run from an agent session, is written with nothing quoted and no receipt. The console's own record appends the text [device <id> HMAC-verified] (keel-cli/src/serve.rs) but does not store the signature, so a typed copy of that tag is indistinguishable at the gate; KEEL_TTY_GESTURE=1 makes tty_gesture() report an asserted gesture from a session with no terminal. The gap: a gesture citation is free text the recorder writes, not something the command writes and the tree can re-verify. Hazard EHZ3 (the AI records human judgment). Not a fabricated acceptance in the tree today - the check is that none of the acceptance notes at HEAD cite a gesture without the command's own device tag - but the channel is open.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGestureCitationsAreWrittenByTheCommand to issue426;
+
+    part issue427 : Issue {
+        :>> id = "8d8d1808-36a5-4709-8378-606f7a11f820";
+        :>> title = "An override unlock matches the written path by substring, so a directory target unlocks any file under it";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by stpa-self run 2 (UCA-O1, cmdOverride provided with a wide target) by code read, 2026-09-09. keel-cli/src/main.rs consume_override matches an armed unlock against the written path by substring in EITHER direction (written_path.contains(target) || target.contains(written_path)), so keel override .tracking --reason '...' arms an unlock that the next write to ANY path containing .tracking consumes, and a short target covers every path containing it. The unlock is single-use and expires after OVERRIDE_TTL_SECS (900), and the consumed write is recorded as an obligation naming the path written, so the exposure is one write of the agent's choosing under a target that named no file. Hazard EHZ2 (a write lands outside a validated channel). Resolver: keel override refuses a target that is not one file and consume_override matches by canonical path equality.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcOverrideBindsToOneFile to issue427;
+
+    part issue428 : Issue {
+        :>> id = "70c6ead2-1da7-48b4-a7ff-48a91c750b99";
+        :>> title = "A Decision that cites the human's direction carries no Statement of their words to check it against";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found by stpa-self run 2 (UCA-H1, humanDirects provided as words the agent renders) by code read, 2026-09-09. The computed control structure (keel show control-structure, keel-cli/src/view/control_structure.rs) records humanDirects as a prose channel nothing parses. A Decision may today say 'the human's words: ...' in its context or rationale, and a task DoD may cite their instruction, with no Statement recorded and no #DerivedFrom edge - so the tree holds the agent's rendering of what the human said and nothing to check it against, and D0289's quote-as-receipt applies only to acceptances, not to the direction that produced the Decision. The intake path (keel record statement, D0216/D0236) exists but only business-elicitation is bound to it; keel hardening (D0166) reports unsourced items as a view and gates nothing. Hazard EHZ3 (an actor is misattributed - the words are attributed to the human without their record). Resolver: a forward-only guard clause requiring a Decision or DoD that quotes the human to carry a #DerivedFrom edge to a Statement holding that span verbatim, grandfathering and counting the existing ones.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDirectionDecisionsLinkTheirStatement to issue428;
 }

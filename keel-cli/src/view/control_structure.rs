@@ -470,10 +470,28 @@ fn camel(s: &str) -> String {
 /// gate must not call `gh`.
 #[must_use]
 pub fn local_action_names(root: &Path) -> Vec<String> {
+    local_actions(root).into_iter().map(|a| a.name).collect()
+}
+
+/// One computed local control action with the edge it sits on: who issues it and what it acts on.
+///
+/// The `stpa-currency` guard groups its remainder by this edge (D0410): a tranche of the analysis is
+/// one controller->process edge walked in full, so the guard names the edges still open rather than
+/// one flat list of names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalAction {
+    pub name: String,
+    pub issued_by: &'static str,
+    pub acts_on: &'static str,
+}
+
+/// The computed local control actions with their edges, in structure order (see `local_action_names`).
+#[must_use]
+pub fn local_actions(root: &Path) -> Vec<LocalAction> {
     let mut actions = Vec::new();
     let mut feedback = Vec::new();
     gather_local(root, &mut actions, &mut feedback);
-    actions.into_iter().map(|a| a.name).collect()
+    actions.into_iter().map(|a| LocalAction { name: a.name, issued_by: a.issued_by, acts_on: a.acts_on }).collect()
 }
 
 /// The structural, derivable half: every action and feedback path, from facts.

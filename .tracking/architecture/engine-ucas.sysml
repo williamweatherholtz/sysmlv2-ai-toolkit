@@ -201,4 +201,94 @@ package EngineUcas {
     }
     // RAN: keel show control-structure . read 2026-09-05 (42 local actions); cmdRecord, cmdLand, cmdAppendResult walked through all four UCA types; nine UCAs, nine constraints, every constraint edged to a control or an Issue; keel validate . clean
     part stpaRun1R1 : TestResult { :>> id = "8d009eac-d493-457b-b942-7040d7d5bad4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "494d293340d569d911ff8a3ff7b07abe9da29526"; :>> judgedAt = "2026-09-05"; :>> judgedBy = "claudeOpus5"; }
+
+    // ── run 2 (stpa3): the human's authority reaching the model - cmdAccept, cmdReject, cmdOverride, ──
+    // ── humanDecidesOnChannel, consoleApprovesWrite, humanDirects; the human->model, human->work and ──
+    // ── console->model edges walked in full ─────────────────────────────────────────────────────────
+
+    part ucaAcceptGestureIsTyped : UnsafeControlAction {
+        :>> id = "74bd015d-c62a-4c80-956e-92bb63aea6b9";
+        :>> title = "UCA-AC1: an acceptance or rejection PROVIDED from an agent session whose note cites a gesture the recorder typed";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdAccept or cmdReject run from an agent-marked session (CLAUDECODE set, no terminal) with delegatedRecording declared, the note carrying the substring console, deck, tty gesture, github comment or github.com/ and no quoted span.";
+        :>> statement = "verdict_channel_refusal (keel-cli/src/main.rs) accepts the note because quotes_conversational_words (view/checks.rs) matches the substring and read_back_names (view/mod.rs) defers to it when nothing is quoted; the console's own tag [device <id> HMAC-verified] is text whose signature is not stored, so a typed copy is the same at the gate - the AI has recorded a human judgment, EHZ3.";
+    }
+    dependency from ucaAcceptGestureIsTyped to ehz3;
+
+    part ucaAcceptThenTextEdited : UnsafeControlAction {
+        :>> id = "5360d481-9b7d-4c0b-9ffb-3b34b50fbf31";
+        :>> title = "UCA-AC2: an acceptance PROVIDED and the Decision's text edited afterwards";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::wrongTimingOrder;
+        :>> context = "cmdAccept recorded at SHA s, then the Decision's decision or rationale field edited at a later commit with no re-binding.";
+        :>> statement = "The human's word stands on text they did not see - EHZ3 - and the accepted Decision reads as authority for a clause nobody accepted.";
+    }
+    dependency from ucaAcceptThenTextEdited to ehz3;
+
+    part ucaOverrideTargetIsWide : UnsafeControlAction {
+        :>> id = "5c68a5ae-f7a7-41dd-8b90-af9870293bac";
+        :>> title = "UCA-O1: an override PROVIDED with a target that names no single file";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdOverride with a directory, a path fragment or a short string as the target, followed within 900 s by a Write or Edit to any path containing it.";
+        :>> statement = "consume_override (keel-cli/src/main.rs) matches written_path.contains(target) || target.contains(written_path), so one unlock covers every path under the fragment and the protected write the agent chooses lands outside the validated channel - EHZ2.";
+    }
+    dependency from ucaOverrideTargetIsWide to ehz2;
+
+    part ucaDirectionRenderedNotRecorded : UnsafeControlAction {
+        :>> id = "9234b22a-36b2-40b2-9b61-6b4668e448b3";
+        :>> title = "UCA-H1: a direction PROVIDED in chat and carried into a Decision as the agent's rendering of it";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "humanDirects: the human states a direction in the conversation; the agent records a Decision or a task DoD whose text says the human's words and quotes or paraphrases them, with no Statement recorded and no DerivedFrom edge.";
+        :>> statement = "The tree attributes words to the human that only the agent's transcript holds; the computed control structure already marks humanDirects as a channel nothing parses, and nothing downstream can check the rendering against a record - an actor is misattributed, EHZ3.";
+    }
+    dependency from ucaDirectionRenderedNotRecorded to ehz3;
+
+    part ccGestureIsTheCommandsReceipt : ControllerConstraint {
+        :>> id = "4d6ab611-69cf-44a9-acca-a7314e76dd42";
+        :>> title = "CC-AC1: a gesture citation is written by the command that observed it and re-verifiable from the tree";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> statement = "A console or deck acceptance stores the signature (or a receipt the paired-device store resolves) beside its tag; a TTY citation is written only by the command at a real terminal; a note that merely contains a gesture word from an agent session is refused with the remedy named. No control does this today - bound to issue426 (resolver dcGestureCitationsAreWrittenByTheCommand).";
+    }
+    dependency from ccGestureIsTheCommandsReceipt to ucaAcceptGestureIsTyped;
+    dependency from ccGestureIsTheCommandsReceipt to issue426;
+
+    part ccAcceptanceBindsToText : ControllerConstraint {
+        :>> id = "98bc7619-2b57-4977-b86d-c542573b80b6";
+        :>> title = "CC-AC2: an acceptance binds to the text it accepted";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> statement = "An accepted Decision whose signed fields differ from their text at the acceptance's SHA fails the gate until re-bound by a new acceptance against the current text (D0308/D0329); enforced by acceptance-binds-to-text.";
+    }
+    dependency from ccAcceptanceBindsToText to ucaAcceptThenTextEdited;
+    dependency from ccAcceptanceBindsToText to gAcceptanceBindsToText;
+
+    part ccOverrideNamesOneFile : ControllerConstraint {
+        :>> id = "8c22c20b-dd24-4eda-9b38-24171e68a428";
+        :>> title = "CC-O1: an override unlock covers exactly one file, matched by canonical path";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> statement = "keel override refuses a target that is not one file and consume_override matches by canonical equality; the single-use consumption and the recorded obligation stand as today. No control does this today - bound to issue427 (resolver dcOverrideBindsToOneFile).";
+    }
+    dependency from ccOverrideNamesOneFile to ucaOverrideTargetIsWide;
+    dependency from ccOverrideNamesOneFile to issue427;
+
+    part ccDirectionLinksItsStatement : ControllerConstraint {
+        :>> id = "0868826c-8427-4d23-9716-08338d4a0969";
+        :>> title = "CC-H1: a Decision or DoD that quotes the human links a Statement holding their words verbatim";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> statement = "A Decision or task DoD that cites the human's words carries a DerivedFrom edge to a Statement (keel record statement, D0216/D0236) whose text contains the span verbatim, forward-only from the guard's date with the existing ones grandfathered and counted. No control does this today - keel hardening reports unsourced items and gates nothing - bound to issue428 (resolver dcDirectionDecisionsLinkTheirStatement).";
+    }
+    dependency from ccDirectionLinksItsStatement to ucaDirectionRenderedNotRecorded;
+    dependency from ccDirectionLinksItsStatement to issue428;
+
+    verification stpaRun2 : Test {
+        :>> id = "432b1153-2f8f-4932-9ce0-322accf471b0";
+        :>> title = "stpa-self run 2 (2026-09-09) - the human's authority reaching the model: cmdAccept, cmdReject, cmdOverride, humanDecidesOnChannel, consoleApprovesWrite, humanDirects";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::analyze;
+        :>> procedureText = "ANALYSED: cmdAccept, cmdReject, cmdOverride, humanDecidesOnChannel, consoleApprovesWrite, humanDirects. FRAME: EHZ1-EHZ9 as recorded in engine-safety.sysml; no hazard added; the tranche is the three edges human->model, human->work and console->model, walked in full. CONSIDERED SAFE: cmdAccept notProvided (a proposed Decision stays proposed and blocks what it charters - the honest default, D0098); cmdAccept provided from the human's own terminal (the TTY is the gesture and the command cites it, D0315 - covered by UCA-AC1 only in its asserted stand-in); cmdAccept provided on a fork without naming the option (read_back_names refuses a note that names neither the id, an option letter nor three words of the text - a control inside the command, exercised by its tests); cmdReject provided or wrongTiming (reject_decision_locked refuses a Decision with no proposed status and writes one fail result under the file lock; the channel gap is UCA-AC1, shared with accept); cmdReject notProvided (a Decision the human wanted refused stays proposed - no hazard); cmdOverride notProvided (the protected write is refused, the honest default); cmdOverride stoppedTooSoonAppliedTooLong (an unlock is single-use, expires after 900 s and its consumption is recorded as an obligation - ctlOverrideObligation); consoleApprovesWrite provided against a changed plan (the approval is bound to the plan hash and refused when the route changed, srServeApproveGateHuman) and provided from an unpaired or altered device (HMAC-SHA256 over a pairing code, refused with nothing written, D0334/D0335); consoleApprovesWrite notProvided (the write waits); humanDecidesOnChannel in all four types (channel_wired is false - the decision channel is disconnected and the structure records the action as dormant; when a channel is wired, the decider list in github-actors.toml is the control to analyse, and that wiring is a process change that re-opens this action); humanDirects notProvided and wrongTimingOrder (an undirected or late-directed agent follows the ranked frontier, D0052 - no hazard). FOUR UCAs recorded, four constraints: one bound to a control (gAcceptanceBindsToText), three bound to Issues naming gaps (issue426 new - a gesture citation is typed text; issue427 new - an override target is a substring; issue428 new - direction is rendered, not recorded). NOT ANALYSED: the remaining computed actions, grouped by edge, are named by the stpa-currency guard until a run covers them.";
+    }
+    // RAN: keel show control-structure . read 2026-09-09 (48 local actions); the six actions of the human->model, human->work and console->model edges walked through all four UCA types against keel-cli/src/main.rs verdict_channel_refusal, tty_gesture and consume_override, view/checks.rs quotes_conversational_words, view/mod.rs read_back_names, write.rs reject_decision_locked, serve.rs device tag and plan-bound approval, view/control_structure.rs channel_wired; four UCAs, four constraints, every constraint edged to a control or an Issue; keel validate . clean
+    part stpaRun2R1 : TestResult { :>> id = "d909e4ab-84e6-4305-b797-ed6d952a580e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e9c5a83f27566cdc0a2a78aa9d9e85c52847019e"; :>> judgedAt = "2026-09-09"; :>> judgedBy = "claudeOpus5"; }
 }

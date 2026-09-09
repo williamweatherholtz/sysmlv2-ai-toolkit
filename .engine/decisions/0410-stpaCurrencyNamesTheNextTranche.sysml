@@ -1,0 +1,23 @@
+// D0410 (PROPOSED — NOT YET ACCEPTED) — stpaCurrencyNamesTheNextTranche: the stpa-currency warning groups its remainder by controller-to-process edge, states the target and names the next tranche with its ANALYSED list
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0410Accept event on sign-off.
+package Decision0410 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0410 : Decision {
+        :>> id = "ce9daae3-679d-4bb0-8e0e-259e7b7e1fa8";
+        :>> title = "stpaCurrencyNamesTheNextTranche: the stpa-currency warning groups its remainder by controller-to-process edge, states the target and names the next tranche with its ANALYSED list";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "issue403, tracked as dcStpaSelfCoversTheActions. The stpa-currency guard (D0313) warned with one flat list: '45 of 48 computed control action(s) no stpa-self run has analysed: agentEditsDeliverable, cmdActivate, ...' - accurate at every turn boundary and acted on by nobody, because a standing number with a forty-name list says where the gap is but not where to start or what a finished piece of it looks like. That is the same failure D0359 removed from the turn boundary for pending Decisions: a line that is right every time stops being read. The first stpa-self run (2026-09-05) walked three actions chosen by hand; nothing in the tree said what the second should be.";
+        :>> decision = "NOT A FORK: the DoD asked me to decide what the currency warning should say, and the shape follows from what the structure already computes - every action sits on one issuedBy -> actsOn edge, and an STPA over a control structure is walked edge by edge, so the unit of a tranche is given, not chosen. The warning now reads: the count (the burndown, kept); TARGET: every controller->process edge walked in full, a run's tranche is one edge; OPEN EDGES: each edge with unanalysed actions, its count (a partly walked edge as 'k of n open') and the names; NEXT TRANCHE: the open edge with the fewest unanalysed actions, ties broken by edge name, with the exact `ANALYSED: <names>.` list its run record will carry. The guard reads the edges from control_structure::local_actions, a new function beside local_action_names carrying issuedBy and actsOn per action; the flat list stays available to any other reader. A fully walked edge is not listed; when nothing is open the guard is silent as before; a project with no run still hears nothing. The stpa-self process's stpa5 text and the skill's step table say that a tranche is one edge and that the guard names the next one.";
+        :>> rationale = "A warning is a control only if a reader can act on it from the line itself. Grouping by edge turns forty names into eight pieces of work, each with a stated end; naming the smallest open edge removes the choice of where to start, which is the step that was never taken; carrying the exact ANALYSED list means the run record is copy-out rather than composed, so the guard's own parser and the next run's record cannot drift apart on a name. The count is kept because the burndown is still true; what changes is that it is no longer the whole message. The smallest edge first is the ordering that finishes a piece soonest and reduces the open-edge count at every run - the frontier's own rule (D0052) applied to the analysis.";
+        :>> consequences = "keel-cli/src/guards.rs currency_warnings takes LocalAction rows and emits the grouped message; three tests replace the flat-list assertions and two new ones fix the grouping, the k-of-n form, the tie-break and the copy-out list. keel-cli/src/view/control_structure.rs gains LocalAction and local_actions. .engine/docs/guards.md, .engine/processes/stpa-self.sysml stpa5 and the stpa-self skill state the edge-as-tranche rule. Guard source changed: this Decision is the ProspectiveChange the keystone lock requires (D0209 clause 2) and, as a process change, is outside standing consent (D0337) - it stays proposed for the human. The message on this tree at the time of recording names agent->deliverable (agentEditsDeliverable) as the next tranche.";
+    }
+}

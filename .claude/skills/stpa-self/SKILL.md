@@ -28,8 +28,11 @@ with two differences that matter:
    and the other inputs/outputs (`OtherInputOutput`, D0363) are authored in
    `.tracking/architecture/engine-control-structure.sysml`, and a role nothing wires is in
    `absentRoles`, not in the structure.
-2. **The structure says when to run again.** The run records the computed action names it analysed
-   (`ANALYSED: ...`); the `stpa-currency` guard warns on any action no run has covered.
+2. **The structure says when to run again, and where.** The run records the computed action names it
+   analysed (`ANALYSED: ...`); the `stpa-currency` guard warns while any action is uncovered, grouped by
+   the controller->process edge each sits on, and names the NEXT TRANCHE - the open edge with the fewest
+   unanalysed actions - with the `ANALYSED:` list its record will carry (D0410). **A tranche is one edge
+   walked in full.** Take the named edge; do not pick actions by hand.
 
 ## Procedure
 
@@ -39,7 +42,7 @@ with two differences that matter:
 | stpa2 | `keel show control-structure .` (and `stpa-diagram` if a human needs the picture); every `stepTwoGate` row must hold, or the run's first record is the clause that does not | the computed action list |
 | stpa3 | For each action, all four UCA types in worst case: `provided`, `notProvided`, `wrongTimingOrder`, `stoppedTooSoonAppliedTooLong`. Each that can lead to a hazard → `UnsafeControlAction` part (context names the action verbatim) + dependency edge to the hazard. Considered-and-safe → one line in the run record | UCA parts; the safe lines |
 | stpa4 | Each UCA → `ControllerConstraint` + edge to the enforcing control in `control-map.sysml`, or `keel record issue` + edge to the Issue | constraints bound to controls or Issues |
-| stpa5 | Run record: a `Test` (analyze) with `ANALYSED: <names>` + passing result at HEAD | the guard's trigger baseline |
+| stpa5 | Run record: a `Test` (analyze) with `ANALYSED: <names>` copied from the guard's NEXT TRANCHE line + passing result at HEAD | the guard's next line |
 
 ## Where the records live
 

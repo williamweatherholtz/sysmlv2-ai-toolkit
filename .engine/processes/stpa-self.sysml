@@ -67,7 +67,7 @@ package ProcessStpaSelf {
         :>> id = "c0e2a4b6-5b7d-4c9f-9d4a-6b8d0f2a4c5d";
         :>> title = "Record what was analysed, so the structure can say when to run again";
         :>> triggerCondition = "stpa4 done.";
-        :>> actionText = "Record the run as a Test (method analyze) whose procedureText lists `ANALYSED: <action>, <action>, ...` - the computed action names walked in stpa3 - and a passing TestResult judged against HEAD. The stpa-currency guard compares the latest run's ANALYSED list with the current computed structure and WARNS on every action no run has analysed: that warning is the re-run trigger, and it clears only by a new run that covers the action.";
+        :>> actionText = "Record the run as a Test (method analyze) whose procedureText lists `ANALYSED: <action>, <action>, ...` - the computed action names walked in stpa3 - and a passing TestResult judged against HEAD. The stpa-currency guard compares the union of every run's ANALYSED list with the current computed structure and WARNS while any action is unanalysed, grouping the remainder by the controller->process edge each action sits on and naming the NEXT TRANCHE - the open edge with the fewest unanalysed actions - with the exact ANALYSED list its record will carry (D0410). A tranche is one edge walked in full; the warning is the re-run trigger, and it clears only by runs that cover every edge.";
         :>> producedArtifact = "The run record; the guard's silence until the structure grows.";
         :>> owner = Owner::ai;
     }
