@@ -2614,8 +2614,29 @@ fn cmd_append_result(args: &[String]) -> i32 {
 
     let evidence = flag(args, "evidence");
     match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by, evidence.as_deref()) {
-        Ok(uuid) => { println!("{uuid}"); 0 }
+        Ok(uuid) => { println!("{uuid}"); binding_note(&file, &sha, &verdict); 0 }
         Err(e) => { eprintln!("error: {e}"); 1 }
+    }
+}
+
+/// Say where a pass recorded on a dirty tree will bind (dcResultBindsToItsLandingCommit): the
+/// `--sha` names the tree BEFORE the work lands, and every reader of `judgedAgainst` will read the
+/// landing commit instead once it exists. stderr, so a caller parsing the uuid is unaffected.
+fn binding_note(file: &std::path::Path, sha: &str, verdict: &str) {
+    if verdict != "pass" {
+        return;
+    }
+    let dir = file.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let Ok(out) = keel_cli::gitx::git().arg("-C").arg(dir).args(["status", "--porcelain"]).output() else { return };
+    if !out.status.success() {
+        return;
+    }
+    let dirty = String::from_utf8_lossy(&out.stdout).lines().filter(|l| !l.trim().is_empty()).count();
+    if dirty > 0 {
+        eprintln!(
+            "note: {dirty} uncommitted path(s) - this pass names {sha} but binds to the commit that lands it, \
+             once {sha} is that commit's ancestor (dcResultBindsToItsLandingCommit)"
+        );
     }
 }
 
@@ -2648,7 +2669,7 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     let notes = flag(args, "notes");
     let evidence = flag(args, "evidence");
     match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref(), evidence.as_deref()) {
-        Ok(uuid) => { println!("{uuid}"); 0 }
+        Ok(uuid) => { println!("{uuid}"); binding_note(&file, &sha, &verdict); 0 }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }
 }

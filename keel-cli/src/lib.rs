@@ -84,6 +84,7 @@ pub mod gitx;
 pub mod corpus;
 pub mod receipt;
 pub mod gitfacts;
+pub mod binding;
 pub mod govern;
 pub mod guards;
 pub mod hook_binary;

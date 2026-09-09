@@ -47,7 +47,26 @@ struct FileShape {
     /// Full sha -> full head sha -> the paths `git diff --name-only sha..head` lists.
     #[serde(default)]
     changed: BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    /// Result `id` -> the full sha of the commit that INTRODUCED it (dcResultBindsToItsLandingCommit).
+    /// Immutable under D0129: history is never rewritten, so the commit that first added a line is a
+    /// fact about the id forever.
+    #[serde(default)]
+    introduced: BTreeMap<String, String>,
+    /// The full HEAD sha up to which every `.tracking` commit has been walked for introduced ids; the
+    /// next walk reads only `walked..HEAD`. Absent means never walked.
+    #[serde(default)]
+    introduced_walked_to: Option<String>,
+    /// The version of the criterion READER that wrote `criterion` / `grep`. A text is a fact about a
+    /// commit only through the reader that extracted it: when the reader changes (it learned to decode
+    /// escapes, dcResultBindsToItsLandingCommit), every text it wrote before is dropped on load rather
+    /// than served as the old reader's answer. Absent means the first reader.
+    #[serde(default)]
+    criterion_reader: u32,
 }
+
+/// Bump when the criterion extraction changes what it returns for the same blob. 1: cut at the first
+/// `"`, no unescape. 2: read as the lexer does (`orient::string_literal_body`).
+const CRITERION_READER: u32 = 2;
 
 struct Facts {
     root: PathBuf,
@@ -98,11 +117,21 @@ fn path_for(root: &Path) -> PathBuf {
 }
 
 fn load(root: &Path) -> Facts {
-    let shape = std::fs::read_to_string(path_for(root))
+    let mut shape = std::fs::read_to_string(path_for(root))
         .ok()
         .and_then(|t| toml::from_str::<FileShape>(&t).ok())
         .unwrap_or_default();
-    Facts { root: root.to_path_buf(), shape, dirty: false }
+    let dirty = if shape.criterion_reader < CRITERION_READER {
+        shape.criterion.clear();
+        shape.criterion_absent.clear();
+        shape.grep.clear();
+        shape.grep_absent.clear();
+        shape.criterion_reader = CRITERION_READER;
+        true
+    } else {
+        false
+    };
+    Facts { root: root.to_path_buf(), shape, dirty }
 }
 
 /// Run `f` against the facts for `root`, loading the file once per process (a second root reloads).
@@ -241,6 +270,35 @@ pub fn remember_changed(root: &Path, sha: &str, head: &str, paths: &[String]) {
     let sha = sha.as_str();
     with(root, |fx| {
         fx.shape.changed.entry(sha.to_string()).or_default().insert(head.to_string(), paths.to_vec());
+        fx.dirty = true;
+    });
+}
+
+/// The commit that introduced result `id`, if a walk has seen it.
+#[must_use]
+pub fn introduced(root: &Path, id: &str) -> Option<String> {
+    with(root, |fx| fx.shape.introduced.get(id).cloned())
+}
+
+/// The full HEAD sha the introduced-id walk last reached, if any.
+#[must_use]
+pub fn introduced_walked_to(root: &Path) -> Option<String> {
+    with(root, |fx| fx.shape.introduced_walked_to.clone())
+}
+
+/// Remember the ids a walk found, and the full HEAD it reached. An id already known keeps its first
+/// (oldest) commit: a later commit that re-adds the same line moved it, it did not introduce it.
+pub fn remember_introduced(root: &Path, found: &[(String, String)], walked_to: &str) {
+    if !is_full_sha(walked_to) {
+        return;
+    }
+    with(root, |fx| {
+        for (id, sha) in found {
+            if is_full_sha(sha) {
+                fx.shape.introduced.entry(id.clone()).or_insert_with(|| sha.clone());
+            }
+        }
+        fx.shape.introduced_walked_to = Some(walked_to.to_string());
         fx.dirty = true;
     });
 }

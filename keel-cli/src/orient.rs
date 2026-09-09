@@ -209,27 +209,47 @@ fn git_criterion_at_uncached(sha: &str, task: &str, repo: &Path) -> Option<Strin
             // Extract procedureText from the line (unchanged from the ls-tree+show path).
             let pat = "procedureText = \"";
             let start = line.find(pat)? + pat.len();
-            let rest = &line[start..];
-            let end = rest.find('"')?;
-            return Some(rest[..end].to_owned());
+            return string_literal_body(&line[start..]);
         }
     }
     None
 }
 
-/// Extract a `<task>DoD` verification's `procedureText` from a file's content (no git).
+/// Extract a `<task>DoD` verification's `procedureText` from a file's content (no git). The value is
+/// UNESCAPED the way the parser reads it, so it compares equal to the model's text.
 fn extract_dod_criterion(content: &str, task: &str) -> Option<String> {
     let pfx = format!("verification {task}DoD");
     for line in content.lines() {
         if line.trim_start().starts_with(&pfx) {
             let pat = "procedureText = \"";
             let start = line.find(pat)? + pat.len();
-            let rest = &line[start..];
-            let end = rest.find('"')?;
-            return Some(rest[..end].to_owned());
+            return string_literal_body(&line[start..]);
         }
     }
     None
+}
+
+/// The body of a `SysML` string literal whose opening quote has been consumed, read with the lexer's
+/// escape rules (`\n` `\t` `\"` `\\`) so a historical blob compares equal to the parsed model text.
+/// Cutting at the first `"` and skipping the unescape is the issue044 false-stale class: a criterion
+/// carrying `\s` or an escaped quote read as CHANGED against itself. `None` when the literal never
+/// closes or carries an escape the lexer would refuse - then there is no text to judge.
+pub(crate) fn string_literal_body(rest: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut chars = rest.chars();
+    loop {
+        match chars.next()? {
+            '"' => return Some(out),
+            '\\' => match chars.next()? {
+                'n' => out.push('\n'),
+                't' => out.push('\t'),
+                '"' => out.push('"'),
+                '\\' => out.push('\\'),
+                _ => return None,
+            },
+            c => out.push(c),
+        }
+    }
 }
 
 /// Map every CURRENT `<task>DoD` verification to its repo-relative file path (one working-tree
@@ -252,6 +272,23 @@ fn build_dod_files(repo: &Path) -> HashMap<String, String> {
         }
     }
     out
+}
+
+/// Feed `lines` to a batch child's stdin from its OWN thread, closing the pipe when done. Writing
+/// the request and then waiting for the reply on one thread deadlocks as soon as the request outgrows
+/// the pipe: git blocks on a full stdout that nobody reads while we block on a full stdin that git
+/// is not reading (dcResultBindsToItsLandingCommit: full 40-hex keys crossed the threshold that
+/// short ones stayed under, and `orient` hung on `cat-file --batch` for good).
+fn feed_stdin(child: &mut std::process::Child, lines: &[String]) -> Option<std::thread::JoinHandle<()>> {
+    let mut si = child.stdin.take()?;
+    let mut buf = String::with_capacity(lines.iter().map(|l| l.len() + 1).sum());
+    for l in lines {
+        buf.push_str(l);
+        buf.push('\n');
+    }
+    Some(std::thread::spawn(move || {
+        let _ = si.write_all(buf.as_bytes());
+    }))
 }
 
 /// Validate many commit SHAs in ONE `git cat-file --batch-check` spawn (orientPerf): returns
@@ -285,15 +322,10 @@ fn valid_commits(repo: &Path, shas: &[String]) -> HashMap<String, bool> {
         for s in shas { out.insert(s.clone(), true); }
         return out;
     };
-    if let Some(mut si) = child.stdin.take() {
-        let mut buf = String::new();
-        for s in shas {
-            buf.push_str(s);
-            buf.push('\n');
-        }
-        let _ = si.write_all(buf.as_bytes());
-    }
-    let Ok(o) = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output()) else {
+    let feeder = feed_stdin(&mut child, shas);
+    let waited = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output());
+    if let Some(f) = feeder { let _ = f.join(); }
+    let Ok(o) = waited else {
         for s in shas { out.insert(s.clone(), true); }
         return out;
     };
@@ -329,15 +361,10 @@ pub(crate) fn batch_cat_blobs(repo: &Path, keys: &[String]) -> HashMap<String, O
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
         .spawn();
     let Ok(mut child) = spawn else { return out; };
-    if let Some(mut si) = child.stdin.take() {
-        let mut buf = String::new();
-        for k in keys {
-            buf.push_str(k);
-            buf.push('\n');
-        }
-        let _ = si.write_all(buf.as_bytes());
-    }
-    let Ok(o) = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output()) else { return out; };
+    let feeder = feed_stdin(&mut child, keys);
+    let waited = crate::perf::timed(&crate::perf::GIT_NANOS, || child.wait_with_output());
+    if let Some(f) = feeder { let _ = f.join(); }
+    let Ok(o) = waited else { return out; };
     let data = o.stdout;
     let mut pos = 0usize;
     for k in keys {
@@ -732,11 +759,23 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     shas.sort();
     shas.dedup();
     let sha_valid = valid_commits(repo, &shas);
+    // A pass recorded at HEAD while the work sat uncommitted names the commit BEFORE the one that
+    // carries the work; the binding is the commit that INTRODUCED the result when `judgedAgainst` is
+    // its ancestor (dcResultBindsToItsLandingCommit). Cached after one history walk, so this is a
+    // lookup on every run after the first.
+    let asks: Vec<crate::binding::Ask<'_>> = tasks
+        .values()
+        .filter_map(|d| d.results.last())
+        .filter(|r| r.outcome == "pass" && !r.judged_against.is_empty() && !r.id.is_empty())
+        .map(|r| crate::binding::Ask { id: &r.id, judged_against: &r.judged_against })
+        .collect();
+    let bound = crate::binding::bind(repo, &asks);
 
     for (name, data) in &tasks {
         if let Some(latest) = data.results.last() {
             if latest.outcome == "pass" {
                 let sha = &latest.judged_against;
+                let binding = bound.get(&latest.id).unwrap_or(sha);
                 let valid = sha.is_empty() || sha_valid.get(sha).copied().unwrap_or(true);
                 if !sha.is_empty() && !valid && clone_can_judge {
                     done_map.insert(name.clone(), false);
@@ -752,7 +791,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
                     unsynchronized_evidence.push(name.clone());
                 } else {
                     done_map.insert(name.clone(), true);
-                    verified_at.insert(name.clone(), sha.clone());
+                    verified_at.insert(name.clone(), binding.clone());
                 }
             } else {
                 done_map.insert(name.clone(), false);
@@ -918,6 +957,30 @@ mod evidence_class_tests {
 
 #[cfg(test)]
 mod tests {
+
+    /// THE CONTROL for the issue044 class reaching the criterion reader (dcResultBindsToItsLandingCommit
+    /// exposed it: twelve done tasks read as OWN-criterion drift against a byte-identical line). The
+    /// historical extraction must read a literal exactly as the lexer does - escapes decoded, an escaped
+    /// quote not taken as the close - so a criterion carrying `\\s` or `\"` compares equal to itself.
+    #[test]
+    fn the_historical_criterion_reads_a_literal_as_the_lexer_does() {
+        let raw = r#"regex \\s and \\w; quoted \"inner\" then a tab\t end"#;
+        let line = format!("        verification tDoD : Test {{ :>> procedureText = \"{raw}\"; :>> id = \"x\"; }}");
+        let ours = super::extract_dod_criterion(&line, "t").expect("a criterion");
+        let toks = keel_parser::tokenize(&format!("\"{raw}\""), "t").expect("lexes");
+        let lexed = toks
+            .iter()
+            .find_map(|t| match &t.kind {
+                keel_parser::token::TokenKind::Str(s) => Some(s.clone()),
+                _ => None,
+            })
+            .expect("one string token");
+        assert_eq!(ours, lexed);
+        assert!(ours.contains("quoted \"inner\" then"), "the escaped quote did not close the literal: {ours}");
+        // The lexer refuses `\q`; so do we - no text, rather than a wrong one.
+        assert_eq!(super::string_literal_body(r#"bad \q escape""#), None);
+        assert_eq!(super::string_literal_body("never closes"), None);
+    }
 
     /// THE CONTROL for issue247: a failure to compute a NARROWING filter must empty the frontier and
     /// be stated, never widen it. The old code used `.unwrap_or_default()` under a comment promising

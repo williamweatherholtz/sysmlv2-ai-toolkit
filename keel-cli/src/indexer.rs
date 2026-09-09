@@ -21,6 +21,11 @@ pub struct ResultRecord {
     pub outcome: String,
     /// Value of the `judgedAgainst` attribute (short git SHA, may be empty).
     pub judged_against: String,
+    /// The result's own `id` (a UUID), by which the commit that INTRODUCED it is found
+    /// (dcResultBindsToItsLandingCommit). Empty when the part carries none.
+    pub id: String,
+    /// Repo-relative path (forward slashes) of the file that declares the result.
+    pub file: String,
 }
 
 /// All data extracted for a single task.
@@ -123,6 +128,7 @@ fn try_extract_result(
     name: &str,
     type_name: Option<&str>,
     attrs: &[Attribute],
+    file: &str,
     raw_results: &mut HashMap<String, Vec<ResultRecord>>,
 ) {
     if type_name != Some("TestResult") {
@@ -131,10 +137,11 @@ fn try_extract_result(
     let Some((task, n)) = decompose_result_name(name) else { return };
     let outcome = enum_member(attrs, "outcome");
     let judged_against = str_attr(attrs, "judgedAgainst");
+    let id = str_attr(attrs, "id");
     raw_results
         .entry(task)
         .or_default()
-        .push(ResultRecord { n, outcome, judged_against });
+        .push(ResultRecord { n, outcome, judged_against, id, file: file.to_owned() });
 }
 
 /// Ensure `name` exists in `tasks`, assigning it the next declaration-order index
@@ -156,6 +163,7 @@ fn set_dod(tasks: &mut HashMap<String, TaskData>, counter: &mut u32, task: &str,
 
 fn extract_items(
     pkg: &Package,
+    file: &str,
     tasks: &mut HashMap<String, TaskData>,
     counter: &mut u32,
     edges: &mut Vec<(String, String)>,
@@ -174,7 +182,7 @@ fn extract_items(
                 }
             }
             Item::Part(p) => {
-                try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, raw_results);
+                try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, file, raw_results);
             }
             Item::ActionDef(def) => {
                 for a in &def.actions {
@@ -189,7 +197,7 @@ fn extract_items(
                     }
                 }
                 for p in &def.parts {
-                    try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, raw_results);
+                    try_extract_result(&p.name, p.type_name.as_deref(), &p.attributes, file, raw_results);
                 }
             }
             _ => {}
@@ -206,19 +214,24 @@ fn extract_items(
 #[must_use]
 pub fn extract(tracking: &Path) -> ExtractedIndex {
     let files = collect_sysml(tracking);
-    let packages: Vec<Package> = files
+    // Each package remembers the file that declared it, repo-relative with forward slashes, so a
+    // result can name the file git is asked about (dcResultBindsToItsLandingCommit).
+    let repo = tracking.parent().unwrap_or(tracking);
+    let packages: Vec<(String, Package)> = files
         .iter()
         .filter_map(|p| {
             let src = std::fs::read_to_string(p).ok()?;
             let fname = p.to_string_lossy();
             let tokens = keel_parser::tokenize(&src, &fname).ok()?;
-            keel_parser::parse(tokens, &fname).ok()
+            let pkg = keel_parser::parse(tokens, &fname).ok()?;
+            let rel = p.strip_prefix(repo).unwrap_or(p).to_string_lossy().replace('\\', "/");
+            Some((rel, pkg))
         })
         .collect();
 
     let cursor = packages
         .iter()
-        .find_map(crate::parse_cursor)
+        .find_map(|(_, pkg)| crate::parse_cursor(pkg))
         .unwrap_or_default();
 
     let mut tasks: HashMap<String, TaskData> = HashMap::new();
@@ -227,8 +240,8 @@ pub fn extract(tracking: &Path) -> ExtractedIndex {
     let mut raw_results: HashMap<String, Vec<ResultRecord>> = HashMap::new();
     let mut order_counter: u32 = 0;
 
-    for pkg in &packages {
-        extract_items(pkg, &mut tasks, &mut order_counter, &mut edges, &mut ordering_only, &mut raw_results);
+    for (file, pkg) in &packages {
+        extract_items(pkg, file, &mut tasks, &mut order_counter, &mut edges, &mut ordering_only, &mut raw_results);
     }
 
     // Attach sorted results to known tasks only (no phantom tasks from result names).

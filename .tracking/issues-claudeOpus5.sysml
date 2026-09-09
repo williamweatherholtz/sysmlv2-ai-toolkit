@@ -1468,4 +1468,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcBriefFactsReadStandingFromTheEdge to issue420;
+
+    part issue421 : Issue {
+        :>> id = "da5c33b3-8cec-4031-84b6-56e7c0cd6da6";
+        :>> title = "Batch git stdin written inline deadlocked orient once the request crossed pipe capacity";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "orient's batch git calls (valid_commits over `cat-file --batch-check`, batch_cat_blobs over `cat-file --batch`) wrote the child's whole stdin from the parent thread and then called wait_with_output. Once the request list exceeded the pipe's capacity while the child's stdout was itself full, both sides blocked forever: git waiting for its output to be drained, keel waiting to finish writing input. It surfaced when dcResultBindsToItsLandingCommit added 40-hex result ids to the request (the extra bytes crossed the threshold) and `keel orient .` hung with git alive and keel idle. Control: `orient::feed_stdin` writes stdin from its own thread while the parent drains stdout, in both sites; a further batch caller that writes stdin inline is the same defect.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcResultBindsToItsLandingCommit to issue421;
+
+    part issue422 : Issue {
+        :>> id = "4d439585-508f-4bc5-9e0d-cb4cc5542735";
+        :>> title = "issue044 escape class recurred in orient's historical criterion reader, six false OWN-drift suspects";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The issue044 class (a raw blob read cut at the first double quote without decoding escapes, so the historical text never equals the parser's text) recurred in orient's criterion reader: `extract_dod_criterion` and the `git grep` fallback compared a DoD literal carrying an escaped quote or an escaped regex class against the parsed text and read six done tasks (critiqueBatch8 among them) as OWN-criterion drift over a byte-identical line, the moment dcResultBindsToItsLandingCommit made their baseline old enough to contain the DoD. Control: `orient::string_literal_body` mirrors the lexer's escapes and returns None for one it does not know; the unit test `the_historical_criterion_reads_a_literal_as_the_lexer_does` holds it equal to `keel_parser::tokenize`; gitfacts drops every cached criterion/grep text written by an older reader (`criterion_reader` below 2) on load, so the wrong texts are not served from cache.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcResultBindsToItsLandingCommit to issue422;
 }
