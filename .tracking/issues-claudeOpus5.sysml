@@ -1578,4 +1578,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcDominanceRechosenUnderItsOwnRule to issue430;
+
+    part issue431 : Issue {
+        :>> id = "a1d624a1-85ed-4bf2-b171-6b21683202fa";
+        :>> title = "routing_probe.py unlinked its last receipt before the estimate read it, so every estimate quoted the 2026-09-06 constant and every dry run erased the previous investigation";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "routing_probe.py unlinked .keel/metrics/routing-investigation.json as the first statement of main(), before last_measured() read it and before the --dry-run branch returned. Two consequences, both read from the code at .engine/tools/routing_probe.py (the unlink at the top of main, last_measured() called after it): every estimate fell back to the 2026-09-06 constant ($0.52, 25 s) however many investigations had been paid for since, and every dry run erased the last real receipt - which is why the sprint609 release investigation named in issue415 was absent from disk on 2026-09-09 before anything had been run. Found by: opening the receipt to read the sprint609 samples and finding no file. Fixed in the same commit as dcRoutingVerdictReadsTheWholeTurn: the unlink moved after the estimate and after the dry-run return; verified by a dry run after a paid run quoting $1.24 / 47 s measured 2026-09-09 with the file still present.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRoutingVerdictReadsTheWholeTurn to issue431;
+
+    part issue432 : Issue {
+        :>> id = "9a77a7be-e29d-4e1d-ba34-70b9cd653c02";
+        :>> title = "Under the whole-turn verdict the release case read 3/3 none at 3 turns with intake as every sample's prefix - the declared prefix spends the budget, so none cannot tell not-routing from exhaustion";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The whole-turn verdict re-ran the release case three times at the default 3-turn budget (2026-09-09, $3.71, 59 s wall, .keel/metrics/routing-investigation.json) and read 3/3 none with prefix intake: every sample invoked intake in its first turn and spent the remaining two on ToolSearch / Read (sample tools: Skill, ToolSearch, ToolSearch; Skill, ToolSearch, Read, Read), so the intended skill never appeared before the budget ended. The samples agree, but on a reason they show: the declared prefix spends the budget the intended skill needed, and the rig's `none` cannot tell 'did not route' from 'ran out of turns after the process's own declared first step'. The sprint609 run at the same budget saw intake-then-release once, so the second skill is reachable in 3 turns but not reliably. WHAT WOULD SETTLE IT: the verdict names exhaustion after a prefix apart from silence - a turn whose prefix ran and whose tool calls continued to the last turn is `budget`, not `none` - and the release case is re-run at a budget that leaves the prefix room (6 turns) to read whether release appears once intake has finished. The receipt also records the per-run cost at $1.24 against the $0.52 estimate the rig carried; the estimate now reads the last receipt (issue431).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcPrefixLeavesRoomForTheRoute to issue432;
 }

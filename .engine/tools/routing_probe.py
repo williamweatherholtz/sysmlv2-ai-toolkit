@@ -6,12 +6,24 @@ supposed to cause: an agent reading a process's prose and invoking the process. 
 skill "routes" was an assumption about text nobody tested. This runs a real model against one
 realistic request for a NAMED process, several times, and reads the transcripts for what it did.
 
-WHAT IS READ, per sample:
-  routed     the intended skill was invoked
-  wrong      a DIFFERENT skill was invoked first - worse than silence, because the agent proceeded
-             confidently under the wrong procedure
-  none       no skill was invoked within the turn budget
+WHAT IS READ, per sample - the WHOLE turn, not its first Skill call (issue415):
+  routed     a skill in the case's accept list was invoked within the turn budget, and every Skill
+             call before it was intake (recorded as `prefix`, printed beside the verdict)
+  wrong      a skill that is neither accepted nor intake was invoked - worse than silence, because the
+             agent proceeded confidently under the wrong procedure, whether or not the intended skill
+             followed it
+  none       the intended skill never appeared (an intake-only turn is `none` with its prefix shown)
   error      the run itself failed (reported, never read as a verdict)
+
+WHY INTAKE IS THE ONE DECLARED PREFIX. The rig's first investigation (2026-09-08) read the release case
+as 1 routed / 2 wrong, and both wrong samples had invoked intake first and release second. Intake's own
+deployed description declares that position - `.claude/skills/intake/SKILL.md:3`: "Use at the START of
+any turn where the human states direction" - and every prompt in routing_prompts.toml is phrased as a
+person stating direction. An agent that runs intake and then the intended skill is following the
+process exactly as written, so scoring its first call was scoring the process as a wrong route. No
+other skill declares a start-of-turn position, so no other skill is a prefix: a different skill first
+stays wrong. `--probe` runs the pure scorer on the four transcripts this rule must read correctly
+(D0388) before any model is paid for.
 
 WHAT THIS IS NOT. There is no standing coverage number and no whole-set sweep. On 2026-09-06 two of
 four verdicts flipped between two runs of identical prompts (issue392), so one sample per skill was
@@ -31,6 +43,7 @@ below with the date it was measured.
 Usage:
   python .engine/tools/routing_probe.py --investigate NAME[,NAME...] [--samples N] [--turns N] [--model M]
   python .engine/tools/routing_probe.py --investigate NAME --dry-run     # what it would run, and the estimate
+  python .engine/tools/routing_probe.py --probe                          # the scorer on its known transcripts
 """
 import argparse
 import concurrent.futures as cf
@@ -55,6 +68,56 @@ MEASURED_ON = "2026-09-06"
 
 # fewer than this many samples cannot ground a finding: one sample flipped on identical inputs (issue392)
 MIN_SAMPLES_FOR_FINDING = 2
+
+# The skills whose own description declares they run at the START of a turn where the human states
+# direction (.claude/skills/intake/SKILL.md:3). A call to one of these before the intended skill is a
+# prefix, not a wrong route. Nothing else declares that position.
+DECLARED_PREFIX = ("intake",)
+
+
+def short(skill):
+    """`plugin:name` and `name` both score as `name`."""
+    return skill.split(":")[-1]
+
+
+def score(skills, accept):
+    """The verdict over EVERY Skill call of a turn, in order -> (verdict, skill_seen, prefix).
+
+    routed: an accepted skill appears and everything before it is a declared prefix; skill_seen is the
+    accepted name, prefix the calls before it. wrong: a skill that is neither accepted nor a declared
+    prefix appears anywhere; skill_seen is the first such name. none: no accepted skill and nothing
+    wrong - an empty turn, or an intake-only turn (prefix shows it). Pure, so `--probe` can read it.
+    """
+    prefix = []
+    for name in (short(s) for s in skills):
+        if name in accept:
+            return "routed", name, prefix
+        if name in DECLARED_PREFIX:
+            prefix.append(name)
+            continue
+        return "wrong", name, prefix
+    return "none", None, prefix
+
+
+def probe():
+    """The scorer against the transcripts its rule must read correctly - known before any run (D0388)."""
+    cases = [
+        ("intake then release = routed with prefix", ["intake", "release"], ["release"], ("routed", "release", ["intake"])),
+        ("release alone = routed", ["release"], ["release"], ("routed", "release", [])),
+        ("stpa then release = wrong (stpa declares no prefix position)", ["stpa", "release"], ["release"], ("wrong", "stpa", [])),
+        ("nothing = none", [], ["release"], ("none", None, [])),
+        ("intake alone = none, prefix shown", ["intake"], ["release"], ("none", None, ["intake"])),
+        ("intake then stpa, release never = wrong", ["intake", "stpa"], ["release"], ("wrong", "stpa", ["intake"])),
+        ("a namespaced call scores by its short name", ["projectSettings:intake", "projectSettings:release"], ["release"], ("routed", "release", ["intake"])),
+    ]
+    ok = True
+    for what, skills, accept, want in cases:
+        got = score(skills, accept)
+        held = got == want
+        ok &= held
+        print(f"[probe] {'PASS' if held else 'FAIL'} {what}\n        -> {got}" + ("" if held else f" wanted {want}"))
+    print(f"[probe] {'all %d cases hold' % len(cases) if ok else 'A CASE FAILED - the verdict is not trusted'}")
+    return ok
 
 
 # The Stop hook runs validate + every guard at each turn boundary - measured at 14-31s in the fire
@@ -124,11 +187,10 @@ def deployed_skills():
 
 
 def run_one(accept, prompt, turns, model):
-    """One headless run. Returns (verdict, skill_seen, skills, tools, seconds, cost, note).
+    """One headless run. Returns (verdict, skill_seen, prefix, skills, tools, seconds, cost, note).
 
-    `skills` is EVERY Skill call in order - the verdict reads the first, but a second call is part of
-    what happened (a case where intake ran first and the intended skill second is scored `wrong` on
-    the first name alone, and the finding needs to show that).
+    `skills` is EVERY Skill call in order and the verdict reads all of them (`score`): intake before the
+    intended skill is a prefix, a different skill anywhere is wrong (issue415).
     """
     cmd = [
         claude_exe(), "-p", prompt,
@@ -143,7 +205,7 @@ def run_one(accept, prompt, turns, model):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=240, cwd=str(REPO))
     except subprocess.TimeoutExpired:
-        return "error", None, [], [], time.time() - started, 0.0, "timed out after 240s"
+        return "error", None, [], [], [], time.time() - started, 0.0, "timed out after 240s"
 
     skills, tools, cost = [], [], 0.0
     for line in proc.stdout.splitlines():
@@ -166,13 +228,9 @@ def run_one(accept, prompt, turns, model):
 
     seconds = time.time() - started
     if proc.returncode != 0 and not tools:
-        return "error", None, skills, tools, seconds, cost, (proc.stderr or "")[:160]
-    if not skills:
-        return "none", None, skills, tools, seconds, cost, ""
-    first = skills[0].split(":")[-1]
-    if first in accept:
-        return "routed", first, skills, tools, seconds, cost, ""
-    return "wrong", first, skills, tools, seconds, cost, ""
+        return "error", None, [], skills, tools, seconds, cost, (proc.stderr or "")[:160]
+    verdict, seen, prefix = score(skills, accept)
+    return verdict, seen, prefix, skills, tools, seconds, cost, ""
 
 
 def last_measured():
@@ -225,9 +283,10 @@ def main():
     ap.add_argument("--model", default="", help="model to run (default: the CLI's own)")
     ap.add_argument("--jobs", type=int, default=4, help="probe sessions to run at once")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--probe", action="store_true", help="run the scorer on its known transcripts and exit (D0388)")
     args = ap.parse_args()
-    if OUT.exists():
-        OUT.unlink()   # D0387: the previous investigation is gone before this one starts; a dead run leaves nothing
+    if args.probe:
+        return 0 if probe() else 1
 
     if not args.investigate:
         sys.exit("refusing: name the case(s) to investigate with --investigate NAME[,NAME...]. "
@@ -260,8 +319,15 @@ def main():
         print(f"note: {', '.join(undeployed)} name(s) a skill that is not deployed - it cannot route; "
               f"the samples will say so", flush=True)
 
+    if not probe():
+        sys.exit(2)   # the scorer failed a transcript it must read correctly; no model is paid for
     print(f"investigating {', '.join(names)}: {args.samples} sample(s) each at {args.turns} turn(s); "
           f"estimate ~${runs * per_usd:.2f} from the {measured_on} measurement", flush=True)
+    if OUT.exists():
+        # D0387: the previous investigation is gone before this one starts, so a dead run leaves nothing.
+        # Removed HERE, after the estimate read it and after a dry run has returned: unlinking first made
+        # every estimate fall back to the constant and every dry run erase the last receipt (issue431).
+        OUT.unlink()
     probe_settings()  # written once, before any worker reads it
     rows, spend, wall_started, done = {n: [] for n in names}, 0.0, time.time(), 0
     with cf.ThreadPoolExecutor(max_workers=args.jobs) as pool:
@@ -272,14 +338,16 @@ def main():
                 futures[fut] = (n, i + 1)
         for fut in cf.as_completed(futures):
             name, i = futures[fut]
-            verdict, seen, skills, tools, secs, cost, note = fut.result()
+            verdict, seen, prefix, skills, tools, secs, cost, note = fut.result()
             spend += cost
             done += 1
-            rows[name].append({"sample": i, "verdict": verdict, "skillInvoked": seen, "skillsInvoked": skills,
-                               "tools": tools[:8], "seconds": round(secs, 1), "costUsd": round(cost, 4),
-                               "note": note})
+            rows[name].append({"sample": i, "verdict": verdict, "skillInvoked": seen, "prefix": prefix,
+                               "skillsInvoked": skills, "tools": tools[:8], "seconds": round(secs, 1),
+                               "costUsd": round(cost, 4), "note": note})
             mark = {"routed": "ROUTED", "wrong": "WRONG ", "none": "none  ", "error": "ERROR "}[verdict]
             extra = f" -> {' then '.join(skills)}" if verdict == "wrong" else (f"  {note}" if note else "")
+            if prefix:
+                extra = f" prefix {' then '.join(prefix)}" + extra
             print(f"{done:>3}/{runs} {mark} {name:28s} #{i} {secs:5.1f}s ${cost:.3f}{extra}", flush=True)
     wall = time.time() - wall_started
 
