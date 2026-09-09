@@ -1,4 +1,4 @@
-// D0394 (PROPOSED — NOT YET ACCEPTED) — scriptProbesRunInCi: every python check under scripts/ that ships its own known cases has them run by CI as a gate, discovered from the tree rather than listed
+// D0394 (status: the `status` field below is the truth) — scriptProbesRunInCi: every python check under scripts/ that ships its own known cases has them run by CI as a gate, discovered from the tree rather than listed
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0394Accept event on sign-off.
 package Decision0394 {
@@ -15,10 +15,14 @@ package Decision0394 {
         :>> title = "scriptProbesRunInCi: every python check under scripts/ that ships its own known cases has them run by CI as a gate, discovered from the tree rather than listed";
         :>> createdAt = "2026-09-08";
         :>> createdBy = "claudeOpus5";
-        :>> status = DecisionStatus::proposed;
+        :>> status = DecisionStatus::accepted;
         :>> context = "dcScriptProbesRunInCi, a retro item: a check whose correctness is verified only by the hand that happens to run its probe is found broken by the next session, not the next push. The item asks for one CI step that discovers every script declaring a probe, runs each as a gate, and picks up a new one without editing the workflow. It changes a CI workflow, which is enforcement surface under the keystone lock (D0209 clause 2), so it waits for the human under D0337.";
         :>> decision = "NOT A FORK: the item states the shape and the only judgment left is whether the step gates or reports, and a known-answer check of a control that fails is a broken control, which is what a gate is for. ci.yml gains one step after the keel gates: it lists every .py under scripts/ whose text declares a --probe or --self-test entry point, runs each with that flag against the built binary, and fails the build on any non-zero exit, printing the script and its output; a tree with no such script passes with a line saying so. Discovery is by the flag string in the file, so a fourth probe joins by existing.";
         :>> rationale = "The probes exist to catch a regression in a control before the control is trusted again; a probe that runs only by hand catches it only when someone remembers, which is the failure mode this project keeps recording. Discovery from the tree rather than a list is the same rule the guards apply to instruments (D0361): a list is a second home that drifts. Gating rather than reporting because each probe is a known-answer check with no interpretation left - a red one is a fact.";
         :>> consequences = "ci.yml carries the step; issue400_reproduction.py gains a --probe entry point and resolves the binary as keel or keel.exe so it runs on the CI host; the retro finding named in sprints 612 through 614 is closed by the same commit's DoD result. A script that wants a probe declares one and is run; one that declares none is not accused - the not-an-instrument line already argues its exclusion from measurement, and this step reads only the flag.";
     }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0394Accept : Test { :>> id = "cbd8c494-6d74-43d4-9083-b937976589c5"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Selected on the decision brief copy-out, pasted into chat 2026-09-09; d0394 accepted (matches the recommendation). - their words, verbatim: “Accept: CI runs every scripts/*.py that ships a probe, as a gate, discovered from the tree (recommended)”"; }
+    part d0394AcceptR1 : TestResult { :>> id = "777d813d-0db6-4065-b1a7-a94debede575"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f998019"; :>> judgedAt = "2026-09-09"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeOpus5"; }
 }
