@@ -237,17 +237,58 @@ for fn in dec_files:
         "consequences": cons.group(1) if cons else "",
     })
 
-accepted = [d for d in decisions if d["status"] == "accepted"]
-proposed = [d for d in decisions if d["status"] == "proposed"]
+# Standing is the status MINUS the edge (D0398): a `#Supersede` edge retires its target whole and the
+# target keeps the status it had, so a proposed-or-accepted Decision that is an edge target is neither
+# pending nor in force. `#SupersedeClause` reverses one clause and leaves its target standing. Read from
+# every non-comment line under .tracking/ and .engine/, the way section 11 reads DerivedFrom.
+SUP_WHOLE_RE = re.compile(r"#Supersede\s+dependency\s+from\s+(\w+)\s+to\s+([\w, ]+);")
+SUP_CLAUSE_RE = re.compile(r"#SupersedeClause\s+dependency\s+from\s+(\w+)\s+to\s+([\w, ]+);")
+_sup_files = []
+for _base in (".tracking", ".engine"):
+    for _dp, _dn, _fns in os.walk(os.path.join(REPO, _base)):
+        _sup_files.extend(os.path.join(_dp, f) for f in _fns if f.endswith(".sysml"))
+retired = set()
+sup_whole_edges = 0
+sup_clause_edges = 0
+clause_targets = set()
+for _p in _sup_files:
+    for _line in (read(_p) or "").splitlines():
+        if _line.lstrip().startswith("//"):
+            continue
+        for _m in SUP_WHOLE_RE.finditer(_line):
+            sup_whole_edges += 1
+            retired.update(x.strip() for x in _m.group(2).split(","))
+        for _m in SUP_CLAUSE_RE.finditer(_line):
+            sup_clause_edges += 1
+            clause_targets.update(x.strip() for x in _m.group(2).split(","))
+_slugs = {d["slug"] for d in decisions}
+retired_decisions = sorted(s for s in _slugs if s in retired)
+clause_targets = {t for t in clause_targets if t in _slugs}
+sup_clause_edges = len(clause_targets)
+STANDING = (" and NOT the target of a `#Supersede` edge (D0398: retirement is the edge, the status is "
+            "what the record read when retired; %d Decisions are retired this way)" % len(retired_decisions))
+
+accepted = [d for d in decisions if d["status"] == "accepted" and d["slug"] not in retired]
+proposed = [d for d in decisions if d["status"] == "proposed" and d["slug"] not in retired]
 
 fact("decisionsTotal", len(decisions), "Decision records",
      DEC_HOW + "one `part dNNNN : Decision` per file; counted by file")
-fact("decisionsAccepted", len(accepted), "Decisions",
+fact("decisionsAccepted", len(accepted), "Decisions in force",
      DEC_HOW + "`:>> status = DecisionStatus::accepted;` inside the Decision part (the `:>>` "
                "assignment only - a bare `DecisionStatus::` in prose is not counted, which is why "
-               "this is lower than a naive grep)")
+               "this is lower than a naive grep)" + STANDING)
 fact("decisionsProposed", len(proposed), "Decisions",
-     DEC_HOW + "`:>> status = DecisionStatus::proposed;` inside the Decision part")
+     DEC_HOW + "`:>> status = DecisionStatus::proposed;` inside the Decision part" + STANDING)
+fact("decisionsRetired", len(retired_decisions), "Decisions retired by a #Supersede edge",
+     "distinct Decision targets of a non-comment `#Supersede dependency from X to Y;` line under "
+     ".tracking/ or .engine/: " + (", ".join(retired_decisions) or "none") + ".")
+fact("supersedeEdges", sup_whole_edges, "#Supersede edges in the model (retire the target whole)",
+     "non-comment lines matching `#Supersede dependency from X to Y;` - Y may be a comma list; "
+     "targets are Decisions, Needs and requirements alike.")
+fact("supersedeClauseEdges", sup_clause_edges, "#SupersedeClause edges (reverse one clause, target stands)",
+     "non-comment lines matching `#SupersedeClause dependency from X to Y;` whose target is a declared "
+     "Decision (a Decision's text quoting the grammar is not an edge): targets "
+     + (", ".join(sorted(clause_targets)) or "none") + ".")
 
 # --- the 7-day window: [today-6, today], i.e. seven calendar days including today
 WIN_START = TODAY - timedelta(days=6)
@@ -283,6 +324,8 @@ for d in decisions:
     text = read(os.path.join(DEC_DIR, d["file"])) or ""
     is_auto = "AUTO-ACCEPTED" in text
     r1 = re.search(r'part\s+' + d["slug"] + r'AcceptR1\s*:\s*TestResult\s*\{.*?judgedAt\s*=\s*"(\d{4}-\d{2}-\d{2})"', text, re.DOTALL)
+    if d["slug"] in retired or d["status"] == "rejected":
+        continue                       # retired by a #Supersede edge (D0398) or rejected (D0122): decided, not open
     if d["status"] != "accepted" or not r1:
         scope_open.append(d["slug"])
     elif is_auto:
@@ -446,9 +489,17 @@ if orient is None:
     for n in ("pendingAcceptances", "suspectElements", "openIssues", "readyItems"):
         fact(n, None, "items", reason)
 else:
-    fact("pendingAcceptances", len(orient.get("pendingAcceptances", [])),
+    _pending = len(orient.get("pendingAcceptances", []))
+    fact("pendingAcceptances", _pending,
          "proposed Decisions awaiting a human's acceptance",
-         O_HOW + "len(.pendingAcceptances). Cross-checks with the file-derived decisionsProposed.")
+         O_HOW + "len(.pendingAcceptances). Cross-checked against the file-derived decisionsProposed.")
+    if _pending != len(proposed):
+        # The file reader has drifted from the engine's standing rule (the D0398 shape: this script
+        # counted two retired-while-proposed Decisions as pending for a day). Publish no number.
+        fact("decisionsProposed", None, "Decisions",
+             "REFUSED: the file-derived count (%d: %s) disagrees with orient's pendingAcceptances (%d) - "
+             "this script's reading of a Decision's standing is stale against the engine's; fix facts.py "
+             "before a brief carries either number." % (len(proposed), ", ".join(d["slug"] for d in proposed), _pending))
     fact("suspectElements", len(orient.get("suspect", [])),
          "done items whose evidence drifted from the tree",
          O_HOW + "len(.suspect) - identical to `keel show suspect .` .suspect, verified by hand; "
@@ -886,50 +937,6 @@ _m = re.search(r"stpa-currency: (\d+) of (\d+) computed control action", _gd or 
 fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed control actions no stpa-self run has analysed",
      "`keel guard .`: the stpa-currency WARN line's first number" + (" of %s" % _m.group(2) if _m else " - line not found") +
      ". sprint610 added agentEditsDeliverable to the action set, which is the designed re-run trigger (D0313).")
-
-# ================================================================ 12. supersession census (issue396 / D0384)
-# The two representations of a retired Decision - `status = DecisionStatus::superseded` and an incoming
-# `#Supersede` edge - counted apart, and where they disagree. Edges are read from every .sysml the same
-# way section 11 reads DerivedFrom; a commented-out line is not an edge.
-_SUP_RE = re.compile(r"#Supersede\s+dependency\s+from\s+(\w+)\s+to\s+([\w, ]+);")
-_status = {}
-for _p in sysml_files:
-    if os.sep + "decisions" + os.sep not in _p:
-        continue
-    _t = read(_p) or ""
-    _n = re.search(r"part (d\d{4}) : Decision", _t)
-    _s = re.search(r"DecisionStatus::(\w+)", _t)
-    if _n:
-        _status[_n.group(1)] = _s.group(1) if _s else None
-_targets = set()
-_edges = 0
-for _p in sysml_files:
-    for _line in (read(_p) or "").splitlines():
-        if _line.lstrip().startswith("//"):
-            continue
-        for _m in _SUP_RE.finditer(_line):
-            _edges += 1
-            _targets.update(x.strip() for x in _m.group(2).split(","))
-_dec_targets = [t for t in _targets if t in _status]
-_accepted_with_edge = sorted(t for t in _dec_targets if _status[t] == "accepted")
-_superseded_no_edge = sorted(d for d, st in _status.items() if st == "superseded" and d not in _targets)
-SUP_HOW = "walk every .sysml under .tracking/ and .engine/ (the section-11 file list); "
-fact("decisionsTotal", len(_status) or None, "Decisions under .engine/decisions",
-     SUP_HOW + "count `part dNNNN : Decision` declarations in files under a decisions/ directory.")
-fact("decisionsStatusSuperseded", sum(1 for st in _status.values() if st == "superseded"),
-     "Decisions whose authored status reads superseded", SUP_HOW + "`DecisionStatus::superseded` per declaration.")
-fact("supersedeEdges", _edges, "#Supersede edges in the model",
-     SUP_HOW + "non-comment lines matching `#Supersede dependency from X to Y;` - Y may be a comma list.")
-fact("supersedeEdgesToDecisions", len(_dec_targets), "of those edges' targets that are Decisions",
-     SUP_HOW + "targets whose name is a declared Decision; the rest target Needs and requirements.")
-fact("acceptedWithSupersedeEdge", len(_accepted_with_edge),
-     "ACCEPTED Decisions carrying an incoming Supersede edge (the edge reverses a clause, the record stands)",
-     SUP_HOW + "status == accepted and name in the edge-target set: " + (", ".join(_accepted_with_edge) or "none") + ".")
-fact("supersededWithoutEdge", len(_superseded_no_edge),
-     "status=superseded Decisions with NO incoming Supersede edge",
-     SUP_HOW + "status == superseded and name not in the edge-target set: " + (", ".join(_superseded_no_edge) or "none") + ".")
-fact("supersessionDisagreements", len(_accepted_with_edge) + len(_superseded_no_edge),
-     "records where the two representations disagree", "acceptedWithSupersedeEdge + supersededWithoutEdge.")
 
 # ================================================================ 13. the recall cap (D0389 / D0390)
 # The hook latency distribution keel enforcement-report computes from the fire-ledger, and the over-cap

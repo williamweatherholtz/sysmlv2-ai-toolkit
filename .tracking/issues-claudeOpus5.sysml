@@ -1457,4 +1457,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcValidateNamesItsScope to issue419;
+
+    part issue420 : Issue {
+        :>> id = "89d71590-28d0-4d29-9ae2-c95b9379b15d";
+        :>> title = "The brief's facts script read a Decision's standing from the status field after D0398 moved retirement to the edge";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "scripts/exec_brief/facts.py read a Decision's standing from the status field alone after D0398 moved retirement to the #Supersede edge. Observed 2026-09-09 at 649b433, the commit after the migration: decisionsProposed = 3 against orient pendingAcceptances = 1 (d0038 and d0353 are retired by edge and keep the status they had), pendingAlreadyShipped listed d0353, and the D0384 census facts reported five 'disagreements' over Decisions the migration had retired whole. The brief builder would have published those numbers. Class: a change to what a field MEANS was doc-synced across the Rust readers and the doc surface, and the one Python reader of the same field was not in the grep because it names the field by regex, not by the enum member that left. Resolver: dcBriefFactsReadStandingFromTheEdge - the retired set is subtracted where standing is read, and the file-derived pending count is refused when it disagrees with the engine's, so the next drift of this kind publishes null with the two numbers named, not a count.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcBriefFactsReadStandingFromTheEdge to issue420;
 }
