@@ -88,6 +88,13 @@ reviewable document. The author's verdict on a page built that way was *"mostly 
 justification for the decision"*, and it was the second time the same complaint landed. It is
 QOC-shaped now: courses crossed with the forces that bear on them, each independently disputable.
 
+**Tabs came back on 2026-09-09, per ASK and not per argument (D0404).** Their words: *"for the decision
+panel, make each ask a separate tab."* What the 2026-09-06 change removed was a tab per argument, which
+split one ask's reasoning across screens; what D0404 puts back is one tab per ask, each carrying the
+whole of that ask's argument (exhibits, courses, falsifier) while the verdict, the ask list, the copy
+controls and the provenance strip stay outside the tabs, visible on every one. Tabs, panels and asks are
+one count, exactly one tab starts selected, and the copy digest walks every panel, not the visible one.
+
 ### 2.1 The section order
 
 Answer first, always. A reader who reads only the title has the recommendation; one who reads only the
@@ -99,8 +106,8 @@ exhibit titles has the argument.
 | 1 | **The ask** | The verdict, then one line per ask with its response options and its reversibility | ≤ 70 words |
 | 2 | **Why now** | Situation, then the one thing that changed and put a clock on it. If nothing has a clock, say so. | ≤ 60 words |
 | 3 | **The decision rule** | The criteria, ranked, stated BEFORE any option is defended | ≤ 40 words |
-| 4 | **Per ask: today → changed → downstream** | Two logic exhibits minimum (§2.3), then the courses table | — |
-| 5 | **Courses** | 2–4 including a do-nothing, each with places-to-change and a quantified cost | table |
+| 4 | **Per ask, in its own tab: today → changed → downstream** | Two logic exhibits minimum (§2.3), then the courses table | — |
+| 5 | **Courses** | 2–4 including a do-nothing, each with its places-to-change and what breaks, as named countable things — never a duration (D0405) | table |
 | 6 | **Why this wins / when the runner-up wins** | Beats the named alternative on the stated criterion; the runner-up as a conditional, not a rival | ≤ 90 words |
 | 7 | **What would change my mind** | One falsifiable condition per ask | ≤ 30 words each |
 | 8 | **Provenance strip** | How every number was measured, by whom, when, against which tree | ≤ 60 words |
@@ -111,9 +118,15 @@ published pages had passed "clean" at 26 / 133 / 71 words against 18 / 70 / 60, 
 on the third was *"the decision brief is still far too verbose."* The remaining rows are measured by the
 exec-summary suite (§4). **Register (their words: *"make it use caveman?"*):** write the reader prose
 terse — no filler, no hedging, one idea per sentence, short words where a short word exists, articles
-and full sentences kept, every number and term exact. The whole-page ceiling (450 reader words, figure
-titles and chips included) is `TERSE_CEILING` in the checker and turns on when the decision that sets
-it is accepted; until then the checker holds the section budgets only.
+and full sentences kept, every number and term exact. The ceiling (450 reader words, figure titles and
+chips included) is `TERSE_CEILING` in the checker (D0377). **It is measured per tab once D0407 is
+accepted** — the shared frame plus one panel, each tab in turn, because the reader sees one panel at a
+time and a ceiling summed over five asks would refuse a page whose every view is short; until then the
+checker sums the whole page. **Cost is never a duration (D0405).** Their words: *"don't tell me how long
+things should take to implement - i really don't care. i care about correctness."* The checker refuses
+"a day each", "five days", "two sprints" in anything the reader reads, figure labels and tables included;
+a date is not a duration. A Decision record still carries its per-option COST clause for guard 48 — the
+brief is the surface this binds.
 
 ### 2.2 Self-containment — the no-references rule
 
@@ -130,6 +143,12 @@ it is accepted; until then the checker holds the section budgets only.
   assert it. Three of five figures in one hand-typed diagram were wrong within a day of publishing.
 - **Numbers in one sentence come from one scope.** Pairing a top-level count with a whole-surface count
   published "72 of 69". The scope is part of the fact, so it belongs in the fact's own name.
+- **A set the page counts is a set the page names (D0406).** Their words: *"'collapsing 5 reads/writes'
+  is irrelevant - i want to know *what* is being collapsed."* Any aggregate verb on a counted set —
+  collapse, fold, merge, consolidate, rename, remove, retire — comes with a members table, marked
+  `data-members="<count>"`, whose rows name every member (`class="m"`) and what becomes of it; the
+  checker refuses the verb without the table and a table whose names do not reconcile with its count.
+  The remainder ("N of M stay") is computed in the builder from the same members fact, never typed.
 - **State whether the change already ships.** Half of one queue was already running, so the only act
   left was revert — and no revert was priced. An ask that is really a ratification says so.
 

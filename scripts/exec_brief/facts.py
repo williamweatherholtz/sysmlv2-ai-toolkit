@@ -145,6 +145,27 @@ else:
                    "cliReadOnly counts the whole surface including the show lenses, so the two must "
                    "never appear in one sentence")
 
+    # THE MEMBERS, not only the counts (D0406): every live top-level verb by family with its effect,
+    # so a page that proposes folding a family can name what folds and compute what remains. The
+    # family-to-router mapping is the Decision's text and stays in the builder, quoted; the members
+    # are facts. `name` and `family` are the authored fields of the CliCommand record.
+    fam_verbs = {}
+    for b in live_top:
+        nm = re.search(r'name\s*=\s*"([^"]+)"', b)
+        fm = re.search(r'family\s*=\s*"([^"]+)"', b)
+        ef = re.search(r"CliEffect::(\w+)", b)
+        if not (nm and fm and ef):
+            continue
+        fam_verbs.setdefault(fm.group(1), []).append({"name": nm.group(1), "effect": ef.group(1)})
+    for fm in fam_verbs:
+        fam_verbs[fm].sort(key=lambda r: r["name"])
+    fact("cliLiveTopLevelByFamily",
+         fam_verbs if sum(len(v) for v in fam_verbs.values()) == len(live_top) else None,
+         "live top-level verbs by family, each with its effect",
+         CLI_HOW + "the live top-level records grouped by their `family` field, each row the record's `name` and "
+                   "CliEffect; the groups sum to cliLiveTopLevel or the fact is null (a record with no name, family "
+                   "or effect would otherwise vanish from a members table without a trace)")
+
 # ================================================================ 2. GATING CALL SITES
 # Mentions of a gating verb invoked through the binary, across git-TRACKED files.
 # .tracking/ is excluded from the headline: it is recorded history and must never be rewritten,
@@ -986,6 +1007,21 @@ fact("scriptsWithProbes", len(_probe_scripts) or None, "scripts under scripts/ s
 _ci = read(os.path.join(REPO, ".github", "workflows", "ci.yml")) or ""
 fact("ciRunsProbes", ("--probe" in _ci or "--self-test" in _ci), "does CI run the script probes",
      ".github/workflows/ci.yml mentions `--probe` or `--self-test`: today it does not, so these checks run only by hand.")
+
+# The fit sensor's own probe set and where it runs (D0402/D0403): the number of constructed known cases,
+# read from the module, and whether the brief builders end in it. A builder whose last statement is not
+# assert_fits publishes unmeasured.
+_fit_src = read(os.path.join(REPO, "scripts", "exec_brief", "fit_check.py")) or ""
+_fit_cases = re.search(r"PROBE_CASES\s*=\s*\{([\s\S]*?)\n\}", _fit_src)
+fact("fitProbeCases", len(re.findall(r'^\s{4}"[^"]+":', _fit_cases.group(1), re.M)) if _fit_cases else None,
+     "constructed known cases fit_check runs before measuring a page",
+     "count of top-level keys in PROBE_CASES in scripts/exec_brief/fit_check.py (each is a page built to show one "
+     "finding kind, or the fitting figure that must show none); null if the dict is not found.")
+_builders = sorted(glob.glob(os.path.join(REPO, "scripts", "exec_brief", "build_*.py")))
+_ending = [b for b in _builders if (read(b) or "").rstrip().splitlines()[-1].lstrip().startswith("assert_fits(")]
+fact("briefBuilders", len(_builders) or None, "brief builder scripts", "count of scripts/exec_brief/build_*.py.")
+fact("briefBuildersEndingInFit", len(_ending), "builders whose last statement is assert_fits",
+     "of those, the ones whose last non-blank line begins `assert_fits(`: " + (", ".join(os.path.basename(b) for b in _ending) or "none") + ".")
 
 # ================================================================ 15. releases bound to tags (D0400)
 # How a git tag finds its Release record. Read from `git tag` and .tracking/baselines.sysml; the

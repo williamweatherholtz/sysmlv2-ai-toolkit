@@ -222,6 +222,28 @@ BRIEF_BUDGETS = [
 TERSE_DECISION = ROOT / ".engine" / "decisions" / "0377-the-brief-is-terse-and-capped.sysml"
 TERSE_CEILING = 450
 
+# D0405: the reader prose carries no implementation duration. A dated fact ("since 2026-09-01") is not
+# a duration; "a day each", "five days", "two sprints", "~3 h" are. Word-number or digit, unit, optional plural.
+DURATION_RE = re.compile(
+    r"(?<![\w-])(?:~?\d+(?:\.\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten|half an?|"
+    r"several|few)\s*(?:hours?|hrs?|h|days?|weeks?|wks?|months?|sprints?|minutes?|mins?)\b(?![\w-])",
+    re.I)
+# D0406: an aggregate verb applied to a counted set must come with the set's members.
+AGGREGATE_RE = re.compile(
+    r"\b(?:collaps\w*|fold\w*|merg\w*|consolidat\w*|renam\w*|remov\w*|retir\w*)\s+"
+    r"(?:the\s+|every\s+|all\s+)?(?:remaining\s+|other\s+|more\s+)?"
+    r"(?:\d+|two|three|four|five|six|seven|eight|nine|ten|\w+teen|twenty|thirty|forty|fifty)\s+"
+    r"(?:more\s+)?\w+", re.I)
+# D0407: the ceiling is measured per tab (frame + one panel) once that Decision is accepted; summed until then.
+PER_TAB_DECISION = ROOT / ".engine" / "decisions" / "0407-briefCeilingIsMeasuredPerTab.sysml"
+
+
+def brief_ceiling_per_tab() -> bool:
+    try:
+        return "DecisionStatus::accepted" in PER_TAB_DECISION.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
 
 def brief_page_ceiling() -> int | None:
     try:
@@ -231,10 +253,12 @@ def brief_page_ceiling() -> int | None:
     return TERSE_CEILING if "DecisionStatus::accepted" in text else None
 
 
-def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None) -> list[str]:
+def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None,
+                per_tab: bool | None = None) -> list[str]:
     """The brief contract. Returns one string per violation, each naming the file."""
     raw = path.read_text(encoding="utf-8") if raw is None else raw
     ceiling = brief_page_ceiling() if ceiling is None else ceiling
+    per_tab = brief_ceiling_per_tab() if per_tab is None else per_tab
     bad: list[str] = []
     rel = path.name
 
@@ -271,6 +295,31 @@ def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None) 
                  "then be attached to any record, which is how one answer was lost")
         if " checked" in body:
             fail("an option is pre-selected, which fabricates a decision the reader never made")
+
+    # 3b. one tab per ask (D0404): tabs, panels and asks are one count; exactly one tab starts selected
+    tabs = re.findall(r'role="tab"', markup)
+    panels = re.findall(r'role="tabpanel"', markup)
+    if not tabs:
+        fail("no tabs - a brief renders each ask as its own tab, with the verdict and provenance outside them")
+    elif not (len(tabs) == len(panels) == len(opt_groups)):
+        fail(f"tabs, panels and asks disagree: {len(tabs)} tabs, {len(panels)} panels, {len(opt_groups)} asks")
+    if tabs and len(re.findall(r'role="tab"[^>]*aria-selected="true"', markup)) != 1:
+        fail("exactly one tab must start selected")
+
+    # 3c. no implementation duration in anything the reader reads (D0405); a date is not a duration
+    dur = DURATION_RE.search(field_text(prose))
+    if dur:
+        fail(f'reader prose states an implementation duration: "{dur.group(0)}" - cost is what changes and what breaks, never time')
+
+    # 3d. an aggregate verb on a counted set names its members, and the names reconcile (D0406)
+    agg = AGGREGATE_RE.search(field_text(prose))
+    members = re.findall(r'<table[^>]*data-members="(\d+)"[^>]*>([\s\S]*?)</table>', markup)
+    if agg and not members:
+        fail(f'"{agg.group(0)}" counts a set the page never names - add a members table (data-members) listing them')
+    for declared, body in members:
+        named = len(re.findall(r'class="m"', body))
+        if named != int(declared):
+            fail(f"members table declares {declared} members and names {named} - the names must reconcile with the count")
 
     # 4. figures: message titles that are sentences, and labels that are not ids
     figs = re.findall(r"<figure[^>]*>([\s\S]*?)</figure>", raw)
@@ -312,9 +361,20 @@ def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None) 
             if words > limit:
                 fail(f"{label}: {words} words over its {limit}-word budget")
     if ceiling is not None:
-        total = len(field_text(prose).split())
-        if total > ceiling:
-            fail(f"reader prose: {total} words over the {ceiling}-word page ceiling (terse register)")
+        panel_html = re.findall(r'<[a-z]+[^>]*role="tabpanel"[^>]*>([\s\S]*?)(?=<[a-z]+[^>]*role="tabpanel"|<label class="note-row"|<div class="copy-bottom"|<footer)', markup)
+        if per_tab and panel_html:
+            frame = markup
+            for ph in panel_html:
+                frame = frame.replace(ph, " ", 1)
+            frame_words = len(field_text(re.sub(r"<[^>]+>", " ", frame)).split())
+            for i, ph in enumerate(panel_html, start=1):
+                seen = frame_words + len(field_text(re.sub(r"<[^>]+>", " ", ph)).split())
+                if seen > ceiling:
+                    fail(f"tab {i}: {seen} words in view (frame {frame_words} + panel {seen - frame_words}) over the {ceiling}-word ceiling (terse register, measured per tab)")
+        else:
+            total = len(field_text(prose).split())
+            if total > ceiling:
+                fail(f"reader prose: {total} words over the {ceiling}-word page ceiling (terse register)")
 
     # 6. the machinery the reader needs
     if raw.count("data-copy") < 2:
@@ -352,19 +412,35 @@ def check_tree(root: Path) -> list[str]:
     return problems
 
 
-def _brief_fixture(title: str, ask: str, filler_words: int = 0) -> str:
-    """A minimal page that satisfies every brief clause, for the self-test to vary."""
+def _brief_fixture(title: str, ask: str, filler_words: int = 0, panels: int = 1, tabs: int | None = None,
+                   selected: int = 1, panel_words: int = 0, extra: str = "") -> str:
+    """A minimal tabbed page that satisfies every brief clause, for the self-test to vary: `panels` asks each
+    in its own panel, `tabs` tab buttons (defaults to panels), `selected` of them selected, `panel_words` of
+    filler inside every panel, `extra` markup inside the first panel."""
     fig = ('<figure><p class="msg">The page shows what waits.</p><svg role="img" '
            'aria-label="a figure whose label is long enough to count as real"><text>a thing</text></svg></figure>')
     filler = " ".join(["word"] * filler_words)
+    pf = " ".join(["word"] * panel_words)
+    tabs = panels if tabs is None else tabs
+    strip = "".join(f'<button role="tab" aria-selected="{"true" if i < selected else "false"}">t{i}</button>'
+                    for i in range(tabs))
+    body = "".join(
+        f'<section role="tabpanel"><p>{pf}</p>{extra if i == 0 else ""}{fig}{fig}'
+        f'<div class="opts" data-records="d000{i}"><label><input type="radio" name="a{i}" value="x">x</label>'
+        f'<label><input type="radio" name="a{i}" value="y">y</label></div></section>'
+        for i in range(panels))
     return (f'<title>Brief</title><meta name="viewport" content="width=device-width">'
             f'<style>:root{{}} @media (prefers-color-scheme: dark){{}} [data-theme="dark"]{{}}</style>'
             f'<h1 data-digest="title">{title}</h1><button data-copy></button>'
-            f'<div class="ask"><p>{ask}</p></div><p>{filler}</p>{fig}{fig}'
-            f'<div class="opts" data-records="d0000"><label><input type="radio" name="a" value="x">x</label>'
-            f'<label><input type="radio" name="a" value="y">y</label></div><button data-copy></button>'
+            f'<div class="ask"><p>{ask}</p></div><p>{filler}</p>{strip}{body}'
+            f'<div class="copy-bottom"><button data-copy></button></div>'
             f'<footer data-digest="provenance">Computed on 2026-09-08.</footer>'
             f'<script>const s = "answers: ";</script>')
+
+
+def _members(n: int, declared: int | None = None) -> str:
+    names = "".join(f'<span class="m">verb{i}</span> ' for i in range(n))
+    return f'<table data-members="{n if declared is None else declared}"><tbody><tr><td>{names}</td></tr></tbody></table>'
 
 
 def self_test() -> int:
@@ -375,12 +451,30 @@ def self_test() -> int:
     good = _brief_fixture("The page shows a receipt when nothing waits.", "Accept the receipt shape.")
     long_title = " ".join(["word"] * 26) + " is"
     long_ask = " ".join(["word"] * 80)
+    fx = _brief_fixture
     checks = [
-        ("in-budget page passes", check_brief(p, ceiling=450, raw=good), []),
-        ("27-word headline refused", check_brief(p, ceiling=None, raw=_brief_fixture(long_title, "Accept.")), ["headline: 27 words"]),
-        ("80-word ask refused", check_brief(p, ceiling=None, raw=_brief_fixture("The page waits.", long_ask)), ["the ask: 80 words"]),
-        ("ceiling refused when given", check_brief(p, ceiling=450, raw=_brief_fixture("The page waits.", "Accept.", 500)), ["reader prose: 5"]),
-        ("a generous ceiling does not refuse a long page", check_brief(p, ceiling=100_000, raw=_brief_fixture("The page waits.", "Accept.", 500)), []),
+        ("in-budget page passes", check_brief(p, ceiling=450, raw=good, per_tab=False), []),
+        ("27-word headline refused", check_brief(p, ceiling=None, raw=fx(long_title, "Accept.")), ["headline: 27 words"]),
+        ("80-word ask refused", check_brief(p, ceiling=None, raw=fx("The page waits.", long_ask)), ["the ask: 80 words"]),
+        ("ceiling refused when given", check_brief(p, ceiling=450, raw=fx("The page waits.", "Accept.", 500), per_tab=False), ["reader prose: 5"]),
+        ("a generous ceiling does not refuse a long page", check_brief(p, ceiling=100_000, raw=fx("The page waits.", "Accept.", 500), per_tab=False), []),
+        # D0404: tabs, panels and asks are one count; one selected
+        ("two asks, two tabs, one selected passes", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", panels=2)), []),
+        ("two asks under one tab refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", panels=2, tabs=1)), ["tabs, panels and asks disagree: 1 tabs, 2 panels, 2 asks"]),
+        ("no tab starting selected refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", selected=0)), ["exactly one tab must start selected"]),
+        ("two tabs starting selected refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", panels=2, selected=2)), ["exactly one tab must start selected"]),
+        # D0405: a duration is refused; a date is not a duration
+        ("a day each refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>A five collapses, a day each.</p>")), ["implementation duration: \"a day\""]),
+        ("five days refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>Five days of work.</p>")), ["implementation duration: \"Five days\""]),
+        ("a date passes", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>Waiting since 2026-09-01.</p>")), []),
+        # D0406: an aggregate names its members, and the count reconciles
+        ("collapse five families with no members refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>Collapse five families.</p>")), ["counts a set the page never names"]),
+        ("collapse with a reconciled members table passes", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>Collapse five families.</p>" + _members(5))), []),
+        ("members table off by one refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", extra="<p>Fold 4 verbs.</p>" + _members(4, declared=5))), ["declares 5 members and names 4"]),
+        # D0407: the ceiling per tab - two 300-word panels pass per tab and fail summed
+        ("two 300-word tabs pass the ceiling per tab", check_brief(p, ceiling=450, raw=fx("The page waits.", "Accept.", panels=2, panel_words=300), per_tab=True), []),
+        ("the same page fails the ceiling summed", check_brief(p, ceiling=450, raw=fx("The page waits.", "Accept.", panels=2, panel_words=300), per_tab=False), ["reader prose: 6"]),
+        ("a 460-word tab fails per tab, naming it", check_brief(p, ceiling=450, raw=fx("The page waits.", "Accept.", panels=2, panel_words=460), per_tab=True), ["tab 1: ", "tab 2: "]),
     ]
     failed = 0
     for name, got, want in checks:

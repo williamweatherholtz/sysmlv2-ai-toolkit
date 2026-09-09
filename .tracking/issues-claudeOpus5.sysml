@@ -1512,4 +1512,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRetroNamesDecisionsAsWritten to issue424;
+
+    part issue425 : Issue {
+        :>> id = "c200afe4-4809-4c80-adb7-a7aca10a4489";
+        :>> title = "The brief stacked its asks, priced courses in days, and counted a set it never named - and the checker passed all three";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The standing decision brief published on 2026-09-09 (three asks, built by scripts/exec_brief/build_2026_09_09_three_asks_tests_bind.py) carried three defects the human read off it in one message: the asks were stacked on one page rather than one tab each; the courses stated an implementation duration ('A five collapses, a day each.'), which the human does not want and cannot judge correctness by; and it counted a set without naming it ('collapse five families ... 70 to 20') so the reader could not check what was being collapsed - and the typed remainder (20) disagrees with the count the members give (34 of 67 live verbs remain under D0399 option A's own mapping). scripts/check_templates.py --brief had a clause for none of the three, so all passed 'clean'. Their words: 'for the decision panel, make each ask a separate tab. and don't tell me how long things should take to implement - i really don't care. i care about correctness. and how can i gauge that if you don't tell me what you're collapsing? 'collapsing 5 reads/writes' is irrelevant - i want to know *what* is being collapsed. totally avoiding the root of the issue.' Root: the brief contract enumerated budgets and exhibits but not the shape of a course's cost or the obligation to name a counted set; the fix is three checker clauses with known cases (D0404, D0405, D0406), a members fact, and a tabbed builder, and the ceiling clause they force (D0407).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyBriefTabsNoDurationsNamedMembers to issue425;
 }
