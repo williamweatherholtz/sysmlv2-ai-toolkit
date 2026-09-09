@@ -126,13 +126,18 @@ package EngineRuleSet {
     // from D0192's acceptance date (issue068): earlier events are grandfathered - and the cutoff READS as the
     // later of this literal and the adopting project's adoption-profile declaredAt (D0319/issue352). GATING - the
     // `confirmation-authenticity` guard sources this rule alongside confirmationAuthenticityRule.
+    // The SECOND date (D0411/issue426): from it a DELEGATED record's gesture WORDS are text - console and
+    // deck records are self-recorded (recorder == judge, exempt) and carry a device receipt the server wrote;
+    // the TTY citation counts only in the form the command writes for a terminal it observed, not the
+    // asserted KEEL_TTY_GESTURE stand-in; a GitHub citation is a URL anyone can type. What a delegated
+    // record evidences is the human's quoted words. Both dates read raised to the adoption date.
     // STATED LIMIT (from D0192 itself): an agent that fabricates a quote defeats this check; the
     // protections behind it are the human reading their own queue and the audit trail.
     part delegatedAcceptanceSubstanceRule : ElementRule {
         :>> id = "f20caebc-aef4-4487-83d4-b4a1be0d8900";
         :>> title = "A delegated acceptance record must quote the human's words (or cite their gesture)";
         :>> subjectType = "Decision";
-        :>> predicate = "acceptQuotesDelegatedWords(2026-08-22)";
+        :>> predicate = "acceptQuotesDelegatedWords(2026-08-22, 2026-09-09)";
         :>> severity = RuleSeverity::blocking;
         :>> onViolation = ViolationKind::block;
         :>> appliesWhen = "whereStatus(accepted)";

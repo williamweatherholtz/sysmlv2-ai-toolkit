@@ -4448,13 +4448,21 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
             // then refuses exactly as before.
             let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
             let delegation = keel_cli::activation::recording_delegation(&root, "decisionAcceptance");
-            let note_quotes = flag(args, "note").is_some_and(|n| keel_cli::view::note_quotes_human(&n));
-            match (delegation, note_quotes) {
-                (Some(d), true) => {
+            // D0411 / issue426: the receipt this session can record is the human's QUOTED WORDS. A
+            // gesture citation - console, deck, TTY, GitHub - is written by the surface that observed
+            // the gesture (the console appends a device receipt; the terminal path above cites its own
+            // TTY), never typed into a note; typed, it is the free text the substance rule used to
+            // accept, and the agent-marked session with no terminal is exactly the writer that cannot
+            // have observed any of them.
+            let receipt = flag(args, "note").map_or(keel_cli::view::NoteReceipt::Nothing, |n| keel_cli::view::note_receipt(&n));
+            match (delegation, receipt) {
+                (Some(d), keel_cli::view::NoteReceipt::QuotedWords) => {
                     // D0201 B, the chat half: READ-BACK RATIFICATION. The quoted words must name THIS
                     // decision (its id, one of its option letters, or three words of its title), or a
                     // bare 'yes' could be attached to any Decision the agent picks. Forward-only by
-                    // construction: it binds new records, never re-reads old ones.
+                    // construction: it binds new records, never re-reads old ones. The note has a
+                    // quoted span here (the arm above), so the read-back reads the span, never a
+                    // gesture word.
                     if let (Some(dec), Some(note)) = (args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
                         let (letters, title) = decision_options_and_title(&root, dec);
                         if !keel_cli::view::read_back_names(&note, dec, &letters, &title) {
@@ -4464,8 +4472,12 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
                     }
                     eprintln!("keel {verb}: recording the human's verdict under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
                 }
-                (Some(d), false) => {
-                    eprintln!("keel {verb}: delegation {d} lets this session RECORD the human's verdict, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair - or cite their deck/console/GitHub gesture (D0192/D0289).");
+                (Some(d), keel_cli::view::NoteReceipt::GestureWordOnly) => {
+                    eprintln!("keel {verb}: the note names a gesture (console, deck, TTY, GitHub) but no gesture reached this command - a gesture citation is written by the surface that observed it (the console appends a device receipt it can re-verify; a terminal cites its own TTY), never typed into a note (D0411/issue426). This session has no terminal and is not the console; under delegation {d} the receipt it can record is the human's words, verbatim: --words \"yes, accept it\" (at least ten characters; D0375). Nothing written.");
+                    return Some(1);
+                }
+                (Some(d), keel_cli::view::NoteReceipt::Nothing) => {
+                    eprintln!("keel {verb}: delegation {d} lets this session RECORD the human's verdict, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair (D0192/D0289). A gesture is cited by the surface that observed it, not by this note (D0411).");
                     return Some(1);
                 }
                 (None, _) => {

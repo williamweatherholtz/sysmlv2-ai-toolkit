@@ -84,6 +84,61 @@ pub fn canonical(kind: &str, target: &str, judged_at: &str, judged_by: &str, not
     format!("{kind}|{target}|{judged_at}|{judged_by}|{note}")
 }
 
+/// The console's own channel citation, appended by the server to a human-recorded verdict (issue287).
+pub const CONSOLE_GESTURE: &str = " [recorded by the human in the keel console]";
+
+/// The receipt the server appends to a tap's recorded note (D0201 B, made re-verifiable by D0411).
+///
+/// It carries the paired device's FULL id and the HMAC the tap arrived with, so a reader holding the
+/// machine-local store can recompute the signature from the record's own fields ([`reverify`]).
+/// Before D0411 the tag named a truncated id and the words `HMAC-verified` - text any writer could
+/// type (issue426); the words stay, the receipt is what makes them true.
+#[must_use]
+pub fn receipt_tag(device_id: &str, hmac_hex: &str) -> String {
+    format!(" [device {} hmac={} HMAC-verified]", device_id.trim(), hmac_hex.trim().to_lowercase())
+}
+
+/// Split a recorded note into (the text the device signed, device id, hmac hex).
+///
+/// `None` when the note carries no receipt of the [`receipt_tag`] form at its end. The console gesture
+/// the server appended between the note and the receipt is stripped too, because the tap signed the
+/// note before either was added.
+#[must_use]
+pub fn parse_receipt(recorded: &str) -> Option<(String, String, String)> {
+    let at = recorded.rfind(" [device ")?;
+    let tail = recorded.get(at + " [device ".len()..)?.strip_suffix(" HMAC-verified]")?;
+    let (id, hmac) = tail.split_once(" hmac=")?;
+    if id.is_empty() || id.contains(' ') || hmac.is_empty() {
+        return None;
+    }
+    let signed = recorded.get(..at)?;
+    let signed = signed.strip_suffix(CONSOLE_GESTURE).unwrap_or(signed);
+    Some((signed.to_string(), id.to_string(), hmac.to_string()))
+}
+
+/// Re-verify a RECORDED verdict against this machine's device store (D0411 / issue426).
+///
+/// `kind`, `target`, `judged_at` and `judged_by` are the record's own fields; `recorded` is the note
+/// as written. `Ok(device id)` means the signature in the receipt is the one that device's key
+/// produces over exactly these fields - the tag was written by the server for this tap, not typed.
+///
+/// # Errors
+/// No receipt in the note, an unpaired device, or a signature that does not match the record.
+pub fn reverify(root: &Path, kind: &str, target: &str, judged_at: &str, judged_by: &str, recorded: &str) -> Result<String, String> {
+    reverify_against(&load(root), kind, target, judged_at, judged_by, recorded)
+}
+
+/// The pure check behind [`reverify`], over a given device set.
+///
+/// # Errors
+/// As [`reverify`].
+pub fn reverify_against(devices: &[Device], kind: &str, target: &str, judged_at: &str, judged_by: &str, recorded: &str) -> Result<String, String> {
+    let Some((signed, id, hmac)) = parse_receipt(recorded) else {
+        return Err("the record carries no device receipt - a console tap since D0411 ends in `[device <id> hmac=<hex> HMAC-verified]`, written by the server; a note that only SAYS console or device is text (issue426)".to_string());
+    };
+    verify_against(devices, Some(&id), Some(&hmac), &canonical(kind, target, judged_at, judged_by, &signed))
+}
+
 /// A six-digit pairing code from the OS CSPRNG, printed by the serving terminal at start.
 #[must_use]
 pub fn pairing_code() -> String {
@@ -186,7 +241,7 @@ pub fn verify_against(devices: &[Device], device_id: Option<&str>, hmac_hex: Opt
 
 #[cfg(test)]
 mod tests {
-    use super::{canonical, hex, hmac_sha256, parse, unhex, verify_against, Device};
+    use super::{canonical, hex, hmac_sha256, parse, parse_receipt, receipt_tag, reverify_against, unhex, verify_against, Device, CONSOLE_GESTURE};
 
     /// RFC 4231 test case 2: key "Jefe", data "what do ya want for nothing?".
     #[test]
@@ -220,5 +275,35 @@ mod tests {
         assert_eq!(d[0].key, b"0123".to_vec());
         assert_eq!(unhex("zz"), None);
         assert_eq!(unhex("abc"), None);
+    }
+
+    /// D0411 / issue426: the record the server writes for a console tap re-verifies from its own
+    /// fields against the device store; a note that merely says `console` or `HMAC-verified`, or a
+    /// record whose signed text was changed after the tap, does not.
+    #[test]
+    fn a_console_records_receipt_reverifies_and_typed_words_do_not() {
+        let key = b"0123456789abcdef".to_vec();
+        let devices = vec![Device { id: "browser-1234abcd".into(), key: key.clone(), enrolled_at: "2026-09-09".into(), label: "hum".into() }];
+        let note = "yes, exactly this";
+        let mac = hex(&hmac_sha256(&key, canonical("accept", "d0001", "2026-09-09", "hum", note).as_bytes()));
+        // what api_decision_accept writes: note + console gesture + receipt
+        let recorded = format!("{note}{CONSOLE_GESTURE}{}", receipt_tag("browser-1234abcd", &mac));
+        assert_eq!(parse_receipt(&recorded), Some((note.to_string(), "browser-1234abcd".to_string(), mac)));
+        assert_eq!(reverify_against(&devices, "accept", "d0001", "2026-09-09", "hum", &recorded), Ok("browser-1234abcd".to_string()));
+        // a gate result carries no console gesture: the receipt alone
+        let gate_mac = hex(&hmac_sha256(&key, canonical("gate-pass", "xGate", "2026-09-09", "hum", "").as_bytes()));
+        let gate_note = receipt_tag("browser-1234abcd", &gate_mac);
+        assert_eq!(reverify_against(&devices, "gate-pass", "xGate", "2026-09-09", "hum", &gate_note), Ok("browser-1234abcd".to_string()));
+        // typed text: the words are there, the receipt is not
+        let typed = "approved at the console [device browser-1234abcd HMAC-verified]";
+        assert!(reverify_against(&devices, "accept", "d0001", "2026-09-09", "hum", typed).unwrap_err().contains("no device receipt"));
+        assert!(reverify_against(&devices, "accept", "d0001", "2026-09-09", "hum", "accepted in the keel console").unwrap_err().contains("no device receipt"));
+        // the signed text edited after the tap, or the record's fields changed: the signature no longer matches
+        let altered = recorded.replace("exactly this", "exactly that");
+        assert!(reverify_against(&devices, "accept", "d0001", "2026-09-09", "hum", &altered).unwrap_err().contains("does not match"));
+        assert!(reverify_against(&devices, "accept", "d0001", "2026-09-10", "hum", &recorded).unwrap_err().contains("does not match"));
+        assert!(reverify_against(&devices, "accept", "d0002", "2026-09-09", "hum", &recorded).unwrap_err().contains("does not match"));
+        // a device this machine never paired
+        assert!(reverify_against(&[], "accept", "d0001", "2026-09-09", "hum", &recorded).unwrap_err().contains("not paired"));
     }
 }

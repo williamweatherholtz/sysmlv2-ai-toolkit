@@ -707,7 +707,7 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         Ok(p) => p,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     };
-    let rationale = format!("{}{}", body.rationale, device_tag(&device));
+    let rationale = format!("{}{}", body.rationale, device_tag(&device, body.hmac.as_deref()));
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
@@ -766,9 +766,10 @@ async fn api_device_enroll(State(s): State<AppState>, axum::Json(b): axum::Json<
     }
 }
 
-/// The device tag appended to a tap's recorded note: which paired device signed it (D0201 B).
-fn device_tag(device_id: &str) -> String {
-    format!(" [device {} HMAC-verified]", device_id.chars().take(12).collect::<String>())
+/// The receipt appended to a tap's recorded note: which paired device signed it and the signature it
+/// sent (D0201 B; re-verifiable from the record since D0411 - `device::reverify`).
+fn device_tag(device_id: &str, hmac: Option<&str>) -> String {
+    crate::device::receipt_tag(device_id, hmac.unwrap_or_default())
 }
 
 /// Refuse a human tap that is not signed by a paired device (D0201 B). `Ok(device id)` lets the write
@@ -796,7 +797,7 @@ struct DecisionAcceptReq {
 /// the `{decision}Accept` event via `write::accept_decision`. The human's note IS the attestation
 /// (D0106 — `judged_by` is a Person, never AI-fabricated); never auto-commits.
 /// The console's own channel citation, appended to a human-recorded acceptance (issue287).
-const CONSOLE_GESTURE: &str = " [recorded by the human in the keel console]";
+const CONSOLE_GESTURE: &str = crate::device::CONSOLE_GESTURE;
 
 async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Json<DecisionAcceptReq>) -> Response {
     let Some(path) = safe_repo_path(&s.rootpath(), &b.file) else {
@@ -821,10 +822,12 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
         Ok(d) => d,
         Err(r) => return *r,
     };
+    // The receipt is appended to EVERY console record (D0411): the tap signed `b.note`, the server
+    // adds the gesture and the receipt, and `device::reverify` strips both to check the signature.
     let note = if b.note.contains(CONSOLE_GESTURE.trim()) {
-        b.note.clone()
+        format!("{}{}", b.note, device_tag(&device, b.hmac.as_deref()))
     } else {
-        format!("{}{CONSOLE_GESTURE}{}", b.note, device_tag(&device))
+        format!("{}{CONSOLE_GESTURE}{}", b.note, device_tag(&device, b.hmac.as_deref()))
     };
     // The human recorded this themselves: recorder == judge, which is what lets the substance rule
     // scope itself to genuinely delegated records (issue287).
@@ -866,7 +869,7 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
         Err(r) => return *r,
     };
     let sha = git_head(&s.rootpath());
-    let rationale = format!("{}{}", b.rationale, device_tag(&device));
+    let rationale = format!("{}{}", b.rationale, device_tag(&device, b.hmac.as_deref()));
     // D0299: the console tap is the human's own record - judge and recorder are the same person.
     match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, judged_by, &rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
@@ -911,7 +914,7 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
         Err(r) => return *r,
     };
     let sha = git_head(&s.rootpath());
-    let tagged = format!("{}{}", b.note.as_deref().unwrap_or(""), device_tag(&device));
+    let tagged = format!("{}{}", b.note.as_deref().unwrap_or(""), device_tag(&device, b.hmac.as_deref()));
     let note = Some(tagged.as_str());
     match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note, None) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
@@ -2682,7 +2685,7 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
         Err(r) => return *r,
     };
     let sha = git_head(&s.rootpath());
-    let evidence = format!("{}{}", b.evidence.as_deref().unwrap_or("recorded in the keel console"), device_tag(&device));
+    let evidence = format!("{}{}", b.evidence.as_deref().unwrap_or("recorded in the keel console"), device_tag(&device, b.hmac.as_deref()));
     match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by, Some(&evidence)) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),

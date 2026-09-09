@@ -36,6 +36,31 @@ pub fn note_quotes_human(text: &str) -> bool {
     checks::quotes_conversational_words(text)
 }
 
+/// What an acceptance note offers as its channel evidence, read before the write (D0411 / issue426).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteReceipt {
+    /// A quoted span of the human's words - the one receipt an agent session can record.
+    QuotedWords,
+    /// Only a gesture word (`console`, `deck`, a GitHub citation, `TTY gesture`) with no quoted span:
+    /// text the recorder typed, which the surface it names would have written itself.
+    GestureWordOnly,
+    /// Neither.
+    Nothing,
+}
+
+/// Classify a note's channel evidence: quoted words outrank a gesture word, and a gesture word alone is
+/// named as such so the command can refuse it with the remedy (D0411 / issue426).
+#[must_use]
+pub fn note_receipt(note: &str) -> NoteReceipt {
+    if !checks::quoted_spans(note).is_empty() {
+        NoteReceipt::QuotedWords
+    } else if checks::quotes_conversational_words(note) {
+        NoteReceipt::GestureWordOnly
+    } else {
+        NoteReceipt::Nothing
+    }
+}
+
 /// READ-BACK RATIFICATION (D0201 B, the chat half): do the human's quoted words name THIS decision?
 ///
 /// A delegated acceptance quotes the human (D0289), but a bare `'yes, do it'` can be attached to any

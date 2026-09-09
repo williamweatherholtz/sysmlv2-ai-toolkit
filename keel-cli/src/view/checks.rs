@@ -72,6 +72,40 @@ fn predicate_args<'a>(t: &'a str, p: &str) -> Option<&'a str> {
     t.strip_prefix(p).and_then(|r| r.strip_suffix(')'))
 }
 
+/// The `acceptQuotesDelegatedWords(cutoff[, strict])` term (see its comment in `eval_predicate_term`).
+fn accept_quotes_delegated_words(model: &Model, name: &str, dates: &str) -> bool {
+    let mut dates = dates.split(',').map(str::trim);
+    let cutoff = dates.next().unwrap_or_default();
+    let strict_from = dates.next();
+    let Some(r1) = model.items.get(&format!("{name}AcceptR1")) else {
+        return true;
+    };
+    let Some(judged_at) = r1.attrs.get("judgedAt") else {
+        return true;
+    };
+    if judged_at.as_str() < cutoff {
+        return true;
+    }
+    // issue287: a record the HUMAN made themselves is not delegated - its recorder (`createdBy`,
+    // written by every accept path since D0299) is the judge - and demanding they quote themselves
+    // points governance at the one party it must never bind. A record with NO recorder stamped
+    // (every acceptance before D0299) is read as delegated: absence of provenance is not evidence
+    // of self-recording, and those records already carry their quote or gesture.
+    let self_recorded = r1.attrs.get("createdBy").is_some_and(|rec| r1.attrs.get("judgedBy") == Some(rec));
+    if self_recorded {
+        return true;
+    }
+    let text = model
+        .items
+        .get(&format!("{name}Accept"))
+        .and_then(|i| i.attrs.get("procedureText"))
+        .map_or("", String::as_str);
+    if strict_from.is_some_and(|s| judged_at.as_str() >= s) {
+        return quotes_delegated_words_strict(text);
+    }
+    quotes_conversational_words(text)
+}
+
 /// Is `name` within a rule's `appliesWhen` SCOPE? `all` (always), `whereStatus(v)` (the item's `status`
 /// attr == v), `whereKind(v)` (the item's `kind` `WorkKind` == v). `Some(bool)`, or `None` if the scope
 /// predicate is unsupported (caller marks the rule not-evaluated). Git-temporal scopes (`newlyAdded`)
@@ -122,38 +156,21 @@ fn eval_predicate_term(model: &Model, name: &str, term: &str) -> Option<bool> {
         let judged_by = model.items.get(&ev).and_then(|i| i.attrs.get("judgedBy"));
         return Some(judged_by.and_then(|jb| model.items.get(jb)).is_some_and(|a| a.type_name == "Person"));
     }
-    // acceptQuotesDelegatedWords(cutoff): D0192 OPTION A substance check. The sibling acceptance event
-    // `<name>AcceptR1`, when judged on/after the cutoff date, must evidence its channel: the Test's
-    // procedureText quotes the human's conversational words (a single-quoted span of >= 10 chars) or
-    // cites a human surface gesture (deck/console). Earlier events are grandfathered (issue068
-    // forward-only). A MISSING event is acceptance-events' violation, not this rule's — vacuously true.
+    // acceptQuotesDelegatedWords(cutoff[, strict]): D0192 OPTION A substance check. The sibling
+    // acceptance event `<name>AcceptR1`, when judged on/after the cutoff date, must evidence its
+    // channel: the Test's procedureText quotes the human's conversational words (a single-quoted span
+    // of >= 10 chars) or cites a human surface gesture (deck/console). Earlier events are grandfathered
+    // (issue068 forward-only). A MISSING event is acceptance-events' violation, not this rule's —
+    // vacuously true. From the SECOND date (D0411 / issue426) a DELEGATED record's gesture words no
+    // longer count: `console`, `deck` and a GitHub citation are text any recorder can type, and the
+    // surfaces that make them true write their own records with recorder == judge (exempt below) or a
+    // device receipt. What a delegated record can carry is the human's quoted words, or the TTY
+    // citation the command itself writes when it observed a terminal - the asserted stand-in
+    // (`KEEL_TTY_GESTURE`) says so in its text and does not count.
     // STATED LIMIT (D0192): a fabricated quote defeats this; the protections behind it are the human
     // reading their own queue and the audit trail.
-    if let Some(cutoff) = predicate_args(term, "acceptQuotesDelegatedWords(") {
-        let Some(r1) = model.items.get(&format!("{name}AcceptR1")) else {
-            return Some(true);
-        };
-        let Some(judged_at) = r1.attrs.get("judgedAt") else {
-            return Some(true);
-        };
-        if judged_at.as_str() < cutoff.trim() {
-            return Some(true);
-        }
-        // issue287: a record the HUMAN made themselves is not delegated - its recorder (`createdBy`,
-        // written by every accept path since D0299) is the judge - and demanding they quote themselves
-        // points governance at the one party it must never bind. A record with NO recorder stamped
-        // (every acceptance before D0299) is read as delegated: absence of provenance is not evidence
-        // of self-recording, and those records already carry their quote or gesture.
-        let self_recorded = r1.attrs.get("createdBy").is_some_and(|rec| r1.attrs.get("judgedBy") == Some(rec));
-        if self_recorded {
-            return Some(true);
-        }
-        let text = model
-            .items
-            .get(&format!("{name}Accept"))
-            .and_then(|i| i.attrs.get("procedureText"))
-            .map_or("", String::as_str);
-        return Some(quotes_conversational_words(text));
+    if let Some(dates) = predicate_args(term, "acceptQuotesDelegatedWords(") {
+        return Some(accept_quotes_delegated_words(model, name, dates));
     }
     // confirmationQuotesOrAttested(cutoff): D0198 OPTION A (quote receipts). A method=confirmation
     // Test whose LATEST result is a human-judged pass on/after the cutoff must carry its evidence:
@@ -328,6 +345,26 @@ pub(super) fn quotes_conversational_words(text: &str) -> bool {
     // The span rule lives in `quoted_spans` so the substance guard and the accept read-back read the
     // human's words by ONE boundary rule (issue397: two copies of it had drifted apart in comment only).
     !quoted_spans(text).is_empty()
+}
+
+/// The stand-in phrase `keel accept` writes under `KEEL_TTY_GESTURE=1` (a test's terminal), which names
+/// itself as asserted rather than observed.
+pub const TTY_GESTURE_ASSERTED_MARK: &str = "asserted by keel_tty_gesture";
+
+/// Does a DELEGATED acceptance record carry evidence its recorder could not have typed (D0411 / issue426)?
+///
+/// A quoted span of the human's words (the rule `quoted_spans` states), or the TTY citation the
+/// command writes when stdin was a terminal it observed. A gesture WORD - `console`, `deck`, a
+/// GitHub citation - is not evidence here: the surfaces it names write their own records (the console
+/// with a device receipt, recorder == judge), so in a delegated record the word can only have been
+/// typed. The `KEEL_TTY_GESTURE` stand-in says `asserted ... not observed` in its own text and is
+/// refused for the same reason.
+pub(super) fn quotes_delegated_words_strict(text: &str) -> bool {
+    if !quoted_spans(text).is_empty() {
+        return true;
+    }
+    let lower = text.to_lowercase();
+    lower.contains(TTY_GESTURE_MARK) && !lower.contains(TTY_GESTURE_ASSERTED_MARK)
 }
 
 /// Evaluate a full `ElementRule` `predicate` (TERMs joined by ` and `) for item `name`. Returns `None`
@@ -507,11 +544,11 @@ pub fn raise_cutoffs(predicate: &str, adopted: Option<&str>) -> String {
         .map(|term| {
             let t = term.trim();
             for prefix in CUTOFF_TERMS {
-                if let Some(date) = predicate_args(t, prefix) {
-                    let date = date.trim();
-                    if date.len() == 10 && date < adopted {
-                        return format!("{prefix}{adopted})");
-                    }
+                if let Some(dates) = predicate_args(t, prefix) {
+                    // every date the term carries (D0411 added a second, the strict cutoff) is read as
+                    // the later of itself and the adoption date
+                    let raised: Vec<&str> = dates.split(',').map(str::trim).map(|d| if d.len() == 10 && d < adopted { adopted } else { d }).collect();
+                    return format!("{prefix}{})", raised.join(", "));
                 }
             }
             t.to_string()
@@ -546,6 +583,9 @@ mod cutoff_tests {
             "nonBlank(rationale) and confirmationQuotesOrAttested(2026-09-03)"
         );
         assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", None), "acceptQuotesDelegatedWords(2026-08-22)");
+        // D0411: the strict date is a second cutoff and follows adoption the same way
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22, 2026-09-09)", Some("2026-09-03")), "acceptQuotesDelegatedWords(2026-09-03, 2026-09-09)");
+        assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22, 2026-09-09)", Some("2026-10-01")), "acceptQuotesDelegatedWords(2026-10-01, 2026-10-01)");
         assert_eq!(raise_cutoffs("acceptQuotesDelegatedWords(2026-08-22)", Some("garbage")), "acceptQuotesDelegatedWords(2026-08-22)");
     }
 }
@@ -716,6 +756,31 @@ mod tests {
         assert_eq!(eval(Some("bot"), "their words: 'yes, accept it as written'"), Some(true), "AI-delegated with the quote passes");
         assert_eq!(eval(None, "agreed with panel's decisions"), Some(false), "no recorder stamped = delegated, not self-recorded");
         assert_eq!(eval(None, "accepted in the keel console"), Some(true), "a cited human gesture still passes unstamped records");
+    }
+
+    /// D0411 / issue426: from the strict date a DELEGATED record's gesture words are text. The
+    /// human's quoted words pass; the observed-TTY citation the command writes passes; `console`,
+    /// `deck`, a GitHub URL and the asserted `KEEL_TTY_GESTURE` stand-in fail. Before the strict date
+    /// the gesture words still count (grandfathered), and a self-recorded console record is exempt at
+    /// any date because its recorder is the judge.
+    #[test]
+    fn from_the_strict_date_a_delegated_records_gesture_words_are_text() {
+        let eval = |recorder: &str, judged_at: &str, note: &str| {
+            let mut model = super::Model { items: std::collections::HashMap::new(), edges: Vec::new() };
+            model.items.insert("d1".to_string(), item("Decision", &[("status", "accepted")]));
+            model.items.insert("d1Accept".to_string(), item("Test", &[("method", "confirmation"), ("procedureText", note)]));
+            model.items.insert("d1AcceptR1".to_string(), item("TestResult", &[("outcome", "pass"), ("judgedAt", judged_at), ("judgedBy", "hum"), ("createdBy", recorder)]));
+            super::eval_predicate_term(&model, "d1", "acceptQuotesDelegatedWords(2026-08-22, 2026-09-09)")
+        };
+        let quoted = "recorded from chat - their words, verbatim: \u{201C}yes, d0001 as written\u{201D}";
+        assert_eq!(eval("bot", "2026-09-09", quoted), Some(true), "the human's quoted words are the delegated receipt");
+        assert_eq!(eval("bot", "2026-09-09", "go ahead - TTY gesture: typed at an interactive terminal by hum, 2026-09-09"), Some(true), "the command's observed-TTY citation passes");
+        assert_eq!(eval("bot", "2026-09-09", "approved at the console"), Some(false), "a typed console word is text");
+        assert_eq!(eval("bot", "2026-09-09", "tapped on the deck"), Some(false), "a typed deck word is text");
+        assert_eq!(eval("bot", "2026-09-09", "see https://github.com/x/y/issues/1#issuecomment-2"), Some(false), "a typed GitHub citation is text");
+        assert_eq!(eval("bot", "2026-09-09", "go ahead - TTY gesture (asserted by KEEL_TTY_GESTURE, not observed): typed at a terminal by hum, 2026-09-09"), Some(false), "the asserted stand-in says so and is refused");
+        assert_eq!(eval("bot", "2026-09-08", "approved at the console"), Some(true), "before the strict date the gesture word is grandfathered");
+        assert_eq!(eval("hum", "2026-09-09", "yes, exactly this [recorded by the human in the keel console] [device b hmac=00 HMAC-verified]"), Some(true), "a self-recorded console record is exempt");
     }
 
     /// D0192 OPTION A: the substance check's boundary. A delegated record passes on a verbatim

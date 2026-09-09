@@ -146,6 +146,13 @@ fn a_tap_records_only_when_signed_by_a_paired_device() {
     let (st, body) = http(port, "POST", "/api/decision/accept", &accept(&format!(",\"device_id\":\"browser-test01\",\"hmac\":\"{good}\"")));
     assert_eq!(st, 200, "{body}");
     let text = dec();
-    assert!(text.contains("AcceptR1") && text.contains("[device browser-test HMAC-verified]"), "recorded and device-tagged:\n{text}");
+    assert!(text.contains("AcceptR1") && text.contains("[device browser-test01 hmac=") && text.contains("HMAC-verified]"), "recorded and device-tagged:\n{text}");
+
+    // 6. D0411 / issue426: the receipt the server wrote RE-VERIFIES from the record's own fields against
+    //    this machine's device store; the same record with its signed text altered does not.
+    let recorded = text.split("d0001Accept : Test").nth(1).and_then(|s| s.split("procedureText = \"").nth(1)).and_then(|s| s.split("\";").next()).expect("the recorded note");
+    assert_eq!(keel_cli::device::reverify(&root, "accept", "d0001", "2026-09-05", "hum", recorded), Ok("browser-test01".to_string()), "the console record re-verifies: {recorded}");
+    let altered = recorded.replace("exactly this", "exactly that");
+    assert!(keel_cli::device::reverify(&root, "accept", "d0001", "2026-09-05", "hum", &altered).unwrap_err().contains("does not match"), "an altered record does not");
     let _ = std::fs::remove_dir_all(&root);
 }
