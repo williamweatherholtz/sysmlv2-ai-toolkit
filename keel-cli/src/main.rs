@@ -1651,18 +1651,9 @@ fn cmd_guard(args: &[String]) -> i32 {
         // unread is this repo's highest-frequency drift mechanism, and it grows with every control
         // added — so the SUBTRACTIVE fix is to state the warning population where the verdict is
         // read, rather than build another detector for what was already detected.
-        let warned: Vec<&str> =
-            reports.iter().filter(|r| !r.warnings.is_empty()).map(|r| r.name).collect();
-        let total: usize = reports.iter().map(|r| r.warnings.len()).sum();
-        let tail = if total == 0 {
-            String::new()
-        } else {
-            format!(
-                " — {total} warning(s) across {} guard(s), NOT violations and NOT blocking, but UNREAD until someone reads them: {}",
-                warned.len(),
-                warned.join(", ")
-            )
-        };
+        // issue404 / D0413: the population is stated in two classes - the actionable warnings, which
+        // are the set a reader is asked to read, and the counted-history lines, which are not.
+        let tail = keel_cli::guards::warning_population(&reports);
         println!("[guard] {}{tail}", if all_ok { keel_cli::color::pass("ALL PASS") } else { keel_cli::color::fail("FAILED") });
         if let Some(line) = from_receipt {
             println!("{line}");

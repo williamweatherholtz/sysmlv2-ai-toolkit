@@ -1556,4 +1556,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcDirectionDecisionsLinkTheirStatement to issue428;
+
+    part issue429 : Issue {
+        :>> id = "490f4484-0a12-4ba8-8a3d-e071c698c8c1";
+        :>> title = "a slow hook fire is unexplained by its own ledger line - the human reads keel as crazy slow and the tail cannot be attributed";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The human, 2026-09-09: 'kind of seems like keel is still crazy slow.' MEASURED before any claim (keel enforcement-report . and a read of .keel/metrics/hooks.jsonl over the last 36 hours, 21 hours holding events): stop 179 fires, median 617 ms, p90 5728 ms, max 35201 ms, 454 s in total; subagent-stop 42 fires, median 2708 ms, p90 7154 ms, max 38219 ms, 199 s; user-prompt 42 fires, median 1149 ms, max 27964 ms, 71 s; post-edit 384 fires, median 0 ms, max 56095 ms; one hook-watchdog-timeout at 120000 ms. Blocking hook time in the window is about 13 minutes, and the tail carries it - fifteen stop runs over 6 s and three events over 27 s. WHAT THE IDLE MACHINE SAYS: a full stop run (KEEL_NO_RECEIPT=1 keel hook stop .) takes 2650-2990 ms across nine samples; a receipt hit takes 217 ms; the same full run sampled five times while cargo build --release ran took 6590, 5983, 4295, 3478 and 3290 ms - so contention from the session's own builds accounts for a 2.3x tail, and the ledger's slow runs sit in editing bursts (post-edit and pre-bash within 120 s of each of the last twelve). WHERE THE 2.8 s GOES (KEEL_PERF=2): validate about 0.4 s, view::check about 0.2 s, and the guard set 2.2 s of wall whose critical path is ONE guard - priority-inversion at 2102 ms of the 2200 ms run, because it recomputes the ready frontier (Model::build x8, git x9 in 580 ms, parse 491 ms) while 76 other guards finish under it; 44 git spawns cost 4114 ms summed across threads. WHAT IS NOT EXPLAINED: a 35 s stop, a 38 s subagent-stop, a 28 s user-prompt and a 120 s watchdog timeout are 4-12x the loaded measurement, and the ledger line carries only ts, event, exit, ms, bin and build - it cannot say which phase took the time, so a tail is reproduced after the fact or not at all. THE DEFECT: a slow turn boundary is unexplained by its own record. The perf counters that would explain it exist (perf.rs, KEEL_PERF) but are off in the hooks, so the one place the cost is felt is the one place it is not attributed. Until the ledger says where a slow run's time went, every answer to 'keel is slow' is a reproduction on a different machine state, which is the inference class perf.rs was built to stop.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSlowHookFireExplainsItself to issue429;
 }

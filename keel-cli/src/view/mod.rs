@@ -3451,6 +3451,7 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
     triggered.sort_by_key(Json::dump);
     Ok(Json::Obj(vec![
         ("need_decomposed_pct".to_string(), Json::Int(i64::from(pct_of(need)))),
+        ("guard_warnings".to_string(), actionable_guard_warnings(root)),
         ("sr_verified_pct".to_string(), Json::Int(i64::from(pct_of(sr)))),
         ("unrooted_capabilities".to_string(), n(unrooted_caps)),
         ("orphan_stories".to_string(), n(orphan_stories)),
@@ -3459,6 +3460,46 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
         ("detail".to_string(), Json::s("keel tier-satisfaction | rootedness | assured | critique-coverage | show indicators (triggers)")),
     ])
     .dump())
+}
+
+/// ACTIONABLE GUARD WARNINGS in the burndown (issue404 / D0413).
+///
+/// The guard set's warnings a reader can act on - every warning that is not a counted-history line
+/// (`guards::is_history`) - per guard, with its first line as the sample and the command that lists the
+/// rest. Read from the guard receipt when the tree it judged is this one; orient does not run the
+/// guards, and a count computed over a different tree would be prose state, so with no receipt for this
+/// tree the value is `null` and `how` says what to run.
+fn actionable_guard_warnings(root: &Path) -> Json {
+    let receipt = crate::receipt::key(root)
+        .and_then(|k| crate::receipt::read(root, &k))
+        .filter(|r| r.covers_all(&[crate::receipt::GUARDS]));
+    let Some(receipt) = receipt else {
+        return Json::Obj(vec![
+            ("actionable".to_string(), Json::Null),
+            ("how".to_string(), Json::s("no green guard receipt for this tree - `keel guard .` runs the set and writes one; its summary states the actionable count".to_string())),
+        ]);
+    };
+    let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
+    let mut per_guard = Vec::new();
+    let mut total = 0;
+    for r in &receipt.guards {
+        let mut lines = r.actionable();
+        let Some(first) = lines.next() else { continue };
+        let count = 1 + lines.count();
+        total += count;
+        per_guard.push(Json::Obj(vec![
+            ("guard".to_string(), Json::s(r.name.to_string())),
+            ("count".to_string(), n(count)),
+            ("first".to_string(), Json::s(first.clone())),
+            ("detail".to_string(), Json::s(format!("keel guard {} .", r.name))),
+        ]));
+    }
+    Json::Obj(vec![
+        ("actionable".to_string(), n(total)),
+        ("counted_history".to_string(), n(receipt.guards.iter().map(|r| r.history().count()).sum())),
+        ("guards".to_string(), Json::Arr(per_guard)),
+        ("how".to_string(), Json::s("from the guard receipt for this tree (.keel/metrics/guard-receipt.toml); counted-history lines are immutable history and are not listed".to_string())),
+    ])
 }
 
 /// Append a parsed commit to the recent-activity timeline (helper for [`recent`]).

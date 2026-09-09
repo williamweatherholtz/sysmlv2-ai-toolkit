@@ -18,6 +18,28 @@ pub struct GuardReport {
     pub violations: Vec<String>,
 }
 
+/// The mark a guard puts on a warning it COUNTS rather than enumerates (issue404 / D0413).
+///
+/// A counted-history line reports immutable history no edit can discharge - legacy actors in records
+/// that predate the convention, resolutions before the naming cutoff, grandfathered attestations and
+/// compound Decisions, a sprint closed before its ceremony existed. The guard says so by constructing
+/// the line with [`history_line`]; everything that reads a report - the printer, the runner's summary,
+/// orient's burndown - separates those from the ACTIONABLE warnings by this mark, so the population a
+/// reader is asked to read is the one they can act on. Nothing classifies by reading the prose.
+pub const HISTORY_PREFIX: &str = "HISTORY ";
+
+/// A warning the guard counts rather than enumerates - see [`HISTORY_PREFIX`].
+#[must_use]
+pub fn history_line(text: &str) -> String {
+    format!("{HISTORY_PREFIX}{text}")
+}
+
+/// Is `warning` a counted-history line?
+#[must_use]
+pub fn is_history(warning: &str) -> bool {
+    warning.starts_with(HISTORY_PREFIX)
+}
+
 impl GuardReport {
     /// True when there are no blocking violations.
     #[must_use]
@@ -42,10 +64,23 @@ impl GuardReport {
         })
     }
 
+    /// The warnings a reader can act on - every warning that is not a counted-history line.
+    pub fn actionable(&self) -> impl Iterator<Item = &String> {
+        self.warnings.iter().filter(|w| !is_history(w))
+    }
+
+    /// The counted-history lines (issue404): immutable history, reported so it is never mistaken for silence.
+    pub fn history(&self) -> impl Iterator<Item = &String> {
+        self.warnings.iter().filter(|w| is_history(w))
+    }
+
     /// Print the human report (warnings, then violations, then a summary line).
     pub fn print(&self) {
         for w in &self.warnings {
-            println!("  {}  {w}", crate::color::warn("WARN"));
+            match w.strip_prefix(HISTORY_PREFIX) {
+                Some(h) => println!("  {}  {h}", crate::color::warn("HISTORY")),
+                None => println!("  {}  {w}", crate::color::warn("WARN")),
+            }
         }
         for v in &self.violations {
             println!("  {} {v}", crate::color::fail("ERROR"));
@@ -53,15 +88,52 @@ impl GuardReport {
         if let Some(line) = self.self_contradiction() {
             println!("  {}  {line}", crate::color::warn("WARN"));
         }
+        let history = self.history().count();
+        let counted = if history == 0 { String::new() } else { format!(" + {history} counted-history line(s)") };
         println!(
-            "[guard:{}] {} — {} scanned, {} warning(s), {} violation(s)",
+            "[guard:{}] {} — {} scanned, {} warning(s){counted}, {} violation(s)",
             self.name,
             crate::color::verdict(self.ok()),
             self.scanned,
-            self.warnings.len(),
+            self.actionable().count(),
             self.violations.len()
         );
     }
+}
+
+/// The runner's summary of the warning population across `reports` (issue404 / D0413).
+///
+/// Empty when nothing warned. Otherwise the ACTIONABLE count and the guards carrying them come first -
+/// that is the set a reader is asked to read - and the counted-history lines are a number with their
+/// guards, never merged into it: a set that contains permanent noise cannot be read as a set worth
+/// reading, and that was the mechanism by which 131 warnings went unread (issue404).
+#[must_use]
+pub fn warning_population(reports: &[GuardReport]) -> String {
+    use std::fmt::Write as _;
+    let actionable: usize = reports.iter().map(|r| r.actionable().count()).sum();
+    let history: usize = reports.iter().map(|r| r.history().count()).sum();
+    if actionable + history == 0 {
+        return String::new();
+    }
+    let names = |pick: fn(&GuardReport) -> bool| reports.iter().filter(|r| pick(r)).map(|r| r.name).collect::<Vec<_>>().join(", ");
+    let mut out = String::new();
+    if actionable > 0 {
+        let _ = write!(
+            out,
+            " — {actionable} actionable warning(s) across {} guard(s), NOT violations and NOT blocking, each naming a condition an edit can discharge (keel orient lists them in its burndown): {}",
+            reports.iter().filter(|r| r.actionable().count() > 0).count(),
+            names(|r| r.actionable().count() > 0)
+        );
+    }
+    if history > 0 {
+        let _ = write!(
+            out,
+            "{} {history} counted-history line(s) ({}): immutable history, counted so it is not mistaken for silence, not dischargeable",
+            if actionable > 0 { ";" } else { " —" },
+            names(|r| r.history().count() > 0)
+        );
+    }
+    out
 }
 
 fn relpath(root: &Path, path: &Path) -> String {
@@ -198,9 +270,9 @@ pub fn actors(root: &Path) -> GuardReport {
         }
     }
     if legacy_historic > 0 {
-        warnings.push(format!(
+        warnings.push(history_line(&format!(
             "{legacy_historic} legacy actor reference(s) in records predating the {LEGACY_ACTOR_CUTOFF}              convention — immutable history, NOT dischargeable (rewriting a judgedBy would falsify              provenance). Counted, not enumerated: a warning nobody can act on trains blindness to              the ones they can. A legacy name dated on/after the cutoff is a violation above."
-        ));
+        )));
     }
     GuardReport { name: "actors", scanned, warnings, violations }
 }
@@ -899,7 +971,7 @@ pub fn ceremony(root: &Path) -> GuardReport {
         if !viols.is_empty() {
             let detail = viols.iter().map(|(g, e)| format!("{g} passed but {e} (earlier) unpassed")).collect::<Vec<_>>().join("; ");
             if grandfathered.contains(stem.as_str()) {
-                warnings.push(format!("{stem}: {detail} (grandfathered, pre-issue010)"));
+                warnings.push(history_line(&format!("{stem}: {detail} (grandfathered, pre-issue010)")));
             } else {
                 violations.push(format!("{stem}: {detail}"));
             }
@@ -2047,9 +2119,9 @@ pub fn issues(root: &Path) -> GuardReport {
                         ));
                     }
                     if historical > 0 {
-                        warnings.push(format!(
+                        warnings.push(history_line(&format!(
                             "{historical} resolution(s) recorded before {ISSUE_NAMING_CUTOFF} do not name their issue - history, forward-only from D0304; re-triaging them is a pull-audit the human may choose (D0204), never owed"
-                        ));
+                        )));
                     }
                 }
                 Err(e) => violations.push(format!("error reading resolutions: {e}")),
@@ -2879,9 +2951,9 @@ pub fn attestation_substance(root: &Path) -> GuardReport {
                 }
             }
             if grandfathered_thin > 0 {
-                warnings.push(format!(
+                warnings.push(history_line(&format!(
                     "{grandfathered_thin} grandfathered thin attestation(s) (pre-issue083) — counted,                      not enumerated (D0261): the allowlist is fixed, so anything outside it is a                      violation above and nothing can hide in this number"
-                ));
+                )));
             }
             GuardReport { name: "attestation-substance", scanned: found.len(), warnings, violations }
         }
@@ -4566,9 +4638,9 @@ pub fn decision_scaffolding(root: &Path) -> GuardReport {
         .collect();
     violations.sort();
     if grandfathered > 0 {
-        warnings.push(format!(
+        warnings.push(history_line(&format!(
             "{grandfathered} compound Decision(s) recorded before {COMPOUND_DECISION_CUTOFF} enumerate several clauses - grandfathered under D0303 option C; their partial delivery is not visible to this guard, and re-splitting history is the D0129 class, so they are counted, not reported"
-        ));
+        )));
     }
     GuardReport { name: "decision-scaffolding", scanned, warnings, violations }
 }
@@ -5900,6 +5972,54 @@ pub fn cli_surface_declared(root: &Path) -> GuardReport {
     let retired: BTreeMap<String, String> = crate::supersede_edges(root).into_iter().map(|(from, to)| (to, from)).collect();
     violations.extend(synopsis_citation_violations(&synopses, &decision_ids_present(root), &retired));
     GuardReport { name: "cli-surface-declared", scanned: authored.len(), warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod warning_population_tests {
+    use super::{history_line, is_history, warning_population, GuardReport};
+
+    fn report(name: &'static str, warnings: &[String]) -> GuardReport {
+        GuardReport { name, scanned: 1, warnings: warnings.to_vec(), violations: Vec::new() }
+    }
+
+    /// issue404 / D0413, the probe pair: the KNOWN-POSITIVE is a warning built with `history_line`
+    /// (counted history) and the KNOWN-NEGATIVE is a plain warning naming a fixable condition. The
+    /// summary states the two classes apart, the actionable one first with its guards, and never
+    /// merges the history count into it.
+    #[test]
+    fn a_counted_history_line_is_history_and_a_plain_warning_is_actionable() {
+        let history = history_line("52 legacy actor reference(s) - immutable history");
+        let plain = "task 'x' is not in deliverable-manifest.txt".to_string();
+        assert!(is_history(&history) && !is_history(&plain));
+        let a = report("actors", std::slice::from_ref(&history));
+        let m = report("manifest-coverage", &[plain.clone(), plain]);
+        assert_eq!(a.actionable().count(), 0);
+        assert_eq!(a.history().count(), 1);
+        assert_eq!(m.actionable().count(), 2);
+        let s = warning_population(&[a, m]);
+        assert!(s.starts_with(" — 2 actionable warning(s) across 1 guard(s)"), "{s}");
+        assert!(s.contains("manifest-coverage") && s.contains("1 counted-history line(s) (actors)"), "{s}");
+        assert!(!s.contains("3 "), "the two classes are never summed: {s}");
+    }
+
+    #[test]
+    fn the_summary_is_empty_with_no_warnings_and_names_only_the_class_present() {
+        assert_eq!(warning_population(&[report("a", &[])]), "");
+        let only_history = warning_population(&[report("issues", &[history_line("111 resolutions before the cutoff")])]);
+        assert!(only_history.starts_with(" — 1 counted-history line(s) (issues)"), "{only_history}");
+        assert!(!only_history.contains("actionable"), "{only_history}");
+        let only_live = warning_population(&[report("viewpoint-renderer", &["baselines: renderer planned".to_string()])]);
+        assert!(only_live.contains("1 actionable warning(s)") && !only_live.contains("counted-history"), "{only_live}");
+    }
+
+    /// The live tree: the actor guard's legacy line carries the mark, so the classification is the
+    /// guard's declaration and not a reading of the prose.
+    #[test]
+    fn the_live_actor_guard_counts_its_legacy_line_as_history() {
+        let r = super::actors(std::path::Path::new(".."));
+        assert!(r.history().any(|w| w.contains("legacy actor reference(s)")), "{:?}", r.warnings);
+        assert_eq!(r.actionable().count(), 0, "{:?}", r.warnings);
+    }
 }
 
 #[cfg(test)]

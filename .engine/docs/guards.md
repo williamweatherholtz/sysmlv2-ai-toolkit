@@ -8,6 +8,14 @@ Run one: `keel guard <name>`. This file is the catalogue; CLAUDE.md §5 has the 
 verdict words are coloured (PASS green, FAIL/ERROR red, WARN yellow, DEFECT magenta; D0287) — piped output is
 bare text, `NO_COLOR` disables, `KEEL_COLOR=1|0` forces.
 
+A warning is one of TWO classes, and the runner states them apart (D0413/issue404). An ACTIONABLE warning names a
+condition an edit can discharge; the runner's verdict line counts them and the guards carrying them, and `keel orient`
+lists them in its burndown (`guard_warnings`, read from the guard receipt for this tree). A COUNTED-HISTORY line -
+printed `HISTORY`, built by the guard with `guards::history_line` - reports immutable history no edit can discharge
+(legacy actors in records predating the convention, resolutions before the naming cutoff, grandfathered attestations
+and compound Decisions, a sprint closed before its ceremony existed); it is counted so it is never mistaken for
+silence and never merged into the actionable number. The class is the guard's declaration, not a reading of the prose.
+
 ## Hard-blocking
 
 | Guard | What it enforces |
