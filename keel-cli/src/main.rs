@@ -935,12 +935,13 @@ fn recalled_facts(root: &Path, payload: &serde_json::Value, session: &str) -> Op
     // and the reader is told, because a recall that silently doubles every turn's latency is the kind
     // of cost that gets discovered months later.
     if ms > RECALL_CAP_MS {
-        // D0389/issue402: the skip is COUNTED where it can be read back - a `recall-skipped` line in the
-        // fire-ledger carrying the turn's session and the time the walk took - not only said to a
-        // transcript nobody tallies. `keel enforcement-report` reports the rate and the tail.
-        ledger_emit(root, session, "recall-skipped", 0, ms);
+        // D0390 option A (the human's word 2026-09-09): the cap is read AFTER the walk, so a drop saves
+        // nothing - the turn has already paid. Push the facts anyway with the latency NAMED, and count
+        // the fire as `recall-slow` (recall-skipped no longer fires; it stays in the ledger as history).
+        // The memory channel is least available when the machine is busiest, so it must not be cut then.
+        ledger_emit(root, session, "recall-slow", 0, ms);
         return Some(format!(
-            "[keel recall] SKIPPED — recall took {ms}ms (cap {RECALL_CAP_MS}ms). Facts not pushed this turn.\n"
+            "[keel recall — pushed LATE, {ms}ms over the {RECALL_CAP_MS}ms cap (D0390); the walk had already run]\n{facts}"
         ));
     }
     // The VISIBLE recall count and elapsed time the process names as this step's produced artifact.

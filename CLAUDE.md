@@ -282,9 +282,12 @@ keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh Test
 
 **A hook's cost is a distribution, read from the ledger (D0389/issue402).** Never document a tier at its best
 case: the per-edit tier once read "~0.35 s" here while the ledger held a median of 0 ms (the D0371 receipt) and a
-maximum of 54 s. `keel enforcement-report` gives median / p90 / p99 / max per event, and `recall` counts the turns
-whose facts were dropped past the recall cap - a `recall-skipped` ledger line per turn, identifiable by
-session and time, so the memory channel's degradation is a rate, not a transcript line.
+maximum of 54 s. `keel enforcement-report` gives median / p90 / p99 / max per event, and `recall` counts the turns whose
+recall ran past the cap. Since D0390 (2026-09-09) those facts are pushed LATE with the latency named,
+not dropped - the check runs after the walk, so a drop saved nothing while the machine was busiest - and
+the fire is counted `recall-slow`; `recall-skipped` is the pre-D0390 history when facts were dropped.
+Each is a ledger line per turn, identifiable by session and time, so the memory channel's degradation is
+a rate, not a transcript line.
 
 **A green gate answers from its receipt (D0371).** A green `keel guard`, `keel hook stop` or `keel gate` writes
 `.keel/metrics/guard-receipt.toml` keyed on every input a guard can read - HEAD, every path `git status` lists with its

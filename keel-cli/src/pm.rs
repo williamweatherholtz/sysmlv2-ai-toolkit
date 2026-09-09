@@ -80,31 +80,36 @@ fn event_rows(per_event: BTreeMap<String, (u64, u64)>, per_event_ms: &BTreeMap<S
 /// D0389/issue402: the memory channel's degradation, counted. A `recall-skipped` line is written by the
 /// user-prompt hook when the walk exceeded its cap and the turn went without facts; the rate is over
 /// user-prompt fires, and the turns that lost their facts are identifiable afterwards by ts + session.
-fn recall_degradation(skips: &[(u64, String, u64)], user_prompt_fires: u64) -> Json {
-    let turns: Vec<Json> = skips
-        .iter()
-        .rev()
-        .take(20)
-        .map(|(ts, session, ms)| {
-            Json::Obj(vec![
-                ("ts".to_string(), Json::Int(i64::try_from(*ts).unwrap_or(i64::MAX))),
-                ("session".to_string(), Json::s(session.clone())),
-                ("ms".to_string(), Json::Int(i64::try_from(*ms).unwrap_or(i64::MAX))),
-            ])
-        })
-        .collect();
-    let rate = if user_prompt_fires == 0 {
-        Json::Null
-    } else {
-        let s = f64::from(u32::try_from(skips.len()).unwrap_or(u32::MAX));
-        let f = f64::from(u32::try_from(user_prompt_fires).unwrap_or(u32::MAX));
-        Json::s(format!("{:.2}", s * 100.0 / f))
+fn recall_turns(rows: &[(u64, String, u64)]) -> Json {
+    Json::Arr(rows.iter().rev().take(20).map(|(ts, session, ms)| {
+        Json::Obj(vec![
+            ("ts".to_string(), Json::Int(i64::try_from(*ts).unwrap_or(i64::MAX))),
+            ("session".to_string(), Json::s(session.clone())),
+            ("ms".to_string(), Json::Int(i64::try_from(*ms).unwrap_or(i64::MAX))),
+        ])
+    }).collect())
+}
+
+fn recall_degradation(skips: &[(u64, String, u64)], slow: &[(u64, String, u64)], user_prompt_fires: u64) -> Json {
+    let pct = |n: usize| -> Json {
+        if user_prompt_fires == 0 {
+            Json::Null
+        } else {
+            let a = f64::from(u32::try_from(n).unwrap_or(u32::MAX));
+            let f = f64::from(u32::try_from(user_prompt_fires).unwrap_or(u32::MAX));
+            Json::s(format!("{:.2}", a * 100.0 / f))
+        }
     };
     Json::Obj(vec![
+        // D0390: past the cap the facts are now pushed LATE and counted `recall-slow` (the turn keeps its
+        // memory); `recall-skipped` is the pre-D0390 history where the facts were dropped.
+        ("slow".to_string(), Json::Int(i64::try_from(slow.len()).unwrap_or(i64::MAX))),
+        ("slowRatePct".to_string(), pct(slow.len())),
+        ("slowTurns".to_string(), recall_turns(slow)),
         ("skipped".to_string(), Json::Int(i64::try_from(skips.len()).unwrap_or(i64::MAX))),
-        ("skipRatePct".to_string(), rate),
-        ("skippedTurns".to_string(), Json::Arr(turns)),
-        ("note".to_string(), Json::s("recall-skipped is counted from 2026-09-08 (D0389); earlier skips exist only as transcript lines. Before that date a user-prompt fire whose ms exceeds the recall cap is the proxy, not the count.".to_string())),
+        ("skipRatePct".to_string(), pct(skips.len())),
+        ("skippedTurns".to_string(), recall_turns(skips)),
+        ("note".to_string(), Json::s("D0390 (2026-09-09): a recall past the cap is pushed LATE and counted recall-slow, not dropped; recall-skipped is the pre-D0390 history when facts were dropped. Both are counted from their ledger event; earlier still, a user-prompt fire over the cap is the proxy.".to_string())),
     ])
 }
 
@@ -118,7 +123,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
     let text = std::fs::read_to_string(&ledger).unwrap_or_default();
     let mut per_event: BTreeMap<String, (u64, u64)> = BTreeMap::new(); // (fires, blocks)
     let mut per_event_ms: BTreeMap<String, Vec<u64>> = BTreeMap::new(); // D0389: the cost is a distribution
-    let mut recall_skips: Vec<(u64, String, u64)> = Vec::new(); // (ts, session, ms) - the turns that lost their facts
+    let mut recall_skips: Vec<(u64, String, u64)> = Vec::new(); // (ts, session, ms) - turns that lost their facts (pre-D0390)
+    let mut recall_slow: Vec<(u64, String, u64)> = Vec::new(); // (ts, session, ms) - turns pushed LATE past the cap (D0390)
     let mut sessions: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut overrides = 0u64;
     let mut unsynced = 0u64;
@@ -145,6 +151,11 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         per_event_ms.entry(event.clone()).or_default().push(ms);
         match event.as_str() {
             "recall-skipped" => recall_skips.push((
+                v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0),
+                v.get("session").and_then(serde_json::Value::as_str).unwrap_or("").to_string(),
+                ms,
+            )),
+            "recall-slow" => recall_slow.push((
                 v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0),
                 v.get("session").and_then(serde_json::Value::as_str).unwrap_or("").to_string(),
                 ms,
@@ -182,7 +193,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         ("malformedLines".to_string(), Json::Int(i64::try_from(malformed).unwrap_or(i64::MAX))),
         ("sessionsSeen".to_string(), Json::Int(i64::try_from(sessions.len()).unwrap_or(i64::MAX))),
         ("perEvent".to_string(), Json::Arr(events_json)),
-        ("recall".to_string(), recall_degradation(&recall_skips, user_prompt_fires)),
+        ("recall".to_string(), recall_degradation(&recall_skips, &recall_slow, user_prompt_fires)),
         ("redYields".to_string(), Json::Int(i64::try_from(red_yields).unwrap_or(i64::MAX))),
         // issue230: spoken advisories vs silent fires, and the repeat-as-ignore signal. APPROXIMATE
         // by stated design: heeded = issued without the same advice hash recurring in-session; a
@@ -317,5 +328,34 @@ mod tests {
         let up = d["perEvent"].as_array().expect("perEvent").iter().find(|e| e["event"] == "user-prompt").expect("user-prompt row").clone();
         assert!(up["msMedian"] == 750 || up["msMedian"] == 700 || up["msMedian"] == 800, "a value from the sample: {up}");
         assert_eq!(up["msMax"], 3300, "the tail is reported beside the count");
+    }
+
+    /// D0390 (2026-09-09): past the cap the facts are pushed LATE and counted `recall-slow`; the report
+    /// counts slow BESIDE the pre-D0390 skipped, each with its rate and named turns.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup
+    fn recall_slow_is_counted_beside_the_pre_d0390_skipped() {
+        let root = std::env::temp_dir().join("keel-pm-recall-slow");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keel").join("metrics")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let lines = [
+            r#"{"ts":10,"session":"s1","event":"user-prompt","decision":"allow","exit":0,"ms":700}"#,
+            r#"{"ts":20,"session":"s1","event":"user-prompt","decision":"allow","exit":0,"ms":4000}"#,
+            r#"{"ts":20,"session":"s1","event":"recall-slow","decision":"allow","exit":0,"ms":4000}"#,
+            r#"{"ts":30,"session":"s2","event":"user-prompt","decision":"allow","exit":0,"ms":9000}"#,
+            r#"{"ts":30,"session":"s2","event":"recall-skipped","decision":"allow","exit":0,"ms":9000}"#,
+        ]
+        .join("\n");
+        std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), lines).expect("write ledger");
+        let report = enforcement_report(&root).expect("report");
+        let d: serde_json::Value = serde_json::from_str(&report).expect("json");
+        assert_eq!(d["recall"]["slow"], 1, "the late push is counted recall-slow");
+        assert_eq!(d["recall"]["skipped"], 1, "the pre-D0390 drop is still counted");
+        assert_eq!(d["recall"]["slowRatePct"], "33.33", "one slow over three user-prompt fires");
+        let slow = d["recall"]["slowTurns"].as_array().expect("slowTurns");
+        assert!(slow.len() == 1 && slow[0]["session"] == "s1" && slow[0]["ms"] == 4000, "the slow turn is named: {slow:?}");
+        let skipped = d["recall"]["skippedTurns"].as_array().expect("skippedTurns");
+        assert!(skipped.len() == 1 && skipped[0]["ms"] == 9000, "the skipped turn is named apart: {skipped:?}");
     }
 }
