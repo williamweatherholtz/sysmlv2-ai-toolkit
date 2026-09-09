@@ -1501,4 +1501,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSynopsisCitesLiveDecisions to issue423;
+
+    part issue424 : Issue {
+        :>> id = "ee418a3d-09e2-42eb-9c9a-d4d444c165ed";
+        :>> title = "The retro-backlog guard reads d0388 but not D0388, the form every document writes";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The retro-backlog guard (guards.rs named_items) recognises a Decision only as lowercase d0NNN, while the repository's documents, CLAUDE.md, commit messages and the guard's own messages write D0NNN. Sprint 627's retro said 'already tracked by D0388 and its probe rule' and the guard reported it 'names no item at all'; sprint 626 wrote the same form and passed only because the sentence also named issue423. So a justification pointing at a real Decision in the documented spelling is unverified, and the pass it does get is accidental - the issue364 class under a different mask. Found 2026-09-09 committing sprint 627.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRetroNamesDecisionsAsWritten to issue424;
 }

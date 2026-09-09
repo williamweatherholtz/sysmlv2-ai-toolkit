@@ -5143,37 +5143,6 @@ mod tests {
         assert_eq!(bash_tokens("a \"b c\" d"), vec!["a", "b c", "d"], "quoted text glues to one token");
     }
 
-    /// The turn boundary blocks ONLY on dishonest state, and says nothing otherwise.
-    ///
-    /// This replaces a test that asserted the OVERSIGHT ADVISORY never blocks. That advisory is gone
-    /// (D0270): it counted items waiting on the human and prescribed how to look at them, guessing
-    /// from an env var whether they were at a terminal or elsewhere. With it removed the old test
-    /// asserted the existence of the thing it was policing, so it failed the moment the thing was
-    /// deleted - a test bound to a mechanism rather than to a property.
-    ///
-    /// The property that survives: nothing but `problems` can reach the block, and a green turn
-    /// RETURNS before it - silently, whether or not Decisions wait on the human (D0359;
-    /// `stop_says_nothing_about_decisions` holds that behaviourally, against a real scaffold).
-    #[test]
-    fn the_turn_boundary_blocks_only_on_dishonest_state() {
-        const MAIN_RS: &str = include_str!("main.rs");
-        let at = MAIN_RS.find("fn hook_stop(").unwrap_or(0);
-        assert!(at > 0, "hook_stop must exist");
-        let hook = &MAIN_RS[at..];
-        let block = hook.find("\"decision\": \"block\"").unwrap_or(0);
-        assert!(block > 0, "the block emit must exist");
-        assert!(
-            hook[..block].contains("if problems.is_empty() {"),
-            "the block path must sit behind the problems check, so only dishonest state can reach it"
-        );
-        let green = hook.find("if problems.is_empty() {").unwrap_or(0);
-        assert!(green > 0 && green < block, "the green branch must come first");
-        assert!(
-            hook[green..block].contains("return 0;"),
-            "and a green turn must RETURN before the block, saying nothing (D0359)"
-        );
-    }
-
     #[test]
     fn an_unknown_flag_is_a_mistake_and_never_a_root() {
         // issue133: the whole class. A mistyped flag used to BECOME the root path (or, in the

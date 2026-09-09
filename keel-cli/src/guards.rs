@@ -25,6 +25,23 @@ impl GuardReport {
         self.violations.is_empty()
     }
 
+    /// SELF-CONTRADICTION CHECK (issue180). A guard cannot find a violation in a population of zero, so
+    /// `0 scanned, 1 violation(s)` means the guard is not reporting what it examined. Three guards printed
+    /// exactly that while working correctly, which made `scanned` useless as a liveness signal - the only
+    /// signal separating a guard whose population is legitimately empty from one that is mis-aimed and
+    /// can never fire. Surfaced by the RUNNER at print time rather than per guard, so it holds for every
+    /// guard added after this one without anybody remembering to. `Some(line)` is the warning to print.
+    #[must_use]
+    pub fn self_contradiction(&self) -> Option<String> {
+        (self.scanned == 0 && !self.violations.is_empty()).then(|| {
+            format!(
+                "guard `{}` reports {} violation(s) against a scan count of 0 - it is not reporting the population it examined (issue180)",
+                self.name,
+                self.violations.len()
+            )
+        })
+    }
+
     /// Print the human report (warnings, then violations, then a summary line).
     pub fn print(&self) {
         for w in &self.warnings {
@@ -33,19 +50,8 @@ impl GuardReport {
         for v in &self.violations {
             println!("  {} {v}", crate::color::fail("ERROR"));
         }
-        // SELF-CONTRADICTION CHECK (issue180). A guard cannot find a violation in a population of
-        // zero, so `0 scanned, 1 violation(s)` means the guard is not reporting what it examined. Three
-        // guards printed exactly that while working correctly, which made `scanned` useless as a
-        // liveness signal - the only signal separating a guard whose population is legitimately empty
-        // from one that is mis-aimed and can never fire. Surfaced in the RUNNER rather than as a test,
-        // so it holds for every guard added after this one without anybody remembering to.
-        if self.scanned == 0 && !self.violations.is_empty() {
-            println!(
-                "  {}  guard `{}` reports {} violation(s) against a scan count of 0 - it is not                  reporting the population it examined (issue180)",
-                crate::color::warn("WARN"),
-                self.name,
-                self.violations.len()
-            );
+        if let Some(line) = self.self_contradiction() {
+            println!("  {}  {line}", crate::color::warn("WARN"));
         }
         println!(
             "[guard:{}] {} — {} scanned, {} warning(s), {} violation(s)",
@@ -4670,8 +4676,8 @@ mod release_tag_tests {
     /// retired record does not vouch.
     #[test]
     fn a_release_is_bound_to_its_tag_by_the_field_and_nothing_else() {
-        // release040's title honestly says "the payload shipped one patch version later" and names
-        // v0.4.1; under containment it was the first hit for the v0.4.1 tag.
+        // release040's title used to end "the payload shipped as v0.4.1" (reworded at 3dd4c2c) - honest
+        // prose that, under containment, made it the first hit for the v0.4.1 tag.
         let rows = vec![row("release040", "v0.4.0", "2c288d8"), row("release041", "v0.4.1", "b171cd7"), row("release0411", "v0.4.11", "aaaaaaa"), row("milestone", "", "61850f4")];
         let none = HashSet::new();
         assert_eq!(release_for_tag("v0.4.1", &rows, &none).map(|r| r.0.as_str()), Some("release041"), "v0.4.1 binds to its own record, not the one whose prose mentions it");
@@ -6040,15 +6046,22 @@ mod scan_count_tests {
     use super::{GuardReport, GUARD_NAMES};
 
     /// No guard may be written to report violations against a zero scan count (issue180). The RUNNER
-    /// surfaces it at print time; this pins that the check exists, since a silent regression here makes
-    /// `scanned` untrustworthy again and untrustworthy numbers get used.
+    /// surfaces it at print time through `GuardReport::self_contradiction`; a silent regression there
+    /// makes `scanned` untrustworthy again and untrustworthy numbers get used. Asserted on the value,
+    /// not on the spelling of the check (D0401).
     #[test]
     fn the_runner_flags_a_violation_against_an_empty_scan() {
-        let src = crate::corpus::read_to_string("src/guards.rs").expect("guards.rs is readable");
-        assert!(
-            src.contains("self.scanned == 0 && !self.violations.is_empty()"),
-            "the self-contradiction check must survive in GuardReport::print"
-        );
+        let report = |scanned: usize, violations: &[&str]| GuardReport {
+            name: "probe",
+            scanned,
+            warnings: vec![],
+            violations: violations.iter().map(|v| (*v).to_string()).collect(),
+        };
+        let flagged = report(0, &["x"]).self_contradiction().expect("0 scanned with a violation is the contradiction");
+        assert!(flagged.contains("probe") && flagged.contains("1 violation(s)") && flagged.contains("issue180"), "{flagged}");
+        assert_eq!(report(0, &[]).self_contradiction(), None, "an empty population with nothing found is legitimate");
+        assert_eq!(report(3, &["x"]).self_contradiction(), None, "a violation in a population is a finding, not a contradiction");
+        assert_eq!(report(3, &[]).self_contradiction(), None);
     }
 
     /// Every guard reporting a real population today keeps reporting one. Guards whose population is

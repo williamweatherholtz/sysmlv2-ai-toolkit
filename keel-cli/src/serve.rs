@@ -2881,6 +2881,46 @@ mod tests {
     const SERVE_RS: &str = include_str!("serve.rs");
     use super::{CONSOLE_HTML, build_launch_prompt, claude_in_dirs, is_localhost_origin, KEEL_API_READ_ENDPOINTS, KEEL_API_VERSION, KEEL_API_WRITE_ENDPOINTS};
 
+    /// A READ must not advance the epoch, and a WRITE must (D0167) - twice, before the handler (so it
+    /// reads fresh) and after (so the next read sees the write). This is the property that makes the
+    /// interactive surface cheap, and getting it backwards is invisible in any single request: the page
+    /// would still be correct, just 50x slower, which is how the cost hid for as long as it did.
+    ///
+    /// Observed through the real middleware, not read off its source (D0401). The epoch is one process-
+    /// wide counter that other tests bump, so the thresholds are chosen to be indifferent to them: fifty
+    /// reads must move it by fewer than fifty, fifty writes by at least a hundred (D0381).
+    #[tokio::test]
+    async fn the_epoch_is_advanced_by_writes_and_not_by_reads() {
+        use axum::routing::get;
+        use tower::ServiceExt as _;
+        let app = axum::Router::new()
+            .route("/x", get(|| async { "read" }).post(|| async { "write" }))
+            .layer(axum::middleware::from_fn(super::log_request));
+        let send = |method: axum::http::Method| {
+            let app = app.clone();
+            async move {
+                let req = axum::http::Request::builder().method(method).uri("/x").body(axum::body::Body::empty()).unwrap();
+                let resp = app.oneshot(req).await.unwrap();
+                assert_eq!(resp.status(), axum::http::StatusCode::OK);
+            }
+        };
+        let before = crate::fingerprint::epoch();
+        for _ in 0..50 {
+            send(axum::http::Method::GET).await;
+        }
+        let after_reads = crate::fingerprint::epoch();
+        assert!(after_reads - before < 50, "fifty reads moved the epoch by {} - a read is not a point in time", after_reads - before);
+        for _ in 0..50 {
+            send(axum::http::Method::POST).await;
+        }
+        let after_writes = crate::fingerprint::epoch();
+        assert!(
+            after_writes - after_reads >= 100,
+            "fifty writes moved the epoch by {} - each must bump before AND after the handler",
+            after_writes - after_reads
+        );
+    }
+
     /// A body that already carries `viewStatus` is not stamped twice (found live: whats-next and
     /// verification rendered the key twice), and the other three shapes still are.
     #[test]

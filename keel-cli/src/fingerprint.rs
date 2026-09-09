@@ -57,6 +57,13 @@ pub fn new_epoch() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
 }
 
+/// The current epoch - a counter with no meaning but ORDER. Read by the serve middleware's test to
+/// observe that reads leave it alone and writes move it (D0167); nothing computes from its value.
+#[must_use]
+pub fn epoch() -> u64 {
+    EPOCH.load(Ordering::SeqCst)
+}
+
 /// Serialises the fingerprint COMPUTE so a parallel cold burst does one walk (see [`of`]).
 static COMPUTE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -127,34 +134,6 @@ mod tests {
         let fb = of(b);
         assert_eq!(of(a), fa, "asking again for the same root in one epoch must be stable");
         assert_ne!(fa, fb, "two different trees must not share one memoized fingerprint");
-    }
-
-    /// A READ must not advance the epoch, and a WRITE must (D0167). This is the property that makes the
-    /// interactive surface cheap, and getting it backwards is invisible in any single request: the page
-    /// would still be correct, just 50x slower, which is exactly how the cost hid for as long as it did.
-    #[test]
-    fn the_epoch_is_advanced_by_writes_and_observations_not_by_reads() {
-        let src = std::fs::read_to_string("src/serve.rs").expect("serve.rs is readable");
-        let mw = src
-            .split_once("async fn log_request")
-            .expect("the request middleware exists")
-            .1;
-        let body = &mw[..mw.find("
-async fn ").unwrap_or(mw.len())];
-        assert!(
-            body.contains("let writes = method != axum::http::Method::GET"),
-            "the middleware must distinguish reads from writes before touching the epoch"
-        );
-        assert_eq!(
-            body.matches("crate::fingerprint::new_epoch()").count(),
-            2,
-            "a write bumps BEFORE (so the handler reads fresh) and AFTER (so the next read sees the write)"
-        );
-        assert!(
-            !body.contains("
-    crate::fingerprint::new_epoch();"),
-            "an UNCONDITIONAL bump in the middleware is the regression this test exists to catch"
-        );
     }
 
     /// A new epoch must re-read. Verified by observing that the memo is not consulted across a bump,
