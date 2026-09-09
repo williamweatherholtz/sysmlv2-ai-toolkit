@@ -4365,6 +4365,14 @@ fn tty_gesture() -> Option<&'static str> {
 /// refusal) and the tree-derived audit are the real controls; this is the friction layer.
 /// `Some(exit)` refuses; `None` lets the accept proceed.
 fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<i32> {
+    verdict_channel_refusal("accept", "accepting", args, tty_gesture)
+}
+
+/// The channel rules shared by `keel accept` and `keel reject` (D0393/issue414): a human's verdict on a
+/// proposed Decision, recorded from an agent session only under the declared delegation, only with
+/// their words quoted, and only when the words read the decision back. `verb` names the command in
+/// every message; `doing` is its participle for the read-back line.
+fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture: Option<&str>) -> Option<i32> {
     {
         let agent_marked = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_BRIDGE_SESSION_ID"]
             .iter()
@@ -4389,19 +4397,19 @@ fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<
                     if let (Some(dec), Some(note)) = (args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
                         let (letters, title) = decision_options_and_title(&root, dec);
                         if !keel_cli::view::read_back_names(&note, dec, &letters, &title) {
-                            eprintln!("keel accept: the quoted words do not name {dec} - read-back ratification (D0201 B) needs the human's words to refer to the decision they are accepting: its id ('{dec} B', 'decision {}'), one of its option letters, or words of its title; a bare 'yes' can be attached to anything. Nothing written.", dec.trim_start_matches(|c: char| !c.is_ascii_digit()).trim_start_matches('0'));
+                            eprintln!("keel {verb}: the quoted words do not name {dec} - read-back ratification (D0201 B) needs the human's words to refer to the decision they are {doing}: its id ('{dec} B', 'decision {}'), one of its option letters, or words of its title; a bare 'yes' can be attached to anything. Nothing written.", dec.trim_start_matches(|c: char| !c.is_ascii_digit()).trim_start_matches('0'));
                             return Some(1);
                         }
                     }
-                    eprintln!("keel accept: recording the human's acceptance under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
+                    eprintln!("keel {verb}: recording the human's verdict under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
                 }
                 (Some(d), false) => {
-                    eprintln!("keel accept: delegation {d} lets this session RECORD the human's acceptance, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair - or cite their deck/console/GitHub gesture (D0192/D0289).");
+                    eprintln!("keel {verb}: delegation {d} lets this session RECORD the human's verdict, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair - or cite their deck/console/GitHub gesture (D0192/D0289).");
                     return Some(1);
                 }
                 (None, _) => {
-                    eprintln!("keel accept: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
-                    eprintln!("  Acceptance is the human's own act: run `keel accept` from YOUR terminal, or accept from the console approve queue / the deck.");
+                    eprintln!("keel {verb}: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
+                    eprintln!("  The verdict is the human's own act: run `keel {verb}` from YOUR terminal, or give it from the console approve queue / the deck.");
                     return Some(1);
                 }
             }
@@ -4546,6 +4554,87 @@ fn cmd_accept(args: &[String]) -> i32 {
     match keel_cli::write::accept_decision(&path, decision, &sha, &date, &judged_by, &recorded_by, &note) {
         Ok(_) => {
             println!("accepted {decision} (judged by {judged_by} at {date}, against {sha})");
+            println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
+            println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
+/// `keel reject <d> --words "<verbatim>" --by <human> --date YYYY-MM-DD` (D0393/issue414): a human's
+/// REJECTION of a proposed Decision, recorded through the write API with the same channel rules as
+/// `keel accept` - delegation, quote receipt, read-back, TTY gesture, unbound-recorder refusal - and
+/// `createdBy` stamped on the result (D0299). Before this the first rejection in the project's
+/// history was a hand edit mirroring the writer's output, which no guard distinguishes from a
+/// fabricated one; `write::reject_decision` existed only behind the console.
+fn cmd_reject(args: &[String]) -> i32 {
+    let args = &fold_words_into_note(args);
+    let tty_gesture = tty_gesture();
+    if let Some(exit) = verdict_channel_refusal("reject", "rejecting", args, tty_gesture) {
+        return exit;
+    }
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
+        eprintln!("usage: keel reject <decision> --words \"<their words, verbatim>\" [--note \"<framing>\"] --by <humanActor> --date YYYY-MM-DD");
+        eprintln!("       keel reject <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
+        eprintln!();
+        eprintln!("Records a HUMAN's rejection of a proposed Decision (D0106): status becomes rejected and a");
+        eprintln!("confirmation Test with a FAIL result carries their words. Same channel rules as `keel accept`.");
+        return 2;
+    };
+    let (Some(note), Some(date)) = (flag(args, "note"), flag(args, "date")) else {
+        eprintln!("error: --note (or --words) and --date are both required. The note is the attestation; the date is when it was given.");
+        return 2;
+    };
+    let judged_by = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
+    let recorded_by = if flag(args, "by").is_some() {
+        match keel_cli::actor::resolve(&root, None) {
+            Ok(a) => a,
+            Err(msg) => {
+                eprintln!("keel reject: --by names the judge, but WHO IS RECORDING is unbound - {msg}");
+                return 2;
+            }
+        }
+    } else {
+        judged_by.clone()
+    };
+    let mut found = None;
+    for p in keel_cli::collect_sysml(&root.join(".engine").join("decisions")) {
+        if std::fs::read_to_string(&p).is_ok_and(|t| t.contains(&format!("part {decision} : Decision"))) {
+            found = Some(p);
+            break;
+        }
+    }
+    let Some(path) = found else {
+        eprintln!("error: no Decision '{decision}' under .engine/decisions/.");
+        return 2;
+    };
+    let sha = keel_cli::gitx::git()
+        .arg("-C")
+        .arg(&root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .unwrap_or_default();
+    let note = match tty_gesture {
+        Some(gesture) => keel_cli::view::note_with_tty_gesture(&note, gesture, &judged_by, &date),
+        None => note,
+    };
+    match keel_cli::write::reject_decision(&path, decision, &sha, &date, &judged_by, &recorded_by, &note) {
+        Ok(_) => {
+            println!("rejected {decision} (judged by {judged_by} at {date}, against {sha})");
             println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
             println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
             0
@@ -4940,6 +5029,7 @@ fn main() {
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
         Some("accept") => cmd_accept(rest),
+        Some("reject") => cmd_reject(rest), // D0393/issue414: the human's rejection through the write API
         Some("record") => cmd_record(rest),
         _ => print_usage(),
     };

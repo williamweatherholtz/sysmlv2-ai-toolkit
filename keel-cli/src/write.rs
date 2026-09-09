@@ -1878,10 +1878,11 @@ pub fn reject_decision(
     sha: &str,
     judged_at: &str,
     judged_by: &str,
+    recorded_by: &str,
     rationale: &str,
 ) -> Result<String, WriteError> {
     // issue185: the whole read-modify-write under one lock.
-    with_file_lock(path, || reject_decision_locked(path, decision, sha, judged_at, judged_by, rationale))
+    with_file_lock(path, || reject_decision_locked(path, decision, sha, judged_at, judged_by, recorded_by, rationale))
 }
 
 fn reject_decision_locked(
@@ -1890,6 +1891,7 @@ fn reject_decision_locked(
     sha: &str,
     judged_at: &str,
     judged_by: &str,
+    recorded_by: &str,
     rationale: &str,
 ) -> Result<String, WriteError> {
     let content = std::fs::read_to_string(path)?;
@@ -1907,7 +1909,7 @@ fn reject_decision_locked(
     let block = format!(
         "\n    // rejection judgment (D0121 review-queue; D0106 — human-judged, not fabricated)\n\
          \x20   verification {decision}Reject : Test {{ :>> id = \"{u1}\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"REJECTED: {why}\"; }}\n\
-         \x20   part {decision}RejectR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; }}\n",
+         \x20   part {decision}RejectR1 : TestResult {{ :>> id = \"{u2}\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judged_by}\"; :>> createdBy = \"{recorded_by}\"; }}\n",
     );
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
     write_atomic(path, new_content)?;

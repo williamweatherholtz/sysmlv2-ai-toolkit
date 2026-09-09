@@ -867,7 +867,8 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
     };
     let sha = git_head(&s.rootpath());
     let rationale = format!("{}{}", b.rationale, device_tag(&device));
-    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, &rationale) {
+    // D0299: the console tap is the human's own record - judge and recorder are the same person.
+    match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, judged_by, &rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
