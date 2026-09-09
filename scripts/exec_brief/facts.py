@@ -1023,6 +1023,100 @@ if _m:
     fact("releaseGuardWarnings", int(_m.group(2)), "release-recorded warnings on this tree",
          "`keel guard release-recorded . --no-receipt` summary line: %s scanned, %s warning(s)." % (_m.group(1), _m.group(2)))
 
+# ================================================================ 16. tests bound to source (D0401)
+# Which tests in keel-cli read program source, and how many assert a code-shaped literal is PRESENT in
+# it. A text scan, coarser than the Rust control (tests_bind_to_properties.rs) but run over two trees:
+# the parent of the commit that added the control (where the offenders still stood) and HEAD. Probed
+# before either number is stated (D0388): the parent tree is the known positive, HEAD the known
+# negative - its own control is green - and a scan that disagrees with either refuses.
+_CODE_TOKENS = (";", "{", "}", "==", "!=", "return ", "let ", "if ", "fn ", "=>", "()")
+_BIND_RE = re.compile(r'(?:const|static|let(?:\s+mut)?)\s+([A-Za-z_]\w*)\b[^;]*?(?:include_str!|read_to_string)\s*\([^)]*\.rs"')
+_NEEDLE_RE = re.compile(r'(!?)\s*([A-Za-z_]\w*)(?:\[[^\]]*\])?\.(?:contains|matches)\(\s*"((?:[^"\\]|\\.)*)"\s*\)')
+_LET_RE = re.compile(r'\blet\s+(?:mut\s+)?([A-Za-z_]\w*)\b[^=]*=([^;]*)')
+_CONTROL_FILE = "keel-cli/tests/tests_bind_to_properties.rs"
+
+
+def _surface_at(rev):
+    """(path, text) for every test region: src files from their first #[cfg(test)], tests/*.rs whole."""
+    ok, listing = run(["git", "-C", REPO, "ls-tree", "-r", "--name-only", rev, "keel-cli/src", "keel-cli/tests"])
+    out = []
+    for p in (listing or "").splitlines():
+        p = p.strip()
+        if not p.endswith(".rs") or p == _CONTROL_FILE:
+            continue
+        if p.startswith("keel-cli/tests/") and p.count("/") != 2:
+            continue
+        ok, text = run(["git", "-C", REPO, "show", "%s:%s" % (rev, p)])
+        if not ok or text is None:
+            continue
+        if p.startswith("keel-cli/src/"):
+            at = text.find("#[cfg(test)]")
+            if at < 0:
+                continue
+            text = text[at:]
+        out.append((p, text))
+    return out
+
+
+def _test_fns(text):
+    """Test function bodies, split at test attributes; the region's module-level text is index 0."""
+    parts = re.split(r"(?=#\[(?:test|tokio::test))", text)
+    return parts[0], parts[1:]
+
+
+def _census(rev):
+    """(source-reading tests, code-shaped positive asserts, tests carrying one)."""
+    reading, asserts, offenders = 0, 0, 0
+    for path, text in _surface_at(rev):
+        module, fns = _test_fns(text)
+        module_bound = set(_BIND_RE.findall(module))
+        for body in fns:
+            bound = set(_BIND_RE.findall(body)) | {b for b in module_bound if re.search(r"\b%s\b" % re.escape(b), body)}
+            if not bound:
+                continue
+            grown = True                       # a `let` whose right side names a bound name binds its left side too
+            while grown:
+                grown = False
+                for name, rhs in _LET_RE.findall(body):
+                    if name not in bound and any(re.search(r"\b%s\b" % re.escape(b), rhs) for b in bound):
+                        bound.add(name)
+                        grown = True
+            reading += 1
+            hits = 0
+            for neg, recv, lit in _NEEDLE_RE.findall(body):
+                if neg == "!" or not any(t in lit for t in _CODE_TOKENS):
+                    continue
+                if any(re.search(r"\b%s\b" % re.escape(b), recv) for b in bound):
+                    hits += 1
+            asserts += hits
+            offenders += 1 if hits else 0
+    return reading, asserts, offenders
+
+
+_ok_added, _added_raw = run(["git", "-C", REPO, "log", "--format=%H", "--diff-filter=A", "--", _CONTROL_FILE])
+_added = (_added_raw or "").split()
+_added_sha = _added[-1] if _added else None
+_before = _census(_added_sha + "^") if _added_sha else (None, None, None)
+_now = _census("HEAD")
+# The known positive is not "some": the control's first real-tree run named 3 tests carrying 5 asserts
+# (sprint 627), so a scan that sees fewer has missed a shape and its numbers are withheld.
+_PROBE_OK = bool(_added_sha) and _before[2] == 3 and _before[1] == 5 and _now[2] == 0
+_HOW = ("text scan over keel-cli test regions (src from the first #[cfg(test)], tests/*.rs, the control's own file "
+        "excluded): a test READS SOURCE when its body, or a module const it names, binds include_str!/read_to_string "
+        "of a .rs path, or a `let` whose right side names such a binding (to a fixpoint); an assert is CODE-SHAPED when a non-negated .contains/.matches on a bound name carries a literal "
+        "holding one of ; { } == != return let if fn => (). Probe (D0388): the parent of the commit adding the control "
+        "must show the 3 tests / 5 asserts its first run named, and HEAD none - " + ("held" if _PROBE_OK else "FAILED, numbers withheld") + ".")
+if not _PROBE_OK:
+    _before, _now = (None, None, None), (None, None, None)
+fact("sourceReadingTestsBefore", _before[0], "tests reading program source, before the rebinding", _HOW + " Tree: %s^." % (_added_sha or "?")[:7])
+fact("codeShapedAssertsBefore", _before[1], "positive code-shaped asserts on bound source, before", _HOW)
+fact("sourceBoundOffendersBefore", _before[2], "tests carrying such an assert, before", _HOW)
+fact("sourceReadingTestsNow", _now[0], "tests reading program source at HEAD", _HOW)
+fact("sourceBoundOffendersNow", _now[2], "tests carrying a code-shaped assert at HEAD", _HOW)
+_probe_fns = len(re.findall(r"\bfn probe_", read(os.path.join(REPO, _CONTROL_FILE)) or ""))
+fact("testsBindProbes", _probe_fns or None, "known-answer probes shipped with the control",
+     "count of `fn probe_` in %s: the fixtures the discriminator is run against before the tree is read (D0388)." % _CONTROL_FILE)
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
