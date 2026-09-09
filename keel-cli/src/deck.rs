@@ -177,9 +177,15 @@ mod fork_shape_tests {
 /// Returns an error string when the named decision does not exist.
 pub fn decision_cards(root: &Path, name: Option<&str>, proposed_only: bool) -> Result<String, String> {
     let idx = item_index(root);
+    // D0398: retirement is the `#Supersede` edge, not a status value - a retired Decision is never
+    // dealt as proposed, whatever its `status` field kept.
+    let retired = crate::supersede_targets(root);
     let mut cards: Vec<Json> = Vec::new();
     for (n, (uid, title, file)) in &idx {
         if !n.starts_with('d') || !file.contains("decisions/") {
+            continue;
+        }
+        if proposed_only && retired.contains(n.as_str()) {
             continue;
         }
         if let Some(want) = name {

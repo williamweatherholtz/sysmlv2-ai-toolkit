@@ -24,7 +24,7 @@ package Decision0251 {
     // Clause B permits a fetch, which D0175 forbade on a literal reading. Recorded as a typed edge
     // rather than left as prose: D0175 stands on package managers, auto-update and unrestricted
     // install scripts, and is superseded ONLY on the single-version, checksum-verified fetch.
-    #Supersede dependency from d0251 to d0175;
+    #SupersedeClause dependency from d0251 to d0175;
 
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0251Accept : Test { :>> id = "a2d664c7-36a2-464c-9f54-edd37de820c3"; :>> method = VerificationMethod::confirmation; :>> procedureText = "AUTO-ACCEPTED under standing consent (D0207). Their standing words, verbatim: 'issues raised are automatically accepted. they can be customizedly changed post-fact.' Not individually reviewed; override anytime by replying 'reject <why>' on https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/29."; }

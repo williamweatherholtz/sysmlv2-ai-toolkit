@@ -329,9 +329,10 @@ pub(super) fn compute_stale_verifications(root: &Path, model: &Model) -> HashSet
     let elem_files = build_element_files(root);
     let mut work: Vec<(String, String, &'static str, String)> = Vec::new(); // (test, element, field, sha)
     let mut keys: HashSet<String> = HashSet::new();
+    let accepted = model.standing("accepted");
     for e in model.edges.iter().filter(|e| e.kind == "verify") {
         let Some(info) = model.items.get(&e.to) else { continue };
-        if info.type_name == "Decision" && info.attrs.get("status").map(String::as_str) != Some("accepted") {
+        if info.type_name == "Decision" && !accepted.contains(&e.to) {
             continue;
         }
         let Some(field) = semantic_field(&info.type_name) else { continue };

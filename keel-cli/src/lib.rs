@@ -116,6 +116,28 @@ pub mod write;
 /// Returns an empty `Vec` if `dir` does not exist or is not readable. Served from the process's
 /// remembered walk while every directory it entered still carries the mtime it had
 /// ([`corpus::collect_sysml`]); the change detector uses [`collect_sysml_uncached`].
+/// Every target of an authored `#Supersede dependency from X to Y;` line under `.engine/decisions/`
+/// and `.tracking/` - the RETIRED set (D0384 option A / D0398). The edge is the only authored mark of
+/// retirement; `#SupersedeClause` reverses one clause and is NOT collected here. The kernel-free
+/// readers (deck, guards) share this scan; the view layer computes the same set from parsed edges
+/// (`view::Model::retired`).
+#[must_use]
+pub fn supersede_targets(root: &Path) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    let dirs = [root.join(".engine").join("decisions"), root.join(".tracking")];
+    for f in dirs.iter().flat_map(|d| collect_sysml(d)) {
+        let Ok(text) = corpus::read_to_string(&f) else { continue };
+        for line in text.lines() {
+            if let Some(rest) = line.trim_start().strip_prefix("#Supersede dependency from ") {
+                if let Some((_, to)) = rest.split_once(" to ") {
+                    out.insert(to.trim().trim_end_matches(';').trim().to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
 #[must_use]
 pub fn collect_sysml(dir: &Path) -> Vec<PathBuf> {
     corpus::collect_sysml(dir)

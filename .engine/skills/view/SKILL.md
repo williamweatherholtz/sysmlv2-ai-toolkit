@@ -34,7 +34,7 @@ audience = "reviewer"
 [select]                      # the starting set (a filter over the enriched item-table)
 type = "Requirement"          # by SysML type;  OR  item = "<name>"  for a single seed
 [select.attrs]                # authored-attribute predicates (value OR set-membership)
-# status = ["accepted", "superseded"]
+# status = ["accepted", "rejected"]
 # has_edge = "satisfy"  /  missing_edge = "deployedBySkill"   (edge presence/absence)
 
 [traverse]                    # OPTIONAL — expand along typed edges

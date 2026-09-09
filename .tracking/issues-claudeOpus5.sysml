@@ -1446,4 +1446,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcReleaseAssetsCarryChecksums to issue418;
+
+    part issue419 : Issue {
+        :>> id = "b1d45760-1936-4c2f-a980-a98ceff13e9a";
+        :>> title = "validate reads clean over a tree it did not judge";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "`keel validate .` answers `708 tracking file(s) validated clean` over a tree whose `.engine/decisions` holds a value the schema no longer has. Observed 2026-09-09 in sprint 622 (D0398, the `superseded` member leaving `DecisionStatus`): after the CONTRACT step, validate stayed green and exit 0 while `keel check-engine .` was the command that refused the member by name. The verdict is TRUE - validate judges `.tracking` only - but two authors in one day read it as the schema gate: D0398's consequences and the sprint's first DoD both said 'keel validate refuses', and the integration test had to be written against check-engine after running both. A verdict that does not name the tree it judged reads as covering the whole project. Resolver: dcValidateNamesItsScope.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcValidateNamesItsScope to issue419;
 }

@@ -92,9 +92,10 @@ pub fn decisions_report(root: &Path) -> Result<String, ViewError> {
         .collect();
 
     let mut rows: Vec<DecisionRow> = Vec::new();
-    for (name, info) in &model.items {
-        if info.type_name != "Decision" || info.attrs.get("status").map(String::as_str) != Some("accepted") {
-            continue; // accepted decisions only — zombies (non-accepted) are out of scope here
+    let accepted = model.standing("accepted");
+    for name in model.items.keys() {
+        if !accepted.contains(name) {
+            continue; // accepted AND in force only — retired / rejected / proposed are out of scope here
         }
         let charters = model.edges.iter().filter(|e| e.kind == "charteredby" && &e.to == name).count();
         let mut citations = 0;
@@ -328,7 +329,7 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
             }
             Some(f64::from(pct(overrides, reviews.max(1))))
         }
-        "accepted_decisions" => Some(cnt(model.items.values().filter(|i| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted")).count())),
+        "accepted_decisions" => Some(cnt(model.standing("accepted").len())),
         "open_findings" => {
             let done = crate::orient::done_names(root);
             let (undisp, crit) = finding_blockers(&compute_issue_resolution(&model, &done), &model);
@@ -893,14 +894,16 @@ mod trigger_tests {
 fn governance_cards(model: &Model) -> Vec<Json> {
     let decisions: Vec<&ItemInfo> = model.items.values().filter(|i| i.type_name == "Decision").collect();
     let total = decisions.len();
-    let accepted = decisions.iter().filter(|i| i.attrs.get("status").map(String::as_str) == Some("accepted")).count();
-    let superseded = decisions.iter().filter(|i| i.attrs.get("status").map(String::as_str) == Some("superseded")).count();
+    let accepted = model.standing("accepted").len();
+    // Retired = the target of a #Supersede edge (D0398); the status field has no such member.
+    let retired = model.retired();
+    let superseded = model.items.iter().filter(|(n, i)| i.type_name == "Decision" && retired.contains(n.as_str())).count();
     let proc_change = decisions.iter().filter(|i| matches!(i.marker.as_deref(), Some("ProspectiveChange" | "SafetyChange"))).count();
     let (att_total, att_missing) = compute_attestation(model);
     let att_pct = pct(att_total - att_missing.len(), att_total);
     let supersede_edges = model.edges.iter().filter(|e| e.kind == "supersede").count();
     vec![
-        card("Decisions", total.to_string(), format!("{accepted} accepted / {superseded} superseded of {total} total"), "good"),
+        card("Decisions", total.to_string(), format!("{accepted} accepted / {superseded} retired of {total} total"), "good"),
         card("Acceptance integrity", format!("{att_pct}%"), format!("{} of {att_total} accepted decisions carry an attestation event", att_total - att_missing.len()), cov_tone(att_pct)),
         card("Process-change decisions", proc_change.to_string(), format!("{proc_change} #ProspectiveChange/#SafetyChange (governed process edits, D0070)"), "good"),
         card("Supersession", supersede_edges.to_string(), format!("{supersede_edges} supersede edges (decision evolution / churn)"), if supersede_edges <= total / 3 { "good" } else { "warn" }),

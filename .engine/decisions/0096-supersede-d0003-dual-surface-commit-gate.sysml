@@ -30,4 +30,6 @@ package Decision0096 {
 
     // Decision-supersedes-decision: d0003.status -> superseded (edited in 0003-single-api-write-policy.sysml);
     // the supersede back-reference is computed (relationships.sysml). This Decision is issue045's #Resolves resolver.
+    // Decision-supersedes-decision: d0003.status -> superseded (recorded in prose; the edge authored 2026-09-09 by D0398's transform - the edge is the fact)
+    #Supersede dependency from d0096 to d0003;
 }

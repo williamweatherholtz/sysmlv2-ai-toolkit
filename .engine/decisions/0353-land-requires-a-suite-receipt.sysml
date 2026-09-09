@@ -14,7 +14,7 @@ package Decision0353 {
         :>> title = "landRequiresASuiteReceipt: keel suite runs the full suite and writes a machine-local receipt over the deliverable's fingerprint, and keel land refuses a self-build tree whose deliverable changed since the last green receipt";
         :>> createdAt = "2026-09-06";
         :>> createdBy = "claudeOpus5";
-        :>> status = DecisionStatus::superseded;  // d0356 withdrew the gate this proposed; the human was
+        :>> status = DecisionStatus::proposed;  // d0356 withdrew the gate this proposed; the human was
         // offered the withdrawal on the decision brief (2026-09-06) and did not contest it, so this
         // record is retired rather than left on their queue asking for a rule the project reversed.
         :>> context = "dcLandRequiresASuiteReceipt. On 2026-09-02 sprint 521 landed on validate plus guards alone; the full suite had last run at sprint 520; CI went red for twenty minutes on a test the suite would have caught locally. The computed control structure says CI is detective - the commit is already on main when it speaks. Today the same shape recurred twice: two pushes (0d70e27, 0fd3173) went red in CI on a Linux-only exec-permission defect the local suite could not show, and every sprint since has run the suite by hand from a background shell with the result copied into a receipt by the author - a discipline, not a control.";

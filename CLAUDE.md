@@ -32,7 +32,11 @@ Don't restate those rules here: one canonical home per fact (D0105).
 3. **Identity is an immutable UUID `id`.** Items never collide on name. `title` is a human string and may
    duplicate; `displayLabel` is computed.
 4. **Capture decisions even when they cause no action.** "We won't do X" is a first-class `Decision` that
-   `supersede`s the need. Scope = superseding Decisions, not a separate type.
+   `supersede`s the need. Scope = superseding Decisions, not a separate type. **Supersession is said ONCE, by the
+   edge (D0398, the human's option A 2026-09-09):** `#Supersede` RETIRES its target whole - out of the queue, the
+   frontier and every scorecard - and `#SupersedeClause` reverses ONE clause and leaves the target in force
+   (d0149 narrows d0129 never-rebase; d0129 stands). A retired Decision keeps the `status` it had when retired;
+   `DecisionStatus` has no `superseded` member and the instance gate (`check-engine` / `validate`) refuses one.
 5. **`schema/core` is frozen.** Schema and process-definition changes go through Change Request (§3) and
    need explicit human sign-off.
 6. **Reference procedure; don't embed it.** Record what *is* — facts, conditions, typed edges. Anything
@@ -124,9 +128,10 @@ frozen (modify it only by out-of-band Decision).
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
   refused, D0232/issue266; a receipt of the form `ci-run id=<run id> workflow=<name>` is the EXTERNAL-FACT kind - CI verifies the run
   itself, D0323/issue374; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
-  `record decision` (`--from FILE`; `--supersedes dNNNN[,..]` / `--derived-from stNNN|usNNN` or the draft's `supersedes:` /
-  `derived-from:` lines author the `#Supersede` / `#DerivedFrom` edges WITH the Decision and refuse a target that does not
-  exist, D0352 — a reversal never lands edgeless), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
+  `record decision` (`--from FILE`; `--supersedes dNNNN[,..]` / `--supersedes-clause dNNNN[,..]` / `--derived-from stNNN|usNNN`
+  or the draft's `supersedes:` / `supersedes-clause:` / `derived-from:` lines author the `#Supersede` / `#SupersedeClause` /
+  `#DerivedFrom` edges WITH the Decision and refuse a target that does not exist, D0352 — a reversal never lands edgeless; a
+  target named by BOTH is refused, D0398: retired whole or one clause reversed, never both), `record issue` (`--description-from FILE`) and `add-task` (`--dod-from FILE`) —
   **never prose as a double-quoted shell argument**: the shell EXECUTES backticks into the record, which
   has now happened FOUR times (D0224/issue256, then issue315, which also ran `keel deactivate` against
   this repo, then issue322 — the fix had been applied per-command, so the one path left unfixed was

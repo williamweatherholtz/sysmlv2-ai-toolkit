@@ -28,6 +28,6 @@ package Decision0291 {
     // QUOTE RECEIPT (D0198 shape): the human's own instruction, which this Decision carries out.
     verification d0291AcceptAttest1 : Test { :>> id = "f816a827-b306-468a-bf69-6aaef67042ff"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-09-03, in chat, verbatim: 'i don't want github issue notifications. disconnect that pipeline.  it wasn't really doing anything anyway, no?' (st088). The acceptance above is standing consent applied at record time - the first one - and this receipt is their word on the same decision."; }
     part d0291AcceptAttest1R1 : TestResult { :>> id = "4fbb3660-bd2f-46e1-bd9a-907ae3dd8877"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "10f2571"; :>> judgedAt = "2026-09-03"; :>> judgedBy = "claudeOpus5"; }
-    #Supersede dependency from d0291 to d0205;
+    #SupersedeClause dependency from d0291 to d0205;
     #DerivedFrom dependency from d0291 to st088;
 }

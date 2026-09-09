@@ -37,7 +37,7 @@ Engineering Measurement Framework + SE Leading Indicators + the model-quality ca
 - **`flow`** [OPPORTUNITY] — ready frontier, WIP, velocity (points/sprint), cycle time (refine→retro),
   time / story point, lead time (created→retro, DORA-style), predictability (point spread), throughput,
   aging WIP, open issues. (`--trend` headline = delivered-points burnup.)
-- **`governance`** [HEALTH] — decisions (accepted/superseded), acceptance integrity %, process-change
+- **`governance`** [HEALTH] — decisions (accepted / retired by a `#Supersede` edge, D0398), acceptance integrity %, process-change
   decisions (#ProspectiveChange/#SafetyChange), supersession churn.
 
 **The two numbers to watch:** verification coverage % (the headline leading indicator) and

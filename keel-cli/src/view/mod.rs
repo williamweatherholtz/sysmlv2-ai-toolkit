@@ -405,6 +405,35 @@ impl Model {
         Ok(model)
     }
 
+    /// The RETIRED set: every target of a `#Supersede` edge (D0384 option A / D0398, 2026-09-09).
+    ///
+    /// The edge is the ONLY authored mark of retirement - `DecisionStatus` has no `superseded` member
+    /// since D0398 - so a Decision's standing is its `status` read TOGETHER with this set: a `proposed`
+    /// Decision in it is not waiting, an `accepted` one in it is not in force. A `#SupersedeClause`
+    /// edge reverses one clause and does NOT retire (d0149 -> d0129 leaves never-rebase standing).
+    pub(crate) fn retired(&self) -> HashSet<String> {
+        self.edges.iter().filter(|e| e.kind == "supersede").map(|e| e.to.clone()).collect()
+    }
+
+    /// The Decisions that STAND with `status` (`proposed` / `accepted` / `rejected`): they read that
+    /// member and are not retired. Every queue, scorecard and governance scope reads its Decisions
+    /// through this one predicate, so a retired Decision cannot reach a human's queue by any of them
+    /// (issue396: d0353 sat on the queue for a day after d0356 retired it).
+    ///
+    /// Matches the enum-path suffix as well as the bare member: the authored value is
+    /// `DecisionStatus::proposed`, and matching the full path would silently stop working if the enum
+    /// were renamed, while the bare word alone would also catch a `counterproposed`.
+    pub(crate) fn standing(&self, status: &str) -> HashSet<&String> {
+        let retired = self.retired();
+        let suffix = format!("::{status}");
+        self.items
+            .iter()
+            .filter(|(n, i)| i.type_name == "Decision" && !retired.contains(n.as_str()))
+            .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with(&suffix) || s == status))
+            .map(|(n, _)| n)
+            .collect()
+    }
+
     fn build_uncached(root: &Path) -> Result<Self, ViewError> {
         let dirs = model_dirs(root);
         let mut items: HashMap<String, ItemInfo> = HashMap::new();
@@ -1622,12 +1651,7 @@ fn run_resolved(root: &Path, view_name: &str) -> Result<(ViewSpec, std::sync::Ar
 // naming + outcome correlation), so a Rust function — not a TOML filter.
 
 fn compute_attestation(model: &Model) -> (usize, Vec<String>) {
-    let mut accepted: Vec<&String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("accepted"))
-        .map(|(n, _)| n)
-        .collect();
+    let mut accepted: Vec<&String> = model.standing("accepted").into_iter().collect();
     accepted.sort();
     let missing: Vec<String> = accepted
         .iter()
@@ -1678,12 +1702,7 @@ pub fn attestation_coverage(root: &Path) -> Result<String, ViewError> {
 pub(crate) fn review_queue_json(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
 
-    let mut decisions: Vec<&String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").map(String::as_str) == Some("proposed"))
-        .map(|(n, _)| n)
-        .collect();
+    let mut decisions: Vec<&String> = model.standing("proposed").into_iter().collect();
     decisions.sort();
 
     let mut gates: Vec<&String> = model
@@ -1830,6 +1849,8 @@ fn issue_disposition(model: &Model, issue: &str) -> Option<String> {
 fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &HashSet<String, S>) -> Vec<IssueStatus> {
     let mut issues: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Issue").map(|(n, _)| n).collect();
     issues.sort();
+    // A resolving Decision completes the Issue only while it is accepted AND in force (D0398).
+    let accepted_decisions = model.standing("accepted");
     issues
         .into_iter()
         .map(|iss| {
@@ -1840,7 +1861,7 @@ fn compute_issue_resolution<S: std::hash::BuildHasher>(model: &Model, done: &Has
                 .map(|e| {
                     let is_decision = model.items.get(&e.from).is_some_and(|i| i.type_name == "Decision");
                     let complete = if is_decision {
-                        model.items.get(&e.from).and_then(|i| i.attrs.get("status")).map(String::as_str) == Some("accepted")
+                        accepted_decisions.contains(&e.from)
                     } else {
                         done.contains(e.from.as_str())
                     };
@@ -2204,13 +2225,7 @@ pub fn item_exists(root: &Path, name: &str) -> Result<bool, ViewError> {
 /// and matching the bare word would also catch a status like `counterproposed` if one were ever
 /// added — while matching the full path would silently stop working if the enum were renamed.
 fn proposed_decisions(model: &Model) -> Vec<String> {
-    let mut pending: Vec<String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision")
-        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
-        .map(|(n, _)| n.clone())
-        .collect();
+    let mut pending: Vec<String> = model.standing("proposed").into_iter().cloned().collect();
     pending.sort();
     pending
 }
@@ -2238,13 +2253,7 @@ pub fn blocked_on_acceptance(root: &Path) -> Result<HashSet<String>, ViewError> 
 
 /// Pure core of [`blocked_on_acceptance`], for self-test.
 fn blocked_by(model: &Model) -> HashSet<String> {
-    let pending: HashSet<&String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision")
-        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
-        .map(|(n, _)| n)
-        .collect();
+    let pending: HashSet<&String> = model.standing("proposed");
     model
         .edges
         .iter()
@@ -2488,11 +2497,8 @@ pub fn decision_follow_through(root: &Path) -> Result<String, ViewError> {
     let model = Model::build(root)?;
     let evidence = |item: &str| dft_evidence(&model, item);
 
-    let mut decisions: Vec<(&String, &ItemInfo)> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision" && i.attrs.get("status").is_some_and(|s| s.ends_with("accepted")))
-        .collect();
+    let accepted = model.standing("accepted");
+    let mut decisions: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(n, _)| accepted.contains(n)).collect();
     decisions.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut gaps: Vec<Json> = Vec::new();
@@ -3924,13 +3930,7 @@ pub fn contentions(root: &Path) -> Result<String, ViewError> {
     }
 
     // (2) Two still-proposed Decisions resolving the same Issue.
-    let proposed: HashSet<&String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision")
-        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
-        .map(|(n, _)| n)
-        .collect();
+    let proposed: HashSet<&String> = model.standing("proposed");
     let mut per_issue: BTreeMap<&String, Vec<&String>> = BTreeMap::new();
     for e in model.edges.iter().filter(|e| e.kind == "resolves") {
         if proposed.contains(&e.from) {
@@ -4039,13 +4039,7 @@ struct Awaiting {
 fn collect_decision_and_finding_obligations(model: &Model, awaiting: &mut Vec<Awaiting>) {
     // (1) Decisions awaiting acceptance. NOT grandfathered: a proposed Decision is a live request
     // whenever it was raised, and no obligation post-dates it — it is the obligation.
-    let mut pending: Vec<&String> = model
-        .items
-        .iter()
-        .filter(|(_, i)| i.type_name == "Decision")
-        .filter(|(_, i)| i.attrs.get("status").is_some_and(|s| s.ends_with("::proposed") || s == "proposed"))
-        .map(|(n, _)| n)
-        .collect();
+    let mut pending: Vec<&String> = model.standing("proposed").into_iter().collect();
     pending.sort();
     for d in pending {
         let info = model.items.get(d);
@@ -4594,8 +4588,8 @@ mod tests {
     #[test]
     fn enum_def_parses_members() {
         // encoding-semantics (N-18/D0120): an enum-typed attribute's domain = its declared members.
-        assert_eq!(enum_def("    enum def DecisionStatus { proposed; accepted; rejected; superseded; }"),
-            Some(("DecisionStatus".to_string(), vec!["proposed".to_string(), "accepted".to_string(), "rejected".to_string(), "superseded".to_string()])));
+        assert_eq!(enum_def("    enum def DecisionStatus { proposed; accepted; rejected; }"),
+            Some(("DecisionStatus".to_string(), vec!["proposed".to_string(), "accepted".to_string(), "rejected".to_string()])));
         assert_eq!(enum_def("enum def ActorKind { human; ai; }"),
             Some(("ActorKind".to_string(), vec!["human".to_string(), "ai".to_string()])));
         assert_eq!(enum_def("    part def Need :> X {"), None);
@@ -5126,7 +5120,7 @@ mod tests {
     #[test]
     fn select_attr_in_set() {
         let mut attrs = HashMap::new();
-        attrs.insert("status".to_string(), AttrPred::Many(vec!["accepted".to_string(), "superseded".to_string()]));
+        attrs.insert("status".to_string(), AttrPred::Many(vec!["accepted".to_string(), "rejected".to_string()]));
         let sel = Select { type_: Some("Decision".to_string()), attrs, ..Default::default() };
         assert_eq!(selects(&model(), &sel).len(), 1);
     }
@@ -5762,8 +5756,10 @@ verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> proce
     #[test]
     fn pending_acceptances_are_the_proposed_decisions_only() {
         // issue096: the console rendered the accepted-only scorecard, so it showed everything EXCEPT
-        // what needs the human. Only `proposed` is waiting — rejected and superseded are settled, and
-        // counting them would recreate the same uselessness from the other direction.
+        // what needs the human. Only `proposed` is waiting — rejected and retired are settled, and
+        // counting them would recreate the same uselessness from the other direction. Retirement is
+        // the `#Supersede` EDGE, not a status value (D0398/issue396): d0004 still READS proposed and
+        // is absent because d0005 retired it.
         let with_status = |ty: &str, status: &str| {
             let mut a = HashMap::new();
             a.insert("status".to_string(), status.to_string());
@@ -5773,11 +5769,12 @@ verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> proce
         items.insert("d0002".to_string(), with_status("Decision", "DecisionStatus::proposed"));
         items.insert("d0001".to_string(), with_status("Decision", "DecisionStatus::accepted"));
         items.insert("d0003".to_string(), with_status("Decision", "DecisionStatus::rejected"));
-        items.insert("d0004".to_string(), with_status("Decision", "DecisionStatus::superseded"));
+        items.insert("d0004".to_string(), with_status("Decision", "DecisionStatus::proposed"));
         items.insert("d0005".to_string(), with_status("Decision", "DecisionStatus::proposed"));
         // A non-Decision carrying the same attribute must not leak in.
         items.insert("someStory".to_string(), with_status("Story", "DecisionStatus::proposed"));
-        let model = Model { items, edges: Vec::new() };
+        let edges = vec![Edge { kind: "supersede".to_string(), from: "d0005".to_string(), to: "d0004".to_string() }];
+        let model = Model { items, edges };
         assert_eq!(proposed_decisions(&model), vec!["d0002".to_string(), "d0005".to_string()]);
 
         // And the empty case returns an EMPTY list rather than anything absent: orient always emits
@@ -5786,6 +5783,35 @@ verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> proce
         let mut only_accepted = HashMap::new();
         only_accepted.insert("d0001".to_string(), with_status("Decision", "DecisionStatus::accepted"));
         assert!(proposed_decisions(&Model { items: only_accepted, edges: Vec::new() }).is_empty());
+    }
+
+    #[test]
+    fn standing_is_the_status_minus_the_edge_and_a_clause_reversal_keeps_its_target() {
+        // D0398 (D0384 option A): `#Supersede` retires its target WHOLE; `#SupersedeClause` reverses one
+        // clause and leaves the target in force. Both targets keep `status = accepted` — the field is
+        // never rewritten — so the reader's predicate is status AND no incoming whole-supersede edge.
+        let with_status = |status: &str| {
+            let mut a = HashMap::new();
+            a.insert("status".to_string(), status.to_string());
+            ItemInfo { type_name: "Decision".to_string(), attrs: a, marker: None, file: String::new() }
+        };
+        let mut items = HashMap::new();
+        for d in ["dWhole", "dClause", "dNewer", "dRetiredWhileProposed"] {
+            items.insert(d.to_string(), with_status(if d == "dRetiredWhileProposed" { "DecisionStatus::proposed" } else { "DecisionStatus::accepted" }));
+        }
+        let edges = vec![
+            Edge { kind: "supersede".to_string(), from: "dNewer".to_string(), to: "dWhole".to_string() },
+            Edge { kind: "supersedeclause".to_string(), from: "dNewer".to_string(), to: "dClause".to_string() },
+            Edge { kind: "supersede".to_string(), from: "dNewer".to_string(), to: "dRetiredWhileProposed".to_string() },
+        ];
+        let model = Model { items, edges };
+        let retired = model.retired();
+        assert!(retired.contains("dWhole") && retired.contains("dRetiredWhileProposed") && !retired.contains("dClause"));
+        let accepted = model.standing("accepted");
+        assert!(accepted.contains(&"dClause".to_string()), "a clause reversal leaves its target in force");
+        assert!(accepted.contains(&"dNewer".to_string()));
+        assert!(!accepted.contains(&"dWhole".to_string()), "retired whole: out of the accepted set whatever the field says");
+        assert!(model.standing("proposed").is_empty(), "a proposed Decision retired by the edge is not waiting on anyone");
     }
 
     #[test]

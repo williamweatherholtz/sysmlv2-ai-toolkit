@@ -9,6 +9,7 @@ package Decision0075 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
     // D0075 itself changes the view MODEL (a representation/tooling decision); it edits no
     // .engine/processes|workflows file, so no process-change marker is required (D0070).
@@ -36,4 +37,6 @@ package Decision0075 {
         :>> judgedAt = "2026-06-19";
         :>> judgedBy = "wweatherholtz";
     }
+    // SUPERSEDES D0071 (recorded in prose; the edge authored 2026-09-09 by D0398's transform - the edge is the fact)
+    #Supersede dependency from d0075 to d0071;
 }

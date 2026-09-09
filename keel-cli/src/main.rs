@@ -2778,6 +2778,7 @@ fn cmd_record(args: &[String]) -> i32 {
     if args.first().map(String::as_str) != Some("decision") {
         eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
         eprintln!("       keel record decision --from DRAFT.md   (prose in a file - the sanctioned path, issue255; flags override)");
+        eprintln!("           [--supersedes dNNNN[,..]] retires each target whole | [--supersedes-clause dNNNN[,..]] reverses one clause, target stays in force (D0398); draft lines `supersedes:` / `supersedes-clause:`");
         eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
         eprintln!("       keel record statement --text \"<their exact words>\" | --from FILE --said-by A --said-at D --title T [--channel C]   (VERBATIM, D0216/D0236)");
         eprintln!("       keel record story --from-statement stNNN --title T --as-a R --i-want C --implication K [--so-that O] [--triage-note W] --at D");
@@ -2839,12 +2840,15 @@ fn cmd_record(args: &[String]) -> i32 {
     // D0352: the edges a Decision is recorded WITH - `--supersedes d0001,d0002` / a `supersedes:` line,
     // `--derived-from st001` / a `derived-from:` line - so a reversal cannot land edgeless.
     let list = |name: &str| -> Vec<String> { req(name).map(|v| v.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default() };
-    let links = w::DecisionLinks { supersedes: list("supersedes"), derived_from: list("derived-from") };
+    let links = w::DecisionLinks { supersedes: list("supersedes"), supersedes_clause: list("supersedes-clause"), derived_from: list("derived-from") };
     match w::record_decision_with_links(&root, &slug, &title, &date, &author, &context, &decision, &rationale, &consequences, marker, research.as_deref(), &links) {
         Ok((nnnn, path)) => {
             println!("recorded D{nnnn} (proposed) -> {path}");
             for d in &links.supersedes {
-                println!("  #Supersede d{nnnn} -> {d} authored with it (D0352)");
+                println!("  #Supersede d{nnnn} -> {d} authored with it (D0352): {d} is RETIRED whole");
+            }
+            for d in &links.supersedes_clause {
+                println!("  #SupersedeClause d{nnnn} -> {d} authored with it (D0398): one clause reversed, {d} stays in force");
             }
             for t in &links.derived_from {
                 println!("  #DerivedFrom d{nnnn} -> {t} authored with it (D0352)");

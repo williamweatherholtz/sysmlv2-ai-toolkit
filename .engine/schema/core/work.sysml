@@ -10,7 +10,11 @@ package EngineWork {
 
     enum def WorkKind { code; research; documentation; refactor; decision; modeling; }
     enum def WorkPriority { p0; p1; p2; p3; }
-    enum def DecisionStatus { proposed; accepted; rejected; superseded; }
+    // A Decision's standing. Retirement is NOT a member (D0384 option A / D0398, 2026-09-09): a retired
+    // Decision is the target of a `#Supersede` edge and keeps the standing it had when retired, so the
+    // fact is said once and the instance gate (`keel check-engine` here, `keel validate` under .tracking)
+    // refuses `DecisionStatus::superseded` as an unknown member.
+    enum def DecisionStatus { proposed; accepted; rejected; }
 
     part def WorkItem :> Element {
         attribute kind : WorkKind;

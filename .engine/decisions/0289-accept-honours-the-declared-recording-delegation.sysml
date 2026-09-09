@@ -29,7 +29,7 @@ package Decision0289 {
     part d0289AcceptAttest1R1 : TestResult { :>> id = "c99ef04b-8fc3-48a7-bbf4-ffc58b4010ba"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "f72aef4"; :>> judgedAt = "2026-09-03"; :>> judgedBy = "claudeOpus5"; }
 
     // What this Decision changes and where it came from - edges the auto-accepted text did not carry.
-    #Supersede dependency from d0289 to d0178;
+    #SupersedeClause dependency from d0289 to d0178;
     dependency from d0289 to d0192;
     #DerivedFrom dependency from d0289 to us076;
 }

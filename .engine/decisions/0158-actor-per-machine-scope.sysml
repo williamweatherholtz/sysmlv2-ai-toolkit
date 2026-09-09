@@ -20,7 +20,7 @@ package Decision0158 {
         :>> consequences = "issue137 resolves. No requirement changes, no Need changes, no work is added or removed — this makes an existing boundary sayable rather than moving it. THE COST: one more Decision to read before the viewer's scope is fully known, and D0115 must be read with D0158 beside it. A future reader who finds only D0115 will still be misled, which is why the supersession is a typed edge the computed views follow rather than a note. NOT SETTLED HERE: whether the console should ever be reachable beyond localhost — that is D0157, deferred with the human as its trigger.";
     }
 
-    #Supersede dependency from d0158 to d0115;
+    #SupersedeClause dependency from d0158 to d0115;
     #Resolves dependency from d0158 to issue137;
 
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)

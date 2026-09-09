@@ -36,7 +36,16 @@ package EngineRelationships {
 
     // #Satisfy / #Verify / #Allocate markers dropped — those edges are native.
     metadata def DependsOn;
+    // #Supersede RETIRES its target whole (D0384 option A / D0398, 2026-09-09): the target leaves
+    // every in-force scope - the acceptance queue, the frontier, the decisions scorecard - and its
+    // `status` keeps the standing it had when retired. The edge is the ONLY authored mark of
+    // retirement; `DecisionStatus` has no `superseded` member and the instance gate (`keel check-engine`
+    // under .engine, `keel validate` under .tracking) refuses one as an unknown enum member.
     metadata def Supersede;
+    // #SupersedeClause reverses ONE clause of its target, named in the source's text, and leaves the
+    // target in force. Seven Decision reversals carry this scope (d0149 -> d0129 leaves never-rebase
+    // standing); without it the readers of `supersede` would retire Decisions still in force.
+    metadata def SupersedeClause;
     metadata def OrderingOnly;
     // #CharteredBy: work item -> the originating item (Decision / Need / Requirement) that
     // chartered it (D0068, charter-lineage governance). Authored as a marked dependency:

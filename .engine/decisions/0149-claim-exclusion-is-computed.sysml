@@ -26,7 +26,7 @@ package Decision0149 {
 
     // Supersedes only the exclusion CLAUSE of D0129 — the rest of that Decision stands, which is why
     // this is a typed edge to the Decision rather than a rewrite of it.
-    #Supersede dependency from d0149 to d0129;
+    #SupersedeClause dependency from d0149 to d0129;
 
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0149Accept : Test { :>> id = "af88c9c4-48db-4dbb-9a44-df990c152d19"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-08-15, verbatim: 'confirmed'. Given in direct reply to a message that asked about D0149 SPECIFICALLY and separately, after their earlier 'approved' had been recorded against D0150 alone rather than assumed to cover both. The message stated what D0149 corrects (the claim-exclusion clause sprint 300's two-clone test disproved), that it NARROWS rather than discards the claim - a rejected push is genuinely first-to-land-wins for integration, but yields no exclusion over a claimed item because after the mandatory merge both claims coexist - and what accepting permits: correcting the distributed-collaboration process text, its SKILL.md, and the srDcWorkClaim requirement statement, which still contains the disproved clause and is why that requirement was left unlinked by #Verify."; }

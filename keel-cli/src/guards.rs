@@ -1298,7 +1298,10 @@ pub fn acceptance_binds_to_text(root: &Path) -> GuardReport {
     if files.is_empty() {
         return GuardReport { name: "acceptance-binds-to-text", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
     }
-    // Every accepted Decision with a result: (rel path, decision, sha, head text).
+    // Every accepted Decision IN FORCE with a result: (rel path, decision, sha, head text). A retired
+    // Decision - the target of a `#Supersede` edge (D0398) - keeps the standing it had when retired, but
+    // its text is no longer what anyone is bound to; the superseder's is, and that one is checked.
+    let retired = crate::supersede_targets(root);
     let mut accepted: Vec<(String, String, String, String)> = Vec::new();
     for f in &files {
         let Ok(text) = crate::corpus::read_to_string(f) else { continue };
@@ -1307,6 +1310,9 @@ pub fn acceptance_binds_to_text(root: &Path) -> GuardReport {
         }
         let Some(i) = text.find("part d0") else { continue };
         let dec: String = text[i + 5..].chars().take_while(|c| c.is_alphanumeric()).collect();
+        if retired.contains(&dec) {
+            continue;
+        }
         let Some(sha) = latest_acceptance_sha(&text, &dec) else { continue };
         let rel = relpath(root, f);
         accepted.push((rel, dec, sha, text));
@@ -4572,18 +4578,7 @@ pub fn release_recorded(root: &Path) -> GuardReport {
     // (issue100). Without this, a correction made through the engine's OWN sanctioned mechanism -
     // and the only one available to a non-owner (D0108) - could never clear the warning, so the
     // warning was unresolvable by construction and therefore permanent noise.
-    let mut superseded: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for f in crate::collect_sysml(&root.join(".tracking")) {
-        let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
-        for line in text.lines() {
-            let l = line.trim_start();
-            if let Some(rest) = l.strip_prefix("#Supersede dependency from ") {
-                if let Some((_, to)) = rest.split_once(" to ") {
-                    superseded.insert(to.trim().trim_end_matches(';').trim().to_string());
-                }
-            }
-        }
-    }
+    let superseded = crate::supersede_targets(root);
     // Every authored Release block: (name, title, commit).
     let mut releases: Vec<(String, String, String)> = Vec::new(); // (name, title, commit)
     for f in crate::collect_sysml(&root.join(".tracking")) {
@@ -4701,13 +4696,28 @@ pub fn enrollment_binding(root: &Path) -> GuardReport {
 /// title (one word before the colon), a substantive rationale, a RESEARCH statement grounding the
 /// choice, and per-option implications (a COST per OPTION). Non-fork decisions auto-accept under the
 /// standing consent and are not scanned here. Accepted history is out of scope (status filter).
+/// The `dNNNN` names declared in one decision file (`part dNNNN : Decision`), in order.
+fn decision_names_in(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|l| l.trim_start().strip_prefix("part "))
+        .filter_map(|r| r.split_once(" : Decision").map(|(n, _)| n.trim().to_string()))
+        .filter(|n| n.starts_with('d') && n.len() == 5 && n[1..].chars().all(|c| c.is_ascii_digit()))
+        .collect()
+}
+
 #[must_use]
 pub fn judgment_request_quality(root: &Path) -> GuardReport {
     let mut scanned = 0usize;
     let mut violations = Vec::new();
+    // D0398: a retired Decision (the target of a #Supersede edge) reaches out to nobody, whatever
+    // its status field kept - its quality as a request is no longer anyone's concern.
+    let retired = crate::supersede_targets(root);
     for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
         let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
         if !text.contains("status = DecisionStatus::proposed") {
+            continue;
+        }
+        if decision_names_in(&text).iter().all(|d| retired.contains(d.as_str())) {
             continue;
         }
         let rel = relpath(root, &path);

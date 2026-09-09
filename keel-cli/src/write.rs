@@ -1593,7 +1593,10 @@ pub fn record_decision(
 /// D0289's text did not. A reversal authored WITH its edge cannot land edgeless.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct DecisionLinks {
+    /// `#Supersede` targets: each is RETIRED whole by this Decision (D0398).
     pub supersedes: Vec<String>,
+    /// `#SupersedeClause` targets: one clause of each is reversed and the target stays in force (D0398).
+    pub supersedes_clause: Vec<String>,
     pub derived_from: Vec<String>,
 }
 
@@ -1609,6 +1612,14 @@ impl DecisionLinks {
                 return Err(WriteError::Parse(format!("--supersedes {d}: no Decision `{d}` is on disk under .engine/decisions/ - a #Supersede edge to nothing is worse than none (every reader would treat it as present)")));
             }
         }
+        for d in &self.supersedes_clause {
+            if !decision_on_disk(root, d) {
+                return Err(WriteError::Parse(format!("--supersedes-clause {d}: no Decision `{d}` is on disk under .engine/decisions/ - a #SupersedeClause edge to nothing names a clause of nothing")));
+            }
+            if self.supersedes.contains(d) {
+                return Err(WriteError::Parse(format!("{d} is named by both --supersedes and --supersedes-clause - a Decision is retired whole OR has one clause reversed, never both (D0398)")));
+            }
+        }
         for t in &self.derived_from {
             let ok = (t.starts_with("st") || t.starts_with("us")) && crate::view::item_exists(root, t).unwrap_or(false);
             if !ok {
@@ -1622,6 +1633,9 @@ impl DecisionLinks {
         let mut out = String::new();
         for d in &self.supersedes {
             let _ = writeln!(out, "    #Supersede dependency from {dname} to {d};");
+        }
+        for d in &self.supersedes_clause {
+            let _ = writeln!(out, "    #SupersedeClause dependency from {dname} to {d};");
         }
         for t in &self.derived_from {
             let _ = writeln!(out, "    #DerivedFrom dependency from {dname} to {t};");

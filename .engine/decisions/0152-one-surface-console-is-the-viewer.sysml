@@ -21,7 +21,7 @@ package Decision0152 {
 
     // Supersedes only D0114's SHAPE choice. The rest of that Decision — the versioned read API as the
     // seam, and keel remaining authoritative — is retained and restated above, not discarded.
-    #Supersede dependency from d0152 to d0114;
+    #SupersedeClause dependency from d0152 to d0114;
 
     // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
     verification d0152Accept : Test { :>> id = "b4e9c07a-52d1-4f86-9a3b-6e18d2c40f75"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz, 2026-08-16, verbatim: 'I like the one app but filtered idea. I think that's the best balance between focus, usefulness, and flexibility. let's proceed with that. supercede d0114 if we need to.' — given in direct reply to a critique that set out the case for and against one surface, including that merging supersedes D0114 and that the audiences genuinely differ. Confirmed again at the Business gate on 2026-08-16 with 'looks great, proceed', authorising the architecture phase in which this Decision is recorded. Recording was deliberately HELD until after the Needs gate: the human's permission predated it, but the business-architecture ordering rule puts an architecture Decision after the Needs it serves are accepted, and recording it earlier would have been the issue054 defect."; }

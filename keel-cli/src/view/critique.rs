@@ -128,16 +128,17 @@ pub(super) fn compute_critique_coverage<S: std::hash::BuildHasher>(
 ) -> Vec<CritiqueCoverage> {
     // Targets = the policy's declared types (D0097). Decisions are critiqued only once accepted (an
     // accepted Decision is a final commitment) — that accepted-only rule is intrinsic, not config.
-    let is_target = |i: &ItemInfo| {
+    let accepted = model.standing("accepted");
+    let is_target = |n: &String, i: &ItemInfo| {
         if !policy.is_target_type(&i.type_name) {
             return false;
         }
         if i.type_name == "Decision" {
-            return i.attrs.get("status").map(String::as_str) == Some("accepted");
+            return accepted.contains(n);
         }
         true
     };
-    let mut targets: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(_, i)| is_target(i)).collect();
+    let mut targets: Vec<(&String, &ItemInfo)> = model.items.iter().filter(|(n, i)| is_target(n, i)).collect();
     targets.sort_by(|a, b| a.0.cmp(b.0));
     targets
         .into_iter()
@@ -429,8 +430,9 @@ pub fn decision_requirement_prose_links(root: &Path) -> Result<Vec<(String, Stri
     let model = Model::build(root)?;
     let reqs: Vec<&String> = model.items.iter().filter(|(_, i)| i.type_name == "Need" || i.type_name == "SystemRequirement").map(|(n, _)| n).collect();
     let mut out: Vec<(String, String)> = Vec::new();
+    let accepted = model.standing("accepted");
     for (dname, dinfo) in &model.items {
-        if dinfo.type_name != "Decision" || dinfo.attrs.get("status").map(String::as_str) != Some("accepted") {
+        if !accepted.contains(dname) {
             continue;
         }
         let own_digits: String = dname.chars().filter(char::is_ascii_digit).take(4).collect();

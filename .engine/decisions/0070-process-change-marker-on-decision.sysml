@@ -40,4 +40,6 @@ package Decision0070 {
         :>> judgedAt = "2026-06-18";
         :>> judgedBy = "wweatherholtz";
     }
+    // Supersedes D0069 (recorded in prose; the edge authored 2026-09-09 by D0398's transform - the edge is the fact)
+    #Supersede dependency from d0070 to d0069;
 }

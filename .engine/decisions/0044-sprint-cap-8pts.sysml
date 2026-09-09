@@ -7,6 +7,7 @@ package Decision0044 {
     private import EngineElement::*;
     private import EngineWork::*;
     private import EngineVerification::*;
+    private import EngineRelationships::*;
 
     part d0044 : Decision {
         :>> id = "a46ed6da-7d16-4deb-a969-12b630de37d8";
@@ -22,4 +23,6 @@ package Decision0044 {
 
     verification d0044Accept : Test { :>> id = "a86a24c7-8cec-4f78-9108-44c8c49ee337"; :>> method = VerificationMethod::confirmation; :>> procedureText = "wweatherholtz attests acceptance of decision d0044 (D0066 acceptance-events migration, attested 2026-06-17); prior record: status=accepted + file prose."; }
     part d0044AcceptR1 : TestResult { :>> id = "f4ac5fa1-3c19-4a8f-94cb-83e8af404999"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e146621"; :>> judgedAt = "2026-06-17"; :>> judgedBy = "wweatherholtz"; }
+    // superseded by D0044 (recorded in prose; the edge authored 2026-09-09 by D0398's transform - the edge is the fact)
+    #Supersede dependency from d0044 to d0038;
 }
