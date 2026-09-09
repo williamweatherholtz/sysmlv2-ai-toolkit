@@ -965,6 +965,20 @@ fact("userPromptOverCap", _over, "fires over the 2,500 ms recall cap",
 fact("recallSkippedCounted", (_er.get("recall") or {}).get("skipped"), "recall-skipped events since D0389",
      ER_HOW + "`recall.skipped`.")
 
+# ================================================================ 14. script probes in CI (D0394)
+# How many scripts under scripts/ ship a known-answer entry point (--probe / --self-test), and whether
+# CI runs them. Read from the tree.
+_probe_scripts = []
+for _p in glob.glob(os.path.join(REPO, "scripts", "**", "*.py"), recursive=True):
+    _t = read(_p) or ""
+    if "--probe" in _t or "--self-test" in _t:
+        _probe_scripts.append(os.path.relpath(_p, REPO).replace(os.sep, "/"))
+fact("scriptsWithProbes", len(_probe_scripts) or None, "scripts under scripts/ shipping a known-answer entry point",
+     "count of scripts/**/*.py whose text declares `--probe` or `--self-test`: " + (", ".join(sorted(_probe_scripts)) or "none") + ".")
+_ci = read(os.path.join(REPO, ".github", "workflows", "ci.yml")) or ""
+fact("ciRunsProbes", ("--probe" in _ci or "--self-test" in _ci), "does CI run the script probes",
+     ".github/workflows/ci.yml mentions `--probe` or `--self-test`: today it does not, so these checks run only by hand.")
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
