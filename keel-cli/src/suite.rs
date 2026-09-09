@@ -14,6 +14,12 @@
 //! THE FINGERPRINT is over the deliverable's CONTENT ON DISK, tracked or not: `keel-cli/`, the
 //! embedded `.engine/`, `keelw`, and the two Cargo manifests. It still answers "was this exact tree
 //! tested", which is worth knowing even when nothing refuses on the answer.
+//!
+//! THE RECEIPT SAYS WHAT WAS MEASURED (issue386). Two ways a run can end without measuring the code
+//! are told apart from a red: launched from the very image `cargo test --release` relinks, the
+//! command refuses BEFORE the running stub (on Windows the file is locked; the copy remedy is named);
+//! and a cargo exit with no `test result:` line restores the previous receipt rather than writing
+//! `fail - 0 passed, 0 failed` over a tree the tests never saw.
 
 use sha2::{Digest as _, Sha256};
 use std::path::{Path, PathBuf};
@@ -146,6 +152,58 @@ fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
+/// The directory `cargo test --release` writes for this repository: `CARGO_TARGET_DIR` when set,
+/// else `<repo>/target`.
+#[must_use]
+pub fn target_dir(repo: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| repo.join("target"), PathBuf::from)
+}
+
+/// Is `exe` a file the release build REWRITES - `<target>/release/keel(.exe)` or anything under
+/// `<target>/release/deps/`? Pure, so the collision is testable on a host that would not lock it.
+///
+/// issue386: on Windows a running image cannot be replaced, so a suite launched from the binary
+/// cargo is about to relink fails with `Access is denied (os error 5)` before any test runs, and
+/// used to record `fail - 0 passed, 0 failed` as if the code had been measured. Deliberately NARROW:
+/// a copy at `<target>/release/keel-serve.exe` (the documented remedy, issue150) sits in the same
+/// directory and does not collide, because cargo never writes it.
+#[must_use]
+pub fn image_collides(exe: &Path, target: &Path) -> bool {
+    let release = target.join("release");
+    let Ok(rel) = exe.strip_prefix(&release) else { return false };
+    let mut parts = rel.components();
+    let Some(first) = parts.next() else { return false };
+    let first = first.as_os_str().to_string_lossy();
+    if parts.next().is_none() {
+        return first == format!("keel{}", std::env::consts::EXE_SUFFIX);
+    }
+    first == "deps"
+}
+
+/// The reason `keel suite` will not run from this image, or `None`. Refuses only where the lock
+/// is real (Windows); elsewhere the build replaces the file under a running process without harm.
+fn own_image_refusal(repo: &Path) -> Option<String> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let exe = std::env::current_exe().ok()?;
+    let target = target_dir(repo);
+    let exe_c = exe.canonicalize().unwrap_or_else(|_| exe.clone());
+    let target_c = target.canonicalize().unwrap_or_else(|_| target.clone());
+    if !(image_collides(&exe, &target) || image_collides(&exe_c, &target_c)) {
+        return None;
+    }
+    let release = target.join("release");
+    let copy = release.join(format!("keel-serve{}", std::env::consts::EXE_SUFFIX));
+    Some(format!(
+        "keel suite: this command is running from {} - the very file `cargo test --release` relinks. On this host a running image cannot be replaced, so the build would fail with `Access is denied` before any test ran (issue386). Run the suite from a copy cargo does not write:\n  cp {} {}\n  {} suite\nNo receipt was written: nothing was measured.",
+        exe.display(),
+        release.join(format!("keel{}", std::env::consts::EXE_SUFFIX)).display(),
+        copy.display(),
+        copy.display()
+    ))
+}
+
 /// `keel suite [-- <cargo test args>]`: run the full suite, write the log and the receipt, exit as
 /// cargo did. Always `--no-fail-fast`, so the receipt's counts are the whole population.
 #[must_use]
@@ -167,8 +225,15 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
         eprintln!("keel suite: cannot create {}: {e}", metrics.display());
         return 1;
     }
+    if let Some(reason) = own_image_refusal(repo) {
+        eprintln!("{reason}");
+        return 2;
+    }
     let started = now_secs();
     let log = metrics.join(format!("suite-{started}.log"));
+    // Kept so a run that never reaches a test can put it back: a receipt says what was MEASURED, and
+    // a build failure measured nothing (issue386).
+    let previous = std::fs::read_to_string(repo.join(RECEIPT)).ok();
     // D0387/issue399: the previous receipt is REPLACED by a running stub before cargo starts, so a run
     // that is killed leaves `outcome = "running"` - not green, not counted - rather than the last
     // completed run's verdict standing over a tree it never saw. Same fingerprint as the final receipt
@@ -196,6 +261,25 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     let _ = std::fs::write(&log, &text);
     let (passed, failed) = count_results(&text);
+    if never_ran(out.status.success(), passed, failed) {
+        // The build (or cargo itself) failed before a single test binary reported: no verdict about
+        // the code exists, so none is recorded. The previous receipt stands as what was last measured.
+        match previous {
+            Some(p) => {
+                if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), p) {
+                    eprintln!("keel suite: previous receipt could not be restored: {e}");
+                }
+            }
+            None => {
+                let _ = std::fs::remove_file(repo.join(RECEIPT));
+            }
+        }
+        for l in text.lines().filter(|l| l.starts_with("error")).take(5) {
+            eprintln!("  {l}");
+        }
+        eprintln!("keel suite: cargo exited {} before any test ran - the deliverable was NOT measured, no receipt written (log -> {})", out.status.code().map_or_else(|| "by signal".to_string(), |c| c.to_string()), log.display());
+        return 2;
+    }
     let outcome = if out.status.success() && failed == 0 { "pass" } else { "fail" };
     let fp = match fingerprint(repo) {
         Ok(f) => f,
@@ -215,6 +299,13 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     if outcome == "pass" { 0 } else { 101 }
 }
 
+/// Did cargo fail without a single `test result:` line - a build or tool failure, not a verdict?
+/// Pure: `(cargo succeeded, passed, failed)`.
+#[must_use]
+pub const fn never_ran(cargo_ok: bool, passed: u64, failed: u64) -> bool {
+    !cargo_ok && passed == 0 && failed == 0
+}
+
 /// A path for tests to plant a receipt.
 #[must_use]
 pub fn receipt_path(repo: &Path) -> PathBuf {
@@ -223,8 +314,25 @@ pub fn receipt_path(repo: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{count_results, parse_receipt, render_receipt, Receipt};
+    use super::{count_results, image_collides, never_ran, parse_receipt, render_receipt, Receipt};
     use std::path::Path;
+
+    /// THE CONTROL for issue386, meaningful on any host: the image cargo relinks collides, the
+    /// documented copy beside it does not, and a run with no `test result:` line is not a verdict.
+    #[test]
+    fn the_suite_knows_its_own_image_and_a_run_that_never_ran() {
+        let target = Path::new("repo").join("target");
+        let release = target.join("release");
+        let keel = format!("keel{}", std::env::consts::EXE_SUFFIX);
+        assert!(image_collides(&release.join(&keel), &target), "the binary cargo writes");
+        assert!(image_collides(&release.join("deps").join("keel-0123abcd.exe"), &target), "a test binary under deps");
+        assert!(!image_collides(&release.join(format!("keel-serve{}", std::env::consts::EXE_SUFFIX)), &target), "the issue150 copy is what the remedy names");
+        assert!(!image_collides(&target.join("debug").join(&keel), &target), "the debug build is not relinked by --release");
+        assert!(!image_collides(Path::new("elsewhere").join(&keel).as_path(), &target), "an installed keel");
+        assert!(never_ran(false, 0, 0), "cargo failed and nothing reported: not a verdict");
+        assert!(!never_ran(false, 3, 1), "a real red is a verdict");
+        assert!(!never_ran(true, 0, 0), "cargo succeeded with an empty filter: measured, trivially");
+    }
 
     #[test]
     fn results_are_summed_across_every_test_binary() {

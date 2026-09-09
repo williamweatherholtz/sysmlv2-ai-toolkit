@@ -374,8 +374,10 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
 - **A command running from `target/release/keel.exe` blocks the rebuild of that same file (issue150, issue386).** Serve a COPY
   (`cp target/release/keel.exe target/release/keel-serve.exe`) when you will keep building — otherwise the
   console gets killed for each build and stays down, which is how the human's queue went unwatched. **`keel suite`
-  has the same problem and reports it as a verdict**: it shells out to `cargo test --release`, cargo cannot relink
-  the running image, and the command prints `fail - 0 passed, 0 failed` over a file lock. Run it from a copy too.
+  has the same problem and REFUSES before it starts** (dcSuiteSurvivesItsOwnImage): it shells out to `cargo test
+  --release`, cargo cannot relink the running image, so a suite launched from `target/release/keel.exe` exits 2
+  naming the copy to run instead and writes no receipt; and a cargo exit with no `test result:` line restores the
+  previous receipt rather than recording `fail - 0 passed, 0 failed` over a tree the tests never saw.
 - **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
   invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
   file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with

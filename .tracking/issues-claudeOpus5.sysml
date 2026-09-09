@@ -1490,4 +1490,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcResultBindsToItsLandingCommit to issue422;
+
+    part issue423 : Issue {
+        :>> id = "7502883c-a481-44cd-9a38-2d99f9560694";
+        :>> title = "A CLI synopsis can cite a retired Decision and no control notices";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A CliCommand synopsis can cite a Decision that has since been retired, and no control notices. The cliSuite synopsis read 'the machine-local receipt keel land demands - a deliverable that changed since the last green run does not push (D0353)' in both fact homes (.engine/cli/commands.sysml and keel-cli/src/cli_facts.rs) from the day D0356 withdrew that gate until sprint 625 corrected it in passing - three days of `keel --help` describing a gate that did not exist. Guard cli-surface-declared holds the two homes EQUAL but does not read what they say; the citation of a retired Decision is checkable from facts the indexer already holds (the decision files and the #Supersede edge set, D0398). Found by reading, not by a control.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSynopsisCitesLiveDecisions to issue423;
 }
