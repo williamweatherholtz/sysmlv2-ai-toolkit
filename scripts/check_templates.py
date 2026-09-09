@@ -221,6 +221,10 @@ BRIEF_BUDGETS = [
 # human's word and not before it (D0337). None = no ceiling.
 TERSE_DECISION = ROOT / ".engine" / "decisions" / "0377-the-brief-is-terse-and-capped.sysml"
 TERSE_CEILING = 450
+# The encoding declaration a host reads before it parses: <meta charset=utf-8> in any quoting or case, or
+# the http-equiv form. Anchored to the first 1024 bytes by the caller (the browsers' prescan window).
+CHARSET_META = re.compile(r'<meta\s[^>]*(?:charset\s*=\s*["\']?\s*utf-?8|content\s*=\s*["\'][^"\']*charset=utf-?8)',
+                          re.IGNORECASE)
 
 # D0405: the reader prose carries no implementation duration. A dated fact ("since 2026-09-01") is not
 # a duration; "a day each", "five days", "two sprints", "~3 h" are. Word-number or digit, unit, optional plural.
@@ -267,6 +271,16 @@ def check_brief(path: Path, ceiling: int | None = None, raw: str | None = None,
 
     markup = markup_only(raw)          # style/script stripped: what the reader actually reads
     prose = re.sub(r"<[^>]+>", " ", markup)
+
+    # 0. the page declares its encoding where a host that sends none will look (issue401): a <meta charset>
+    # inside the first 1024 bytes, which is the prescan window every browser reads before guessing. The
+    # standing brief once carried its typographic characters as raw UTF-8 with no declaration; the publisher's
+    # wrapper supplied one, so the artifact looked right while the file rendered mojibake on any host that
+    # guessed. The characters stay - a declaration is the fix, entities are a workaround for its absence.
+    head_bytes = raw.encode("utf-8")[:1024].decode("utf-8", errors="ignore")
+    if not CHARSET_META.search(head_bytes):
+        fail("no charset declaration in the first 1024 bytes - a host that sends no charset guesses, and "
+             "the typographic characters render as mojibake; declare <meta charset=\"utf-8\"> first in the page")
 
     # 1. no references in the reader's text
     ids = sorted(set(BRIEF_ID.findall(prose)))
@@ -413,7 +427,7 @@ def check_tree(root: Path) -> list[str]:
 
 
 def _brief_fixture(title: str, ask: str, filler_words: int = 0, panels: int = 1, tabs: int | None = None,
-                   selected: int = 1, panel_words: int = 0, extra: str = "") -> str:
+                   selected: int = 1, panel_words: int = 0, extra: str = "", charset: bool = True) -> str:
     """A minimal tabbed page that satisfies every brief clause, for the self-test to vary: `panels` asks each
     in its own panel, `tabs` tab buttons (defaults to panels), `selected` of them selected, `panel_words` of
     filler inside every panel, `extra` markup inside the first panel."""
@@ -429,7 +443,8 @@ def _brief_fixture(title: str, ask: str, filler_words: int = 0, panels: int = 1,
         f'<div class="opts" data-records="d000{i}"><label><input type="radio" name="a{i}" value="x">x</label>'
         f'<label><input type="radio" name="a{i}" value="y">y</label></div></section>'
         for i in range(panels))
-    return (f'<title>Brief</title><meta name="viewport" content="width=device-width">'
+    meta = '<meta charset="utf-8">' if charset else ""
+    return (f'{meta}<title>Brief</title><meta name="viewport" content="width=device-width">'
             f'<style>:root{{}} @media (prefers-color-scheme: dark){{}} [data-theme="dark"]{{}}</style>'
             f'<h1 data-digest="title">{title}</h1><button data-copy></button>'
             f'<div class="ask"><p>{ask}</p></div><p>{filler}</p>{strip}{body}'
@@ -458,6 +473,10 @@ def self_test() -> int:
         ("80-word ask refused", check_brief(p, ceiling=None, raw=fx("The page waits.", long_ask)), ["the ask: 80 words"]),
         ("ceiling refused when given", check_brief(p, ceiling=450, raw=fx("The page waits.", "Accept.", 500), per_tab=False), ["reader prose: 5"]),
         ("a generous ceiling does not refuse a long page", check_brief(p, ceiling=100_000, raw=fx("The page waits.", "Accept.", 500), per_tab=False), []),
+        # issue401: the encoding is declared in the prescan window; a page carrying the character without it is refused
+        ("no charset refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", charset=False, extra="<p>Read \u2014 then answer.</p>")), ["no charset declaration in the first 1024 bytes"]),
+        ("charset past the first 1024 bytes refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", charset=False, extra="<p>Read \u2014 then answer.</p>").replace("<title>", "<!--" + "x" * 1100 + "--><meta charset=\"utf-8\"><title>", 1)), ["no charset declaration in the first 1024 bytes"]),
+        ("an http-equiv declaration passes", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", charset=False).replace("<title>", "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><title>", 1)), []),
         # D0404: tabs, panels and asks are one count; one selected
         ("two asks, two tabs, one selected passes", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", panels=2)), []),
         ("two asks under one tab refused", check_brief(p, ceiling=None, raw=fx("The page waits.", "Accept.", panels=2, tabs=1)), ["tabs, panels and asks disagree: 1 tabs, 2 panels, 2 asks"]),

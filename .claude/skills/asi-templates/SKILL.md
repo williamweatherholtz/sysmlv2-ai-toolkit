@@ -149,6 +149,13 @@ brief is the surface this binds.
   `data-members="<count>"`, whose rows name every member (`class="m"`) and what becomes of it; the
   checker refuses the verb without the table and a table whose names do not reconcile with its count.
   The remainder ("N of M stay") is computed in the builder from the same members fact, never typed.
+- **The page declares its encoding in the first 1024 bytes (D0409, issue401).** `<meta charset="utf-8">`
+  is the first element of the head. The standing brief once carried its curly quotes and dashes as raw
+  UTF-8 with no declaration; the publisher's wrapper supplied one, so every review from the publisher
+  looked right while the file rendered mojibake on any host that sent no charset (a guessing browser
+  decodes it as windows-1252). The checker reads the file's first 1024 bytes - the browsers' prescan
+  window - and refuses a page with no declaration there. Keep the characters; entities are a workaround
+  for the declaration's absence, not a substitute for it.
 - **State whether the change already ships.** Half of one queue was already running, so the only act
   left was revert — and no revert was priced. An ask that is really a ratification says so.
 
