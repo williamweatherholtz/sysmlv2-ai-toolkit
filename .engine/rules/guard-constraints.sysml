@@ -111,5 +111,6 @@ package EngineGuardConstraints {
     constraint def instrumentsDeclared;     // guard 65 (D0361): every measurement instrument is declared, and every declaration resolves
     constraint def releaseChecksumsPublished; // guard 66 (D0385): a workflow that publishes release assets hashes them and publishes the hash
     constraint def wrapperPinChecksummed;   // guard 67 (D0385), warning-tier: the pinned engine has a wrapper checksum for every asset keelw can download
+    constraint def planCoversStep;          // guard 68 (D0396): a PLAN-COVERED acceptance still holds its plan's three clauses against the tree
 
 }

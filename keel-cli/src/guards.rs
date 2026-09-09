@@ -3172,8 +3172,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 67] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed"];
+pub const GUARD_NAMES: [&str; 68] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3928,6 +3928,49 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "gating-workflow-history", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 68: a PLAN-COVERED acceptance still holds against its plan (D0396 / issue-dcSignedPlan).
+///
+/// A marker Decision accepted at record time under D0375 option C carries a `PLAN-COVERED under dNNNN
+/// step '<name>'` acceptance note: the human signed the plan, not this Decision, so the cover is only
+/// as good as the plan it cites. If the plan is later un-accepted, re-accepted under standing consent,
+/// itself becomes plan-covered, loses its decider, or its text stops naming the step, the cover is a
+/// signature that no longer exists. This guard re-runs the same three clauses `plan_cover::assess`
+/// applied at record time and FAILS any covered Decision whose plan no longer holds them - so the
+/// cover cannot outlive the plan.
+fn plan_covers_step(root: &Path) -> GuardReport {
+    let mut violations = Vec::new();
+    let mut scanned = 0usize;
+    for p in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = crate::corpus::read_to_string(&p) else { continue };
+        // the covered Decision's own name and its acceptance note
+        let Some(dname) = text.split("part d").nth(1).and_then(|r| r.split(' ').next()).map(|s| format!("d{s}")) else {
+            continue;
+        };
+        let accept_marker = format!("verification {dname}Accept ");
+        let Some(after) = text.split(&accept_marker).nth(1) else { continue };
+        let Some(note) = after.split(":>> procedureText = \"").nth(1).and_then(|r| r.split('"').next()) else {
+            continue;
+        };
+        if !note.starts_with(crate::plan_cover::TOKEN) {
+            continue;
+        }
+        scanned += 1;
+        let Some((plan_id, step)) = crate::plan_cover::parse_note(note) else {
+            violations.push(format!("{dname}: carries a {} note that cannot be parsed for its plan and step", crate::plan_cover::TOKEN));
+            continue;
+        };
+        match crate::plan_cover::assess(root, &dname, &plan_id, &step) {
+            crate::plan_cover::Cover::Covered { .. } => {}
+            crate::plan_cover::Cover::Refused { clause, detail } => {
+                violations.push(format!(
+                    "{dname}: accepted as PLAN-COVERED by {plan_id} step '{step}', but the plan no longer holds clause ({clause}): {detail}. The cover is a signature that no longer exists - re-accept {dname} with a human's own word, or restore the plan."
+                ));
+            }
+        }
+    }
+    GuardReport { name: "plan-covers-step", scanned, warnings: Vec::new(), violations }
 }
 
 /// Guard 66: a workflow that PUBLISHES release assets hashes them and publishes the hash (D0385/issue417).
@@ -5072,6 +5115,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "gating-workflow-history" => Some(gating_workflow_history(root)),
         "release-checksums-published" => Some(release_checksums_published(root)), // hard (D0385/issue417) - a published binary with no published hash
         "wrapper-pin-checksummed" => Some(wrapper_pin_checksummed(root)), // WARNING-tier (D0385/issue418) - the pin moved, the wrapper table did not
+        "plan-covers-step" => Some(plan_covers_step(root)), // hard (D0396) - a PLAN-COVERED acceptance whose plan no longer holds
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record

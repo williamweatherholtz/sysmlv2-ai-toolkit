@@ -2701,6 +2701,33 @@ fn decision_fields_from_file(path: &str) -> Result<std::collections::BTreeMap<St
     Ok(out)
 }
 
+/// D0396 / D0375 option C: accept a marker Decision at record time when a plan the human signed
+/// THEMSELVES names its step, or leave it proposed naming the clause that failed. Returns the process
+/// exit code; the caller returns it directly.
+#[allow(clippy::too_many_arguments)] // the record context this runs inside
+fn try_plan_cover(root: &Path, path: &str, dname: &str, nnnn: &str, date: &str, author: &str, plan_id: &str, step: &str) -> i32 {
+    match keel_cli::plan_cover::assess(root, dname, plan_id, step) {
+        keel_cli::plan_cover::Cover::Covered { judge } => {
+            let sha = keel_cli::gitx::git().arg("-C").arg(root).args(["rev-parse", "--short", "HEAD"]).output().ok().and_then(|o| String::from_utf8(o.stdout).ok()).map(|s| s.trim().to_owned()).unwrap_or_default();
+            let cover_note = keel_cli::plan_cover::note(plan_id, step, &judge);
+            match keel_cli::write::accept_decision(std::path::Path::new(path), dname, &sha, date, &judge, author, &cover_note) {
+                Ok(_) => {
+                    println!("accepted D{nnnn} at record time - PLAN-COVERED by {plan_id} step '{step}' (D0396); the human signed {plan_id}, and this enumerated step does not re-ask. Judge: {judge}.");
+                    0
+                }
+                Err(e) => {
+                    eprintln!("D{nnnn}: plan {plan_id} covers step '{step}', but recording the acceptance failed: {e}");
+                    1
+                }
+            }
+        }
+        keel_cli::plan_cover::Cover::Refused { clause, detail } => {
+            println!("D{nnnn} stays proposed - plan cover clause ({clause}) does not hold: {detail}. Accept with the human's own word (D0289), the console, or their terminal; or fix the plan / step name and re-record.");
+            0
+        }
+    }
+}
+
 /// D0337 (the human's answer to D0324, 2026-09-05: 'standing consent is scoped only to the existing
 /// processes under which it was promulgated'): a Decision that CHANGES the process or enforcement
 /// surface - a process-change or safety-change marker - is outside the ground the consent stands on and
@@ -2834,6 +2861,14 @@ fn cmd_record(args: &[String]) -> i32 {
             // Two distinct signals in the decision text hold it proposed and say which words; the
             // author writes it as a fork or states `NOT A FORK` in the text.
             let disguised = keel_cli::deck::disguised_fork(&decision);
+            // D0396 / D0375 option C: a marker Decision naming a STEP of a plan the human signed
+            // themselves is covered by that signature - the human signed once, on the plan, and its
+            // enumerated steps do not re-ask. Checked BEFORE standing consent, because the cover flows
+            // through a human's own signature on the plan, not through consent (which never reaches the
+            // enforcement surface, D0337).
+            if let (Some(_m), Some(plan_id), Some(step)) = (marker, req("plan"), req("step")) {
+                return try_plan_cover(&root, &path, &dname, &nnnn, &date, &author, &plan_id, &step);
+            }
             // D0337: a marker Decision is outside standing consent (see outside_standing_consent).
             if let Some(m) = marker.filter(|_| keel_cli::activation::standing_consent(&root).is_some()) {
                 return outside_standing_consent(m);

@@ -94,6 +94,7 @@ mod json;
 pub mod fingerprint;
 pub mod perf;
 pub mod pm;
+pub mod plan_cover;
 pub mod orient;
 pub mod process_cmd;
 pub mod claude_surface;
