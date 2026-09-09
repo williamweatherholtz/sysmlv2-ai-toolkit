@@ -4,10 +4,16 @@
 //! "prove the in-loop gate" step, delivered.
 //!
 //! THE LEDGER SCHEMA IS FROZEN HERE (D0180 owns the freeze): one JSON object per line in
-//! `.keel/metrics/hooks.jsonl`, fields exactly
+//! `.keel/metrics/hooks.jsonl`, whose CORE fields are exactly
 //! `ts` (unix seconds), `session` (harness session id), `event` (hook event name),
 //! `decision` ("allow" | "block"), `exit` (i32), `ms` (u64). Emitters (`ledger_emit` in the hook
 //! wrapper) and this reader are the two parties to the freeze, and the schema test binds them.
+//! Three ADDITIVE fields ride beside the core, each by its own Decision and each optional to the
+//! reader: `bin` and `build` (issue378 - which binary and build fired), and `phases` (D0414 /
+//! issue429 - present ONLY on a fire whose `ms` reached [`SLOW_FIRE_MS`], an array of
+//! `{name, ms}` naming what the fire spent its time on, longest first, with the remainder no
+//! counter covered as `unattributed`). A line without `phases` is a fast fire or one recorded
+//! before D0414; the report says which.
 //! Entirely machine-local (gitignored class): no tracked summaries until a consumer for them is
 //! named (D0144 — resolved fork B).
 //!
@@ -22,6 +28,76 @@ use std::path::Path;
 
 /// The frozen field set — the schema test asserts emitted lines carry exactly these.
 pub const LEDGER_FIELDS: [&str; 6] = ["ts", "session", "event", "decision", "exit", "ms"];
+
+/// The additive fields the reader accepts beside the core (see the module doc); anything else is
+/// a schema drift the test names.
+pub const LEDGER_ADDITIVE_FIELDS: [&str; 3] = ["bin", "build", "phases"];
+
+/// A hook fire at or past this many ms is SLOW (issue429 / D0414).
+///
+/// It carries `phases` in its ledger line and appears in `enforcement-report`'s `slowFires`. Set from
+/// the measurement that opened issue429: an idle full stop-hook run on the reference host is
+/// 2 650-2 990 ms, so a fire at 3 000 is one that did more than the idle run - and the tails (28 s,
+/// 35 s, 38 s, the 120 s watchdog) are the fires this exists to explain. A fire under it explains
+/// nothing and carries nothing.
+pub const SLOW_FIRE_MS: u64 = 3000;
+
+/// The `phases` value for a fire of `total_ms`, or `None` when the fire is not slow - the
+/// known-negative of D0414's probe pair: a fast fire carries no field at all.
+#[must_use]
+pub fn slow_fire_phases(total_ms: u64) -> Option<serde_json::Value> {
+    if total_ms < SLOW_FIRE_MS {
+        return None;
+    }
+    let rows = crate::perf::attribution(total_ms)
+        .into_iter()
+        .map(|(name, ms)| serde_json::json!({"name": name, "ms": ms}))
+        .collect::<Vec<_>>();
+    Some(serde_json::Value::Array(rows))
+}
+
+/// One `slowFires` row (D0414 / issue429): the fire's identity and its own attribution. A line
+/// recorded before D0414 has no `phases`; the row says so instead of reading as an empty attribution.
+fn slow_fire_row(v: &serde_json::Value, event: &str, ms: u64) -> Json {
+    let n = |x: u64| Json::Int(i64::try_from(x).unwrap_or(i64::MAX));
+    let phases = v.get("phases").and_then(serde_json::Value::as_array).map_or_else(
+        || Json::s("unattributed: recorded before D0414, the line carries no phases"),
+        |rows| {
+            Json::Arr(
+                rows.iter()
+                    .map(|r| {
+                        Json::Obj(vec![
+                            ("name".to_string(), Json::s(r.get("name").and_then(serde_json::Value::as_str).unwrap_or("?"))),
+                            ("ms".to_string(), n(r.get("ms").and_then(serde_json::Value::as_u64).unwrap_or(0))),
+                        ])
+                    })
+                    .collect(),
+            )
+        },
+    );
+    Json::Obj(vec![
+        ("ts".to_string(), n(v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0))),
+        ("session".to_string(), Json::s(v.get("session").and_then(serde_json::Value::as_str).unwrap_or(""))),
+        ("event".to_string(), Json::s(event)),
+        ("ms".to_string(), n(ms)),
+        ("phases".to_string(), phases),
+    ])
+}
+
+/// The `slowFires` section: the threshold, the count in the ledger, and the LAST 25 rows newest
+/// first - the tails are what the human asked about, and a row per fire is what the ledger line
+/// alone could not say (issue429).
+fn slow_fires_json(mut rows: Vec<Json>) -> Json {
+    let count = rows.len();
+    rows.reverse();
+    rows.truncate(25);
+    Json::Obj(vec![
+        ("thresholdMs".to_string(), Json::Int(i64::try_from(SLOW_FIRE_MS).unwrap_or(i64::MAX))),
+        ("count".to_string(), Json::Int(i64::try_from(count).unwrap_or(i64::MAX))),
+        ("rows".to_string(), Json::Arr(rows)),
+        ("how".to_string(), Json::s("every ledger line with ms >= thresholdMs; phases are the fire's own attribution written by the hook process (perf::attribute), longest first, remainder as unattributed")),
+    ])
+}
 
 /// (median, p90, p99, max) of a sample, in ms; zeros for an empty sample. Nearest-rank percentiles,
 /// so every reported value is one that actually occurred (D0389: a documented cost is a distribution).
@@ -118,6 +194,7 @@ fn recall_degradation(skips: &[(u64, String, u64)], slow: &[(u64, String, u64)],
 /// # Errors
 /// Never errors on an absent ledger — absence is a finding, not a failure; the `Result` signature
 /// matches the computed-view convention so serve's cache can hold it.
+#[allow(clippy::too_many_lines)] // one pass over the ledger = one place a line's every reading is made
 pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError> {
     let ledger = root.join(".keel").join("metrics").join("hooks.jsonl");
     let text = std::fs::read_to_string(&ledger).unwrap_or_default();
@@ -133,6 +210,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
     let mut advisory_repeated = 0u64;
     let mut malformed = 0u64;
     let mut lines = 0u64;
+    // D0414 / issue429: every fire at or past the slow threshold, with what it attributed itself to.
+    let mut slow_fires: Vec<Json> = Vec::new();
     for line in text.lines() {
         lines += 1;
         let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
@@ -149,6 +228,9 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         }
         let ms = v.get("ms").and_then(serde_json::Value::as_u64).unwrap_or(0);
         per_event_ms.entry(event.clone()).or_default().push(ms);
+        if ms >= SLOW_FIRE_MS {
+            slow_fires.push(slow_fire_row(&v, &event, ms));
+        }
         match event.as_str() {
             "recall-skipped" => recall_skips.push((
                 v.get("ts").and_then(serde_json::Value::as_u64).unwrap_or(0),
@@ -193,6 +275,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         ("malformedLines".to_string(), Json::Int(i64::try_from(malformed).unwrap_or(i64::MAX))),
         ("sessionsSeen".to_string(), Json::Int(i64::try_from(sessions.len()).unwrap_or(i64::MAX))),
         ("perEvent".to_string(), Json::Arr(events_json)),
+        ("slowFires".to_string(), slow_fires_json(slow_fires)),
         ("recall".to_string(), recall_degradation(&recall_skips, &recall_slow, user_prompt_fires)),
         ("redYields".to_string(), Json::Int(i64::try_from(red_yields).unwrap_or(i64::MAX))),
         // issue230: spoken advisories vs silent fires, and the repeat-as-ignore signal. APPROXIMATE
@@ -228,7 +311,7 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
 
 #[cfg(test)]
 mod tests {
-    use super::{enforcement_report, latency, LEDGER_FIELDS};
+    use super::{enforcement_report, latency, slow_fire_phases, LEDGER_ADDITIVE_FIELDS, LEDGER_FIELDS, SLOW_FIRE_MS};
 
     /// THE SCHEMA FREEZE, bound: a line emitted with exactly the frozen fields parses and counts;
     /// a malformed line is COUNTED as malformed, never silently skipped (K2 applied to evidence).
@@ -247,6 +330,9 @@ mod tests {
         let mut got = keys.clone();
         got.sort_unstable();
         assert_eq!(got, frozen, "the fixture IS the frozen schema");
+        for extra in LEDGER_ADDITIVE_FIELDS {
+            assert!(!LEDGER_FIELDS.contains(&extra), "an additive field never shadows a core one: {extra}");
+        }
         std::fs::write(
             root.join(".keel").join("metrics").join("hooks.jsonl"),
             format!("{good}\nnot json at all\n{good}\n"),
@@ -255,6 +341,7 @@ mod tests {
         let report = enforcement_report(&root).expect("report");
         let d: serde_json::Value = serde_json::from_str(&report).expect("report json");
         assert_eq!(d["ledgerLines"], 3);
+        assert_eq!(d["slowFires"]["count"], 0, "a 10 ms fire is not slow");
         assert_eq!(d["malformedLines"], 1, "a malformed line is visible, never silently skipped");
         assert_eq!(d["sessionsSeen"], 1);
         let per = d["perEvent"].as_array().expect("perEvent");
@@ -357,5 +444,40 @@ mod tests {
         assert!(slow.len() == 1 && slow[0]["session"] == "s1" && slow[0]["ms"] == 4000, "the slow turn is named: {slow:?}");
         let skipped = d["recall"]["skippedTurns"].as_array().expect("skippedTurns");
         assert!(skipped.len() == 1 && skipped[0]["ms"] == 9000, "the skipped turn is named apart: {skipped:?}");
+    }
+
+    /// D0414 / issue429: a slow fire's row carries the phases the hook wrote, longest first; a fast
+    /// fire is not a row; a slow line recorded before the field says it is unattributed rather than
+    /// reading as an empty attribution. The threshold itself is the known-negative boundary.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup
+    fn a_slow_fire_is_a_row_with_its_phases_and_a_fast_one_is_not() {
+        let root = std::env::temp_dir().join("keel-pm-slow-fires");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keel").join("metrics")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let fast = r#"{"ts":1,"session":"s1","event":"stop","decision":"allow","exit":0,"ms":217}"#;
+        let slow = r#"{"ts":2,"session":"s1","event":"stop","decision":"allow","exit":0,"ms":28000,"phases":[{"name":"hook:guards","ms":27000},{"name":"guard:priority-inversion (critical path)","ms":26900},{"name":"unattributed","ms":600}]}"#;
+        let old = r#"{"ts":3,"session":"s0","event":"stop","decision":"allow","exit":0,"ms":35000}"#;
+        std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), format!("{fast}\n{slow}\n{old}\n")).expect("write");
+        let d: serde_json::Value = serde_json::from_str(&enforcement_report(&root).expect("report")).expect("json");
+        assert_eq!(d["slowFires"]["thresholdMs"], SLOW_FIRE_MS);
+        assert_eq!(d["slowFires"]["count"], 2, "the 217 ms fire is not a row");
+        let rows = d["slowFires"]["rows"].as_array().expect("rows");
+        assert_eq!(rows[0]["ts"], 3, "newest first");
+        assert!(rows[0]["phases"].as_str().is_some_and(|s| s.contains("unattributed: recorded before D0414")), "{}", rows[0]);
+        assert_eq!(rows[1]["ms"], 28000);
+        assert_eq!(rows[1]["phases"][0]["name"], "hook:guards", "the phase the hook named first is read back first");
+        assert_eq!(rows[1]["phases"][1]["name"], "guard:priority-inversion (critical path)");
+    }
+
+    /// The ledger emitter's decision: below the threshold no field is written at all (the
+    /// known-negative); at it the field exists and always ends in an accounted remainder.
+    #[test]
+    fn a_fast_fire_carries_no_phases_and_a_slow_one_always_carries_the_remainder() {
+        assert!(slow_fire_phases(SLOW_FIRE_MS - 1).is_none());
+        let v = slow_fire_phases(SLOW_FIRE_MS).expect("a slow fire attributes itself");
+        let rows = v.as_array().expect("array");
+        assert!(rows.iter().any(|r| r["name"] == "unattributed"), "{v}");
     }
 }

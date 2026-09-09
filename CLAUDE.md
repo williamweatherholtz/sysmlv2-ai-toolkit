@@ -293,6 +293,17 @@ not dropped - the check runs after the walk, so a drop saved nothing while the m
 the fire is counted `recall-slow`; `recall-skipped` is the pre-D0390 history when facts were dropped.
 Each is a ledger line per turn, identifiable by session and time, so the memory channel's degradation is
 a rate, not a transcript line.
+**A slow hook fire explains itself (D0414/issue429).** The tails were the problem the ledger could not answer: a
+fire that took 28 s wrote `ms: 28000` and nothing else. A hook process now collects its phases without `KEEL_PERF`,
+and a fire at or past `pm::SLOW_FIRE_MS` (3 000 ms - the idle full stop run is 2.65-2.99 s on this host) carries an
+additive `phases` field: its serial steps (`hook:validate`, `hook:guards`, `hook:rules`, `hook:recall`, ...) longest
+first, the guard runner's critical path (`guard:<name> (critical path)` - the guards run in parallel, so only the
+longest bounds the wall clock), the remainder no counter covered as `unattributed` rather than omitted, then the
+summed cross-cutting counters (`git xN summed`, `parse`), which can exceed the total and never lead. A fast fire
+carries no field. `keel enforcement-report` lists them under `slowFires` (threshold, count, the last 25 rows by
+phase; a line from before D0414 says it is unattributed), the guard receipt records `critical_path`, and
+`KEEL_PERF=1 keel guard .` prints it. The first live line: 8 337 ms = `hook:guards` 7 269 of which
+`guard:priority-inversion` 7 160, `hook:validate` 578, `git x46 summed` 12 778.
 
 **A green gate answers from its receipt (D0371).** A green `keel guard`, `keel hook stop` or `keel gate` writes
 `.keel/metrics/guard-receipt.toml` keyed on every input a guard can read - HEAD, every path `git status` lists with its

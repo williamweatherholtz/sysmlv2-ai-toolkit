@@ -339,6 +339,9 @@ fn cmd_hook(args: &[String]) -> i32 {
             let _ = std::fs::write(&bl, keel_cli::fingerprint::of(&root).to_string());
         }
     }
+    // D0414 / issue429: a hook fire collects its phases whether or not KEEL_PERF is set, so a slow
+    // one can write what it spent its time on into its own ledger line.
+    keel_cli::perf::collect_phases();
     let started = std::time::Instant::now();
     let code = match event {
         "post-edit" => hook_post_edit(&payload, &root),
@@ -409,13 +412,20 @@ fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
     }
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let decision = if exit == 0 { "allow" } else { "block" };
-    let line = format!(
-        "{}\n",
-        // issue378 / GH#55: WHICH binary ran this hook, and which build - the turn-boundary surface's
-        // answer to "did the pinned engine gate this", readable from `keel status`.
-        serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": u64::try_from(ms).unwrap_or(u64::MAX),
-            "bin": std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(), "build": env!("KEEL_BUILD_COMMIT")})
-    );
+    let ms = u64::try_from(ms).unwrap_or(u64::MAX);
+    // issue378 / GH#55: WHICH binary ran this hook, and which build - the turn-boundary surface's
+    // answer to "did the pinned engine gate this", readable from `keel status`.
+    let mut record = serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": ms,
+        "bin": std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(), "build": env!("KEEL_BUILD_COMMIT")});
+    // D0414 / issue429: a SLOW fire explains itself - the phases it measured, longest first, with the
+    // remainder no counter covered named as unattributed. A fast fire carries no field (pm.rs owns the
+    // threshold and the reader).
+    if let Some(phases) = keel_cli::pm::slow_fire_phases(ms) {
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert("phases".to_string(), phases);
+        }
+    }
+    let line = format!("{record}\n");
     let appended = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -685,7 +695,7 @@ fn hook_subagent_stop(payload: &serde_json::Value, root: &Path, session: &str) -
         );
         return 0;
     };
-    if baseline.trim() == keel_cli::fingerprint::of(root).to_string() {
+    if baseline.trim() == keel_cli::perf::phase("hook:fingerprint", || keel_cli::fingerprint::of(root)).to_string() {
         return 0; // wrote nothing — pays nothing
     }
     // The tree changed under this subagent: same gate as the turn boundary.
@@ -951,7 +961,7 @@ fn recalled_facts(root: &Path, payload: &serde_json::Value, session: &str) -> Op
 fn hook_user_prompt(root: &Path, payload: &serde_json::Value, session: &str) -> i32 {
     // PUSH FIRST, then the routing contract: the facts have to be in front of the model when it wakes,
     // and the contract is what it should do with them.
-    if let Some(facts) = recalled_facts(root, payload, session) {
+    if let Some(facts) = keel_cli::perf::phase("hook:recall", || recalled_facts(root, payload, session)) {
         print!("{facts}");
     }
     // D0064/D0106: routing is structural, fired every turn rather than left to vigilance.
@@ -1031,7 +1041,7 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
     }
 
     let mut problems: Vec<String> = Vec::new();
-    let report = keel_cli::validate_root(root);
+    let report = keel_cli::perf::phase("hook:validate", || keel_cli::validate_root(root));
     for (p, d) in &report.diagnostics {
         problems.push(format!("ERROR: {}:{} — {}", p.display(), d.line, d.message));
     }
@@ -1040,7 +1050,7 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     // Only the EXACT guards — a per-edit gate must never fire on a heuristic (see cmd_gate).
     for name in ["duplicate-identity", "marker-vocabulary"] {
-        if let Some(r) = keel_cli::guards::run_one(name, root) {
+        if let Some(r) = keel_cli::perf::phase("hook:fast-guards", || keel_cli::guards::run_one(name, root)) {
             for v in &r.violations {
                 problems.push(format!("GUARD [{name}]: {v}"));
             }
@@ -1055,7 +1065,7 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
             .unwrap_or_else(|_| std::path::Path::new(path))
             .to_string_lossy()
             .replace('\\', "/");
-        let advisories = keel_cli::proactive::post_edit_advisories(root, &rel);
+        let advisories = keel_cli::perf::phase("hook:advisory", || keel_cli::proactive::post_edit_advisories(root, &rel));
         if advisories.is_empty() {
             return 0; // clean -> silent, so a passing gate costs nothing
         }
@@ -1107,15 +1117,17 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // and .keel/ inputs are byte-for-byte the ones the last green run judged is the same question, and
     // it gets the same answer without recomputing it - silently, as any green turn is (D0359). The key
     // is what makes that honest (see receipt.rs); `KEEL_NO_RECEIPT=1` forces the run.
-    let receipt_key = if keel_cli::receipt::forced(&[]) { None } else { keel_cli::receipt::key(root) };
+    let receipt_key = keel_cli::perf::phase("hook:receipt-key", || if keel_cli::receipt::forced(&[]) { None } else { keel_cli::receipt::key(root) });
     if let Some(k) = &receipt_key {
         if keel_cli::receipt::read(root, k).is_some_and(|r| r.covers_all(&keel_cli::receipt::ALL_LAYERS)) {
             return 0;
         }
     }
 
+    // Each serial step is a named phase (D0414 / issue429) so a slow fire's ledger line can say
+    // which one it was; the guard runner names its own critical path inside `hook:guards`.
     let mut problems: Vec<String> = Vec::new();
-    let report = keel_cli::validate_root(root);
+    let report = keel_cli::perf::phase("hook:validate", || keel_cli::validate_root(root));
     if !report.diagnostics.is_empty() || !report.errors.is_empty() {
         use std::fmt::Write as _;
         let mut s = String::from("keel validate:\n");
@@ -1131,7 +1143,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // process this project deactivated no longer blocks turns (D0177/P1.5 fixing the guards.rs
     // bypass the proposal cited — hook_stop was the one caller that skipped the filter).
     let mut failing: Vec<String> = Vec::new();
-    let reports = keel_cli::guards::run_all(root);
+    let reports = keel_cli::perf::phase("hook:guards", || keel_cli::guards::run_all(root));
     for r in &reports {
         for v in r.violations.iter().take(5) {
             failing.push(format!("  [{}] {v}", r.name));
@@ -1142,7 +1154,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     // Declared rules gate the turn (D0177/P1.5): blocking rules block; warning rules report only at
     // their own surfaces (`keel rules`), not here — a turn boundary repeats no warning noise.
-    match keel_cli::view::check(root) {
+    match keel_cli::perf::phase("hook:rules", || keel_cli::view::check(root)) {
         Ok(json) => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
                 let empty = Vec::new();
@@ -1655,6 +1667,12 @@ fn cmd_guard(args: &[String]) -> i32 {
         // are the set a reader is asked to read, and the counted-history lines, which are not.
         let tail = keel_cli::guards::warning_population(&reports);
         println!("[guard] {}{tail}", if all_ok { keel_cli::color::pass("ALL PASS") } else { keel_cli::color::fail("FAILED") });
+        // D0414 / issue429: the set's wall clock is bounded below by its longest guard; name it.
+        if keel_cli::perf::enabled() {
+            if let Some((name, ms)) = keel_cli::guards::critical_path() {
+                println!("[guard] critical path: {name} {ms} ms - the parallel set's wall clock is bounded below by it");
+            }
+        }
         if let Some(line) = from_receipt {
             println!("{line}");
         } else if let Some(k) = &receipt_key {

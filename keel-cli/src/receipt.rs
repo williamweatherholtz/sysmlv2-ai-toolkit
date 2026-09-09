@@ -76,6 +76,11 @@ struct Stored {
     covers: BTreeSet<String>,
     #[serde(default)]
     guards: Vec<StoredGuard>,
+    /// The longest guard of the run that wrote this receipt, `<name> <ms> ms` (issue429 / D0414);
+    /// empty when the run recorded none. Stated so the receipt says what the set's wall clock was
+    /// bounded by, not only that it was green.
+    #[serde(default)]
+    critical_path: String,
 }
 
 /// A receipt whose key equals the one the caller computed.
@@ -83,6 +88,8 @@ pub struct Receipt {
     pub age: Duration,
     pub covers: BTreeSet<String>,
     pub guards: Vec<GuardReport>,
+    /// `<guard> <ms> ms` - the critical path of the run that wrote it (D0414); empty if unrecorded.
+    pub critical_path: String,
 }
 
 impl Receipt {
@@ -247,7 +254,7 @@ pub fn read(root: &Path, key: &Key) -> Option<Receipt> {
         let name = crate::guards::GUARD_NAMES.iter().find(|n| **n == g.name)?;
         guards.push(GuardReport { name, scanned: g.scanned, warnings: g.warnings, violations: Vec::new() });
     }
-    Some(Receipt { age, covers: stored.covers, guards })
+    Some(Receipt { age, covers: stored.covers, guards, critical_path: stored.critical_path })
 }
 
 /// Record a green run; returns whether a receipt was written.
@@ -283,6 +290,7 @@ pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[Guard
             .iter()
             .map(|r| StoredGuard { name: r.name.to_string(), scanned: r.scanned, warnings: r.warnings.clone() })
             .collect(),
+        critical_path: crate::guards::critical_path_line(),
     };
     let Ok(text) = toml::to_string(&stored) else { return false };
     let p = path(root);

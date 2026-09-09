@@ -5432,6 +5432,35 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
 /// measurement patch the spike needed (docs/reviews/perf-spike-2026-09-07/phase_patch.py).
 /// Guards are pure reads of the tree (no guard writes a file or sets process state - the one
 /// `fs::write` in this module is in a test) so running them concurrently changes no answer.
+/// THE CRITICAL PATH of the last guard run (issue429 / D0414): the longest single guard by wall clock.
+///
+/// The guards run in parallel, so the set's wall clock is bounded below by its longest member and by
+/// nothing else - a sum of guard times is not a duration. Timed always, `KEEL_PERF` or not: one
+/// `Instant` per guard is nothing against a guard, and both the receipt (which states it) and a slow
+/// hook fire (which attributes to it) need the number without anyone having asked for a report.
+static CRITICAL_PATH: std::sync::Mutex<Option<(&'static str, u64)>> = std::sync::Mutex::new(None);
+
+fn note_critical_path(name: &'static str, took: std::time::Duration) {
+    let ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
+    if let Ok(mut g) = CRITICAL_PATH.lock() {
+        if g.is_none_or(|(_, best)| ms > best) {
+            *g = Some((name, ms));
+        }
+    }
+}
+
+/// The longest guard of the last run in this process, `(name, ms)`, or `None` when no guard has run.
+#[must_use]
+pub fn critical_path() -> Option<(&'static str, u64)> {
+    CRITICAL_PATH.lock().ok().and_then(|g| *g)
+}
+
+/// The critical path as the receipt and the runner print it: `priority-inversion 2102 ms`.
+#[must_use]
+pub fn critical_path_line() -> String {
+    critical_path().map(|(n, ms)| format!("{n} {ms} ms")).unwrap_or_default()
+}
+
 fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [Option<GuardReport>]) {
     let workers = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get).min(to_run.len().max(1));
     let next = std::sync::atomic::AtomicUsize::new(0);
@@ -5445,7 +5474,9 @@ fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [O
             let spawned = std::thread::Builder::new().stack_size(16 * 1024 * 1024).spawn_scoped(s, move || loop {
                 let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let Some(&(slot, name)) = to_run.get(i) else { break };
+                let t0 = std::time::Instant::now();
                 let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
+                note_critical_path(name, t0.elapsed());
                 if let Ok(mut d) = done.lock() {
                     d.push((slot, report));
                 }
@@ -5455,7 +5486,9 @@ fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [O
                 loop {
                     let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let Some(&(slot, name)) = to_run.get(i) else { break };
+                    let t0 = std::time::Instant::now();
                     let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
+                    note_critical_path(name, t0.elapsed());
                     if let Ok(mut d) = done.lock() {
                         d.push((slot, report));
                     }
