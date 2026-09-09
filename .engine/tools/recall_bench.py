@@ -28,6 +28,17 @@ CHOSEN on the default set is asking a question that set cannot answer, and the a
 generated set - never a hand-picked case, and never the eight questions of `recall_ab.py`, which are read
 only after a mechanism is already chosen.
 
+WHY A SWEEP STATES WHETHER IT COULD CHOOSE (issue405 / dcSweepSaysWhenItCouldNotChoose). Six settings of
+the second hop were once swept on the default arm by hand and every one returned 49/50 at median 3,
+byte-identical to the mechanism switched off - and that neutrality was read as a verdict, twice in
+opposite directions: once to reject a working mechanism (D0325's rare-term narrowing) and once as
+pressure to choose by the eight hand-written questions instead. Neutrality on a set with no case the
+knob applies to is not a measurement. `--sweep KNOB=v1,v2,...` runs the arm once per value and ends with
+a verdict line DERIVED FROM THE NUMBERS: DISCRIMINATED, naming the spread, or COULD NOT CHOOSE, naming
+the statistic that never moved - and, when no case's outcome changed at any value, saying so: this set
+contains no case the knob applies to. No flag sets the verdict; `--probe` runs the pure verdict on its
+known-positive and known-negative cases before anything is measured (D0388).
+
 WHAT IS MEASURED. hit: the target is among the rows the payload actually SHOWS (budget 4000). precision:
 of the rows shown, the share that are the target or its one-hop neighbours - the only mechanical
 relevance available without judging each row by hand; it is a floor, since a shown row can be relevant
@@ -37,18 +48,22 @@ arms do not search the same number of things.
 """
 import argparse
 import math
+import os
 import random
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+KNOB_PREFIX = "KEEL_RECALL_"
+
 
 def _env():
     """A clean environment plus any KEEL_RECALL_* experiment knob the caller set (the mechanism is
     chosen on the 50-case set with these before it is hardcoded)."""
-    import os
     env = {"PATH": "/usr/bin:/bin", "SYSTEMROOT": "C:\\Windows"}
-    env.update({k: v for k, v in os.environ.items() if k.startswith("KEEL_RECALL_")})
+    env.update({k: v for k, v in os.environ.items() if k.startswith(KNOB_PREFIX)})
     return env
 
 
@@ -191,16 +206,13 @@ def mcnemar_exact(b, c):
     return min(1.0, 2 * tail)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--self", action="store_true", help="the old LEAKAGE set: queries from the target's own body")
-    ap.add_argument("--cases", type=int, default=N_CASES)
-    ap.add_argument("--hops", type=int, default=1, choices=(1, 2),
-                    help="how far from the target the query's words are drawn (default 1)")
-    args = ap.parse_args()
+def median(xs):
+    xs = sorted(xs)
+    return xs[len(xs) // 2] if xs else None
 
-    elements, edges = load_elements()
-    adj = neighbours(edges)
+
+def build_cases(elements, adj, args):
+    """The seeded case list for the chosen arm, and the two-hop source map (empty off that arm)."""
     with_body = {n for n, (_t, b, _f, _ty) in elements.items() if len(b) >= MIN_BODY}
 
     def two_hop_sources(n):
@@ -231,24 +243,14 @@ def main():
         # least one linked record with a body of its own
         candidates = sorted(n for n in with_body if args.self or any(m in with_body for m in adj.get(n, ())))
     random.Random(SEED).shuffle(candidates)
-    cases = candidates[:args.cases]
-    label = (
-        "SELF (LEAKAGE - the target's own body words)" if args.self
-        else "TWO HOPS (a record two edges away, through a named intermediate)" if args.hops == 2
-        else "NEIGHBOUR (a linked record's body words)"
-    )
-    print(f"corpus: {len(elements)} elements with a title ({len(with_body)} with a body >= {MIN_BODY} chars); "
-          f"{len(edges)} typed edges; {len(candidates)} eligible targets; sampling {len(cases)}")
-    print(f"query  = {QUERY_WORDS} content words, set {label}; words naming the target (and the source) removed")
-    print(f"control= naive keyword search on the query's rarest word over name+title+body, first {BASELINE_K} hits;")
-    print("         second control = those hits plus their one-hop neighbours\n")
+    return candidates, candidates[:args.cases], with_body, two
 
-    kg_hit = base_hit = base1_hit = 0
-    base1_sizes, shown_sizes = [], []
-    both = kg_only = base_only = neither = 0
-    kg_pos, ms_all, precisions = [], [], []
-    kg_corpus = None
-    rng = random.Random(SEED + 1)
+
+def run_arm(cases, elements, adj, with_body, two, args, verbose=True):
+    """One pass over the cases on the current environment. Returns every statistic the summary prints,
+    plus the per-case outcome list a sweep compares across values."""
+    st = dict(n=len(cases), kg_hit=0, base_hit=0, base1_hit=0, both=0, kg_only=0, base_only=0, neither=0,
+              base1_sizes=[], shown_sizes=[], kg_pos=[], ms_all=[], precisions=[], kg_corpus=None, outcomes=[])
     for i, name in enumerate(cases, 1):
         title, body, _f, typ = elements[name]
         if args.self:
@@ -263,7 +265,7 @@ def main():
             src = sorted(m for m in adj[name] if m in with_body)[0]
             q = build_query(elements[src][1], name_words(name) | name_words(src))
         shown, ms, corpus = recall(q)
-        kg_corpus = kg_corpus or corpus
+        st["kg_corpus"] = st["kg_corpus"] or corpus
         b = baseline(q, elements)
         # the second control: the same grep hits PLUS their one-hop neighbours - what a searcher who
         # opened each hit and followed its edges would see. If this scores as well as the KG, the
@@ -272,48 +274,212 @@ def main():
         for hit in b:
             b1 |= adj.get(hit, set())
         h_kg, h_b = name in shown, name in b
-        base1_hit += name in b1
-        base1_sizes.append(len(b1))
-        shown_sizes.append(len(shown))
-        kg_hit += h_kg
-        base_hit += h_b
-        both += h_kg and h_b
-        kg_only += h_kg and not h_b
-        base_only += h_b and not h_kg
-        neither += not h_kg and not h_b
-        ms_all.append(ms)
+        st["base1_hit"] += name in b1
+        st["base1_sizes"].append(len(b1))
+        st["shown_sizes"].append(len(shown))
+        st["kg_hit"] += h_kg
+        st["base_hit"] += h_b
+        st["both"] += h_kg and h_b
+        st["kg_only"] += h_kg and not h_b
+        st["base_only"] += h_b and not h_kg
+        st["neither"] += not h_kg and not h_b
+        st["ms_all"].append(ms)
         relevant = {name} | adj.get(name, set())
-        if shown:
-            precisions.append(sum(1 for s in shown if s in relevant) / len(shown))
+        prec = sum(1 for s in shown if s in relevant) / len(shown) if shown else None
+        if prec is not None:
+            st["precisions"].append(prec)
+        pos = shown.index(name) + 1 if h_kg else 0
         if h_kg:
-            kg_pos.append(shown.index(name) + 1)
-        # where the SOURCE (the linked record whose words formed the query) landed: if it is shown and the
-        # target is not, the ranker found the neighbour and failed to follow the edge - the diagnostic
-        # that separates a lexical miss from a traversal miss
-        src_pos = shown.index(src) + 1 if src in shown else 0
-        print(f"{i:3d} {name[:30]:30s} <- {src[:22]:22s} kg={'Y' if h_kg else '.'} grep={'Y' if h_b else '.'} "
-              f"src@{src_pos:<3} rows={len(shown):<3} p={precisions[-1] if shown else 0:.2f} {ms}ms")
+            st["kg_pos"].append(pos)
+        # the per-case outcome a sweep compares: the target's position (0 = not shown). The knob's whole
+        # effect on this case is in that number, so two values with equal outcomes on every case did not
+        # touch the set at all
+        st["outcomes"].append((name, pos))
+        if verbose:
+            # where the SOURCE (the linked record whose words formed the query) landed: if it is shown and
+            # the target is not, the ranker found the neighbour and failed to follow the edge - the
+            # diagnostic that separates a lexical miss from a traversal miss
+            src_pos = shown.index(src) + 1 if src in shown else 0
+            print(f"{i:3d} {name[:30]:30s} <- {src[:22]:22s} kg={'Y' if h_kg else '.'} grep={'Y' if h_b else '.'} "
+                  f"src@{src_pos:<3} rows={len(shown):<3} p={prec if prec is not None else 0:.2f} {ms}ms")
+    return st
 
-    n = len(cases)
+
+def print_summary(st, label, elements):
+    n = st["n"]
     print("\n" + "=" * 78)
     print(f"query set                  : {label}")
-    print(f"KG hit (target shown)      : {kg_hit}/{n} = {100 * kg_hit / n:.0f}%")
-    print(f"control hit (rarest word)  : {base_hit}/{n} = {100 * base_hit / n:.0f}%")
-    print(f"control + 1-hop neighbours : {base1_hit}/{n} = {100 * base1_hit / n:.0f}%  in a candidate set of mean {sum(base1_sizes) // n} "
-          f"(UNRANKED; the KG shows mean {sum(shown_sizes) // n} ranked rows) - the size the reader would have to read")
-    if precisions:
-        precisions.sort()
-        print(f"KG precision (1-hop floor) : mean {sum(precisions) / len(precisions):.2f}, "
-              f"median {precisions[len(precisions) // 2]:.2f} over {len(precisions)} pushes")
-    if kg_pos:
-        kg_pos.sort()
-        print(f"KG hit position            : median {kg_pos[len(kg_pos) // 2]}, top-3 in {sum(1 for p in kg_pos if p <= 3)}/{kg_hit}")
-    print(f"2x2 (KG hit / control hit) : both {both}, KG-only {kg_only}, control-only {base_only}, neither {neither}")
-    p = mcnemar_exact(kg_only, base_only)
+    print(f"KG hit (target shown)      : {st['kg_hit']}/{n} = {100 * st['kg_hit'] / n:.0f}%")
+    print(f"control hit (rarest word)  : {st['base_hit']}/{n} = {100 * st['base_hit'] / n:.0f}%")
+    print(f"control + 1-hop neighbours : {st['base1_hit']}/{n} = {100 * st['base1_hit'] / n:.0f}%  in a candidate set of mean "
+          f"{sum(st['base1_sizes']) // n} (UNRANKED; the KG shows mean {sum(st['shown_sizes']) // n} ranked rows) - "
+          "the size the reader would have to read")
+    if st["precisions"]:
+        pr = sorted(st["precisions"])
+        print(f"KG precision (1-hop floor) : mean {sum(pr) / len(pr):.2f}, median {pr[len(pr) // 2]:.2f} over {len(pr)} pushes")
+    if st["kg_pos"]:
+        print(f"KG hit position            : median {median(st['kg_pos'])}, "
+              f"top-3 in {sum(1 for p in st['kg_pos'] if p <= 3)}/{st['kg_hit']}")
+    print(f"2x2 (KG hit / control hit) : both {st['both']}, KG-only {st['kg_only']}, control-only {st['base_only']}, neither {st['neither']}")
+    p = mcnemar_exact(st["kg_only"], st["base_only"])
     verdict = "significant at 0.05" if p < 0.05 else "NOT significant - parity not excluded"
-    print(f"McNemar exact, two-sided   : p = {p:.3f} on {kg_only + base_only} discordant pairs ({verdict})")
-    print(f"corpus asymmetry           : KG searches {kg_corpus} model items; the control scans {len(elements)} titled elements")
-    print(f"latency                    : mean {sum(ms_all) // len(ms_all)}ms, max {max(ms_all)}ms")
+    print(f"McNemar exact, two-sided   : p = {p:.3f} on {st['kg_only'] + st['base_only']} discordant pairs ({verdict})")
+    print(f"corpus asymmetry           : KG searches {st['kg_corpus']} model items; the control scans {len(elements)} titled elements")
+    print(f"latency                    : mean {sum(st['ms_all']) // len(st['ms_all'])}ms, max {max(st['ms_all'])}ms")
+
+
+# ---------------------------------------------------------------------------------------------------
+# The sweep (issue405). Everything under here that decides is pure and runs under --probe first.
+
+def sweep_stats(st):
+    """The statistics a sweep compares per value: the ones a chooser reads (hits, median position, top-3)
+    and the per-case outcome vector that says whether the knob touched the set at all."""
+    return {
+        "hits": st["kg_hit"],
+        "median position": median(st["kg_pos"]),
+        "top-3": sum(1 for p in st["kg_pos"] if p <= 3),
+        "outcomes": tuple(st["outcomes"]),
+    }
+
+
+def sweep_verdict(knob, per_value):
+    """DERIVED FROM THE NUMBERS, never from a flag: `per_value` is [(value, sweep_stats)] in sweep order.
+
+    DISCRIMINATED when a chooser statistic (hits or median position) took more than one value across the
+    sweep - the line names the spread. COULD NOT CHOOSE when neither moved - the line names them, and
+    then says which of two things that is: no case's outcome changed at any value (this set contains no
+    case the knob applies to - the issue405 shape), or the knob moved N cases' positions without moving
+    either statistic (the set has cases the knob touches, but too few for these statistics to choose).
+    """
+    if len(per_value) < 2:
+        return f"COULD NOT CHOOSE: a sweep over {knob} needs two or more values; {len(per_value)} given"
+    values = [v for v, _ in per_value]
+    hits = [s["hits"] for _, s in per_value]
+    med = [s["median position"] for _, s in per_value]
+    top3 = [s["top-3"] for _, s in per_value]
+    moved = [name for name, xs in (("hits", hits), ("median position", med)) if len(set(xs)) > 1]
+    if moved:
+        spread = "; ".join(
+            f"{name} {min(xs)}..{max(xs)} ({', '.join(f'{v}={x}' for v, x in zip(values, xs))})"
+            for name, xs in (("hits", hits), ("median position", med), ("top-3", top3))
+        )
+        return f"DISCRIMINATED on {knob}: {' and '.join(moved)} moved - {spread}"
+    first = per_value[0][1]["outcomes"]
+    touched = set()
+    for _, s in per_value[1:]:
+        for (name, pos), (name0, pos0) in zip(s["outcomes"], first):
+            if name == name0 and pos != pos0:
+                touched.add(name)
+    still = f"hits {hits[0]} and median position {med[0]} never moved across {knob} = {', '.join(values)}"
+    if not touched:
+        return (f"COULD NOT CHOOSE on {knob}: {still}, and no case's outcome changed at any value - "
+                f"this set contains no case the knob applies to; sweep it on an arm that does")
+    return (f"COULD NOT CHOOSE on {knob}: {still}; the knob moved the position of {len(touched)} case(s) "
+            f"({', '.join(sorted(touched)[:5])}{', ...' if len(touched) > 5 else ''}) without moving either "
+            f"statistic - too few cases the knob applies to for these statistics to choose")
+
+
+def parse_sweep(spec):
+    """`KNOB=v1,v2,...` -> (KEEL_RECALL_KNOB, [v1, v2, ...]); the prefix may be given or left off."""
+    if "=" not in spec:
+        raise SystemExit(f"--sweep wants KNOB=v1,v2,...; got {spec!r}")
+    knob, vals = spec.split("=", 1)
+    knob = knob.strip()
+    if not knob.startswith(KNOB_PREFIX):
+        knob = KNOB_PREFIX + knob
+    values = [v.strip() for v in vals.split(",") if v.strip()]
+    if len(values) < 2:
+        raise SystemExit(f"--sweep wants two or more values for {knob}; got {values}")
+    return knob, values
+
+
+def probe():
+    """D0388: the verdict is run on cases known before any tree is read. Known-positive: D0364's measured
+    two-hop numbers (DOMINANCE off 15/50 median 8 -> 1.25 22/50 median 5) must read DISCRIMINATED.
+    Known-negative: issue405's default-arm numbers (49/50 median 3 at every setting, identical per case)
+    must read COULD NOT CHOOSE and say the set contains no case the knob applies to. Third case: equal
+    totals with one case's position shifted must read COULD NOT CHOOSE and NOT say 'no case'."""
+    def stats(hits, med, outcomes):
+        return {"hits": hits, "median position": med, "top-3": sum(1 for _, p in outcomes if 0 < p <= 3), "outcomes": tuple(outcomes)}
+
+    knob = KNOB_PREFIX + "DOMINANCE"
+    pos_off = [(f"c{i}", (i % 8) + 1 if i < 15 else 0) for i in range(50)]
+    pos_on = [(f"c{i}", (i % 5) + 1 if i < 22 else 0) for i in range(50)]
+    v_pos = sweep_verdict(knob, [("0", stats(15, 8, pos_off)), ("1.25", stats(22, 5, pos_on))])
+    neg = [(f"c{i}", 3 if i < 49 else 0) for i in range(50)]
+    v_neg = sweep_verdict(knob, [("0", stats(49, 3, neg)), ("1.25", stats(49, 3, list(neg))), ("2.0", stats(49, 3, list(neg)))])
+    shifted = list(neg)
+    shifted[7] = ("c7", 4)
+    v_touch = sweep_verdict(knob, [("0", stats(49, 3, neg)), ("1.25", stats(49, 3, shifted))])
+    checks = [
+        ("known-positive (D0364 two-hop: 15/50 md 8 -> 22/50 md 5) reads DISCRIMINATED", v_pos.startswith("DISCRIMINATED"), v_pos),
+        ("known-positive names the spread 15..22", "hits 15..22" in v_pos, v_pos),
+        ("known-negative (issue405 default arm: 49/50 md 3 x3, identical per case) reads COULD NOT CHOOSE",
+         v_neg.startswith("COULD NOT CHOOSE"), v_neg),
+        ("known-negative says this set contains no case the knob applies to", "no case the knob applies to" in v_neg, v_neg),
+        ("equal totals with one shifted case reads COULD NOT CHOOSE", v_touch.startswith("COULD NOT CHOOSE"), v_touch),
+        ("equal totals with one shifted case does NOT say 'no case'", "no case the knob applies to" not in v_touch and "1 case(s)" in v_touch, v_touch),
+    ]
+    ok = True
+    for what, held, line in checks:
+        print(f"[probe] {'PASS' if held else 'FAIL'} {what}\n        -> {line}")
+        ok &= held
+    print(f"[probe] {'all ' + str(len(checks)) + ' cases hold' if ok else 'A CASE FAILED - the verdict is not trusted'}")
+    return ok
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--self", action="store_true", help="the old LEAKAGE set: queries from the target's own body")
+    ap.add_argument("--cases", type=int, default=N_CASES)
+    ap.add_argument("--hops", type=int, default=1, choices=(1, 2),
+                    help="how far from the target the query's words are drawn (default 1)")
+    ap.add_argument("--sweep", metavar="KNOB=v1,v2,...",
+                    help="run the arm once per value of one KEEL_RECALL_* knob (prefix optional) and end with a "
+                         "verdict derived from the numbers: DISCRIMINATED with the spread, or COULD NOT CHOOSE "
+                         "naming the statistic that never moved (issue405)")
+    ap.add_argument("--probe", action="store_true",
+                    help="run the sweep verdict on its known-positive and known-negative cases and exit (D0388)")
+    args = ap.parse_args()
+
+    if args.probe:
+        sys.exit(0 if probe() else 1)
+
+    elements, edges = load_elements()
+    adj = neighbours(edges)
+    candidates, cases, with_body, two = build_cases(elements, adj, args)
+    label = (
+        "SELF (LEAKAGE - the target's own body words)" if args.self
+        else "TWO HOPS (a record two edges away, through a named intermediate)" if args.hops == 2
+        else "NEIGHBOUR (a linked record's body words)"
+    )
+    print(f"corpus: {len(elements)} elements with a title ({len(with_body)} with a body >= {MIN_BODY} chars); "
+          f"{len(edges)} typed edges; {len(candidates)} eligible targets; sampling {len(cases)}")
+    print(f"query  = {QUERY_WORDS} content words, set {label}; words naming the target (and the source) removed")
+    print(f"control= naive keyword search on the query's rarest word over name+title+body, first {BASELINE_K} hits;")
+    print("         second control = those hits plus their one-hop neighbours\n")
+
+    if not args.sweep:
+        st = run_arm(cases, elements, adj, with_body, two, args)
+        print_summary(st, label, elements)
+        return
+
+    knob, values = parse_sweep(args.sweep)
+    if not probe():
+        raise SystemExit(2)
+    print(f"\nsweep: {knob} over {', '.join(values)} on the {label.split(' (')[0]} arm, {len(cases)} cases per value\n")
+    per_value = []
+    for v in values:
+        os.environ[knob] = v
+        st = run_arm(cases, elements, adj, with_body, two, args, verbose=False)
+        s = sweep_stats(st)
+        per_value.append((v, s))
+        print(f"  {knob}={v:<8} hits {s['hits']}/{st['n']}  median position {s['median position']}  "
+              f"top-3 {s['top-3']}/{s['hits']}  mean rows {sum(st['shown_sizes']) // st['n']}  "
+              f"latency mean {sum(st['ms_all']) // len(st['ms_all'])}ms")
+    del os.environ[knob]
+    print("\n" + "=" * 78)
+    print(sweep_verdict(knob, per_value))
 
 
 main()

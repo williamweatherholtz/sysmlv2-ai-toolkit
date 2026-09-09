@@ -97,7 +97,7 @@ must not send a project off to rebuild them:
 | 1-3 vocabulary, shapes | **the engine** - seeding is corpus-derived (D0243): names, titles, bodies, typed edges | nothing |
 | 4-5 identity, seed + walk | **the engine** - `keel recall` / `keel why` over the model (D0161, D0243) | nothing |
 | 6 inject before the model | **the engine** - `keel init` and `keel sync-claude` wire the UserPromptSubmit hook (claude_surface.rs) | run `keel sync-claude` after an engine update |
-| 7 verify on a trap | the engine's own benches (recall_bench.py, recall_ab.py) are THIS repository's | measure on your own model if you change the ranker — and run BOTH arms, `--hops 2` as well as the default, because a set of one-hop cases cannot tell any setting of a two-hop mechanism from off (D0364) |
+| 7 verify on a trap | the engine's own benches (recall_bench.py, recall_ab.py) are THIS repository's | measure on your own model if you change the ranker — and run BOTH arms, `--hops 2` as well as the default, because a set of one-hop cases cannot tell any setting of a two-hop mechanism from off (D0364); sweep a knob with `--sweep KNOB=v1,v2,...` and read the last line, which is derived from the numbers - DISCRIMINATED with the spread, or COULD NOT CHOOSE naming what never moved and whether the set held any case the knob touched at all (D0415/D0416, issue405) |
 | declare questions | **optional** - `.knowledge/questions` makes `keel knowledge question-coverage` computable | declare them if you want coverage measured |
 | declare aliases | **optional** - `.knowledge/lexicon` routes words your people use that the corpus does not | declare them if seeding misses your vocabulary |
 

@@ -1567,4 +1567,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSlowHookFireExplainsItself to issue429;
+
+    part issue430 : Issue {
+        :>> id = "d12e0e30-8250-43dd-b443-65c2bddb7dd8";
+        :>> title = "The dominant-source setting D0364 took no longer holds its own no-regression rule on the one-hop arm";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "FOUND 2026-09-09 by the first run of recall_bench.py --sweep (sprint 636, dcSweepSaysWhenItCouldNotChoose). CHECK: python .engine/tools/recall_bench.py --sweep DOMINANCE=0,1.25 on the default one-hop arm, 50 cases, tree df7a54e plus the sweep's own uncommitted script: DOMINANCE=0 -> hits 46/50, median position 2, top-3 33/46; DOMINANCE=1.25 -> hits 46/50, median position 3, top-3 29/46; verdict DISCRIMINATED on KEEL_RECALL_DOMINANCE: median position moved - hits 46..46; median position 2..3; top-3 29..33. The same sweep on --hops 2: 0 -> 19/50 median 5 top-3 0/19; 1.25 -> 24/50 median 5 top-3 6/24; verdict DISCRIMINATED, hits moved 19..24. MECHANISM: D0364 took DOMINANCE 1.25 on 2026-09-07 under the rule that the near set must hold (49/50 median 3 at every setting then, 'hits, median position and mean rows all held'); the tree has since grown to 17311 items and the one-hop set now has cases the bonus touches - at 1.25 it displaces the target by one median position and out of four top-3 placements. The plain default run's hits also read 46/50 against sprint 593's 49/50, which the sweep cannot attribute to the knob (both values give 46) and this Issue does not. CONSEQUENCE: the setting in force fails the rule that chose it, on the current tree, and either the constant or the rule has to move - which one is a judgment. PREVENTING CHANGE: dcDominanceRechosenUnderItsOwnRule - both arms swept, D0364's rule applied to the two verdict lines, the outcome recorded as a Decision or surfaced as a fork.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDominanceRechosenUnderItsOwnRule to issue430;
 }
