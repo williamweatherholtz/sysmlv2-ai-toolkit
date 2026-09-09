@@ -4553,12 +4553,33 @@ mod compound_decision_tests {
     }
 }
 
+/// An authored `Release` block as guard 43 reads it: `(name, tag, commit)`. `tag` is the record's
+/// own `:>> tag` field (D0400) - empty for a milestone that shipped no tag.
+pub type ReleaseRow = (String, String, String);
+
+/// The Release whose `tag` field EQUALS `tag`, skipping retired records.
+///
+/// Pure, so the binding is testable against the two shapes issue387 named: a title that honestly
+/// mentions another version, and a tag that is a prefix of a longer one (v0.4.1 / v0.4.11). Neither
+/// can match here, because the title is never read and equality is not containment.
+#[must_use]
+pub fn release_for_tag<'a, S: std::hash::BuildHasher>(tag: &str, releases: &'a [ReleaseRow], retired: &std::collections::HashSet<String, S>) -> Option<&'a ReleaseRow> {
+    if tag.is_empty() {
+        return None;
+    }
+    releases.iter().filter(|(n, _, _)| !retired.contains(n)).find(|(_, t, _)| t == tag)
+}
+
 /// Guard 43 (D0191, WARNING tier, owned by the `deploy` unit).
 ///
-/// Every local version tag has a `Release` item naming it whose recorded commit matches the tag's commit — "a version was
+/// Every local version tag has a `Release` item whose `tag` field names it (D0400) and whose recorded commit matches the tag's commit — "a version was
 /// recorded" and "the reconciled version matches the tag" were process-enforcement.toml's own
 /// admitted checkable claims, unguarded until now. Zero tags scans zero and passes, so a project
 /// without releases (or without the deploy unit) is untouched.
+///
+/// issue387: the binding used to be `title.contains(tag)`, first hit. A v0.4.0 record whose title
+/// said its payload shipped as v0.4.1 was reported as v0.4.1's record, and unanchored containment
+/// would let a v0.4.1 record vouch for a v0.4.11 tag. The tag is now the record's own field.
 #[must_use]
 pub fn release_recorded(root: &Path) -> GuardReport {
     let tags: Vec<String> = crate::gitx::git()
@@ -4579,12 +4600,12 @@ pub fn release_recorded(root: &Path) -> GuardReport {
     // and the only one available to a non-owner (D0108) - could never clear the warning, so the
     // warning was unresolvable by construction and therefore permanent noise.
     let superseded = crate::supersede_targets(root);
-    // Every authored Release block: (name, title, commit).
-    let mut releases: Vec<(String, String, String)> = Vec::new(); // (name, title, commit)
+    // Every authored Release block: (name, tag, commit).
+    let mut releases: Vec<ReleaseRow> = Vec::new();
     for f in crate::collect_sysml(&root.join(".tracking")) {
         let Ok(text) = crate::corpus::read_to_string(&f) else { continue };
         let mut name = String::new();
-        let mut title = String::new();
+        let mut tag = String::new();
         let mut commit = String::new();
         let mut in_release = false;
         for line in text.lines() {
@@ -4592,30 +4613,28 @@ pub fn release_recorded(root: &Path) -> GuardReport {
             if l.starts_with("part ") && l.contains(": Release {") {
                 in_release = true;
                 name = l.trim_start_matches("part ").split_whitespace().next().unwrap_or("").to_string();
-                title.clear();
+                tag.clear();
                 commit.clear();
             }
             if in_release {
-                if let Some(v) = l.strip_prefix(":>> title = \"") {
-                    title = v.split('"').next().unwrap_or("").to_string();
+                if let Some(v) = l.strip_prefix(":>> tag = \"") {
+                    tag = v.split('"').next().unwrap_or("").to_string();
                 }
                 if let Some(v) = l.strip_prefix(":>> commit = \"") {
                     commit = v.split('"').next().unwrap_or("").to_string();
                 }
                 if l.trim_end() == "}" {
                     in_release = false;
-                    releases.push((name.clone(), title.clone(), commit.clone()));
+                    releases.push((name.clone(), tag.clone(), commit.clone()));
                 }
             }
         }
     }
     let mut warnings = Vec::new();
     for tag in &tags {
-        let Some((_, _, recorded)) =
-            releases.iter().filter(|(n, _, _)| !superseded.contains(n)).find(|(_, title, _)| title.contains(tag.as_str()))
-        else {
+        let Some((_, _, recorded)) = release_for_tag(tag, &releases, &superseded) else {
             warnings.push(format!(
-                "tag `{tag}` has NO Release item naming it — what shipped is not an authored fact (D0191; record it in .tracking/baselines.sysml)"
+                "tag `{tag}` has NO Release item whose `tag` field names it — what shipped is not an authored fact (D0191/D0400; record it in .tracking/baselines.sysml with `:>> tag = \"{tag}\"`)"
             ));
             continue;
         };
@@ -4635,6 +4654,34 @@ pub fn release_recorded(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "release-recorded", scanned: tags.len(), warnings, violations: Vec::new() }
+}
+
+#[cfg(test)]
+mod release_tag_tests {
+    use super::{release_for_tag, ReleaseRow};
+    use std::collections::HashSet;
+
+    fn row(name: &str, tag: &str, commit: &str) -> ReleaseRow {
+        (name.to_string(), tag.to_string(), commit.to_string())
+    }
+
+    /// THE CONTROL for issue387 (D0400): the binding is the `tag` field, exact - a title that
+    /// mentions another version is never consulted, a prefix tag never matches a longer one, and a
+    /// retired record does not vouch.
+    #[test]
+    fn a_release_is_bound_to_its_tag_by_the_field_and_nothing_else() {
+        // release040's title honestly says "the payload shipped one patch version later" and names
+        // v0.4.1; under containment it was the first hit for the v0.4.1 tag.
+        let rows = vec![row("release040", "v0.4.0", "2c288d8"), row("release041", "v0.4.1", "b171cd7"), row("release0411", "v0.4.11", "aaaaaaa"), row("milestone", "", "61850f4")];
+        let none = HashSet::new();
+        assert_eq!(release_for_tag("v0.4.1", &rows, &none).map(|r| r.0.as_str()), Some("release041"), "v0.4.1 binds to its own record, not the one whose prose mentions it");
+        assert_eq!(release_for_tag("v0.4.0", &rows, &none).map(|r| r.0.as_str()), Some("release040"));
+        assert_eq!(release_for_tag("v0.4.11", &rows, &none).map(|r| r.0.as_str()), Some("release0411"), "v0.4.11 is not vouched for by v0.4.1");
+        assert_eq!(release_for_tag("v0.4.12", &rows, &none), None, "a tag with no record is the D0191 violation, not a near match");
+        assert_eq!(release_for_tag("", &rows, &none), None, "an untagged milestone never binds to anything");
+        let retired: HashSet<String> = std::iter::once("release041".to_string()).collect();
+        assert_eq!(release_for_tag("v0.4.1", &rows, &retired), None, "a retired record does not vouch (issue244/D0214)");
+    }
 }
 
 /// Guard 44 (D0191, WARNING tier, owned by the `actor-enrollment` unit).

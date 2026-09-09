@@ -80,7 +80,9 @@ trust-on-first-use), so a pin that moves before this step refuses every fresh cl
 for two days at 0.4.1 (issue418). Guard `wrapper-pin-checksummed` warns while the pinned version has no entry;
 read `keel guard wrapper-pin-checksummed .` clean before step 4.
 
-**4. Record the `Release`.** Author it in `.tracking/baselines.sysml` with version, commit and purpose.
+**4. Record the `Release`.** Author it in `.tracking/baselines.sysml` with `tag` (the git tag, exact - this
+field is the binding guard `release-recorded` reads, D0400; the title is prose and may name any version it
+likes), commit and purpose.
 A git tag is not a tracked fact — it cannot be traced to, queried, or asked as-of. Leave the release
 **contents** computed from git ancestry (§2.1); a hand-written contents list drifts the moment anything
 is amended.

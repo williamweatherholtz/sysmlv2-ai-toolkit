@@ -1,0 +1,24 @@
+// D0400 (PROPOSED — NOT YET ACCEPTED) — releaseNamesItsTag: a Release carries the tag it names as its own attribute, and the release-recorded guard matches on that field
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0400Accept event on sign-off.
+package Decision0400 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // RESEARCH: Census 2026-09-09 (git tag; grep ': Release {' over .tracking, re-runnable): 9 version tags v0.1.0..v0.4.1, 13 Release records in .tracking/baselines.sysml, one retired by #Supersede (release020 by release020Shipped). Guard release-recorded (keel-cli/src/guards.rs, release_recorded) binds a tag to a record with title.contains(tag) and takes the FIRST hit. Two of the 13 titles mention a version other than their own: release040's title says the payload shipped one patch version later (v0.4.1 is in the prose), and the v0.2.0 pair share a title prefix. Containment on unanchored text also makes v0.4.1 a match for a future v0.4.11.
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0400 : Decision {
+        :>> id = "924edb48-4393-42d4-9f04-ef93576c81db";
+        :>> title = "releaseNamesItsTag: a Release carries the tag it names as its own attribute, and the release-recorded guard matches on that field";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "A Release is the authored fact of what shipped (D0042, D0191). The only binding between a git tag and its Release record today is that the record's title CONTAINS the tag string, first match wins. issue387: a v0.4.0 record whose title explained that its payload shipped as v0.4.1 was reported as the v0.4.1 tag's record, and two records that were each correct were reported as a disagreement. Substring containment is also unanchored: the tag v0.4.1 matches a title naming v0.4.11, and in that direction the wrong record would VOUCH for a tag rather than merely warn about it. The frozen schema `EngineBaseline::Release` has `commit` and `purpose` and no field for the tag.";
+        :>> decision = "`Release` gains `attribute tag : String [0..1]` in `.engine/schema/core/baseline.sysml` - the git tag this record is the record OF, exact, as `git tag` prints it. Guard release-recorded matches a tag to the Release whose `tag` field EQUALS it, and only that; a title is prose and is never read for the binding. The thirteen existing records are migrated to carry their tag (D0067 shape: committed transform, dry run reconciling 9 tags to 10 tagged records - the retired v0.2.0 record is also the record of that tag - plus 3 untagged milestones, idempotent), so the guard reports no warning on this tree for a reason that can be pointed at. A record with no `tag` is a milestone that shipped nothing, which the schema already allows. NOT A FORK: the DoD of dcReleaseRecordNamesItsTag names this shape and the alternative (anchor the substring match) leaves the binding in prose, which is the defect.";
+        :>> rationale = "Text is truth and a binding is a typed fact, not a pattern over a sentence. A title is for a human and may say anything - including, correctly, the name of another version - so any rule that reads it for identity will be right until someone writes an honest title. An authored field is exact, migratable and queryable, and a tag with no record whose field names it stays the violation D0191 already defines. The [0..1] multiplicity keeps the four pre-tag milestones valid without fabricating a tag they never had.";
+        :>> consequences = "Schema addition on the frozen core (invariant 5), so this Decision carries the process-change marker and waits for the human's word; the change is co-committed under the D0070 lock. release_recorded reads `:>> tag =` instead of `:>> title =`; its warning text names the field to fill. Migration script under .engine/tools/migrations/ adds `:>> tag = 'vX.Y.Z'` to the ten records whose title opens with a version token, taken from that first word only, with a dry run reconciling nine tags to ten records and three milestones before apply. The baseline view and `keel baseline` are unaffected: they read `commit`. Sprint 626 delivers dcReleaseRecordNamesItsTag and resolves issue387.";
+    }
+}

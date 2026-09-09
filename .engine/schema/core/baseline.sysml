@@ -18,5 +18,6 @@ package EngineBaseline {
     occurrence def Release :> Element {
         attribute commit : String;        // git SHA at baseline cut
         attribute purpose : String;       // what this release represents
+        attribute tag : String [0..1];    // the git tag this record is the record OF, exact (D0400, issue387); absent = a milestone that shipped no tag
     }
 }

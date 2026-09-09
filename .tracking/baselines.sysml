@@ -20,6 +20,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-14";
         :>> createdBy = "claudeOpus5";
         :>> commit = "425145d";
+        :>> tag = "v0.2.0";
         :>> purpose = "First release since v0.1.0 (six weeks stale) and the first real run of the DEFINED-but-never-run Deploy workflow. Adds: the D0129 distributed-collaboration model (ancestry-preserving integration, per-machine actor identity that REFUSES rather than defaulting, CSPRNG ids, a portable gate); in-loop governance (the response contract in the system prompt, plus turn-boundary and per-edit gates in the binary, D0130/D0134); and the guard set 17 -> 23 (18 hard, 5 warning-only) including duplicate-identity, marker-vocabulary, attestation-substance, verification-trace, priority-inversion and retro-backlog. BREAKING for callers: write paths now refuse when the acting actor is unstated (D0129) — bind with `keel actor set`, KEEL_ACTOR, or an explicit flag. NOT included: process import/export/activation (nProcessPortability unbuilt — `keel init` remains all-or-nothing).";
     }
 
@@ -36,6 +37,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-24";
         :>> createdBy = "claudeFable5";
         :>> commit = "e2c812f";
+        :>> tag = "v0.2.0";
         :>> purpose = "Supersedes release020's commit field ONLY. Same release, same contents; the recorded commit was authored two commits before the tag was cut, so it named the intended commit rather than the shipped one. Recorded because the release-recorded guard correctly flagged the disagreement and a warning that is merely true is not resolved - it is unread. NOTE for a reader who follows the tag: e2c812f carries a garbage commit MESSAGE (a captured pre-commit hook log was used as the message), which is a separate cosmetic defect in history that must not be rewritten.";
     }
     #Supersede dependency from release020Shipped to release020;
@@ -47,6 +49,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-14";
         :>> createdBy = "claudeOpus5";
         :>> commit = "c4464de";
+        :>> tag = "v0.2.1";
         :>> purpose = "Fixes a v0.2.0 regression reported from the field: marker-vocabulary was a HARD guard in the BINARY whose passing condition was `metadata def` lines in the PROJECT's schema, and upgrading the binary never updates an existing project's on-disk .engine/schema/. Reproduced at 566 violations with every commit blocked, including on the engine's own shipped files, with the only apparent remedy being an edit to FROZEN schema/core. The engine's 17-marker algebra is now BUILTIN to the binary and always valid undeclared; project markers may be declared in any .engine or .tracking file. Typo protection unchanged — an undeclared or misspelled marker still hard-fails. Upgrading requires NO action in a downstream project.";
     }
 
@@ -57,6 +60,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-14";
         :>> createdBy = "claudeOpus5";
         :>> commit = "b98f526";
+        :>> tag = "v0.2.2";
         :>> purpose = "Six HARD guards are rule-sourced and reported a MISSING rule as a VIOLATION, so any project whose .engine/rules/ is absent, older, or authored fresh hit six hard failures and could not commit — with messages naming internal rule names that suggest no action. A project that never ADOPTED a control has not VIOLATED it: an absent rule now yields a visible NOT-ADOPTED warning and a pass, while a malformed rule and a declared-but-violated rule both still hard-fail. Also confirmed this release: a fresh `keel init` project passes its own full gate. Upgrading requires NO action in a downstream project.";
     }
 
@@ -67,6 +71,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-14";
         :>> createdBy = "claudeOpus5";
         :>> commit = "b006f10";
+        :>> tag = "v0.2.3";
         :>> purpose = "Adds `keel version` (also --version / -V / --json): the release version, the commit the binary was built from, and the guard inventory it carries. The three prior releases shipped with NO version identification — `--version` printed usage — so a downstream project told to upgrade could not confirm which binary it was running, and neither could the maintainer; a project still on the blocked version was indistinguishable from one that had upgraded. Since a guard's behaviour is a property of the BINARY (the mechanism behind issue089 and issue090), that is the first diagnostic step for any blocked-downstream report, and it was unavailable to both sides. The BUILD COMMIT is the load-bearing part: the version string alone cannot separate the published artifact from a stale local build claiming the same number; it degrades honestly (`unknown` off-git, `+dirty` from a modified tree) and is checkable against these Release facts. The guard inventory is computed from GUARD_NAMES, so it cannot drift from the guards that run. ALSO verified this release, against the DOWNLOADED v0.2.2 asset rather than a local build: a fresh `keel init` project passes its own full gate, and both downstream blocker states pass (.engine/rules/ absent; marker declarations absent from project schema). This is the FIRST release whose published asset was obtained and asked to identify itself — the prior three were verified only by confirming files existed at a URL, which is the process gap issue091 records. Upgrading requires NO action in a downstream project.";
     }
 
@@ -107,6 +112,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-21";
         :>> createdBy = "claudeFable5";
         :>> commit = "a0f5afc";
+        :>> tag = "v0.1.0";
         :>> purpose = "The first tagged release, tagged 2026-06 at the v0.1.0 release-prep commit. Recorded retroactively on guard 43 (release-recorded) catching that the tag had no authored Release item.";
     }
 
@@ -122,6 +128,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-24";
         :>> createdBy = "claudeFable5";
         :>> commit = "c444ca5";
+        :>> tag = "v0.3.0";
         :>> purpose = "Makes the engine adoptable by a project other than its author. Units travel whole - a skill declares itself beside itself, and `keel process audit` computes whether a unit would land green in a project that lacks it (D0220/D0222). A governance record cannot silently carry captured tool output, and `record decision --from FILE` is the safe authoring path (D0224). The five Decision-authoring guards are CORE rather than switchable (D0223). A project chooses its process set by being asked about its work, each process declares the situation it applies to, and the guard enforcing that is scoped to projects which adopted it (D0225/D0228). 51 guards, up from 44 at v0.2.3. Three platform binaries attached, gate green on the tagged commit.";
     }
 
@@ -132,6 +139,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-08-29";
         :>> createdBy = "claudeOpus5";
         :>> commit = "c4d5dbf";  // the TAGGED commit - what v0.3.1 actually ships. Corrected 2026-08-30 by the rigor audit: this said c4e306c (the content commit), but the release process tags AFTER recording, so the tag lands one commit later and the two disagree systematically (issue311).
+        :>> tag = "v0.3.1";
         :>> purpose = "The portability release (D0250/D0251/D0252; the st033 readiness plan, increments 1-4). The engine pin becomes BINDING: writes refuse at the write-lock choke point and gates in the one gate body, reads warn, version/migrate never refuse, absent declarations keep working. keelw resolves the pin against a seeded machine-local cache, downloads exactly the pinned version verified against committed SHA-256s, and never falls back to PATH. keel library init/sync/list + process publish/import --from-library carry the working material: fast-forward-only sync, stated staleness offline, publish as one loud commit that never pushes, and a byte-identical-gate differential holding availability-is-never-activation. Guards 53-54 and six arming probes land with it; the pre-push bootstrap-refusal field defect (issue306) is fixed. BREAKING: a pinned project refuses a mismatched binary - keel migrate re-stamps and announces.";
     }
 
@@ -141,6 +149,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-09-06";
         :>> createdBy = "claudeOpus5";
         :>> commit = "2c288d8";  // the TAGGED commit - what v0.4.0 actually ships (issue311: the record lands one commit after the tag, so this names the tag rather than the recording)
+        :>> tag = "v0.4.0";
         :>> purpose = "The release the field asked for. An upgrade no longer overwrites a project's own control choices, and a configuration naming a decision the project does not hold now fails loudly instead of reading as governed. Every gating surface - the commit hook, the agent's hooks and the wrapper - resolves the same pinned binary through one shared probe and prints which one it used, so a turn and a commit can no longer be judged by different builds. A binary cached under a pinned name is verified against the committed checksum before it runs, and a cache is no longer seeded from a build nobody else can obtain. The scanner that blocks a migration reads schema rather than prose, so a quoted foreign symbol in an authored description stops refusing a healthy project. Standing consent becomes the adopting project's own fact: the words an acceptance quotes are declared per project, a scaffold ships no grant at all, and a resync leaves an adopter's grants alone. A library unit can be retired with its reason and replacement, and the unit that signed acceptances in one human's name is withdrawn. Consent is scoped to the processes it was promulgated under, so a change to a gate waits for the human. keel currency runs the unattended pass; keel suite runs the full suite and records what it cost. THIS TAG PUBLISHED NOTHING. Its release gate ran the suite with no GH_TOKEN, so the federation suite's live-upstream claim failed where it passes on every push, needs: gate skipped the build matrix, and no release object exists for v0.4.0. The tag is left in place as the evidence rather than moved, and the same payload ships as v0.4.1 with the gate's environment fixed and guard 64 holding the two gating workflows to the same environment (issue385, D0358). NOT BREAKING: the command names are unchanged - the collapse was weighed and declined, and the three deprecated channel verbs stay until a breaking release.";
     }
 
@@ -150,6 +159,7 @@ package ProjectBaselines {
         :>> createdAt = "2026-09-06";
         :>> createdBy = "claudeOpus5";
         :>> commit = "b171cd7";
+        :>> tag = "v0.4.1";
         :>> purpose = "Everything v0.4.0 was cut for, shipped. An upgrade no longer overwrites a project's own control choices, and a configuration naming a decision the project does not hold now fails loudly instead of reading as governed. Every gating surface - the commit hook, the agent's hooks and the wrapper - resolves the same pinned binary through one shared probe and prints which one it used, so a turn and a commit can no longer be judged by different builds. A binary cached under a pinned name is verified against the committed checksum before it runs, and a cache is no longer seeded from a build nobody else can obtain. The scanner that blocks a migration reads schema rather than prose, so a quoted foreign symbol in an authored description stops refusing a healthy project. Standing consent becomes the adopting project's own fact: the words an acceptance quotes are declared per project, a scaffold ships no grant at all, and a resync leaves an adopter's grants alone. A library unit can be retired with its reason and replacement, and the unit that signed acceptances in one human's name is withdrawn. Consent is scoped to the processes it was promulgated under, so a change to a gate waits for the human. keel currency runs the unattended pass; keel suite runs the full suite and records what it cost, and no longer gates the push. NEW IN THIS TAG: the release gate is given the same repository token the everyday gate has, and guard 64 gate-environment-parity holds every workflow that runs the suite to the same environment, so a release can no longer fail on a precondition the everyday gate quietly supplies. NOT BREAKING: the command names are unchanged - the collapse was weighed and declined, and the three deprecated channel verbs stay until a breaking release.";
     }
 }
