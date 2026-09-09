@@ -39,6 +39,12 @@ the statistic that never moved - and, when no case's outcome changed at any valu
 contains no case the knob applies to. No flag sets the verdict; `--probe` runs the pure verdict on its
 known-positive and known-negative cases before anything is measured (D0388).
 
+THE BINARY IS NAMED (issue406 / dcRecallMeasurementNamesItsBinary). Every run prints the build line of the
+binary it is about to interrogate before the first case and re-reads it after the last: a run against an
+image cargo is still relinking once read 6/8 on recall_ab.py and looked like a regression. A binary that
+cannot be identified aborts before any number; one that changed under the run disowns the numbers and
+exits non-zero. `KEEL_BENCH_BIN` overrides the path (recall_binary.py).
+
 WHAT IS MEASURED. hit: the target is among the rows the payload actually SHOWS (budget 4000). precision:
 of the rows shown, the share that are the target or its one-hop neighbours - the only mechanical
 relevance available without judging each row by hand; it is a floor, since a shown row can be relevant
@@ -56,6 +62,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import recall_binary  # noqa: E402
+
 KNOB_PREFIX = "KEEL_RECALL_"
 
 
@@ -67,7 +76,7 @@ def _env():
     return env
 
 
-KEEL = "./target/release/keel.exe"
+KEEL = recall_binary.keel_path()  # KEEL_BENCH_BIN overrides; the run names it (issue406)
 SEED = 20260828
 N_CASES = 50
 QUERY_WORDS = 14
@@ -445,6 +454,8 @@ def main():
     if args.probe:
         sys.exit(0 if probe() else 1)
 
+    binary = recall_binary.Run(KEEL)
+    binary.header()
     elements, edges = load_elements()
     adj = neighbours(edges)
     candidates, cases, with_body, two = build_cases(elements, adj, args)
@@ -462,6 +473,7 @@ def main():
     if not args.sweep:
         st = run_arm(cases, elements, adj, with_body, two, args)
         print_summary(st, label, elements)
+        binary.footer()
         return
 
     knob, values = parse_sweep(args.sweep)
@@ -480,6 +492,7 @@ def main():
     del os.environ[knob]
     print("\n" + "=" * 78)
     print(sweep_verdict(knob, per_value))
+    binary.footer()
 
 
 main()

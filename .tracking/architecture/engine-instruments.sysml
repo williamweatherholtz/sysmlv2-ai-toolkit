@@ -17,7 +17,7 @@ package EngineInstruments {
     private import EngineSafety::*;
 
     // recallBench: .engine/tools/recall_bench.py
-    // KNOWN FAILURE MODES: issue296 (a query built from the target's own body scores ~100% and discriminates nothing); issue391 (an element that answers the question is scored a miss because ground truth names one record)
+    // KNOWN FAILURE MODES: issue296 (a query built from the target's own body scores ~100% and discriminates nothing); issue391 (an element that answers the question is scored a miss because ground truth names one record); issue406 (a number read against a binary cargo was still relinking - the run now names its build line before the first case and re-reads it after the last, recall_binary.py)
     // PUBLISHED TO: a DoD criterion, and the standing brief when retrieval is the subject
     part fbRecallBench : Feedback {
         :>> id = "d7cccf55-0e25-5649-9a33-798ef195d4b7";
@@ -38,7 +38,7 @@ package EngineInstruments {
     }
 
     // recallAb: .engine/tools/recall_ab.py
-    // KNOWN FAILURE MODES: issue391 (the hit definition); the set is small enough that one case moves the number by 12 points
+    // KNOWN FAILURE MODES: issue391 (the hit definition); the set is small enough that one case moves the number by 12 points; issue406 (6/8 read against a relinking image - the run names its binary at header and footer, recall_binary.py)
     // PUBLISHED TO: a DoD criterion
     part fbRecallAb : Feedback {
         :>> id = "5b94e5c1-c8a4-5380-88a2-de70c50c545c";

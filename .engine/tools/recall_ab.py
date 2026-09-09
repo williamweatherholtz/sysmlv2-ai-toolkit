@@ -6,11 +6,21 @@ confidence thresholds were tuned on (that overfitting risk is recorded in sprint
 The measure is mechanical, not self-reported: for each question, is the element that ANSWERS it present
 in the rows the payload actually SHOWS? Injection ON hands it over; injection OFF is the same prompt
 with recall suppressed, where the count is necessarily zero and the model must go and search.
+
+THE BINARY IS NAMED (issue406). A run of this once printed 6/8 while cargo was still relinking the image
+it was calling, and nothing in the output said so; the header now carries the build line of the binary
+about to be interrogated, the footer re-reads it, and a run whose binary cannot be identified or changed
+underneath it prints no score it stands behind (recall_binary.py).
 """
+import os
 import subprocess
+import sys
 import time
 
-KEEL = "./target/release/keel.exe"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import recall_binary  # noqa: E402
+
+KEEL = recall_binary.keel_path()
 BUDGET = "4000"
 
 def _env():
@@ -63,6 +73,8 @@ def shown_elements(text):
 
 
 def main():
+    binary = recall_binary.Run(KEEL)
+    binary.header()
     hits_on = hits_off = 0
     rows = []
     for prompt, truth in CASES:
@@ -89,6 +101,7 @@ def main():
     print(f"stayed silent (LOW confidence): {silent}/{len(CASES)}")
     avg = sum(r[6] for r in rows) / len(rows)
     print(f"mean prompt-path cost with recall: {avg:.0f}ms")
+    binary.footer()
 
 
 main()
