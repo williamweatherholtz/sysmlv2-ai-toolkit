@@ -91,11 +91,23 @@ def probe_census() -> None:
 
 
 # ------------------------------------------------------------------ (2) the controller / anchor check
+def _keel() -> str:
+    # Resolve the binary CROSS-PLATFORM (D0394): the CI host is Linux with target/release/keel (no
+    # .exe), while a Windows session runs keel-serve.exe / keel.exe. Try the built binary under each
+    # name, then fall back to PATH (the CI script-probe step exports target/release onto it).
+    import shutil
+    rel = os.path.join(REPO, "target", "release")
+    for name in ("keel-serve.exe", "keel.exe", "keel-serve", "keel"):
+        p = os.path.join(rel, name)
+        if os.path.exists(p):
+            return p
+    return shutil.which("keel") or "keel"
+
+
 def control_structure() -> dict:
-    keel = os.path.join(REPO, "target", "release", "keel-serve.exe")
-    if not os.path.exists(keel):
-        keel = os.path.join(REPO, "target", "release", "keel.exe")
-    out = subprocess.run([keel, "show", "control-structure", "."], capture_output=True, text=True, encoding="utf-8")
+    out = subprocess.run([_keel(), "show", "control-structure", "."], capture_output=True, text=True, encoding="utf-8")
+    if out.returncode != 0:
+        raise SystemExit(f"issue400 reproduction: `keel show control-structure` failed ({out.returncode}): {out.stderr[-300:]}")
     return json.loads(out.stdout)
 
 
