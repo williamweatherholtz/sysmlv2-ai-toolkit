@@ -5,7 +5,7 @@
 //! report text. M3a ports the three no-git guards: `actors`, `acceptance-events`,
 //! `sprint-coverage`. M3b/M3c add ceremony/charter/keystone + a unified runner.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::algo::is_space;
@@ -5814,6 +5814,66 @@ pub fn cli_surface_violations(
     out
 }
 
+/// Every `dNNNN` / `DNNNN` token in `text`, lowercased, in order, deduplicated.
+///
+/// A token is four digits behind a `d`/`D` with no identifier character on either side, so `D0356`
+/// and `d0345` are cited and `dcOneClick`, `d03561` and `keeld0001` are not.
+#[must_use]
+pub fn decision_ids_cited(text: &str) -> Vec<String> {
+    let b = text.as_bytes();
+    let ident = |i: usize| b.get(i).is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    let mut out: Vec<String> = Vec::new();
+    for (i, c) in b.iter().enumerate() {
+        if !matches!(c, b'd' | b'D') || (i > 0 && ident(i - 1)) {
+            continue;
+        }
+        let Some(digits) = b.get(i + 1..i + 5) else { continue };
+        if digits.iter().all(u8::is_ascii_digit) && !ident(i + 5) {
+            let id = format!("d{}", String::from_utf8_lossy(digits));
+            if !out.contains(&id) {
+                out.push(id);
+            }
+        }
+    }
+    out
+}
+
+/// The Decision ids that exist in this tree: `.engine/decisions/NNNN-*.sysml` -> `dNNNN`.
+fn decision_ids_present(root: &Path) -> BTreeSet<String> {
+    crate::collect_sysml(&root.join(".engine").join("decisions"))
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
+        .filter_map(|n| n.get(..4).filter(|d| d.bytes().all(|c| c.is_ascii_digit())))
+        .map(|d| format!("d{d}"))
+        .collect()
+}
+
+/// issue423: a `CliCommand` synopsis that cites a Decision cites a LIVE one.
+///
+/// Pure. `synopses` is `(home, command, synopsis)` for both fact homes; `present` is the ids with a
+/// file under `.engine/decisions`; `retired` maps each `#Supersede` target to the Decision that
+/// retired it (D0398: a retired Decision is out of every scorecard, so a synopsis pointing a reader
+/// at it points them at authority the tree has withdrawn). A cited id that is retired, or that has
+/// no file, is a violation naming the home, the command, the id and - when retired - the superseder.
+#[must_use]
+pub fn synopsis_citation_violations(
+    synopses: &[(&str, &str, &str)],
+    present: &BTreeSet<String>,
+    retired: &BTreeMap<String, String>,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    for (home, command, synopsis) in synopses {
+        for id in decision_ids_cited(synopsis) {
+            if let Some(by) = retired.get(&id) {
+                out.push(format!("`{command}` synopsis in {home} cites {id}, which is RETIRED - superseded by {by} (D0398); cite {by} or the Decision in force"));
+            } else if !present.contains(&id) {
+                out.push(format!("`{command}` synopsis in {home} cites {id}, and no Decision file under .engine/decisions carries that number"));
+            }
+        }
+    }
+    out
+}
+
 /// Guard: the CLI surface is an authored fact, held equal to the dispatch and to the help.
 ///
 /// (D0271, issue344.) `.engine/cli/commands.sysml` is the home; `cli_facts::CLI_FACTS` mirrors it and renders
@@ -5832,7 +5892,13 @@ pub fn cli_surface_declared(root: &Path) -> GuardReport {
         };
     };
     let authored = parse_cli_facts(&text);
-    let violations = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
+    let mut violations = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
+    // issue423: what a synopsis CITES is held to the tree too - both homes, so a stale citation
+    // cannot survive in the one the drift check happens not to compare.
+    let mut synopses: Vec<(&str, &str, &str)> = authored.iter().map(|f| (".engine/cli/commands.sysml", f.name.as_str(), f.synopsis.as_str())).collect();
+    synopses.extend(crate::cli_facts::CLI_FACTS.iter().map(|f| ("cli_facts.rs", f.name, f.synopsis)));
+    let retired: BTreeMap<String, String> = crate::supersede_edges(root).into_iter().map(|(from, to)| (to, from)).collect();
+    violations.extend(synopsis_citation_violations(&synopses, &decision_ids_present(root), &retired));
     GuardReport { name: "cli-surface-declared", scanned: authored.len(), warnings: Vec::new(), violations }
 }
 
@@ -5976,6 +6042,52 @@ mod cli_surface_declared_tests {
         let authored = parse_cli_facts(&text);
         assert_eq!(authored.len(), crate::cli_facts::CLI_FACTS.len(), "every fact parsed");
         let v = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
+        assert!(v.is_empty(), "{v:#?}");
+    }
+
+    /// issue423, the probe pair named in the definition of done (D0388): the KNOWN-POSITIVE is a synopsis citing
+    /// D0353 - the push gate, retired by D0356 - and the KNOWN-NEGATIVE is the corrected `suite`
+    /// synopsis in the live facts, which cites `D0356`. The retired citation names its superseder; an
+    /// id with no file is its own class; an id that is present and live is not a violation.
+    #[test]
+    fn a_synopsis_citing_a_retired_or_absent_decision_is_a_violation_and_the_live_suite_synopsis_is_not() {
+        let present: BTreeSet<String> = ["d0271", "d0356"].iter().map(|s| (*s).to_string()).collect();
+        let retired: BTreeMap<String, String> = std::iter::once(("d0353".to_string(), "d0356".to_string())).collect();
+        let suite = crate::cli_facts::CLI_FACTS.iter().find(|f| f.name == "suite").expect("the suite fact");
+        assert!(suite.synopsis.contains("D0356"), "the known-negative cites D0356: {}", suite.synopsis);
+        let v = synopsis_citation_violations(
+            &[
+                ("fixture", "gate", "gates the push on the last green suite (D0353)"),
+                ("cli_facts.rs", "suite", suite.synopsis),
+                ("fixture", "ghost", "declared under d0999 which was never recorded"),
+                ("fixture", "help", "renders from the facts (D0271)"),
+            ],
+            &present,
+            &retired,
+        );
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v[0].contains("`gate`") && v[0].contains("d0353") && v[0].contains("RETIRED") && v[0].contains("d0356"), "{v:?}");
+        assert!(v[1].contains("`ghost`") && v[1].contains("d0999") && v[1].contains("no Decision file"), "{v:?}");
+    }
+
+    #[test]
+    fn decision_ids_are_cited_as_whole_tokens_only() {
+        assert_eq!(decision_ids_cited("D0356 then d0345, D0356 again"), vec!["d0356", "d0345"]);
+        assert!(decision_ids_cited("dcOneClick keeld0001 d03561 D035 d-0356").is_empty());
+        assert_eq!(decision_ids_cited("(D0201 B)"), vec!["d0201"]);
+    }
+
+    /// The live tree: every id either fact home cites has a file and is not retired.
+    #[test]
+    fn the_live_synopses_cite_only_live_decisions() {
+        let root = Path::new("..");
+        let text = crate::corpus::read_to_string("../.engine/cli/commands.sysml").expect("the facts ship with the engine");
+        let authored = parse_cli_facts(&text);
+        let mut synopses: Vec<(&str, &str, &str)> = authored.iter().map(|f| ("commands.sysml", f.name.as_str(), f.synopsis.as_str())).collect();
+        synopses.extend(crate::cli_facts::CLI_FACTS.iter().map(|f| ("cli_facts.rs", f.name, f.synopsis)));
+        let retired: BTreeMap<String, String> = crate::supersede_edges(root).into_iter().map(|(from, to)| (to, from)).collect();
+        assert!(retired.contains_key("d0353"), "the retired set holds the push gate");
+        let v = synopsis_citation_violations(&synopses, &decision_ids_present(root), &retired);
         assert!(v.is_empty(), "{v:#?}");
     }
 }
