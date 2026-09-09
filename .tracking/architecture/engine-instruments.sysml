@@ -205,6 +205,27 @@ package EngineInstruments {
         :>> producesFeedback = fbTemplateContract;
     }
 
+    // fitCheck: scripts/exec_brief/fit_check.py (D0402, sprint 628)
+    // KNOWN FAILURE MODES: the fallback face it measures is THIS host's default sans-serif; a wider fallback elsewhere can overrun where this host fits (the 2px tolerance and the OVERRUN rule leave a margin, not a proof). CI carries no browser, so its --probe does not run there.
+    // PUBLISHED TO: the build of every brief - assert_fits is the builder's last line and removes a page that does not fit
+    part fbFitCheck : Feedback {
+        :>> id = "d522b85d-3b61-5505-876e-eb1b62f00923";
+        :>> title = "whether every SVG text on a built brief lands inside its canvas, clear of its neighbours and inside the box it starts in, measured in a browser with and without web fonts";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> sensedFrom = cpDeliverable;
+        :>> reportsTo = ctAgent;
+    }
+    part snFitCheck : Sensor {
+        :>> id = "005f7385-0a6e-5aea-a0a5-68a8287434ee";
+        :>> title = "fitCheck";
+        :>> createdAt = "2026-09-09"; :>> createdBy = "claudeOpus5";
+        :>> mechanism = "scripts/exec_brief/fit_check.py";
+        :>> measures = "rendered text geometry per figure: OVERFLOW past the viewBox, OVERLAP with a sibling, OVERRUN past the drawn box, horizontal SCROLL - each finding with figure, kind, pixels and text; four known cases run as --probe first";
+        :>> determinism = Determinism::external;
+        :>> reading = SensorReading::verdict;
+        :>> producesFeedback = fbFitCheck;
+    }
+
     // docRender: scripts/render.py
     // KNOWN FAILURE MODES: none recorded; UNPROVEN in the D0360 sense — no test constructs a render defect and shows this catching it
     // PUBLISHED TO: a DoD criterion

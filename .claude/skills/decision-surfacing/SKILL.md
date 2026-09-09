@@ -80,8 +80,15 @@ the model answers it, I haven't finished my work — answer it myself.
 ### 5. Check, publish, record
 
 ```
-python scripts/check_templates.py --brief <page.html>
+python scripts/check_templates.py --brief <page.html>     # the contract: structure, budgets, ids, verbs
+python scripts/exec_brief/fit_check.py <page.html>        # the geometry: every exhibit fits, measured in a browser
 ```
+
+The second is also the builder's last line (`assert_fits`, D0402): it probes its four known cases,
+loads the page in headless Chromium with and without web fonts, and on any text that crosses its
+canvas, overprints a neighbour or overruns its box it REMOVES the page - so a builder that exits 0
+has left a page that fits. A read of the screenshot is not the check; issue390's two defects and the
+7px overrun found the day this landed had all passed a screenshot.
 
 Publish as an Artifact and **republish the same file path** so the URL stays one queue. Then write
 the published id set and URL back to `.keel/decision-page.toml` — that file is what step 2 reads

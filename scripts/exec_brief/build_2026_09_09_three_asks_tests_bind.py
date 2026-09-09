@@ -18,6 +18,7 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else __file__.r
 from logic_exhibits import downstream, logic_lanes     # noqa: E402
 sys.path.insert(0, "scripts")
 from artefact import claim, require_complete   # noqa: E402  (D0387: a stale answer is refused, a dead run leaves no page)
+from fit_check import assert_fits              # noqa: E402  (D0402: a page whose exhibits hide text is removed, not published)
 
 facts_path, prev_path, out_path = sys.argv[1:4]
 if prev_path == out_path:
@@ -100,7 +101,7 @@ fig5 = logic_lanes(
     ("before", [
         ("test reads a .rs file", "", "muted", ""),
         ("asserts a line's spelling", "", "warn", ""),
-        ("reword fails, defect passes", "", "bad", ""),
+        ("reword fails", "a defect passes", "bad", ""),
     ], ["", ""]),
     ("after", [
         ("test drives the code", "", "accent", ""),
@@ -153,3 +154,4 @@ page = head + body + tail
 words = len(re.sub(r"<[^>]+>", " ", body).split())
 open(out_path, "w", encoding="utf-8").write(page)
 print(f"wrote {out_path}: {len(page)} bytes, ~{words} body words before the checker's own count")
+assert_fits(out_path)   # probe first, then measure in a browser with and without web fonts; findings remove the page
