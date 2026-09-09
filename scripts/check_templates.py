@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ci-probe: --self-test
 """HTML template + instance contract check (D0237). ONE implementation, two callers:
 the keel pre-commit gate runs it, and tests/exec_summary imports it — so the check the
 gate enforces and the check the suite asserts can never drift apart (the defect class
@@ -368,7 +369,8 @@ def _brief_fixture(title: str, ask: str, filler_words: int = 0) -> str:
 
 def self_test() -> int:
     """The budget clauses in both directions (issue413): a page over any declared budget is refused
-    naming the section; a page inside them passes; the whole-page ceiling refuses only when given."""
+    naming the section; a page inside them passes; the whole-page ceiling refuses a page over it and a
+    generous ceiling passes a long one (D0377 is accepted, so ceiling=None resolves to 450, not off)."""
     p = Path("fixture.html")
     good = _brief_fixture("The page shows a receipt when nothing waits.", "Accept the receipt shape.")
     long_title = " ".join(["word"] * 26) + " is"
@@ -378,7 +380,7 @@ def self_test() -> int:
         ("27-word headline refused", check_brief(p, ceiling=None, raw=_brief_fixture(long_title, "Accept.")), ["headline: 27 words"]),
         ("80-word ask refused", check_brief(p, ceiling=None, raw=_brief_fixture("The page waits.", long_ask)), ["the ask: 80 words"]),
         ("ceiling refused when given", check_brief(p, ceiling=450, raw=_brief_fixture("The page waits.", "Accept.", 500)), ["reader prose: 5"]),
-        ("no ceiling when not given", check_brief(p, ceiling=None, raw=_brief_fixture("The page waits.", "Accept.", 500)), []),
+        ("a generous ceiling does not refuse a long page", check_brief(p, ceiling=100_000, raw=_brief_fixture("The page waits.", "Accept.", 500)), []),
     ]
     failed = 0
     for name, got, want in checks:

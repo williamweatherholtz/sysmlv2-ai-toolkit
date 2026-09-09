@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ci-probe: --probe
 # not-an-instrument: it holds the write discipline the instruments share; it measures nothing.
 """artefact - a run that cannot complete leaves no artefact that reads as a current answer (D0387, issue399).
 

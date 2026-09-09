@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ci-probe: --probe
 # not-an-instrument: it edits text files at a stated anchor; it measures nothing.
 """textpatch - a patch that cannot find its anchor FAILS, and never lands where it does no work (D0386, issue398).
 

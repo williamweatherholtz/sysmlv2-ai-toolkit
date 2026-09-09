@@ -41,6 +41,41 @@ jobs:
           ./target/release/keel guard
           ./target/release/keel check-engine .
           ./target/release/keel rules --enforce
+          ./target/release/keel check-engine .
+          ./target/release/keel rules --enforce
+      - name: script probes (every scripts/*.py that ships known cases, run as a gate; D0394)
+        # Discovery from the tree, not a list (D0361): a script that DISPATCHES on --probe or
+        # --self-test (the flag as a list literal, so a prose mention is not a false positive) is run
+        # with that flag and must exit 0. Three retros (sprints 612-614) named this gap.
+        run: |
+          export PATH="$PWD/target/release:$PATH"
+          python3 - <<'PY'
+          import glob, subprocess, sys
+          ran = 0
+          failed = []
+          for path in sorted(glob.glob('scripts/**/*.py', recursive=True)):
+              flag = None
+              for line in open(path, encoding='utf-8', errors='replace'):
+                  s = line.strip()
+                  if s.startswith('# ci-probe:'):
+                      flag = s.split(':', 1)[1].strip()
+                      break
+              if not flag:
+                  continue
+              ran += 1
+              print(f'== {path} {flag}', flush=True)
+              r = subprocess.run([sys.executable, path, flag])
+              if r.returncode != 0:
+                  failed.append(f'{path} {flag} -> exit {r.returncode}')
+          if ran == 0:
+              print('no scripts/*.py dispatches on --probe or --self-test; nothing to run')
+          if failed:
+              print('SCRIPT PROBES FAILED:')
+              for f in failed:
+                  print(' ', f)
+              sys.exit(1)
+          print(f'{ran} script probe(s) passed')
+          PY
       # Layer 3, hook-independent (K15/D0179): re-derive every pushed commit's verdict from the
       # tree alone — the issue116 control, now remote. No hook having run is assumed.
       - name: keel audit-history (tree-derived verdicts over the pushed range)

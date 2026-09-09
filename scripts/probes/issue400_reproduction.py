@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ci-probe: --probe
 # not-an-instrument: a reproduction of two DEFECTIVE checks against their known cases (issue400 / D0388).
 # Its numbers are the defects', kept as evidence that a probe catches them; nothing reads them as a measure.
 """issue400: two hand-written checks answered wrong on their first run, and both answers were stated.
@@ -131,6 +132,10 @@ def probe_anchor() -> None:
 
 
 if __name__ == "__main__":
+    # --probe (or no args) runs both reproductions as known-answer checks; the `# ci-probe:` marker at
+    # the top is how the CI script-probe step discovers this file (D0394).
+    if sys.argv[1:] not in ([], ["--probe"]):
+        sys.exit("usage: python scripts/probes/issue400_reproduction.py [--probe]")
     probe_census()
     probe_anchor()
     print(f"issue400 reproduction: {FAILS} failure(s) - every FAIL above means a defect did NOT reproduce or a correction did not hold")
