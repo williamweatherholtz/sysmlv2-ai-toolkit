@@ -987,6 +987,42 @@ _ci = read(os.path.join(REPO, ".github", "workflows", "ci.yml")) or ""
 fact("ciRunsProbes", ("--probe" in _ci or "--self-test" in _ci), "does CI run the script probes",
      ".github/workflows/ci.yml mentions `--probe` or `--self-test`: today it does not, so these checks run only by hand.")
 
+# ================================================================ 15. releases bound to tags (D0400)
+# How a git tag finds its Release record. Read from `git tag` and .tracking/baselines.sysml; the
+# old rule (title contains the tag, first hit) is re-run here over the SAME records so its miscount is a
+# number, not a story.
+_tags = [t.strip() for t in (run(["git", "-C", REPO, "tag"])[1] or "").splitlines() if re.match(r"^v\d+\.\d+\.\d+$", t.strip())]
+_rel_blocks = []
+_cur = None
+for _line in (read(os.path.join(REPO, ".tracking", "baselines.sysml")) or "").splitlines():
+    _s = _line.strip()
+    if _s.startswith("part ") and ": Release {" in _s:
+        _cur = {"name": _s.split()[1], "title": "", "tag": ""}
+    elif _cur is not None and _s.startswith(':>> title = "'):
+        _cur["title"] = _s.split('"')[1]
+    elif _cur is not None and _s.startswith(':>> tag = "'):
+        _cur["tag"] = _s.split('"')[1]
+    elif _cur is not None and _s == "}":
+        _rel_blocks.append(_cur)
+        _cur = None
+fact("versionTags", len(_tags) or None, "git tags of the form vN.N.N", "`git tag` filtered to vN.N.N: " + ", ".join(_tags) + ".")
+fact("releaseRecords", len(_rel_blocks) or None, "Release blocks in .tracking/baselines.sysml", "count of `part X : Release {` blocks.")
+fact("releaseRecordsWithTagField", sum(1 for b in _rel_blocks if b["tag"]), "Release blocks carrying `:>> tag`",
+     "count of blocks with a `:>> tag = ` line (D0400 migration 2026-09-09-release-tag-field.py).")
+_title_hits = {t: [b["name"] for b in _rel_blocks if t in b["title"]] for t in _tags}
+_title_wrong = [t for t in _tags if _title_hits[t] and next(b["tag"] for b in _rel_blocks if b["name"] == _title_hits[t][0]) != t]
+_title_multi = [t for t in _tags if len(_title_hits[t]) > 1]
+fact("tagsWithSeveralTitleMatches", len(_title_multi), "tags whose string occurs in more than one Release title",
+     "re-running the pre-D0400 rule (title contains tag) over the same records: " + (", ".join(f"{t} -> {', '.join(_title_hits[t])}" for t in _title_multi) or "none") + ".")
+fact("tagsMisboundByTitle", len(_title_wrong), "tags the title rule would bind to a record whose `tag` field says otherwise",
+     "for each tag, the FIRST title hit compared with the record whose `tag` field equals it: " + (", ".join(f"{t} -> first title hit {_title_hits[t][0]}" for t in _title_wrong) or "none") + ".")
+fact("releaseGuardWarnings", None, "release-recorded warnings on this tree", "not run here; keel guard release-recorded . prints it.")
+_rr_ok, _rr_raw = run([KEEL, "guard", "release-recorded", REPO, "--no-receipt"])
+_m = re.search(r"release-recorded\] \w+ [^0-9]*(\d+) scanned, (\d+) warning", _rr_raw or "")
+if _m:
+    fact("releaseGuardWarnings", int(_m.group(2)), "release-recorded warnings on this tree",
+         "`keel guard release-recorded . --no-receipt` summary line: %s scanned, %s warning(s)." % (_m.group(1), _m.group(2)))
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),
