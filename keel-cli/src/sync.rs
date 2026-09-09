@@ -242,6 +242,15 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     // cannot reproduce. The detective control (CI, answering in ~3 minutes) is the better trade at
     // this price. `keel suite` stays: it runs the suite, writes the receipt, and is what measured the
     // cost that decided this - it simply no longer blocks the push.
+    //
+    // THE TOUCHED SET IS NOT THAT GATE (D0421, issue416). The next CI red after D0356 was a test whose
+    // text named the very module the commit changed. `touched::before_push` computes the integration
+    // tests that name a changed module and prints the set on every self-build push; it RUNS them and
+    // refuses only once D0421 carries the human's acceptance (D0337: a refusal on this path is outside
+    // standing consent), and an empty set runs nothing and says so. A downstream tree is untouched.
+    if let Some(code) = crate::touched::before_push(repo) {
+        return code;
+    }
     for attempt in 1..=max_attempts {
         println!("keel land: pushing {branch} -> origin (attempt {attempt}/{max_attempts})");
         if git(repo, &["push", "origin", &branch]).is_ok() {
@@ -292,7 +301,7 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
 /// File-granular by design (an item-level diff would re-parse two trees per land): coarse in the
 /// safe direction — it can warn about a neighbor edit in a shared file, never stay silent about a
 /// held item's own file.
-/// issue434 (D0419): before a push, say what CI concluded about the commit this push lands ON. Two
+/// issue434 (D0420): before a push, say what CI concluded about the commit this push lands ON. Two
 /// reports of "CI green" were made from a shell wrapper's exit code (`gh run watch ...; echo $?`
 /// exits 0 whatever the run did) while `main` had been red for six pushes; the next push then landed
 /// on a red base without anyone saying so. This line is the binary reading the `conclusion` field -

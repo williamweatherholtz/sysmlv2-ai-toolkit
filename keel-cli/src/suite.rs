@@ -180,9 +180,12 @@ pub fn image_collides(exe: &Path, target: &Path) -> bool {
     first == "deps"
 }
 
-/// The reason `keel suite` will not run from this image, or `None`. Refuses only where the lock
-/// is real (Windows); elsewhere the build replaces the file under a running process without harm.
-fn own_image_refusal(repo: &Path) -> Option<String> {
+/// The reason `who` (`keel suite`, `keel land`, ...) will not run cargo from this image, or `None`.
+///
+/// Refuses only where the lock is real (Windows); elsewhere the build replaces the file under a
+/// running process without harm. Shared with the touched set (D0421), which links the same binaries.
+#[must_use]
+pub fn own_image_refusal(repo: &Path, who: &str) -> Option<String> {
     if !cfg!(windows) {
         return None;
     }
@@ -196,11 +199,12 @@ fn own_image_refusal(repo: &Path) -> Option<String> {
     let release = target.join("release");
     let copy = release.join(format!("keel-serve{}", std::env::consts::EXE_SUFFIX));
     Some(format!(
-        "keel suite: this command is running from {} - the very file `cargo test --release` relinks. On this host a running image cannot be replaced, so the build would fail with `Access is denied` before any test ran (issue386). Run the suite from a copy cargo does not write:\n  cp {} {}\n  {} suite\nNo receipt was written: nothing was measured.",
+        "{who}: this command is running from {} - the very file `cargo test --release` relinks. On this host a running image cannot be replaced, so the build would fail with `Access is denied` before any test ran (issue386). Run it from a copy cargo does not write:\n  cp {} {}\n  {} {}\nNo receipt was written: nothing was measured.",
         exe.display(),
         release.join(format!("keel{}", std::env::consts::EXE_SUFFIX)).display(),
         copy.display(),
-        copy.display()
+        copy.display(),
+        who.strip_prefix("keel ").unwrap_or(who)
     ))
 }
 
@@ -210,10 +214,16 @@ fn own_image_refusal(repo: &Path) -> Option<String> {
 pub fn cmd(args: &[String], repo: &Path) -> i32 {
     // --help must not RUN the suite. It did, once, and cost 185 seconds to discover.
     if args.iter().take_while(|a| *a != "--").any(|a| a == "--help" || a == "-h") {
-        println!("usage: keel suite [ROOT] [-- <cargo test args>]");
+        println!("usage: keel suite [ROOT] [--touched] [-- <cargo test args>]");
         println!("  runs the full suite (--release --no-fail-fast), logs under .keel/metrics/, and writes");
         println!("  {RECEIPT}: the deliverable fingerprint, counts and outcome of that run.");
+        println!("  --touched: instead run ONLY the integration tests that name a module changed since the base");
+        println!("  of the push (origin/<branch>, else the last suite receipt's head, else HEAD~1) and write");
+        println!("  {}: the base, stems, set and cost - an empty set is recorded too (D0421).", crate::touched::RECEIPT);
         return 0;
+    }
+    if args.iter().take_while(|a| *a != "--").any(|a| a == "--touched") {
+        return crate::touched::cmd(repo);
     }
     if !is_self_build(repo) {
         eprintln!("keel suite: {} holds no keel-cli/Cargo.toml - there is no suite to run here (a downstream project's gate is `keel gate`)", repo.display());
@@ -225,7 +235,7 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
         eprintln!("keel suite: cannot create {}: {e}", metrics.display());
         return 1;
     }
-    if let Some(reason) = own_image_refusal(repo) {
+    if let Some(reason) = own_image_refusal(repo, "keel suite") {
         eprintln!("{reason}");
         return 2;
     }

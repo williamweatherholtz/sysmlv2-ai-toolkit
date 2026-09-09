@@ -210,7 +210,14 @@ frozen (modify it only by out-of-band Decision).
   one day `land` refused a push whose deliverable had moved since the last green run; measured, that run
   costs ~11 wall minutes every time code moves against roughly one catchable bad push in twenty-five, and
   the human withdrew it. Run the suite through `keel suite` when you want the receipt — CI remains the
-  check that a push must survive.
+  check that a push must survive. **The TOUCHED set is not that gate (D0421, issue416):** `land` computes the
+  integration tests whose text names a module changed since `origin/<branch>` (`keel-cli/src/<stem>.rs` ->
+  `<stem>`; `main.rs`/`lib.rs` name no module and are reported unattributed) and prints the set on every
+  self-build push; once D0421 carries the human's acceptance it RUNS exactly those binaries before the first
+  push and refuses on a failure, naming them from cargo's own `--test <name>` rerun hint (a capture reads
+  stdout before stderr, so the `Running` header pairing does not hold there). While D0421 is proposed the set
+  is printed and nothing runs. `keel suite --touched` is the same run by hand; either writes
+  `.keel/metrics/touched-receipt.toml` beside the suite's receipt, never in it.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by the local hooks

@@ -57,7 +57,7 @@ package ProjectCodeRegistry {
         :>> filePath = "keel-cli/src/sync.rs";
         :>> riskClass = RiskClass::dataLoss;
         :>> invariantSafety = InvariantSafety::enforced;
-        :>> codeHash = "2927d6474c7e5404";
+        :>> codeHash = "f7536dfe52d72bcc";
     }
 
     part ceGuards : CodeElement {
