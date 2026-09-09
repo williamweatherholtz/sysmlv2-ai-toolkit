@@ -6000,10 +6000,22 @@ pub fn cli_surface_declared(root: &Path) -> GuardReport {
     let mut violations = cli_surface_violations(&authored, &crate::cli_facts::CLI_FACTS, &crate::cli_surface::COMMAND_NAMES, &crate::cli_surface::LENS_NAMES);
     // issue423: what a synopsis CITES is held to the tree too - both homes, so a stale citation
     // cannot survive in the one the drift check happens not to compare.
-    let mut synopses: Vec<(&str, &str, &str)> = authored.iter().map(|f| (".engine/cli/commands.sysml", f.name.as_str(), f.synopsis.as_str())).collect();
-    synopses.extend(crate::cli_facts::CLI_FACTS.iter().map(|f| ("cli_facts.rs", f.name, f.synopsis)));
-    let retired: BTreeMap<String, String> = crate::supersede_edges(root).into_iter().map(|(from, to)| (to, from)).collect();
-    violations.extend(synopsis_citation_violations(&synopses, &decision_ids_present(root), &retired));
+    //
+    // ONLY WHERE THE CITED DECISIONS LIVE (issue433, D0419). The Decisions a synopsis cites are the
+    // ENGINE's, in the engine's own `.engine/decisions`. A downstream project's `.engine/decisions`
+    // holds THAT project's Decisions - `keel init` ships none - so the same check read every scaffold
+    // as citing twelve missing Decisions and turned CI red for six pushes (the two tests that build
+    // a project and land in it). The engine's channel is recognised by D0271 being in it - the
+    // Decision that made the surface an authored fact; a tree without it cannot resolve what the
+    // synopses cite, and `keel-cli/Cargo.toml` alone does not say so (a test fixture shaped like the
+    // self-build carries no Decisions either). Where the citations cannot resolve, they are not read.
+    let present = decision_ids_present(root);
+    if present.contains("d0271") {
+        let mut synopses: Vec<(&str, &str, &str)> = authored.iter().map(|f| (".engine/cli/commands.sysml", f.name.as_str(), f.synopsis.as_str())).collect();
+        synopses.extend(crate::cli_facts::CLI_FACTS.iter().map(|f| ("cli_facts.rs", f.name, f.synopsis)));
+        let retired: BTreeMap<String, String> = crate::supersede_edges(root).into_iter().map(|(from, to)| (to, from)).collect();
+        violations.extend(synopsis_citation_violations(&synopses, &present, &retired));
+    }
     GuardReport { name: "cli-surface-declared", scanned: authored.len(), warnings: Vec::new(), violations }
 }
 
@@ -6242,6 +6254,26 @@ mod cli_surface_declared_tests {
         assert!(retired.contains_key("d0353"), "the retired set holds the push gate");
         let v = synopsis_citation_violations(&synopses, &decision_ids_present(root), &retired);
         assert!(v.is_empty(), "{v:#?}");
+    }
+
+    /// issue433: the citation check reads only a tree that holds the engine's Decision channel
+    /// (D0271 present). Known-negative: the engine's facts under `.engine/cli` with NO Decisions -
+    /// the shape `keel init` ships and the shape the self-build-like fixtures take - yields no
+    /// citation violation. Known-positive: the same tree with a `0271-` file yields the twelve.
+    #[test]
+    fn citations_are_read_only_where_the_engines_decisions_live() {
+        let root = std::env::temp_dir().join(format!("kcite{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine").join("cli")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".engine").join("decisions")).expect("mkdir");
+        std::fs::copy("../.engine/cli/commands.sysml", root.join(".engine").join("cli").join("commands.sysml")).expect("copy the facts");
+        let cites = |r: &GuardReport| r.violations.iter().filter(|v| v.contains(" cites ")).count();
+        let without = cli_surface_declared(&root);
+        assert_eq!(cites(&without), 0, "no Decisions in the tree: nothing to hold the citations against: {:#?}", without.violations);
+        std::fs::write(root.join(".engine").join("decisions").join("0271-cliSurfaceIsAnAuthoredFact.sysml"), "package Decision0271 {}\n").expect("write");
+        let with = cli_surface_declared(&root);
+        assert!(cites(&with) >= 12, "the engine's channel is present and every other cited Decision is absent: {} citation violation(s)", cites(&with));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
 

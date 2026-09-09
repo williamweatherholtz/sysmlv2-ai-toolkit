@@ -201,6 +201,9 @@ frozen (modify it only by out-of-band Decision).
   a push carries the whole repository, issue280) and, on rejection, merges and **gates the MERGED tree**
   before retrying — two contributions that pass alone can fail together. `orient` reports
   its own `sync` position, so every computed answer states the tree it was computed against.
+  **A CI verdict is the `conclusion` field (D0420/issue434):** read it from `gh run list --json conclusion` or
+  `keel status`, never from a wrapper's exit code - `gh run watch ...; echo $?` reported 0 over two failed runs and
+  main was red for six pushes while the transcript said green. `land` names the base's verdict before every push.
   **`keel suite` runs the full suite and records what it cost; it gates NOTHING (D0356).** It writes
   `.keel/metrics/suite-receipt.toml` over the deliverable's fingerprint (`keel-cli/`, `.engine/`, `keelw`,
   the Cargo manifests — content on disk, so an uncommitted edit counts) with the counts and outcome. For

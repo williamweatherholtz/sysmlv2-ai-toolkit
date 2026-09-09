@@ -378,48 +378,60 @@ fn ci_section(root: &Path) -> Section {
     let Some(head) = head else {
         return Section { label: "ci", state: State::Unknown, lines: vec!["not a git repository".into()] };
     };
+    let (verdict, line) = ci_verdict(root, &head);
+    let state = match verdict {
+        CiVerdict::Failed => State::Attention,
+        CiVerdict::Passed => State::Ok,
+        CiVerdict::Running | CiVerdict::NoRun | CiVerdict::Unknown => State::Unknown,
+    };
+    Section { label: "ci", state, lines: vec![line] }
+}
+
+/// What CI concluded about one commit, read from `gh run list --json conclusion,status`.
+///
+/// The ONE reading of a CI verdict in the binary. issue434: two "CI green" reports were made from the exit
+/// code of a shell wrapper around `gh run watch` while the runs had failed; the conclusion field is
+/// what a report may cite, and `keel land` names it for the base before every push.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CiVerdict {
+    /// A run for the commit concluded `failure` or `timed_out`.
+    Failed,
+    /// A run is queued or in progress and none has failed.
+    Running,
+    /// Every run for the commit concluded and none failed.
+    Passed,
+    /// `gh` found no run for the commit.
+    NoRun,
+    /// `gh` is unavailable or could not reach the runs.
+    Unknown,
+}
+
+/// The verdict and a one-line rendering of it for `sha` (abbreviated to seven characters in the line).
+#[must_use]
+pub fn ci_verdict(root: &Path, sha: &str) -> (CiVerdict, String) {
+    let short = &sha[..7.min(sha.len())];
     let out = std::process::Command::new("gh")
-        .args(["run", "list", "--commit", &head, "--limit", "5", "--json", "conclusion,status,workflowName"])
+        .args(["run", "list", "--commit", sha, "--limit", "5", "--json", "conclusion,status,workflowName"])
         .current_dir(root)
         .output();
     let Ok(o) = out else {
-        return Section {
-            label: "ci",
-            state: State::Unknown,
-            lines: vec!["`gh` unavailable — cannot tell whether this commit passed".into()],
-        };
+        return (CiVerdict::Unknown, "`gh` unavailable — cannot tell whether this commit passed".into());
     };
     if !o.status.success() {
-        return Section {
-            label: "ci",
-            state: State::Unknown,
-            lines: vec!["gh could not reach the runs — cannot tell whether this commit passed".into()],
-        };
+        return (CiVerdict::Unknown, "gh could not reach the runs — cannot tell whether this commit passed".into());
     }
     let text = String::from_utf8_lossy(&o.stdout);
     if text.trim() == "[]" || text.trim().is_empty() {
-        return Section {
-            label: "ci",
-            state: State::Unknown,
-            lines: vec![format!("no run found for {} — pushed yet?", &head[..7.min(head.len())])],
-        };
+        return (CiVerdict::NoRun, format!("no run found for {short} — pushed yet?"));
     }
     let failed = text.contains("\"conclusion\":\"failure\"") || text.contains("\"conclusion\":\"timed_out\"");
     let running = text.contains("\"status\":\"in_progress\"") || text.contains("\"status\":\"queued\"");
     if failed {
-        Section {
-            label: "ci",
-            state: State::Attention,
-            lines: vec![format!("{} FAILED — `gh run list` for the run", &head[..7.min(head.len())])],
-        }
+        (CiVerdict::Failed, format!("{short} FAILED — `gh run list` for the run"))
     } else if running {
-        Section {
-            label: "ci",
-            state: State::Unknown,
-            lines: vec![format!("{} still running", &head[..7.min(head.len())])],
-        }
+        (CiVerdict::Running, format!("{short} still running"))
     } else {
-        Section { label: "ci", state: State::Ok, lines: vec![format!("{} passed", &head[..7.min(head.len())])] }
+        (CiVerdict::Passed, format!("{short} passed"))
     }
 }
 

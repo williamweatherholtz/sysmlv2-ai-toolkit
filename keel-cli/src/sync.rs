@@ -211,6 +211,7 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     // worse than a contention), but the actor must SEE the contention at the moment it becomes real
     // and record the Issue for human adjudication (D0108) rather than discover it at integration.
     warn_if_landing_on_held_items(repo, &branch);
+    name_ci_verdict_of_base(repo, &branch);
     // GATE BEFORE THE FIRST PUSH (issue280). This loop used to push FIRST and only reach the gate
     // after a REJECTION, so on the success path — the common path — NOTHING was gated and a broken
     // project left the machine. D0234 clause 4 asserted that `land` gates every project before a
@@ -291,6 +292,27 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
 /// File-granular by design (an item-level diff would re-parse two trees per land): coarse in the
 /// safe direction — it can warn about a neighbor edit in a shared file, never stay silent about a
 /// held item's own file.
+/// issue434 (D0419): before a push, say what CI concluded about the commit this push lands ON. Two
+/// reports of "CI green" were made from a shell wrapper's exit code (`gh run watch ...; echo $?`
+/// exits 0 whatever the run did) while `main` had been red for six pushes; the next push then landed
+/// on a red base without anyone saying so. This line is the binary reading the `conclusion` field -
+/// the one reading a report may cite - at the moment the base is about to change. ADVISORY, never a
+/// refusal: a red base is exactly what the fixing push must land on. Silent when the remote is not
+/// GitHub (nothing to ask) or `origin/<branch>` does not resolve (first push).
+fn name_ci_verdict_of_base(repo: &Path, branch: &str) {
+    let Ok(url) = git(repo, &["remote", "get-url", "origin"]) else { return };
+    if !url.contains("github.com") {
+        return;
+    }
+    let Ok(base) = git(repo, &["rev-parse", &format!("origin/{branch}")]) else { return };
+    let base = base.trim();
+    let (verdict, line) = crate::status::ci_verdict(repo, base);
+    println!("keel land: CI on the base origin/{branch}: {line}");
+    if verdict == crate::status::CiVerdict::Failed {
+        println!("  The base is RED. If this push is not its fix, main stays red after it lands; report CI from `gh run list --json conclusion`, never from a wrapper's exit code (issue434).");
+    }
+}
+
 fn warn_if_landing_on_held_items(repo: &Path, branch: &str) {
     let me = crate::actor::resolve(repo, None).unwrap_or_default();
     if me.is_empty() {

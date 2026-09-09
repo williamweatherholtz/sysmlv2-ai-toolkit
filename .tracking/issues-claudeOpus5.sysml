@@ -1600,4 +1600,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcPrefixLeavesRoomForTheRoute to issue432;
+
+    part issue433 : Issue {
+        :>> id = "a10fdafc-c2f7-490e-88dd-564d6b042938";
+        :>> title = "guard cli-surface-declared's citation check (e902566) fails every downstream tree - CI red six pushes";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The synopsis-citation check added to guard cli-surface-declared at e902566 (D0412, issue423) ran in every tree. The Decisions a synopsis cites are the ENGINE's; a downstream project's .engine/decisions holds that project's own Decisions and ships from keel init with none, so every scaffolded tree read as citing twelve missing Decisions (d0301, d0323, d0296, d0356, d0338, d0311, in both fact homes). CI was red for six consecutive pushes (e902566 through afd90d0): adoption_check_can_fail failed on the scaffold it builds, and push_gate_is_withdrawn failed locally because keel land refused the fixture's push on the same twelve violations. The check must read only a tree that holds the engine's Decision channel, recognised by D0271 being present.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcCitationCheckHoldsWhereTheDecisionsLive to issue433;
+
+    part issue434 : Issue {
+        :>> id = "bf49c6f0-b364-4239-8576-2098c214e978";
+        :>> title = "CI reported green for f848923 and afd90d0 while red: a wrapper's exit code was read as the run's conclusion";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Two reports in this session said CI was green for f848923 and afd90d0 while both runs had FAILED (adoption_check_can_fail, issue433). The mechanism: a background command of the form gh run watch <id> --exit-status > /dev/null 2>&1; echo 'ci exit=$?' - the harness reported the wrapper's exit code, 0, and the report was read from that instead of from the run's conclusion. The verdict of a CI run is the conclusion field of gh run list --json conclusion (what keel status reads for HEAD); a wrapper's exit code is not evidence of anything. The correction is a control in the binary: keel land names the CI verdict of the base it is about to push onto, from that field, before every push - a red base is then said at the moment it matters, and the reading is the binary's, not a transcript's.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcLandNamesTheCiVerdictOfTheBase to issue434;
 }
