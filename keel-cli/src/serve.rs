@@ -319,6 +319,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         .route("/api/commit", post(api_commit))
         .route("/view/report/:name", get(view_report))
         .route("/view/diagram", get(view_diagram))
+        .route("/view/control-structure", get(view_control_structure))
         // persistent serve settings (e.g. the agent-bridge toggle — claude -p billing control)
         .route("/api/settings", get(api_settings_get).post(api_settings_post))
         // m3 — agent-bridge (headless claude -> SSE)
@@ -1129,6 +1130,12 @@ async fn view_report(State(s): State<AppState>, AxPath(name): AxPath<String>) ->
 /// GET /view/diagram (D0094 m2) — the whole-model interactive diagram HTML (render action).
 async fn view_diagram(State(s): State<AppState>) -> Response {
     view_html(crate::view::diagram_html(&s.rootpath()))
+}
+
+/// GET /view/control-structure (D0285) — the STPA step-2 diagram drawn in the binary, the safety
+/// viewpoint's picture; the console embeds it where that viewpoint's panel renders.
+async fn view_control_structure(State(s): State<AppState>) -> Response {
+    view_html(crate::view::stpa_diagram::control_structure_html(&s.rootpath()))
 }
 
 // ── m3 agent-bridge — drive the LOCALLY-AUTHENTICATED `claude` CLI, stream its work over SSE ───────

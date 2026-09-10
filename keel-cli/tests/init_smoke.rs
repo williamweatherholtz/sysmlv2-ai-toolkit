@@ -70,7 +70,7 @@ fn init_scaffolds_a_working_project() {
     names.sort_unstable();
     assert_eq!(
         names,
-        vec!["deck_inbox_record.py", "stpa_diagram.py", "test_deck_e2e.py"],
+        vec!["deck_inbox_record.py", "test_deck_e2e.py"],
         "scaffolded python must be exactly the tools shipped processes deploy by path; got {names:?}"
     );
     // D0174/P0: the in-loop enforcement surface ships with init — five hook events, the output

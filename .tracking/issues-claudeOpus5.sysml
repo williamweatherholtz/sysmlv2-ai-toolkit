@@ -1908,4 +1908,48 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcMarkerTextWithoutMarkerHolds to issue460;
+
+    part issue461 : Issue {
+        :>> id = "03803592-879d-4723-98c6-cf26cf3d4de5";
+        :>> title = "control-structure lens row order varied between runs with the tree unchanged";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel show control-structure produced a different feedback row order on consecutive runs with nothing in the tree changed: three runs on 2026-09-10 differed at line 20 (cmp), found when the Rust port of the STPA diagram was byte-compared against the Python tool on the same JSON and the only difference was the order of sensor-fed feedback rows. Cause (control_structure.rs instrument_feedback): the sensors were walked in HashMap order and the feedback rows pushed in that walk kept it, while the sensor rows beside them were sorted. A computed view that varies run to run is not a view of the tree. Fixed by walking the sensors in item-name order; instrument_feedback_rows_are_in_one_order_whatever_the_map_order fails with the sort removed (sixty sensors, two seeds) and passes with it. The class-wide question - which other lenses push rows from a map walk - is not answered here.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyStpaDiagramInTheBinary to issue461;
+
+    part issue462 : Issue {
+        :>> id = "ea6b789f-01ec-4421-945a-61ceecbb863a";
+        :>> title = "console viewpoint panel fetched /api/computed/show for every keel show renderer";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The console's generic viewpoint panel could not reach any viewpoint whose renderer text began with keel show: vpCmd stripped only the leading keel, so a renderer of keel show control-structure fetched /api/computed/show, which does not exist. 15 of the 30 declared viewpoint renderers begin with keel show. Confirmed at runtime on a served copy of the binary (port 7791): GET /api/computed/show returned 404, GET /api/computed/control-structure returned 200. Fixed in console.html by stripping keel and an optional show; the safety viewpoint now embeds /view/control-structure. No test in the suite exercises the console's JS against the declared viewpoints, so the residual is that this class is caught only by using the console.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from storyStpaDiagramInTheBinary to issue462;
+
+    part issue463 : Issue {
+        :>> id = "57871829-0b38-4385-b424-71174eca123a";
+        :>> title = "suite --touched measured the changed set to HEAD, so the pre-commit verifier run was empty";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel suite --touched computed its changed set as `git diff --name-only <base>...HEAD` - committed changes only. The D0425/D0432 verifier runs it BEFORE the commit, so on 2026-09-10 (sprint 659: HEAD equal to origin/main, twenty files edited and one new module under keel-cli/) the verifier's run read `changed modules []`, wrote a touched receipt with outcome empty, passed 0, failed 0, and reported it - the gate's own set was nothing, and the flow would have recorded a green Implement gate over zero tests. Sprint 658 did not show it only because HEAD was then a commit ahead of origin. Fixed at the root in touched.rs: the set is measured from the merge-base of the base and HEAD to the WORKING TREE (git diff --name-only <merge-base>, no second revision) plus the untracked files under keel-cli (git ls-files --others --exclude-standard), so a new module counts; inside the post-commit land the working tree is HEAD and nothing changes there. Known-positive after the fix: this tree reads eight stems including the untracked stpa_diagram; known-negative: an empty diff still yields the empty set (the empty-out path is unchanged).";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from storyStpaDiagramInTheBinary to issue463;
+
+    part issue464 : Issue {
+        :>> id = "bc14b007-35b4-4633-8269-a71bbe9d8112";
+        :>> title = "keel guard before staging passed process-change that the pre-commit hook then refused - the index-reading guards scan nothing until git add";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Observed 2026-09-10 on the sprint 659 commit. The D0425 verifier ran `keel guard --no-receipt .` over the working tree and reported ALL PASS with 0 FAIL; the recorder wrote the ceremony from that receipt; `git add -A` then `git commit` was refused by the pre-commit hook with `[guard:process-change] FAIL - locked file(s) changed (.engine/processes/stpa-diagram.sysml, .engine/skills/stpa-diagram/SKILL.md, .engine/skills/stpa-diagram/registry.sysml) with NO co-committed process-change Decision`. Both verdicts were correct for what each read: `process-change` reads `git diff --cached` (guards.rs `staged_changes`), so with nothing staged it scanned nothing and passed, and the hook saw the same edits staged and refused. The gap is that `keel guard` before staging and the commit tier after staging answer differently over one tree, and the verifier flow reads the first as the second. Every sprint under D0425 verifies before staging, so this recurs whenever a sprint touches a locked file without its Decision - the verifier's ALL PASS cannot be read as 'the commit will pass'.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcGuardReadsTheWorkingTreeOutsideTheHook to issue464;
 }

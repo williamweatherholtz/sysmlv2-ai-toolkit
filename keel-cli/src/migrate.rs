@@ -240,7 +240,7 @@ mod section_merge_tests {
 /// The tools a scaffold RECEIVES from the engine: stdlib-only, kernel-free, referenced by shipped
 /// processes. One home, because two lists of what the engine ships would drift and the drift would be
 /// invisible until a follower found a dead path.
-const PORTABLE_TOOLS: [&str; 3] = ["test_deck_e2e.py", "deck_inbox_record.py", "stpa_diagram.py"];
+const PORTABLE_TOOLS: [&str; 2] = ["test_deck_e2e.py", "deck_inbox_record.py"];
 
 /// Is this one of the tools the engine ships into every project?
 ///
@@ -254,9 +254,10 @@ pub fn is_portable_engine_tool(rel: &Path) -> bool {
 
 #[must_use]
 pub fn is_engine_dev_only(rel: &Path) -> bool {
-    // stpa_diagram.py (D0285): stdlib-only, referenced by the shipped stpa-diagram process - a scaffold
-    // that ships the process without the tool hands a follower a dead path (tool-reference went red on
-    // CI's foreign-tree check the day the process landed without this line).
+    // A tool a shipped process references by path must ship with it - a scaffold that ships the process
+    // without the tool hands a follower a dead path (tool-reference went red on CI's foreign-tree check
+    // the day stpa-diagram landed without its Python interim on this list; that renderer is in the
+    // binary since D0285's port, `keel show control-structure --svg`).
     if is_portable_engine_tool(rel) {
         return false;
     }

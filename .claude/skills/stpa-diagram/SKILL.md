@@ -17,19 +17,21 @@ Controller / ControlAction / Feedback set.
 ## Procedure
 
 ```
-keel show control-structure . | python .engine/tools/stpa_diagram.py --out diagram.svg
-#   or, live:     python .engine/tools/stpa_diagram.py --root . --out diagram.svg
+keel show control-structure --svg . > diagram.svg        # the SVG fragment (CSS variables, host page owns the palette)
+keel render control-structure --mode graph > diagram.html # the same picture on a self-contained page, light and dark
+#   the console serves it at /view/control-structure and embeds it in the safety viewpoint's panel
 ```
 
 1. **Compute, never draw** (`sd0Compute`). The JSON is the input; the SVG is a view of it. If a box
    is missing, fix the view or the authored residue, not the picture.
-2. The tool lays out rows by authority, assigns sides and directions, routes orthogonally with one
+2. The binary lays out rows by authority, assigns sides and directions, routes orthogonally with one
    channel per edge, places labels off other edges' verticals, and hops crossings (`sd1`–`sd5`) — by
-   construction. There is nothing to do by hand here, and nothing may be done by hand here.
+   construction, and each property is a unit test on the layout (`keel-cli/src/view/stpa_diagram.rs`).
+   There is nothing to do by hand here, and nothing may be done by hand here.
 3. **Look at it** (`sd6Verify`): render in a browser at full size and at a zoomed crop of the densest
    region; check the five properties. The two defects construction cannot rule out are a label hiding
    a line it was placed over and a label floating past a short channel — both were found only by
-   looking. Fix in the tool; never edit the SVG.
+   looking. Fix in the renderer; never edit the SVG.
 4. Embed the SVG where the human reads: the console or the published page. The SVG uses CSS
    variables (`--ctl --fb --proc --ctl-bg --proc-bg --panel --ink --muted`) so the host page owns the
    palette and dark mode.
@@ -40,8 +42,6 @@ keel show control-structure . | python .engine/tools/stpa_diagram.py --out diagr
   `.tracking/architecture/engine-control-structure.sysml`.
 - It does not run UCA analysis. That is the STPA process (`dcStpaProcessForKeel`); this skill draws
   its step 2 input.
-- It is Python under `.engine/tools/` as the sanctioned interim; the port into the binary as
-  `keel render control-structure --mode graph` is chartered (`dcStpaDiagramInTheBinary`, D0221).
 
 ## Questions this skill answers
 

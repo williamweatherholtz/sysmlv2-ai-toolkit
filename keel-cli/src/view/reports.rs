@@ -1161,6 +1161,11 @@ pub fn render_html(root: &Path, view: &str, mode: &str) -> Result<String, ViewEr
             if matches!(view, "model" | "all" | "whole") {
                 return diagram_html(root);
             }
+            if view == "control-structure" {
+                // the STPA control structure is a computed lens, not a declared view: its graph is the
+                // ortholinear diagram drawn by construction (D0285), not a force layout
+                return super::stpa_diagram::control_structure_html(root);
+            }
             let (_, model, result) = run_resolved(root, view)?;
             let elements = graph_elements(&model, Some(&result));
             Ok(DIAGRAM_TEMPLATE

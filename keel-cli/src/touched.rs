@@ -18,7 +18,11 @@
 //!
 //! THE BASE is `origin/<branch>` when it resolves (what the push will land on), else the head the
 //! last suite receipt recorded, else `HEAD~1`; a tree with none of those reads every tracked module
-//! as changed and says so.
+//! as changed and says so. THE CHANGED SET is measured from the merge-base to the WORKING TREE -
+//! tracked edits and untracked files alike - not to HEAD: the D0425 verifier runs this BEFORE the
+//! commit, and on 2026-09-10 (sprint 659, HEAD equal to origin/main, twenty files edited under
+//! `keel-cli/`) `base...HEAD` read an empty set and the verifier ran nothing (issue463). Inside the
+//! post-commit land the working tree IS HEAD, so nothing changes there.
 //!
 //! WHERE IT IS INERT (D0337). A refusal on `land` is a change to the integration path, which is outside
 //! standing consent - so `land` computes and PRINTS the set on every push, but RUNS it and refuses only
@@ -184,16 +188,24 @@ fn base_ref(repo: &Path) -> Option<String> {
     git_out(repo, &["rev-parse", "--verify", "--quiet", "HEAD~1^{commit}"]).map(|_| "HEAD~1".to_string())
 }
 
-/// Compute the touched set for `repo` at HEAD. Self-build only (the caller checks).
+/// Compute the touched set for `repo`: what the working tree changed since the base. Self-build only
+/// (the caller checks).
 ///
 /// # Errors
 /// When git cannot list the changed paths (`diff --name-only` against the base, or `ls-files` when
 /// no base resolves).
 pub fn compute(repo: &Path) -> Result<Touched, String> {
     let (base, changed): (String, Vec<String>) = if let Some(b) = base_ref(repo) {
-        let range = format!("{b}...HEAD");
-        let out = git_out(repo, &["diff", "--name-only", &range]).or_else(|| git_out(repo, &["diff", "--name-only", &format!("{b}..HEAD")])).ok_or_else(|| format!("git diff --name-only {range} failed"))?;
-        (b, out.lines().map(str::to_string).collect())
+        // The merge-base, so a remote that moved ahead does not read as our change; then the diff
+        // from it to the WORKING TREE (no second revision), plus the untracked files under the crate -
+        // a new module or test file is a change the diff of tracked paths cannot see.
+        let from = git_out(repo, &["merge-base", &b, "HEAD"]).unwrap_or_else(|| b.clone());
+        let out = git_out(repo, &["diff", "--name-only", &from]).ok_or_else(|| format!("git diff --name-only {from} failed"))?;
+        let untracked = git_out(repo, &["ls-files", "--others", "--exclude-standard", "--", "keel-cli"]).unwrap_or_default();
+        let mut paths: Vec<String> = out.lines().chain(untracked.lines()).filter(|l| !l.is_empty()).map(str::to_string).collect();
+        paths.sort();
+        paths.dedup();
+        (b, paths)
     } else {
         let out = git_out(repo, &["ls-files", "keel-cli/src", "keel-cli/tests"]).ok_or_else(|| "git ls-files failed".to_string())?;
         ("(no base: every tracked module)".to_string(), out.lines().map(str::to_string).collect())
@@ -451,7 +463,7 @@ pub fn cmd(repo: &Path) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{failing_binaries, module_stem, names_stem, test_name, text_carries_acceptance, touched_tests};
+    use super::{compute, failing_binaries, module_stem, names_stem, test_name, text_carries_acceptance, touched_tests};
 
     #[test]
     fn a_stem_is_the_module_a_path_names() {
@@ -515,5 +527,39 @@ mod tests {
         let lib = "error: test failed, to rerun pass `--lib`\nerror: 2 targets failed:\n    `--lib`\n    `--test a_gate`\n";
         assert_eq!(failing_binaries(lib), vec!["a_gate".to_string(), "lib".to_string()]);
         assert!(failing_binaries("test result: ok. 1 passed; 0 failed\n     Running tests/other.rs (x)\n").is_empty());
+    }
+
+    /// The set is what the WORKING TREE changed, not what HEAD did (issue463): with HEAD equal to the
+    /// base and edits uncommitted, the verifier's pre-commit run read an empty set. Known-negative: a
+    /// clean tree whose last commit touched no module reads no stem. Known-positive: an uncommitted edit
+    /// to a tracked module and an untracked new module both read as changed.
+    #[test]
+    fn the_changed_set_is_the_working_trees_not_heads() {
+        let dir = std::env::temp_dir().join(format!("keel-touched-{}", crate::write::gen_uuid()));
+        std::fs::create_dir_all(dir.join("keel-cli").join("src")).unwrap();
+        std::fs::create_dir_all(dir.join("keel-cli").join("tests")).unwrap();
+        let git = |args: &[&str]| {
+            let o = crate::gitx::git().arg("-C").arg(&dir).args(args).output().unwrap();
+            assert!(o.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&o.stderr));
+            String::from_utf8_lossy(&o.stdout).trim().to_string()
+        };
+        git(&["init", "-q"]);
+        std::fs::write(dir.join("keel-cli").join("src").join("foo.rs"), "pub fn foo() {}\n").unwrap();
+        std::fs::write(dir.join("keel-cli").join("tests").join("foo_bites.rs"), "// names foo\n").unwrap();
+        git(&["add", "-A"]);
+        git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"]);
+        // A second commit touching no module, so the base (HEAD~1, no remote here) differs from HEAD by nothing under keel-cli.
+        git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "head"]);
+        let clean = compute(&dir).unwrap();
+        assert!(clean.stems.is_empty(), "known-negative: a clean tree reads no stem, got {:?}", clean.stems);
+        assert!(!clean.lib, "known-negative: no source path changed");
+
+        std::fs::write(dir.join("keel-cli").join("src").join("foo.rs"), "pub fn foo() { /* edited, uncommitted */ }\n").unwrap();
+        std::fs::write(dir.join("keel-cli").join("src").join("newmod.rs"), "pub fn newmod() {}\n").unwrap();
+        let dirty = compute(&dir).unwrap();
+        assert_eq!(dirty.stems, vec!["foo".to_string(), "newmod".to_string()], "known-positive: the uncommitted edit and the untracked module are the change");
+        assert!(dirty.lib, "a source path changed, so the lib's own tests run");
+        assert_eq!(dirty.tests, vec!["foo_bites".to_string()], "the test naming the changed stem is in the set");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

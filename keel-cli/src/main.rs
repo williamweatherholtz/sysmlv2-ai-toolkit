@@ -5138,7 +5138,17 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
             Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
             Some("control-census") => cmd_view0(rest, "control-census", keel_cli::view::census::control_census),
-            Some("control-structure") => cmd_view0(rest, "control-structure", keel_cli::view::control_structure::control_structure),
+            Some("control-structure") => {
+                // `--svg` draws the STPA diagram in the binary (D0285, the Python interim retired):
+                // same computed structure, serialised as the picture instead of the JSON.
+                let svg = rest.iter().any(|a| a == "--svg");
+                let rest: Vec<String> = rest.iter().filter(|a| *a != "--svg").cloned().collect();
+                if svg {
+                    cmd_view0(&rest, "control-structure --svg", keel_cli::view::stpa_diagram::control_structure_svg)
+                } else {
+                    cmd_view0(&rest, "control-structure", keel_cli::view::control_structure::control_structure)
+                }
+            }
             Some("coverage") => cmd_coverage(rest),
             Some("critique-coverage") => cmd_critique_coverage(rest),
             Some("critique-policy") => cmd_critique_policy(rest),

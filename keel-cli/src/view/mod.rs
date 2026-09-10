@@ -25,6 +25,7 @@ mod checks;
 pub mod census;
 pub mod delta;
 pub mod control_structure;
+pub mod stpa_diagram;
 
 /// Does an acceptance note carry the human's words as a quote receipt (D0192)?
 ///

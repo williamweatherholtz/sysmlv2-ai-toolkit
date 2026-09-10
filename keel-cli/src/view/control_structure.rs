@@ -586,10 +586,14 @@ pub fn declared_sensor_mechanisms(root: &Path) -> Vec<String> {
 /// run of this is a sample" are different facts about a number and nothing else says which (issue392).
 fn instrument_feedback(model: &Model, feedback: &mut Vec<Fb>) -> Vec<Json> {
     let mut sensors: Vec<(String, Json)> = Vec::new();
-    for (name, item) in &model.items {
-        if item.type_name != "Sensor" {
-            continue;
-        }
+    // Walk the sensors in item-name order: `model.items` is a HashMap, and the feedback rows pushed here
+    // keep the walk's order - three consecutive runs of the lens differed in their `feedback` row order
+    // (found 2026-09-10 by byte-comparing the diagram the lens feeds against its Python predecessor).
+    // The sensor rows are sorted below; the feedback rows must be too, or a computed view varies with
+    // nothing in the tree changed.
+    let mut sensor_items: Vec<_> = model.items.iter().filter(|(_, i)| i.type_name == "Sensor").collect();
+    sensor_items.sort_by(|a, b| a.0.cmp(b.0));
+    for (name, item) in sensor_items {
         let attr = |k: &str| item.attrs.get(k).cloned().unwrap_or_default();
         let produces = attr("producesFeedback");
         let (mut sensed, mut reports) = ("", "");
@@ -1119,6 +1123,46 @@ mod tests {
 
     fn act(name: &str, issued_by: &'static str, acts_on: &'static str) -> Action {
         Action { name: name.to_string(), title: format!("{name} does a thing"), issued_by, acts_on, data: "what passes".to_string(), source: "test".to_string() }
+    }
+
+    /// The `feedback` rows a lens computes are in the same order on every run: three consecutive runs of
+    /// `keel show control-structure` differed in their sensor-fed rows (2026-09-10), because the sensors
+    /// were walked in `HashMap` order and the rows kept it. Two models holding the same sixty sensors in
+    /// two independently seeded maps must yield one row order; with the sort removed this fails on the
+    /// first pair with different seeds (the known-positive run), and a two-sensor model passed only by
+    /// chance, which is why there are sixty.
+    #[test]
+    fn instrument_feedback_rows_are_in_one_order_whatever_the_map_order() {
+        use crate::view::ItemInfo;
+        use std::collections::HashMap;
+        let build = || {
+            let mut model = Model { items: HashMap::new(), edges: Vec::new() };
+            for i in 0..60u32 {
+                let fb_name = format!("fbProbe{i}");
+                let mut fb_attrs = HashMap::new();
+                fb_attrs.insert("sensedFrom".to_string(), "cpModel".to_string());
+                fb_attrs.insert("reportsTo".to_string(), "ctHuman".to_string());
+                model.items.insert(fb_name.clone(), ItemInfo { type_name: "Feedback".to_string(), attrs: fb_attrs, marker: None, file: String::new() });
+                let mut attrs = HashMap::new();
+                attrs.insert("title".to_string(), format!("probe{i}"));
+                attrs.insert("mechanism".to_string(), format!("scripts/probe{i}.py"));
+                attrs.insert("measures".to_string(), "a number".to_string());
+                attrs.insert("producesFeedback".to_string(), fb_name);
+                attrs.insert("determinism".to_string(), "Determinism::tree".to_string());
+                model.items.insert(format!("snProbe{i}"), ItemInfo { type_name: "Sensor".to_string(), attrs, marker: None, file: String::new() });
+            }
+            let mut feedback = Vec::new();
+            instrument_feedback(&model, &mut feedback);
+            feedback.into_iter().map(|f| f.name).collect::<Vec<_>>()
+        };
+        let first = build();
+        assert_eq!(first.len(), 60, "every sensor with a resolvable feedback item yields one row");
+        for _ in 0..4 {
+            assert_eq!(build(), first, "the row order depends on the map's seed");
+        }
+        let mut sorted = first.clone();
+        sorted.sort();
+        assert_eq!(first, sorted, "the order is the sensors' item-name order");
     }
 
     /// The actuator is a judgment made once, by the shape of the action: hooks act through the harness's

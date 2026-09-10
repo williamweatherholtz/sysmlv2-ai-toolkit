@@ -10,13 +10,13 @@
 // re-derived wrongly next time (D0040); as a process with a tool that enforces it by construction,
 // the fourth attempt is the last.
 //
-// THE TOOL IS THE ENFORCEMENT. `.engine/tools/stpa_diagram.py` takes the JSON of
-// `keel show control-structure` and cannot draw a diagonal, a shared segment, an unlabelled edge or a
+// THE RENDERER IS THE ENFORCEMENT. `keel show control-structure --svg` (and `keel render
+// control-structure --mode graph`, the same picture on a page; `keel-cli/src/view/stpa_diagram.rs`)
+// takes the computed structure and cannot draw a diagonal, a shared segment, an unlabelled edge or a
 // junction where a crossing belongs: each convention below is a property of its layout, not an
-// instruction to the person drawing. The steps therefore describe what the reader may rely on, and
-// the one judgment that remains (sd6Verify) is a read-back against the five properties, not a
-// re-drawing. Porting the renderer into the binary is chartered (dcStpaDiagramInTheBinary, D0221:
-// deterministic logic goes in the binary); until then the tool is the sanctioned interim.
+// instruction to the person drawing, and each is a unit test on that layout (D0221: deterministic
+// logic goes in the binary). The steps therefore describe what the reader may rely on, and the one
+// judgment that remains (sd6Verify) is a read-back against the five properties, not a re-drawing.
 package ProcessStpaDiagram {
     private import EngineElement::*;
     private import EngineProcess::*;

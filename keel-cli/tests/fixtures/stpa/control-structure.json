@@ -1,0 +1,2641 @@
+{
+  "control-structure": "STPA step 2 for this project's own workflow, COMPUTED from the authored measures (Sensor and Feedback items - the mechanism, its determinism and the loop it closes), the hook config, git hooks, workflow files, CLI facts and declared deciders (D0284). Actuators and responsibilities are derived from the actions; process models and the other inputs/outputs (the handbook's fifth element type, D0363) are authored and joined onto the roles; the step-2 gate is decided clause by clause from this structure; the remote's rules are fetched live and never copied.",
+  "controllers": [
+    {
+      "role": "human",
+      "what": "the human director",
+      "anchor": "ctHuman",
+      "anchorTitle": "Human director (wweatherholtz)",
+      "inert": false,
+      "actions": [
+        "cmdAccept",
+        "humanDirects",
+        "humanDecidesOnChannel"
+      ],
+      "feedback": [
+        "statusCi",
+        "statusCurrency",
+        "statusRelease",
+        "consoleLenses",
+        "execBriefFacts",
+        "stpaDiagram",
+        "execBriefLogicExhibits",
+        "execBriefCharts",
+        "statusDashboard"
+      ],
+      "actuators": [
+        "actAgentRouting",
+        "actWriteLayer"
+      ],
+      "processModel": "pmHuman",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "human",
+          "process": "model",
+          "hazard": "ehz2",
+          "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+          "via": "acts on model"
+        },
+        {
+          "controller": "human",
+          "process": "model",
+          "hazard": "ehz3",
+          "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+          "via": "acts on model"
+        },
+        {
+          "controller": "human",
+          "process": "model",
+          "hazard": "ehz4",
+          "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+          "via": "acts on model"
+        },
+        {
+          "controller": "human",
+          "process": "model",
+          "hazard": "ehz6",
+          "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+          "via": "acts on model"
+        },
+        {
+          "controller": "human",
+          "process": "model",
+          "hazard": "ehz8",
+          "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+          "via": "acts on model"
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "what": "the AI agent",
+      "anchor": "ctAgent",
+      "anchorTitle": "AI agent (claudeOpus5 / claudeFable5, Claude Code session)",
+      "inert": false,
+      "actions": [
+        "cmdReject",
+        "cmdOverride",
+        "cmdClaim",
+        "cmdEnroll",
+        "cmdActor",
+        "cmdAddTask",
+        "cmdRecord",
+        "cmdNew",
+        "cmdAppendResult",
+        "cmdAppendGateResult",
+        "cmdApplyReview",
+        "cmdRecordMeasurement",
+        "cmdSnapshotIndicators",
+        "cmdReverify",
+        "cmdDeck",
+        "cmdServe",
+        "cmdInit",
+        "cmdSync",
+        "cmdLand",
+        "cmdMigrate",
+        "cmdSyncClaude",
+        "cmdProcess",
+        "cmdLibrary",
+        "cmdActivate",
+        "cmdDeactivate",
+        "cmdGithubPull",
+        "cmdSuite",
+        "cmdCurrency",
+        "cmdGithubIngest",
+        "agentEditsDeliverable"
+      ],
+      "feedback": [
+        "readAdvance",
+        "readValidate",
+        "readCheck",
+        "readCheckEngine",
+        "readGuard",
+        "readGate",
+        "readRules",
+        "readAudit",
+        "readAuditHistory",
+        "readAuditAdherence",
+        "readAuditCiRuns",
+        "readAssured",
+        "readAdoptionCheck",
+        "readOrient",
+        "readWhatsNext",
+        "readStatus",
+        "readShow",
+        "readView",
+        "readItem",
+        "readArch",
+        "readAttestation",
+        "readActorTrace",
+        "readGoverningVersion",
+        "readReprocessCandidates",
+        "readEnforcementReport",
+        "readRender",
+        "readDiagram",
+        "readReport",
+        "readDecisionCard",
+        "readProjects",
+        "readOnboard",
+        "readActivation",
+        "readGithubDecider",
+        "readGithubGesture",
+        "readRecall",
+        "readAssumptions",
+        "readAttestationCoverage",
+        "readAuthorityQueue",
+        "readBoundary",
+        "readBoundarySweep",
+        "readBusiness",
+        "readConcernCoverage",
+        "readContentions",
+        "readCommitDelta",
+        "readControlCensus",
+        "readControlStructure",
+        "readControls",
+        "readCoverage",
+        "readCritiqueCoverage",
+        "readCritiquePolicy",
+        "readDecisionFollowThrough",
+        "readDecisions",
+        "readDispositions",
+        "readHardening",
+        "readIndicators",
+        "readIntake",
+        "readKnowledge",
+        "readLaunchables",
+        "readLs",
+        "readMarkerCensus",
+        "readPriority",
+        "readOpenIssues",
+        "readOrphans",
+        "readOutstanding",
+        "readRecent",
+        "readRootedness",
+        "readSittingCoverage",
+        "readSuspect",
+        "readTierSatisfaction",
+        "readTrace",
+        "readTraceNeed",
+        "readVerification",
+        "readWhy",
+        "readWorkflows",
+        "deliverableDrift",
+        "guardProofCensus",
+        "validateWorkflows",
+        "validateTracking",
+        "recallAb",
+        "templateContract",
+        "recallBench",
+        "importProbe",
+        "fitCheck",
+        "spikeMetamodel",
+        "validateSchema",
+        "routingProbe",
+        "docRender",
+        "structureProbe",
+        "validateInstances",
+        "validateProbes",
+        "conformanceLane"
+      ],
+      "actuators": [
+        "actGitPush",
+        "actHarnessFileTools",
+        "actSurfaceRewrite",
+        "actWriteLayer"
+      ],
+      "processModel": "pmAgent",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "agent",
+          "process": "deliverable",
+          "hazard": "ehz9",
+          "hazardTitle": "EHZ9 - an ungated artifact ships outward",
+          "via": "acts on deliverable"
+        },
+        {
+          "controller": "agent",
+          "process": "enforcement-surface",
+          "hazard": "ehz5",
+          "hazardTitle": "EHZ5 - an enforcement point is silently dead",
+          "via": "acts on enforcement-surface"
+        },
+        {
+          "controller": "agent",
+          "process": "enforcement-surface",
+          "hazard": "ehz7",
+          "hazardTitle": "EHZ7 - a control is weakened without a record",
+          "via": "acts on enforcement-surface"
+        },
+        {
+          "controller": "agent",
+          "process": "main-ref",
+          "hazard": "ehz1",
+          "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+          "via": "acts on main-ref"
+        },
+        {
+          "controller": "agent",
+          "process": "model",
+          "hazard": "ehz2",
+          "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+          "via": "acts on model"
+        },
+        {
+          "controller": "agent",
+          "process": "model",
+          "hazard": "ehz3",
+          "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+          "via": "acts on model"
+        },
+        {
+          "controller": "agent",
+          "process": "model",
+          "hazard": "ehz4",
+          "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+          "via": "acts on model"
+        },
+        {
+          "controller": "agent",
+          "process": "model",
+          "hazard": "ehz6",
+          "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+          "via": "acts on model"
+        },
+        {
+          "controller": "agent",
+          "process": "model",
+          "hazard": "ehz8",
+          "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+          "via": "acts on model"
+        }
+      ]
+    },
+    {
+      "role": "hooks",
+      "what": "keel at the Claude Code hook boundary",
+      "anchor": "ctHooks",
+      "anchorTitle": "keel binary at the Claude Code hook boundary",
+      "inert": false,
+      "actions": [
+        "hookConfigChange",
+        "hookPostToolUse",
+        "hookPreToolUse",
+        "hookStop",
+        "hookSubagentStop",
+        "hookUserPromptSubmit",
+        "launchPin"
+      ],
+      "feedback": [],
+      "actuators": [
+        "actHarnessVerdict",
+        "actLaunchSettings"
+      ],
+      "processModel": "pmHooks",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "hooks",
+          "process": "deliverable",
+          "hazard": "ehz9",
+          "hazardTitle": "EHZ9 - an ungated artifact ships outward",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "enforcement-surface",
+          "hazard": "ehz5",
+          "hazardTitle": "EHZ5 - an enforcement point is silently dead",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "enforcement-surface",
+          "hazard": "ehz7",
+          "hazardTitle": "EHZ7 - a control is weakened without a record",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "main-ref",
+          "hazard": "ehz1",
+          "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "model",
+          "hazard": "ehz2",
+          "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "model",
+          "hazard": "ehz3",
+          "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "model",
+          "hazard": "ehz4",
+          "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "model",
+          "hazard": "ehz6",
+          "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+          "via": "acts on agent-turn, which the agent enacts"
+        },
+        {
+          "controller": "hooks",
+          "process": "model",
+          "hazard": "ehz8",
+          "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+          "via": "acts on agent-turn, which the agent enacts"
+        }
+      ]
+    },
+    {
+      "role": "commit-gate",
+      "what": "keel at the git hook boundary",
+      "anchor": "ctCommitGate",
+      "anchorTitle": "keel binary at the git hook boundary (.githooks)",
+      "inert": false,
+      "actions": [
+        "githookPostCommit",
+        "githookPreCommit",
+        "githookPreMergeCommit",
+        "githookPrePush"
+      ],
+      "feedback": [],
+      "actuators": [
+        "actGitHookDispatch"
+      ],
+      "processModel": "pmCommitGate",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "commit-gate",
+          "process": "main-ref",
+          "hazard": "ehz1",
+          "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+          "via": "acts on main-ref"
+        }
+      ]
+    },
+    {
+      "role": "ci",
+      "what": "GitHub Actions CI",
+      "anchor": "ctCI",
+      "anchorTitle": "GitHub Actions ci.yml",
+      "inert": false,
+      "actions": [
+        "workflowCi",
+        "workflowCurrency",
+        "workflowRelease"
+      ],
+      "feedback": [],
+      "actuators": [
+        "actCheckConclusion"
+      ],
+      "processModel": "pmCI",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "ci",
+          "process": "main-ref",
+          "hazard": "ehz1",
+          "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+          "via": "acts on main-ref"
+        }
+      ]
+    },
+    {
+      "role": "remote",
+      "what": "the GitHub remote",
+      "anchor": "ctRemote",
+      "anchorTitle": "GitHub remote (origin/main, branch protection)",
+      "inert": false,
+      "actions": [
+        "remoteRefusesRewrite"
+      ],
+      "feedback": [],
+      "actuators": [
+        "actRefUpdateRefusal"
+      ],
+      "processModel": "pmRemote",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "remote",
+          "process": "main-ref",
+          "hazard": "ehz1",
+          "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+          "via": "acts on main-ref"
+        }
+      ]
+    },
+    {
+      "role": "console",
+      "what": "keel serve",
+      "anchor": "ctConsole",
+      "anchorTitle": "keel serve on 127.0.0.1:7777 (the human's oversight lens)",
+      "inert": false,
+      "actions": [
+        "consoleApprovesWrite"
+      ],
+      "feedback": [],
+      "actuators": [
+        "actServeWriteApi"
+      ],
+      "processModel": "pmConsole",
+      "processModelAbsent": null,
+      "responsibilities": [
+        {
+          "controller": "console",
+          "process": "model",
+          "hazard": "ehz2",
+          "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+          "via": "acts on model"
+        },
+        {
+          "controller": "console",
+          "process": "model",
+          "hazard": "ehz3",
+          "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+          "via": "acts on model"
+        },
+        {
+          "controller": "console",
+          "process": "model",
+          "hazard": "ehz4",
+          "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+          "via": "acts on model"
+        },
+        {
+          "controller": "console",
+          "process": "model",
+          "hazard": "ehz6",
+          "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+          "via": "acts on model"
+        },
+        {
+          "controller": "console",
+          "process": "model",
+          "hazard": "ehz8",
+          "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+          "via": "acts on model"
+        }
+      ]
+    }
+  ],
+  "processes": [
+    {
+      "role": "model",
+      "what": "the recorded model (.tracking + .engine instances)",
+      "anchor": "cpModel",
+      "anchorTitle": "The recorded model (.tracking + .engine instance files in the working tree)",
+      "actionsOnIt": 22,
+      "enactedBy": null
+    },
+    {
+      "role": "main-ref",
+      "what": "the shared history (origin/main)",
+      "anchor": "cpMainRef",
+      "anchorTitle": "The shared history (origin/main)",
+      "actionsOnIt": 11,
+      "enactedBy": null
+    },
+    {
+      "role": "enforcement-surface",
+      "what": "guards, hooks, workflows, processes, skills, contracts",
+      "anchor": "cpEnforcementSurface",
+      "anchorTitle": "The enforcement surface (guards.rs, adherence.rs, .githooks/, .github/workflows/*.yml, .engine/processes, .engine/skills, contracts)",
+      "actionsOnIt": 6,
+      "enactedBy": null
+    },
+    {
+      "role": "deliverable",
+      "what": "the deliverable source and tests",
+      "anchor": "cpDeliverable",
+      "anchorTitle": "The deliverable (keel-cli source and tests)",
+      "actionsOnIt": 1,
+      "enactedBy": null
+    },
+    {
+      "role": "work",
+      "what": "sprints, ceremonies, the frontier",
+      "anchor": "cpWork",
+      "anchorTitle": "The work in flight (sprints, ceremonies, the frontier)",
+      "actionsOnIt": 2,
+      "enactedBy": null
+    },
+    {
+      "role": "agent-turn",
+      "what": "one Claude Code response",
+      "anchor": "cpAgentTurn",
+      "anchorTitle": "The agent's turn (one Claude Code response, its tool calls and edits)",
+      "actionsOnIt": 7,
+      "enactedBy": "agent"
+    }
+  ],
+  "actions": [
+    {
+      "name": "hookConfigChange",
+      "title": "ConfigChange: refuses and restores",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook config-change; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "hookPostToolUse",
+      "title": "PostToolUse: blocks",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook post-edit; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "hookPreToolUse",
+      "title": "PreToolUse: denies or advises",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook pre-bash, pre-write; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "hookStop",
+      "title": "Stop: blocks",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook stop; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "hookSubagentStop",
+      "title": "SubagentStop: blocks",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook subagent-stop; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "hookUserPromptSubmit",
+      "title": "UserPromptSubmit: advises",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "keel hook user-prompt; verdict JSON the harness enforces",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "actuator": "actHarnessVerdict"
+    },
+    {
+      "name": "launchPin",
+      "title": "launch: disableAllHooks pinned false above project scope",
+      "issuedBy": "hooks",
+      "actsOn": "agent-turn",
+      "data": "--settings .keel/launch-settings.json; --plugin-dir the plugin rendering; KEEL_BIN",
+      "source": ".keel/launch-settings.json",
+      "actuator": "actLaunchSettings"
+    },
+    {
+      "name": "githookPostCommit",
+      "title": "post-commit: refuse unless green",
+      "issuedBy": "commit-gate",
+      "actsOn": "main-ref",
+      "data": "keel land, keel validate, keel guard",
+      "source": ".githooks/post-commit",
+      "actuator": "actGitHookDispatch"
+    },
+    {
+      "name": "githookPreCommit",
+      "title": "pre-commit: refuse unless green",
+      "issuedBy": "commit-gate",
+      "actsOn": "main-ref",
+      "data": "keel check-engine, keel validate, keel guard, keel rules",
+      "source": ".githooks/pre-commit",
+      "actuator": "actGitHookDispatch"
+    },
+    {
+      "name": "githookPreMergeCommit",
+      "title": "pre-merge-commit: refuse unless green",
+      "issuedBy": "commit-gate",
+      "actsOn": "main-ref",
+      "data": "no keel command",
+      "source": ".githooks/pre-merge-commit",
+      "actuator": "actGitHookDispatch"
+    },
+    {
+      "name": "githookPrePush",
+      "title": "pre-push: refuse unless green",
+      "issuedBy": "commit-gate",
+      "actsOn": "main-ref",
+      "data": "keel land",
+      "source": ".githooks/pre-push",
+      "actuator": "actGitHookDispatch"
+    },
+    {
+      "name": "workflowCi",
+      "title": "ci.yml: fail the build",
+      "issuedBy": "ci",
+      "actsOn": "main-ref",
+      "data": "steps: clippy (-D warnings) | test | keel gates (kernel-free backstop \u2014 SKIP_VALIDATE can't bypass CI) | script probes (every scripts/*.py that ships known cases, run as a gate; D0394) | keel audit-history (tree-derived verdicts over the pushed range) | keel adoption-check (a unit must land in a project that lacks it) | keel audit-adherence (guard-set monotonicity \u2014 a control cannot be disarmed unsigned, D0209) | keel audit-ci-runs (the external-fact gate \u2014 a ci-run receipt names a real green run on the judged SHA, D0323); runs: keel validate, keel guard, keel check-engine, keel rules, keel audit-history, keel adoption-check, keel audit-adherence, keel audit-ci-runs",
+      "source": ".github/workflows/ci.yml",
+      "actuator": "actCheckConclusion"
+    },
+    {
+      "name": "workflowCurrency",
+      "title": "currency.yml: fail the build",
+      "issuedBy": "ci",
+      "actsOn": "main-ref",
+      "data": "steps: is D0338 accepted? (D0337 - the schedule is inert until the human's word) | build | currency pass (pull as verbatim Statements, library sync, drift; one report) | gate, then commit the new Statements (words only - nothing is triaged); runs: keel currency, keel gate",
+      "source": ".github/workflows/currency.yml",
+      "actuator": "actCheckConclusion"
+    },
+    {
+      "name": "workflowRelease",
+      "title": "release.yml: fail the build",
+      "issuedBy": "ci",
+      "actsOn": "main-ref",
+      "data": "steps: clippy (deny warnings) | cargo test | keel gate (validate + guards) | build keel (release) | stage binary (unix) | stage binary (windows) | checksum (unix) | checksum (windows) | attach to GitHub Release | aggregate and verify; runs: keel gate, keel validate, keel guard",
+      "source": ".github/workflows/release.yml",
+      "actuator": "actCheckConclusion"
+    },
+    {
+      "name": "cmdAccept",
+      "title": "keel accept: record a human's acceptance of a proposed Decision; refused for an AI actor",
+      "issuedBy": "human",
+      "actsOn": "model",
+      "data": "effect writes; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdReject",
+      "title": "keel reject: record a human's rejection of a proposed Decision; the same channel rules as accept",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdOverride",
+      "title": "keel override: arm a single-use, path-bound write unlock; consuming it records an obligation",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdClaim",
+      "title": "keel claim: take or inspect a work claim; liveness is computed",
+      "issuedBy": "agent",
+      "actsOn": "work",
+      "data": "effect both; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdEnroll",
+      "title": "keel enroll: enroll a contributor: register the actor, bind this machine, verify the gate",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdActor",
+      "title": "keel actor: show the actor this session writes as, or bind one for this machine",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect both; family governance",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdAddTask",
+      "title": "keel add-task: add a backlog task with its Definition of Done",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdRecord",
+      "title": "keel record: record one atomic fact: a Decision, an Issue with its resolver, a human's words verbatim, or the story translating them",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdNew",
+      "title": "keel new: scaffold a sprint's ceremony record with minted ids; --fill writes its prose from a draft file and never a result (D0301)",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdAppendResult",
+      "title": "keel append-result: record a verdict on a task's Definition of Done",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdAppendGateResult",
+      "title": "keel append-gate-result: record a verdict on a ceremony gate",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdApplyReview",
+      "title": "keel apply-review: write a human review batch back as linked critiques",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdRecordMeasurement",
+      "title": "keel record-measurement: add one measurement to an indicator series",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdSnapshotIndicators",
+      "title": "keel snapshot-indicators: stamp the current indicator values as a dated series point",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdReverify",
+      "title": "keel reverify: re-run the declared gate at HEAD and stamp fresh results where it is green",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family authoring",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdDeck",
+      "title": "keel deck: the mobile obligation deck; saving writes through the API",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect both; family rendering",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdServe",
+      "title": "keel serve: the interactive console: lenses, approve queue, deck; wraps the write API",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect both; family rendering",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdInit",
+      "title": "keel init: scaffold the engine into a new project",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect writes; family integration",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdSync",
+      "title": "keel sync: fetch, report divergence, integrate by merge, gate the result",
+      "issuedBy": "agent",
+      "actsOn": "main-ref",
+      "data": "effect both; family integration",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actGitPush"
+    },
+    {
+      "name": "cmdLand",
+      "title": "keel land: gate every project, push; on rejection merge and gate the merged tree, then retry",
+      "issuedBy": "agent",
+      "actsOn": "main-ref",
+      "data": "effect both; family integration",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actGitPush"
+    },
+    {
+      "name": "cmdMigrate",
+      "title": "keel migrate: bring an existing project onto this binary's engine vintage, refusing and rolling back on failure",
+      "issuedBy": "agent",
+      "actsOn": "main-ref",
+      "data": "effect both; family integration",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actGitPush"
+    },
+    {
+      "name": "cmdSyncClaude",
+      "title": "keel sync-claude: regenerate the keel-owned .claude/ surface; --check reports drift only",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect both; family integration",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdProcess",
+      "title": "keel process: the process catalogue: import, export or remove a unit",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect both; family distribution",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdLibrary",
+      "title": "keel library: the machine-local cache of the portable-content repository",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect both; family distribution",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdActivate",
+      "title": "keel activate: adopt a process or viewpoint as a unit",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect writes; family distribution",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdDeactivate",
+      "title": "keel deactivate: drop a process or viewpoint as a unit",
+      "issuedBy": "agent",
+      "actsOn": "enforcement-surface",
+      "data": "effect writes; family distribution",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actSurfaceRewrite"
+    },
+    {
+      "name": "cmdGithubPull",
+      "title": "keel github-pull: pull open issues and ingest the new ones as verbatim Statements; autonomy follows repository visibility",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family channel",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdSuite",
+      "title": "keel suite: run the full suite and write the machine-local receipt of what it cost - a measurement, gating nothing (D0356); refuses from the image cargo relinks and records no verdict for a run that never reached a test (issue386); --touched runs only the integration tests that name a module changed since the base and writes its own receipt (D0421)",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect both; family gating",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdCurrency",
+      "title": "keel currency: the unattended currency pass: pull open issues as verbatim Statements, sync the library, read drift back - one report, never a triage (D0338)",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family channel",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "cmdGithubIngest",
+      "title": "keel github-ingest: one GitHub issue becomes a verbatim Statement, idempotent on its URL",
+      "issuedBy": "agent",
+      "actsOn": "model",
+      "data": "effect writes; family channel",
+      "source": ".engine/cli/commands.sysml",
+      "actuator": "actWriteLayer"
+    },
+    {
+      "name": "humanDirects",
+      "title": "the human gives direction",
+      "issuedBy": "human",
+      "actsOn": "work",
+      "data": "prose: chat, a Statement recorded verbatim, a direction Decision; nothing parses it - the agent's routing is the only translation (D0166)",
+      "source": "keel record statement (intake)",
+      "actuator": "actAgentRouting"
+    },
+    {
+      "name": "humanDecidesOnChannel",
+      "title": "a declared login accepts or rejects on the decision channel",
+      "issuedBy": "human",
+      "actsOn": "model",
+      "data": "logins: williamweatherholtz",
+      "source": ".engine/contracts/github-actors.toml",
+      "actuator": null,
+      "actuatorAbsent": "no actuator: the decision channel is disconnected - no .github/workflows/decision-*.yml carries a decider's comment to the model; an acceptance is recorded from their quoted words instead (D0289)"
+    },
+    {
+      "name": "consoleApprovesWrite",
+      "title": "a human approves an ask-tier write from the console queue",
+      "issuedBy": "console",
+      "actsOn": "model",
+      "data": "approval of a queued write: path, requesting run, approver; recorded as an obligation, not a click",
+      "source": "keel serve (approve queue, D0182)",
+      "actuator": "actServeWriteApi"
+    },
+    {
+      "name": "agentEditsDeliverable",
+      "title": "the agent edits the deliverable source with its own tools",
+      "issuedBy": "agent",
+      "actsOn": "deliverable",
+      "data": "Write, Edit and Bash on the paths the manifest names; keel mediates none of it - pre-write advises on protected surfaces, drift makes done work suspect afterwards",
+      "source": ".engine/deliverable-manifest.txt",
+      "actuator": "actHarnessFileTools"
+    },
+    {
+      "name": "remoteRefusesRewrite",
+      "title": "the remote refuses a history rewrite",
+      "issuedBy": "remote",
+      "actsOn": "main-ref",
+      "data": "force-push and deletion rejected; requires no status check and no review unless the row says otherwise",
+      "source": "branch protection, fetched live",
+      "actuator": "actRefUpdateRefusal"
+    }
+  ],
+  "feedback": [
+    {
+      "name": "statusCi",
+      "title": "ci.yml: run status",
+      "sensedFrom": "main-ref",
+      "reportsTo": "human",
+      "data": "red or green per run; email and `gh run list`; nothing makes the agent look (D0266)",
+      "source": ".github/workflows/ci.yml"
+    },
+    {
+      "name": "statusCurrency",
+      "title": "currency.yml: run status",
+      "sensedFrom": "main-ref",
+      "reportsTo": "human",
+      "data": "red or green per run; email and `gh run list`; nothing makes the agent look (D0266)",
+      "source": ".github/workflows/currency.yml"
+    },
+    {
+      "name": "statusRelease",
+      "title": "release.yml: run status",
+      "sensedFrom": "main-ref",
+      "reportsTo": "human",
+      "data": "red or green per run; email and `gh run list`; nothing makes the agent look (D0266)",
+      "source": ".github/workflows/release.yml"
+    },
+    {
+      "name": "readAdvance",
+      "title": "keel advance: the sprint's current ceremony step; --to is refused until every earlier step's verify-Test passes",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family governance",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readValidate",
+      "title": "keel validate: semantic validation of every .tracking file - the authority",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCheck",
+      "title": "keel check: parse-check .sysml files, or report the baked grammar version",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCheckEngine",
+      "title": "keel check-engine: .engine instance reference resolution, kernel-free",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readGuard",
+      "title": "keel guard: run every enforced honest-state guard, or one by name",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readGate",
+      "title": "keel gate: the commit tier: validate plus guards; --fast is the per-edit tier; --workspace gates every project the commit touches",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readRules",
+      "title": "keel rules: the declared rules and whether each holds",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAudit",
+      "title": "keel audit: retrospective adherence: charter, ceremony, estimation, sitting review",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAuditHistory",
+      "title": "keel audit-history: re-derive the gate verdict per commit over a range",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAuditAdherence",
+      "title": "keel audit-adherence: re-derive guard-set and severity monotonicity per commit - a control cannot be disarmed unsigned",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAuditCiRuns",
+      "title": "keel audit-ci-runs: the external-fact gate: every ci-run receipt names a real green run on the judged SHA (D0323)",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAssured",
+      "title": "keel assured: composite READY / NOT-READY assurance verdict with per-check detail",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAdoptionCheck",
+      "title": "keel adoption-check: gate a foreign tree: every unit must land clean in a project that lacks it",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family gating",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readOrient",
+      "title": "keel orient: in-progress sprints, the ready and suspect frontier, the non-blocking burndown",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readWhatsNext",
+      "title": "keel whats-next: the ready list in priority order - declaration order is priority",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readStatus",
+      "title": "keel status: every base in one screen: engine pin, library drift, model honesty, work, CI verdict for HEAD",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readShow",
+      "title": "keel show: one computed lens by name; `show` alone lists them",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readView",
+      "title": "keel view: render a declared TOML view as text",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readItem",
+      "title": "keel item: one item with its attributes and edges",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readArch",
+      "title": "keel arch: architecture lenses over the code registry",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAttestation",
+      "title": "keel attestation: is a pass a receipt or a testimony: results by judge kind, receipts, fail rate",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readActorTrace",
+      "title": "keel actor-trace: everything an actor authored, judged or owns",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readGoverningVersion",
+      "title": "keel governing-version: which process version governs an item",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readReprocessCandidates",
+      "title": "keel reprocess-candidates: items whose governing process version has moved since they were judged",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readEnforcementReport",
+      "title": "keel enforcement-report: fires, blocks, overrides and red-yields from the machine-local fire-ledger",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family orientation",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readRender",
+      "title": "keel render: render any declared view as interactive HTML",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family rendering",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readDiagram",
+      "title": "keel diagram: whole-model interactive graph as HTML on stdout",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family rendering",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readReport",
+      "title": "keel report: a human-facing scorecard",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family rendering",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readDecisionCard",
+      "title": "keel decision-card: a Decision's deciding context as JSON - the channel issue body",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family rendering",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readProjects",
+      "title": "keel projects: every keel project in this repository, and which one you are in",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family integration",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readOnboard",
+      "title": "keel onboard: has this project chosen its processes, and on what basis",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family distribution",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readActivation",
+      "title": "keel activation: which processes and viewpoints this project has adopted",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family distribution",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readGithubDecider",
+      "title": "keel github-decider: who may decide on the channel; an unmapped login is refused, never defaulted",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family channel",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readGithubGesture",
+      "title": "keel github-gesture: parse a channel comment into a JSON verdict; called by the workflow",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family channel",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readRecall",
+      "title": "keel recall: seed recall from a prompt on stdin and print a budgeted brief; zero model calls",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family knowledge",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAssumptions",
+      "title": "keel show assumptions: accepted-but-unverified items something depends on",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAttestationCoverage",
+      "title": "keel show attestation-coverage: accepted Decisions lacking a passing acceptance result",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readAuthorityQueue",
+      "title": "keel show authority-queue: what awaits a human's authority, and what may not be self-attested",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readBoundary",
+      "title": "keel show boundary: one element's interface surface; takes an element",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readBoundarySweep",
+      "title": "keel show boundary-sweep: tier-satisfaction white-box sweep, per Need slice",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readBusiness",
+      "title": "keel show business: the what/why layer: Brief, Personas, Needs, UseCases",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readConcernCoverage",
+      "title": "keel show concern-coverage: declared viewpoints against stakeholder concerns - which concerns nothing serves",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readContentions",
+      "title": "keel show contentions: recorded disagreements between contributors awaiting adjudication",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCommitDelta",
+      "title": "keel show commit-delta: the model delta a git range made - Needs, Requirements, Decisions, Issues and tasks added, items retired by #Supersede and Issues resolved, with titles, reconciled against the diff's added declarations by count; empty when the range changed no item (D0282)",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readControlCensus",
+      "title": "keel show control-census: every control by whose act it binds, the ledger blocks by actor kind, its motivating incidents (observed vs code-read) and its evidence class - friction and hypothetical first",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readControlStructure",
+      "title": "keel show control-structure: STPA step 2 for this project's own workflow, computed: authorities, what each issues on which process carrying what data, and what feedback returns",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readControls",
+      "title": "keel show controls: the two-way hazard/control diff: uncovered failure conditions and unanchored controls",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCoverage",
+      "title": "keel show coverage: Needs and requirements with and without satisfy and verify edges",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCritiqueCoverage",
+      "title": "keel show critique-coverage: per-element required-lens matrix and the gap set",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readCritiquePolicy",
+      "title": "keel show critique-policy: which antagonistic lenses each assurance-element type requires",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readDecisionFollowThrough",
+      "title": "keel show decision-follow-through: every accepted Decision's downstream items and evidence, and the gaps",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readDecisions",
+      "title": "keel show decisions: load-bearing Decisions, ranked by how much depends on them",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readDispositions",
+      "title": "keel show dispositions: findings by verdict: act, acceptRisk, dismiss, undispositioned",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readHardening",
+      "title": "keel show hardening: the critique process's own questions, computed",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readIndicators",
+      "title": "keel show indicators: monitored values with no enforced threshold",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readIntake",
+      "title": "keel show intake: statements, user stories and routing: unparsed, unrouted, unsourced",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readKnowledge",
+      "title": "keel show knowledge: question coverage: does seeding find an entity and traversal reach an answer",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readLaunchables",
+      "title": "keel show launchables: the console's launchable set from declared skills and processes",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readLs",
+      "title": "keel show ls: the .tracking files",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readMarkerCensus",
+      "title": "keel show marker-census: per-marker edge count against prose mentions",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readPriority",
+      "title": "keel show priority: the priority metric: every ready item in declared order with its computed class - resolver severity or retro recurrence - and the inversions (D0311)",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readOpenIssues",
+      "title": "keel show open-issues: every open Issue, its resolvers, and whether each resolver is complete",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readOrphans",
+      "title": "keel show orphans: items nothing references: tasks with no DoD, Issues with no resolver",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readOutstanding",
+      "title": "keel show outstanding: every not-done item, flat",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readRecent",
+      "title": "keel show recent: git-derived activity timeline over .tracking and .engine",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readRootedness",
+      "title": "keel show rootedness: charter-source burndown: need-rooted, decision-chartered, orphan",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readSittingCoverage",
+      "title": "keel show sitting-coverage: per-sitting human review currency",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readSuspect",
+      "title": "keel show suspect: done work whose evidence drifted from the tree it was judged against",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readTierSatisfaction",
+      "title": "keel show tier-satisfaction: per tier, the fraction cleanly satisfied downstream",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readTrace",
+      "title": "keel show trace: every typed edge reaching an item, both directions",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readTraceNeed",
+      "title": "keel show trace-need: one Need's satisfaction chain down to test results",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readVerification",
+      "title": "keel show verification: EXAMINED against EXERCISED, never one number; --pending lists the gap",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readWhy",
+      "title": "keel show why: answer a question from the model as a graph, with provenance",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "readWorkflows",
+      "title": "keel show workflows: the six workflows and their phases",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "family lens",
+      "source": ".engine/cli/commands.sysml"
+    },
+    {
+      "name": "consoleLenses",
+      "title": "console lenses and approve queue",
+      "sensedFrom": "model",
+      "reportsTo": "human",
+      "data": "#View renders on 127.0.0.1:7777; a pull audit, nothing owed (D0204)",
+      "source": "keel serve"
+    },
+    {
+      "name": "deliverableDrift",
+      "title": "deliverable drift makes done work suspect",
+      "sensedFrom": "deliverable",
+      "reportsTo": "agent",
+      "data": "source listed in the manifest changed since a task's verified commit -> suspect (orient)",
+      "source": ".engine/deliverable-manifest.txt"
+    },
+    {
+      "name": "guardProofCensus",
+      "title": ".engine/tools/guard_proof_census.py: how many enforced guards have a test that constructs their defect and asserts they report it",
+      "sensedFrom": "enforcement-surface",
+      "reportsTo": "agent",
+      "data": "how many enforced guards have a test that constructs their defect and asserts they report it; determinism: tree",
+      "source": ".engine/tools/guard_proof_census.py"
+    },
+    {
+      "name": "validateWorkflows",
+      "title": ".engine/tools/validate/validate_workflows.py: whether the process-as-data workflow files parse and type-check against the pilot kernel",
+      "sensedFrom": "enforcement-surface",
+      "reportsTo": "agent",
+      "data": "whether the process-as-data workflow files parse and type-check against the pilot kernel; determinism: external",
+      "source": ".engine/tools/validate/validate_workflows.py"
+    },
+    {
+      "name": "validateTracking",
+      "title": ".engine/tools/validate/validate_tracking.py: whether tracking instances type against the full schema in the kernel",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether tracking instances type against the full schema in the kernel; determinism: external",
+      "source": ".engine/tools/validate/validate_tracking.py"
+    },
+    {
+      "name": "recallAb",
+      "title": ".engine/tools/recall_ab.py: whether injection puts the answering element in front of the model on eight hand-written questions",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether injection puts the answering element in front of the model on eight hand-written questions; determinism: tree",
+      "source": ".engine/tools/recall_ab.py"
+    },
+    {
+      "name": "templateContract",
+      "title": "scripts/check_templates.py: whether a document meets the brand and executive-brief contracts",
+      "sensedFrom": "deliverable",
+      "reportsTo": "agent",
+      "data": "whether a document meets the brand and executive-brief contracts; determinism: tree",
+      "source": "scripts/check_templates.py"
+    },
+    {
+      "name": "recallBench",
+      "title": ".engine/tools/recall_bench.py: whether ranked recall beats a keyword search at putting the answering record in front of the model",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether ranked recall beats a keyword search at putting the answering record in front of the model; determinism: seeded",
+      "source": ".engine/tools/recall_bench.py"
+    },
+    {
+      "name": "importProbe",
+      "title": ".engine/tools/validate/import_probe.py: whether the kernel resolves imports the way the schema assumes",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether the kernel resolves imports the way the schema assumes; determinism: external",
+      "source": ".engine/tools/validate/import_probe.py"
+    },
+    {
+      "name": "execBriefFacts",
+      "title": "scripts/exec_brief/facts.py: every number the standing decision brief asserts, each with the command or parse rule that produced it",
+      "sensedFrom": "work",
+      "reportsTo": "human",
+      "data": "every number the standing decision brief asserts, each with the command or parse rule that produced it; determinism: tree",
+      "source": "scripts/exec_brief/facts.py"
+    },
+    {
+      "name": "fitCheck",
+      "title": "scripts/exec_brief/fit_check.py: rendered text geometry per figure: OVERFLOW past the viewBox, OVERLAP with a sibling, OVERRUN past the drawn box, horizontal SCROLL - each finding with figure, kind, pixels and text; four known cases run as --probe first",
+      "sensedFrom": "deliverable",
+      "reportsTo": "agent",
+      "data": "rendered text geometry per figure: OVERFLOW past the viewBox, OVERLAP with a sibling, OVERRUN past the drawn box, horizontal SCROLL - each finding with figure, kind, pixels and text; four known cases run as --probe first; determinism: external",
+      "source": "scripts/exec_brief/fit_check.py"
+    },
+    {
+      "name": "spikeMetamodel",
+      "title": ".engine/tools/validate/spike_metamodel.py: whether SysML v2 can express the process-as-data meta-model at all",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether SysML v2 can express the process-as-data meta-model at all; determinism: external",
+      "source": ".engine/tools/validate/spike_metamodel.py"
+    },
+    {
+      "name": "stpaDiagram",
+      "title": ".engine/tools/stpa_diagram.py: nothing itself \u2014 it draws the computed control structure",
+      "sensedFrom": "enforcement-surface",
+      "reportsTo": "human",
+      "data": "nothing itself \u2014 it draws the computed control structure; determinism: tree",
+      "source": ".engine/tools/stpa_diagram.py"
+    },
+    {
+      "name": "validateSchema",
+      "title": ".engine/tools/validate/validate_schema.py: whether the schema packages parse and type-check against the pilot kernel",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether the schema packages parse and type-check against the pilot kernel; determinism: external",
+      "source": ".engine/tools/validate/validate_schema.py"
+    },
+    {
+      "name": "routingProbe",
+      "title": ".engine/tools/routing_probe.py: whether a skill's prose actually causes a real model to invoke the process",
+      "sensedFrom": "enforcement-surface",
+      "reportsTo": "agent",
+      "data": "whether a skill's prose actually causes a real model to invoke the process; determinism: stochastic",
+      "source": ".engine/tools/routing_probe.py"
+    },
+    {
+      "name": "execBriefLogicExhibits",
+      "title": "scripts/exec_brief/logic_exhibits.py: nothing itself \u2014 it renders the today-versus-changed and downstream exhibits the brief argues from",
+      "sensedFrom": "work",
+      "reportsTo": "human",
+      "data": "nothing itself \u2014 it renders the today-versus-changed and downstream exhibits the brief argues from; determinism: tree",
+      "source": "scripts/exec_brief/logic_exhibits.py"
+    },
+    {
+      "name": "docRender",
+      "title": "scripts/render.py: whether a document renders and matches its golden output",
+      "sensedFrom": "deliverable",
+      "reportsTo": "agent",
+      "data": "whether a document renders and matches its golden output; determinism: tree",
+      "source": "scripts/render.py"
+    },
+    {
+      "name": "structureProbe",
+      "title": ".engine/tools/validate/structure_probe.py: whether the kernel accepts the structural constructs the schema relies on",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether the kernel accepts the structural constructs the schema relies on; determinism: external",
+      "source": ".engine/tools/validate/structure_probe.py"
+    },
+    {
+      "name": "validateInstances",
+      "title": ".engine/tools/validate/validate_instances.py: whether each instance file types against the flat schema in the kernel",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "whether each instance file types against the flat schema in the kernel; determinism: external",
+      "source": ".engine/tools/validate/validate_instances.py"
+    },
+    {
+      "name": "execBriefCharts",
+      "title": "scripts/exec_brief/charts.py: nothing itself \u2014 it RENDERS measured values as figures, and a figure is what the human actually reads",
+      "sensedFrom": "work",
+      "reportsTo": "human",
+      "data": "nothing itself \u2014 it RENDERS measured values as figures, and a figure is what the human actually reads; determinism: tree",
+      "source": "scripts/exec_brief/charts.py"
+    },
+    {
+      "name": "validateProbes",
+      "title": ".engine/tools/validate/validate_probes.py: which exact SysML v2 patterns the kernel accepts, cell by cell",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "which exact SysML v2 patterns the kernel accepts, cell by cell; determinism: external",
+      "source": ".engine/tools/validate/validate_probes.py"
+    },
+    {
+      "name": "conformanceLane",
+      "title": ".engine/tools/validate/conformance_lane.py: which authored constructs the SysML v2 pilot kernel rejects",
+      "sensedFrom": "model",
+      "reportsTo": "agent",
+      "data": "which authored constructs the SysML v2 pilot kernel rejects; determinism: external",
+      "source": ".engine/tools/validate/conformance_lane.py"
+    },
+    {
+      "name": "statusDashboard",
+      "title": ".engine/tools/report.py: nothing itself \u2014 it materialises project state as an HTML dashboard",
+      "sensedFrom": "work",
+      "reportsTo": "human",
+      "data": "nothing itself \u2014 it materialises project state as an HTML dashboard; determinism: tree",
+      "source": ".engine/tools/report.py"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "conformanceLane",
+      "item": "snConformanceLane",
+      "mechanism": ".engine/tools/validate/conformance_lane.py",
+      "producesFeedback": "fbConformanceLane",
+      "determinism": "external",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "docRender",
+      "item": "snDocRender",
+      "mechanism": "scripts/render.py",
+      "producesFeedback": "fbDocRender",
+      "determinism": "tree",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "execBriefCharts",
+      "item": "snExecBriefCharts",
+      "mechanism": "scripts/exec_brief/charts.py",
+      "producesFeedback": "fbExecBriefCharts",
+      "determinism": "tree",
+      "reading": "figure",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "execBriefFacts",
+      "item": "snExecBriefFacts",
+      "mechanism": "scripts/exec_brief/facts.py",
+      "producesFeedback": "fbExecBriefFacts",
+      "determinism": "tree",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "execBriefLogicExhibits",
+      "item": "snExecBriefLogicExhibits",
+      "mechanism": "scripts/exec_brief/logic_exhibits.py",
+      "producesFeedback": "fbExecBriefLogicExhibits",
+      "determinism": "tree",
+      "reading": "figure",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "fitCheck",
+      "item": "snFitCheck",
+      "mechanism": "scripts/exec_brief/fit_check.py",
+      "producesFeedback": "fbFitCheck",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "guardProofCensus",
+      "item": "snGuardProofCensus",
+      "mechanism": ".engine/tools/guard_proof_census.py",
+      "producesFeedback": "fbGuardProofCensus",
+      "determinism": "tree",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "importProbe",
+      "item": "snImportProbe",
+      "mechanism": ".engine/tools/validate/import_probe.py",
+      "producesFeedback": "fbImportProbe",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "recallAb",
+      "item": "snRecallAb",
+      "mechanism": ".engine/tools/recall_ab.py",
+      "producesFeedback": "fbRecallAb",
+      "determinism": "tree",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "recallBench",
+      "item": "snRecallBench",
+      "mechanism": ".engine/tools/recall_bench.py",
+      "producesFeedback": "fbRecallBench",
+      "determinism": "seeded",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "routingProbe",
+      "item": "snRoutingProbe",
+      "mechanism": ".engine/tools/routing_probe.py",
+      "producesFeedback": "fbRoutingProbe",
+      "determinism": "stochastic",
+      "reading": "number",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "spikeMetamodel",
+      "item": "snSpikeMetamodel",
+      "mechanism": ".engine/tools/validate/spike_metamodel.py",
+      "producesFeedback": "fbSpikeMetamodel",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "statusDashboard",
+      "item": "snStatusDashboard",
+      "mechanism": ".engine/tools/report.py",
+      "producesFeedback": "fbStatusDashboard",
+      "determinism": "tree",
+      "reading": "figure",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "stpaDiagram",
+      "item": "snStpaDiagram",
+      "mechanism": ".engine/tools/stpa_diagram.py",
+      "producesFeedback": "fbStpaDiagram",
+      "determinism": "tree",
+      "reading": "figure",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "structureProbe",
+      "item": "snStructureProbe",
+      "mechanism": ".engine/tools/validate/structure_probe.py",
+      "producesFeedback": "fbStructureProbe",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "templateContract",
+      "item": "snTemplateContract",
+      "mechanism": "scripts/check_templates.py",
+      "producesFeedback": "fbTemplateContract",
+      "determinism": "tree",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "validateInstances",
+      "item": "snValidateInstances",
+      "mechanism": ".engine/tools/validate/validate_instances.py",
+      "producesFeedback": "fbValidateInstances",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "validateProbes",
+      "item": "snValidateProbes",
+      "mechanism": ".engine/tools/validate/validate_probes.py",
+      "producesFeedback": "fbValidateProbes",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "validateSchema",
+      "item": "snValidateSchema",
+      "mechanism": ".engine/tools/validate/validate_schema.py",
+      "producesFeedback": "fbValidateSchema",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "validateTracking",
+      "item": "snValidateTracking",
+      "mechanism": ".engine/tools/validate/validate_tracking.py",
+      "producesFeedback": "fbValidateTracking",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    },
+    {
+      "name": "validateWorkflows",
+      "item": "snValidateWorkflows",
+      "mechanism": ".engine/tools/validate/validate_workflows.py",
+      "producesFeedback": "fbValidateWorkflows",
+      "determinism": "external",
+      "reading": "verdict",
+      "propriety": "UNASSESSED - no propriety finding names this instrument"
+    }
+  ],
+  "actuators": [
+    {
+      "name": "actHarnessVerdict",
+      "title": "Claude Code applies the hook's verdict",
+      "mechanism": "the harness reads the hook's stdout JSON and blocks, denies or allows the tool call or the turn; the hook itself changes nothing",
+      "source": ".claude/settings.json; .engine/claude-plugin/hooks/hooks.json",
+      "controllers": [
+        "hooks"
+      ],
+      "processes": [
+        "agent-turn"
+      ],
+      "carries": [
+        "hookConfigChange",
+        "hookPostToolUse",
+        "hookPreToolUse",
+        "hookStop",
+        "hookSubagentStop",
+        "hookUserPromptSubmit"
+      ]
+    },
+    {
+      "name": "actLaunchSettings",
+      "title": "the launch passes settings above project scope",
+      "mechanism": "`keel claude` passes --settings and --plugin-dir; the harness's own precedence carries the pin, so a kill switch on disk is overridden (D0296 run 6)",
+      "source": "keel claude",
+      "controllers": [
+        "hooks"
+      ],
+      "processes": [
+        "agent-turn"
+      ],
+      "carries": [
+        "launchPin"
+      ]
+    },
+    {
+      "name": "actGitHookDispatch",
+      "title": "git runs the hook and honours its exit code",
+      "mechanism": "core.hooksPath -> .githooks/<hook>; a non-zero exit refuses the commit or the push - git carries the refusal, keel only exits",
+      "source": ".githooks/",
+      "controllers": [
+        "commit-gate"
+      ],
+      "processes": [
+        "main-ref"
+      ],
+      "carries": [
+        "githookPostCommit",
+        "githookPreCommit",
+        "githookPreMergeCommit",
+        "githookPrePush"
+      ]
+    },
+    {
+      "name": "actCheckConclusion",
+      "title": "the runner records the job's conclusion on the ref",
+      "mechanism": "GitHub Actions executes the job; the red or green conclusion is all the action leaves on main - preventive only if branch protection requires it (see remote.reading)",
+      "source": ".github/workflows/",
+      "controllers": [
+        "ci"
+      ],
+      "processes": [
+        "main-ref"
+      ],
+      "carries": [
+        "workflowCi",
+        "workflowCurrency",
+        "workflowRelease"
+      ]
+    },
+    {
+      "name": "actWriteLayer",
+      "title": "the keel write layer lands the file",
+      "mechanism": "temp-file-then-rename under .keel-write-lock; actor and date required or the write refuses (D0129, issue184/185)",
+      "source": "keel-cli/src/write.rs",
+      "controllers": [
+        "agent",
+        "human"
+      ],
+      "processes": [
+        "model",
+        "work"
+      ],
+      "carries": [
+        "cmdAccept",
+        "cmdReject",
+        "cmdOverride",
+        "cmdClaim",
+        "cmdEnroll",
+        "cmdActor",
+        "cmdAddTask",
+        "cmdRecord",
+        "cmdNew",
+        "cmdAppendResult",
+        "cmdAppendGateResult",
+        "cmdApplyReview",
+        "cmdRecordMeasurement",
+        "cmdSnapshotIndicators",
+        "cmdReverify",
+        "cmdDeck",
+        "cmdServe",
+        "cmdGithubPull",
+        "cmdSuite",
+        "cmdCurrency",
+        "cmdGithubIngest"
+      ]
+    },
+    {
+      "name": "actSurfaceRewrite",
+      "title": "keel rewrites the generated surface in place",
+      "mechanism": "init, migrate, sync-claude, activate and deactivate write the engine-owned files directly; sync-claude --check reports the drift afterwards",
+      "source": "keel-cli/src (init, migrate, claude_surface, activation)",
+      "controllers": [
+        "agent"
+      ],
+      "processes": [
+        "enforcement-surface"
+      ],
+      "carries": [
+        "cmdInit",
+        "cmdSyncClaude",
+        "cmdProcess",
+        "cmdLibrary",
+        "cmdActivate",
+        "cmdDeactivate"
+      ]
+    },
+    {
+      "name": "actGitPush",
+      "title": "git pushes after the gate",
+      "mechanism": "keel sync / keel land gate every project in the workspace, then git pushes; what the ref accepts is the remote's rule",
+      "source": "keel land; keel sync",
+      "controllers": [
+        "agent"
+      ],
+      "processes": [
+        "main-ref"
+      ],
+      "carries": [
+        "cmdSync",
+        "cmdLand",
+        "cmdMigrate"
+      ]
+    },
+    {
+      "name": "actAgentRouting",
+      "title": "the agent reads the direction and routes the turn",
+      "mechanism": "prose enters the agent's context; the intake skill and the agent's own routing translate it - nothing mechanical carries it, and the routing rig investigates whether it arrives (D0382, issue415)",
+      "source": ".claude/skills/intake/SKILL.md",
+      "controllers": [
+        "human"
+      ],
+      "processes": [
+        "work"
+      ],
+      "carries": [
+        "humanDirects"
+      ]
+    },
+    {
+      "name": "actServeWriteApi",
+      "title": "keel serve calls the write API",
+      "mechanism": "HTTP on 127.0.0.1:7777 into the same write layer; a tap is signed by the paired device (D0334/D0335) and an unsigned one writes nothing",
+      "source": "keel serve",
+      "controllers": [
+        "console"
+      ],
+      "processes": [
+        "model"
+      ],
+      "carries": [
+        "consoleApprovesWrite"
+      ]
+    },
+    {
+      "name": "actHarnessFileTools",
+      "title": "the harness's Write, Edit and Bash tools change the source",
+      "mechanism": "keel mediates none of it: pre-write advises on protected surfaces, and manifest drift makes done work suspect afterwards",
+      "source": "Claude Code tools; .engine/deliverable-manifest.txt",
+      "controllers": [
+        "agent"
+      ],
+      "processes": [
+        "deliverable"
+      ],
+      "carries": [
+        "agentEditsDeliverable"
+      ]
+    },
+    {
+      "name": "actRefUpdateRefusal",
+      "title": "GitHub refuses the ref update",
+      "mechanism": "branch protection is evaluated at receive-pack: a force-push or a deletion is rejected before the ref moves",
+      "source": "branch protection, fetched live",
+      "controllers": [
+        "remote"
+      ],
+      "processes": [
+        "main-ref"
+      ],
+      "carries": [
+        "remoteRefusesRewrite"
+      ]
+    }
+  ],
+  "processModels": [
+    {
+      "name": "pmAgent",
+      "heldBy": "ctAgent",
+      "beliefs": "That the ready list is the priority (true, D0052); that a green Stop gate ends the turn honestly (true for FORM); that its own judgment on demo/inspect/analyze suffices as verification (the belief st065 withdraws); that a non-fork classification is its call (true, and the channel acts on it).",
+      "falseBeliefsCite": []
+    },
+    {
+      "name": "pmCI",
+      "heldBy": "ctCI",
+      "beliefs": "That the pushed range is the whole story (true - audit-history walks it); that its verdict is read (false often enough to have a Decision, D0266); that its pinned binary is the engine under test (true here, where it builds from source).",
+      "falseBeliefsCite": []
+    },
+    {
+      "name": "pmCommitGate",
+      "heldBy": "ctCommitGate",
+      "beliefs": "That the staged tree is the tree being committed (true - it gates the index, not the working copy); that the binary core.hooksPath resolved is the pinned engine (true only through the probe, D0343/GH#55 - PATH used to decide it); that HEAD after the commit is the SHA its results will be judged against (false whenever the post-commit land merges first); that a green fast tier means the model is honestly formed, never that the work is complete (D0098).",
+      "falseBeliefsCite": []
+    },
+    {
+      "name": "pmConsole",
+      "heldBy": "ctConsole",
+      "beliefs": "That a tap signed by the paired device is the human's judgment (true as far as a device can prove - D0334/D0335 bind the device, not the person); that the working tree it serves is the tree the agent's session sees (true - and the reason its writes must be diffed out of the agent's commit); that the queue it renders is the whole set awaiting the human (true - authority-queue is the same lens the brief reads).",
+      "falseBeliefsCite": []
+    },
+    {
+      "name": "pmHooks",
+      "heldBy": "ctHooks",
+      "beliefs": "That the session is an agent session because the environment says so (agent-mutable); that the binary they resolve is the pinned one (true only where KEEL_BIN or PATH agrees with the pin - issue 43 downstream); that a clean fast tier means the edit was safe to continue (form only).",
+      "falseBeliefsCite": []
+    },
+    {
+      "name": "pmHuman",
+      "heldBy": "ctHuman",
+      "beliefs": "That an auto-accepted Decision is fine unless overridden; that a green gate means the model is honest (true) and the work is complete (false by design, D0098); that the DoD verified is the DoD agreed (FALSE today - issue343: the owner may rewrite it after the pass); that a pass with a receipt was produced by what the receipt names (unchecked - CI does not re-run receipts).",
+      "falseBeliefsCite": [
+        "issue343"
+      ]
+    },
+    {
+      "name": "pmRemote",
+      "heldBy": "ctRemote",
+      "beliefs": "That whoever holds the push credential is the actor named in the commit (false - the credential is a machine's, the commit's author field is prose); that a ref update is safe when it is a fast-forward (true for history, silent about content - it reads no gate); that a required status check is what makes CI preventive (true, and none is required here, so CI is detective - remote.reading).",
+      "falseBeliefsCite": []
+    }
+  ],
+  "otherInputsOutputs": [
+    {
+      "name": "oioDecisionBrief",
+      "title": "the published decision brief",
+      "direction": "outbound",
+      "externalParty": "the claude.ai artifact host - the one page the pending set is published to (D0359), read outside every control here",
+      "atController": "agent",
+      "atProcess": null
+    },
+    {
+      "name": "oioGithubIssues",
+      "title": "issues filed on the repository",
+      "direction": "inbound",
+      "externalParty": "anyone who can open an issue - an unauthenticated stranger when the repository is public, which is why D0264 routes by visibility",
+      "atController": "agent",
+      "atProcess": null
+    },
+    {
+      "name": "oioHooksPathConfig",
+      "title": "core.hooksPath and the resolved binary",
+      "direction": "inbound",
+      "externalParty": "the machine's git config - machine-local, uncommitted, and the whole reason the commit gate runs at all; a clone without it commits ungated",
+      "atController": "commit-gate",
+      "atProcess": null
+    },
+    {
+      "name": "oioHostClock",
+      "title": "the host clock and file mtimes",
+      "direction": "inbound",
+      "externalParty": "the operating system - the guard receipt is keyed on mtimes and refuses a path younger than two seconds (D0371), and every judgedAt is the host's date",
+      "atController": "hooks",
+      "atProcess": null
+    },
+    {
+      "name": "oioModelApi",
+      "title": "the model's completions",
+      "direction": "inbound",
+      "externalParty": "the Anthropic API - the agent's every judgment is a sample from it (issue392: two of four verdicts flipped on identical inputs)",
+      "atController": "agent",
+      "atProcess": null
+    },
+    {
+      "name": "oioPairedDeviceKey",
+      "title": "the paired device's key",
+      "direction": "inbound",
+      "externalParty": "the browser that paired with the code the serving terminal printed (D0334) - a device, and whoever holds it",
+      "atController": "console",
+      "atProcess": null
+    },
+    {
+      "name": "oioPushCredential",
+      "title": "the push credential",
+      "direction": "inbound",
+      "externalParty": "the machine's credential helper - the remote authenticates a token, and the token belongs to a machine both the human and the agent push from",
+      "atController": "remote",
+      "atProcess": null
+    },
+    {
+      "name": "oioReleaseBinary",
+      "title": "the released binary",
+      "direction": "outbound",
+      "externalParty": "downstream projects - keelw and keel init fetch the release asset the tag names, and a defect here becomes theirs (D0275, D0302)",
+      "atController": "remote",
+      "atProcess": null
+    },
+    {
+      "name": "oioSessionEnvironment",
+      "title": "the harness's session environment",
+      "direction": "inbound",
+      "externalParty": "Claude Code - the hook event payload, KEEL_BIN, PATH and the settings precedence decide which binary fires and whether it fires at all (D0296, GH#43)",
+      "atController": "hooks",
+      "atProcess": null
+    },
+    {
+      "name": "oioToolchain",
+      "title": "the runner image and the Rust toolchain",
+      "direction": "inbound",
+      "externalParty": "GitHub-hosted runners, rustup and crates.io - CI builds the engine under test from source on whatever they serve that day",
+      "atController": "ci",
+      "atProcess": null
+    },
+    {
+      "name": "oioUncommittedEdits",
+      "title": "out-of-band edits to the working tree",
+      "direction": "inbound",
+      "externalParty": "an editor, the console, or a second session writing the same working tree - they reach the model through no keel command and no hook sees them (S-F9)",
+      "atController": null,
+      "atProcess": "model"
+    }
+  ],
+  "responsibilities": [
+    {
+      "controller": "agent",
+      "process": "deliverable",
+      "hazard": "ehz9",
+      "hazardTitle": "EHZ9 - an ungated artifact ships outward",
+      "via": "acts on deliverable"
+    },
+    {
+      "controller": "agent",
+      "process": "enforcement-surface",
+      "hazard": "ehz5",
+      "hazardTitle": "EHZ5 - an enforcement point is silently dead",
+      "via": "acts on enforcement-surface"
+    },
+    {
+      "controller": "agent",
+      "process": "enforcement-surface",
+      "hazard": "ehz7",
+      "hazardTitle": "EHZ7 - a control is weakened without a record",
+      "via": "acts on enforcement-surface"
+    },
+    {
+      "controller": "agent",
+      "process": "main-ref",
+      "hazard": "ehz1",
+      "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+      "via": "acts on main-ref"
+    },
+    {
+      "controller": "agent",
+      "process": "model",
+      "hazard": "ehz2",
+      "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+      "via": "acts on model"
+    },
+    {
+      "controller": "agent",
+      "process": "model",
+      "hazard": "ehz3",
+      "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+      "via": "acts on model"
+    },
+    {
+      "controller": "agent",
+      "process": "model",
+      "hazard": "ehz4",
+      "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+      "via": "acts on model"
+    },
+    {
+      "controller": "agent",
+      "process": "model",
+      "hazard": "ehz6",
+      "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "agent",
+      "process": "model",
+      "hazard": "ehz8",
+      "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "ci",
+      "process": "main-ref",
+      "hazard": "ehz1",
+      "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+      "via": "acts on main-ref"
+    },
+    {
+      "controller": "commit-gate",
+      "process": "main-ref",
+      "hazard": "ehz1",
+      "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+      "via": "acts on main-ref"
+    },
+    {
+      "controller": "console",
+      "process": "model",
+      "hazard": "ehz2",
+      "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+      "via": "acts on model"
+    },
+    {
+      "controller": "console",
+      "process": "model",
+      "hazard": "ehz3",
+      "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+      "via": "acts on model"
+    },
+    {
+      "controller": "console",
+      "process": "model",
+      "hazard": "ehz4",
+      "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+      "via": "acts on model"
+    },
+    {
+      "controller": "console",
+      "process": "model",
+      "hazard": "ehz6",
+      "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "console",
+      "process": "model",
+      "hazard": "ehz8",
+      "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "hooks",
+      "process": "deliverable",
+      "hazard": "ehz9",
+      "hazardTitle": "EHZ9 - an ungated artifact ships outward",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "enforcement-surface",
+      "hazard": "ehz5",
+      "hazardTitle": "EHZ5 - an enforcement point is silently dead",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "enforcement-surface",
+      "hazard": "ehz7",
+      "hazardTitle": "EHZ7 - a control is weakened without a record",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "main-ref",
+      "hazard": "ehz1",
+      "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "model",
+      "hazard": "ehz2",
+      "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "model",
+      "hazard": "ehz3",
+      "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "model",
+      "hazard": "ehz4",
+      "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "model",
+      "hazard": "ehz6",
+      "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "hooks",
+      "process": "model",
+      "hazard": "ehz8",
+      "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+      "via": "acts on agent-turn, which the agent enacts"
+    },
+    {
+      "controller": "human",
+      "process": "model",
+      "hazard": "ehz2",
+      "hazardTitle": "EHZ2 - a write lands outside a validated channel",
+      "via": "acts on model"
+    },
+    {
+      "controller": "human",
+      "process": "model",
+      "hazard": "ehz3",
+      "hazardTitle": "EHZ3 - AI records human judgment, or an actor is misattributed",
+      "via": "acts on model"
+    },
+    {
+      "controller": "human",
+      "process": "model",
+      "hazard": "ehz4",
+      "hazardTitle": "EHZ4 - completion computed from absent or invalid evidence",
+      "via": "acts on model"
+    },
+    {
+      "controller": "human",
+      "process": "model",
+      "hazard": "ehz6",
+      "hazardTitle": "EHZ6 - duplicate identity forks the truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "human",
+      "process": "model",
+      "hazard": "ehz8",
+      "hazardTitle": "EHZ8 - a stale computed layer is served as current truth",
+      "via": "acts on model"
+    },
+    {
+      "controller": "remote",
+      "process": "main-ref",
+      "hazard": "ehz1",
+      "hazardTitle": "EHZ1 - history rewritten on a shared ref",
+      "via": "acts on main-ref"
+    }
+  ],
+  "hazardsByProcess": [
+    {
+      "hazard": "ehz1",
+      "process": "cpMainRef"
+    },
+    {
+      "hazard": "ehz2",
+      "process": "cpModel"
+    },
+    {
+      "hazard": "ehz3",
+      "process": "cpModel"
+    },
+    {
+      "hazard": "ehz4",
+      "process": "cpModel"
+    },
+    {
+      "hazard": "ehz5",
+      "process": "cpEnforcementSurface"
+    },
+    {
+      "hazard": "ehz6",
+      "process": "cpModel"
+    },
+    {
+      "hazard": "ehz7",
+      "process": "cpEnforcementSurface"
+    },
+    {
+      "hazard": "ehz8",
+      "process": "cpModel"
+    },
+    {
+      "hazard": "ehz9",
+      "process": "cpDeliverable"
+    }
+  ],
+  "remote": {
+    "status": "fetched live from williamweatherholtz/sysmlv2-ai-toolkit",
+    "refusesForcePush": true,
+    "enforceAdmins": true,
+    "requiresStatusChecks": false,
+    "requiresReviews": false,
+    "reading": "CI is DETECTIVE: no status check is required, so a red build reports a commit already on main"
+  },
+  "inertControllers": [],
+  "absentRoles": [
+    {
+      "role": "channel",
+      "what": "the decision channel workflows",
+      "wiredBy": "a decision-*.yml workflow in .github/workflows/"
+    }
+  ],
+  "stepTwoGate": [
+    {
+      "clause": "at least one controller, one control action and one controlled process",
+      "holds": true,
+      "evidence": "7 controllers issue 49 actions on 6 processes"
+    },
+    {
+      "clause": "every arrow is labelled functionally with what passes (no bare Command / Status / Computer)",
+      "holds": true,
+      "evidence": "49 actions and 100 feedback paths carry a title and data; bare: none"
+    },
+    {
+      "clause": "every controlled process has at least one controller acting on it",
+      "holds": true,
+      "evidence": "acted on: model, main-ref, enforcement-surface, deliverable, work, agent-turn; with no controller: none"
+    },
+    {
+      "clause": "responsibilities are traced: every acting controller answers for a hazard on a process it reaches, and every hazard has a controller that answers for it",
+      "holds": true,
+      "evidence": "31 responsibilities over 9 hazards; controllers with none: none; hazards nobody answers for: none"
+    },
+    {
+      "clause": "every controller has a process model, or its absence is justified",
+      "holds": true,
+      "evidence": "7 process models for 7 present controllers; without one: none"
+    },
+    {
+      "clause": "each process model is maintained by feedback, or by an other-input, reaching its controller",
+      "holds": true,
+      "evidence": "maintained by nothing: none"
+    },
+    {
+      "clause": "the fifth element type - other inputs and outputs, neither control nor feedback - is enumerated or declared empty with a reason",
+      "holds": true,
+      "evidence": "9 inbound, 2 outbound, each with its external party"
+    },
+    {
+      "clause": "sensors and actuators are present or deliberately deferred to step 4",
+      "holds": true,
+      "evidence": "21 sensors authored, 11 actuators computed from the actions"
+    }
+  ]
+}

@@ -116,7 +116,7 @@ function readOnlyNote(cmd){
   +'computed view and cannot discharge it. Nothing here is a control. To act: use the review queue where '
   +'the item is acceptance-bearing, or run <code>keel '+esc(cmd)+'</code> and record the result.</p>';
 }
-function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+/,'').split(/[\s(]/)[0]}
+function vpCmd(vp){return String(vp&&vp.renderer||'').replace(/^keel\s+(show\s+)?/,'').split(/[\s(]/)[0]}
 // WHAT AWAITS THE HUMAN, per viewpoint (issue288). Filled by buildNav from /api/obligations, which
 // derives its classes from viewpoints declaring surface="act" — so declaring one adds a class with no
 // console change. `countable:false` means the class has NO bound counter and must NEVER render as 0.
@@ -629,6 +629,10 @@ async function render(){
     (failed
       ? '<p class=muted style="border-left:3px solid #c33;padding-left:8px">this view could not be computed: '+esc(failed)+' — it is NOT empty. Run <code>keel '+esc(cmd)+'</code> on the CLI.</p>'
       : statusBanner(d)+actBridge(acceptanceItems(d))+readOnlyNote(cmd)
+        +(cmd==='control-structure'
+          ? '<iframe src="/view/control-structure" title="STPA control structure" style="width:100%;height:70vh;border:1px solid var(--line,#ccc);border-radius:4px;background:transparent"></iframe>'
+           +'<p class=muted>the diagram is drawn by the binary from this same JSON (<code>keel show control-structure --svg</code>, D0285); <a href="/view/control-structure" target=_blank>open full size</a></p>'
+          : '')
         +renderComputed(d)
         // The payload stays available, collapsed: a rendered table is a READING of the data, and the
         // reader must be able to check it against what the server actually sent (issue286).

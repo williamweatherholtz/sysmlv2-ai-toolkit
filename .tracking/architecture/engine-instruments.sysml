@@ -268,27 +268,6 @@ package EngineInstruments {
         :>> producesFeedback = fbStatusDashboard;
     }
 
-    // stpaDiagram: .engine/tools/stpa_diagram.py
-    // KNOWN FAILURE MODES: it can only draw what the computed structure contains, and that structure omits every instrument in this file — the omission is invisible in the picture
-    // PUBLISHED TO: the safety viewpoint's rendering
-    part fbStpaDiagram : Feedback {
-        :>> id = "b6f1d7b9-eb27-53a6-8c92-799dfca100a7";
-        :>> title = "nothing itself — it draws the computed control structure";
-        :>> createdAt = "2026-09-07"; :>> createdBy = "claudeOpus5";
-        :>> sensedFrom = cpEnforcementSurface;
-        :>> reportsTo = ctHuman;
-    }
-    part snStpaDiagram : Sensor {
-        :>> id = "8eecf9e3-841f-5b07-9a3b-d2484d975fd3";
-        :>> title = "stpaDiagram";
-        :>> createdAt = "2026-09-07"; :>> createdBy = "claudeOpus5";
-        :>> mechanism = ".engine/tools/stpa_diagram.py";
-        :>> measures = "nothing itself — it draws the computed control structure";
-        :>> determinism = Determinism::tree;
-        :>> reading = SensorReading::figure;
-        :>> producesFeedback = fbStpaDiagram;
-    }
-
     // validateSchema: .engine/tools/validate/validate_schema.py
     // KNOWN FAILURE MODES: an external verdict can flip without a change here; the kernel's own gaps are indistinguishable from ours (D0132/issue081)
     // PUBLISHED TO: it BLOCKS a schema change (CLAUDE.md section 5)
