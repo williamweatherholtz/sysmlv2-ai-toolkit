@@ -1699,4 +1699,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcVerificationTraceIsAttributedAndCut to issue441;
+
+    part issue442 : Issue {
+        :>> id = "199f54e4-97cf-4cc7-9f93-12b3481d5151";
+        :>> title = "Hook latency and git-facts size are measured every fire and are not indicators, so no threshold can own them";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The per-turn hook cost and the git-facts cache size are measured every fire (the fire-ledger's ms and phases, D0389/D0414; the file's byte length on disk) and neither is an indicator, so no threshold can be declared for them in indicator-triggers.toml and nothing surfaces when they grow. issue440 sat visible in the cache's size for fourteen commits; issue439 and issue441 sat visible in the ledger's critical path. Sprint 644's retro named both as threshold candidates and folded them into issue441's work; sprint 645 found the indicator does not exist to threshold. Known positive: the ledger held a stop-hook median of 5711 ms for priority-inversion and a 26.9 MB git-facts.toml, both unowned. Known negative: ungroundedRatioIndicator, which has a threshold and triggers today.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcHookLatencyIsAnIndicator to issue442;
 }

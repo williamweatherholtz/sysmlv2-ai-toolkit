@@ -365,12 +365,13 @@ pub(super) fn thin_attestation_list(model: &Model) -> Vec<(String, String)> {
         }
     }
 
+    let latest = latest_results(model);
     let mut out: Vec<(String, String)> = Vec::new();
     for (vname, vinfo) in &model.items {
         if vinfo.attrs.get("method").map(String::as_str) != Some("confirmation") {
             continue;
         }
-        if latest_result(model, vname).as_ref().map(|(o, _)| o.as_str()) != Some("pass") {
+        if latest.get(vname).map(|(o, _)| o.as_str()) != Some("pass") {
             continue; // unanswered confirmation = pending human obligation, not a defect
         }
         let text = vinfo.attrs.get("procedureText").map_or("", String::as_str).trim();
@@ -489,9 +490,9 @@ pub fn decision_requirement_prose_links(root: &Path) -> Result<Vec<(String, Stri
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
 pub fn untraced_verification_links(root: &Path) -> Result<Vec<(String, String)>, ViewError> {
-    let model = Model::build(root)?;
-    let phases = declared_workflow_phases(root);
-    Ok(untraced_links(&model, &phases))
+    let model = crate::perf::phase("verification-trace:model", || Model::build(root))?;
+    let phases = crate::perf::phase("verification-trace:phases", || declared_workflow_phases(root));
+    Ok(crate::perf::phase("verification-trace:scan", || untraced_links(&model, &phases)))
 }
 
 /// Pure core of [`untraced_verification_links`], for self-test.
@@ -517,6 +518,13 @@ pub(super) fn untraced_links(model: &Model, phases: &[String]) -> Vec<(String, S
         phases.iter().any(|p| lower.ends_with(&format!("{}gate", p.to_ascii_lowercase())))
     };
 
+    // One pass for every verification's latest result, and the outgoing edges grouped by source, so
+    // the scan below is linear in the procedures rather than procedures x items (issue441).
+    let latest = latest_results(model);
+    let mut targets_of: HashMap<&str, HashSet<&str>> = HashMap::new();
+    for e in &model.edges {
+        targets_of.entry(e.from.as_str()).or_default().insert(e.to.as_str());
+    }
     let mut out: Vec<(String, String)> = Vec::new();
     for (vname, vinfo) in &model.items {
         // Keyed on the SHAPE (carries a procedure, has a passing result) rather than a type name, so
@@ -525,11 +533,12 @@ pub(super) fn untraced_links(model: &Model, phases: &[String]) -> Vec<(String, S
         if is_phase_gate(vname) {
             continue;
         }
-        if latest_result(model, vname).as_ref().map(|(o, _)| o.as_str()) != Some("pass") {
+        if latest.get(vname).map(|(o, _)| o.as_str()) != Some("pass") {
             continue; // not delivered -> an unverified SR here is honest incompleteness, not a gap
         }
+        let linked = targets_of.get(vname.as_str());
         for sr in &unverified {
-            if contains_token(text, sr) && !model.edges.iter().any(|e| &e.from == vname && e.to == **sr) {
+            if contains_token(text, sr) && !linked.is_some_and(|t| t.contains(sr.as_str())) {
                 out.push((vname.clone(), (*sr).clone()));
             }
         }

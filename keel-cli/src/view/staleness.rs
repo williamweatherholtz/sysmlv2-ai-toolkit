@@ -247,6 +247,32 @@ pub(super) fn latest_result(model: &Model, v: &str) -> Option<(String, String)> 
     best.map(|(_, o, s)| (o, s))
 }
 
+/// [`latest_result`] for EVERY verification at once: `verification -> (outcome, judgedAgainst)` of its
+/// highest-numbered `<v>R<n>` result, built in one pass over the items.
+///
+/// A result's name splits uniquely as `<v>R<digits>` - the digits are its maximal trailing run (any
+/// shorter run would leave a digit, not `R`, before it) - so each item contributes to exactly one
+/// verification, and the map holds exactly what [`latest_result`] would return for each key. A scan
+/// that asks about every verification in the model (issue441: `untraced_links` asked 6 432 times over
+/// 15 770 items, the guard's 4.3 s) reads this once instead of walking the items per question.
+pub(super) fn latest_results(model: &Model) -> HashMap<String, (String, String)> {
+    let mut best: HashMap<String, (u32, String, String)> = HashMap::new();
+    for (name, info) in &model.items {
+        let stem = name.trim_end_matches(|c: char| c.is_ascii_digit());
+        if stem.len() == name.len() {
+            continue; // no trailing digits: not a result
+        }
+        let Some(v) = stem.strip_suffix('R') else { continue };
+        let Ok(n) = name[stem.len()..].parse::<u32>() else { continue };
+        if best.get(v).is_none_or(|(bn, _, _)| n > *bn) {
+            let outcome = info.attrs.get("outcome").cloned().unwrap_or_default();
+            let sha = info.attrs.get("judgedAgainst").cloned().unwrap_or_default();
+            best.insert(v.to_string(), (n, outcome, sha));
+        }
+    }
+    best.into_iter().map(|(v, (_, o, s))| (v, (o, s))).collect()
+}
+
 /// Map each assurance element (`requirement <n/sr>` / `part <d> : Decision`) to its repo-relative
 /// file (one working-tree pass, no git) — to fetch its historical content for staleness.
 fn build_element_files(root: &Path) -> HashMap<String, String> {

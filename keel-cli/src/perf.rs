@@ -32,6 +32,8 @@ pub static WALK_HITS: AtomicU64 = AtomicU64::new(0);
 pub static FILE_OPENS: AtomicU64 = AtomicU64::new(0);
 /// Reads answered from the corpus cache because the file's `(len, mtime)` still matched.
 pub static CORPUS_HITS: AtomicU64 = AtomicU64::new(0);
+/// Parses answered from the corpus's package cache (`corpus::parsed`, issue441).
+pub static PARSE_HITS: AtomicU64 = AtomicU64::new(0);
 
 /// `git` subprocesses spawned. A process spawn is the most expensive thing this program does on
 /// Windows, and it is invisible in a wall-clock number — hence a counter rather than another inference.

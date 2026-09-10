@@ -15,7 +15,6 @@ use std::path::Path;
 
 use serde::Deserialize;
 use keel_parser::ast::{Item, Package, Value};
-use keel_parser::{parse, tokenize};
 
 use crate::json::Json;
 
@@ -466,9 +465,10 @@ impl Model {
         let paths: Vec<_> = dirs.iter().flat_map(|d| crate::collect_sysml(d)).collect();
         for path in paths {
             let name = path.display().to_string();
-            let src = crate::corpus::read_to_string(&path).map_err(|e| ViewError::Io(name.clone(), e))?;
-            let tokens = tokenize(&src, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
-            let pkg = parse(tokens, &name).map_err(|e| ViewError::Track(name.clone(), e.to_string()))?;
+            let pkg = crate::corpus::parsed(&path).map_err(|e| match e {
+                crate::corpus::ParseFailure::Io(e) => ViewError::Io(name.clone(), e),
+                crate::corpus::ParseFailure::Lex(m) | crate::corpus::ParseFailure::Parse(m) => ViewError::Track(name.clone(), m),
+            })?;
             // Repo-relative, forward-slashed path — matches `git diff --name-only` for `newlyAdded` scope.
             let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string().replace('\\', "/");
             Self::ingest(&pkg, &mut items, &mut edges, &rel);

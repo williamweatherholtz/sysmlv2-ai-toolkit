@@ -217,13 +217,13 @@ pub fn extract(tracking: &Path) -> ExtractedIndex {
     // Each package remembers the file that declared it, repo-relative with forward slashes, so a
     // result can name the file git is asked about (dcResultBindsToItsLandingCommit).
     let repo = tracking.parent().unwrap_or(tracking);
-    let packages: Vec<(String, Package)> = files
+    let packages: Vec<(String, std::sync::Arc<Package>)> = files
         .iter()
         .filter_map(|p| {
-            let src = std::fs::read_to_string(p).ok()?;
-            let fname = p.to_string_lossy();
-            let tokens = keel_parser::tokenize(&src, &fname).ok()?;
-            let pkg = keel_parser::parse(tokens, &fname).ok()?;
+            // Through the process corpus (dcOneCorpusPerProcess): under the guard set the model has
+            // already parsed every one of these files, and the second parse of `.tracking` was 1.3-1.5 s
+            // of the priority guard's critical path (issue441). `corpus::parsed` shares that tree.
+            let pkg = crate::corpus::parsed(p).ok()?;
             let rel = p.strip_prefix(repo).unwrap_or(p).to_string_lossy().replace('\\', "/");
             Some((rel, pkg))
         })

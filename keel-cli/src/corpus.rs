@@ -18,6 +18,13 @@
 //! cache: it is re-read (or re-walked) and the cost is one open for a file touched in the last two
 //! seconds, which is the only file that could be lying.
 //!
+//! THE PARSE IS CACHED THE SAME WAY (issue441). Two readers parsed the corpus in one process - the
+//! model and the orient indexer - and under the parallel guard set the second parse of `.tracking`
+//! cost 1.3-1.5 s on the critical path for an answer the first had already computed. [`parsed`]
+//! serves the `Package` a file parsed to while its `(len, mtime)` still match, under the same racy
+//! window; a file that fails to parse is never remembered, so every caller sees the failure it would
+//! have seen.
+//!
 //! WHAT DOES NOT GO THROUGH HERE. The change DETECTOR - `fingerprint::compute` - walks with
 //! [`crate::collect_sysml_uncached`]: the thing that detects change must not read a memo.
 
@@ -27,7 +34,8 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
-use crate::perf::{CORPUS_HITS, FILE_OPENS, WALK_HITS};
+use crate::perf::{CORPUS_HITS, FILE_OPENS, PARSE_HITS, WALK_HITS};
+use keel_parser::ast::Package;
 
 /// An mtime younger than this is not trusted to distinguish two writes (see the module doc).
 const RACY: Duration = Duration::from_secs(2);
@@ -44,8 +52,29 @@ struct Walk {
     files: Arc<Vec<PathBuf>>,
 }
 
+struct Parsed {
+    len: u64,
+    mtime: SystemTime,
+    package: Arc<Package>,
+}
+
+/// Why a file did not parse: the same three stages every caller distinguished by hand before.
+#[derive(Debug)]
+pub enum ParseFailure {
+    Io(std::io::Error),
+    Lex(String),
+    Parse(String),
+}
+
+impl From<std::io::Error> for ParseFailure {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
 static TEXTS: Mutex<Option<HashMap<PathBuf, Text>>> = Mutex::new(None);
 static WALKS: Mutex<Option<HashMap<PathBuf, Walk>>> = Mutex::new(None);
+static PACKAGES: Mutex<Option<HashMap<PathBuf, Parsed>>> = Mutex::new(None);
 
 fn settled(mtime: SystemTime) -> bool {
     SystemTime::now().duration_since(mtime).is_ok_and(|age| age >= RACY)
@@ -59,7 +88,11 @@ fn settled(mtime: SystemTime) -> bool {
 /// The same as `std::fs::read_to_string`'s: a missing file, a directory, or non-UTF-8 content. A
 /// cached entry is never served for a path whose metadata cannot be read.
 pub fn read_to_string<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
-    let path = path.as_ref();
+    read_keyed(path.as_ref()).map(|(_, _, body)| body.to_string())
+}
+
+/// The text with the `(len, mtime)` it was served under - the key the parse cache shares.
+fn read_keyed(path: &Path) -> std::io::Result<(u64, SystemTime, Arc<str>)> {
     let meta = std::fs::metadata(path)?;
     let len = meta.len();
     let mtime = meta.modified()?;
@@ -68,20 +101,50 @@ pub fn read_to_string<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
         if let Some(t) = g.as_ref().and_then(|m| m.get(path)) {
             if t.len == len && t.mtime == mtime {
                 CORPUS_HITS.fetch_add(1, Ordering::Relaxed);
-                return Ok(t.body.to_string());
+                return Ok((len, mtime, Arc::clone(&t.body)));
             }
         }
     }
     // Counted unconditionally, not behind KEEL_PERF: the open count is the receipt the DoD's test reads.
     FILE_OPENS.fetch_add(1, Ordering::Relaxed);
     let text = std::fs::read_to_string(path)?;
-    let entry = Text { len, mtime, body: Arc::from(text.as_str()) };
+    let body: Arc<str> = Arc::from(text.as_str());
     TEXTS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get_or_insert_with(HashMap::new)
-        .insert(path.to_path_buf(), entry);
-    Ok(text)
+        .insert(path.to_path_buf(), Text { len, mtime, body: Arc::clone(&body) });
+    Ok((len, mtime, body))
+}
+
+/// The `Package` a `.sysml` file parses to, from the process cache while its `(len, mtime)` still match
+/// what was parsed. A shared handle, never a clone of the tree.
+///
+/// The file name the lexer and parser are given is the path as displayed, which is what both former
+/// call sites passed; it reaches only positions and error text.
+///
+/// # Errors
+/// [`ParseFailure`] names the stage: the read, the lexer, or the parser. A failure is never cached.
+pub fn parsed(path: &Path) -> Result<Arc<Package>, ParseFailure> {
+    let (len, mtime, body) = read_keyed(path)?;
+    if settled(mtime) {
+        let g = PACKAGES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(p) = g.as_ref().and_then(|m| m.get(path)) {
+            if p.len == len && p.mtime == mtime {
+                PARSE_HITS.fetch_add(1, Ordering::Relaxed);
+                return Ok(Arc::clone(&p.package));
+            }
+        }
+    }
+    let fname = path.display().to_string();
+    let tokens = keel_parser::tokenize(&body, &fname).map_err(|e| ParseFailure::Lex(e.to_string()))?;
+    let package = Arc::new(keel_parser::parse(tokens, &fname).map_err(|e| ParseFailure::Parse(e.to_string()))?);
+    PACKAGES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get_or_insert_with(HashMap::new)
+        .insert(path.to_path_buf(), Parsed { len, mtime, package: Arc::clone(&package) });
+    Ok(package)
 }
 
 fn dir_mtime(dir: &Path) -> Option<SystemTime> {
@@ -174,6 +237,33 @@ mod tests {
         std::fs::write(&f, "package A; part y;").expect("rewrite same len");
         age(&f);
         assert_eq!(read_to_string(&f).expect("read"), "package A; part y;");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// issue441: a second parse of an unchanged file is the same tree (one handle, no re-lex); a
+    /// rewritten file is parsed again; a file that does not parse is an error every time, never a hit.
+    #[test]
+    fn a_second_parse_of_an_unchanged_file_shares_the_tree_and_a_rewrite_reparses() {
+        let d = fresh_dir("parsed");
+        let f = d.join("p.sysml");
+        std::fs::write(&f, "package P { part x { attribute a = 1; } }").expect("write");
+        age(&f);
+        let first = parsed(&f).expect("parse");
+        let hits0 = PARSE_HITS.load(Ordering::Relaxed);
+        let second = parsed(&f).expect("parse again");
+        assert!(Arc::ptr_eq(&first, &second), "an unchanged settled file must serve the same tree");
+        assert!(PARSE_HITS.load(Ordering::Relaxed) > hits0, "the second parse is a hit");
+        std::fs::write(&f, "package P { part x { attribute a = 1; } part y { attribute a = 2; } }").expect("rewrite");
+        age(&f);
+        let third = parsed(&f).expect("reparse");
+        assert!(!Arc::ptr_eq(&first, &third), "a rewritten file is parsed again");
+        assert_eq!(third.items.len(), 2, "and the new tree is the rewritten file's");
+        std::fs::write(&f, "package P { part x { ").expect("break it");
+        age(&f);
+        assert!(matches!(parsed(&f), Err(ParseFailure::Parse(_) | ParseFailure::Lex(_))), "a broken file fails");
+        assert!(matches!(parsed(&f), Err(ParseFailure::Parse(_) | ParseFailure::Lex(_))), "and fails again: never cached");
+        std::fs::remove_file(&f).expect("remove");
+        assert!(matches!(parsed(&f), Err(ParseFailure::Io(_))), "a removed file is an io error, not a hit");
         let _ = std::fs::remove_dir_all(&d);
     }
 
