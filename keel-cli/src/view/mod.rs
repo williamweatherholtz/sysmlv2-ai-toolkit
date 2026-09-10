@@ -60,6 +60,13 @@ pub fn note_receipt(note: &str) -> NoteReceipt {
     }
 }
 
+/// The declared spans of a note shorter than the D0375 floor of ten characters (D0423): the words are
+/// recorded as given, and the record says they were short.
+#[must_use]
+pub fn short_quoted_spans(note: &str) -> Vec<String> {
+    checks::quoted_spans(note).into_iter().filter(|s| s.chars().count() < 10).collect()
+}
+
 /// READ-BACK RATIFICATION (D0201 B, the chat half): do the human's quoted words name THIS decision?
 ///
 /// A delegated acceptance quotes the human (D0289), but a bare `'yes, do it'` can be attached to any

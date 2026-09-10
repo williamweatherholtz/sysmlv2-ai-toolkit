@@ -1754,4 +1754,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcRefusalIsALedgerFact to issue446;
+
+    part issue447 : Issue {
+        :>> id = "1d0da739-235b-4ed8-85ac-6770c08e33eb";
+        :>> title = "Console/deck tap signature check refused the human's own act (D0426 dissolution + census strikes)";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The console/deck tap signature check refused a human's own act. D0334/D0335 bound every console and deck tap to a paired device: an unsigned, unpaired or altered tap was refused with 401 and nothing written. Under D0426 (a control whose refusal falls on a human act with no observed abuse is dissolved or reduced to WARN) this is the clearest case in the census: the only actor who taps the console is the human at their own browser, the ledger holds no line of any actor other than them meeting the refusal, and what the signature proves is a DEVICE, not a person - a device the human paired themselves. The refusal is dissolved: the tap records with a WARN line naming why it is unsigned, the verified citation is what pairing still buys, and reverify of a WARN note is Err so the badge cannot be faked by prose. Census strikes closed out with this Issue, not dissolved: (1) acceptance-binds-to-text fails an accepted Decision whose signed text drifted - the EDIT is the agent's act (issue371: 17 drifts, all agent editorial), so it binds the agent, not the human; (2) the no-quote refusal on a delegated accept - an agent paraphrasing the human into an acceptance is the D0198 fabrication, the human's own channel is --words which is never refused for content; (3) enroll with a wrong pairing code - the code is the key exchange, a wrong one cannot produce a key, and since this dissolution the cost to the human of not pairing is the verified badge only. The gesture-word-only refusal is D0427, proposed for the human.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcUnsignedTapIsRecordedWithAWarn to issue447;
 }

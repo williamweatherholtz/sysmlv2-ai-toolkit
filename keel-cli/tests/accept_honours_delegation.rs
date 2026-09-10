@@ -4,7 +4,9 @@
 //! 2026-08-22 (D0192 option A: the record must quote the human's words verbatim). The command's channel
 //! layer nevertheless refused every agent session outright, so the human had to go to a terminal to
 //! type acceptances the policy already allowed. Three properties:
-//!   1. delegation declared + the note quotes the human  -> the acceptance is recorded;
+//!   1. delegation declared + the note quotes the human  -> the acceptance is recorded - and since D0423
+//!      words that do not read the decision back, or are shorter than ten characters, are recorded too,
+//!      with a WARN line in the note naming the check (the human's 'A' was refused for its length, issue445);
 //!   2. delegation declared + no quote                    -> refused, and the refusal says QUOTE;
 //!   3. delegation withdrawn (line deleted)               -> refused as before, quote or not.
 
@@ -72,19 +74,39 @@ fn decision_text(root: &Path) -> String {
 #[test]
 fn a_quoted_note_records_the_acceptance_under_the_declared_delegation() {
     let root = project_with_a_proposed_decision("q");
-    // D0335 (D0201 B read-back): a quote that names NO decision is a generic yes an agent could attach
-    // to anything - refused, nothing written, the remedy named.
-    let (ok, text) = agent(&root, &["accept", "d0001", "--note", "their words in chat: 'yes, accept it and keep going'", "--by", "you", "--date", "2026-09-03"]);
-    assert!(!ok, "a quote naming no decision is refused under read-back ratification: {text}");
-    assert!(text.contains("read-back") && text.contains("d0001"), "the refusal names the remedy: {text}");
-    assert!(!decision_text(&root).contains("AcceptR1"), "nothing written");
-    // The human's words naming the decision: recorded under the delegation, carrying the quote.
+    // The human's words naming the decision: recorded under the delegation, carrying the quote and no WARN.
     let (ok, text) = agent(&root, &["accept", "d0001", "--note", "their words in chat: 'yes, accept d0001 and keep going'", "--by", "you", "--date", "2026-09-03"]);
     assert!(ok, "delegation declared + a quote naming the decision must record: {text}");
     assert!(text.contains("delegation d0192"), "the record cites the delegation it acts under: {text}");
     let d = decision_text(&root);
     assert!(d.contains("DecisionStatus::accepted") && d.contains("yes, accept d0001 and keep going"), "the acceptance event carries the quote:\n{d}");
+    assert!(!d.contains("WARN:"), "words that read the decision back carry no WARN:\n{d}");
     let _ = std::fs::remove_dir_all(&root);
+}
+
+/// D0423 / issue445: the read-back and ten-character checks are computed and WRITTEN, never refused.
+#[test]
+fn words_that_name_nothing_or_are_short_record_with_a_warn_line() {
+    let root = project_with_a_proposed_decision("w");
+    // a quote naming no decision: recorded, the note says the read-back did not hold
+    let (ok, text) = agent(&root, &["accept", "d0001", "--note", "their words in chat: 'yes, accept it and keep going'", "--by", "you", "--date", "2026-09-10"]);
+    assert!(ok, "a quote naming no decision is recorded under D0423: {text}");
+    assert!(text.contains("WARN") && text.contains("read-back"), "the command says which check would have refused: {text}");
+    let d = decision_text(&root);
+    assert!(d.contains("AcceptR1") && d.contains("WARN: read-back") && d.contains("D0423"), "the record carries the WARN line naming the check:\n{d}");
+
+    // the human's one-letter answer to a fork: recorded as given, the note says it was short
+    let root2 = project_with_a_proposed_decision("s");
+    let (ok, text) = agent(&root2, &["accept", "d0001", "--words", "A", "--by", "you", "--date", "2026-09-10"]);
+    assert!(ok, "'A' is recorded as given (issue445): {text}");
+    assert!(text.contains("WARN") && text.contains("ten characters"), "{text}");
+    let d = decision_text(&root2);
+    assert!(d.contains("\u{201C}A\u{201D}") && d.contains("WARN: short words"), "the declared pair holds the letter and the record says it was short:\n{d}");
+    // and the recorded tree passes the delegated-substance rule: a declared pair is exact at any length
+    let (ok, text) = agent(&root2, &["guard", "confirmation-authenticity", "."]);
+    assert!(ok, "the short declared quote satisfies the substance rule: {text}");
+    let _ = std::fs::remove_dir_all(&root);
+    let _ = std::fs::remove_dir_all(&root2);
 }
 
 #[test]
@@ -94,6 +116,12 @@ fn an_unquoted_note_is_refused_and_told_to_quote() {
     assert!(!ok, "no quote, no record: {text}");
     assert!(text.contains("QUOTE"), "the refusal names the missing receipt: {text}");
     assert!(!decision_text(&root).contains("DecisionStatus::accepted"), "nothing was written");
+    // issue445: the refusal itself is a ledger fact - the question "has an agent ever tried this"
+    // used to have no record to be read from.
+    let ledger = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).expect("a refused write leaves a ledger line");
+    let refused: Vec<&str> = ledger.lines().filter(|l| l.contains(r#""event":"refused""#)).collect();
+    assert_eq!(refused.len(), 1, "one refusal, one line: {ledger}");
+    assert!(refused[0].contains(r#""control":"accept:no-quote""#) && refused[0].contains(r#""actorKind":"#), "the line names the check and the actor kind: {}", refused[0]);
     let _ = std::fs::remove_dir_all(&root);
 }
 

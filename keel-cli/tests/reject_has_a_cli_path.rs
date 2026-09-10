@@ -6,7 +6,7 @@
 //! from a fabricated one. Three properties, mirroring accept_honours_delegation.rs:
 //!   1. a quote naming the decision -> status rejected, a Reject confirmation Test, a FAIL result judged
 //!      by the human and CREATED BY the session actor (D0299);
-//!   2. a bare 'no' that names no decision -> refused with the read-back message, nothing written;
+//!   2. a bare 'no' that names no decision -> recorded with a WARN line naming the read-back (D0423);
 //!   3. `--by` given while the session actor is unbound -> refused, nothing written.
 
 use std::path::{Path, PathBuf};
@@ -91,12 +91,13 @@ fn a_quoted_rejection_naming_the_decision_is_recorded_with_judge_and_recorder_ap
 }
 
 #[test]
-fn a_bare_no_that_names_nothing_is_refused_with_the_read_back_message() {
+fn a_bare_no_that_names_nothing_records_with_the_read_back_warn() {
     let root = project_with_a_proposed_decision("bare");
     let (ok, text) = agent(&root, &["reject", "d0001", "--words", "no thanks, not that", "--by", "you", "--date", "2026-09-08"]);
-    assert!(!ok, "a quote naming no decision is refused: {text}");
-    assert!(text.contains("read-back") && text.contains("rejecting"), "the same read-back message accept uses, in this verb: {text}");
-    assert!(!decision_text(&root).contains("DecisionStatus::rejected"), "nothing written");
+    assert!(ok, "a quote naming no decision is recorded under D0423: {text}");
+    assert!(text.contains("read-back") && text.contains("rejecting"), "the same read-back WARN accept uses, in this verb: {text}");
+    let d = decision_text(&root);
+    assert!(d.contains("DecisionStatus::rejected") && d.contains("WARN: read-back"), "written, with the WARN in the note:\n{d}");
     let _ = std::fs::remove_dir_all(&root);
 }
 

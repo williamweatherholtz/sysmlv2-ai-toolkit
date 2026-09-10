@@ -99,7 +99,7 @@ fn serve(root: &Path, port: u16) -> (Server, String) {
 }
 
 #[test]
-fn a_tap_records_only_when_signed_by_a_paired_device() {
+fn a_tap_records_with_its_device_receipt_verified_or_warned() {
     let base = if cfg!(windows) { PathBuf::from("C:\\kt") } else { std::env::temp_dir() };
     let root = base.join(format!("dev{}", std::process::id() % 10_000));
     let _ = std::fs::remove_dir_all(&root);
@@ -117,11 +117,17 @@ fn a_tap_records_only_when_signed_by_a_paired_device() {
     let dec = || std::fs::read_to_string(root.join(".engine/decisions/0001-probe.sysml")).expect("read");
     let accept = |extra: &str| format!("{{\"decision\":\"d0001\",\"file\":\".engine/decisions/0001-probe.sysml\",\"note\":\"yes, exactly this\",\"judged_at\":\"2026-09-05\",\"judged_by\":\"hum\"{extra}}}");
 
-    // 1. no device: refused, nothing written
+    // 1. no device: RECORDED (D0426), the note says the tap named no device. Before D0426 this was a
+    //    401 with nothing written - a refusal of the human's own act that no observed abuse justified.
     let (st, body) = http(port, "POST", "/api/decision/accept", &accept(""));
-    assert_eq!(st, 401, "{body}");
-    assert!(body.contains("names no device"), "{body}");
-    assert!(!dec().contains("AcceptR1"), "nothing written");
+    assert_eq!(st, 200, "{body}");
+    let text = dec();
+    assert!(text.contains("AcceptR1") && text.contains("WARN: unsigned tap") && text.contains("names no device") && text.contains("D0426"), "recorded, with the WARN naming why the receipt is absent:\n{text}");
+    assert!(!text.contains("HMAC-verified"), "an unsigned tap carries no verified receipt:\n{text}");
+    assert!(keel_cli::device::reverify(&root, "accept", "d0001", "2026-09-05", "hum", "yes, exactly this WARN: unsigned tap - x (D0426).").is_err(), "and it does not re-verify as a device tap");
+    // reset the decision so the later taps write AcceptR1 again
+    git(&root, &["checkout", "--", ".engine/decisions/0001-probe.sysml"]);
+    assert!(!dec().contains("AcceptR1"), "reset");
 
     // 2. a wrong pairing code enrols nothing
     let key = b"0123456789abcdef0123456789abcdef";
@@ -134,12 +140,14 @@ fn a_tap_records_only_when_signed_by_a_paired_device() {
     assert_eq!(st, 200, "{body}");
     assert!(root.join(".keel/devices.toml").is_file());
 
-    // 4. wrong signature: refused, nothing written
+    // 4. wrong signature: RECORDED with the WARN naming the mismatch (D0426); no verified receipt
     let bad = sign(b"another-key", &keel_cli::device::canonical("accept", "d0001", "2026-09-05", "hum", "yes, exactly this"));
     let (st, body) = http(port, "POST", "/api/decision/accept", &accept(&format!(",\"device_id\":\"browser-test01\",\"hmac\":\"{bad}\"")));
-    assert_eq!(st, 401, "{body}");
-    assert!(body.contains("does not match"), "{body}");
-    assert!(!dec().contains("AcceptR1"), "nothing written on a wrong signature");
+    assert_eq!(st, 200, "{body}");
+    let text = dec();
+    assert!(text.contains("AcceptR1") && text.contains("WARN: unsigned tap") && text.contains("does not match"), "recorded, the WARN names the mismatch:\n{text}");
+    assert!(!text.contains("HMAC-verified"), "a wrong signature is never written as verified:\n{text}");
+    git(&root, &["checkout", "--", ".engine/decisions/0001-probe.sysml"]);
 
     // 5. the paired device's signature: recorded, and the record names the device
     let good = sign(key, &keel_cli::device::canonical("accept", "d0001", "2026-09-05", "hum", "yes, exactly this"));

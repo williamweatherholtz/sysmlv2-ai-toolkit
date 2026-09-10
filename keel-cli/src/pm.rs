@@ -31,7 +31,7 @@ pub const LEDGER_FIELDS: [&str; 6] = ["ts", "session", "event", "decision", "exi
 
 /// The additive fields the reader accepts beside the core (see the module doc); anything else is
 /// a schema drift the test names.
-pub const LEDGER_ADDITIVE_FIELDS: [&str; 3] = ["bin", "build", "phases"];
+pub const LEDGER_ADDITIVE_FIELDS: [&str; 5] = ["bin", "build", "phases", "control", "actorKind"];
 
 /// A hook fire at or past this many ms is SLOW (issue429 / D0414).
 ///
@@ -135,6 +135,24 @@ fn tracked_counts(root: &Path) -> (usize, usize, usize) {
 /// One row per hook event: fires, blocks, and the latency DISTRIBUTION (D0389/issue402) - a documented
 /// cost is never the best case; the per-edit tier documented at ~0.35 s had a median of 0 ms and a
 /// maximum of 54 s in this ledger.
+/// The refusal census rows (D0424): one per (event, control, actorKind), most frequent first.
+fn refusal_rows(refusals: BTreeMap<(String, String, String), u64>) -> Json {
+    let mut rows: Vec<((String, String, String), u64)> = refusals.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    Json::Arr(
+        rows.into_iter()
+            .map(|((event, control, kind), n)| {
+                Json::Obj(vec![
+                    ("event".to_string(), Json::s(event)),
+                    ("control".to_string(), Json::s(control)),
+                    ("actorKind".to_string(), Json::s(kind)),
+                    ("refusals".to_string(), Json::Int(i64::try_from(n).unwrap_or(i64::MAX))),
+                ])
+            })
+            .collect(),
+    )
+}
+
 fn event_rows(per_event: BTreeMap<String, (u64, u64)>, per_event_ms: &BTreeMap<String, Vec<u64>>) -> Vec<Json> {
     per_event
         .into_iter()
@@ -210,6 +228,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
     let mut advisory_repeated = 0u64;
     let mut malformed = 0u64;
     let mut lines = 0u64;
+    // (event, control, actorKind) -> refusals: the census's evidence (D0424, D0426).
+    let mut refusals: BTreeMap<(String, String, String), u64> = BTreeMap::new();
     // D0414 / issue429: every fire at or past the slow threshold, with what it attributed itself to.
     let mut slow_fires: Vec<Json> = Vec::new();
     for line in text.lines() {
@@ -219,8 +239,19 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
             continue;
         };
         let event = v.get("event").and_then(serde_json::Value::as_str).unwrap_or("?").to_string();
-        let block = v.get("decision").and_then(serde_json::Value::as_str) == Some("block")
+        // issue446: the verdict is the EMITTED decision - `block`, `deny` (a PreToolUse permission
+        // decision) and `refused` (a write path) are all refusals, and every hook exits 0 for the
+        // harness to read its JSON, so the exit code alone read 1 block in 16 196 fires.
+        let decision = v.get("decision").and_then(serde_json::Value::as_str).unwrap_or("");
+        let block = matches!(decision, "block" | "deny" | "refused")
             || v.get("exit").and_then(serde_json::Value::as_i64).unwrap_or(0) != 0;
+        if block {
+            // D0424 / dcRefusalIsALedgerFact: a refusal is attributable to a control and to the KIND of
+            // actor it fell on; a line from before the fields existed says so rather than defaulting.
+            let control = v.get("control").and_then(serde_json::Value::as_str).unwrap_or("unrecorded (pre-D0424 line)").to_string();
+            let kind = v.get("actorKind").and_then(serde_json::Value::as_str).unwrap_or("unrecorded").to_string();
+            *refusals.entry((event.clone(), control, kind)).or_insert(0) += 1;
+        }
         if let Some(s) = v.get("session").and_then(serde_json::Value::as_str) {
             if !s.is_empty() {
                 sessions.insert(s.to_string());
@@ -275,6 +306,8 @@ pub fn enforcement_report(root: &Path) -> Result<String, crate::view::ViewError>
         ("malformedLines".to_string(), Json::Int(i64::try_from(malformed).unwrap_or(i64::MAX))),
         ("sessionsSeen".to_string(), Json::Int(i64::try_from(sessions.len()).unwrap_or(i64::MAX))),
         ("perEvent".to_string(), Json::Arr(events_json)),
+        ("refusals".to_string(), refusal_rows(refusals)),
+        ("refusalsNote".to_string(), Json::s("every block / deny / refused line by event, the control that refused and the KIND of actor it fell on (D0424): the evidence a control is kept or dissolved on (D0426). A row whose actorKind is `human` is a control that gatekept a person; `unrecorded` is a line from before the fields existed (issue445/446), which is why the count before 2026-09-10 is not evidence of anything.")),
         ("slowFires".to_string(), slow_fires_json(slow_fires)),
         ("recall".to_string(), recall_degradation(&recall_skips, &recall_slow, user_prompt_fires)),
         ("redYields".to_string(), Json::Int(i64::try_from(red_yields).unwrap_or(i64::MAX))),
@@ -347,6 +380,41 @@ mod tests {
         let per = d["perEvent"].as_array().expect("perEvent");
         assert!(per.iter().any(|e| e["event"] == "stop" && e["fires"] == 2 && e["blocks"] == 2));
         assert!(d["launcherFraction"].as_str().is_some_and(|s| s.contains("unavailable")), "absent P5 data says so");
+    }
+
+    /// D0424 / dcRefusalIsALedgerFact: the report reads refusals back per event, control and actor
+    /// kind, and counts `deny` and `refused` as refusals alongside `block` (issue446: every hook exits
+    /// 0, so the exit code alone read a deny as an allow). A line from before the fields existed is
+    /// counted under `unrecorded`, never attributed to a control it did not name.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup
+    fn refusals_are_read_back_per_event_control_and_actor_kind() {
+        let root = std::env::temp_dir().join("keel-pm-refusals");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keel").join("metrics")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        let lines = [
+            r#"{"ts":1,"session":"s1","event":"pre-write","decision":"allow","exit":0,"ms":1}"#,
+            r#"{"ts":2,"session":"s1","event":"pre-write","decision":"deny","exit":0,"ms":1,"control":"api-owned-surface","actorKind":"ai"}"#,
+            r#"{"ts":3,"session":"s1","event":"pre-write","decision":"deny","exit":0,"ms":1,"control":"api-owned-surface","actorKind":"ai"}"#,
+            r#"{"ts":4,"session":"s1","event":"refused","decision":"refused","exit":1,"ms":0,"control":"accept:no-quote","actorKind":"ai"}"#,
+            r#"{"ts":5,"session":"s1","event":"stop","decision":"block","exit":2,"ms":10}"#,
+        ];
+        std::fs::write(root.join(".keel").join("metrics").join("hooks.jsonl"), lines.join("
+")).expect("write ledger");
+        let report = enforcement_report(&root).expect("report");
+        let d: serde_json::Value = serde_json::from_str(&report).expect("report json");
+        let rows = d["refusals"].as_array().expect("refusals");
+        assert_eq!(rows.len(), 3, "{rows:?}");
+        assert_eq!(rows[0]["event"], "pre-write");
+        assert_eq!(rows[0]["control"], "api-owned-surface");
+        assert_eq!(rows[0]["actorKind"], "ai");
+        assert_eq!(rows[0]["refusals"], 2, "most frequent first");
+        assert!(rows.iter().any(|r| r["event"] == "refused" && r["control"] == "accept:no-quote"), "a write-path refusal is a row");
+        assert!(rows.iter().any(|r| r["event"] == "stop" && r["control"].as_str().is_some_and(|c| c.starts_with("unrecorded")) && r["actorKind"] == "unrecorded"), "a pre-D0424 line says it is unrecorded");
+        let per = d["perEvent"].as_array().expect("perEvent");
+        assert!(per.iter().any(|e| e["event"] == "pre-write" && e["fires"] == 3 && e["blocks"] == 2), "a deny counts as a block: {per:?}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// issue207/D0193: BOTH override paths count as overrides; only the failure path counts as

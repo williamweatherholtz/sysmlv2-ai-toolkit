@@ -285,7 +285,9 @@ pub const TTY_GESTURE_MARK: &str = "tty gesture";
 /// Two kinds of boundary, in order of trust (D0375 / issue397):
 /// - DECLARED: a typographic pair, opening “ (U+201C) to the next closing ” (U+201D), or ‘ (U+2018) to
 ///   ’ (U+2019). Nothing in ordinary prose produces these by accident, so the span is exactly what was
-///   quoted. `keel accept --words` records the human's words inside such a pair.
+///   quoted. `keel accept --words` records the human's words inside such a pair - at ANY length since
+///   D0423: the human answered a fork with 'A' and was refused for it (issue445); a declared pair is
+///   exact whatever it holds, and the short-words fact is written into the record as a WARN line.
 /// - INFERRED: an ASCII single quote. It opens a span only when it is NOT inside a word - the byte
 ///   before it is not alphanumeric - and it closes a span only when NOT followed by a letter. Both
 ///   halves of that rule exist because the same character is the apostrophe: `brief's` opened a
@@ -314,7 +316,8 @@ pub(super) fn quoted_spans(text: &str) -> Vec<String> {
         });
         match close_at {
             Some(j) => {
-                if let Some(span) = chars.get(i + 1..j).filter(|s| s.len() >= 10) {
+                let floor = if closer == '\'' { 10 } else { 1 };
+                if let Some(span) = chars.get(i + 1..j).filter(|s| s.iter().filter(|c| !c.is_whitespace()).count() >= floor) {
                     out.push(span.iter().collect());
                 }
                 i = j + 1;

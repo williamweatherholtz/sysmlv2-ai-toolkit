@@ -231,6 +231,42 @@ fn every_hook_fire_leaves_a_counted_ledger_line() {
         let v: serde_json::Value = serde_json::from_str(l).expect("ledger line is valid JSON");
         assert_eq!(v.get("session").and_then(|s| s.as_str()), Some("probe-session"));
     }
+    // issue446: the verdict is the one the hook EMITTED, not the exit code. Both fires exit 0 - the
+    // harness reads the JSON - so before this the second line read `allow` over a deny. The ordinary
+    // file is an allow with no control; the protected surface is a deny naming the control that
+    // refused and the kind of actor it refused.
+    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("json");
+    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("json");
+    assert_eq!(first.get("decision").and_then(|d| d.as_str()), Some("allow"), "{first}");
+    assert!(first.get("control").is_none(), "an allow carries no control: {first}");
+    assert_eq!(second.get("decision").and_then(|d| d.as_str()), Some("deny"), "the emitted verdict, not the exit code: {second}");
+    assert_eq!(second.get("control").and_then(|d| d.as_str()), Some("api-owned-surface"), "{second}");
+    assert_eq!(second.get("actorKind").and_then(|d| d.as_str()), Some("undeclared"), "the fixture binds an actor no actors.sysml describes: {second}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// dcRefusalIsALedgerFact clause (d): the commit tier's separate processes each leave a
+/// `commit-gate-<tier>` line - a red `keel validate` is a block naming the tier, a green one an allow -
+/// so the commit gate's refusals sit in the ledger with the in-loop tiers' (known positive: a tracking
+/// file that does not parse; known negative: the same fixture with the file removed).
+#[test]
+fn the_commit_tier_leaves_a_commit_gate_line() {
+    let root = strict_project("commit-gate");
+    let ledger = root.join(".keel").join("metrics").join("hooks.jsonl");
+    std::fs::write(root.join(".tracking").join("broken.sysml"), "package Broken { part x : Nope { :>> id = \"z\"; } }\n").expect("broken");
+    let red = Command::new(keel_bin()).args(["validate", "."]).current_dir(&root).output().expect("validate");
+    assert!(!red.status.success(), "the broken file fails validate");
+    std::fs::remove_file(root.join(".tracking").join("broken.sysml")).expect("rm");
+    let green = Command::new(keel_bin()).args(["validate", "."]).current_dir(&root).output().expect("validate");
+    assert!(green.status.success(), "{}", String::from_utf8_lossy(&green.stdout));
+    let text = std::fs::read_to_string(&ledger).expect("the commit tier writes the ledger");
+    let lines: Vec<serde_json::Value> = text.lines().filter(|l| l.contains("commit-gate-validate")).map(|l| serde_json::from_str(l).expect("json")).collect();
+    assert_eq!(lines.len(), 2, "one line per run: {text}");
+    assert_eq!(lines[0]["decision"], "block", "{}", lines[0]);
+    assert_eq!(lines[0]["control"], "validate", "{}", lines[0]);
+    assert!(lines[0]["actorKind"].as_str().is_some(), "a block names the kind of actor it fell on: {}", lines[0]);
+    assert_eq!(lines[1]["decision"], "allow", "{}", lines[1]);
+    assert!(lines[1].get("control").is_none(), "an allow carries no control: {}", lines[1]);
     let _ = std::fs::remove_dir_all(&root);
 }
 

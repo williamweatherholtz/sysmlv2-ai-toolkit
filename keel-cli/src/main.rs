@@ -235,6 +235,8 @@ fn cmd_validate(args: &[String]) -> i32 {
         println!("FAIL:  {} — {}", err.file.display(), err.message);
     }
 
+    let failing: Vec<String> = if report.is_clean() { Vec::new() } else { vec!["validate".to_string()] };
+    ledger_gate(&root, "validate", &failing, 0);
     if report.is_clean() {
         println!("{}", keel_cli::color::pass(&format!("{} tracking file(s) validated clean.", report.validated)));
         0
@@ -356,7 +358,7 @@ fn cmd_hook(args: &[String]) -> i32 {
             2
         }
     };
-    ledger_emit(&root, &session, event, code, started.elapsed().as_millis());
+    ledger_fire(&root, &session, event, code, started.elapsed().as_millis());
     code
 }
 
@@ -404,6 +406,77 @@ fn hook_config_change(payload: &serde_json::Value) -> i32 {
 /// Best-effort by design: the ledger is evidence infrastructure, and a full disk must not turn an
 /// advisory hook into a blocker — but a write failure is still printed, never swallowed (K2).
 fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
+    ledger_line(root, session, event, exit, ms, None);
+}
+
+/// The verdict a hook fire EMITTED and the control that emitted it (issue446). `hook_emit` exits 0 for
+/// allow and block alike - the harness reads the verdict from the JSON on stdout, never from the exit
+/// code - so for its first 16 196 lines the ledger derived `allow` from `exit == 0` and held ONE block
+/// (config-change, the only handler that exits non-zero). The emitting site notes what it wrote here
+/// through `hook_refuse`; the dispatcher's `ledger_fire` reads it once. First verdict wins: a fire emits
+/// at most one protocol object the harness acts on.
+static EMITTED_VERDICT: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
+
+fn note_verdict(decision: &str, control: &str) {
+    if let Ok(mut g) = EMITTED_VERDICT.lock() {
+        if g.is_none() {
+            *g = Some((decision.to_string(), control.to_string()));
+        }
+    }
+}
+
+/// Emit a REFUSING hook-protocol object (`decision: block` or `permissionDecision: deny`) and note the
+/// verdict for the ledger under `control`, the name of the check that refused. Same exit as `hook_emit`.
+fn hook_refuse(control: &str, v: &serde_json::Value) -> i32 {
+    let decision = if v.get("decision").and_then(|d| d.as_str()) == Some("block") {
+        "block"
+    } else if v.pointer("/hookSpecificOutput/permissionDecision").and_then(|d| d.as_str()) == Some("deny") {
+        "deny"
+    } else {
+        "allow"
+    };
+    note_verdict(decision, control);
+    hook_emit(v)
+}
+
+/// The fire line for a dispatched hook event: the EMITTED verdict when one was noted, the exit code
+/// only for a handler that emitted nothing. A refusal carries `control` and `actorKind`, so the ledger
+/// can answer whose act a control fell on (issue445/446, D0424: a control is kept on evidence).
+fn ledger_fire(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
+    let emitted = EMITTED_VERDICT.lock().ok().and_then(|mut g| g.take());
+    ledger_line(root, session, event, exit, ms, emitted);
+}
+
+/// A write-path refusal is a ledger fact (issue445): `keel accept` / `reject` and the other API writes
+/// that refuse used to exit non-zero and write nothing anywhere, so the question "has an agent ever
+/// tried this" had no record to be read from. `event = refused`, `control` names the check, `verb` the
+/// command; ms is 0 because the refusal is the whole run.
+fn ledger_refused(root: &Path, verb: &str, control: &str) {
+    let session = std::env::var("CLAUDE_CODE_SESSION_ID").unwrap_or_default();
+    ledger_line(root, &session, "refused", 1, 0, Some(("refused".to_string(), format!("{verb}:{control}"))));
+}
+/// The commit tier is in the ledger with the in-loop tiers (dcRefusalIsALedgerFact clause d): the
+/// scaffolded pre-commit hook runs `keel validate`, `keel guard` and `keel check-engine` as separate
+/// processes, so each writes one `commit-gate-<tier>` line - `allow` when green, `block` naming the
+/// refusing controls (the failing guard names, or the tier itself) when red. A run by hand writes the same line; the ledger does not know who
+/// invoked it, and a rate over both is still a rate.
+fn ledger_gate(root: &Path, tier: &str, failing: &[String], ms: u128) {
+    let session = std::env::var("CLAUDE_CODE_SESSION_ID").unwrap_or_default();
+    let verdict = if failing.is_empty() { None } else { Some(("block".to_string(), failing.join(","))) };
+    ledger_line(root, &session, &format!("commit-gate-{tier}"), i32::from(!failing.is_empty()), ms, verdict);
+}
+
+/// The kind of actor this process runs as - `human`, `ai` or `unknown` from actors.sysml, `undeclared`
+/// when the bound actor has no part there, `unbound` when no actor resolves at all - so a refusal
+/// line says whose act the control fell on.
+fn ledger_actor_kind(root: &Path) -> String {
+    keel_cli::actor::resolve(root, None).map_or_else(
+        |_| "unbound".to_string(),
+        |name| keel_cli::actor::kind_of(root, &name).unwrap_or_else(|| "undeclared".to_string()),
+    )
+}
+
+fn ledger_line(root: &Path, session: &str, event: &str, exit: i32, ms: u128, verdict: Option<(String, String)>) {
     use std::io::Write as _;
     let dir = root.join(".keel").join("metrics");
     if std::fs::create_dir_all(&dir).is_err() {
@@ -411,17 +484,27 @@ fn ledger_emit(root: &Path, session: &str, event: &str, exit: i32, ms: u128) {
         return;
     }
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let decision = if exit == 0 { "allow" } else { "block" };
+    let (decision, control) = match verdict {
+        Some((d, c)) => (d, Some(c)),
+        None => ((if exit == 0 { "allow" } else { "block" }).to_string(), None),
+    };
     let ms = u64::try_from(ms).unwrap_or(u64::MAX);
     // issue378 / GH#55: WHICH binary ran this hook, and which build - the turn-boundary surface's
     // answer to "did the pinned engine gate this", readable from `keel status`.
     let mut record = serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": ms,
         "bin": std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(), "build": env!("KEEL_BUILD_COMMIT")});
-    // D0414 / issue429: a SLOW fire explains itself - the phases it measured, longest first, with the
-    // remainder no counter covered named as unattributed. A fast fire carries no field (pm.rs owns the
-    // threshold and the reader).
-    if let Some(phases) = keel_cli::pm::slow_fire_phases(ms) {
-        if let Some(obj) = record.as_object_mut() {
+    if let Some(obj) = record.as_object_mut() {
+        // issue446: a line that is not an allow names the control that refused and the kind of actor
+        // it refused. An allow carries neither - 16 000 lines a day should not each pay for a fact that
+        // only a refusal has.
+        if decision != "allow" {
+            obj.insert("control".to_string(), serde_json::Value::String(control.unwrap_or_else(|| "exit-code".to_string())));
+            obj.insert("actorKind".to_string(), serde_json::Value::String(ledger_actor_kind(root)));
+        }
+        // D0414 / issue429: a SLOW fire explains itself - the phases it measured, longest first, with the
+        // remainder no counter covered named as unattributed. A fast fire carries no field (pm.rs owns the
+        // threshold and the reader).
+        if let Some(phases) = keel_cli::pm::slow_fire_phases(ms) {
             obj.insert("phases".to_string(), phases);
         }
     }
@@ -605,10 +688,10 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
             .join("\n");
         if keel_cli::claude_surface::text_sets_kill_switch(&text) {
             let key = keel_cli::claude_surface::HOOK_KILL_SWITCH;
-            println!(
-                "{}",
-                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                    "permissionDecisionReason": format!("[keel] {path} would set {key} - that silences EVERY hook from every scope (issue365/D0296). Refused in all profiles; a hook host changes through a Decision, never by switching the hooks off.")}})
+            hook_refuse(
+                "kill-switch",
+                &serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                    "permissionDecisionReason": format!("[keel] {path} would set {key} - that silences EVERY hook from every scope (issue365/D0296). Refused in all profiles; a hook host changes through a Decision, never by switching the hooks off.")}}),
             );
             return 0;
         }
@@ -650,9 +733,9 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
             let reason = format!(
                 "[keel] {surface} is an API-owned fact surface. Use the sanctioned path: {sanctioned} - or, for what the API cannot express, `keel override {path} --reason \"...\"` (single-use, recorded, reviewed)."
             );
-            println!(
-                "{}",
-                serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}})
+            hook_refuse(
+                "api-owned-surface",
+                &serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}}),
             );
         }
         (None, "strict") => {
@@ -661,10 +744,10 @@ fn hook_pre_write(payload: &serde_json::Value, root: &Path) -> i32 {
                 if headless_ask(root, &path, session, &run_id) {
                     println!("[keel] headless ask APPROVED from the console queue - write allowed");
                 } else {
-                    println!(
-                        "{}",
-                        serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                            "permissionDecisionReason": format!("[keel] headless run: the ask-tier write to {path} was not approved within the bounded wait - DENIED and queued as an obligation (D0182)")}})
+                    hook_refuse(
+                        "headless-ask-unapproved",
+                        &serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                            "permissionDecisionReason": format!("[keel] headless run: the ask-tier write to {path} was not approved within the bounded wait - DENIED and queued as an obligation (D0182)")}}),
                     );
                 }
                 return 0;
@@ -814,10 +897,10 @@ fn hook_pre_bash(payload: &serde_json::Value, root: &Path, session: &str) -> i32
     // through a heredoc is silently rewritten; this recurred eight-plus times in a week after being
     // tracked, which is the proof that an advisory and a memory were not controls (D0047).
     if let Some((tag, line)) = keel_cli::shellcheck::heredoc_with_backslash(cmd) {
-        println!(
-            "{}",
-            serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                "permissionDecisionReason": format!("[keel] heredoc <<{tag} carries a backslash (`{line}`) - this harness collapses backslash pairs before bash runs, so source written this way is silently rewritten (D0309/issue372, recurred 8+ times). Write the file with the Write tool and run it by path; a heredoc is for prose without backslashes.")}})
+        hook_refuse(
+            "heredoc-backslash",
+            &serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": format!("[keel] heredoc <<{tag} carries a backslash (`{line}`) - this harness collapses backslash pairs before bash runs, so source written this way is silently rewritten (D0309/issue372, recurred 8+ times). Write the file with the Write tool and run it by path; a heredoc is for prose without backslashes.")}}),
         );
         ledger_advisory(root, session, "heredoc-backslash denied");
         return 0;
@@ -827,10 +910,10 @@ fn hook_pre_bash(payload: &serde_json::Value, root: &Path, session: &str) -> i32
     match bash_classify(root, cmd) {
         BashVerdict::Block(why) => {
             if profile == "strict" {
-                println!(
-                    "{}",
-                    serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                        "permissionDecisionReason": format!("[keel] {why} (D0176; blocking under the strict profile)")}})
+                hook_refuse(
+                    "strict-bash-verdict",
+                    &serde_json::json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                        "permissionDecisionReason": format!("[keel] {why} (D0176; blocking under the strict profile)")}}),
                 );
                 return 0;
             }
@@ -1079,7 +1162,7 @@ fn hook_post_edit(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     let mut body = problems.join("\n");
     body.truncate(2000);
-    hook_emit(&serde_json::json!({
+    hook_refuse("edit-gate", &serde_json::json!({
         "decision": "block",
         "reason": format!(
             "[edit gate] That edit left the model broken — fix it now, at the point of the edit:\n\n{body}\n\nThis is the FAST tier (validate + duplicate-identity + marker-vocabulary, all exact). Author through the keel write API where one exists."
@@ -1239,7 +1322,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     }
     let mut body = problems.join("\n\n");
     body.truncate(4000);
-    hook_emit(&serde_json::json!({
+    hook_refuse("in-loop-gate", &serde_json::json!({
         "decision": "block",
         "reason": format!(
             "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (append-result / add-task / record decision); run `keel guard <name>` for detail. Then end the turn."
@@ -1334,6 +1417,8 @@ fn cmd_check_engine(args: &[String]) -> i32 {
             println!("       hint: {hint}");
         }
     }
+    let failing: Vec<String> = if diags.is_empty() { Vec::new() } else { vec!["check-engine".to_string()] };
+    ledger_gate(&root, "check-engine", &failing, 0);
     if diags.is_empty() {
         println!("{}", keel_cli::color::pass(".engine instance files validated clean (kernel-free; D0112 phase 2)."));
         0
@@ -1633,6 +1718,7 @@ fn cmd_guard(args: &[String]) -> i32 {
         // THE GUARD RECEIPT (dcGateAnswersFromItsReceipt): an equal key means the same inputs, and the
         // stored reports are printed as they were; one line names the receipt's age. `--no-receipt`
         // forces the run. A red run deletes the receipt so nothing green is ever answered over it.
+        let guard_started = std::time::Instant::now();
         let receipt_key = if keel_cli::receipt::forced(args) { None } else { keel_cli::receipt::key(&root) };
         let receipt = receipt_key
             .as_ref()
@@ -1667,6 +1753,8 @@ fn cmd_guard(args: &[String]) -> i32 {
         // are the set a reader is asked to read, and the counted-history lines, which are not.
         let tail = keel_cli::guards::warning_population(&reports);
         println!("[guard] {}{tail}", if all_ok { keel_cli::color::pass("ALL PASS") } else { keel_cli::color::fail("FAILED") });
+        let failing: Vec<String> = reports.iter().filter(|r| !r.ok()).map(|r| r.name.to_string()).collect();
+        ledger_gate(&root, "guard", &failing, guard_started.elapsed().as_millis());
         // D0414 / issue429: the set's wall clock is bounded below by its longest guard; name it.
         if keel_cli::perf::enabled() {
             if let Some((name, ms)) = keel_cli::guards::critical_path() {
@@ -4435,15 +4523,47 @@ fn tty_gesture() -> Option<&'static str> {
 /// approve queue - the actor binding alone is agent-mutable state. The write layer (AI-kind
 /// refusal) and the tree-derived audit are the real controls; this is the friction layer.
 /// `Some(exit)` refuses; `None` lets the accept proceed.
-fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Option<i32> {
+fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Result<Vec<String>, i32> {
     verdict_channel_refusal("accept", "accepting", args, tty_gesture)
 }
 
+/// D0423: the checks that used to refuse a delegated record are written INTO it. Each WARN line names
+/// the check, so a reader of the acceptance sees what kind of receipt it is; the write proceeds.
+fn fold_warnings_into_note(args: &[String], warnings: &[String]) -> Vec<String> {
+    if warnings.is_empty() {
+        return args.to_vec();
+    }
+    let note = flag(args, "note").unwrap_or_default();
+    let mut out: Vec<String> = Vec::with_capacity(args.len());
+    let mut skip_value = false;
+    for a in args {
+        if skip_value {
+            skip_value = false;
+        } else if a == "--note" {
+            skip_value = true;
+        } else {
+            out.push(a.clone());
+        }
+    }
+    out.push("--note".to_string());
+    out.push(format!("{note} {}", warnings.join(" ")));
+    out
+}
+
 /// The channel rules shared by `keel accept` and `keel reject` (D0393/issue414): a human's verdict on a
-/// proposed Decision, recorded from an agent session only under the declared delegation, only with
-/// their words quoted, and only when the words read the decision back. `verb` names the command in
-/// every message; `doing` is its participle for the read-back line.
-fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture: Option<&str>) -> Option<i32> {
+/// proposed Decision, recorded from an agent session only under the declared delegation and only with
+/// their words quoted. `verb` names the command in every message; `doing` is its participle for the
+/// read-back line.
+///
+/// `Err(exit)` refuses and writes a `refused` ledger line naming the check (issue445); `Ok(warnings)`
+/// proceeds, and since D0423 the warnings are what two of the checks used to refuse on: words shorter
+/// than ten characters (D0375) and words that do not read the decision back (D0289 / D0201 B). Both are
+/// still computed; they land in the record as `WARN: <check>` instead of costing the human their
+/// channel. What still refuses: no delegation declared, no quote at all (a paraphrase is the
+/// fabrication D0198 names), and a gesture word typed as the only evidence - that one binds the
+/// AGENT's act, not the human's, and D0427 keeps it out of D0423's dissolution.
+fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture: Option<&str>) -> Result<Vec<String>, i32> {
+    let mut warnings: Vec<String> = Vec::new();
     {
         let agent_marked = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_BRIDGE_SESSION_ID"]
             .iter()
@@ -4475,30 +4595,39 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
                     // gesture word.
                     if let (Some(dec), Some(note)) = (args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
                         let (letters, title) = decision_options_and_title(&root, dec);
+                        // D0423: computed the same way, written into the record instead of refusing.
                         if !keel_cli::view::read_back_names(&note, dec, &letters, &title) {
-                            eprintln!("keel {verb}: the quoted words do not name {dec} - read-back ratification (D0201 B) needs the human's words to refer to the decision they are {doing}: its id ('{dec} B', 'decision {}'), one of its option letters, or words of its title; a bare 'yes' can be attached to anything. Nothing written.", dec.trim_start_matches(|c: char| !c.is_ascii_digit()).trim_start_matches('0'));
-                            return Some(1);
+                            eprintln!("keel {verb}: WARN - the quoted words do not name {dec}, the decision they are {doing} (read-back, D0201 B: its id, an option letter, or three words of its title); recorded as given with the WARN in the note (D0423).");
+                            warnings.push(format!("WARN: read-back - the quoted words do not name {dec} (D0201 B); recorded as given (D0423)."));
+                        }
+                        let short = keel_cli::view::short_quoted_spans(&note);
+                        if !short.is_empty() {
+                            eprintln!("keel {verb}: WARN - the quoted words are shorter than ten characters (D0375); recorded as given with the WARN in the note (D0423).");
+                            warnings.push("WARN: short words - fewer than ten characters quoted (D0375); recorded as given (D0423).".to_string());
                         }
                     }
-                    eprintln!("keel {verb}: recording the human's verdict under delegation {d} - the note quotes their words and names the decision (D0289, D0201 B read-back).");
+                    eprintln!("keel {verb}: recording the human's verdict under delegation {d} - the note quotes their words (D0289).");
                 }
                 (Some(d), keel_cli::view::NoteReceipt::GestureWordOnly) => {
-                    eprintln!("keel {verb}: the note names a gesture (console, deck, TTY, GitHub) but no gesture reached this command - a gesture citation is written by the surface that observed it (the console appends a device receipt it can re-verify; a terminal cites its own TTY), never typed into a note (D0411/issue426). This session has no terminal and is not the console; under delegation {d} the receipt it can record is the human's words, verbatim: --words \"yes, accept it\" (at least ten characters; D0375). Nothing written.");
-                    return Some(1);
+                    eprintln!("keel {verb}: the note names a gesture (console, deck, TTY, GitHub) but no gesture reached this command - a gesture citation is written by the surface that observed it (the console appends a device receipt it can re-verify; a terminal cites its own TTY), never typed into a note (D0411/issue426). This session has no terminal and is not the console; under delegation {d} the receipt it can record is the human's words, verbatim: --words \"<what they said>\". Nothing written.");
+                    ledger_refused(&root, verb, "gesture-word-typed");
+                    return Err(1);
                 }
                 (Some(d), keel_cli::view::NoteReceipt::Nothing) => {
-                    eprintln!("keel {verb}: delegation {d} lets this session RECORD the human's verdict, but it must QUOTE their words verbatim - pass them as their own argument, --words \"yes, accept it\" (at least ten characters; D0375), or quote them in the note inside a declared pair (D0192/D0289). A gesture is cited by the surface that observed it, not by this note (D0411).");
-                    return Some(1);
+                    eprintln!("keel {verb}: delegation {d} lets this session RECORD the human's verdict, but it must QUOTE their words verbatim - pass them as their own argument, --words \"<what they said>\", or quote them in the note inside a declared pair (D0192/D0289). A gesture is cited by the surface that observed it, not by this note (D0411).");
+                    ledger_refused(&root, verb, "no-quote");
+                    return Err(1);
                 }
                 (None, _) => {
                     eprintln!("keel {verb}: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
                     eprintln!("  The verdict is the human's own act: run `keel {verb}` from YOUR terminal, or give it from the console approve queue / the deck.");
-                    return Some(1);
+                    ledger_refused(&root, verb, "no-delegation");
+                    return Err(1);
                 }
             }
         }
     }
-    None
+    Ok(warnings)
 }
 
 /// A decision's OPTION letters (a fork) and its title plus decision text, for read-back ratification (D0201 B).
@@ -4550,14 +4679,16 @@ fn fold_words_into_note(args: &[String]) -> Vec<String> {
 fn cmd_accept(args: &[String]) -> i32 {
     let args = &fold_words_into_note(args);
     let tty_gesture = tty_gesture();
-    if let Some(exit) = accept_channel_refusal(args, tty_gesture) {
-        return exit;
-    }
+    let args = &match accept_channel_refusal(args, tty_gesture) {
+        Ok(warnings) => fold_warnings_into_note(args, &warnings),
+        Err(exit) => return exit,
+    };
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
     let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
         eprintln!("usage: keel accept <decision> --note \"<what the human said>\" --by <humanActor> --date YYYY-MM-DD");
         eprintln!("       keel accept <decision> --words \"<their words, verbatim>\" [--note \"<framing>\"] --by <humanActor> --date YYYY-MM-DD");
-        eprintln!("         --words records the words inside a typographic quote pair, so an apostrophe in the framing can never shift the span (D0375/issue397).");
+        eprintln!("         --words records the words inside a typographic quote pair, so an apostrophe in the framing can never shift the span (D0375/issue397);");
+        eprintln!("         they are recorded as given - short words or words that do not name the decision land as a WARN line in the note (D0423).");
         eprintln!();
         eprintln!("Records a HUMAN's acceptance of a proposed Decision (D0106). The note must be what they");
         eprintln!("actually said — it IS the attestation, and `confirmation-authenticity` independently checks");
@@ -4657,9 +4788,10 @@ fn cmd_accept(args: &[String]) -> i32 {
 fn cmd_reject(args: &[String]) -> i32 {
     let args = &fold_words_into_note(args);
     let tty_gesture = tty_gesture();
-    if let Some(exit) = verdict_channel_refusal("reject", "rejecting", args, tty_gesture) {
-        return exit;
-    }
+    let args = &match verdict_channel_refusal("reject", "rejecting", args, tty_gesture) {
+        Ok(warnings) => fold_warnings_into_note(args, &warnings),
+        Err(exit) => return exit,
+    };
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
     let Some(decision) = args.first().filter(|a| !a.starts_with('-')) else {
         eprintln!("usage: keel reject <decision> --words \"<their words, verbatim>\" [--note \"<framing>\"] --by <humanActor> --date YYYY-MM-DD");

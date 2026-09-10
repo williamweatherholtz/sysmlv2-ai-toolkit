@@ -609,10 +609,8 @@ async fn api_deck_sitting(
         )
             .into_response();
     }
-    // D0201 B: a sitting-review tap is a human attestation too - signed by a paired device or refused.
-    if let Err(r) = require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("sitting-{}", b.verdict), &b.story, &b.judged_at, &b.by, &b.note)) {
-        return *r;
-    }
+    // D0201 B: a sitting-review tap is a human attestation too - its device receipt is recorded with it (D0426).
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("sitting-{}", b.verdict), &b.story, &b.judged_at, &b.by, &b.note));
     let severity = match b.verdict.as_str() {
         "accept" | "batch-ack" => None,
         "maybe" | "reject" => Some("Medium"),
@@ -635,6 +633,7 @@ async fn api_deck_sitting(
     } else {
         format!("sitting review via deck: {} - {}", b.verdict, b.note)
     };
+    let rationale = format!("{rationale}{}", receipt.tag());
     // issue210: the sitting critique lands in the REVIEWER's per-actor file.
     let critiques = match crate::write::per_actor_file(&root, "critiques", &b.by) {
         Ok(p) => p,
@@ -698,16 +697,13 @@ async fn api_disposition(State(s): State<AppState>, axum::Json(body): axum::Json
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the actor is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
     let judged_by = judged_by.to_string();
-    let device = match require_device(&s, body.device_id.as_deref(), body.hmac.as_deref(), &crate::device::canonical(&format!("disposition-{verdict}"), &body.finding, &body.judged_at, &judged_by, &body.rationale)) {
-        Ok(d) => d,
-        Err(r) => return *r,
-    };
+    let receipt = tap_receipt(&s, body.device_id.as_deref(), body.hmac.as_deref(), &crate::device::canonical(&format!("disposition-{verdict}"), &body.finding, &body.judged_at, &judged_by, &body.rationale));
     // issue210: the disposition lands in the JUDGE's per-actor file.
     let critiques = match crate::write::per_actor_file(&s.rootpath(), "critiques", &judged_by) {
         Ok(p) => p,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     };
-    let rationale = format!("{}{}", body.rationale, device_tag(&device, body.hmac.as_deref()));
+    let rationale = format!("{}{}", body.rationale, receipt.tag());
     let d = crate::write::Disposition { finding: &body.finding, verdict, rationale: &rationale, sha: &sha, judged_at: &body.judged_at, judged_by: &judged_by };
     match crate::write::append_disposition(&critiques, &d) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
@@ -766,17 +762,39 @@ async fn api_device_enroll(State(s): State<AppState>, axum::Json(b): axum::Json<
     }
 }
 
-/// The receipt appended to a tap's recorded note: which paired device signed it and the signature it
-/// sent (D0201 B; re-verifiable from the record since D0411 - `device::reverify`).
-fn device_tag(device_id: &str, hmac: Option<&str>) -> String {
-    crate::device::receipt_tag(device_id, hmac.unwrap_or_default())
+/// The device receipt a human tap carries, as the write records it (D0201 B, D0426).
+///
+/// A tap signed by a paired device is `Verified` and its record ends in
+/// `[device <id> hmac=<hex> HMAC-verified]`, re-verifiable from the record's own fields (D0411,
+/// `device::reverify`). A tap the store cannot verify - no device named, an unpaired device, no or a
+/// wrong signature - used to be a 401 with nothing written. Since D0426 (the human's words, st116:
+/// "any guards that have not been abused that gatekeep me should be reconsidered or dissolved
+/// outright") it is `Unverified` and RECORDED: the write proceeds and the note ends in a WARN line
+/// naming the reason, so a later reader knows what kind of receipt this is without the human's act
+/// having been refused for it. No abuse of the tap channel was ever observed (issue445/issue446: the
+/// refusals left no record to read); the control that binds the AGENT - a typed receipt fails
+/// `reverify` - is unchanged.
+enum TapReceipt {
+    Verified { device: String, hmac: String },
+    Unverified(String),
 }
 
-/// Refuse a human tap that is not signed by a paired device (D0201 B). `Ok(device id)` lets the write
-/// proceed; `Err(response)` is the 401 with the reason, and NOTHING has been written.
-fn require_device(s: &AppState, device_id: Option<&str>, hmac: Option<&str>, canonical: &str) -> Result<String, Box<Response>> {
-    crate::device::verify(&s.rootpath(), device_id, hmac, canonical)
-        .map_err(|e| Box::new((StatusCode::UNAUTHORIZED, format!("{{\"error\":\"{}\",\"binds\":\"a tap is bound to the paired DEVICE that made it, not to a person (D0201 B)\"}}", e.replace('"', "'"))).into_response()))
+impl TapReceipt {
+    /// The text appended to the recorded note.
+    fn tag(&self) -> String {
+        match self {
+            Self::Verified { device, hmac } => crate::device::receipt_tag(device, hmac),
+            Self::Unverified(reason) => format!(" WARN: unsigned tap - {} (D0426).", reason.replace("; nothing written", "").replace(" - nothing written", "")),
+        }
+    }
+}
+
+/// Classify a tap by its device signature (D0201 B). Never refuses: see [`TapReceipt`].
+fn tap_receipt(s: &AppState, device_id: Option<&str>, hmac: Option<&str>, canonical: &str) -> TapReceipt {
+    match crate::device::verify(&s.rootpath(), device_id, hmac, canonical) {
+        Ok(device) => TapReceipt::Verified { device, hmac: hmac.unwrap_or_default().to_string() },
+        Err(reason) => TapReceipt::Unverified(reason),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -817,17 +835,14 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     // party it must never bind. The rule already accepts a cited human surface gesture, so the console
     // now says so in the record. Appended, never substituted: the human's own words are left exactly
     // as they wrote them, and this is a factual statement about the channel, not a paraphrase of them.
-    // D0201 B: the tap must be signed by a paired device, or nothing is written.
-    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("accept", &b.decision, &b.judged_at, judged_by, &b.note)) {
-        Ok(d) => d,
-        Err(r) => return *r,
-    };
+    // D0201 B / D0426: the tap's device receipt - verified, or a WARN naming why not - is recorded with it.
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("accept", &b.decision, &b.judged_at, judged_by, &b.note));
     // The receipt is appended to EVERY console record (D0411): the tap signed `b.note`, the server
     // adds the gesture and the receipt, and `device::reverify` strips both to check the signature.
     let note = if b.note.contains(CONSOLE_GESTURE.trim()) {
-        format!("{}{}", b.note, device_tag(&device, b.hmac.as_deref()))
+        format!("{}{}", b.note, receipt.tag())
     } else {
-        format!("{}{CONSOLE_GESTURE}{}", b.note, device_tag(&device, b.hmac.as_deref()))
+        format!("{}{CONSOLE_GESTURE}{}", b.note, receipt.tag())
     };
     // The human recorded this themselves: recorder == judge, which is what lets the substance rule
     // scope itself to genuinely delegated records (issue287).
@@ -864,12 +879,9 @@ async fn api_decision_reject(State(s): State<AppState>, axum::Json(b): axum::Jso
     let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
         return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the signer is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
     };
-    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("reject", &b.decision, &b.judged_at, judged_by, &b.rationale)) {
-        Ok(d) => d,
-        Err(r) => return *r,
-    };
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical("reject", &b.decision, &b.judged_at, judged_by, &b.rationale));
     let sha = git_head(&s.rootpath());
-    let rationale = format!("{}{}", b.rationale, device_tag(&device, b.hmac.as_deref()));
+    let rationale = format!("{}{}", b.rationale, receipt.tag());
     // D0299: the console tap is the human's own record - judge and recorder are the same person.
     match crate::write::reject_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, judged_by, &rationale) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"rejected\"}}", b.decision)),
@@ -909,12 +921,9 @@ async fn api_gate_result(State(s): State<AppState>, axum::Json(b): axum::Json<Ga
         Some("fail") => "fail",
         _ => "pass",
     };
-    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("gate-{verdict}"), &b.gate, &b.judged_at, &judged_by, b.note.as_deref().unwrap_or(""))) {
-        Ok(d) => d,
-        Err(r) => return *r,
-    };
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("gate-{verdict}"), &b.gate, &b.judged_at, &judged_by, b.note.as_deref().unwrap_or("")));
     let sha = git_head(&s.rootpath());
-    let tagged = format!("{}{}", b.note.as_deref().unwrap_or(""), device_tag(&device, b.hmac.as_deref()));
+    let tagged = format!("{}{}", b.note.as_deref().unwrap_or(""), receipt.tag());
     let note = Some(tagged.as_str());
     match crate::write::append_gate_result(&path, &b.gate, &sha, verdict, &b.judged_at, &judged_by, note, None) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"gate\":\"{}\",\"outcome\":\"{verdict}\"}}", b.gate)),
@@ -2680,12 +2689,9 @@ async fn api_testresult(State(s): State<AppState>, axum::Json(b): axum::Json<TrR
         // human attestation and making confirmation-authenticity (D0106) meaningless. Refuse instead.
         Err(msg) => return (StatusCode::BAD_REQUEST, format!("{{\"error\":\"{}\"}}", msg.replace('"', "'").replace('\n', " "))).into_response(),
     };
-    let device = match require_device(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("testresult-{verdict}"), &b.task, &b.judged_at, &by, b.evidence.as_deref().unwrap_or(""))) {
-        Ok(d) => d,
-        Err(r) => return *r,
-    };
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("testresult-{verdict}"), &b.task, &b.judged_at, &by, b.evidence.as_deref().unwrap_or("")));
     let sha = git_head(&s.rootpath());
-    let evidence = format!("{}{}", b.evidence.as_deref().unwrap_or("recorded in the keel console"), device_tag(&device, b.hmac.as_deref()));
+    let evidence = format!("{}{}", b.evidence.as_deref().unwrap_or("recorded in the keel console"), receipt.tag());
     match crate::write::append_result(&file, &b.task, &sha, &verdict, &b.judged_at, &by, Some(&evidence)) {
         Ok(name) => ok_json(format!("{{\"ok\":true,\"name\":\"{name}\",\"verdict\":\"{verdict}\"}}")),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
