@@ -213,7 +213,7 @@ frozen (modify it only by out-of-band Decision).
   check that a push must survive. **The TOUCHED set is not that gate (D0421, issue416):** `land` computes the
   integration tests whose text names a module changed since `origin/<branch>` (`keel-cli/src/<stem>.rs` ->
   `<stem>`; `main.rs`/`lib.rs` name no module and are reported unattributed) and prints the set on every
-  self-build push; once D0421 carries the human's acceptance it RUNS exactly those binaries before the first
+  self-build push - plus the lib's own unit tests whenever any `keel-cli/src` path changed (issue438); once D0421 carries the human's acceptance it RUNS exactly those binaries before the first
   push and refuses on a failure, naming them from cargo's own `--test <name>` rerun hint (a capture reads
   stdout before stderr, so the `Running` header pairing does not hold there). While D0421 is proposed the set
   is printed and nothing runs. `keel suite --touched` is the same run by hand; either writes
@@ -401,7 +401,7 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   previous receipt rather than recording `fail - 0 passed, 0 failed` over a tree the tests never saw. **The
   post-commit hook makes its own copy (D0422, issue436):** it copies the self-build's binary to
   `target/release/keel-land(.exe)` and runs `keel land` from that, so an armed touched-test run (D0421) can relink
-  `keel.exe`; a `keel` on PATH runs as it is.
+  `keel.exe`; the test is on the resolved file, so a PATH `keel` that resolves into `target/release` is copied too (issue437).
 - **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
   invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
   file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with

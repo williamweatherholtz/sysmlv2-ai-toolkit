@@ -34,12 +34,25 @@ command -v keel >/dev/null 2>&1 && KEEL=keel
 # it from, which on Windows cannot be replaced while it runs (issue386). The self-build's own binary is
 # copied to a land-only image first; a `keel` on PATH is not the relinked file and runs as it is. A copy
 # that cannot be made falls back to the original, whose own-image refusal then says why nothing ran.
-case "$KEEL" in
-    ./target/release/keel|./target/release/keel.exe)
-        LAND_COPY="${KEEL%keel*}keel-land${KEEL##*/keel}"
-        if cp -f "$KEEL" "$LAND_COPY" 2>/dev/null; then KEEL="$LAND_COPY"; fi
-        ;;
-esac
+# The test is on the RESOLVED file, not on how it was found (issue437): on this host `command -v keel`
+# answers ./target/release/keel because the self-build's target dir is on PATH, and the first cut matched
+# the literal path only, so the copy was never made and the push ran from the image again.
+if [ -n "$KEEL" ]; then
+    KEEL_FILE="$(command -v "$KEEL" 2>/dev/null || printf '%s' "$KEEL")"
+    KEEL_DIR="$(cd "$(dirname "$KEEL_FILE")" 2>/dev/null && pwd -P)"
+    RELEASE_DIR="$(cd ./target/release 2>/dev/null && pwd -P)"
+    if [ -n "$RELEASE_DIR" ] && [ "$KEEL_DIR" = "$RELEASE_DIR" ]; then
+        case "$(basename "$KEEL_FILE")" in
+            keel|keel.exe)
+                # MSYS answers `keel` for keel.exe; the copy keeps the real extension so it executes.
+                EXT=""
+                case "$KEEL_FILE" in *.exe) EXT=.exe ;; *) [ -f "$KEEL_FILE.exe" ] && EXT=.exe ;; esac
+                LAND_COPY="$RELEASE_DIR/keel-land$EXT"
+                if cp -f "$KEEL_FILE" "$LAND_COPY" 2>/dev/null; then KEEL="$LAND_COPY"; fi
+                ;;
+        esac
+    fi
+fi
 if [ -n "$KEEL" ]; then
     KEEL_POST_COMMIT_ACTIVE=1 export KEEL_POST_COMMIT_ACTIVE
     "$KEEL" land . || true   # non-fatal: the commit already succeeded

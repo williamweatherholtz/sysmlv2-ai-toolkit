@@ -1644,4 +1644,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcHookLandRunsFromACopy to issue436;
+
+    part issue437 : Issue {
+        :>> id = "30ba539b-9de5-47ff-833a-8c8567601a85";
+        :>> title = "The hook's land copy was never made: command -v keel resolves into target/release and the case matched literal paths";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The post-commit hook's land-from-a-copy (D0422, sprint 642) never made the copy. The hook resolves the binary with `command -v keel` first, and on this host that answers ./target/release/keel because the self-build's target directory is on PATH - so KEEL was the bare word keel, the case block matched only the literal ./target/release/keel(.exe) paths, and the commit that carried the change (b522674) ran land from the relinked image again: after it, target/release/keel-land.exe did not exist (ls), and `command -v keel` printed the target path. The probe before the edit checked the two literal shapes and a PATH keel assumed to live elsewhere; the negative was chosen from an assumption about the host, not read from it. Same class as issue435 - the check was probed, but not against the case that was live.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHookCopyFollowsPathResolution to issue437;
+
+    part issue438 : Issue {
+        :>> id = "f5330c5a-d8e0-4f32-b1e1-d43d574a2eca";
+        :>> title = "CI red on cab7cac: a lib unit test hardcoded the suite synopsis's citations, and the touched set never runs the lib tests";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CI red on cab7cac (run 34419851075, conclusion failure, job rust step test): guards::cli_surface_declared_tests::a_synopsis_citing_a_retired_or_absent_decision_is_a_violation_and_the_live_suite_synopsis_is_not hardcoded the present set as {d0271, d0356} and used the LIVE suite synopsis as its known-negative; sprint 640 added a D0421 citation to that synopsis, so the live text cited a Decision the test's fixed set did not hold. Two defects: the test encoded 'cites exactly D0356' where the property is 'cites only what is in force'; and the touched set (D0421) covers keel-cli/tests/*.rs only, so a lib unit test that reads a changed module's facts is never in the pre-push set - and the session's own check ran the lib tests filtered to `touched`, which is why 450 green unit tests hid one red. The class is the one D0421 exists for, in the one place D0421 did not look.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcTouchedRunIncludesTheLibTests to issue438;
+
+    part issue439 : Issue {
+        :>> id = "4f2b7468-c612-439c-9a8d-6f1fb38bcfd8";
+        :>> title = "The priority-inversion guard pays orient::compute whole for a ready list: 5.7 s critical path on every changed-tree turn boundary";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0414's attribution works and answers the human's question - and the answer has not been acted on. Every attributed slow fire since ae58328 (8 lines, ledger .keel/metrics/hooks.jsonl, read 2026-09-09) names guard:priority-inversion as the critical path at a median 5711 ms of a ~6 600 ms subagent-stop fire; KEEL_PERF=1 keel guard . prints the same (6 287 ms). The guard computes inversions over the ready frontier, and view::priority_signals (view/mod.rs:3652) gets that frontier by calling orient::compute(root) whole - drift, sync position, burndown, every git read orient makes - to use one field. Standalone, keel whats-next takes 3.1 s on this host (parse 631 ms, git x9 924 ms, gitfacts:load 431 ms, the rest orient's own work); inside the parallel guard set that becomes 5.5-6.3 s under contention, and it bounds the wall clock of every turn boundary whose tree changed (stop fires since D0414: 3, median 6 844 ms, none under 1 s). The instrumentation was the deliverable of sprint 635; the reduction it points to was never recorded as work, so a measured hot spot sat unowned for a day while the human asked twice how the performance was.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcPriorityGuardReadsTheFrontierCheaply to issue439;
 }

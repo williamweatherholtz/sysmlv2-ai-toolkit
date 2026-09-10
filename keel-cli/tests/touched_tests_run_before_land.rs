@@ -102,16 +102,26 @@ fn a_stale_test_naming_a_changed_module_refuses_the_push_and_the_fixed_one_lands
     let receipt = std::fs::read_to_string(root.join(keel_cli::touched::RECEIPT)).expect("receipt written");
     assert!(receipt.contains("outcome = \"pass\""), "the receipt records the pass: {receipt}");
 
-    // A change touching no module any test names runs nothing, and the receipt records the empty set.
+    // A change touching no module any integration test names runs the LIB tests only (issue438): the
+    // integration set is empty, the lib's own tests are the set.
     write(&root, "keel-cli/src/other.rs", "pub fn other() -> u8 { 3 }\n");
     write(&root, "keel-cli/src/lib.rs", "pub mod widget;\npub mod other;\n");
     commit(&root, "an unnamed module");
     let (ok, out) = run(&root, &["land", "."]);
-    assert!(ok && out.contains("landed"), "an untouched set lands: {out}");
-    assert!(out.contains("set EMPTY"), "and says the set is empty: {out}");
+    assert!(ok && out.contains("landed"), "an untouched integration set lands: {out}");
+    assert!(out.contains("set EMPTY") && out.contains("plus the lib unit tests"), "the integration set is empty and the lib tests are named: {out}");
     assert!(out.contains("unattributed (name no module): [keel-cli/src/lib.rs]"), "lib.rs is reported, not matched: {out}");
     let receipt = std::fs::read_to_string(root.join(keel_cli::touched::RECEIPT)).expect("receipt written");
-    assert!(receipt.contains("outcome = \"empty\"") && receipt.contains("tests = []") && receipt.contains("stems = [\"other\"]"), "the empty set is a receipt too: {receipt}");
+    assert!(receipt.contains("outcome = \"pass\"") && receipt.contains("tests = []") && receipt.contains("lib = true") && receipt.contains("stems = [\"other\"]"), "the lib-only run is a receipt too: {receipt}");
+
+    // A push that changes no source at all - a record - has nothing to run, and that is the receipt.
+    write(&root, "notes.md", "a record, not source\n");
+    commit(&root, "a record");
+    let (ok, out) = run(&root, &["land", "."]);
+    assert!(ok && out.contains("landed"), "a record lands: {out}");
+    assert!(out.contains("nothing to run"), "and says so: {out}");
+    let receipt = std::fs::read_to_string(root.join(keel_cli::touched::RECEIPT)).expect("receipt written");
+    assert!(receipt.contains("outcome = \"empty\"") && receipt.contains("lib = false"), "the empty set is a receipt too: {receipt}");
     let _ = std::fs::remove_dir_all(root.parent().expect("base"));
 }
 

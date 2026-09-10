@@ -118,6 +118,10 @@ pub fn touched_tests(tests: &[(String, String)], stems: &[String], changed_tests
 pub fn failing_binaries(cargo_output: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for line in cargo_output.lines() {
+        // The lib's hint is `--lib`, with no name: it is reported as `lib`.
+        if line.contains("`--lib`") && !out.iter().any(|n| n == "lib") {
+            out.push("lib".to_string());
+        }
         let mut rest = line;
         while let Some(i) = rest.find("`--test ") {
             let after = &rest[i + "`--test ".len()..];
@@ -143,6 +147,20 @@ pub struct Touched {
     pub stems: Vec<String>,
     pub unattributed: Vec<String>,
     pub tests: Vec<String>,
+    /// The lib's own unit tests (`cargo test --lib`) are in the set whenever ANY `keel-cli/src` path
+    /// changed: a module's `#[cfg(test)]` block names it by construction, and a unit test elsewhere
+    /// can read the changed module's live facts - `cli_surface_declared_tests` read the suite
+    /// synopsis and hardcoded which Decisions it may cite, and CI went red on cab7cac when the
+    /// synopsis gained a citation the set never ran (issue438). ~15 s on this host.
+    pub lib: bool,
+}
+
+impl Touched {
+    /// Nothing to run: no integration test names a changed module AND no source path changed.
+    #[must_use]
+    pub const fn nothing_to_run(&self) -> bool {
+        self.tests.is_empty() && !self.lib
+    }
 }
 
 fn git_out(repo: &Path, args: &[&str]) -> Option<String> {
@@ -199,7 +217,8 @@ pub fn compute(repo: &Path) -> Result<Touched, String> {
         }
     }
     let tests = touched_tests(&tests, &stems, &changed_tests);
-    Ok(Touched { base, stems, unattributed, tests })
+    let lib = !stems.is_empty() || !unattributed.is_empty();
+    Ok(Touched { base, stems, unattributed, tests, lib })
 }
 
 /// Is the land refusal ARMED - has the human accepted D0421? The D0338 pattern: the decision file
@@ -250,13 +269,14 @@ fn render_receipt(t: &Touched, head: &str, at: u64, run: Option<&Run>) -> String
     use std::fmt::Write as _;
     let list = |v: &[String]| v.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ");
     let mut s = format!(
-        "# touched receipt (D0421): the integration tests that NAME a module changed since the base, and what\n# running exactly those cost. An empty set is a receipt too. Beside the suite's receipt, never in it.\nhead = \"{}\"\nat = {}\nbase = \"{}\"\nstems = [{}]\nunattributed = [{}]\ntests = [{}]\n",
+        "# touched receipt (D0421): the integration tests that NAME a module changed since the base, and what\n# running exactly those cost. An empty set is a receipt too. Beside the suite's receipt, never in it.\nhead = \"{}\"\nat = {}\nbase = \"{}\"\nstems = [{}]\nunattributed = [{}]\ntests = [{}]\nlib = {}\n",
         head,
         at,
         t.base,
         list(&t.stems),
         list(&t.unattributed),
-        list(&t.tests)
+        list(&t.tests),
+        t.lib
     );
     match run {
         Some(r) => {
@@ -274,7 +294,7 @@ fn render_receipt(t: &Touched, head: &str, at: u64, run: Option<&Run>) -> String
         }
         // `empty`: nothing to run. `not-run`: a set exists and was not run (the refusal is inert, D0337).
         None => {
-            let _ = write!(s, "outcome = \"{}\"\npassed = 0\nfailed = 0\nseconds = 0\n", if t.tests.is_empty() { "empty" } else { "not-run" });
+            let _ = write!(s, "outcome = \"{}\"\npassed = 0\nfailed = 0\nseconds = 0\n", if t.nothing_to_run() { "empty" } else { "not-run" });
         }
     }
     s
@@ -295,7 +315,7 @@ fn write_receipt(repo: &Path, t: &Touched, run: Option<&Run>) {
 /// # Errors
 /// When the metrics directory cannot be created or cargo cannot be started at all.
 pub fn run(repo: &Path, t: &Touched) -> Result<Run, String> {
-    if t.tests.is_empty() {
+    if t.nothing_to_run() {
         write_receipt(repo, t, None);
         return Ok(Run { passed: 0, failed: 0, failing: vec![], seconds: 0, cargo_ok: true, log: PathBuf::new() });
     }
@@ -307,6 +327,9 @@ pub fn run(repo: &Path, t: &Touched) -> Result<Run, String> {
     cmd.arg("test").arg("--release").arg("--manifest-path").arg(repo.join("keel-cli").join("Cargo.toml")).arg("--no-fail-fast");
     for name in &t.tests {
         cmd.arg("--test").arg(name);
+    }
+    if t.lib {
+        cmd.arg("--lib");
     }
     let out = cmd.current_dir(repo).output().map_err(|e| format!("cargo could not be run: {e}"))?;
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
@@ -328,9 +351,14 @@ fn describe(t: &Touched) -> String {
         let _ = write!(s, "; unattributed (name no module): [{}]", t.unattributed.join(", "));
     }
     if t.tests.is_empty() {
-        s.push_str("; set EMPTY - no integration test names a changed module, nothing to run");
+        s.push_str("; set EMPTY - no integration test names a changed module");
     } else {
         let _ = write!(s, "; set [{}]", t.tests.join(", "));
+    }
+    if t.lib {
+        s.push_str("; plus the lib unit tests (a source path changed)");
+    } else if t.tests.is_empty() {
+        s.push_str(", nothing to run");
     }
     s
 }
@@ -350,12 +378,12 @@ pub fn before_push(repo: &Path) -> Option<i32> {
         }
     };
     println!("keel land: {}", describe(&t));
-    if t.tests.is_empty() {
+    if t.nothing_to_run() {
         write_receipt(repo, &t, None);
         return None;
     }
     if !gate_accepted(repo) {
-        println!("keel land: not run - D0421 is proposed; the touched-test refusal is declared but INERT until the human's word (D0337). Run them yourself with `keel suite --touched`.");
+        println!("keel land: not run - D0421 is proposed; the touched-test refusal is declared but INERT until the human's word (D0337); the set is in the receipt ({RECEIPT}).");
         write_receipt(repo, &t, None);
         return None;
     }
@@ -396,7 +424,7 @@ pub fn cmd(repo: &Path) -> i32 {
         }
     };
     println!("keel suite --touched: {}", describe(&t));
-    if t.tests.is_empty() {
+    if t.nothing_to_run() {
         write_receipt(repo, &t, None);
         println!("keel suite --touched: empty set recorded in {RECEIPT}");
         return 0;
@@ -484,6 +512,8 @@ mod tests {
         assert_eq!(failing_binaries(out), vec!["land_gate".to_string()]);
         let two = "error: 2 targets failed:\n    `--test b_gate`\n    `--test a_gate`\n";
         assert_eq!(failing_binaries(two), vec!["a_gate".to_string(), "b_gate".to_string()]);
+        let lib = "error: test failed, to rerun pass `--lib`\nerror: 2 targets failed:\n    `--lib`\n    `--test a_gate`\n";
+        assert_eq!(failing_binaries(lib), vec!["a_gate".to_string(), "lib".to_string()]);
         assert!(failing_binaries("test result: ok. 1 passed; 0 failed\n     Running tests/other.rs (x)\n").is_empty());
     }
 }
