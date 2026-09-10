@@ -423,7 +423,12 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   previous receipt rather than recording `fail - 0 passed, 0 failed` over a tree the tests never saw. **The
   post-commit hook makes its own copy (D0422, issue436):** it copies the self-build's binary to
   `target/release/keel-land(.exe)` and runs `keel land` from that, so an armed touched-test run (D0421) can relink
-  `keel.exe`; the test is on the resolved file, so a PATH `keel` that resolves into `target/release` is copied too (issue437).
+  `keel.exe`; the test is on the resolved file, so a PATH `keel` that resolves into `target/release` is copied too (issue437). **That land runs INSIDE the
+  commit's hook, and the armed touched run takes 7-11 minutes (434 s and 623 s measured)** - an agent shell tool
+  that caps a foreground command at ten minutes kills the hook's process tree on the cap, the commit stays, the push
+  is lost, and until dcLandRunIsAFactUntilItFinishes lands nothing records that a land started and died (issue453):
+  run `git commit` detached or in the background, then read `git status -sb` and the CI `conclusion`, never the
+  commit command's exit.
 - **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
   invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
   file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with
