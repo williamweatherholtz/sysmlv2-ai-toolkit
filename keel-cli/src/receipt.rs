@@ -60,6 +60,10 @@ struct StoredGuard {
     scanned: usize,
     #[serde(default)]
     warnings: Vec<String>,
+    /// The guard's wall clock in the run that wrote this receipt (issue455) - the set's measured profile,
+    /// so a scheduling claim is judged against history rather than a promise. Zero when untimed.
+    #[serde(default)]
+    ms: u64,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -286,10 +290,18 @@ pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[Guard
         build: build_id(),
         written: SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs()),
         covers: set,
-        guards: reports
-            .iter()
-            .map(|r| StoredGuard { name: r.name.to_string(), scanned: r.scanned, warnings: r.warnings.clone() })
-            .collect(),
+        guards: {
+            let timed: std::collections::HashMap<&str, u64> = crate::guards::last_durations().into_iter().collect();
+            reports
+                .iter()
+                .map(|r| StoredGuard {
+                    name: r.name.to_string(),
+                    scanned: r.scanned,
+                    warnings: r.warnings.clone(),
+                    ms: timed.get(r.name).copied().unwrap_or(0),
+                })
+                .collect()
+        },
         critical_path: crate::guards::critical_path_line(),
     };
     let Ok(text) = toml::to_string(&stored) else { return false };

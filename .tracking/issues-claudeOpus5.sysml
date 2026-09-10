@@ -1875,4 +1875,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRecordIssueNamesOpenIssuesOnTheSameInstrument to issue457;
+
+    part issue458 : Issue {
+        :>> id = "1e37258d-c0a6-46e6-aa09-813780916c10";
+        :>> title = "A timing comparison stated from two windows read host drift as a thirty percent penalty and was written down before the A/A case ran";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "OBSERVED IN THE FIELD, sprint 657 (dcGuardPoolDispatchesLongestFirst), 2026-09-10, on the primary agent's own act. A performance comparison was stated from two separate timing windows with no like-for-like control: three runs of the declaration-order binary (2147-2252 ms wall) and, after a rebuild, three runs of the longest-first binary (2600-2991 ms), read as 'longest-first is thirty percent slower'. That sentence, with its numbers, was written into the run_all comment in guards.rs and into the sprint notes before any check had been run against the one case known to be negative - the SAME code timed twice. When that case was run (the reverted binary, later the same day) it measured 2853-3039 ms: identical code, thirty percent apart, the host and not the order (Defender was the top CPU consumer and thirteen stale kernel JVMs were alive). Six INTERLEAVED pairs of the same binary with the order switched by an env var then measured 2567 vs 2544 ms - no difference inside the spread. The first claim was wrong in sign and had already been written down. THE CLASS is D0388's, seen a third time: a number stated before its check was probed against a known case (issue455 - a DoD figure promised before measurement; sprint 655's retro - a validate clause and a history count promised from an unprobed hypothesis; now this). For a timing comparison the known-negative is the A/A run - identical code, alternating - and it was skipped because each window's three runs agreed with each other, which measures the host's stability inside a window and nothing about the difference between windows. THE CONTROL that lands with this Issue: scripts/probes/guard_dispatch_order.py --ab compares two sets of timed runs and REFUSES two sets whose files do not interleave in time (by mtime) - that shape is two windows, and it is refused before any median is printed; its --probe carries the known-positive (alternating stamps accepted) and known-negative (two blocks refused), and the refusal fired on the very before/after files this Issue describes. It is an instrument's refusal, not a gate: nothing can read a number in a code comment and know which host state it came from, so a timing claim about the pool made without the instrument is still only caught by a reader - which is why the comment in run_all and CLAUDE.md section 5 both say a claim about this pool's order is judged by interleaved pairs and name the command.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from d0431 to issue458;
 }

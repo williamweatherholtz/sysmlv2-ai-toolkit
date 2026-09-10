@@ -324,9 +324,16 @@ first, the guard runner's critical path (`guard:<name> (critical path)` - the gu
 longest bounds the wall clock), the remainder no counter covered as `unattributed` rather than omitted, then the
 summed cross-cutting counters (`git xN summed`, `parse`), which can exceed the total and never lead. A fast fire
 carries no field. `keel enforcement-report` lists them under `slowFires` (threshold, count, the last 25 rows by
-phase; a line from before D0414 says it is unattributed), the guard receipt records `critical_path`, and
+phase; a line from before D0414 says it is unattributed), the guard receipt records `critical_path` and every guard's
+own `ms` (issue455: the set's measured profile, so a scheduling claim is judged against history), and
 `KEEL_PERF=1 keel guard .` prints it. The first live line: 8 337 ms = `hook:guards` 7 269 of which
-`guard:priority-inversion` 7 160, `hook:validate` 578, `git x46 summed` 12 778.
+`guard:priority-inversion` 7 160, `hook:validate` 578, `git x46 summed` 12 778. **The pool dispatches in declaration
+order, on measurement (issue455, 2026-09-10):** longest-first was built and A/B-timed in six interleaved pairs - wall
+medians 2567 vs 2544 ms, inside the spread - because the git-spawning guards contend when packed into one wave (the
+longest guard stretched 1.6 -> 2.2 s, `git x40` 5.2 -> 7.3 s); the floor is that contention (dcGitReadsStayInProcess,
+dcBatchGitReads), not the schedule. Two timings of identical code in separate windows differed by 30% - host drift - so
+a claim about this pool's order is judged by interleaved pairs (`scripts/probes/guard_dispatch_order.py --ab`), never by
+two windows.
 
 **A green gate answers from its receipt (D0371).** A green `keel guard`, `keel hook stop` or `keel gate` writes
 `.keel/metrics/guard-receipt.toml` keyed on every input a guard can read - HEAD, every path `git status` lists with its

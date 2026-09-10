@@ -1630,6 +1630,22 @@ mod parallel_tests {
         assert_eq!(non_v4_ids_in(".tracking/new.sysml", fresh), vec![(".tracking/new.sysml".to_string(), "0069b38f-a2cd-44f8-1750-8c6ea975cd34".to_string())]);
     }
 
+    /// Every guard that ran is timed, so the receipt's per-guard `ms` is a measured profile (issue455).
+    #[test]
+    fn last_durations_names_every_guard_that_ran() {
+        let root = std::path::Path::new("..");
+        if !root.join(".tracking").is_dir() {
+            return; // not the self-build tree
+        }
+        let reports = super::run_all(root);
+        let ran = reports.iter().filter(|r| !r.warnings.iter().any(|w| w.starts_with("NOT ACTIVE"))).count();
+        let timed = super::last_durations();
+        assert_eq!(timed.len(), ran, "one duration per guard that ran");
+        for (name, _) in &timed {
+            assert!(super::GUARD_NAMES.contains(name), "{name} is not a guard");
+        }
+    }
+
     /// dcGuardsRunInParallelAndTimed: the reports come back in `GUARD_NAMES` order, one per enforced
     /// guard, with every inactive one present as its NOT ACTIVE report - exactly what the serial loop
     /// returned. Run against this repository, whose activation set is the real one; a thread finishing
@@ -5575,6 +5591,20 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
             slots.push(None);
         }
     }
+    // DISPATCH ORDER IS DECLARATION ORDER, on measurement (dcGuardPoolDispatchesLongestFirst, issue455,
+    // 2026-09-10). Longest-first from the receipt's per-guard durations was built and A/B-timed on this
+    // host (14 cores / 20 threads), six interleaved pairs of `KEEL_PERF=2 keel guard --no-receipt`:
+    // list-scheduling simulation over three measured runs had promised 1849 -> 1314 ms
+    // (scripts/probes/guard_dispatch_order.py); the binary measured wall medians 2567 (declared) vs
+    // 2544 ms (longest-first) - one percent, inside the run-to-run spread - while the guard sum rose
+    // 21.3 -> 23.3 s, `git x40` 5.2 -> 7.3 s, and the longest guard itself, `acceptance-binds-to-text`,
+    // stretched 1.55-1.68 -> 2.16-2.34 s. Dispatched first it runs beside the other git-spawning,
+    // tree-walking guards and contends with them, so the makespan's lower bound grows by what the
+    // schedule saves. The simulation assumed a guard's duration is independent of what runs beside it;
+    // it is not. The floor is shared-resource contention (dcGitReadsStayInProcess, dcBatchGitReads),
+    // not the schedule - so the pool takes `to_run` as declared, and the receipt keeps each guard's
+    // `ms` so the next assessment reads history instead of promising a number. (Two earlier timings in
+    // separate windows read 2.2 and 2.9 s for the same code: the host, not the order.)
     run_in_parallel(root, &to_run, &mut slots);
     slots.into_iter().flatten().collect()
 }
@@ -5599,6 +5629,10 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
 /// hook fire (which attributes to it) need the number without anyone having asked for a report.
 static CRITICAL_PATH: std::sync::Mutex<Option<(&'static str, u64)>> = std::sync::Mutex::new(None);
 
+/// Every guard's wall clock in the last run of this process, `(name, ms)` - the receipt stores them as the
+/// run's measured profile (issue455: the number a dispatch decision is judged against, read from history).
+static DURATIONS: std::sync::Mutex<Vec<(&'static str, u64)>> = std::sync::Mutex::new(Vec::new());
+
 fn note_critical_path(name: &'static str, took: std::time::Duration) {
     let ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
     if let Ok(mut g) = CRITICAL_PATH.lock() {
@@ -5606,6 +5640,15 @@ fn note_critical_path(name: &'static str, took: std::time::Duration) {
             *g = Some((name, ms));
         }
     }
+    if let Ok(mut d) = DURATIONS.lock() {
+        d.push((name, ms));
+    }
+}
+
+/// Every guard's duration from the last run in this process, `(name, ms)`; empty when none has run.
+#[must_use]
+pub fn last_durations() -> Vec<(&'static str, u64)> {
+    DURATIONS.lock().map(|d| d.clone()).unwrap_or_default()
 }
 
 /// The longest guard of the last run in this process, `(name, ms)`, or `None` when no guard has run.
@@ -5621,6 +5664,9 @@ pub fn critical_path_line() -> String {
 }
 
 fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [Option<GuardReport>]) {
+    if let Ok(mut d) = DURATIONS.lock() {
+        d.clear();
+    }
     let workers = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get).min(to_run.len().max(1));
     let next = std::sync::atomic::AtomicUsize::new(0);
     let done: std::sync::Mutex<Vec<(usize, Option<GuardReport>)>> = std::sync::Mutex::new(Vec::with_capacity(to_run.len()));
