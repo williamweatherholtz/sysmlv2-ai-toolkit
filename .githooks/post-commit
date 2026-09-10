@@ -29,6 +29,17 @@ KEEL=""
 command -v keel >/dev/null 2>&1 && KEEL=keel
 [ -z "$KEEL" ] && [ -x ./target/release/keel.exe ] && KEEL=./target/release/keel.exe
 [ -z "$KEEL" ] && [ -x ./target/release/keel ] && KEEL=./target/release/keel
+# LAND FROM A COPY (D0422, issue436): `keel land` may run the touched test set (D0421), and
+# `cargo test --release` relinks target/release/keel(.exe) - the very image this hook would be running
+# it from, which on Windows cannot be replaced while it runs (issue386). The self-build's own binary is
+# copied to a land-only image first; a `keel` on PATH is not the relinked file and runs as it is. A copy
+# that cannot be made falls back to the original, whose own-image refusal then says why nothing ran.
+case "$KEEL" in
+    ./target/release/keel|./target/release/keel.exe)
+        LAND_COPY="${KEEL%keel*}keel-land${KEEL##*/keel}"
+        if cp -f "$KEEL" "$LAND_COPY" 2>/dev/null; then KEEL="$LAND_COPY"; fi
+        ;;
+esac
 if [ -n "$KEEL" ]; then
     KEEL_POST_COMMIT_ACTIVE=1 export KEEL_POST_COMMIT_ACTIVE
     "$KEEL" land . || true   # non-fatal: the commit already succeeded

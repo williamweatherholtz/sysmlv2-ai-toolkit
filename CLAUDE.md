@@ -398,7 +398,10 @@ See `.engine/docs/sysmlv2-syntax-notes.md` before authoring SysML.
   has the same problem and REFUSES before it starts** (dcSuiteSurvivesItsOwnImage): it shells out to `cargo test
   --release`, cargo cannot relink the running image, so a suite launched from `target/release/keel.exe` exits 2
   naming the copy to run instead and writes no receipt; and a cargo exit with no `test result:` line restores the
-  previous receipt rather than recording `fail - 0 passed, 0 failed` over a tree the tests never saw.
+  previous receipt rather than recording `fail - 0 passed, 0 failed` over a tree the tests never saw. **The
+  post-commit hook makes its own copy (D0422, issue436):** it copies the self-build's binary to
+  `target/release/keel-land(.exe)` and runs `keel land` from that, so an armed touched-test run (D0421) can relink
+  `keel.exe`; a `keel` on PATH runs as it is.
 - **Never pipe a command whose output a JVM holds** — `conda run`, and **`git commit`** when its hooks
   invoke the kernel. The JVM holds the pipe and the shell hangs (cost: a 5-minute stall). Redirect to a
   file and read the file: `git commit -F msg > log 2>&1`. Sweep afterwards with
