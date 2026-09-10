@@ -713,7 +713,46 @@ fn propagate_transitive_suspect(
     }
 }
 
-fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
+/// The frontier half of an orient run: the done-set, the evidence classes, and `ready` in declaration
+/// order. Everything `whats-next` and the priority lens need, and nothing the burndown needs - the
+/// suspect walk, the deliverable drift, the open issues and the burndown are the second half
+/// ([`compute_orient`]), and the priority-inversion guard used to pay for all of it to read one field
+/// (issue439: 5.7 s of a 6.6 s turn boundary, the critical path of every attributed slow fire).
+struct Frontier {
+    tasks: HashMap<String, TaskData>,
+    ordering_only: HashSet<(String, String)>,
+    done_map: HashMap<String, bool>,
+    verified_at: HashMap<String, String>,
+    invalid_evidence: Vec<String>,
+    unsynchronized_evidence: Vec<String>,
+    ready: Vec<String>,
+    compute_failures: Vec<String>,
+    sync_state: crate::sync::Divergence,
+}
+
+/// The ready frontier alone, in declaration order (D0052).
+///
+/// The same list `orient` carries, computed without the suspect walk, the deliverable drift, the open
+/// issues or the burndown. A filter that could not be computed empties it, as in `orient` (issue247);
+/// `compute_failures` says which.
+///
+/// Returns `(ready, compute_failures, outstanding)`.
+#[must_use]
+pub fn ready(root: &Path) -> (Vec<String>, Vec<String>, usize) {
+    let idx = crate::perf::phase("frontier:extract", || crate::indexer::extract(&root.join(".tracking")));
+    let f = frontier(root, idx, false, false);
+    let outstanding = f.done_map.values().filter(|&&v| !v).count();
+    (f.ready, f.compute_failures, outstanding)
+}
+
+/// `evidence` says whether the caller reads `verified_at` and the evidence classes (orient does; the
+/// ready list does not). When it is false and this clone cannot judge a dangling anchor anyway
+/// (`clone_can_judge` below), the SHA validation and the landing-commit binding are skipped: neither
+/// can change `done_map` in that state - an unresolvable anchor leaves the task DONE either way - so
+/// `ready` is identical by construction, and the two git spawns that cost the priority-inversion guard
+/// a second on every fire (issue439: `cat-file --batch-check` over 666 short ids, then the binding
+/// walk) are not paid to read a list they cannot alter.
+fn frontier(repo: &Path, idx: ExtractedIndex, fetched: bool, evidence: bool) -> Frontier {
     let ExtractedIndex { tasks, ordering_only, .. } = idx;
 
     // Step 1: compute done/invalid-evidence/verified-at.
@@ -745,7 +784,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     // stop running — so from `orient` the answer is "unverifiable from here", with the remedy named.
     // `keel sync` fetches first and passes `fetched = true`, which is where the issue071 protection
     // against a truly orphaned anchor lands.
-    let sync_state = crate::sync::divergence(repo);
+    let sync_state = crate::perf::phase("frontier:divergence", || crate::sync::divergence(repo));
     let no_upstream = sync_state.unknown.is_some();
     let clone_can_judge = fetched || no_upstream;
 
@@ -758,7 +797,13 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
         .collect();
     shas.sort();
     shas.dedup();
-    let sha_valid = valid_commits(repo, &shas);
+    // With nothing to judge and no caller reading `verified_at`, every anchor is taken as it stands
+    // (`unwrap_or(true)` below) - the same `done` the validated path reaches when `clone_can_judge` is false.
+    let sha_valid = if evidence || clone_can_judge {
+        crate::perf::phase("frontier:valid-commits", || valid_commits(repo, &shas))
+    } else {
+        HashMap::new()
+    };
     // A pass recorded at HEAD while the work sat uncommitted names the commit BEFORE the one that
     // carries the work; the binding is the commit that INTRODUCED the result when `judgedAgainst` is
     // its ancestor (dcResultBindsToItsLandingCommit). Cached after one history walk, so this is a
@@ -769,7 +814,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
         .filter(|r| r.outcome == "pass" && !r.judged_against.is_empty() && !r.id.is_empty())
         .map(|r| crate::binding::Ask { id: &r.id, judged_against: &r.judged_against })
         .collect();
-    let bound = crate::binding::bind(repo, &asks);
+    let bound = if evidence { crate::perf::phase("frontier:bind", || crate::binding::bind(repo, &asks)) } else { HashMap::new() };
 
     for (name, data) in &tasks {
         if let Some(latest) = data.results.last() {
@@ -805,7 +850,7 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     // authored statement that the work is deliberately retired (§1.4), and the frontier is auto-followed
     // (D0052), so leaving it ready schedules work a Decision has forbidden. Conservative on error:
     // failing to read the model must not silently make everything ready again.
-    let Narrowing { superseded, blocked, claimed_by_others, compute_failures } = narrowing_filters(repo);
+    let Narrowing { superseded, blocked, claimed_by_others, compute_failures } = crate::perf::phase("frontier:narrowing", || narrowing_filters(repo));
     let mut ready: Vec<String> = Vec::new();
     for (name, data) in &tasks {
         let is_done = done_map.get(name.as_str()).copied().unwrap_or(false);
@@ -824,6 +869,17 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     if !compute_failures.is_empty() {
         ready.clear();
     }
+
+    // Rank ready by backlog declaration order (D0052) — priority, not alphabetical.
+    ready.sort_by_key(|name| tasks.get(name).map_or(u32::MAX, |t| t.order));
+    invalid_evidence.sort();
+    unsynchronized_evidence.sort();
+    Frontier { tasks, ordering_only, done_map, verified_at, invalid_evidence, unsynchronized_evidence, ready, compute_failures, sync_state }
+}
+
+fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
+    let Frontier { tasks, ordering_only, done_map, verified_at, invalid_evidence, unsynchronized_evidence, ready, compute_failures, sync_state } =
+        frontier(repo, idx, fetched, true);
 
     // Step 3: compute suspect (criterion text changed since verified). Capture WHY per task.
     // Perf (orientPerf/sr11): one batched `git cat-file` reads ALL needed historical DoD blobs.
@@ -849,17 +905,12 @@ fn compute_orient(repo: &Path, idx: ExtractedIndex, fetched: bool) -> Output {
     let done_set: HashSet<String> = done_map.iter().filter(|(_, &v)| v).map(|(k, _)| k.clone()).collect();
     let open_issues = crate::view::open_issue_names(repo, &done_set).unwrap_or_default();
 
-    // Rank ready by backlog declaration order (D0052) — priority, not alphabetical.
-    let mut ready_sorted = ready;
-    ready_sorted.sort_by_key(|name| tasks.get(name).map_or(u32::MAX, |t| t.order));
     let mut suspect: Vec<String> = suspect_set.into_iter().collect();
     suspect.sort();
-    invalid_evidence.sort();
-    unsynchronized_evidence.sort();
 
     Output {
         in_progress_sprints: in_progress_sprints(repo),
-        ready: ready_sorted,
+        ready,
         suspect,
         invalid_evidence,
         unsynchronized_evidence,

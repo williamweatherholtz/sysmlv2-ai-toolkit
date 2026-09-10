@@ -1677,4 +1677,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcPriorityGuardReadsTheFrontierCheaply to issue439;
+
+    part issue440 : Issue {
+        :>> id = "62ebbc59-ec29-448f-98b7-6224764d8fa6";
+        :>> title = "The git-facts changed section keeps every past HEAD's rows: 24 of 27 MB, 416 ms parsed by every hook fire";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The git-facts cache (.keel/cache/git-facts.toml) held 26.9 MB on this host, and 24 MB of it was the changed section: the paths of git diff sha..head for every verified commit, keyed by the HEAD the question was asked under. HEAD only advances (D0129), so every row written under a past HEAD is dead - never asked for again on this clone - yet remember_changed kept them all: fourteen heads, one full path list per verified commit each, growing about 1.7 MB per commit. The file is parsed by every process that asks the cache anything, measured at 416 ms per load (KEEL_PERF=2 phase gitfacts:load), which every hook fire paid. Found while attributing the priority-inversion guard's critical path (issue439).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcChangedCacheKeepsOneHead to issue440;
+
+    part issue441 : Issue {
+        :>> id = "4837ada9-64ec-48bc-ac97-ccec38b6121b";
+        :>> title = "verification-trace is the guard set's critical path at 4.3 s once priority-inversion reads the frontier";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "With the priority-inversion guard reading the frontier alone (issue439), the critical path of a full guard run on this host moved to verification-trace: 4318, 4289 and 4385 ms on three consecutive runs of KEEL_PERF=1 keel guard --no-receipt . at the new build, against a set wall clock of 5940 ms. Under parallel load its neighbours are inflated too (untrusted-taint 2999 ms, release-recorded 2278 ms, parser-coverage 2003 ms), so the next reduction has to be attributed before it is attempted - the guard has no phases of its own yet. The wall clock gained from issue439 was 6573 to 5940 ms, not the 5.7 s the priority guard had been paying, because this guard was just behind it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcVerificationTraceIsAttributedAndCut to issue441;
 }

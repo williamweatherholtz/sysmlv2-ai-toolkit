@@ -3651,8 +3651,10 @@ const fn recurrence_class(citations: usize) -> Option<&'static str> {
 /// Propagates model-build failures.
 pub fn priority_signals(root: &Path) -> Result<Vec<PrioritySignal>, ViewError> {
     let model = Model::build(root)?;
-    let ready = crate::orient::compute(root).ready;
-    let citations = retro_citations(root);
+    // The frontier alone (issue439): the guard built on this paid orient::compute whole - suspect
+    // walk, drift, burndown - to read `ready`, and was the critical path of every slow hook fire.
+    let (ready, _compute_failures, _outstanding) = crate::perf::phase("priority:frontier", || crate::orient::ready(root));
+    let citations = crate::perf::phase("priority:retro-citations", || retro_citations(root));
     let severity_of = |task: &str| -> Option<String> {
         model
             .edges

@@ -261,7 +261,13 @@ pub fn changed(root: &Path, sha: &str, head: &str) -> Option<Vec<String>> {
     with(root, |fx| fx.shape.changed.get(sha).and_then(|m| m.get(head)).cloned())
 }
 
-/// Remember the diff between two full commit ids.
+/// Remember the diff between two full commit ids - and keep the rows of THIS head only.
+///
+/// The fact is immutable, but its key moves: `head` is HEAD, and under D0129 HEAD only advances, so a
+/// row written under the last commit is never asked for again on this clone. Left in place the section
+/// grew by one full path list per verified commit per HEAD - 24 of the file's 27 MB after fourteen
+/// commits, loaded and parsed by every process that asked the cache anything, 416 ms per hook fire
+/// and rising (issue440). A checkout of an older commit misses and recomputes the identical answer.
 pub fn remember_changed(root: &Path, sha: &str, head: &str, paths: &[String]) {
     if !is_full_sha(head) {
         return;
@@ -269,6 +275,10 @@ pub fn remember_changed(root: &Path, sha: &str, head: &str, paths: &[String]) {
     let Some(sha) = full_id(root, sha) else { return };
     let sha = sha.as_str();
     with(root, |fx| {
+        for rows in fx.shape.changed.values_mut() {
+            rows.retain(|h, _| h == head);
+        }
+        fx.shape.changed.retain(|_, rows| !rows.is_empty());
         fx.shape.changed.entry(sha.to_string()).or_default().insert(head.to_string(), paths.to_vec());
         fx.dirty = true;
     });
@@ -385,6 +395,34 @@ mod tests {
         assert_eq!(criterion(&root, FULL, "f", "dcResolved"), Some(Some("via short".to_string())));
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&other);
+    }
+
+    /// issue440 (dcChangedCacheKeepsOneHead): the changed-paths section keeps the rows of the head it was
+    /// last asked under and drops every earlier head's - HEAD only advances (D0129), so a row keyed by a
+    /// past HEAD is never read again on this clone, and left in place the section grew by one path list
+    /// per verified commit per HEAD (24 of 27 MB after fourteen commits, parsed by every hook fire).
+    #[test]
+    fn changed_rows_of_an_earlier_head_are_dropped_when_a_new_head_is_remembered() {
+        let _s = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let root = fresh_root("onehead");
+        let head1 = FULL;
+        let head2 = FULL.replace('0', "e");
+        let sha_a = FULL.replace('0', "a");
+        let sha_b = FULL.replace('0', "b");
+        remember_changed(&root, &sha_a, head1, &["a.rs".to_string()]);
+        remember_changed(&root, &sha_b, head1, &["b.rs".to_string()]);
+        assert_eq!(changed(&root, &sha_a, head1), Some(vec!["a.rs".to_string()]));
+        // A second row under the SAME head keeps the first: the head is what moved, not the sha.
+        assert_eq!(changed(&root, &sha_b, head1), Some(vec!["b.rs".to_string()]));
+        // HEAD advances: the first row written under the new head drops every row of the old one.
+        remember_changed(&root, &sha_a, &head2, &["a2.rs".to_string()]);
+        assert_eq!(changed(&root, &sha_a, &head2), Some(vec!["a2.rs".to_string()]));
+        assert_eq!(changed(&root, &sha_a, head1), None, "the earlier head's row must be gone");
+        assert_eq!(changed(&root, &sha_b, head1), None, "every earlier-head row must be gone, not only this sha's");
+        flush(&root);
+        let text = std::fs::read_to_string(path_for(&root)).expect("cache file written");
+        assert!(text.contains("a2.rs") && !text.contains("\"a.rs\"") && !text.contains("b.rs"), "{text}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// An unreadable or corrupt cache file is an EMPTY cache, never an error: the answers are recomputed.
