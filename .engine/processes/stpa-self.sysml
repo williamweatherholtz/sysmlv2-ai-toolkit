@@ -45,10 +45,19 @@ package ProcessStpaSelf {
         :>> owner = Owner::ai;
     }
 
+    action stpa2bCensus : ProcessStep {
+        :>> id = "7b3d9f1a-5c2e-4a8b-9d6f-1e3a5c7b9d2f";
+        :>> title = "Read the control census before writing a UCA - the evidence class is computed, never asserted";
+        :>> triggerCondition = "stpa2 done.";
+        :>> actionText = "Run `keel show control-census [ROOT]` (D0426) and read, per control, whose act it binds (human / ai / either), its ledger blocks by actor kind (D0424) and its motivating Issues classed observed or code-read; then read its `ucas` section, which classes every recorded UnsafeControlAction from its edges - `observed` when a dependency edge from the UCA, or from a ControllerConstraint bound to it, reaches an Issue whose incident happened (discoveredInField = true), `code-read` otherwise - and lists as REMOVAL CANDIDATES the constraints standing on a control the census classes friction or hypothetical. A UCA written in stpa3 for an act never observed against the actor kind it names is code-read by construction and is still written, labelled by its edges (an edge to an Issue whose incident happened is what makes it observed; the text never says which). Never write a control that binds a person on a code-read UCA alone (st115).";
+        :>> producedArtifact = "The census read; the UCA classes and candidate list the run record (stpa5) reports.";
+        :>> owner = Owner::ai;
+    }
+
     action stpa3Ucas : ProcessStep {
         :>> id = "e6a8c0d2-3f5b-4a7c-9b2d-4e6a8c0d2f3a";
         :>> title = "For every control action, the four unsafe-control-action types";
-        :>> triggerCondition = "stpa2 done.";
+        :>> triggerCondition = "stpa2b done.";
         :>> actionText = "For each computed control action consider all four UCA types - provided, not provided, wrong timing or order, stopped too soon or applied too long - in worst case, not most likely. Record each that can lead to a hazard as an UnsafeControlAction part (ucaType, context naming the computed action verbatim, statement) under .tracking/architecture/, with a dependency edge to the hazard. A type considered and found harmless is written as one line in the run record, so the reader can tell considered-and-safe from not-considered.";
         :>> producedArtifact = "UnsafeControlAction parts, each edged to a hazard; the considered-safe lines in the run record.";
         :>> owner = Owner::ai;
@@ -67,13 +76,14 @@ package ProcessStpaSelf {
         :>> id = "c0e2a4b6-5b7d-4c9f-9d4a-6b8d0f2a4c5d";
         :>> title = "Record what was analysed, so the structure can say when to run again";
         :>> triggerCondition = "stpa4 done.";
-        :>> actionText = "Record the run as a Test (method analyze) whose procedureText lists `ANALYSED: <action>, <action>, ...` - the computed action names walked in stpa3 - and a passing TestResult judged against HEAD. The stpa-currency guard compares the union of every run's ANALYSED list with the current computed structure and WARNS while any action is unanalysed, grouping the remainder by the controller->process edge each action sits on and naming the NEXT TRANCHE - the open edge with the fewest unanalysed actions - with the exact ANALYSED list its record will carry (D0410). A tranche is one edge walked in full; the warning is the re-run trigger, and it clears only by runs that cover every edge.";
+        :>> actionText = "Record the run as a Test (method analyze) whose procedureText lists `ANALYSED: <action>, <action>, ...` - the computed action names walked in stpa3 - then `EVIDENCE: <n> observed, <m> code-read` and `REMOVAL CANDIDATES: ...` copied from `keel show control-census` `ucaSummary` at the same tree (D0424; a run that adds only code-read UCAs says so), and a passing TestResult judged against HEAD. The stpa-currency guard compares the union of every run's ANALYSED list with the current computed structure and WARNS while any action is unanalysed, grouping the remainder by the controller->process edge each action sits on and naming the NEXT TRANCHE - the open edge with the fewest unanalysed actions - with the exact ANALYSED list its record will carry (D0410). A tranche is one edge walked in full; the warning is the re-run trigger, and it clears only by runs that cover every edge.";
         :>> producedArtifact = "The run record; the guard's silence until the structure grows.";
         :>> owner = Owner::ai;
     }
 
     first stpa1Losses then stpa2Structure;
-    first stpa2Structure then stpa3Ucas;
+    first stpa2Structure then stpa2bCensus;
+    first stpa2bCensus then stpa3Ucas;
     first stpa3Ucas then stpa4Constraints;
     first stpa4Constraints then stpa5Trigger;
 }

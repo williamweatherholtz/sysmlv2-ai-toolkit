@@ -800,7 +800,7 @@ package IssuesClaudeOpus5 {
         :>> createdAt = "2026-09-03";
         :>> createdBy = "claudeOpus5";
         :>> description = "2026-09-02: sprint 521 (the stpa-diagram process) was landed after validate and guards but WITHOUT the full suite; the suite had last run at sprint 520. CI failed twenty minutes later on adoption_check_can_fail: the shipped process named a tool the scaffold did not ship - a test the suite runs locally in seconds. Nothing refused the land: keel land gates validate and guards, not the deliverable's tests, and no receipt records whether the suite ran on the tree being pushed. CI caught it, and CI is detective (branch protection requires no status check - computed, keel show control-structure). Recorded in the fix commit's message only, until now. FIX: dcLandRequiresASuiteReceipt.";
-        :>> discoveredInField = false;
+        :>> discoveredInField = true;
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcLandRequiresASuiteReceipt to issue360;
@@ -932,7 +932,7 @@ package IssuesClaudeOpus5 {
         :>> createdAt = "2026-09-05";
         :>> createdBy = "claudeOpus5";
         :>> description = "FOUND 2026-09-05 when the human asked why the heredoc defect was still occurring and whether retros were flagging issues. THEY WERE: dcPreBashSeesHeredocSource was created 2026-09-03 (sprint 531) as the resolver of a recurring heredoc failure, a memory said the same, and every retro afterwards wrote 'no new item - already tracked: dcPreBashSeesHeredocSource' - which the retro-backlog guard accepted, because D0294's fourth shape checks that a justification NAMES an existing item and nothing checks that the named item is being worked. The item had been placed below the High-issue resolvers to quiet a priority-inversion warning, and the defect recurred at least eight times in two days (sprints 540-550), each time caught by a wrong test result or an unparsable file rather than prevented. MECHANISM: 'already tracked' is a valid justification the FIRST time; the second time the same open item is named, the finding has recurred, and an item that keeps absorbing recurrences without moving is a reminder in an item's clothes (D0047) - and no control computed the count. CONSEQUENCE: the process that exists to turn recurring defects into controls accepted eight recurrences as tracked, and the human saw the defect keep happening. PREVENTING CHANGE: guard recurrence-escalates (D0310) - two or more retro citations of an open item is a violation unless the item is in the next three ready items or blocked on a proposed Decision; and the heredoc defect itself is closed by D0309's deny, which is dcPreBashSeesHeredocSource's delivery. Resolver: dcPreBashSeesHeredocSource, the item whose stasis is the defect.";
-        :>> discoveredInField = false;
+        :>> discoveredInField = true;
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcPreBashSeesHeredocSource to issue372;
@@ -954,7 +954,7 @@ package IssuesClaudeOpus5 {
         :>> createdAt = "2026-09-05";
         :>> createdBy = "claudeOpus5";
         :>> description = "FOUND 2026-09-05 by stpa-self run 1 (UCA-A1, ucaResultReceiptIsTestimony): `append-result --evidence` satisfies guard 52 (attestation-substance, D0232) with WHATEVER the agent writes after `// RAN:`. The receipt proves a sentence was typed, not that a run happened or finished. It happened in this tree on 2026-09-04: I wrote a suite count into a receipt while the background suite was still running, and only my own read-back caught it - no control did. The pass then computes completion from evidence that did not yet exist (EHZ4). PREVENTING CHANGE: dcExternalFactGate - a result class that closes only on an external fact keel queries (a CI run id for the judged SHA, verified by CI on push), never on the agent's assertion; the fork D0312 decides how far that authority model extends to the other methods. Constraint CC-A1 (ccResultReceiptIsExternal) is bound to this Issue until then.";
-        :>> discoveredInField = false;
+        :>> discoveredInField = true;
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcExternalFactGate to issue374;
@@ -965,7 +965,7 @@ package IssuesClaudeOpus5 {
         :>> createdAt = "2026-09-05";
         :>> createdBy = "claudeOpus5";
         :>> description = "FOUND 2026-09-05 by stpa-self run 1 (UCA-A2, ucaResultBoundToTheWrongTree): the ordinary DoD pass is recorded with `append-result --sha HEAD` while the verified work is still uncommitted, so judgedAgainst names a commit whose tree does not contain the work. Every reader that dereferences the SHA - deliverable-drift suspicion in orient, reverify, the attestation census - reads the claim against a tree where it is false, and drift is measured from the wrong baseline (EHZ4). This is the result-side twin of issue341, which D0308 closed for acceptances with the introducing-commit fallback. PREVENTING CHANGE: dcResultBindsToItsLandingCommit - the same fallback for results, and `append-result` naming the tree the pass will read against when the working tree is dirty. Constraint CC-A2 (ccResultBindsToLandingTree) is bound to this Issue until then.";
-        :>> discoveredInField = false;
+        :>> discoveredInField = true;
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcResultBindsToItsLandingCommit to issue375;
@@ -1218,7 +1218,7 @@ package IssuesClaudeOpus5 {
         :>> createdAt = "2026-09-07";
         :>> createdBy = "claudeOpus5";
         :>> description = "A patch script that cannot find its anchor APPENDS instead of failing, so an edit lands somewhere it does no work and the run reports success. WHAT HAPPENED, 2026-09-07: a patch adding a new computation section to the computed-facts script looked for an anchor comment, and had a fallback - if the anchor was not found, append at end of file. The anchor did not match. The section was appended AFTER the line that serialises the output, so the script ran clean, exited zero, wrote its file, and silently omitted every fact the new section had just computed. Nothing failed. The only thing that noticed was reading back the specific keys the section was supposed to add and finding them missing. WHY THE FALLBACK IS THE DEFECT: an append is a plausible-looking success. A refusal would have named the problem in one line at the moment it occurred. The fallback exists because appending 'usually works' for a self-contained block, and it does - right up to the case where position is semantic, which in a script is always: code after the emit is code that runs after the answer was published. THE SAME SHAPE, TWICE MORE IN ONE SESSION, so this is a pattern rather than an incident: a patch that replaced a string with `assert s.count(old) == 1` failed LOUDLY and correctly every time it missed - that is the right behaviour and it is why those misses cost seconds. Every silent one cost a read-back to discover. And one earlier patch applied a `sed` substitution that matched nothing, leaving a stale anchor in the docs, found later by grep. PREVENTING CHANGE: a patch asserts its anchor and exits non-zero when it is absent - no fallback, no append, no best effort. Where a patch legitimately needs to add at end-of-file, it says so explicitly rather than arriving there by failure. This is cheap: the assertion pattern is already used in most of these scripts and is what makes them safe; the defect is that it is a convention rather than the only available shape.";
-        :>> discoveredInField = false;
+        :>> discoveredInField = true;
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcPatchesFailWhenTheyMiss to issue398;
@@ -1765,4 +1765,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcUnsignedTapIsRecordedWithAWarn to issue447;
+
+    part issue448 : Issue {
+        :>> id = "37df5110-53e0-44c5-ae9a-5075f71fe3a8";
+        :>> title = "append-gate-result landed an AI-judged method=test result with no receipt; the refusal CLAUDE.md names is only the turn-boundary guard";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CLAUDE.md sec 4 says an AI-judged method=test result with no // RAN: receipt is refused (D0232/issue266); the code refuses nowhere at write time - write.rs:688-760 (append_result_locked) and write.rs:1146-1199 (append_gate_result_locked) write the RAN line when --evidence is given and otherwise land the result, and guards.rs:4046 (guard 52 evidence-cited) fails the tree afterwards. Observed 2026-09-10 recording sprint 649 under D0425: the RECORDER subagent ran append-gate-result --gate ucaCarriesItsEvidenceClassImplementGate without --evidence (the gate's Test declares method=test), the result landed, the Stop hook went red at two consecutive turn boundaries and yielded obligationf76e7aba, and the subagent - told to stop on a refusal, having received none - appended a second result with the receipt, leaving R1 receiptless and R2 receipted. A refused write is recoverable; a landed one cost a red-yield obligation, a hand edit of a ceremony record, and a control that the census now reads as having blocked nothing. Known positive: this file at that moment. Known negative: sprint 648's ImplementGate, recorded with --evidence, passed the guard first time.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcReceiptlessResultIsRefusedAtWrite to issue448;
 }

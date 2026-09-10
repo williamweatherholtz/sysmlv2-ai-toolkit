@@ -40,9 +40,10 @@ with two differences that matter:
 |---|---|---|
 | stpa1 | Read EL/EHZ in `engine-safety.sysml`; add a Hazard only if a control action exposes a loss no hazard covers | the hazard ids used |
 | stpa2 | `keel show control-structure .` (and `stpa-diagram` if a human needs the picture); every `stepTwoGate` row must hold, or the run's first record is the clause that does not | the computed action list |
+| stpa2b | `keel show control-census .` (D0426): per control whose act it binds and its evidence class; its `ucaSummary` classes every recorded UCA `observed` / `code-read` from the edges and lists the constraints standing on a friction or hypothetical control as REMOVAL CANDIDATES (st115). A UCA for an act never observed against the actor kind it names is code-read by construction - write it, and never a person-binding control on it alone | the census read; the classes and candidates stpa5 reports |
 | stpa3 | For each action, all four UCA types in worst case: `provided`, `notProvided`, `wrongTimingOrder`, `stoppedTooSoonAppliedTooLong`. Each that can lead to a hazard → `UnsafeControlAction` part (context names the action verbatim) + dependency edge to the hazard. Considered-and-safe → one line in the run record | UCA parts; the safe lines |
 | stpa4 | Each UCA → `ControllerConstraint` + edge to the enforcing control in `control-map.sysml`, or `keel record issue` + edge to the Issue | constraints bound to controls or Issues |
-| stpa5 | Run record: a `Test` (analyze) with `ANALYSED: <names>` copied from the guard's NEXT TRANCHE line + passing result at HEAD | the guard's next line |
+| stpa5 | Run record: a `Test` (analyze) with `ANALYSED: <names>` copied from the guard's NEXT TRANCHE line, `EVIDENCE: <n> observed, <m> code-read` and `REMOVAL CANDIDATES: ...` copied from `ucaSummary` at the same tree, + passing result at HEAD | the guard's next line |
 
 ## Where the records live
 

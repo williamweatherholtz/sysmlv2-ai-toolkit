@@ -291,4 +291,78 @@ package EngineUcas {
     }
     // RAN: keel show control-structure . read 2026-09-09 (48 local actions); the six actions of the human->model, human->work and console->model edges walked through all four UCA types against keel-cli/src/main.rs verdict_channel_refusal, tty_gesture and consume_override, view/checks.rs quotes_conversational_words, view/mod.rs read_back_names, write.rs reject_decision_locked, serve.rs device tag and plan-bound approval, view/control_structure.rs channel_wired; four UCAs, four constraints, every constraint edged to a control or an Issue; keel validate . clean
     part stpaRun2R1 : TestResult { :>> id = "d909e4ab-84e6-4305-b797-ed6d952a580e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "e9c5a83f27566cdc0a2a78aa9d9e85c52847019e"; :>> judgedAt = "2026-09-09"; :>> judgedBy = "claudeOpus5"; }
+
+    // ── run 3 (stpa3, first under stpa2bCensus): the agent editing the deliverable - agentEditsDeliverable; ──
+    // ── the agent->deliverable edge walked in full. keel mediates none of the edit itself (issue394); ──
+    // ── what stands around it is the keystone at commit, the pre-bash hook, drift feedback afterwards. ──
+
+    part ucaDeliverableEditWeakensControl : UnsafeControlAction {
+        :>> id = "e0de5571-54c9-4309-9a6d-5f4bca12e976";
+        :>> title = "UCA-ED1: agentEditsDeliverable PROVIDED on the enforcement surface with no marked Decision in the same commit";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "agentEditsDeliverable on keel-cli/src/guards.rs, adherence.rs, .githooks/ or .github/workflows/*.yml, committed with no #ProspectiveChange or #SafetyChange Decision staged beside it.";
+        :>> statement = "The monitored edits the monitor: a guard's severity, a hook's command or a CI job can be relaxed by the actor it gates, and nothing in the edit itself records that a control changed - EHZ7. The keystone (guards.rs keystone_violations, line 1165) reads the marker from decision files STAGED in the commit, and CI's audit-adherence re-derives guard-set monotonicity from the tree, so the edit is refused at commit and again at push; issue236 is the code-read finding that the surface was modifiable by the monitored before the keystone covered it.";
+    }
+    dependency from ucaDeliverableEditWeakensControl to ehz7;
+
+    part ucaDeliverableEditRewrittenInTransit : UnsafeControlAction {
+        :>> id = "0bd969ef-8b89-456d-9b67-2bce16cc312a";
+        :>> title = "UCA-ED2: agentEditsDeliverable PROVIDED through a shell heredoc whose body carries a backslash";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "The agent writes source (Rust with escapes, a regex, a Windows path) through a Bash heredoc; the harness collapses a backslash pair before bash runs, even inside a quoted heredoc.";
+        :>> statement = "The file that lands is not the file the agent authored and the tool reports success, so a test run against it verifies something nobody wrote - EHZ4. It broke Rust files with literal newlines eight times in two days (issue372) while every retro said the item was already tracked; the pre-bash hook now DENIES the shape (D0309, control heredoc-backslash - the ledger holds its blocks, all on agent acts).";
+    }
+    dependency from ucaDeliverableEditRewrittenInTransit to ehz4;
+
+    part ucaDeliverableEditLandsPartially : UnsafeControlAction {
+        :>> id = "1e236e72-f038-4314-ab91-1668a1aaf146";
+        :>> title = "UCA-ED3: agentEditsDeliverable STOPPED TOO SOON - a patch whose anchor misses lands nowhere, or after the serialisation, and exits zero";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> ucaType = UcaType::stoppedTooSoonAppliedTooLong;
+        :>> context = "A scripted edit finds its anchor by string; the anchor occurs zero times or more than once; the script falls through to an append or a no-op and exits 0.";
+        :>> statement = "The computation is present in the file and never runs, or is absent and nothing said so - the receipt of the edit is the script's exit code, which is clean - EHZ4. Three times in one session (issue398, D0386); scripts/textpatch.py now refuses a zero or ambiguous anchor and writes nothing, but it is a tool the agent chooses, not a control at any boundary: a bare str.replace still lands nowhere silently, and no census control counts it.";
+    }
+    dependency from ucaDeliverableEditLandsPartially to ehz4;
+
+    part ccEnforcementEditCarriesItsDecision : ControllerConstraint {
+        :>> id = "6d506998-e60b-4ad7-9248-3edbb1fbf8a5";
+        :>> title = "CC-ED1: an edit to the enforcement surface is co-committed with the marked Decision that governs it, and CI re-derives that no control weakened without one";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> statement = "A commit touching guard source, hook config or a CI workflow carries a #ProspectiveChange or #SafetyChange Decision staged in the same commit (guard process-change, D0209 clause 2), and CI fails any push where guard-set or severity monotonicity broke without a signed Decision (ctlAuditAdherence). Bound to both; the census classes process-change evidenced (issue024) and ctlAuditAdherence hypothetical - no block and no incident - which is what a control that has never had to fire looks like from the ledger.";
+    }
+    dependency from ccEnforcementEditCarriesItsDecision to ucaDeliverableEditWeakensControl;
+    dependency from ccEnforcementEditCarriesItsDecision to gProcessChange;
+    dependency from ccEnforcementEditCarriesItsDecision to ctlAuditAdherence;
+    dependency from ccEnforcementEditCarriesItsDecision to issue236;
+
+    part ccSourceEditGoesThroughTheWriteTool : ControllerConstraint {
+        :>> id = "d996de90-3f98-4b72-9811-afd5cb2355aa";
+        :>> title = "CC-ED2: a heredoc body carrying a backslash is refused before bash runs; source goes through the Write tool and runs by path";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> statement = "hook pre-bash denies a heredoc whose body carries a backslash in every profile (D0309) - the one deny in an otherwise advisory hook. Bound to the hook rule heredoc-backslash, declared in control-map.sysml by this run so the census's ledger row and the control map name one control, and to issue372, the incident that recurred eight times before the deny existed.";
+    }
+    dependency from ccSourceEditGoesThroughTheWriteTool to ucaDeliverableEditRewrittenInTransit;
+    dependency from ccSourceEditGoesThroughTheWriteTool to ctlHeredocBackslash;
+    dependency from ccSourceEditGoesThroughTheWriteTool to issue372;
+
+    part ccPatchFailsWhenItsAnchorMisses : ControllerConstraint {
+        :>> id = "368e596d-fea7-483a-94ca-813a070fac1d";
+        :>> title = "CC-ED3: an anchored edit that finds its anchor zero times or more than once writes nothing and fails";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> statement = "scripts/textpatch.py holds the rule (replace_once, insert_after, insert_before; --probe is its known-positive and known-negative case, D0386/D0388), and no boundary enforces the choice of it. Bound to issue398 as the named gap: the control that would make this a constraint rather than a habit - pre-bash seeing a bare str.replace over a source path - does not exist.";
+    }
+    dependency from ccPatchFailsWhenItsAnchorMisses to ucaDeliverableEditLandsPartially;
+    dependency from ccPatchFailsWhenItsAnchorMisses to issue398;
+
+    verification stpaRun3 : Test {
+        :>> id = "a2b0c755-e43c-4910-9558-87f3b68f6c09";
+        :>> title = "stpa-self run 3 (2026-09-10) - the agent editing the deliverable: agentEditsDeliverable; first run under stpa2bCensus";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> method = VerificationMethod::analyze;
+        :>> procedureText = "ANALYSED: agentEditsDeliverable. FRAME: EHZ1-EHZ9 as recorded in engine-safety.sysml; no hazard added; the tranche is the one edge agent->deliverable, an action keel mediates at no point (issue394) - the structure has of it only the feedback deliverableDrift. CENSUS READ FIRST (stpa2b, D0426/D0428): 76 controls, 2 friction (accept:delegated-words, tap:unsigned - both dissolved to WARN lines, both binding the human), 64 hypothetical, 10 evidenced; heredoc-backslash was an evidenced hook rule with 4 blocks on agent acts that no constraint could bind because the control map did not declare it - this run declares it (ctlHeredocBackslash). CONSIDERED SAFE: agentEditsDeliverable notProvided (undone work stays ready on the frontier - the honest default, D0098); provided on the generated .claude/ surface instead of .engine/skills (done in this very session on stpa-self/SKILL.md: the claude-surface-drift guard reports the drift at the turn boundary and at commit, and sync-claude regenerates - gClaudeSurfaceDrift, exercised today); provided on source a done task's pass verified (deliverableDrift makes the task suspect in orient and ctlReverify re-stamps at HEAD - feedback, not refusal, and the honest one); wrongTimingOrder as an edit landing AFTER the pass that claims it (the unsafe act is the record, not the edit - ucaResultBoundToTheWrongTree, run 1, observed via issue375); wrongTimingOrder as a rebuild of the binary a running command holds (issue150/issue386: cargo fails loudly, keel suite refuses before it starts, the post-commit hook lands from its own copy, D0422 - no hazard); appliedTooLong as an edit session spanning a context compaction (the tree is the truth the gates read; a patch re-applied from a summary is refused by textpatch on a zero-count anchor). THREE UCAs recorded, three constraints: one bound to two controls (gProcessChange, ctlAuditAdherence) and issue236; one bound to a control declared by this run (ctlHeredocBackslash) and issue372; one bound to an Issue alone naming the gap (issue398 - anchor discipline is a tool, not a boundary). EVIDENCE: 5 observed, 11 code-read (ucaSummary at this tree: observed = ucaLandWithoutSuite/issue360, ucaResultBoundToTheWrongTree/issue375, ucaResultReceiptIsTestimony/issue374, ucaDeliverableEditRewrittenInTransit/issue372, ucaDeliverableEditLandsPartially/issue398 - the last two flagged discoveredInField by this run because each title reports an act that happened eight and three times; the 11 code-read are every other UCA, this run's UCA-ED1 among them). REMOVAL CANDIDATES: (no constraint) accept:delegated-words (friction; refused a correct act in issue397); (no constraint) tap:unsigned (friction; refused a correct act in issue447); ucaAcceptThenTextEdited -> gAcceptanceBindsToText (hypothetical); ucaRecordAcceptedBeforeFinal -> gAcceptanceBindsToText (hypothetical); ucaLandBeforeGate -> ctlPrePushBehind (hypothetical); ucaLandMergedTreeUngated -> ctlPrePushBehind (hypothetical); ucaResultHumanWordRecordedByAi -> gAttestationAuthority, gConfirmationAuthenticity (hypothetical); ucaDeliverableEditWeakensControl -> ctlAuditAdherence (hypothetical). The two friction rows are the human's ask (st115, 2026-09-10: guards that gatekeep the human and have not been abused should be reconsidered or dissolved), and every constraint-level candidate stands on a hypothetical control - a control with no incident and no block, which is not the same as a control that gatekeeps a person. NOT ANALYSED: the remaining 38 computed actions, grouped by edge, named by the stpa-currency guard until a run covers them.";
+    }
+    // RAN: keel show control-structure . read 2026-09-10 (48 local actions; stpa-currency NEXT TRANCHE: agent->deliverable); keel show control-census . read before any UCA was written (76 controls / 2 friction / 64 hypothetical / 10 evidenced; heredoc-backslash undeclared) and again after the records landed (ucaSummary observed 5, codeRead 11, 9 removal candidates, copied above - ucaResultHumanWordRecordedByAi is two rows, one per control); agentEditsDeliverable walked through all four UCA types against keel-cli/src/guards.rs keystone_violations, keel-cli/src/view/control_structure.rs agentEditsDeliverable, scripts/textpatch.py, the pre-bash heredoc deny (D0309) and the claude-surface-drift guard; three UCAs, three constraints, every constraint edged to a control or an Issue; keel validate . clean
+    part stpaRun3R1 : TestResult { :>> id = "6a1c2e8f-9b4d-4f7a-8c3e-2d5b7a9f1c4e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7674e12e56a2886094d0849917d7e29bfc9e8627"; :>> judgedAt = "2026-09-10"; :>> judgedBy = "claudeOpus5"; }
 }

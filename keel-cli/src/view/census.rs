@@ -32,7 +32,7 @@
 //! line from before 2026-09-10 names no control, so a block there is counted `unattributed`, never
 //! credited to a control it did not name.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::json::Json;
@@ -355,6 +355,17 @@ fn declared_controls(model: &Model) -> Vec<ControlDecl> {
                 aliases: vec![name.clone()],
                 refusal_issues: Vec::new(),
             });
+        } else if let Some(h) = title.strip_prefix("hook-rule: ") {
+            // a harness hook fires on the agent's tool call and on nobody else's act (D0426)
+            out.push(ControlDecl {
+                name: h.trim().to_string(),
+                kind: "hook-rule",
+                binds: Subject::Ai,
+                binds_rule: "a harness hook rule fires on the agent's own tool call; a human never issues one".to_string(),
+                state: "active".to_string(),
+                aliases: vec![name.clone()],
+                refusal_issues: Vec::new(),
+            });
         }
     }
     for (name, binds, state, rule, aliases) in WRITE_PATH_CHECKS {
@@ -455,6 +466,155 @@ fn row_json(r: &Row) -> Json {
     ])
 }
 
+// ---- the STPA join (dcUcaCarriesItsEvidenceClass, D0424) -------------------------------------------
+//
+// An UnsafeControlAction's evidence class is computed from the edges, never asserted in its text: it is
+// `observed` when a dependency edge from the UCA, or from a ControllerConstraint bound to it, reaches an
+// Issue whose incident happened (`discoveredInField = true`), and `code-read` otherwise. A constraint's
+// bound control (a control-map part) is looked up in the census rows, so a constraint standing on a
+// `friction` or `hypothetical` control is a REMOVAL CANDIDATE the stpa-self run record lists (st115).
+
+/// The evidence class of an `UnsafeControlAction`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UcaEvidence {
+    Observed,
+    CodeRead,
+}
+
+impl UcaEvidence {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Observed => "observed",
+            Self::CodeRead => "code-read",
+        }
+    }
+}
+
+/// What the join reads about one UCA: the constraints bound to it, every Issue reached from it or
+/// from those constraints (with the Issue's in-field flag), and the control-map parts the constraints
+/// bind.
+#[derive(Clone, Debug, Default)]
+pub struct UcaFacts {
+    pub name: String,
+    pub title: String,
+    pub constraints: Vec<String>,
+    pub issues: Vec<(String, bool)>,
+    pub controls: Vec<String>,
+}
+
+/// One UCA with its computed class and the census class of every control its constraints bind.
+#[derive(Clone, Debug)]
+pub struct UcaRow {
+    pub facts: UcaFacts,
+    pub class: UcaEvidence,
+    /// (control-map part, census control name, census class) for each bound control the census knows.
+    pub bound: Vec<(String, String, EvidenceClass)>,
+    /// bound controls the census does not know - a constraint edged to a part no census row names
+    pub unknown: Vec<String>,
+}
+
+/// Pure: classify each UCA and join its bound controls to the census rows.
+#[must_use]
+pub fn uca_rows(ucas: &[UcaFacts], rows: &[Row]) -> Vec<UcaRow> {
+    let mut out: Vec<UcaRow> = ucas
+        .iter()
+        .map(|u| {
+            let class = if u.issues.iter().any(|(_, in_field)| *in_field) { UcaEvidence::Observed } else { UcaEvidence::CodeRead };
+            let mut bound = Vec::new();
+            let mut unknown = Vec::new();
+            for part in &u.controls {
+                match rows.iter().find(|r| r.decl.name == *part || r.decl.aliases.iter().any(|a| a == part)) {
+                    Some(r) => bound.push((part.clone(), r.decl.name.clone(), r.class)),
+                    None => unknown.push(part.clone()),
+                }
+            }
+            UcaRow { facts: u.clone(), class, bound, unknown }
+        })
+        .collect();
+    out.sort_by(|a, b| a.facts.name.cmp(&b.facts.name));
+    out
+}
+
+/// The constraints standing on a control the census classes friction or hypothetical: the run record's
+/// REMOVAL CANDIDATE list, one line per (constraint, control).
+#[must_use]
+pub fn uca_removal_candidates(ucas: &[UcaRow], rows: &[Row]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut bound: BTreeSet<&str> = BTreeSet::new();
+    for u in ucas {
+        for (part, control, class) in &u.bound {
+            bound.insert(control.as_str());
+            if *class != EvidenceClass::Evidenced {
+                out.push(format!("{} -> {part} = {control} ({}) via {}", u.facts.name, class.label(), u.facts.constraints.join(",")));
+            }
+        }
+    }
+    // A friction control (its only record is gatekeeping a person, D0426) is a candidate whether or not
+    // an analysis ever stood a constraint on it - the human's ask names the control, not the UCA.
+    for r in rows.iter().filter(|r| r.class == EvidenceClass::Friction && !bound.contains(r.decl.name.as_str())) {
+        out.push(format!("(no constraint) {} (friction; {})", r.decl.name, r.basis));
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// The UCAs and their constraint/Issue/control edges as the tree records them.
+fn uca_facts(model: &Model) -> Vec<UcaFacts> {
+    let in_field = |issue: &str| model.items.get(issue).is_some_and(|i| i.type_name == "Issue" && i.attrs.get("discoveredInField").is_some_and(|f| f.trim() == "true"));
+    let is_issue = |n: &str| model.items.get(n).is_some_and(|i| i.type_name == "Issue");
+    let is_control = |n: &str| model.items.get(n).is_some_and(|i| i.type_name == "SystemSafetyConstraint");
+    let mut out = Vec::new();
+    for (name, info) in &model.items {
+        if info.type_name != "UnsafeControlAction" {
+            continue;
+        }
+        let mut facts = UcaFacts { name: name.clone(), title: info.attrs.get("title").cloned().unwrap_or_default(), ..UcaFacts::default() };
+        for e in model.edges.iter().filter(|e| e.kind == "dependency" && e.from == *name) {
+            if is_issue(&e.to) {
+                facts.issues.push((e.to.clone(), in_field(&e.to)));
+            }
+        }
+        for cc in model.edges.iter().filter(|e| e.kind == "dependency" && e.to == *name && model.items.get(&e.from).is_some_and(|i| i.type_name == "ControllerConstraint")) {
+            facts.constraints.push(cc.from.clone());
+            for e in model.edges.iter().filter(|e| e.kind == "dependency" && e.from == cc.from) {
+                if is_issue(&e.to) {
+                    facts.issues.push((e.to.clone(), in_field(&e.to)));
+                } else if is_control(&e.to) {
+                    facts.controls.push(e.to.clone());
+                }
+            }
+        }
+        facts.constraints.sort();
+        facts.issues.sort();
+        facts.issues.dedup();
+        facts.controls.sort();
+        facts.controls.dedup();
+        out.push(facts);
+    }
+    out
+}
+
+fn uca_json(u: &UcaRow) -> Json {
+    Json::Obj(vec![
+        ("uca".to_string(), Json::s(u.facts.name.clone())),
+        ("title".to_string(), Json::s(u.facts.title.clone())),
+        ("evidenceClass".to_string(), Json::s(u.class.label().to_string())),
+        ("constraints".to_string(), Json::Arr(u.facts.constraints.iter().map(|c| Json::s(c.clone())).collect())),
+        ("issues".to_string(), Json::Arr(u.facts.issues.iter().map(|(i, f)| Json::Obj(vec![("issue".to_string(), Json::s(i.clone())), ("inField".to_string(), Json::Bool(*f))])).collect())),
+        (
+            "boundControls".to_string(),
+            Json::Arr(
+                u.bound
+                    .iter()
+                    .map(|(part, control, class)| Json::Obj(vec![("part".to_string(), Json::s(part.clone())), ("control".to_string(), Json::s(control.clone())), ("evidenceClass".to_string(), Json::s(class.label().to_string()))]))
+                    .collect(),
+            ),
+        ),
+        ("unknownControls".to_string(), Json::Arr(u.unknown.iter().map(|c| Json::s(c.clone())).collect())),
+    ])
+}
+
 /// `keel show control-census [ROOT]`.
 ///
 /// # Errors
@@ -465,6 +625,11 @@ pub fn control_census(root: &Path) -> Result<String, ViewError> {
     let issues = issue_facts(&model);
     let ledger = std::fs::read_to_string(root.join(".keel").join("metrics").join("hooks.jsonl")).unwrap_or_default();
     let (rows, unattributed, event_fires) = census_rows(decls, &ledger, &issues);
+    let ucas = uca_rows(&uca_facts(&model), &rows);
+    let uca_count = |c: UcaEvidence| ucas.iter().filter(|u| u.class == c).count();
+    // an evidenced control no ControllerConstraint stands on: the UCA nobody has analysed yet
+    let bound_parts: BTreeSet<&str> = ucas.iter().flat_map(|u| u.bound.iter().map(|(_, c, _)| c.as_str())).collect();
+    let evidenced_without_uca: Vec<Json> = rows.iter().filter(|r| r.class == EvidenceClass::Evidenced && !bound_parts.contains(r.decl.name.as_str())).map(|r| Json::s(r.decl.name.clone())).collect();
     let count = |c: EvidenceClass| rows.iter().filter(|r| r.class == c).count();
     let observed_total = issues.iter().filter(|i| i.in_field).count();
     let candidates: Vec<Json> = rows
@@ -485,6 +650,15 @@ pub fn control_census(root: &Path) -> Result<String, ViewError> {
         ])),
         ("removalCandidates".to_string(), Json::Arr(candidates)),
         ("controls".to_string(), Json::Arr(rows.iter().map(row_json).collect())),
+        ("ucaSummary".to_string(), Json::Obj(vec![
+            ("note".to_string(), Json::s("every UnsafeControlAction's evidence class COMPUTED from its edges (dcUcaCarriesItsEvidenceClass, D0424): observed when a dependency edge from the UCA or from a ControllerConstraint bound to it reaches an Issue with discoveredInField = true, code-read otherwise; a constraint standing on a friction or hypothetical control is a removal candidate the stpa-self run record lists (st115); an evidenced control no constraint stands on is the UCA not yet analysed".to_string())),
+            ("ucas".to_string(), Json::Int(i64::try_from(ucas.len()).unwrap_or(i64::MAX))),
+            ("observed".to_string(), Json::Int(i64::try_from(uca_count(UcaEvidence::Observed)).unwrap_or(i64::MAX))),
+            ("codeRead".to_string(), Json::Int(i64::try_from(uca_count(UcaEvidence::CodeRead)).unwrap_or(i64::MAX))),
+            ("removalCandidates".to_string(), Json::Arr(uca_removal_candidates(&ucas, &rows).into_iter().map(Json::s).collect())),
+            ("evidencedWithoutUca".to_string(), Json::Arr(evidenced_without_uca)),
+        ])),
+        ("ucas".to_string(), Json::Arr(ucas.iter().map(uca_json).collect())),
         ("eventFires".to_string(), Json::Obj(event_fires.iter().map(|(k, v)| (k.clone(), Json::Int(i64::try_from(*v).unwrap_or(i64::MAX)))).collect())),
     ])
     .dump())
@@ -494,8 +668,67 @@ pub fn control_census(root: &Path) -> Result<String, ViewError> {
 mod tests {
     use super::*;
 
+    fn uca(name: &str, issues: &[(&str, bool)], controls: &[&str]) -> UcaFacts {
+        UcaFacts {
+            name: name.into(),
+            title: String::new(),
+            constraints: vec![format!("cc{name}")],
+            issues: issues.iter().map(|(i, f)| ((*i).to_string(), *f)).collect(),
+            controls: controls.iter().map(|c| (*c).to_string()).collect(),
+        }
+    }
+
+    /// Probe pair (D0388): a UCA whose constraint reaches an in-field Issue classes observed; one that
+    /// reaches no Issue classes code-read - and a code-read Issue does not make it observed.
+    #[test]
+    fn a_uca_reaching_an_in_field_issue_is_observed_and_one_reaching_none_is_code_read() {
+        let rows = uca_rows(&[uca("ucaA", &[("issue9", true)], &[]), uca("ucaB", &[], &[]), uca("ucaC", &[("issue8", false)], &[])], &[]);
+        let class = |n: &str| rows.iter().find(|u| u.facts.name == n).map(|u| u.class).expect("row");
+        assert_eq!(class("ucaA"), UcaEvidence::Observed);
+        assert_eq!(class("ucaB"), UcaEvidence::CodeRead);
+        assert_eq!(class("ucaC"), UcaEvidence::CodeRead);
+    }
+
+    /// A constraint standing on a hypothetical control is a removal candidate; one on an evidenced
+    /// control is not; a control the census does not know is reported unknown, never silently dropped.
+    #[test]
+    fn a_constraint_on_a_hypothetical_control_is_a_removal_candidate() {
+        let issues = [
+            IssueFacts { name: "issue1".into(), text: "the acceptance-binds-to-text guard could miss a rebinding".into(), in_field: false },
+            IssueFacts { name: "issue2".into(), text: "a script stamped a verdict past the ceremony guard".into(), in_field: true },
+        ];
+        let mut hyp = guard("acceptance-binds-to-text");
+        hyp.aliases.push("gAcceptanceBindsToText".into());
+        let mut evd = guard("ceremony");
+        evd.aliases.push("gCeremony".into());
+        let (rows, _, _) = census_rows(vec![hyp, evd], "", &issues);
+        let ucas = uca_rows(&[uca("ucaX", &[], &["gAcceptanceBindsToText"]), uca("ucaY", &[], &["gCeremony", "gNobody"])], &rows);
+        let cands = uca_removal_candidates(&ucas, &rows);
+        assert_eq!(cands.len(), 1, "{cands:?}");
+        assert!(cands[0].starts_with("ucaX -> gAcceptanceBindsToText = acceptance-binds-to-text (hypothetical)"), "{}", cands[0]);
+        let y = ucas.iter().find(|u| u.facts.name == "ucaY").expect("ucaY");
+        assert_eq!(y.unknown, vec!["gNobody".to_string()]);
+        assert_eq!(y.bound.len(), 1);
+    }
+
     fn guard(name: &str) -> ControlDecl {
         ControlDecl { name: name.to_string(), kind: "guard", binds: Subject::Either, binds_rule: String::new(), state: "active".to_string(), aliases: Vec::new(), refusal_issues: Vec::new() }
+    }
+
+    /// Probe pair (D0388): a friction control no constraint binds IS a candidate (the human's ask names
+    /// the control); an evidenced control no constraint binds is NOT.
+    #[test]
+    fn a_friction_control_no_constraint_binds_is_still_a_removal_candidate() {
+        let issues = [IssueFacts { name: "issue9".into(), text: "a script stamped a verdict past the ceremony guard".into(), in_field: true }];
+        let mut fric = guard("accept:delegated-words");
+        fric.binds = Subject::Human;
+        let mut evd = guard("ceremony");
+        evd.aliases.push("gCeremony".into());
+        let ledger = r#"{"event":"refused","decision":"block","control":"accept:delegated-words","actorKind":"human"}"#;
+        let (rows, _, _) = census_rows(vec![fric, evd], ledger, &issues);
+        let cands = uca_removal_candidates(&uca_rows(&[], &rows), &rows);
+        assert_eq!(cands.len(), 1, "{cands:?}");
+        assert!(cands[0].starts_with("(no constraint) accept:delegated-words (friction;"), "{}", cands[0]);
     }
 
     /// Probe pair, chosen before any tree was read (D0388): a guard whose only Issue is code-read and

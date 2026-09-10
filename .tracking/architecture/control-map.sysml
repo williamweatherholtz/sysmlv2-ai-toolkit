@@ -78,6 +78,7 @@ package ControlMap {
     part ctlOverrideObligation : SystemSafetyConstraint { :>> id = "8f6f8fc1-f27c-41d0-91f1-f203b74a3e43"; :>> title = "control: ctlOverrideObligation"; :>> createdAt = "2026-08-29"; :>> createdBy = "claudeOpus5"; :>> statement = "A protected-surface write unlock is single-use, path-bound, and its consumption RECORDS a tracked obligation; a failed obligation write leaves a named recovery breadcrumb rather than passing silently (keel override, D0176/issue207)."; }
     part ctlFireLedger : SystemSafetyConstraint { :>> id = "b8c675a6-c8f7-4227-b5dd-e88708d02235"; :>> title = "control: ctlFireLedger"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every enforcement fire leaves a counted machine-local line; the report computes over it (D0180)"; }
     part ctlReverify : SystemSafetyConstraint { :>> id = "e54d5849-5927-46f5-ba9a-b14aebf60c9b"; :>> title = "control: ctlReverify"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Drift-suspect reproducible evidence re-runs at HEAD and re-stamps honestly (keel reverify, D0101)"; }
+    part ctlHeredocBackslash : SystemSafetyConstraint { :>> id = "6f6f3ae8-ac0e-43b0-a650-25bbb012dffe"; :>> title = "hook-rule: heredoc-backslash"; :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5"; :>> statement = "A Bash heredoc whose body carries a backslash is DENIED before bash runs, in every profile - the harness collapses the pair and the source that lands is not the source authored (hook pre-bash, D0309/issue372). Declared here by stpa-self run 3 so the ledger's evidenced row and the control map name one control; the census reads a `hook-rule:` title as binding the agent's act alone."; }
 
     // ---- constraint -> hazard discharge edges (plain base-SysML dependencies) ----
     dependency from gActors to ehz3;
@@ -145,4 +146,5 @@ package ControlMap {
     dependency from ctlReleaseGateJob to ehz9;
     dependency from ctlFireLedger to ehz5;
     dependency from ctlReverify to ehz8;
+    dependency from ctlHeredocBackslash to ehz4;
 }
