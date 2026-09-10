@@ -46,6 +46,7 @@ package ControlMap {
     part gImpossibleEvidenceDate : SystemSafetyConstraint { :>> id = "ae93f00d-0727-48b5-b59d-25642bd23072"; :>> title = "guard: impossible-evidence-date"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "No judgment predates the commit it claims to judge. ENFORCED BY guard `impossible-evidence-date`."; }
     part gIdentityPresent : SystemSafetyConstraint { :>> id = "adc75f2f-dba3-4e4b-ae3a-fffc82c5010c"; :>> title = "guard: identity-present"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every tracked item carries an id. ENFORCED BY guard `identity-present`."; }
     part gIdentityWellFormed : SystemSafetyConstraint { :>> id = "be225c0b-a843-4045-abe7-381c2ecd1631"; :>> title = "guard: identity-well-formed"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every id is a well-formed v4 UUID. ENFORCED BY guard `identity-well-formed`."; }
+    part gIdIsAUuid : SystemSafetyConstraint { :>> id = "27a4e369-8e8a-49b7-8384-63cc521d9a76"; :>> title = "guard: id-is-a-uuid"; :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5"; :>> statement = "An id on a record dated on/after 2026-09-10, or on a line added in the working tree, is an RFC 4122 v4 UUID - the shape the write API emits; earlier and undated ids that fail it are counted as history, never enumerated. ENFORCED BY guard `id-is-a-uuid` (D0430/issue454). The v4 claim gIdentityWellFormed made was enforced by nothing until this guard: identity-well-formed checks 8-4-4-4-12 of [0-9a-z]."; }
     part gToolReference : SystemSafetyConstraint { :>> id = "bdca2a6d-7645-4b00-9fce-f0564825c43c"; :>> title = "guard: tool-reference"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "No doc names a deleted tool. ENFORCED BY guard `tool-reference`."; }
     part gScaffoldPlaceholder : SystemSafetyConstraint { :>> id = "4ab75541-5e0a-4ecf-871b-cb4b235d9b28"; :>> title = "guard: scaffold-placeholder"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "No unfilled scaffold text passes as a recorded judgment. ENFORCED BY guard `scaffold-placeholder`."; }
     part gClaudeSurfaceDrift : SystemSafetyConstraint { :>> id = "565274ff-68c3-4543-9b7d-c169459f90f3"; :>> title = "guard: claude-surface-drift"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "The keel-owned enforcement surface matches this binary's generator. ENFORCED BY guard `claude-surface-drift`."; }
@@ -120,6 +121,7 @@ package ControlMap {
     dependency from gImpossibleEvidenceDate to ehz4;
     dependency from gIdentityPresent to ehz6;
     dependency from gIdentityWellFormed to ehz6;
+    dependency from gIdIsAUuid to ehz6;
     dependency from gToolReference to ehz8;
     dependency from gScaffoldPlaceholder to ehz4;
     dependency from gClaudeSurfaceDrift to ehz7;

@@ -337,6 +337,53 @@ pub(crate) fn unnamed_resolutions(root: &Path, cutoff: &str) -> Result<UnnamedRe
     Ok((scanned, forward, historical))
 }
 
+/// D0430 / issue454: every item's id classed against the RFC 4122 v4 shape the write API emits.
+///
+/// `forward` is the guard's violations - items whose recorded date (`judgedAt`, `createdAt`,
+/// `saidAt`, `acceptedAt`, first present) is on or after `cutoff` and whose id is not v4 - as
+/// `(item, file, id, date)`. The two `history_*` counts are the ids that fail the shape on records
+/// dated before the cutoff or carrying no date at all, hex-but-not-v4 (v5s, sequence-shaped ids)
+/// apart from not-hex (mnemonic suffixes, typed ids): counted, never enumerated (D0261), because an
+/// id is immutable (section 1.3) and a list of 5,600 would be the migration nobody asked for.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct IdShapeCensus {
+    pub scanned: usize,
+    pub forward: Vec<(String, String, String, String)>,
+    pub history_not_hex: usize,
+    pub history_hex_not_v4: usize,
+}
+
+/// The census over the model at `root`.
+///
+/// # Errors
+/// Propagates model-build failures.
+pub(crate) fn id_shape_census(root: &Path, cutoff: &str) -> Result<IdShapeCensus, ViewError> {
+    let model = Model::build(root)?;
+    Ok(id_shape_census_of(model.items.iter().map(|(n, i)| (n.as_str(), i)), cutoff))
+}
+
+fn id_shape_census_of<'a>(items: impl Iterator<Item = (&'a str, &'a ItemInfo)>, cutoff: &str) -> IdShapeCensus {
+    let mut out = IdShapeCensus::default();
+    for (name, info) in items {
+        let Some(id) = info.attrs.get("id") else { continue };
+        out.scanned += 1;
+        if crate::guards::is_v4_uuid(id) {
+            continue;
+        }
+        let date = ["judgedAt", "createdAt", "saidAt", "acceptedAt"]
+            .iter()
+            .find_map(|k| info.attrs.get(*k))
+            .map(|d| d.chars().take(10).collect::<String>());
+        match date {
+            Some(d) if d.as_str() >= cutoff => out.forward.push((name.to_string(), info.file.clone(), id.clone(), d)),
+            _ if crate::guards::uuid_hex_shaped(id) => out.history_hex_not_v4 += 1,
+            _ => out.history_not_hex += 1,
+        }
+    }
+    out.forward.sort();
+    out
+}
+
 /// The directories whose `.sysml` files ARE the model.
 ///
 /// Authored instances live in `.tracking` and in the `.engine` INSTANCE dirs. Parsing is syntactic
@@ -5831,6 +5878,44 @@ verification storyDoD : Test {{ :>> method = VerificationMethod::test; :>> proce
         let recorded: HashSet<String> = std::iter::once("enabler".to_string()).collect();
         assert_eq!(inversion_pairs(&ready, &recorded), vec![("cosmetic".to_string(), "urgent".to_string(), "High".to_string())]);
         assert_eq!(inversion_pairs(&ready, &HashSet::new()).len(), 2);
+    }
+
+    #[test]
+    fn id_shape_census_fails_the_two_dated_on_or_after_the_cutoff_and_counts_the_rest() {
+        // D0430 / issue454: one v4 id, one hex-but-not-v4 (variant nibble 1), the typed id the
+        // verifier wrote (`eh5h6i7g-...`), one pre-cutoff typed id and one undated non-v4 - exactly
+        // the two dated on/after the cutoff are violations; the other two are counted by class.
+        let dir = std::env::temp_dir().join(format!("keel_idcensus_{}", std::process::id()));
+        std::fs::remove_dir_all(&dir).ok();
+        let tracking = dir.join(".tracking");
+        std::fs::create_dir_all(&tracking).unwrap();
+        std::fs::write(
+            tracking.join("m.sysml"),
+            concat!(
+                "package P {\n",
+                "    part okV4 : Issue { :>> id = \"5a6bb71c-66d8-497b-90c1-0b544f47c758\"; :>> createdAt = \"2026-09-10\"; }\n",
+                "    part hexNotV4 : Issue { :>> id = \"0069b38f-a2cd-44f8-1750-8c6ea975cd34\"; :>> createdAt = \"2026-09-11\"; }\n",
+                "    part typedToday : Issue {\n",
+                "        :>> id = \"eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d\";\n",
+                "        :>> createdAt = \"2026-09-10\";\n",
+                "    }\n",
+                "    part typedBefore : Issue { :>> id = \"a608di4d-1f56-4c8a-bc91-1f48f5i4h111\"; :>> createdAt = \"2026-06-01\"; }\n",
+                "    part undatedHex : Issue { :>> id = \"005f7385-0a6e-5aea-a0a5-68a8287434ee\"; }\n",
+                "}\n"
+            ),
+        )
+        .unwrap();
+        let c = id_shape_census(&dir, "2026-09-10").unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(c.scanned, 5);
+        assert_eq!(
+            c.forward,
+            vec![
+                ("hexNotV4".to_string(), ".tracking/m.sysml".to_string(), "0069b38f-a2cd-44f8-1750-8c6ea975cd34".to_string(), "2026-09-11".to_string()),
+                ("typedToday".to_string(), ".tracking/m.sysml".to_string(), "eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d".to_string(), "2026-09-10".to_string()),
+            ]
+        );
+        assert_eq!((c.history_not_hex, c.history_hex_not_v4), (1, 1));
     }
 
     #[test]

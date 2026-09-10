@@ -1593,6 +1593,43 @@ pub fn unit_extras_present(root: &Path) -> GuardReport {
 
 #[cfg(test)]
 mod parallel_tests {
+    use super::{added_non_v4_ids, is_v4_uuid, non_v4_ids_in, uuid_hex_shaped, uuid_shaped};
+
+    /// D0430/issue454: the known positive is an id the write API emitted this session; the known
+    /// negatives are the verifier's typed id (shape only), a v5 and a sequence-shaped hex id.
+    #[test]
+    fn is_v4_uuid_accepts_the_api_shape_and_refuses_shape_alone() {
+        // known positive: an id add-task wrote this session; known negatives: the verifier's typed id
+        // (shaped, not hex), a v5, a wrong variant nibble, uppercase hex.
+        assert!(is_v4_uuid("5a6bb71c-66d8-497b-90c1-0b544f47c758"));
+        assert!(uuid_shaped("eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d"));
+        assert!(!is_v4_uuid("eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d"));
+        assert!(!is_v4_uuid("005f7385-0a6e-5aea-a0a5-68a8287434ee"));
+        assert!(!is_v4_uuid("0069b38f-a2cd-44f8-1750-8c6ea975cd34"));
+        assert!(!is_v4_uuid("5A6BB71C-66D8-497B-90C1-0B544F47C758"));
+        assert!(uuid_hex_shaped("005f7385-0a6e-5aea-a0a5-68a8287434ee"));
+        assert!(!uuid_hex_shaped("eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d"));
+    }
+
+    #[test]
+    fn added_non_v4_ids_reads_only_added_lines_of_the_diff() {
+        let diff = concat!(
+            "diff --git a/.tracking/x.sysml b/.tracking/x.sysml\n",
+            "--- a/.tracking/x.sysml\n",
+            "+++ b/.tracking/x.sysml\n",
+            "@@ -1,0 +2,3 @@\n",
+            "+    part a : Issue { :>> id = \"5a6bb71c-66d8-497b-90c1-0b544f47c758\"; }\n",
+            "+    part b : Issue { :>> id = \"eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d\"; }\n",
+            "+    // :>> id = \"zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz\" in a comment is not an id\n",
+            "-    part c : Issue { :>> id = \"a608di4d-1f56-4c8a-bc91-1f48f5i4h111\"; }\n",
+        );
+        assert_eq!(added_non_v4_ids(diff), vec![(".tracking/x.sysml".to_string(), "eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d".to_string())]);
+        assert!(added_non_v4_ids("").is_empty());
+        // an untracked file is scanned whole, comments skipped
+        let fresh = "package Q {\n    // :>> id = \"zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz\"\n    part u : Issue { :>> id = \"0069b38f-a2cd-44f8-1750-8c6ea975cd34\"; }\n    part v : Issue { :>> id = \"5a6bb71c-66d8-497b-90c1-0b544f47c758\"; }\n}\n";
+        assert_eq!(non_v4_ids_in(".tracking/new.sysml", fresh), vec![(".tracking/new.sysml".to_string(), "0069b38f-a2cd-44f8-1750-8c6ea975cd34".to_string())]);
+    }
+
     /// dcGuardsRunInParallelAndTimed: the reports come back in `GUARD_NAMES` order, one per enforced
     /// guard, with every inactive one present as its NOT ACTIVE report - exactly what the serial loop
     /// returned. Run against this repository, whose activation set is the real one; a thread finishing
@@ -3352,8 +3389,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 68] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step"];
+pub const GUARD_NAMES: [&str; 69] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -3914,6 +3951,106 @@ pub fn identity_well_formed(root: &Path) -> GuardReport {
         }
     }
     GuardReport { name: "identity-well-formed", scanned, warnings: Vec::new(), violations }
+}
+
+/// Guard 69: an id written from the cutoff on, or added in the working tree, is a v4 UUID (D0430 / issue454).
+///
+/// Guard 38 checks an id is SHAPED like a UUID - `[0-9a-z]` groups - and the control map claimed
+/// "every id is a well-formed v4 UUID" on its strength. On 2026-09-10 a verifier subagent hand-wrote
+/// six `TestResult`s around the write API with ids such as `eh5h6i7g-8f9e-0j1h-2i3d-4e5f6g7h8i9d`,
+/// and validate and all 68 guards accepted them. `write::gen_uuid` emits RFC 4122 v4 and every id
+/// dated that day in the tree is v4, so the v4 shape is the fingerprint that separates an API-written
+/// record from a typed one.
+///
+/// TWO FORWARD CLAUSES, ONE `HISTORY` LINE. (1) An item whose recorded date is on or after the cutoff
+/// and whose id is not v4 is a violation. (2) Any non-v4 id on a line ADDED in the working tree
+/// relative to HEAD is a violation whatever its date or lack of one - the fabrication issue454 saw
+/// was staged, not committed, and an id that did not exist at HEAD is new no matter what it says
+/// about itself; this is the clause a date ratchet alone lacks (guard 36's first version exempted
+/// the defect it existed for). Everything else that fails the shape - 5,515 hex-but-not-v4 ids
+/// (v5s and sequence-shaped ids never typed by hand) and 88 not-hex ones (mnemonic suffixes, the
+/// earlier typed ids) on 2026-09-10 - is history, counted by class and never enumerated (D0261):
+/// identity is immutable (section 1.3), so none of them can be corrected. STATED RESIDUAL: a typed id
+/// that happens to satisfy the nibbles passes; the guard is a fingerprint, the write ledger (D0424) is
+/// the proof.
+#[must_use]
+pub fn id_is_a_uuid(root: &Path) -> GuardReport {
+    /// The day the write API's shape became binding on every id (D0430).
+    const CUTOFF: &str = "2026-09-10";
+    let census = match crate::view::id_shape_census(root, CUTOFF) {
+        Ok(c) => c,
+        Err(e) => {
+            return GuardReport { name: "id-is-a-uuid", scanned: 0, warnings: Vec::new(), violations: vec![format!("error building the model: {e}")] };
+        }
+    };
+    let mut violations = Vec::new();
+    let mut reported: HashSet<String> = HashSet::new();
+    for (item, file, id, date) in &census.forward {
+        reported.insert(id.clone());
+        violations.push(format!(
+            "{file}: {item} is dated {date} and its id \"{id}\" is not an RFC 4122 v4 UUID (8-4-4-4-12 lowercase hex, version nibble 4, variant in 89ab) - the write API emits v4, so a record dated on/after {CUTOFF} with another shape was typed around it (D0430/issue454)"
+        ));
+    }
+    // `git diff HEAD` lists no UNTRACKED file, and a new sprint record is exactly that - the probe
+    // (sprint 655) put a typed id in a new file and the diff clause counted it as history. Every line
+    // of an untracked `.sysml` under the model roots is an added line.
+    let diff = git_stdout(root, &["diff", "HEAD", "-U0", "--", ".tracking", ".engine"]);
+    let mut added = added_non_v4_ids(&diff);
+    for rel in git_stdout(root, &["ls-files", "--others", "--exclude-standard", "--", ".tracking", ".engine"]).lines() {
+        let rel = rel.trim();
+        if !std::path::Path::new(rel).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")) {
+            continue;
+        }
+        if let Ok(text) = crate::corpus::read_to_string(root.join(rel)) {
+            added.extend(non_v4_ids_in(rel, &text));
+        }
+    }
+    for (file, id) in added {
+        if reported.insert(id.clone()) {
+            violations.push(format!(
+                "{file}: id \"{id}\" is ADDED in the working tree and is not an RFC 4122 v4 UUID - an id that did not exist at HEAD is new whatever its record says, and the write API would have emitted v4 (D0430/issue454)"
+            ));
+        }
+    }
+    let history = census.history_not_hex + census.history_hex_not_v4;
+    let warnings = if history == 0 {
+        Vec::new()
+    } else {
+        vec![history_line(&format!(
+            "{history} ids on records dated before {CUTOFF} or carrying no date fail the v4 shape - {} hex but not v4 (v5s, sequence-shaped), {} not hex - immutable (section 1.3), counted not enumerated (D0261)",
+            census.history_hex_not_v4, census.history_not_hex
+        ))]
+    };
+    GuardReport { name: "id-is-a-uuid", scanned: census.scanned, warnings, violations }
+}
+
+/// `(file, id)` for every `:>> id = "..."` on an ADDED line of a unified diff whose value is not v4.
+/// Pure over the diff text so the clause is testable without a repository.
+fn added_non_v4_ids(diff: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut file = String::new();
+    for line in diff.lines() {
+        if let Some(rest) = line.strip_prefix("+++ ") {
+            file = rest.strip_prefix("b/").unwrap_or(rest).to_string();
+            continue;
+        }
+        if !line.starts_with('+') || line.starts_with("+++") {
+            continue;
+        }
+        out.extend(non_v4_ids_in(&file, &line[1..]));
+    }
+    out
+}
+
+/// `(file, id)` for every non-v4 `:>> id = "..."` in `text`, comment lines skipped.
+fn non_v4_ids_in(file: &str, text: &str) -> Vec<(String, String)> {
+    text.lines()
+        .map(str::trim_start)
+        .filter(|l| !l.starts_with("//"))
+        .flat_map(id_values)
+        .filter(|id| !is_v4_uuid(id))
+        .map(|id| (file.to_string(), id))
+        .collect()
 }
 
 /// Guard 39: a tool the LIVING doc surface references must EXIST (issue196).
@@ -5197,6 +5334,21 @@ pub(crate) fn uuid_shaped(v: &str) -> bool {
         })
 }
 
+/// 8-4-4-4-12 groups of lowercase hex - shaped AND hexadecimal, any version.
+pub(crate) fn uuid_hex_shaped(v: &str) -> bool {
+    let groups: Vec<&str> = v.split('-').collect();
+    groups.len() == 5
+        && [8usize, 4, 4, 4, 12].iter().zip(&groups).all(|(want, g)| {
+            g.len() == *want && g.chars().all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'))
+        })
+}
+
+/// An RFC 4122 version-4 UUID exactly as `write::gen_uuid` emits one: lowercase hex, version
+/// nibble `4`, variant nibble in `89ab` (D0430 / issue454). The fingerprint of an API-written id.
+pub(crate) fn is_v4_uuid(v: &str) -> bool {
+    uuid_hex_shaped(v) && v.as_bytes().get(14) == Some(&b'4') && matches!(v.as_bytes().get(19), Some(b'8' | b'9' | b'a' | b'b'))
+}
+
 /// `(name, type, 1-based line, body-up-to-the-next-declaration)` for each id-bearing declaration.
 ///
 /// The body stops at the NEXT declaration so a member can never borrow its sibling's id — the bug that
@@ -5347,6 +5499,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "release-checksums-published" => Some(release_checksums_published(root)), // hard (D0385/issue417) - a published binary with no published hash
         "wrapper-pin-checksummed" => Some(wrapper_pin_checksummed(root)), // WARNING-tier (D0385/issue418) - the pin moved, the wrapper table did not
         "plan-covers-step" => Some(plan_covers_step(root)), // hard (D0396) - a PLAN-COVERED acceptance whose plan no longer holds
+        "id-is-a-uuid" => Some(id_is_a_uuid(root)), // hard (D0430/issue454) - an id from the cutoff on, or added in the tree, is v4
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
