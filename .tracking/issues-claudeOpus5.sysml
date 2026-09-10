@@ -1732,4 +1732,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcTouchedCostIsMeasuredNotQuoted to issue444;
+
+    part issue445 : Issue {
+        :>> id = "7745f2a9-d6d0-47cc-ba9d-060832e19989";
+        :>> title = "A refused keel accept (or any refused write) leaves no trace, so whether an agent ever tried to accept under the human's authority is unanswerable";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The human asked, 2026-09-10, whether any agent has attempted to accept a Decision under their authority - the question that decides whether the delegated-acceptance refusals (ten-character minimum D0375, read-back D0289, gesture citation D0411) guard anything. The record cannot answer it. CHECK: keel-cli/src/main.rs verdict_channel_refusal (lines 4446-4502) refuses and returns; a grep of that span for ledger, append, write or metrics matches only comment text - a refused keel accept writes nothing anywhere. The same holds for every keel write path that refuses (append-result without a receipt, record decision with tool output in prose): the refusal is a stderr line and an exit code, and the process's own instrument for what its controls did - the fire-ledger .keel/metrics/hooks.jsonl - never hears of it. What CAN be read: 453 acceptances recorded by AI actors and 73 by the human across .engine/decisions (grep createdBy), every one of which passed the gate that stood at its time; the guards' origins are issue059 (a vigilance gap, not an acceptance), issue426 (a UCA found by code read in stpa-self run 2, no observed attempt) and issue397 (the gate refused EIGHT correct human acceptances). So the empirical record of these controls is: zero observed subversions, eight observed refusals of the human, and no instrument that could have counted the first. A control whose refusals leave no trace cannot be shown to do anything, and cannot be honestly removed either.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRefusalIsALedgerFact to issue445;
+
+    part issue446 : Issue {
+        :>> id = "d58e1a2e-9f9a-47c2-b581-b9d217b459b7";
+        :>> title = "The fire-ledger records every in-loop block as allow: hook_emit returns 0 for block, ledger_emit derives decision from exit - 1 block in 16 196 fires";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The fire-ledger records every in-loop block as an allow. CHECK: keel-cli/src/main.rs hook_emit (1027-1030) prints the hook's JSON and returns 0 for a decision of block exactly as for allow - Claude Code reads the verdict from the JSON, not the exit code - and ledger_emit (406-414) derives its decision field as allow when exit == 0. Read back from .keel/metrics/hooks.jsonl on this host: 16 196 fires, ONE block (config-change, the one handler that exits non-zero); stop 449 fires / 0 blocks, post-edit 1 977 / 0, pre-bash 11 099 / 0, pre-write 179 / 0 - while this very session was denied twice by pre-bash (heredoc backslash, D0309) and both fires appear as allow, exit 0. Every block count keel enforcement-report prints for those events is therefore structurally zero, and the question of how often each control fires, against which actor kind, and what it stopped - the question the human asked on 2026-09-10 - has no honest answer from the instrument built to give it (D0180, D0389). The commit tier is not in the ledger at all: .githooks/pre-commit, post-commit and pre-push reference no ledger, so the two guard refusals of 2026-09-09 (sprint-coverage, retro-backlog) exist only in a conversation transcript.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcRefusalIsALedgerFact to issue446;
 }
