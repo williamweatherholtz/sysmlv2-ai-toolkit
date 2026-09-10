@@ -1853,4 +1853,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcGuardPoolDispatchesLongestFirst to issue455;
+
+    part issue456 : Issue {
+        :>> id = "db593c07-52fc-42a3-bb0a-a66048727c7d";
+        :>> title = "The routing rig scores a turn that ran out of budget after intake as none - the sandbox that disallows Bash sends the agent hunting for intake's instrument, and release split 1 routed / 2 none on it";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The routing rig's second investigation of the release case (2026-09-10, after dcRoutingVerdictReadsTheWholeTurn made the scorer read the whole turn) again disagreed with itself: three samples of the prompt 'Time to make this obtainable by someone outside this machine, with a version that actually means something.' at three turns each gave ROUTED once and none twice ($3.78 measured, 39s wall; .keel/metrics/routing-investigation.json). Under D0381 that is a defect of the CHECK. WHAT THE JSON SHOWS: the routed sample's tools were Skill(intake), Skill(release), ToolSearch; both none samples were Skill(intake), ToolSearch, ToolSearch - every turn of the budget spent, the intended skill never reached, nothing wrong invoked. WHAT THE CHECK DOES TO CAUSE IT: the rig disallows Bash so a probe session cannot write to the tree, but intake's deployed procedure tells the agent to run keel record statement - so an agent that follows the declared prefix exactly finds its instrument gone, searches for a tool for the rest of the budget, and is scored none as if it had never intended the skill at all. The scorer cannot tell 'never reached' from 'cut off on the way': score() returns none for both, and --max-turns 3 leaves a prefix plus one search no room. The 2026-09-08 finding (issue415) was the scorer reading the first call; this one is the budget and the sandbox reading as the agent's choice. This is the class issue432 recorded on 2026-09-09 (3/3 none at 3 turns, prefix intake) with the CAUSE added: the sandbox removes the instrument the prefix's procedure names. RESOLVER: dcPrefixLeavesRoomForTheRoute, already tracked - a budget verdict apart from none, a 6-turn re-run, the transcript in --probe (D0388); its DoD should also name the disallowed-Bash cause when the re-run is made.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcPrefixLeavesRoomForTheRoute to issue456;
+
+    part issue457 : Issue {
+        :>> id = "1ba90748-70d7-4700-a10d-fc781edd884a";
+        :>> title = "A second resolver was added for a class already tracked - record issue shows nothing about the open Issues on the instrument the new description names";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "On 2026-09-10, sprint 656, the primary recorded issue456 (the routing rig scores a turn cut off by its budget after intake as none) and added a NEW backlog task as its resolver, dcRoutingRigTellsExhaustedFromNone, with a full DoD - when issue432, recorded 2026-09-09 on the same case (release), the same verdict pattern (3/3 none at 3 turns, prefix intake in every sample) and the same instrument (.engine/tools/routing_probe.py), already had dcPrefixLeavesRoomForTheRoute as its resolver with a DoD that names the same fix. The primary had read the backlog for the item's own history and the issue file for issue415, and did not read the open Issues on the check it was about to record against. The duplicate was found only because keel show priority listed dcPrefixLeavesRoomForTheRoute by a name that said the same thing; it was removed and the edge repointed before commit. Nothing in the write path shows a recorder what is already open on the instrument they name: record issue requires a resolver (D0077) but says nothing about the resolvers other open Issues already have, so the same class can be tracked twice with two resolvers that will both be built. Not in-field: found by the agent in its own work. RESOLVER: dcRecordIssueNamesOpenIssuesOnTheSameInstrument - record issue prints the open Issues whose text names a path or tool the new description names.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecordIssueNamesOpenIssuesOnTheSameInstrument to issue457;
 }
