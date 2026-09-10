@@ -209,8 +209,26 @@ pub fn gate_accepted(repo: &Path) -> bool {
     let Ok(rd) = std::fs::read_dir(repo.join(".engine").join("decisions")) else { return false };
     rd.flatten().any(|e| {
         let name = e.file_name().to_string_lossy().to_string();
-        name.starts_with("0421-") && std::fs::read_to_string(e.path()).is_ok_and(|t| t.contains("d0421AcceptR1"))
+        name.starts_with("0421-") && std::fs::read_to_string(e.path()).is_ok_and(|t| text_carries_acceptance(&t, "d0421"))
     })
+}
+
+/// Does a Decision file's text carry a PASSING first acceptance - the `part <dec>AcceptR1 : TestResult`
+/// declaration itself, with `outcome = VerdictKind::pass` in its body (pure).
+///
+/// Not a substring search for the token: D0421's own decision text names `d0421AcceptR1` as the thing
+/// that arms it, and the first cut matched that prose at record time - the gate armed itself on the
+/// sentence describing how it would be armed, and the post-commit hook's `land` then refused a push
+/// while the Decision was PROPOSED (issue435). Only the declaration is the acceptance.
+#[must_use]
+pub fn text_carries_acceptance(text: &str, dec: &str) -> bool {
+    let needle = format!("part {dec}AcceptR1 ");
+    let Some(pos) = text.find(&needle) else { return false };
+    let after = &text[pos..];
+    // `keel accept` writes the part on one line with no nested braces; its own `}` ends the body.
+    let body_end = after.find('}').unwrap_or(after.len());
+    let body = &after[..body_end];
+    body.contains(": TestResult") && body.contains("outcome = VerdictKind::pass")
 }
 
 /// One run of the set.
@@ -405,7 +423,7 @@ pub fn cmd(repo: &Path) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{failing_binaries, module_stem, names_stem, test_name, touched_tests};
+    use super::{failing_binaries, module_stem, names_stem, test_name, text_carries_acceptance, touched_tests};
 
     #[test]
     fn a_stem_is_the_module_a_path_names() {
@@ -443,6 +461,19 @@ mod tests {
         assert_eq!(got, vec!["land_gate".to_string(), "unrelated".to_string()]);
         // known negative: a module nothing names -> empty
         assert!(touched_tests(&tests, &["orient".to_string()], &[]).is_empty());
+    }
+
+    /// Known-positive: the shape `keel accept` writes. Known-negatives: the token named in the decision
+    /// prose (issue435, the live failure), a declared acceptance whose outcome is fail, and no token.
+    #[test]
+    fn arming_reads_the_acceptance_part_not_the_token_in_prose() {
+        let accepted = "package D { part d0421 : Decision { :>> decision = \"armed by d0421AcceptR1\"; }\n    part d0421AcceptR1 : TestResult { :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc\"; }\n}\n";
+        assert!(text_carries_acceptance(accepted, "d0421"));
+        let prose_only = "package D { part d0421 : Decision { :>> decision = \"once this Decision carries d0421AcceptR1 in its file\"; } }\n";
+        assert!(!text_carries_acceptance(prose_only, "d0421"));
+        let failed = "package D {\n    part d0421AcceptR1 : TestResult { :>> outcome = VerdictKind::fail; }\n}\n";
+        assert!(!text_carries_acceptance(failed, "d0421"));
+        assert!(!text_carries_acceptance("package D { }", "d0421"));
     }
 
     /// Known-positive: a capture in cargo's real order - every stdout result first, then stderr with

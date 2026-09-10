@@ -1622,4 +1622,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcLandNamesTheCiVerdictOfTheBase to issue434;
+
+    part issue435 : Issue {
+        :>> id = "341abbee-4a44-433e-ae37-bf3dc3d19253";
+        :>> title = "The touched-test refusal armed itself: the acceptance check matched the token in D0421's own prose";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The touched-test refusal armed itself at record time. gate_accepted in keel-cli/src/touched.rs tested whether the D0421 file CONTAINED the string d0421AcceptR1; D0421's own decision text names that token as the thing that will arm it ('once this Decision carries the human's acceptance (d0421AcceptR1 in its file)'), so the check read the sentence describing the arming as the arming. Observed on the first live use: the post-commit hook's keel land for 9d574f8 printed the 24-binary set and then, instead of the INERT line the proposed state owes, reached the own-image refusal (issue386) and did not push - the check that established it is the hook's output in the commit log, and the decision file's line 19 which is the only occurrence of the token. The class is a text-match standing in for an attestation: an acceptance is the DECLARED part `<dec>AcceptR1 : TestResult` with outcome pass, the shape keel accept writes, and nothing else - the same rule govern.rs already applies when it reads the acceptance's commit. While proposed, D0421's gate would have refused every hook-driven push once cargo was reachable; the own-image refusal masked it as the wrong error.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Critical;
+    }
+    #Resolves dependency from dcArmingReadsTheAcceptancePart to issue435;
+
+    part issue436 : Issue {
+        :>> id = "e99b9363-2bdb-469c-b6c6-fbbff99bcd6f";
+        :>> title = "The post-commit hook runs land from the image an armed touched run relinks";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The post-commit hook runs keel land from ./target/release/keel.exe - the very image cargo test --release relinks - so once D0421 is accepted every hook-driven push of a change that touches a named module would meet the own-image refusal (issue386) and not push, while a land run from a copy would run the set and push. Observed on 9d574f8 (the hook's land reached the refusal because of issue435, but the path is the same when legitimately armed): .githooks/post-commit chooses `keel` on PATH, else ./target/release/keel.exe, and never a copy. The control's own home cannot run the control. The fix is in the hook - copy the binary to a land-only image before running land - which is the enforcement surface (D0209 clause 2) and needs its co-committed marked Decision; it should land before D0421 is accepted, or the acceptance arms a refusal that fires on every hook push.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcHookLandRunsFromACopy to issue436;
 }

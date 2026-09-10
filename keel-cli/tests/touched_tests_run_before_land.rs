@@ -43,6 +43,12 @@ fn write(root: &Path, rel: &str, text: &str) {
 /// names it, committed and PUSHED so `origin/main` is the base the next push is measured from.
 /// `accepted` plants the D0421 acceptance token the refusal is armed by.
 fn fixture(tag: &str, accepted: bool) -> PathBuf {
+    fixture_with(tag, accepted, false)
+}
+
+/// `prose_names_token`: the Decision file (proposed, no acceptance part) whose decision TEXT names
+/// `d0421AcceptR1` - the live shape of D0421 at record time, which must NOT arm the gate (issue435).
+fn fixture_with(tag: &str, accepted: bool, prose_names_token: bool) -> PathBuf {
     let base = if cfg!(windows) { PathBuf::from("C:\\kt") } else { std::env::temp_dir() };
     let base = base.join(format!("tt{tag}{}", std::process::id() % 10_000));
     let _ = std::fs::remove_dir_all(&base);
@@ -53,10 +59,15 @@ fn fixture(tag: &str, accepted: bool) -> PathBuf {
     write(&root, "keel-cli/src/lib.rs", "pub mod widget;\n");
     write(&root, "keel-cli/src/widget.rs", "pub fn answer() -> u8 { 1 }\n");
     write(&root, "keel-cli/tests/widget_check.rs", "#[test]\nfn widget_answers() { assert_eq!(fake::widget::answer(), 1); }\n");
+    // A parseable package either way: every decisions-reading guard walks this directory, so an
+    // unparseable file would make the tree gate red for a reason that is not the one under test.
+    if prose_names_token {
+        write(&root, ".engine/decisions/0421-touchedTestsRunBeforeLand.sysml", "package Decision0421Fixture {\n    private import EngineWork::*;\n    part d0421 : Decision { :>> id = \"00000000-0000-4000-8000-000000000421\"; :>> title = \"fixture\"; :>> context = \"a fixture Decision whose prose names the acceptance token (issue435)\"; :>> decision = \"once this Decision carries d0421AcceptR1 in its file, land runs the set\"; :>> rationale = \"the token in prose must not read as the acceptance itself\"; :>> consequences = \"none; a fixture\"; :>> status = DecisionStatus::proposed; :>> createdBy = \"t\"; :>> createdAt = \"2026-09-09\"; }\n}\n");
+    }
     if accepted {
-        // A parseable package: every decisions-reading guard walks this directory, so an unparseable
-        // file would make the tree gate red for a reason that is not the one under test.
-        write(&root, ".engine/decisions/0421-touchedTestsRunBeforeLand.sysml", "// fixture: the acceptance token d0421AcceptR1 arms the refusal\npackage Decision0421Fixture { private import EngineWork::*; }\n");
+        // The acceptance is the DECLARED part with a passing outcome - the shape `keel accept` writes -
+        // never the token named in prose, which is what armed the gate at record time (issue435).
+        write(&root, ".engine/decisions/0421-touchedTestsRunBeforeLand.sysml", "package Decision0421Fixture {\n    private import EngineWork::*;\n    part d0421AcceptR1 : TestResult { :>> id = \"00000000-0000-4000-8000-000000000422\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"seed\"; :>> judgedAt = \"2026-09-09\"; :>> judgedBy = \"t\"; :>> createdBy = \"t\"; }\n}\n");
     }
     git(&root, &["init", "-q", "-b", "main", "."]);
     git(&root, &["config", "user.email", "t@example.invalid"]);
@@ -115,6 +126,21 @@ fn while_d0421_is_proposed_the_set_is_printed_and_the_push_is_not_refused() {
     assert!(out.contains("set [widget_check]") && out.contains("INERT"), "but the set is named and the state said: {out}");
     let receipt = std::fs::read_to_string(root.join(keel_cli::touched::RECEIPT)).expect("receipt written");
     assert!(receipt.contains("outcome = \"not-run\"") && receipt.contains("tests = [\"widget_check\"]"), "the receipt carries the set nothing ran: {receipt}");
+    let _ = std::fs::remove_dir_all(root.parent().expect("base"));
+}
+
+/// issue435: the Decision's own prose names the acceptance token; that is not an acceptance. The set is
+/// printed, nothing runs, nothing is refused - the same as a Decision that never mentions it.
+#[test]
+fn a_decision_whose_prose_names_the_token_does_not_arm_the_gate() {
+    let root = fixture_with("prose", false, true);
+    write(&root, "keel-cli/src/widget.rs", "pub fn answer() -> u8 { 2 }\n");
+    commit(&root, "widget moved, test stale, token in prose");
+    let (ok, out) = run(&root, &["land", "."]);
+    assert!(ok && out.contains("landed"), "prose is not an acceptance; nothing refuses: {out}");
+    assert!(out.contains("INERT"), "the state is said: {out}");
+    let receipt = std::fs::read_to_string(root.join(keel_cli::touched::RECEIPT)).expect("receipt written");
+    assert!(receipt.contains("outcome = \"not-run\""), "nothing ran: {receipt}");
     let _ = std::fs::remove_dir_all(root.parent().expect("base"));
 }
 
