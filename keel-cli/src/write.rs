@@ -35,6 +35,9 @@ pub enum WriteError {
     /// A prose field carries what looks like captured tool output rather than authored text
     /// (issue255): `(field, excerpt)`.
     InjectedToolOutput(String, String),
+    /// issue448: an AI-judged `method=test` result with no `--evidence` - the receipt guard 52 reads
+    /// at the turn boundary is owed at the WRITE. Carries the verb, so the caller can ledger it.
+    ReceiptOwed(String, String),
 }
 
 impl std::fmt::Display for WriteError {
@@ -49,6 +52,9 @@ impl std::fmt::Display for WriteError {
             Self::ActionDefNotFound(n) => write!(f, "action def not found: {n}"),
             Self::InsertionPointNotFound(n) => write!(f, "cannot find insertion point for task: {n}"),
             Self::GateNotFound(n) => write!(f, "gate not found: {n}"),
+            Self::ReceiptOwed(what, judge) => {
+                write!(f, "refusing to write: {what} is AI-judged (`{judge}`) and carries no --evidence.\n  An AI-judged method=test result records WHAT WAS RUN as its `// RAN:` receipt (D0232/issue266) -\n  pass --evidence '<the command you ran and what it printed>'. A human's word is the evidence and owes none.\n  Refused at the write (issue448): the turn-boundary guard used to be the only check, so the line landed.")
+            }
             Self::InjectedToolOutput(field, excerpt) => {
                 write!(f, "refusing to write: --{field} carries what looks like captured TOOL OUTPUT, not authored text.\n  near: {excerpt}\n  A governance record must state what someone actually wrote. This is how it gets in: a BACKTICK\n  inside a double-quoted shell argument is command substitution, so sh RUNS the command named in\n  your prose and substitutes its output into the field (issue255/D0223). Pass the text through a\n  file or a single-quoted heredoc rather than an interpolated shell argument.")
             }
@@ -581,26 +587,51 @@ pub fn record_obligation(root: &Path, slug: &str, title: &str, description: &str
     Ok(path)
 }
 
-/// True when `{task}DoD`'s declared method is `confirmation` — searched at package level and inside
-/// action defs, the two places a `DoD` verification lives.
-fn dod_method_is_confirmation(pkg: &Package, task_name: &str) -> bool {
-    let dod = format!("{task_name}DoD");
-    let is_conf = |v: &keel_parser::ast::Verification| {
-        v.name == dod
+/// True when the verification named `name` declares `method = <member>` — searched at package level
+/// and inside action defs, the two places a `DoD` or a ceremony gate lives. A string or bare-ident
+/// value counts when it contains the member name.
+fn verification_declares_method(pkg: &Package, name: &str, member: &str) -> bool {
+    let is_it = |v: &keel_parser::ast::Verification| {
+        v.name == name
             && v.attributes.iter().any(|a| {
                 a.name == "method"
                     && match &a.value {
-                        keel_parser::ast::Value::EnumLit { member, .. } => member == "confirmation",
-                        keel_parser::ast::Value::Str(s) | keel_parser::ast::Value::Ident(s) => s.contains("confirmation"),
+                        keel_parser::ast::Value::EnumLit { member: m, .. } => m == member,
+                        keel_parser::ast::Value::Str(s) | keel_parser::ast::Value::Ident(s) => s.contains(member),
                         _ => false,
                     }
             })
     };
     pkg.items.iter().any(|item| match item {
-        Item::Verification(v) => is_conf(v),
-        Item::ActionDef(def) => def.verifications.iter().any(is_conf),
+        Item::Verification(v) => is_it(v),
+        Item::ActionDef(def) => def.verifications.iter().any(is_it),
         _ => false,
     })
+}
+
+/// True when `{task}DoD`'s declared method is `confirmation`.
+fn dod_method_is_confirmation(pkg: &Package, task_name: &str) -> bool {
+    verification_declares_method(pkg, &format!("{task_name}DoD"), "confirmation")
+}
+
+/// issue448 write-layer check: a `method=test` result judged by an AI-kind (or unregistered) actor
+/// with no evidence is refused BEFORE the line is built. A registered human owes no receipt (their
+/// word is the evidence, D0232); outside a model tree or without a registry the guard owns it, as
+/// `refuse_ai_judgment` does. Returns the ledger control name the caller records (D0424).
+fn refuse_receiptless_ai_test(path: &Path, judged_by: &str, evidence: Option<&str>, what: &str) -> Result<(), WriteError> {
+    if evidence.map(str::trim).is_some_and(|e| !e.is_empty()) {
+        return Ok(());
+    }
+    let Some(root) = model_root_of(path) else {
+        return Ok(());
+    };
+    if !root.join(".tracking").join("actors.sysml").exists() {
+        return Ok(());
+    }
+    match crate::actor::kind_of(&root, judged_by).as_deref() {
+        Some("human") => Ok(()),
+        _ => Err(WriteError::ReceiptOwed(what.to_owned(), judged_by.to_owned())),
+    }
 }
 
 /// The model root above `target` (the directory holding `.tracking`/`.engine`), when any.
@@ -707,6 +738,11 @@ fn append_result_locked(
     // AI-kind judge regardless of what any hook or caller claimed.
     if dod_method_is_confirmation(&pkg, task_name) {
         refuse_ai_judgment(path, judged_by, "a method=confirmation result")?;
+    }
+    // issue448: the receipt guard 52 reads at the turn boundary is owed HERE - a receiptless
+    // AI-judged method=test result never lands.
+    if verification_declares_method(&pkg, &format!("{task_name}DoD"), "test") {
+        refuse_receiptless_ai_test(path, judged_by, evidence, &format!("the method=test result on {task_name}DoD"))?;
     }
 
     let n = max_result_n(&pkg, task_name) + 1;
@@ -1153,6 +1189,11 @@ fn append_gate_result_locked(
 
     if !gate_exists_in_pkg(&pkg, gate_name) {
         return Err(WriteError::GateNotFound(gate_name.to_owned()));
+    }
+    // issue448: the Implement gate is method=test and is the one that landed receiptless - the
+    // same write-layer refusal as append_result, before any line is built.
+    if verification_declares_method(&pkg, gate_name, "test") {
+        refuse_receiptless_ai_test(path, judged_by, evidence, &format!("the method=test gate result on {gate_name}"))?;
     }
 
     let n = max_gate_result_n(&pkg, gate_name) + 1;
@@ -2067,8 +2108,43 @@ mod tests {
         assert!(ai_conf.is_err(), "an AI judging a confirmation must be refused");
         let hum_conf = super::append_result(&f, "tconf", "abc1234", "pass", "2026-08-21", "hum", None);
         assert!(hum_conf.is_ok(), "a Person judging a confirmation passes: {hum_conf:?}");
-        let ai_test = super::append_result(&f, "ttest", "abc1234", "pass", "2026-08-21", "bot", None);
-        assert!(ai_test.is_ok(), "an AI judging a method=test result is the normal case: {ai_test:?}");
+        let ai_test = super::append_result(&f, "ttest", "abc1234", "pass", "2026-08-21", "bot", Some("cargo test --lib write: ok"));
+        assert!(ai_test.is_ok(), "an AI judging a method=test result WITH its receipt is the normal case: {ai_test:?}");
+    }
+
+    /// issue448 probe pair, for both write paths: an AI judge with no evidence on a method=test
+    /// verification is refused and the file is unchanged byte-for-byte; the same call with evidence
+    /// lands with its `// RAN:` line; a human judge with no evidence lands; a method=inspect
+    /// verification with an AI judge and no evidence lands. Blank evidence is no evidence.
+    #[test]
+    fn receiptless_ai_test_results_are_refused_at_the_write() {
+        let root = k6_root("receipt");
+        let f = root.join(".tracking").join("delivery").join("s.sysml");
+        let body = "package S {\n    action def Run {\n        action ttest;\n        verification ttestDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000d101\"; :>> method = VerificationMethod::test; :>> procedureText = \"machine verifies\"; }\n        action tinsp;\n        verification tinspDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000d102\"; :>> method = VerificationMethod::inspect; :>> procedureText = \"eyes\"; }\n    }\n    verification gImpl : Test { :>> id = \"e2e00000-0000-4000-8000-00000000d103\"; :>> method = VerificationMethod::test; :>> procedureText = \"the implement gate\"; }\n    verification gRefine : Test { :>> id = \"e2e00000-0000-4000-8000-00000000d104\"; :>> method = VerificationMethod::inspect; :>> procedureText = \"the refine gate\"; }\n}\n";
+        std::fs::write(&f, body).expect("write");
+        let before = std::fs::read(&f).expect("read");
+
+        // append-result
+        let r = super::append_result(&f, "ttest", "abc1234", "pass", "2026-09-10", "bot", None);
+        assert!(matches!(r, Err(WriteError::ReceiptOwed(..))), "AI + method=test + no evidence is refused: {r:?}");
+        let r = super::append_result(&f, "ttest", "abc1234", "pass", "2026-09-10", "bot", Some("   "));
+        assert!(matches!(r, Err(WriteError::ReceiptOwed(..))), "blank evidence is no evidence: {r:?}");
+        assert_eq!(std::fs::read(&f).expect("read"), before, "a refused write leaves the file byte-for-byte");
+        super::append_result(&f, "ttest", "abc1234", "pass", "2026-09-10", "bot", Some("cargo test: ok")).expect("with evidence lands");
+        assert!(std::fs::read_to_string(&f).expect("read").contains("// RAN: cargo test: ok"), "the RAN line is written");
+        super::append_result(&f, "ttest", "abc1234", "pass", "2026-09-10", "hum", None).expect("a human owes no receipt");
+        super::append_result(&f, "tinsp", "abc1234", "pass", "2026-09-10", "bot", None).expect("method=inspect owes no receipt");
+
+        // append-gate-result
+        let before = std::fs::read(&f).expect("read");
+        let r = super::append_gate_result(&f, "gImpl", "abc1234", "pass", "2026-09-10", "bot", None, None);
+        assert!(matches!(r, Err(WriteError::ReceiptOwed(..))), "AI + method=test gate + no evidence is refused: {r:?}");
+        assert_eq!(std::fs::read(&f).expect("read"), before, "a refused gate write leaves the file byte-for-byte");
+        super::append_gate_result(&f, "gImpl", "abc1234", "pass", "2026-09-10", "bot", None, Some("cargo test: ok")).expect("with evidence lands");
+        super::append_gate_result(&f, "gImpl", "abc1234", "pass", "2026-09-10", "hum", None, None).expect("a human owes no receipt");
+        super::append_gate_result(&f, "gRefine", "abc1234", "pass", "2026-09-10", "bot", None, None).expect("method=inspect gate owes no receipt");
+        let written = std::fs::read_to_string(&f).expect("read");
+        assert_eq!(written.matches("gImplR").count(), 2, "exactly the two permitted gImpl results landed:\n{written}");
     }
 
     /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,

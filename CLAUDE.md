@@ -126,7 +126,10 @@ frozen (modify it only by out-of-band Decision).
   cannot acquire the lock **fails loudly** — a refused write is recoverable, a lost one is not.
 - **The write API is the sanctioned write path.** `keel append-result` / `append-gate-result`
   (`--evidence "<what you ran>"` — an AI-judged `method=test` result with no `// RAN:` receipt is
-  refused, D0232/issue266; a receipt of the form `ci-run id=<run id> workflow=<name>` is the EXTERNAL-FACT kind - CI verifies the run
+  refused AT THE WRITE, D0232/issue266 and issue448: `append-result` and `append-gate-result` refuse it before any
+  line is built, leave the file byte-for-byte and write a `refused` ledger line (`append-result:ran-receipt` /
+  `append-gate-result:ran-receipt`, D0424) - guard 52 `evidence-cited` re-reads the tree at the turn boundary as the
+  backstop, and for one day was the only check, which is how a receiptless Implement-gate result landed; a receipt of the form `ci-run id=<run id> workflow=<name>` is the EXTERNAL-FACT kind - CI verifies the run
   itself, D0323/issue374; a HUMAN's judgment is never in scope, their word IS the evidence), `add-task`,
   `record decision` (`--from FILE`; `--supersedes dNNNN[,..]` / `--supersedes-clause dNNNN[,..]` / `--derived-from stNNN|usNNN`
   or the draft's `supersedes:` / `supersedes-clause:` / `derived-from:` lines author the `#Supersede` / `#SupersedeClause` /

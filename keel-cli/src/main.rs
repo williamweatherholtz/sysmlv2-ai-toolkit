@@ -2713,6 +2713,12 @@ fn cmd_append_result(args: &[String]) -> i32 {
     let evidence = flag(args, "evidence");
     match w::append_result(&file, &task, &sha, &verdict, &judged_at, &judged_by, evidence.as_deref()) {
         Ok(uuid) => { println!("{uuid}"); binding_note(&file, &sha, &verdict); 0 }
+        Err(e @ w::WriteError::ReceiptOwed(..)) => {
+            // issue448/D0424: the refusal is a ledger fact - `append-result:ran-receipt` is the census row.
+            ledger_refused(&keel_cli::actor::root_for(&file), "append-result", "ran-receipt");
+            eprintln!("error: {e}");
+            1
+        }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }
 }
@@ -2768,6 +2774,12 @@ fn cmd_append_gate_result(args: &[String]) -> i32 {
     let evidence = flag(args, "evidence");
     match w::append_gate_result(&file, &gate, &sha, &verdict, &judged_at, &judged_by, notes.as_deref(), evidence.as_deref()) {
         Ok(uuid) => { println!("{uuid}"); binding_note(&file, &sha, &verdict); 0 }
+        Err(e @ w::WriteError::ReceiptOwed(..)) => {
+            // issue448/D0424: the refusal is a ledger fact - `append-gate-result:ran-receipt` is the census row.
+            ledger_refused(&keel_cli::actor::root_for(&file), "append-gate-result", "ran-receipt");
+            eprintln!("error: {e}");
+            1
+        }
         Err(e) => { eprintln!("error: {e}"); 1 }
     }
 }

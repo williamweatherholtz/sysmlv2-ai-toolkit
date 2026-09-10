@@ -183,8 +183,15 @@ const WRITE_PATH_CHECKS: &[(&str, Subject, &str, &str, &[&str])] = &[
         "append-result:ran-receipt",
         Subject::Ai,
         "active",
-        "an AI-judged method=test result with no `// RAN:` receipt: the act refused is the agent's verdict without what produced it (D0232/issue266)",
+        "an AI-judged method=test result with no `// RAN:` receipt: the act refused is the agent's verdict without what produced it (D0232/issue266; refused at the write since issue448)",
         &["// ran:", "ran: receipt", "ran receipt", "recorded what produced it", "append-result receipt"],
+    ),
+    (
+        "append-gate-result:ran-receipt",
+        Subject::Ai,
+        "active",
+        "an AI-judged method=test ceremony gate result with no `// RAN:` receipt: the act refused is the agent's Implement-gate verdict without what produced it (issue448 - the line that landed)",
+        &["append-gate-result", "gate result with no receipt", "receiptless gate"],
     ),
     (
         "record:tool-output-prose",

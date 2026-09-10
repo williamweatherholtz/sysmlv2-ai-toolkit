@@ -1776,4 +1776,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcReceiptlessResultIsRefusedAtWrite to issue448;
+
+    part issue449 : Issue {
+        :>> id = "98f898e3-a306-4e2d-aa38-fe35c2b15a27";
+        :>> title = "the census declared append-result:ran-receipt an active write-path check while no write path refused - a control row with no refusal behind it";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The control census (view/census.rs WRITE_PATH_CHECKS) declared `append-result:ran-receipt` as an ACTIVE write-path check binding the AI's act from D0426 (2026-09-10) while write.rs append_result_locked / append_gate_result_locked refused nothing - the row was true of guard 52 at the turn boundary and false of the verb it named. Nothing holds a write-path census row to a refusal site in code, so the census could report a control that did not exist; issue448 is the incident (a receiptless Implement-gate result landed through the verb the row said refused it). control_structure's test holds HUMAN_ONLY_WRITE_COMMANDS equal to the refusal sites for the accept path; the write-path census rows have no such check.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcWritePathCensusRowsHaveARefusalBehindThem to issue449;
+
+    part issue450 : Issue {
+        :>> id = "c19f2d61-f2d6-4bb4-aea2-04c345299dee";
+        :>> title = "guard retro-backlog scans only the staged diff, so an unstaged guard run passes a retro the commit gate refuses";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "guard retro-backlog reads the commit's additions from `git diff --cached` (guards.rs retro_backlog), so with nothing staged it scans nothing and reports PASS: a `keel guard` run at the turn boundary, or by the D0425 VERIFIER before staging, cannot see a retro whose findings became no tracked item. Observed 2026-09-10 (sprint650): the verifier's receipt read `guard ALL PASS`, the primary's own `guard --no-receipt` read ALL PASS, and the pre-commit gate then refused the commit on retro-backlog - probed by unstaging (0 scanned, PASS) and restaging (1 scanned, FAIL). A guard that answers differently before and after `git add` gives the in-loop tiers a false green on exactly the finding class D0131 exists for.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRetroBacklogReadsTheWorkingTree to issue450;
 }
