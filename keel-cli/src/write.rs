@@ -25,7 +25,9 @@ pub enum WriteError {
     /// Verdict string was not "pass" or "fail".
     InvalidVerdict(String),
     /// Method string was not a known `VerificationMethod` variant.
-    InvalidMethod(String),
+    /// The member named (with its field, for the intake vocabularies), and the accepted set - a
+    /// refusal names what it would have taken (issue451 / GH#70).
+    InvalidMethod(String, Vec<String>),
     /// Named action def not found in the file.
     ActionDefNotFound(String),
     /// Cannot find a `DoD` verification or existing result line for the task.
@@ -48,7 +50,11 @@ impl std::fmt::Display for WriteError {
             Self::TaskNotFound(n) => write!(f, "task not found: {n}"),
             Self::TaskAlreadyExists(n) => write!(f, "task already exists: {n}"),
             Self::InvalidVerdict(v) => write!(f, "invalid verdict '{v}' (expected 'pass' or 'fail')"),
-            Self::InvalidMethod(m) => write!(f, "invalid method '{m}'"),
+            Self::InvalidMethod(m, accepted) => write!(
+                f,
+                "invalid method '{m}' - expected one of {}",
+                accepted.join(" | ")
+            ),
             Self::ActionDefNotFound(n) => write!(f, "action def not found: {n}"),
             Self::InsertionPointNotFound(n) => write!(f, "cannot find insertion point for task: {n}"),
             Self::GateNotFound(n) => write!(f, "gate not found: {n}"),
@@ -1271,9 +1277,17 @@ fn add_task_locked(
     dod_text: &str,
     method: &str,
 ) -> Result<String, WriteError> {
-    const VALID_METHODS: &[&str] = &["test", "inspect", "confirmation", "demo", "analysis"];
-    if !VALID_METHODS.contains(&method) {
-        return Err(WriteError::InvalidMethod(method.to_owned()));
+    // The vocabulary is the SCHEMA's, read the way `validate` reads it (issue451 / GH#70): a literal
+    // list here held `analysis` and lacked `analyze` and `critique`, so the CLI wrote a member the
+    // authority refused and refused two it accepts. The engine's members unioned with the project's
+    // own when the file sits in a model tree - the write-path rule intake_write applies to its
+    // vocabularies (`enum_members_union`); the embedded schema alone outside a tree.
+    let accepted = model_root_of(path).map_or_else(
+        || crate::schema::enum_members("VerificationMethod"),
+        |root| crate::schema::enum_members_union(&root, "VerificationMethod"),
+    );
+    if !accepted.iter().any(|m| m == method) {
+        return Err(WriteError::InvalidMethod(method.to_owned(), accepted));
     }
 
     let pkg = parse_file(path)?;
@@ -2158,6 +2172,51 @@ mod tests {
             assert!(crate::guards::uuid_shaped(&u), "guard 38 rejects a minted id: {u}");
             assert!(seen.insert(u), "duplicate within 10000 mints");
         }
+    }
+
+    /// The control for issue451 / GH#70 (D0047): `add-task` accepted `analysis` and refused `analyze`
+    /// because its method list was a hand-written copy of `VerificationMethod`. Asserting every member
+    /// the SCHEMA declares one by one means the next member added to `schema/core/element.sysml` either
+    /// works or turns this red; the negative case is the member the report shows landing in a record
+    /// `validate` then flagged.
+    #[test]
+    fn add_task_accepts_exactly_the_schemas_verification_methods() {
+        let dir = std::env::temp_dir().join(format!("keel-method-vocab-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("backlog.sysml");
+        std::fs::write(&path, "package B {\n    action def Work {\n    }\n}\n").expect("seed");
+        let members = crate::schema::enum_members("VerificationMethod");
+        assert!(
+            members.len() >= 6,
+            "schema/core/element.sysml should declare at least the 6 known VerificationMethod members, found {}: {members:?}",
+            members.len()
+        );
+        for m in &members {
+            super::add_task(&path, "Work", &format!("dc{m}"), "a criterion", m)
+                .unwrap_or_else(|e| panic!("VerificationMethod::{m} is declared in the schema but refused by add-task: {e}"));
+        }
+        let written = std::fs::read_to_string(&path).expect("read back");
+        for m in &members {
+            assert!(
+                written.contains(&format!("method = VerificationMethod::{m};")),
+                "the DoD for {m} must carry the member as the schema spells it:\n{written}"
+            );
+        }
+        // The member the report showed landing (GH#70): refused, and the refusal names the set.
+        let before = written;
+        let err = super::add_task(&path, "Work", "dcBogus", "a criterion", "analysis")
+            .expect_err("`analysis` is not a VerificationMethod member");
+        let msg = err.to_string();
+        assert!(
+            matches!(err, super::WriteError::InvalidMethod(ref m, _) if m == "analysis"),
+            "expected InvalidMethod for analysis, got {err:?}"
+        );
+        for m in &members {
+            assert!(msg.contains(m), "the refusal must name every accepted member; missing {m} in: {msg}");
+        }
+        assert_eq!(std::fs::read_to_string(&path).expect("read back"), before, "a refused method writes nothing");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// issue325: a `DoD` containing a double-quoted phrase must not be able to close the `SysML` string

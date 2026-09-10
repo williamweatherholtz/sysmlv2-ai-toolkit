@@ -66,4 +66,14 @@ package ProjectIntake20260910 {
         :>> sourceUrl = "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/70";
         :>> sourceTrust = SourceTrust::untrusted;
     }
+
+    part us108 : UserStory {
+        :>> id = "74b11f7f-d575-4f07-b335-e98aaf8811f2";
+        :>> title = "add-task accepts exactly the schema's VerificationMethod members";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> asA = "maintainer adding a task from the CLI";
+        :>> iWant = "keel add-task --method to accept every member VerificationMethod declares and refuse what it does not, so a task the CLI writes is one validate accepts";
+        :>> implication = ImplicationKind::bug;
+    }
+    #DerivedFrom dependency from us108 to st117;
 }

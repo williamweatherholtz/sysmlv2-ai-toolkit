@@ -87,10 +87,7 @@ fn check_member(root: &Path, enum_name: &str, field: &str, value: &str) -> Resul
     if accepted.iter().any(|m| m == value) {
         return Ok(());
     }
-    Err(WriteError::InvalidMethod(format!(
-        "{field} `{value}` — expected one of {}",
-        accepted.join(" | ")
-    )))
+    Err(WriteError::InvalidMethod(format!("{field} `{value}`"), accepted))
 }
 
 /// Escape a VERBATIM span for a one-line `SysML` string literal, altering nothing else.

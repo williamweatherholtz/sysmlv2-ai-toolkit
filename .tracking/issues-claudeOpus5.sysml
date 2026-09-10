@@ -1798,4 +1798,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRetroBacklogReadsTheWorkingTree to issue450;
+
+    part issue451 : Issue {
+        :>> id = "bb44b3b5-d568-4b5b-af18-92e6df9d5295";
+        :>> title = "add-task's method vocabulary is a hand-written copy of the schema's and drifted (GH#70)";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "GH#70 (st117, us108), reported by the declared decider against keel 0.3.1: `keel add-task --method analyze` is refused with `invalid method 'analyze'`, while `--method analysis` is accepted and writes `VerificationMethod::analysis`, which `keel validate` then flags (valid members: analyze, confirmation, critique, demo, inspect, test). Root: keel-cli/src/write.rs:1274 carries a hand-written VALID_METHODS = [test, inspect, confirmation, demo, analysis] that drifted from .engine/schema/core/element.sysml:28 - the CLI's vocabulary is a second copy of the schema's, and nothing held them equal, so the write path emitted a record the authority refuses. The intake write path already reads its vocabularies from the schema (intake_write.rs, every_schema_declared_member_of_both_intake_vocabularies_is_accepted); add-task did not. Discovered in the field by the human at their own terminal.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcMethodVocabularyIsTheSchemas to issue451;
+
+    part issue452 : Issue {
+        :>> id = "8fd0b1de-99ae-401c-a1ef-b72f43872981";
+        :>> title = "a hand-written copy of a schema enum drifted for the second time and nothing finds the next one";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 651 retro finding. add-task's method list (issue451, GH#70) was the SECOND hand-written copy of a schema enum found drifted: intake_write's ImplicationKind list was the first (issue300, sat at 12 against a declared 15) and was fixed with a test that walks the schema's members - but the fix was applied at that one site and nothing enumerated the other write paths validating against an enum, so the same class shipped in 0.3.1 at write.rs:1274 and was found by an adopter, not a test. D0047: a fix applied at one site of a class is a recurrence waiting for its next site. Nothing in the tree finds a literal vocabulary beside a schema enum.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLiteralVocabulariesAreFoundByATest to issue452;
 }
