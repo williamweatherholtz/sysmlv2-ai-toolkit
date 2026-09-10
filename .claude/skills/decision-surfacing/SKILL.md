@@ -63,6 +63,14 @@ exhibits, a do-nothing course, a falsifier. The exhibit builders are
 A number that is not in `facts.json` does not go on the page. A fact that cannot be computed
 honestly is emitted with `"value": null` and a `how` that says why — publish that, not a guess.
 
+**What this range changed** is one section of the page, built from `facts.commitDelta` (D0282,
+`keel show commit-delta . --range <publishedAgainst>..HEAD`): the Needs, Requirements, Decisions,
+Issues and tasks the model gained since the page was last published, what was retired by a
+`#Supersede` edge and which Issues were resolved, each by title. It is the spec of the range ahead
+of its hunks - a reader who last saw the page at `publishedAgainst` reads what the model gained, not
+a diff. When `commitDelta.empty` is true the section says the range changed no item; when
+`reconciled` is false the section states both counts (the view's and the diff's) rather than one.
+
 ### 4. Ground each section so it can be judged independently
 
 Their words on what fails: *"I get some semblance of 'we need Need1 & Need2 judged. WHAT DECIDES IT:

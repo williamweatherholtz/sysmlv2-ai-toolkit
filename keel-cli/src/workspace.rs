@@ -428,7 +428,7 @@ pub fn gate_outcome(project: &Path, tag: &str) -> (Vec<String>, Option<String>) 
     }
     // Guards and rules are still evaluated when validate failed, because a caller aggregating across
     // a workspace wants the whole picture in one run rather than one layer per invocation.
-    let reports = crate::guards::run_all(project);
+    let (reports, durations) = crate::guards::run_all_timed(project);
     for g in &reports {
         for v in &g.violations {
             problems.push(format!("{tag}VIOLATION {}: {v}", g.name));
@@ -439,7 +439,7 @@ pub fn gate_outcome(project: &Path, tag: &str) -> (Vec<String>, Option<String>) 
     }
     if let Some(k) = &receipt_key {
         if problems.is_empty() {
-            let _ = crate::receipt::record_green(project, k, &crate::receipt::ALL_LAYERS, &reports);
+            let _ = crate::receipt::record_green(project, k, &crate::receipt::ALL_LAYERS, &reports, &durations);
         } else {
             crate::receipt::delete(project);
         }

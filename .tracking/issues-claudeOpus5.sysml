@@ -1886,4 +1886,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from d0431 to issue458;
+
+    part issue459 : Issue {
+        :>> id = "c90b1b81-bfa3-41d2-81cf-44f62958b6c6";
+        :>> title = "The sprint 657 verifier ran a six-test filter the primary chose; the land's full lib run failed one of them and refused the push";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The verifier subagent for sprint 657 ran a six-test cargo filter the primary had named; all six passed and the Implement gate was recorded on that receipt. The land's armed touched run then ran the full keel-cli lib (D0421 - keel-cli/src had moved) and last_durations_names_every_guard_that_ran FAILED: the guard durations lived in a process-global static that a concurrent test's run_all cleared mid-count. Commit 0e84415 stood, the push was refused (.keel/metrics/touched-receipt.toml: outcome fail, 544 passed, 1 failed, failing lib). Observed in the field on 2026-09-10: the gate caught what the verifier's set could not, because the verifier's set was narrower than the gate's. The defect is the scope, not the test - D0425 says 'the touched binaries' and leaves the primary to choose them. Resolved by D0432: the verifier runs keel suite --touched, the set the land computes, and its receipt names that file.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from d0432 to issue459;
+
+    part issue460 : Issue {
+        :>> id = "a2fb4a98-ee42-413a-bf0e-3e98f012219d";
+        :>> title = "A Decision whose text says process-change but whose draft lacks the marker header auto-accepted under standing consent";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "On 2026-09-10 `keel record decision --from d0432.md` AUTO-ACCEPTED D0432 under standing consent. Its consequences text read 'Process-change (D0337): it changes what the D0425 verifier runs, so it waits for the human's word' - the author had classified it, in the record's own words, as outside consent - but the draft lacked the `marker: process-change` header line, and the write path reads ONLY the marker. The record landed accepted, with a confirmation result judged by the human, for a process change the human never saw. It was caught because the recording session read the write path's own output, deleted the uncommitted file and re-recorded with the marker; nothing in the engine would have caught it. Observed in the field: this is the D0337 scope rule defeated by a missing header, and D0425's own recording went the same way (issue346 is the same class from the other side: a marker value the write path did not know was dropped silently). The control it wants: a Decision whose text names process-change or safety-change and carries no marker is HELD proposed with the mismatch named, never auto-accepted. Resolved by dcMarkerTextWithoutMarkerHolds.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcMarkerTextWithoutMarkerHolds to issue460;
 }

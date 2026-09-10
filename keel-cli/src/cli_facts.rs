@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 108] = [
+pub const CLI_FACTS: [CliFact; 109] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "reject", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> (--words TEXT | --note TEXT) --by <person> --date YYYY-MM-DD", synopsis: "record a human's rejection of a proposed Decision; the same channel rules as accept" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
@@ -95,6 +95,7 @@ pub const CLI_FACTS: [CliFact; 108] = [
     CliFact { name: "business", family: "lens", effect: "reads", stability: "stable", invocation: "show business [ROOT]", synopsis: "the what/why layer: Brief, Personas, Needs, UseCases" },
     CliFact { name: "concern-coverage", family: "lens", effect: "reads", stability: "stable", invocation: "show concern-coverage [ROOT]", synopsis: "declared viewpoints against stakeholder concerns - which concerns nothing serves" },
     CliFact { name: "contentions", family: "lens", effect: "reads", stability: "stable", invocation: "show contentions [ROOT]", synopsis: "recorded disagreements between contributors awaiting adjudication" },
+    CliFact { name: "commit-delta", family: "lens", effect: "reads", stability: "stable", invocation: "show commit-delta [ROOT] [--range A..B]", synopsis: "the model delta a git range made - Needs, Requirements, Decisions, Issues and tasks added, items retired by #Supersede and Issues resolved, with titles, reconciled against the diff's added declarations by count; empty when the range changed no item (D0282)" },
     CliFact { name: "control-census", family: "lens", effect: "reads", stability: "stable", invocation: "show control-census [ROOT]", synopsis: "every control by whose act it binds, the ledger blocks by actor kind, its motivating incidents (observed vs code-read) and its evidence class - friction and hypothetical first" },
     CliFact { name: "control-structure", family: "lens", effect: "reads", stability: "stable", invocation: "show control-structure [ROOT]", synopsis: "STPA step 2 for this project's own workflow, computed: authorities, what each issues on which process carrying what data, and what feedback returns" },
     CliFact { name: "controls", family: "lens", effect: "reads", stability: "stable", invocation: "show controls [ROOT]", synopsis: "the two-way hazard/control diff: uncovered failure conditions and unanchored controls" },

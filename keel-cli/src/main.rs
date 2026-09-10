@@ -1226,7 +1226,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     // process this project deactivated no longer blocks turns (D0177/P1.5 fixing the guards.rs
     // bypass the proposal cited — hook_stop was the one caller that skipped the filter).
     let mut failing: Vec<String> = Vec::new();
-    let reports = keel_cli::perf::phase("hook:guards", || keel_cli::guards::run_all(root));
+    let (reports, durations) = keel_cli::perf::phase("hook:guards", || keel_cli::guards::run_all_timed(root));
     for r in &reports {
         for v in r.violations.iter().take(5) {
             failing.push(format!("  [{}] {v}", r.name));
@@ -1284,7 +1284,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         // runs at all is not enforceable here (no gate reads conversational output, D0151); what is
         // enforceable is that this hook does not substitute a count for it.
         if let Some(k) = &receipt_key {
-            let _ = keel_cli::receipt::record_green(root, k, &keel_cli::receipt::ALL_LAYERS, &reports);
+            let _ = keel_cli::receipt::record_green(root, k, &keel_cli::receipt::ALL_LAYERS, &reports, &durations);
         }
         return 0;
     }
@@ -1724,12 +1724,12 @@ fn cmd_guard(args: &[String]) -> i32 {
             .as_ref()
             .and_then(|k| keel_cli::receipt::read(&root, k))
             .filter(|r| r.covers_all(&[keel_cli::receipt::GUARDS]));
-        let (reports, from_receipt) = match receipt {
-            Some(r) => {
-                let line = r.line("[guard]");
-                (r.guards, Some(line))
-            }
-            None => (keel_cli::guards::run_all(&root), None),
+        let (reports, durations, from_receipt) = if let Some(r) = receipt {
+            let line = r.line("[guard]");
+            (r.guards, Vec::new(), Some(line))
+        } else {
+            let (reports, durations) = keel_cli::guards::run_all_timed(&root);
+            (reports, durations, None)
         };
         // D0278: a control with a KNOWN defect says so beside its own verdict. Printed here rather
         // than inside `GuardReport::print` because the runner is what holds the root — and because
@@ -1765,7 +1765,7 @@ fn cmd_guard(args: &[String]) -> i32 {
             println!("{line}");
         } else if let Some(k) = &receipt_key {
             if all_ok {
-                let _ = keel_cli::receipt::record_green(&root, k, &[keel_cli::receipt::GUARDS], &reports);
+                let _ = keel_cli::receipt::record_green(&root, k, &[keel_cli::receipt::GUARDS], &reports, &durations);
             } else {
                 keel_cli::receipt::delete(&root);
             }
@@ -1898,6 +1898,33 @@ fn cmd_intake(args: &[String]) -> i32 {
 }
 
 /// `keel show priority [ROOT]` (D0311): the priority metric made visible.
+// `keel show commit-delta [ROOT] [--range A..B]` - the model delta over a git range (dcCommitDeltaView, D0282).
+fn cmd_commit_delta(args: &[String]) -> i32 {
+    let usage = "keel show commit-delta [ROOT] [--range A..B]";
+    let range = args.iter().position(|a| a == "--range").map_or_else(|| "HEAD~1..HEAD".to_string(), |i| args.get(i + 1).cloned().unwrap_or_default());
+    if range.is_empty() || range.starts_with("--") {
+        eprintln!("error: --range takes a value of the form A..B");
+        eprintln!("usage: {usage}");
+        return 2;
+    }
+    // the range value is consumed here, so it is not a positional for root_arg
+    let rest: Vec<String> = args.iter().filter(|a| *a != "--range" && **a != range).cloned().collect();
+    let root = match root_arg(&rest, usage, &["range"], 0) {
+        Ok(r) => r,
+        Err(code) => return code,
+    };
+    match keel_cli::view::delta::commit_delta(&root, &range) {
+        Ok(json) => {
+            println!("{json}");
+            0
+        }
+        Err(e) => {
+            eprintln!("commit-delta error: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_priority(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel show priority [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -5106,6 +5133,7 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
             Some("boundary-sweep") => cmd_query0(rest, "keel boundary-sweep [ROOT]", |r| keel_cli::view::boundary_sweep_json(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
             Some("business") => cmd_business(rest),
+            Some("commit-delta") => cmd_commit_delta(rest),
             Some("concern-coverage") => cmd_concern_coverage(rest),
             Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
             Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
@@ -5144,12 +5172,12 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
         Some(other) => {
             eprintln!("keel show: unknown lens `{other}`.");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
             2
         }
         None => {
             eprintln!("usage: keel show <lens> [ROOT] [flags]");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
             2
         }
     }

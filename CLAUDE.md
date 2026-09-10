@@ -74,6 +74,7 @@ a content gate (frozen schema, a direction Decision) or an empty frontier.
 Other computed lenses: `verification` (EXAMINED vs EXERCISED — never one number; `--pending` for the
 gap), `suspect` (drift), `orphans`, `view <name>`, `audit`, `coverage`,
 `tier-satisfaction`, `rootedness`, `dispositions`, `sitting-coverage`, `concern-coverage`,
+`commit-delta` (D0282: the model delta a git range made - items added by type, retired by `#Supersede`, Issues resolved, each by title, reconciled against the diff's added declarations net of moves; `--range A..B`, default `HEAD~1..HEAD`; `facts.py` carries it as `commitDelta` over the last published tree),
 `governing-version`, `open-issues`, `indicators` (with `triggered`: the indicators past a declared threshold in `indicator-triggers.toml`, surfacing work - never gating, D0333; `orient` repeats them in its burndown), `intake`, `control-structure` (D0284: STPA step 2 for
 this project's own workflow, computed from hook config, git hooks, workflow files, CLI facts and declared deciders — the
 `safety` viewpoint's renderer; draw it with the **`stpa-diagram`** skill, D0285 — authority descending, control down / feedback
@@ -200,11 +201,13 @@ frozen (modify it only by out-of-band Decision).
   because `dNNNN` is unique only per project. A single-project repo is unaffected throughout.
 - **Substance to the primary, verification and recording to subagents (D0425, the human's words 2026-09-10:
   *"AI spends so much time check listing that it doesn't have any brain power to burn on actually solving
-  problems"*).** The primary agent does the work. A VERIFIER subagent (haiku) runs the checks - the touched
-  test binaries, `validate`, `check-engine`, `guard --no-receipt` - against the tree and reports every
-  discrepancy naming the command; a RECORDER subagent writes the sprint ceremony through the keel write API
-  from the verifier's receipt ONLY, never from the primary's description of what it did. Neither reads the
-  other's conclusion as fact.
+  problems"*).** The primary agent does the work. A VERIFIER subagent (haiku) runs the checks - **`keel suite
+  --touched`** (the set the land will run, computed from the changed paths: the lib's own tests whenever
+  `keel-cli/src` moved; D0432, proposed, after issue459: a six-test filter the primary named passed in the
+  verifier and the land's full lib run failed one of them), `validate`, `check-engine`, `guard --no-receipt` -
+  against the tree and reports every discrepancy naming the command and the touched receipt's counts; a
+  RECORDER subagent writes the sprint ceremony through the keel write API from the verifier's receipt ONLY,
+  never from the primary's description of what it did. Neither reads the other's conclusion as fact.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
 - **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook - and `keel audit-ci-runs` (D0323): every TestResult whose receipt reads `// RAN: ci-run id=<run> workflow=<name>` is checked by CI against the run itself (exists here, concluded success, ran on the judgedAgainst SHA) - the external-fact gate an agent cannot talk past.** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` **gates before the first push** (workspace-wide —

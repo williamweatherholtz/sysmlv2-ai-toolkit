@@ -1631,15 +1631,15 @@ mod parallel_tests {
     }
 
     /// Every guard that ran is timed, so the receipt's per-guard `ms` is a measured profile (issue455).
+    /// The durations are the RUN's, so this holds with other `run_all`s live on other test threads.
     #[test]
-    fn last_durations_names_every_guard_that_ran() {
+    fn run_all_timed_names_every_guard_that_ran() {
         let root = std::path::Path::new("..");
         if !root.join(".tracking").is_dir() {
             return; // not the self-build tree
         }
-        let reports = super::run_all(root);
+        let (reports, timed) = super::run_all_timed(root);
         let ran = reports.iter().filter(|r| !r.warnings.iter().any(|w| w.starts_with("NOT ACTIVE"))).count();
-        let timed = super::last_durations();
         assert_eq!(timed.len(), ran, "one duration per guard that ran");
         for (name, _) in &timed {
             assert!(super::GUARD_NAMES.contains(name), "{name} is not a guard");
@@ -5568,6 +5568,12 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
 /// Run all enforced guards over `root`, returning their reports in `GUARD_NAMES` order.
 #[must_use]
 pub fn run_all(root: &Path) -> Vec<GuardReport> {
+    run_all_timed(root).0
+}
+
+/// [`run_all`] with every guard's wall clock beside the reports - what the receipt stores (issue455).
+#[must_use]
+pub fn run_all_timed(root: &Path) -> (Vec<GuardReport>, Durations) {
     let act = crate::activation::Activation::load(root);
     // The activation filter runs first and serially: it decides WHICH guards run, and the answer for an
     // inactive one is a report, not a computation.
@@ -5605,8 +5611,8 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
     // not the schedule - so the pool takes `to_run` as declared, and the receipt keeps each guard's
     // `ms` so the next assessment reads history instead of promising a number. (Two earlier timings in
     // separate windows read 2.2 and 2.9 s for the same code: the host, not the order.)
-    run_in_parallel(root, &to_run, &mut slots);
-    slots.into_iter().flatten().collect()
+    let durations = run_in_parallel(root, &to_run, &mut slots);
+    (slots.into_iter().flatten().collect(), durations)
 }
 
 /// Run `to_run` across a fixed pool of OS threads, writing each guard's report into its slot
@@ -5629,27 +5635,25 @@ pub fn run_all(root: &Path) -> Vec<GuardReport> {
 /// hook fire (which attributes to it) need the number without anyone having asked for a report.
 static CRITICAL_PATH: std::sync::Mutex<Option<(&'static str, u64)>> = std::sync::Mutex::new(None);
 
-/// Every guard's wall clock in the last run of this process, `(name, ms)` - the receipt stores them as the
-/// run's measured profile (issue455: the number a dispatch decision is judged against, read from history).
-static DURATIONS: std::sync::Mutex<Vec<(&'static str, u64)>> = std::sync::Mutex::new(Vec::new());
-
-fn note_critical_path(name: &'static str, took: std::time::Duration) {
+/// Note one guard's wall clock against the critical path and return it in ms.
+fn note_critical_path(name: &'static str, took: std::time::Duration) -> u64 {
     let ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
     if let Ok(mut g) = CRITICAL_PATH.lock() {
         if g.is_none_or(|(_, best)| ms > best) {
             *g = Some((name, ms));
         }
     }
-    if let Ok(mut d) = DURATIONS.lock() {
-        d.push((name, ms));
-    }
+    ms
 }
 
-/// Every guard's duration from the last run in this process, `(name, ms)`; empty when none has run.
-#[must_use]
-pub fn last_durations() -> Vec<(&'static str, u64)> {
-    DURATIONS.lock().map(|d| d.clone()).unwrap_or_default()
-}
+/// Every guard's wall clock in ONE run, `(name, ms)`.
+///
+/// The receipt stores them as the run's measured
+/// profile (issue455: the number a dispatch decision is judged against, read from history). A value
+/// the run RETURNS, not process state: the first cut kept them in a static cleared per run, and two
+/// `run_all`s in one process - which is what `cargo test` is - interleaved their pushes, so the count
+/// held in a filtered test run and failed in the full one (the land refusal of 2026-09-10).
+pub type Durations = Vec<(&'static str, u64)>;
 
 /// The longest guard of the last run in this process, `(name, ms)`, or `None` when no guard has run.
 #[must_use]
@@ -5663,13 +5667,10 @@ pub fn critical_path_line() -> String {
     critical_path().map(|(n, ms)| format!("{n} {ms} ms")).unwrap_or_default()
 }
 
-fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [Option<GuardReport>]) {
-    if let Ok(mut d) = DURATIONS.lock() {
-        d.clear();
-    }
+fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [Option<GuardReport>]) -> Durations {
     let workers = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get).min(to_run.len().max(1));
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let done: std::sync::Mutex<Vec<(usize, Option<GuardReport>)>> = std::sync::Mutex::new(Vec::with_capacity(to_run.len()));
+    let done: std::sync::Mutex<Vec<(usize, Option<GuardReport>, u64)>> = std::sync::Mutex::new(Vec::with_capacity(to_run.len()));
     std::thread::scope(|s| {
         for _ in 0..workers {
             let next = &next;
@@ -5681,9 +5682,9 @@ fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [O
                 let Some(&(slot, name)) = to_run.get(i) else { break };
                 let t0 = std::time::Instant::now();
                 let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
-                note_critical_path(name, t0.elapsed());
+                let ms = note_critical_path(name, t0.elapsed());
                 if let Ok(mut d) = done.lock() {
-                    d.push((slot, report));
+                    d.push((slot, report, ms));
                 }
             });
             // A host that refuses a thread gets the guards run on this one - slower, same answer.
@@ -5693,19 +5694,36 @@ fn run_in_parallel(root: &Path, to_run: &[(usize, &'static str)], slots: &mut [O
                     let Some(&(slot, name)) = to_run.get(i) else { break };
                     let t0 = std::time::Instant::now();
                     let report = crate::perf::phase(&format!("guard:{name}"), || run_one(name, root));
-                    note_critical_path(name, t0.elapsed());
+                    let ms = note_critical_path(name, t0.elapsed());
                     if let Ok(mut d) = done.lock() {
-                        d.push((slot, report));
+                        d.push((slot, report, ms));
                     }
                 }
             }
         }
     });
     let done = done.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
-    for (slot, report) in done {
+    let mut durations = Durations::with_capacity(done.len());
+    for (slot, report, ms) in done {
         if let Some(cell) = slots.get_mut(slot) {
-            *cell = report;
+            if let Some(r) = cell.insert_report(report) {
+                durations.push((r, ms));
+            }
         }
+    }
+    durations
+}
+
+/// Fill a slot and hand back the guard's name, so a duration is recorded only for a report that exists.
+trait SlotFill {
+    fn insert_report(&mut self, report: Option<GuardReport>) -> Option<&'static str>;
+}
+
+impl SlotFill for Option<GuardReport> {
+    fn insert_report(&mut self, report: Option<GuardReport>) -> Option<&'static str> {
+        let name = report.as_ref().map(|r| r.name);
+        *self = report;
+        name
     }
 }
 

@@ -1153,6 +1153,47 @@ _probe_fns = len(re.findall(r"\bfn probe_", read(os.path.join(REPO, _CONTROL_FIL
 fact("testsBindProbes", _probe_fns or None, "known-answer probes shipped with the control",
      "count of `fn probe_` in %s: the fixtures the discriminator is run against before the tree is read (D0388)." % _CONTROL_FILE)
 
+# ================================================================ 17. what this range changed (D0282 / dcCommitDeltaView)
+# `keel show commit-delta` is the model delta over a git range - items ADDED by type, items RETIRED by a
+# #Supersede edge, Issues RESOLVED - reconciled against the diff's declaration count. The brief's "what this
+# range changed" section is built from THIS fact, never typed: the range runs from the tree the page was last
+# published against (`publishedAgainst` in .keel/decision-page.toml) to HEAD, so a reader of the refreshed page
+# sees what the model gained since they last read it. The decision channel the item's DoD named as a second
+# surface is disconnected (D0291); the page is the surface.
+_page = read(os.path.join(REPO, ".keel", "decision-page.toml")) or ""
+_m = re.search(r'^publishedAgainst\s*=\s*"([0-9a-fA-F]+)"', _page, re.M)
+_delta_from = _m.group(1) if _m else None
+_DELTA_HOW = ("`keel show commit-delta . --range %s..HEAD` (D0282): items of a delta type - Need, SystemRequirement, "
+              "Requirement, Decision, Issue, action - present at HEAD and absent at the range start, #Supersede and "
+              "#Resolves edges new in the range; `reconciled` is the view's per-type count against the "
+              "`+part <name> : <Type>` / `+action <name>;` lines git diff adds NET of the same name removed (a move)."
+              % (_delta_from or "?"))
+if _delta_from is None:
+    fact("commitDelta", None, "model delta since the last publish",
+         "no `publishedAgainst` in .keel/decision-page.toml, so the range has no start - " + _DELTA_HOW)
+else:
+    ok, out = run([KEEL, "show", "commit-delta", ".", "--range", "%s..HEAD" % _delta_from], timeout=180)
+    _delta = None
+    if ok:
+        try:
+            _delta = json.loads(out)
+        except ValueError:
+            ok, out = False, "commit-delta emitted non-JSON: %s" % out[:200]
+    if _delta is None:
+        fact("commitDelta", None, "model delta since the last publish", "commit-delta failed: %s - %s" % (out, _DELTA_HOW))
+    else:
+        fact("commitDelta", {
+            "range": _delta.get("range"),
+            "empty": _delta.get("empty"),
+            "added": _delta.get("added", []),
+            "superseded": _delta.get("superseded", []),
+            "resolved": _delta.get("resolved", []),
+            "reconciled": (_delta.get("reconciliation") or {}).get("matches"),
+        }, "model delta since the last publish", _DELTA_HOW)
+        fact("commitDeltaAdded", len(_delta.get("added", [])), "items added since the last publish", _DELTA_HOW)
+        fact("commitDeltaSuperseded", len(_delta.get("superseded", [])), "items retired since the last publish", _DELTA_HOW)
+        fact("commitDeltaResolved", len(_delta.get("resolved", [])), "Issues resolved since the last publish", _DELTA_HOW)
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),

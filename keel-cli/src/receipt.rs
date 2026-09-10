@@ -268,7 +268,7 @@ pub fn read(root: &Path, key: &Key) -> Option<Receipt> {
 /// this run vouched for. An existing receipt with an EQUAL key keeps its layers - so a `keel guard`
 /// after a green turn boundary does not narrow what the boundary proved.
 #[must_use]
-pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[GuardReport]) -> bool {
+pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[GuardReport], durations: &[(&str, u64)]) -> bool {
     if !before.settled || reports.iter().any(|r| !r.ok()) {
         return false;
     }
@@ -291,7 +291,7 @@ pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[Guard
         written: SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs()),
         covers: set,
         guards: {
-            let timed: std::collections::HashMap<&str, u64> = crate::guards::last_durations().into_iter().collect();
+            let timed: std::collections::HashMap<&str, u64> = durations.iter().copied().collect();
             reports
                 .iter()
                 .map(|r| StoredGuard {
@@ -364,13 +364,13 @@ mod tests {
         let k = key(&d).expect("key");
         assert!(k.settled, "an aged scratch repo must be settled");
         assert!(read(&d, &k).is_none(), "no receipt before any run");
-        assert!(record_green(&d, &k, &[GUARDS], &green()), "a green run writes");
+        assert!(record_green(&d, &k, &[GUARDS], &green(), &[]), "a green run writes");
         let r = read(&d, &k).expect("the receipt answers an equal key");
         assert!(r.covers_all(&[GUARDS]) && !r.covers_all(&[VALIDATE]));
         assert_eq!(r.guards.len(), 1);
         assert_eq!(r.guards[0].warnings, vec!["w".to_string()]);
         // A second writer with an equal key widens the layers rather than narrowing them.
-        assert!(record_green(&d, &k, &[VALIDATE, RULES], &green()));
+        assert!(record_green(&d, &k, &[VALIDATE, RULES], &green(), &[]));
         assert!(read(&d, &k).expect("still equal").covers_all(&[VALIDATE, GUARDS, RULES]));
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -385,7 +385,7 @@ mod tests {
         git(&d, &["add", "tracked.txt"]);
         git(&d, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "tracked"]);
         let k0 = key(&d).expect("key");
-        assert!(record_green(&d, &k0, &[GUARDS], &green()));
+        assert!(record_green(&d, &k0, &[GUARDS], &green(), &[]));
         assert!(read(&d, &k0).is_some());
 
         // Untracked file: it appears in status, so the key moves.
@@ -421,16 +421,16 @@ mod tests {
     fn a_red_run_deletes_the_receipt_and_an_unsettled_key_is_never_trusted() {
         let d = repo("red");
         let k = key(&d).expect("key");
-        assert!(record_green(&d, &k, &[GUARDS], &green()));
+        assert!(record_green(&d, &k, &[GUARDS], &green(), &[]));
         let red = vec![GuardReport { name: crate::guards::GUARD_NAMES[0], scanned: 1, warnings: Vec::new(), violations: vec!["v".into()] }];
-        assert!(!record_green(&d, &k, &[GUARDS], &red), "a red run never writes");
+        assert!(!record_green(&d, &k, &[GUARDS], &red, &[]), "a red run never writes");
         delete(&d);
         assert!(read(&d, &k).is_none(), "a red run leaves no receipt");
         // Fresh write inside the racy window: unsettled.
         std::fs::write(d.join("fresh.txt"), "f").expect("w");
         let ku = key(&d).expect("key");
         assert!(!ku.settled, "a file written just now is inside the racy window");
-        assert!(!record_green(&d, &ku, &[GUARDS], &green()), "an unsettled key is not written");
+        assert!(!record_green(&d, &ku, &[GUARDS], &green(), &[]), "an unsettled key is not written");
         assert!(read(&d, &ku).is_none(), "nor honoured");
         let _ = std::fs::remove_dir_all(&d);
     }

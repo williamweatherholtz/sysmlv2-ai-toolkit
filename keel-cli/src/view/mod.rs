@@ -23,6 +23,7 @@ use crate::json::Json;
 // existing `crate::view::X` path valid - callers are untouched by design.
 mod checks;
 pub mod census;
+pub mod delta;
 pub mod control_structure;
 
 /// Does an acceptance note carry the human's words as a quote receipt (D0192)?
