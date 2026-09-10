@@ -5097,6 +5097,7 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("concern-coverage") => cmd_concern_coverage(rest),
             Some("contentions") => cmd_view0(rest, "contentions", keel_cli::view::contentions),
             Some("controls") => cmd_view0(rest, "controls", keel_cli::view::controls),
+            Some("control-census") => cmd_view0(rest, "control-census", keel_cli::view::census::control_census),
             Some("control-structure") => cmd_view0(rest, "control-structure", keel_cli::view::control_structure::control_structure),
             Some("coverage") => cmd_coverage(rest),
             Some("critique-coverage") => cmd_critique_coverage(rest),
