@@ -59,6 +59,12 @@ package EngineRelationships {
     // complete — an action that is done or a Decision with status=accepted; else OPEN.
     metadata def Resolves;
 
+    // #PrioritizedBy: a ready backlog item -> the Statement or Decision that ranks it (D0429, issue345).
+    // Authored as a marked dependency: `#PrioritizedBy dependency from <item> to <stNNN|dNNNN>;`. The
+    // priority-inversion guard does not warn on an item carrying one and `keel show priority` lists the
+    // citation; an edge to any other type is a violation - a rank cited to a work item records nothing.
+    metadata def PrioritizedBy;
+
     // #ProspectiveChange / #SafetyChange: marks a Decision AS a process change + its RETROACTIVITY
     // (D0068/D0070, process-governance). prospective = outputs chartered under the prior version
     // stay valid (D0062 default); safety = downstream items are mandatory reprocess candidates.

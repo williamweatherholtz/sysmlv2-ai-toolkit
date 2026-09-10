@@ -2884,17 +2884,23 @@ pub fn retro_backlog(root: &Path) -> GuardReport {
 /// WARNING-level and never blocking: priority IS a human judgment and deferring a High item behind an
 /// enabler can be entirely correct. The point is to make the trade-off visible rather than leave it to
 /// whoever last appended to the file. A compute error IS a violation.
+///
+/// D0429 (issue345): "if that is deliberate say so" now names where - a `#PrioritizedBy` dependency
+/// from the item to the Statement or Decision that ranks it. An item carrying one is not warned on
+/// (`keel show priority` lists it under `recorded` with the citation); an edge to any other type IS a
+/// violation, because a rank cited to a work item records nothing.
 #[must_use]
 pub fn priority_inversion(root: &Path) -> GuardReport {
     match crate::view::priority_inversions(root) {
-        Ok(pairs) => {
-            let warnings = pairs
+        Ok(inv) => {
+            let warnings = inv
+                .pairs
                 .iter()
                 .map(|(lower, high, sev)| {
-                    format!("{lower} outranks {high}, whose computed class is {sev} (a resolved Issue's severity, or a finding retros keep naming as already tracked - D0311; `keel show priority` shows which) — if that is deliberate say so, otherwise reorder the backlog (D0052: declaration order IS priority; reordering is how you reprioritize)")
+                    format!("{lower} outranks {high}, whose computed class is {sev} (a resolved Issue's severity, or a finding retros keep naming as already tracked - D0311; `keel show priority` shows which) — if that is deliberate record it: `#PrioritizedBy dependency from {lower} to <stNNN|dNNNN>;` citing the Statement or Decision that ranks it (D0429); otherwise reorder the backlog (D0052: declaration order IS priority; reordering is how you reprioritize)")
                 })
                 .collect();
-            GuardReport { name: "priority-inversion", scanned: pairs.len(), warnings, violations: Vec::new() }
+            GuardReport { name: "priority-inversion", scanned: inv.pairs.len() + inv.recorded.len() + inv.violations.len(), warnings, violations: inv.violations }
         }
         Err(e) => GuardReport { name: "priority-inversion", scanned: 0, warnings: Vec::new(), violations: vec![format!("error computing priority inversions: {e}")] },
     }
