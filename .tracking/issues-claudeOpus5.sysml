@@ -1710,4 +1710,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcHookLatencyIsAnIndicator to issue442;
+
+    part issue443 : Issue {
+        :>> id = "14cd3c7b-aa1d-42e9-92fe-d31c898c4dd9";
+        :>> title = "The guard set's floor is one serial parse every guard waits on";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "With issue439 and issue441 cut, the guard set's floor is the one serial parse every guard waits on. KEEL_PERF=2 keel guard --no-receipt . on 2026-09-09 after sprint 645: Model::build x38 (37 cached, 1 parsed), parse 1068 ms in one thread while the pool's other workers block on MODEL_BUILD_LOCK - verification-trace:model 1470 ms and priority:frontier 1370 ms are that wait, not work - and twenty guards then read 1.5-3.2 s each under contention, acceptance-binds-to-text 3198 ms at the head. build_uncached (view/mod.rs) parses the corpus file by file in one for loop and ingests in declaration order; corpus::parsed already makes each file's tree an independent unit, and guards.rs::run_in_parallel already sizes a std::thread::scope pool from available_parallelism. Known positive: the pre-sprint-644 ledger line 8337 ms with priority-inversion 7160 ms. Known negative: a fingerprint-equal rerun answers from the receipt in 0.2-0.3 s and parses nothing.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcModelParsesInParallel to issue443;
 }
