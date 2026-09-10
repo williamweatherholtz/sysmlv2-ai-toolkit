@@ -144,7 +144,7 @@ pub fn orphans(root: &Path) -> Result<String, AlgoError> {
 // completeness, estimation discipline, sitting-review currency — ACTIONABLE vs
 // grandfathered. Text-based (matches query.py's regex semantics) for byte parity.
 
-const CEREMONY_GATES: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+// The ceremony gate order is `crate::orient::gate_order(root)` (D0435), passed into the scan.
 const CHARTER_SINCE: u32 = 38;
 
 fn is_ceremony_grandfathered(fname: &str) -> bool {
@@ -264,7 +264,7 @@ struct AuditScan {
 
 /// Scan `.tracking/delivery` (basename order; `collect_sysml` is path-sorted = basename-sorted
 /// here) for charter coverage, ceremony completeness, and estimation discipline.
-fn scan_delivery_files(tracking: &Path, chartered: &HashSet<String>) -> AuditScan {
+fn scan_delivery_files(tracking: &Path, chartered: &HashSet<String>, order: &[String]) -> AuditScan {
     let mut scan = AuditScan::default();
     for path in crate::collect_sysml(&tracking.join("delivery")) {
         let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
@@ -287,11 +287,11 @@ fn scan_delivery_files(tracking: &Path, chartered: &HashSet<String>) -> AuditSca
                 }
             }
         }
-        let absent: Vec<&str> = CEREMONY_GATES.iter().copied().filter(|g| !crate::orient::gate_passed(&text, g)).collect();
+        let absent: Vec<&String> = order.iter().filter(|g| !crate::orient::gate_passed(&text, g)).collect();
         if !absent.is_empty() {
             let entry = Json::Obj(vec![
                 ("file".to_string(), Json::s(fname.clone())),
-                ("missing".to_string(), Json::Arr(absent.into_iter().map(|g| Json::s(g.to_string())).collect())),
+                ("missing".to_string(), Json::Arr(absent.into_iter().map(|g| Json::s(g.clone())).collect())),
             ]);
             if is_ceremony_grandfathered(&fname) {
                 scan.gates_gf.push(entry);
@@ -363,7 +363,8 @@ pub fn audit(root: &Path) -> Result<String, AlgoError> {
         collect_sitting_reviews(&text, &mut sitting);
     }
 
-    let scan = scan_delivery_files(&tracking, &chartered);
+    let order = crate::orient::gate_order(root);
+    let scan = scan_delivery_files(&tracking, &chartered, &order);
     let charter_ok = scan.uncharted_actionable.is_empty();
     let ceremony_ok = scan.gates_actionable.is_empty();
     let sitting_ok = !sitting.is_empty();

@@ -544,29 +544,195 @@ fn narrowing_filters(repo: &Path) -> Narrowing {
 
 // ── classification ────────────────────────────────────────────────────────────
 
-/// Canonical ceremony gate order (mirrors `query.py` `read_sprint_ceremony_status` + D0047).
-/// `pub(crate)` so the process-cursor (`keel advance`, D0209 clause 3) reads the SAME sequence —
-/// one source of the step order, never a third copy.
-pub(crate) const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+/// The `first A then B;` successions every workflow under `.engine/workflows/` declares, as
+/// (file stem, A, B) in declaration order. The ONE place the chain is read (D0435).
+#[must_use]
+pub(crate) fn workflow_successions(root: &Path) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    for path in crate::collect_sysml(&root.join(".engine").join("workflows")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        for line in text.lines() {
+            let l = line.trim();
+            if l.starts_with("//") {
+                continue;
+            }
+            let Some(rest) = l.strip_prefix("first ") else { continue };
+            let body = rest.split(';').next().unwrap_or("");
+            let Some((a, b)) = body.split_once(" then ") else { continue };
+            let a: String = a.trim().chars().take_while(|c| crate::algo::is_word(*c)).collect();
+            let b: String = b.trim().chars().take_while(|c| crate::algo::is_word(*c)).collect();
+            if !a.is_empty() && !b.is_empty() {
+                out.push((stem.clone(), a, b));
+            }
+        }
+    }
+    out
+}
+
+/// Every phase a workflow chain names - the vocabulary a `checkedBy = "gate:<phase>"` resolves against.
+#[must_use]
+pub(crate) fn workflow_phases(root: &Path) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for (_, a, b) in workflow_successions(root) {
+        out.insert(a);
+        out.insert(b);
+    }
+    out
+}
+
+/// The ceremony gate order, READ FROM THE TREE (D0435).
+///
+/// The workflow whose phases some `ProcessStep` binds as `checkedBy = "gate:<phase>"` supplies the
+/// order: its declared successions, linearised, each phase spelt as the gate a sprint record declares
+/// (`closeOut` -> `CloseOut`, the `<...>CloseOutGate : Test`). Until 2026-09-10 this was a compiled
+/// constant here, a second in the `ceremony` guard, a third in `audit`, and an `include_str!` test
+/// holding one of them to `.engine/workflows/delivery.sysml` - four homes for one sequence. A tree
+/// whose processes bind no gate has NO ceremony order: every caller then reports a sprint as
+/// unenforceable-by-step rather than enforcing an order nobody declared.
+#[must_use]
+pub(crate) fn gate_order(root: &Path) -> Vec<String> {
+    let bound: HashSet<String> = crate::guards::step_check_bindings(root)
+        .into_iter()
+        .filter_map(|(_, _, _, name)| name.strip_prefix("gate:").map(str::to_owned))
+        .collect();
+    if bound.is_empty() {
+        return Vec::new();
+    }
+    let succ = workflow_successions(root);
+    // The workflow files whose chain some step binds, in file order.
+    let mut files: Vec<&str> = Vec::new();
+    for (f, a, b) in &succ {
+        if (bound.contains(a) || bound.contains(b)) && !files.contains(&f.as_str()) {
+            files.push(f);
+        }
+    }
+    let mut out = Vec::new();
+    for f in files {
+        let edges: Vec<(&str, &str)> =
+            succ.iter().filter(|(g, _, _)| g == f).map(|(_, a, b)| (a.as_str(), b.as_str())).collect();
+        out.extend(linearise(&edges).into_iter().map(|p| gate_name(&p)));
+    }
+    out
+}
+
+/// Kahn's algorithm with declaration order as the tie-break: a chain comes out as written, a fork
+/// (deploy's `first declare then systemVnV; first declare then safetyValidation;`) in the order its
+/// branches were declared. A cycle leaves its members out - a succession that loops orders nothing.
+fn linearise(edges: &[(&str, &str)]) -> Vec<String> {
+    let mut nodes: Vec<&str> = Vec::new();
+    for (a, b) in edges {
+        for n in [*a, *b] {
+            if !nodes.contains(&n) {
+                nodes.push(n);
+            }
+        }
+    }
+    let mut indeg: HashMap<&str, usize> = nodes.iter().map(|n| (*n, 0usize)).collect();
+    for (_, b) in edges {
+        if let Some(d) = indeg.get_mut(b) {
+            *d += 1;
+        }
+    }
+    let mut ready: std::collections::VecDeque<&str> =
+        nodes.iter().copied().filter(|n| indeg.get(n).copied().unwrap_or(0) == 0).collect();
+    let mut out = Vec::new();
+    while let Some(n) = ready.pop_front() {
+        out.push(n.to_owned());
+        for (a, b) in edges {
+            if *a != n {
+                continue;
+            }
+            if let Some(d) = indeg.get_mut(b) {
+                *d -= 1;
+                if *d == 0 {
+                    ready.push_back(b);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// `closeOut` -> `CloseOut`: the phase as the gate's Test name spells it.
+#[must_use]
+pub(crate) fn gate_name(phase: &str) -> String {
+    let mut c = phase.chars();
+    c.next()
+        .map_or_else(String::new, |f| f.to_uppercase().collect::<String>() + c.as_str())
+}
+
+#[cfg(test)]
+mod gate_order_tests {
+    use super::{gate_name, gate_order, linearise};
+
+    #[test]
+    fn a_chain_linearises_as_written_and_a_fork_in_branch_order() {
+        let chain = [("refine", "standup"), ("standup", "implement"), ("implement", "review")];
+        assert_eq!(linearise(&chain), ["refine", "standup", "implement", "review"]);
+        let fork = [("declare", "systemVnV"), ("declare", "safetyValidation")];
+        assert_eq!(linearise(&fork), ["declare", "systemVnV", "safetyValidation"]);
+        let cycle = [("a", "b"), ("b", "a")];
+        assert!(linearise(&cycle).is_empty(), "a loop orders nothing");
+    }
+
+    #[test]
+    fn gate_name_upper_cases_the_first_letter_only() {
+        assert_eq!(gate_name("closeOut"), "CloseOut");
+        assert_eq!(gate_name("retro"), "Retro");
+        assert_eq!(gate_name(""), "");
+    }
+
+    /// The order READ FROM THIS TREE is the six the sprint records declare - the replacement for the
+    /// `include_str!` test that held a compiled constant to the file. If agile-workflow's bindings or
+    /// delivery.sysml's chain move, this is where it shows.
+    #[test]
+    fn this_trees_ceremony_order_is_the_delivery_chain() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        assert_eq!(gate_order(&root), ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]);
+    }
+
+    /// A tree whose processes bind no gate has no ceremony order.
+    #[test]
+    fn no_gate_binding_means_no_order() {
+        let dir = std::env::temp_dir().join(format!("keel-gateorder-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".engine/workflows")).expect("mkdir");
+        std::fs::create_dir_all(dir.join(".engine/processes")).expect("mkdir");
+        std::fs::write(dir.join(".engine/workflows/d.sysml"), "package D {\n    action def D {\n        first a then b;\n    }\n}\n").expect("write");
+        let proc = dir.join(".engine/processes/p.sysml");
+        let unbound = "package P {\n    action p : Process { :>> purpose = \"p\"; }\n    action s : ProcessStep {\n        :>> actionText = \"x\";\n        :>> owner = Owner::ai;\n    }\n}\n";
+        std::fs::write(&proc, unbound).expect("write");
+        assert!(gate_order(&dir).is_empty());
+        let bound = unbound.replace("        :>> owner = Owner::ai;\n", "        :>> owner = Owner::ai;\n        :>> checkedBy = \"gate:b\";\n");
+        std::fs::write(&proc, bound).expect("write");
+        assert_eq!(gate_order(&dir), ["A", "B"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
 
 /// Compute in-progress sprint ceremony status from `.tracking/delivery/*.sysml`
 /// (D0045: replaces the `StateCursor`). A sprint is in-progress if at least one gate
-/// passed and Retro has not; `pending` is the first canonical gate not yet passed.
+/// passed and the chain's terminal gate has not; `pending` is the first gate in the declared
+/// order (`gate_order`, D0435) not yet passed. A tree with no ceremony order has no in-progress
+/// sprint to report.
 fn in_progress_sprints(repo: &Path) -> Vec<SprintCeremony> {
     let delivery = repo.join(".tracking").join("delivery");
     let mut out = Vec::new();
+    let order = gate_order(repo);
+    let Some(terminal) = order.last() else { return out };
     for path in crate::collect_sysml(&delivery) {
         let Ok(text) = std::fs::read_to_string(&path) else { continue };
-        let passed: Vec<String> = GATE_ORDER.iter()
+        let passed: Vec<String> = order.iter()
             .filter(|g| gate_passed(&text, g))
-            .map(|g| (*g).to_owned())
+            .cloned()
             .collect();
-        if passed.is_empty() || passed.iter().any(|g| g == "Retro") {
+        if passed.is_empty() || passed.iter().any(|g| g == terminal) {
             continue; // not started, or ceremony complete
         }
-        let pending = GATE_ORDER.iter()
+        let pending = order.iter()
             .find(|g| !passed.iter().any(|p| p == *g))
-            .map(|g| (*g).to_owned());
+            .cloned();
         let sprint = path.file_stem().map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
         out.push(SprintCeremony { sprint, passed, pending });

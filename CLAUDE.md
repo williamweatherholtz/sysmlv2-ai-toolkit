@@ -64,8 +64,9 @@ keel orient [ROOT]        # in-progress sprints + ready/suspect frontier + non-b
 keel whats-next [ROOT]    # the ready list, in PRIORITY order (declaration order IS priority, D0052)
 keel show priority [ROOT] # the priority METRIC: each ready item's computed class - resolver severity, or retro recurrence (2 = High, 3+ = Critical, D0311) - and the inversions
 keel status [ROOT]        # every base in one screen: engine pin, library drift + NEW units, model, work, hook hosts + kill switch (D0296), CI (D0270)
-keel advance <sprint>     # the process cursor: the sprint's current ceremony step (D0209 clause 3)
+keel advance <sprint>     # the process cursor: the sprint's current ceremony step (D0209 clause 3); the order is the workflow chain the steps bind (D0435), never a table
 keel advance <sprint> --to <Gate>   # forward gate: refused until every earlier step's verify-Test passes
+keel advance <process> [--to <step>]  # any process: each step, its checkedBy binding and the check's verdict on the tree; --to is refused while an earlier bound step is red, and a process with no bound step is unenforceable-by-step, not refused (D0436)
 ```
 
 The AI **auto-follows** the ranked frontier (D0052). Do not ask which ready item to work. Pause only for

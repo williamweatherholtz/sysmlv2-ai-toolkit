@@ -22,8 +22,10 @@ refused it: marker-census is a LENS (commands.sysml, family lens), not a guard, 
 step; the migration process stays unbound until a guard reads its control totals (dcMigrationTotalsAreAGuard).
 
 Every other step stays unbound and valid: `checkedBy` is `[0..1]` (the EXPAND, in process.sysml), so this
-run contracts nothing. The agile-workflow ceremony steps are bound by dcAdvanceRefusesAnyBoundStep, whose
-reader is `keel advance`; binding them here with no reader is the D0144 producer-before-consumer shape.
+run contracts nothing. SECOND RUN (D0435, the same day): the six agile-workflow ceremony steps bind the
+per-run gate that records them - refineLink gate:refine, standupGate gate:standup, implDo gate:implement,
+implReview gate:review, implClose gate:closeOut, retroIdentify gate:retro - now that `keel advance` reads
+the binding (the first run left them for their reader: the D0144 producer-before-consumer shape).
 
 Control totals (gate 2 of the `migration` skill) - the run FAILS before writing when any does not balance:
 
@@ -54,7 +56,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PROCESSES = ROOT / ".engine" / "processes"
 
-# (file stem, step name, guard) - the seven of D0321's eight bindings that name a guard.
+# (file stem, step name, check) - the seven of D0321's eight bindings that name a guard, then D0435's six gates.
 BINDINGS: list[tuple[str, str, str]] = [
     ("control-defect", "cd4Register", "control-defect-registry"),
     ("decision-surfacing", "dsGround", "judgment-request-quality"),
@@ -63,6 +65,13 @@ BINDINGS: list[tuple[str, str, str]] = [
     ("stpa-self", "stpa5Trigger", "stpa-currency"),
     ("github-intake", "giRoute", "untrusted-routing"),
     ("github-intake", "giBoundary", "untrusted-taint"),
+    # D0435 (second run, same day): the ceremony steps name the per-run gate that records them.
+    ("agile-workflow", "refineLink", "gate:refine"),
+    ("agile-workflow", "standupGate", "gate:standup"),
+    ("agile-workflow", "implDo", "gate:implement"),
+    ("agile-workflow", "implReview", "gate:review"),
+    ("agile-workflow", "implClose", "gate:closeOut"),
+    ("agile-workflow", "retroIdentify", "gate:retro"),
 ]
 
 STEP_RE = re.compile(r"^\s*action\s+(\w+)\s*:\s*ProcessStep\b")

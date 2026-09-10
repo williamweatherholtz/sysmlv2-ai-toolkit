@@ -1,0 +1,24 @@
+// D0436 (PROPOSED — NOT YET ACCEPTED) — advanceRefusesAnyBoundStep: keel advance takes any process, and --to <step> is refused while an earlier step's bound check is red - a process with no bound step is reported unenforceable-by-step, never refused
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0436Accept event on sign-off.
+package Decision0436 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0436 : Decision {
+        :>> id = "1f0eccf9-709d-480c-b8a8-d835e30ea022";
+        :>> title = "advanceRefusesAnyBoundStep: keel advance takes any process, and --to <step> is refused while an earlier step's bound check is red - a process with no bound step is reported unenforceable-by-step, never refused";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "`keel advance <sprint> --to <Gate>` (D0209 clause 3) is the one in-loop refusal the engine has for a process step: it reads the sprint's ceremony gates and refuses a forward move while an earlier defined gate has no passing result. It knows six steps of one process, by a compiled table. D0434 and D0435 gave every ProcessStep a way to name its check - a guard or rule that runs on the tree, or a per-run gate - so the refusal can now be computed for any process from the steps' own bindings, which is D0321 option A's second half and the item dcAdvanceRefusesAnyBoundStep. Depends on D0435.";
+        :>> decision = "NOT A FORK: the shape is the DoD's, chartered by D0321. `keel advance <arg> [--to <step>]` resolves its argument first as a delivery file (a sprint, the existing behaviour, with the ceremony order read from the workflow chain) and otherwise as a process: the name of an `action <name> : Process` or a process file's stem under .engine/processes/. For a process, the steps are the ProcessSteps declared after it and before the next Process in its file, in declaration order. Without --to it prints the cursor: each step, its binding, and for a guard or rule binding the check's verdict on the tree now; a `gate:` binding is reported as needing a run (`keel advance <sprint>`). With `--to <step>` it is REFUSED (exit 1) if any earlier step bound to a guard or rule is red on the tree, naming the step, the check and its first violation, and PERMITTED otherwise; unbound steps are listed as judgment and never block. A process with no bound step prints `unenforceable-by-step` and exits 0 - the absence of a check is reported, not enforced as a refusal, because refusing on nothing would be the honest-state inversion D0098 forbids.";
+        :>> rationale = "The ceremony refusal was worth having because it fires BEFORE the act, where the `ceremony` guard fires after; every other process's guards fire only at the commit, after the step was skipped. Reading the binding at advance time gives every bound step the same in-loop shape at no new authoring cost: the fact was written for the lens (D0434) and the reader is the same helper. Refusing only on a red guard or rule keeps the command's claim exactly as strong as the checks it names - it cannot refuse on a judgment step, and it says so, which is what stops it from becoming a checklist that gatekeeps the human (the human's words 2026-09-10: guards that gatekeep them without evidence of subversion are to be reconsidered; this one binds the agent's next act to a check the agent already accepts). A gate binding needs a run to evaluate against, so the process form reports it rather than guessing.";
+        :>> consequences = "Process-change (D0337): proposed until the human's word. cursor.rs gains the process path beside the sprint path, resolving through `guards::step_check_bindings` and `guards::run_one` / `view::check`; the CLI fact cliAdvance's invocation and synopsis follow; the cursor tests hold the sprint behaviour unchanged and two fixture tests cover the process form - two bound steps refused while the first's guard is red and permitted when green, and a process with no bound step reported unenforceable-by-step. STATED: the process form evaluates tree-wide checks, so PERMITTED means the earlier steps' checks hold on the tree now, not that the steps were performed in order - order-of-performance is only knowable for a run with per-step results, which is the sprint form.";
+    }
+    #DependsOn dependency from d0436 to d0435;
+}

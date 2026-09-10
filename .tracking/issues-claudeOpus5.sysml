@@ -1974,4 +1974,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcProcessStepDeclaresItsCheck to issue466;
+
+    part issue467 : Issue {
+        :>> id = "68cf1189-191d-4e63-98bf-8e048c9be7a0";
+        :>> title = "check-engine reports clean over an instance file keel check rejects with a parse error";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "OBSERVED 2026-09-10 while recording D0435/D0436: an insert_before edit doubled the closing brace of .engine/decisions/0436-advanceRefusesAnyBoundStep.sysml (three `}` for two opens). `keel check-engine .` reported '.engine instance files validated clean' and exited 0 over that file; `keel check <file>` on the same bytes reported '25:1: expected end of file (one package per file; all items must be inside the package), got RBrace'. Reproduced deliberately once more with the brace re-added and both commands re-run, then reverted - the well-formed file passes both (the known-negative), the extra-brace file passes check-engine and fails check (the known-positive). The instance gate that the commit tier runs (`commit-gate-check-engine`) therefore does not parse-check the files it validates: it resolves references over whatever its own reader recovers, so a structurally broken instance file reaches the tree as clean. The defect a downstream reader meets (the kernel, a parser that is not lenient, a future keel release) is then attributed to that reader. HAZARD: EHZ5 - an enforcement point that reports a pass it did not compute. Resolver: dcCheckEngineParsesEveryInstanceFile.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCheckEngineParsesEveryInstanceFile to issue467;
 }

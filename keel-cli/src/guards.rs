@@ -888,41 +888,41 @@ pub fn control_defect_registry(root: &Path) -> GuardReport {
 }
 
 // ── ceremony guard (gate ordering + retro-scan evidence) ───────────────────────────────────────
-
-const GATE_ORDER: [&str; 6] = ["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"];
+// The gate order is `crate::orient::gate_order(root)`, read from the workflow chain the process steps
+// bind (D0435) - never a constant here.
 const CEREMONY_GRANDFATHERED: &[&str] = &["sprint11_nativeSpikes"];
 const SCAN_EVIDENCE: &[&str] = &["avoidable", "improvement", "retro held", "no avoidable", "process improvement"];
 
-/// Gate names with a `verification <…{G}Gate>` declaration in the text.
-fn gates_defined(text: &str) -> HashSet<&'static str> {
+/// Gate names (of `order`) with a `verification <…{G}Gate>` declaration in the text.
+fn gates_defined(text: &str, order: &[String]) -> HashSet<String> {
     let mut out = HashSet::new();
     for (idx, _) in text.match_indices("verification ") {
         let after = &text[idx + "verification ".len()..];
         let name: String = after.chars().take_while(|c| crate::algo::is_word(*c)).collect();
-        for g in GATE_ORDER {
+        for g in order {
             if name.ends_with(&format!("{g}Gate")) {
-                out.insert(g);
+                out.insert(g.clone());
             }
         }
     }
     out
 }
 
-/// Gate names with a passing `part <…{G}Gate…R\d+> : TestResult` (reuses `orient::gate_passed`).
-fn gates_passed(text: &str) -> HashSet<&'static str> {
-    GATE_ORDER.into_iter().filter(|g| crate::orient::gate_passed(text, g)).collect()
+/// Gate names (of `order`) with a passing `part <…{G}Gate…R\d+> : TestResult` (reuses `orient::gate_passed`).
+fn gates_passed(text: &str, order: &[String]) -> HashSet<String> {
+    order.iter().filter(|g| crate::orient::gate_passed(text, g)).cloned().collect()
 }
 
 /// Ordering violations: a passed gate while an earlier DEFINED gate is unpassed.
-fn ordering_violations(defined: &HashSet<&'static str>, passed: &HashSet<&'static str>) -> Vec<(&'static str, &'static str)> {
+fn ordering_violations(order: &[String], defined: &HashSet<String>, passed: &HashSet<String>) -> Vec<(String, String)> {
     let mut out = Vec::new();
-    for (i, g) in GATE_ORDER.into_iter().enumerate() {
+    for (i, g) in order.iter().enumerate() {
         if !passed.contains(g) {
             continue;
         }
-        for earlier in GATE_ORDER.into_iter().take(i) {
+        for earlier in order.iter().take(i) {
             if defined.contains(earlier) && !passed.contains(earlier) {
-                out.push((g, earlier));
+                out.push((g.clone(), earlier.clone()));
             }
         }
     }
@@ -932,7 +932,7 @@ fn ordering_violations(defined: &HashSet<&'static str>, passed: &HashSet<&'stati
 /// True if Retro passed but its gate text records no avoidable-issue scan evidence (issue011).
 /// Anchors on the `verification …RetroGate… : Test` declaration (not any `RetroGate` substring,
 /// which can appear in other gates' prose) — mirrors `_RETRO_TEXT`.
-fn retro_scan_missing(text: &str, passed: &HashSet<&'static str>) -> bool {
+fn retro_scan_missing(text: &str, passed: &HashSet<String>) -> bool {
     if !passed.contains("Retro") {
         return false;
     }
@@ -953,21 +953,34 @@ fn retro_scan_missing(text: &str, passed: &HashSet<&'static str>) -> bool {
     false // no retro verification declaration found
 }
 
-/// Guard: within a delivery file, no ceremony gate passes while an earlier DEFINED gate is
+/// Guard: ceremony gates pass in order, and a passing Retro carries its scan evidence.
+///
+/// Within a delivery file, no ceremony gate passes while an earlier DEFINED gate is
 /// unpassed; a passing Retro records avoidable-issue scan evidence. Mirrors `validate_ceremony.py`.
+/// The order is the workflow chain the process steps bind (D0435); a tree that binds no gate has no
+/// ceremony order, and the guard WARNS that the delivery records are unenforceable-by-step rather
+/// than enforcing a sequence nobody declared.
 #[must_use]
 pub fn ceremony(root: &Path) -> GuardReport {
     let files = crate::collect_sysml(&root.join(".tracking").join("delivery"));
     let mut warnings = Vec::new();
     let mut violations = Vec::new();
+    let order = crate::orient::gate_order(root);
+    if order.is_empty() {
+        warnings.push(format!(
+            "no ProcessStep binds a `gate:<phase>` check, so no ceremony order is declared - {} delivery record(s) are unenforceable-by-step (D0435)",
+            files.len()
+        ));
+        return GuardReport { name: "ceremony", scanned: files.len(), warnings, violations };
+    }
     let grandfathered: HashSet<&str> = CEREMONY_GRANDFATHERED.iter().copied().collect();
     for path in &files {
         let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        let passed = gates_passed(&text);
-        let mut defined = gates_defined(&text);
-        defined.extend(passed.iter().copied());
-        let viols = ordering_violations(&defined, &passed);
+        let passed = gates_passed(&text, &order);
+        let mut defined = gates_defined(&text, &order);
+        defined.extend(passed.iter().cloned());
+        let viols = ordering_violations(&order, &defined, &passed);
         if !viols.is_empty() {
             let detail = viols.iter().map(|(g, e)| format!("{g} passed but {e} (earlier) unpassed")).collect::<Vec<_>>().join("; ");
             if grandfathered.contains(stem.as_str()) {
@@ -6629,34 +6642,6 @@ verification storyXDoD : Test { :>> method = VerificationMethod::test; :>> proce
 }
 
 #[cfg(test)]
-mod gate_order_tests {
-    use super::GATE_ORDER;
-
-    /// Panel R2 (robotics finding 2): `GATE_ORDER` is a compiled constant that hand-duplicates the
-    /// succession chain DECLARED in .engine/workflows/delivery.sysml - two homes for one fact.
-    /// This test binds them: a CR that edits the declared order breaks the build until the
-    /// constant follows, so the guard can never silently enforce a superseded ceremony order.
-    #[test]
-    fn gate_order_matches_the_declared_successions() {
-        let declared = include_str!("../../.engine/workflows/delivery.sysml");
-        let mut chain: Vec<(String, String)> = Vec::new();
-        for line in declared.lines() {
-            let l = line.trim();
-            if let Some(rest) = l.strip_prefix("first ") {
-                if let Some((a, b)) = rest.trim_end_matches(';').split_once(" then ") {
-                    chain.push((a.trim().to_lowercase(), b.trim().to_lowercase()));
-                }
-            }
-        }
-        assert_eq!(chain.len(), GATE_ORDER.len() - 1, "the declared chain must cover every adjacent GATE_ORDER pair");
-        for (i, pair) in GATE_ORDER.windows(2).enumerate() {
-            assert_eq!(chain[i].0, pair[0].to_lowercase(), "declared succession {i} disagrees with GATE_ORDER");
-            assert_eq!(chain[i].1, pair[1].to_lowercase(), "declared succession {i} disagrees with GATE_ORDER");
-        }
-    }
-}
-
-#[cfg(test)]
 mod scan_count_tests {
     use super::{GuardReport, GUARD_NAMES};
 
@@ -7055,21 +7040,36 @@ mod tests {
         assert_eq!(uncovered, vec!["fakeOrphan".to_string()]);
     }
 
+    fn strs(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
     #[test]
     fn ceremony_ordering_violation_detected() {
         // Implement passed while Standup (defined) is unpassed -> violation.
-        let mut defined: HashSet<&'static str> = HashSet::new();
-        defined.extend(["Refine", "Standup", "Implement"]);
-        let mut passed: HashSet<&'static str> = HashSet::new();
-        passed.extend(["Refine", "Implement"]); // Standup skipped
-        let v = ordering_violations(&defined, &passed);
-        assert_eq!(v, vec![("Implement", "Standup")]);
+        let order = strs(&["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]);
+        let defined: HashSet<String> = strs(&["Refine", "Standup", "Implement"]).into_iter().collect();
+        let passed: HashSet<String> = strs(&["Refine", "Implement"]).into_iter().collect(); // Standup skipped
+        let v = ordering_violations(&order, &defined, &passed);
+        assert_eq!(v, vec![("Implement".to_owned(), "Standup".to_owned())]);
+    }
+
+    /// The live tree's order is the delivery chain, and the guard's per-file helpers read it (D0435).
+    #[test]
+    fn ceremony_reads_the_order_from_the_tree() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let order = crate::orient::gate_order(&root);
+        assert_eq!(order, strs(&["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]));
+        let text = "verification xRefineGate : Test { }\nverification xStandupGate : Test { }\n";
+        let defined = gates_defined(text, &order);
+        assert_eq!(defined.len(), 2, "{defined:?}");
+        assert!(gates_defined(text, &[]).is_empty(), "no order, nothing defined against it");
     }
 
     #[test]
     fn retro_scan_evidence_required() {
-        let mut passed: HashSet<&'static str> = HashSet::new();
-        passed.insert("Retro");
+        let mut passed: HashSet<String> = HashSet::new();
+        passed.insert("Retro".to_owned());
         let with = "verification xRetroGate : Test { :>> procedureText = \"no avoidable issue found\"; }";
         let without = "verification xRetroGate : Test { :>> procedureText = \"rubber stamp\"; }";
         assert!(!retro_scan_missing(with, &passed));
@@ -7535,6 +7535,11 @@ pub fn declared_check_names(root: &Path) -> HashSet<String> {
             }
         }
     }
+    // D0435: a per-run check - the phase's `<...><Phase>Gate` result in a run of the process - is
+    // named `gate:<phase>`, and resolves against the phases the workflow chains declare.
+    for phase in crate::orient::workflow_phases(root) {
+        names.insert(format!("gate:{phase}"));
+    }
     names
 }
 
@@ -7606,6 +7611,11 @@ pub fn step_check_resolves(root: &Path) -> GuardReport {
         let rel = relpath(root, &path);
         let hint = if name.is_empty() {
             "the value is empty - a binding to nothing".to_string()
+        } else if let Some(phase) = name.strip_prefix("gate:") {
+            nearest_attr(&name, &names).map_or_else(
+                || format!("no `first A then B;` under .engine/workflows/ declares a phase `{phase}` (D0435)"),
+                |n| format!("did you mean `{n}`?"),
+            )
         } else {
             nearest_attr(&name, &names).map_or_else(
                 || "no guard in GUARD_NAMES and no `part <name> : EdgeRule|ElementRule` under .engine/rules/ has that name".to_string(),
@@ -7642,6 +7652,12 @@ mod step_check_resolves_tests {
         let _ = std::fs::remove_dir_all(dir.path());
         std::fs::create_dir_all(dir.path().join(".engine/processes")).expect("mkdir");
         std::fs::create_dir_all(dir.path().join(".engine/rules")).expect("mkdir");
+        std::fs::create_dir_all(dir.path().join(".engine/workflows")).expect("mkdir");
+        std::fs::write(
+            dir.path().join(".engine/workflows/w.sysml"),
+            "package W {\n    action def W {\n        first refine then standup;\n    }\n}\n",
+        )
+        .expect("write");
         std::fs::write(
             dir.path().join(".engine/rules/rules.sysml"),
             "package Rules {\n    part issuesTriagedRule : EdgeRule { :>> id = \"r\"; }\n}\n",
@@ -7679,6 +7695,19 @@ mod step_check_resolves_tests {
         assert_eq!((r.scanned, r.violations.len()), (1, 0), "{:?}", r.violations);
     }
 
+    /// Known-positive / known-negative for the `gate:` class (D0435): a phase the workflow chain
+    /// declares resolves; a spelling no chain declares fails naming the phase.
+    #[test]
+    fn a_gate_binding_resolves_against_the_workflow_chain() {
+        let dir = fixture("        :>> checkedBy = \"gate:refine\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!((r.scanned, r.violations.len()), (1, 0), "{:?}", r.violations);
+        let dir = fixture("        :>> checkedBy = \"gate:closeout\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+        assert!(r.violations[0].contains("phase `closeout`") || r.violations[0].contains("did you mean"), "{}", r.violations[0]);
+    }
+
     /// An empty binding is a binding to nothing.
     #[test]
     fn an_empty_binding_fails() {
@@ -7688,12 +7717,12 @@ mod step_check_resolves_tests {
         assert!(r.violations[0].contains("empty"), "{}", r.violations[0]);
     }
 
-    /// The live tree: the seven D0434 bindings resolve, and every name is a guard this binary runs.
+    /// The live tree: the seven D0434 guard bindings and the six D0435 gate bindings resolve.
     #[test]
     fn the_live_bindings_resolve() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let r = super::step_check_resolves(&root);
         assert!(r.violations.is_empty(), "{:?}", r.violations);
-        assert!(r.scanned >= 7, "expected the seven D0434 bindings, scanned {}", r.scanned);
+        assert!(r.scanned >= 13, "expected the 7 D0434 + 6 D0435 bindings, scanned {}", r.scanned);
     }
 }

@@ -19,8 +19,10 @@ use std::path::{Path, PathBuf};
 /// `keel gate --fast` rejects it per-edit — the token IS the incompleteness marker.
 pub const PLACEHOLDER: &str = "KEEL-SCAFFOLD-FILL-ME";
 
-/// The six ceremony gates, in `GATE_ORDER`, with each one's verification method.
-const GATES: [(&str, &str, &str); 6] = [
+/// Each ceremony gate's verification method and title. The gates themselves - which and in what
+/// order - are `crate::orient::gate_order(root)` (D0435); a gate this table does not know is
+/// scaffolded as `inspect` with a plain title.
+const GATE_KINDS: [(&str, &str, &str); 6] = [
     ("Refine", "inspect", "refine gate (DoR)"),
     ("Standup", "inspect", "standup gate"),
     ("Implement", "test", "implement gate"),
@@ -28,6 +30,13 @@ const GATES: [(&str, &str, &str); 6] = [
     ("CloseOut", "inspect", "closeOut gate (autonomous, D0049)"),
     ("Retro", "analyze", "retro gate (autonomous, D0049)"),
 ];
+
+fn gate_kind(gate: &str) -> (&'static str, String) {
+    GATE_KINDS
+        .iter()
+        .find(|(g, _, _)| *g == gate)
+        .map_or_else(|| ("inspect", format!("{} gate", key_for(gate))), |(_, m, t)| (m, (*t).to_owned()))
+}
 
 /// Scaffold `.tracking/delivery/sprint<number>_<slug>.sysml`. Returns the path written.
 ///
@@ -162,12 +171,13 @@ fn sprint_with(
         field(fill, "dod", &format!("{PLACEHOLDER}: DELIVERED BACKLOG ITEMS: <items>. <what done means, verified how>."))
     );
     let _ = writeln!(t, "    }}\n");
-    for (g, method, title) in GATES {
+    for g in crate::orient::gate_order(root) {
+        let (method, title) = gate_kind(&g);
         let _ = writeln!(
             t,
             "    verification {slug}{g}Gate : Test {{ :>> id = \"{}\"; :>> title = \"Sprint {number} {title}\"; :>> createdAt = \"{today}\"; :>> createdBy = \"{actor}\"; :>> method = VerificationMethod::{method}; :>> procedureText = \"{}\"; }}",
             gen_uuid(),
-            field(fill, &key_for(g), PLACEHOLDER)
+            field(fill, &key_for(&g), PLACEHOLDER)
         );
     }
     let _ = writeln!(t, "}}");

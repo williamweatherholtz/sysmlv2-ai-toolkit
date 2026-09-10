@@ -82,6 +82,7 @@ package EngineAgileProcess {
                   + "semantic). Readiness is the COMPUTED view - never authored.";
         :>> producedArtifact = "Graph-connected, sprint-eligible Story.";
         :>> owner = Owner::either;
+        :>> checkedBy = "gate:refine";
         assert constraint enforcesPriorityInversion : priorityInversion;
         assert constraint enforcesVerificationTrace : verificationTrace;
     }
@@ -133,6 +134,7 @@ package EngineAgileProcess {
                   + "Pass -> go. Fail -> resolve or invoke grill-me skill.";
         :>> producedArtifact = "Batch cleared to start, or gaps logged/resolved.";
         :>> owner = Owner::either;
+        :>> checkedBy = "gate:standup";
         assert constraint enforcesCeremony : ceremony;
         assert constraint enforcesSprintCoverage : sprintCoverage;
     }
@@ -151,6 +153,7 @@ package EngineAgileProcess {
         :>> actionText = "Write code/content + the Tests that verify it.";
         :>> producedArtifact = "Working changes; TestResults appended.";
         :>> owner = Owner::either;
+        :>> checkedBy = "gate:implement";
     }
     action implModel : ProcessStep {
         :>> id = "dba37bd4-406f-43d3-af02-8e3ef8b0c017";
@@ -169,6 +172,7 @@ package EngineAgileProcess {
                   + "computed from the commit, never authored.";
         :>> producedArtifact = "PR open.";
         :>> owner = Owner::either;
+        :>> checkedBy = "gate:review";
     }
     action implClose : ProcessStep {
         :>> id = "893dad0b-5a2a-4548-94e7-11dc07e87647";
@@ -178,6 +182,7 @@ package EngineAgileProcess {
                   + "Done is the COMPUTED view over results - never authored.";
         :>> producedArtifact = "Story done iff satisfaction == verified.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "gate:closeOut";
     }
 
     // ---- Retrospective (per-sprint) ---------------------------------
@@ -197,6 +202,7 @@ package EngineAgileProcess {
         :>> actionText = "Name what went well and, specifically, what was AVOIDABLE — a defect, rework, or friction that a guard, rule, skill, doc or check could have prevented. Distinguish avoidable from merely difficult: only the avoidable class produces an obligation. State each finding plainly, including findings against this thread's own earlier work.";
         :>> producedArtifact = "A recorded retro gate (method=analyze) naming each avoidable issue.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "gate:retro";
     }
     action retroTrack : ProcessStep {
         :>> id = "0d6b0002-0813-4b02-9b3e-0000001b0002";
