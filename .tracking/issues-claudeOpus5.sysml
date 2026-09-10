@@ -1842,4 +1842,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcIdIsAUuid to issue454;
+
+    part issue455 : Issue {
+        :>> id = "3ddc7f7a-28ae-4557-8c30-f70a5f307597";
+        :>> title = "A DoD promised the guard wall clock from an unprobed hypothesis about the parse";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The DoD of dcModelParsesInParallel (issue443) predicted the guard set's wall clock would fall under 4500 ms (from 5073-5463) once the parse left the serial floor. The parse change landed and was measured: parse 1057 -> 283/308/294 ms on three runs, but wall 5475 -> 5033/5090/4840 ms. The floor moved, not vanished: 68 guards sum 58.8 s across 20 workers (2.9 s throughput bound) and run_in_parallel dispatches in declaration order, so the longest guards (acceptance-binds-to-text 3.1 s under contention) can start last. A DoD stated the wall figure as a promise derived from one hypothesis about where the time went; the hypothesis was three-quarters wrong and no probe preceded the number. Observed in the field by KEEL_PERF=2 keel guard --no-receipt . on 2026-09-10; the parse clause of the DoD stands and its wall clause is moved here.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcGuardPoolDispatchesLongestFirst to issue455;
 }

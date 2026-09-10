@@ -467,20 +467,46 @@ impl Model {
     }
 
     fn build_uncached(root: &Path) -> Result<Self, ViewError> {
-        let dirs = model_dirs(root);
+        let n = model_dirs(root).iter().map(|d| crate::collect_sysml(d).len()).sum();
+        Self::build_with_workers(root, Self::parse_workers(n))
+    }
+
+    /// The pool width for `n` files: sized as `guards::run_in_parallel` sizes its own, never wider
+    /// than the work.
+    fn parse_workers(n: usize) -> usize {
+        std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get).min(n.max(1))
+    }
+
+    /// The model from the corpus, parsed and ingested file by file across `workers` threads (`1` is
+    /// the serial build) and REPLAYED in declaration order.
+    ///
+    /// issue443: the parse was the one serial floor every guard waited on. `corpus::parsed` makes each
+    /// file an independent unit, and a file's ingest is a sequence of puts (last file wins) and
+    /// put-if-absents (first wins) whose effect depends only on the order the sequences are applied in -
+    /// so each worker records its file's sequence and the calling thread applies them in `paths` order.
+    /// Items, edges and every view are what the serial build produced.
+    fn build_with_workers(root: &Path, workers: usize) -> Result<Self, ViewError> {
+        let paths: Vec<_> = model_dirs(root).iter().flat_map(|d| crate::collect_sysml(d)).collect();
+        let ingested = crate::perf::phase("model:parse-files", || Self::parse_all(root, &paths, workers));
         let mut items: HashMap<String, ItemInfo> = HashMap::new();
         let mut edges: Vec<Edge> = Vec::new();
-        let paths: Vec<_> = dirs.iter().flat_map(|d| crate::collect_sysml(d)).collect();
-        for path in paths {
-            let name = path.display().to_string();
-            let pkg = crate::corpus::parsed(&path).map_err(|e| match e {
-                crate::corpus::ParseFailure::Io(e) => ViewError::Io(name.clone(), e),
-                crate::corpus::ParseFailure::Lex(m) | crate::corpus::ParseFailure::Parse(m) => ViewError::Track(name.clone(), m),
-            })?;
-            // Repo-relative, forward-slashed path — matches `git diff --name-only` for `newlyAdded` scope.
-            let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string().replace('\\', "/");
-            Self::ingest(&pkg, &mut items, &mut edges, &rel);
-        }
+        crate::perf::phase("model:ingest", || -> Result<(), ViewError> {
+            for file in ingested {
+                let file = file?;
+                for op in file.ops {
+                    match op {
+                        ItemOp::Put(name, info) => {
+                            items.insert(name, info);
+                        }
+                        ItemOp::PutIfAbsent(name, info) => {
+                            items.entry(name).or_insert(info);
+                        }
+                    }
+                }
+                edges.extend(file.edges);
+            }
+            Ok(())
+        })?;
         // `resultof` edges: a TestResult named `<test>R<n>` records a run of Test `<test>` (gate or
         // DoD). The link is by naming convention, not a typed edge — derive it so result leaves
         // connect to their Test (which is itself `contains`-linked to its def).
@@ -496,7 +522,60 @@ impl Model {
         Ok(Self { items, edges })
     }
 
-    fn ingest(pkg: &Package, items: &mut HashMap<String, ItemInfo>, edges: &mut Vec<Edge>, file: &str) {
+    /// One file's contribution to the model: its item ops and edges in the order `ingest` produced them.
+    fn ingest_file(root: &Path, path: &Path) -> Result<FileIngest, ViewError> {
+        let name = path.display().to_string();
+        let pkg = crate::corpus::parsed(path).map_err(|e| match e {
+            crate::corpus::ParseFailure::Io(e) => ViewError::Io(name.clone(), e),
+            crate::corpus::ParseFailure::Lex(m) | crate::corpus::ParseFailure::Parse(m) => ViewError::Track(name.clone(), m),
+        })?;
+        // Repo-relative, forward-slashed path — matches `git diff --name-only` for `newlyAdded` scope.
+        let rel = path.strip_prefix(root).unwrap_or(path).display().to_string().replace('\\', "/");
+        let mut out = FileIngest { ops: Vec::new(), edges: Vec::new() };
+        Self::ingest(&pkg, &mut out.ops, &mut out.edges, &rel);
+        Ok(out)
+    }
+
+    /// Every path parsed and ingested, returned in `paths` order, across `workers` threads.
+    ///
+    /// A host that refuses a thread gets that worker's share done on the calling thread - slower,
+    /// same answer. A slot no worker filled is reported as a failure of that file rather than
+    /// silently dropped: a model missing a file it was asked for is a lie every view would repeat.
+    fn parse_all(root: &Path, paths: &[std::path::PathBuf], workers: usize) -> Vec<Result<FileIngest, ViewError>> {
+        if workers <= 1 || paths.len() <= 1 {
+            return paths.iter().map(|p| Self::ingest_file(root, p)).collect();
+        }
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let slots: Vec<std::sync::Mutex<Option<Result<FileIngest, ViewError>>>> = paths.iter().map(|_| std::sync::Mutex::new(None)).collect();
+        std::thread::scope(|s| {
+            for _ in 0..workers {
+                let work = || loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some(path) = paths.get(i) else { break };
+                    let done = Self::ingest_file(root, path);
+                    if let Some(Ok(mut slot)) = slots.get(i).map(std::sync::Mutex::lock) {
+                        *slot = Some(done);
+                    }
+                };
+                // 16 MiB, as the guard pool: the parser recurses on nesting depth, and a spawned
+                // thread's default stack is a quarter of the main thread's on some hosts.
+                if std::thread::Builder::new().stack_size(16 * 1024 * 1024).spawn_scoped(s, work).is_err() {
+                    work();
+                }
+            }
+        });
+        slots
+            .into_iter()
+            .zip(paths)
+            .map(|(slot, path)| {
+                slot.into_inner()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .unwrap_or_else(|| Err(ViewError::Track(path.display().to_string(), "parsed by no worker".to_string())))
+            })
+            .collect()
+    }
+
+    fn ingest(pkg: &Package, items: &mut Vec<ItemOp>, edges: &mut Vec<Edge>, file: &str) {
         for item in &pkg.items {
             match item {
                 Item::Part(p) => add_item(items, &p.name, p.type_name.as_deref(), &p.attributes, p.marker.as_deref(), file),
@@ -576,13 +655,27 @@ impl Model {
     }
 }
 
-fn add_item(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: Option<&str>, attributes: &[keel_parser::ast::Attribute], marker: Option<&str>, file: &str) {
-    let attrs = attributes.iter().map(|a| (a.name.clone(), value_to_string(&a.value))).collect();
-    items.insert(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string), file: file.to_string() });
+/// One step of a file's ingest, recorded where it is produced and applied in declaration order
+/// (issue443). `Put` is the typed item with its attributes - the last file to declare a name wins;
+/// `PutIfAbsent` is a bare declaration (`action x;`, an `action def`) that never overwrites a typed one.
+enum ItemOp {
+    Put(String, ItemInfo),
+    PutIfAbsent(String, ItemInfo),
 }
 
-fn add_item_typed(items: &mut HashMap<String, ItemInfo>, name: &str, type_name: &str, file: &str) {
-    items.entry(name.to_string()).or_insert_with(|| ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None, file: file.to_string() });
+/// What one file contributes to the model, in the order `Model::ingest` produced it.
+struct FileIngest {
+    ops: Vec<ItemOp>,
+    edges: Vec<Edge>,
+}
+
+fn add_item(items: &mut Vec<ItemOp>, name: &str, type_name: Option<&str>, attributes: &[keel_parser::ast::Attribute], marker: Option<&str>, file: &str) {
+    let attrs = attributes.iter().map(|a| (a.name.clone(), value_to_string(&a.value))).collect();
+    items.push(ItemOp::Put(name.to_string(), ItemInfo { type_name: type_name.unwrap_or("").to_string(), attrs, marker: marker.map(str::to_string), file: file.to_string() }));
+}
+
+fn add_item_typed(items: &mut Vec<ItemOp>, name: &str, type_name: &str, file: &str) {
+    items.push(ItemOp::PutIfAbsent(name.to_string(), ItemInfo { type_name: type_name.to_string(), attrs: HashMap::new(), marker: None, file: file.to_string() }));
 }
 
 /// Strip a `R<digits>` result suffix: `storyDiagramRenderFixDoDR1` -> `storyDiagramRenderFixDoD`.
@@ -4507,6 +4600,51 @@ pub fn days_between_pub(from: &str, to: &str) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pooled_build_is_the_serial_build() {
+        // issue443: the corpus parses and ingests across a pool and the model must be what the serial
+        // build produced - the same items with the same fields and source files, the edges in the same
+        // order, and the same winner where two files declare one name (last typed declaration wins,
+        // a bare `action x;` never overwrites). Seven files whose sorted order differs from the order
+        // they were written in; two of them collide on `shared`.
+        let dir = std::env::temp_dir().join(format!("keel_ppar_{}", std::process::id()));
+        std::fs::remove_dir_all(&dir).ok();
+        let tracking = dir.join(".tracking");
+        std::fs::create_dir_all(&tracking).unwrap();
+        for (i, tag) in ["g", "a", "f", "b", "e", "c", "d"].iter().enumerate() {
+            let body = format!(
+                concat!(
+                    "package P{tag} {{\n",
+                    "    part n{tag} : Need {{ :>> id = \"{i}\"; :>> title = \"{tag}\"; }}\n",
+                    "    part sr{tag} : SystemRequirement {{ :>> id = \"{i}0\"; }}\n",
+                    "    part shared : Need {{ :>> title = \"from {tag}\"; }}\n",
+                    "    action def D{tag} {{ action shared; action step{tag}; }}\n",
+                    "    satisfy n{tag} by sr{tag};\n",
+                    "}}\n"
+                ),
+                tag = tag,
+                i = i
+            );
+            std::fs::write(tracking.join(format!("{tag}.sysml")), body).unwrap();
+        }
+        let serial = Model::build_with_workers(&dir, 1).unwrap();
+        let pooled = Model::build_with_workers(&dir, 4).unwrap();
+        let edges = |m: &Model| m.edges.iter().map(|e| format!("{} {} {}", e.kind, e.from, e.to)).collect::<Vec<_>>();
+        assert_eq!(edges(&pooled), edges(&serial));
+        assert!(edges(&serial).len() >= 7 * 3, "{:?}", edges(&serial));
+        assert_eq!(pooled.items.len(), serial.items.len());
+        for (name, want) in &serial.items {
+            let got = &pooled.items[name];
+            assert_eq!((&got.type_name, &got.attrs, &got.marker, &got.file), (&want.type_name, &want.attrs, &want.marker, &want.file), "{name}");
+        }
+        // The collision resolves as it always did: the last file in sorted order (g.sysml) wins the typed
+        // `shared`, and the bare `action shared;` declarations never displaced it.
+        assert_eq!(pooled.items["shared"].type_name, "Need");
+        assert_eq!(pooled.items["shared"].attrs["title"], "from g");
+        assert_eq!(pooled.items["shared"].file, ".tracking/g.sysml");
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn critique_policy_default_is_core3() {
