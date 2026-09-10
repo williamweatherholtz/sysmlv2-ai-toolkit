@@ -56,4 +56,14 @@ package ProjectIntake20260910 {
         :>> implication = ImplicationKind::process;
     }
     #DerivedFrom dependency from us107 to st116;
+
+    part st117 : Statement {
+        :>> id = "1e44adee-170e-45f0-9958-280bb11447f6";
+        :>> title = "GH#70 [bug] add-task rejects --method analyze (the schema's member) and accepts 'analysis', writing an enum value keel validate rejects";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "githubRecorder";
+        :>> text = "**Observed (keel 0.3.1).** `keel add-task --method analyze` is refused: `error: invalid method 'analyze'`. `keel add-task --method analysis` is accepted and writes `:>> method = VerificationMethod::analysis;` — which `keel validate` then flags as a semantic diagnostic: `hint: valid members: analyze, confirmation, critique, demo, inspect, test`. So the CLI's method vocabulary and the schema's `VerificationMethod` enum disagree on the one member; the write path accepts the invalid spelling and rejects the valid one.\n\n**Expected.** `add-task` validates `--method` against the schema enum it writes (`analyze`), or maps the CLAUDE.md prose form `analysis` to it. As it stands the sanctioned write path produces a record the validator rejects, and the only fix is a hand edit of the `.sysml`.\n\n---\nFiled from obsidian-selfsync (keel 0.3.1, 2026-09-09).\n";
+        :>> saidBy = "williamweatherholtz"; :>> saidAt = "2026-09-09"; :>> channel = StatementChannel::github;
+        :>> sourceUrl = "https://github.com/williamweatherholtz/sysmlv2-ai-toolkit/issues/70";
+        :>> sourceTrust = SourceTrust::untrusted;
+    }
 }
