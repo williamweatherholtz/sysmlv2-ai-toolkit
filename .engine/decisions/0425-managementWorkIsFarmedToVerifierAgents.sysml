@@ -1,0 +1,27 @@
+// D0425 (status: the `status` field below is the truth) — managementWorkIsFarmedToVerifierAgents: the primary agent spends its effort on the problem; ceremony, checking and verification against keel are farmed out to independent subagents that report discrepancies, not summaries
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0425Accept event on sign-off.
+package Decision0425 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0425 : Decision {
+        :>> id = "369d2323-eedb-4252-9eaa-fbf61ce50e5d";
+        :>> title = "managementWorkIsFarmedToVerifierAgents: the primary agent spends its effort on the problem; ceremony, checking and verification against keel are farmed out to independent subagents that report discrepancies, not summaries";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "The human, 2026-09-10 (st116): 'I feel like AI spends so much time check listing that it doesn't have any brain power to burn on actually solving problems. all the test is in terms of 'I did X process and the guards worked great' but the actual meat of the content seems to have gone downhill. fire the next several prompts, let's try farming out the management work to other haiku agents that can independently check and verify work against keel.' The process as run put every ceremony step - orient, sprint record, gate stamps, guard runs, doc-sync grep, commit - in the same context as the engineering, and the transcript shows what that costs: a turn's report leads with what the process did and the change itself is the smaller part.";
+        :>> decision = "NOT A FORK: the human named the arrangement. Within a session the PRIMARY agent does the substance - the design, the code, the analysis - and hands each unit of management work to a subagent with its own context: a VERIFIER runs the checks (cargo test on the touched binaries, keel validate, keel guard, the DoD's own probe pair) against the tree as it is and reports every discrepancy between what was claimed and what the commands returned, naming the command; a RECORDER writes the sprint ceremony through the keel write API (new sprint --fill, append-result, append-gate-result) only from the verifier's receipt, never from the primary's description; a CENSUS or ANALYSIS agent reads the code or the record and returns a table with file:line for every row. Haiku-class models are the default for verifying and recording; a task that needs judgment over code names the model it used. The primary never stamps its own work's verdict where a verifier exists in the session, and a subagent's report is relayed as what matters, not as the transcript. What a subagent cannot do: accept a Decision, edit an item it does not own, or write a TestResult whose receipt names a run it did not make.";
+        :>> rationale = "Independence is what the guards were standing in for: the primary checking its own work is the testimony problem (issue266) in another form, and the human's read is that the checking has crowded out the work. A verifier in a fresh context runs the same commands and cannot inherit the primary's belief that they passed; the recorder writing from the verifier's receipt keeps the D0232 chain (a pass names what produced it) without the primary spending its turn on it. This is also the first change made under nControlBindsTheSubvertingActor's principle that costs the human nothing and the AI its ceremony. What would change it: verifier reports that agree with the primary in every case over a sprint - then they are adding latency, not independence - or a recorder that writes a verdict the verifier did not return.";
+        :>> consequences = "CLAUDE.md sec 4 gains one working rule naming the three roles; the delivery skill (sprint-execution / sprint-planning) names the recorder as the ceremony's writer; the Agent tool's subagent_type and model are named in each dispatch. No guard changes: the write API already enforces provenance and receipts on whoever writes. Process-change (D0337) - accepted on the human's word in st116. What accepting binds: a sprint's ceremony records are written by a recorder from a verifier's receipt. What it forecloses: the primary stamping its own gates when a session can spawn a verifier.";
+    }
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0425Accept : Test { :>> id = "12200b1c-80e8-4f0b-902a-8731b2197ebc"; :>> method = VerificationMethod::confirmation; :>> procedureText = "chat words in st116, same message as the D0423/D0424 acceptance - their words, verbatim: “let's try farming out the management work to other haiku agents that can independently check and verify work against keel”"; }
+    part d0425AcceptR1 : TestResult { :>> id = "fdb63d49-401f-4450-b4a5-5e7861638d9d"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "c1e8b69"; :>> judgedAt = "2026-09-10"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeOpus5"; }
+}

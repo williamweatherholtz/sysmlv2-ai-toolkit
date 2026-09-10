@@ -37,4 +37,23 @@ package ProjectIntake20260910 {
         :>> triageNote = "no existing process runs census -> STPA evidence -> Business workflow end to end; the process is the deliverable";
     }
     #DerivedFrom dependency from us106 to st115;
+
+    part st116 : Statement {
+        :>> id = "ff109db8-86a2-4af6-89f0-377302087870";
+        :>> title = "any unabused guard that gatekeeps me is reconsidered or dissolved; AI check-lists instead of solving; farm management work to haiku agents that verify against keel";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> text = "accept d0424 and d0423.\n\nand you're kind of missing the point - any guards that have not been abused that gatekeep me should be reconsidered or dissolved outright. it's not this one edge case that's the issue, really.\n\nand I feel like AI spends so much time check listing that it doesn't have any brain power to burn on actually solving problems. all the test is in terms of ''I did X process and the guards worked great'' but the actual meat of the content seems to have gone downhill. fire the next several prompts, let's try farming out the management work to other haiku agents that can independently check and verify work against keel.";
+        :>> saidBy = "wweatherholtz"; :>> saidAt = "2026-09-10"; :>> channel = StatementChannel::chat;
+    }
+
+    part us107 : UserStory {
+        :>> id = "33a7e9d6-53ba-4460-866f-b91426f8b550";
+        :>> title = "The primary agent solves; independent subagents check, verify and record against keel";
+        :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5";
+        :>> asA = "human decider";
+        :>> iWant = "the agent's effort on the problem and the ceremony, checking and recording done by separate agents that verify the work against keel independently";
+        :>> soThat = "the meat of the content stops going downhill and the checks are independent of the one who did the work";
+        :>> implication = ImplicationKind::process;
+    }
+    #DerivedFrom dependency from us107 to st116;
 }
