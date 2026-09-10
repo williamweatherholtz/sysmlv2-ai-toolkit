@@ -1721,4 +1721,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcModelParsesInParallel to issue443;
+
+    part issue444 : Issue {
+        :>> id = "3a0aecef-2942-42c2-8b43-7a57cb7464ac";
+        :>> title = "D0421 asked for a gate priced in seconds; the first live set cost 528 s, 90 percent of the suite the human withdrew for cost";
+        :>> createdAt = "2026-09-09";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "D0421 was proposed with its cost stated from the fixture - the set of one runs in about two seconds, a typical sprint names one to four binaries - and never measured on a live set before the human was asked to accept a gate on it. The first live set, the view-touching commit 5fbe410, named 15 integration binaries plus the lib: 528 s wall on this host (cargo test --release -p keel-cli --lib --test ... x15: compile 234 s, tests 286 s, 519 passed), against the full suite's 585 s at 9369863. A gate whose cost is 90 percent of the gate the human withdrew for cost (D0356) is not the Decision the text described. Known positive: the fixture's single-binary set, which does run in about two seconds. Known negative: the empty set on 4192458, which cost 0 s and is a receipt too. The recurrence class is D0388's: a figure stated before the check that would establish it, here the cost of a control on the very path it would gate.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcTouchedCostIsMeasuredNotQuoted to issue444;
 }
