@@ -113,5 +113,6 @@ package EngineGuardConstraints {
     constraint def wrapperPinChecksummed;   // guard 67 (D0385), warning-tier: the pinned engine has a wrapper checksum for every asset keelw can download
     constraint def planCoversStep;          // guard 68 (D0396): a PLAN-COVERED acceptance still holds its plan's three clauses against the tree
     constraint def idIsAUuid;               // guard 69 (D0430/issue454): an id dated on/after 2026-09-10, or on a line added in the working tree, is an RFC 4122 v4 UUID; earlier failures are history, counted by class
+    constraint def stepCheckResolves;       // guard 70 (D0434, D0321 option A): a ProcessStep's checkedBy names a guard or declared rule that runs; a ghost or empty name is EHZ5
 
 }

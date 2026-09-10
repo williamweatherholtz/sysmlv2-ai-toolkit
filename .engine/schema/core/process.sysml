@@ -27,5 +27,10 @@ package EngineProcess {
         attribute actionText : String;         // what is done
         attribute producedArtifact : String;   // the tracked artifact change produced
         attribute owner : Owner;
+        // The guard (a GUARD_NAMES entry) or declared rule (`part <name> : EdgeRule|ElementRule` in
+        // rules.sysml) whose predicate checks that this step was done. Optional: a step with none is
+        // judgment, and `keel show hardening` reports it as such per step. Guard `step-check-resolves`
+        // FAILS a name nothing runs - a step claiming a dead check is EHZ5 (D0321 option A, D0434).
+        attribute checkedBy : String [0..1];
     }
 }

@@ -79,6 +79,7 @@ package ProcessStpaSelf {
         :>> actionText = "Record the run as a Test (method analyze) whose procedureText lists `ANALYSED: <action>, <action>, ...` - the computed action names walked in stpa3 - then `EVIDENCE: <n> observed, <m> code-read` and `REMOVAL CANDIDATES: ...` copied from `keel show control-census` `ucaSummary` at the same tree (D0424; a run that adds only code-read UCAs says so), and a passing TestResult judged against HEAD. The stpa-currency guard compares the union of every run's ANALYSED list with the current computed structure and WARNS while any action is unanalysed, grouping the remainder by the controller->process edge each action sits on and naming the NEXT TRANCHE - the open edge with the fewest unanalysed actions - with the exact ANALYSED list its record will carry (D0410). A tranche is one edge walked in full; the warning is the re-run trigger, and it clears only by runs that cover every edge.";
         :>> producedArtifact = "The run record; the guard's silence until the structure grows.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "stpa-currency";
     }
 
     first stpa1Losses then stpa2Structure;

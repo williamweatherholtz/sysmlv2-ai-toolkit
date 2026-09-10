@@ -38,6 +38,7 @@ package ProcessStpaDiagram {
         :>> actionText = "Run `keel show control-structure [ROOT]` and feed its JSON to the tool. Nothing about a specific controller, action or feedback path is typed by hand: the diagram is a VIEW of the JSON and redraws when the facts change (a removed hook event disappears from the picture on the next run). If the picture needs a box the JSON lacks, the fix is in the view or the authored residue, not in the drawing.";
         :>> producedArtifact = "The JSON of the structure to be drawn.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "viewpoint-renderer";
     }
 
     action sd1Axis : ProcessStep {

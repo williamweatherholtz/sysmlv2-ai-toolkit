@@ -38,6 +38,7 @@ pub fn hardening(root: &Path) -> Result<String, crate::view::ViewError> {
         ),
         ("helpCoverage".to_string(), help_coverage(root)),
         ("processEnforcement".to_string(), process_enforcement(root)),
+        ("stepEnforcement".to_string(), step_enforcement(root)),
         ("decisionFollowThrough".to_string(), decision_follow_through(root)),
         ("apiSurface".to_string(), api_surface(root)),
         ("enforcementPoints".to_string(), enforcement_points(root)),
@@ -249,6 +250,106 @@ fn process_enforcement(root: &Path) -> Json {
         ("accountedPct".to_string(), measured(pct(accounted, total), "no processes declared")),
         ("undeclared".to_string(), Json::Arr(undeclared)),
         ("unenforceable".to_string(), Json::Arr(unenforceable)),
+    ])
+}
+
+// ── lens 2b: which STEPS are checked? (D0321 option A / D0434) ───────────────────────────────────
+
+/// Per `ProcessStep`: is the step bound to a check that runs, is its process a declared judgment, or is
+/// nothing said about it?
+///
+/// The per-process lens above reads a process with one bound step as ENFORCED, which is true of the
+/// process and says nothing about its other steps - a process checked at one step and judgment at five
+/// looks the same as one checked at six. This is the per-step surface D0321 measured the absence of.
+/// Three classes, mirroring the process buckets so the two lenses read together:
+///
+/// * `checked` - the step's `checkedBy` names a guard in `GUARD_NAMES` or a rule declared under
+///   `.engine/rules/` (`guards::declared_check_names`, the vocabulary the `step-check-resolves`
+///   guard enforces);
+/// * `declaredJudgment` - unbound, and EVERY top-level process in its unit is declared
+///   `checkable = false` in `process-enforcement.toml`;
+/// * `undeclared` - unbound, and nothing says whether a check could exist.
+///
+/// A bound step whose name does not resolve is counted under `unresolved` and is a guard violation, not
+/// a lens class - the lens never hides what the guard would fail. AN INDICATOR, NEVER A GATE (invariant
+/// 7): a binding names the control and does not make it good (D0254), and gating the ratio would make the
+/// cheapest fix a binding to whatever guard is nearest. The lens prints each checked step's guard name so a
+/// reader can see how far that guard reaches - a warning-tier guard checks only as far as a warning goes.
+fn step_enforcement(root: &Path) -> Json {
+    let declared = enforcement_contract(root);
+    let names = crate::guards::declared_check_names(root);
+    let bound: std::collections::BTreeMap<(String, String), String> = crate::guards::step_check_bindings(root)
+        .into_iter()
+        .map(|(path, _, step, name)| {
+            let unit = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            ((unit, step), name)
+        })
+        .collect();
+    let (mut checked, mut judgment, mut undeclared, mut unresolved) = (Vec::new(), 0usize, 0usize, Vec::new());
+    let mut per_unit: Vec<Json> = Vec::new();
+    for f in crate::collect_sysml(&root.join(".engine/processes")) {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let unit = f.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let processes = top_level_processes(&text);
+        let all_judgment = !processes.is_empty()
+            && processes.iter().all(|p| matches!(declared.get(p), Some((false, _, _))));
+        let (mut u_steps, mut u_checked, mut u_judgment, mut u_undeclared) = (0usize, 0usize, 0usize, 0usize);
+        for raw in text.lines() {
+            let line = raw.trim_start();
+            if line.starts_with("//") {
+                continue;
+            }
+            let Some(rest) = line.strip_prefix("action ") else { continue };
+            let Some((name, after)) = rest.split_once(':') else { continue };
+            if !after.trim_start().starts_with("ProcessStep") {
+                continue;
+            }
+            u_steps += 1;
+            let step = name.trim().to_string();
+            match bound.get(&(unit.clone(), step.clone())) {
+                Some(check) if names.contains(check) => {
+                    u_checked += 1;
+                    checked.push(Json::Obj(vec![
+                        ("unit".to_string(), Json::s(unit.clone())),
+                        ("step".to_string(), Json::s(step)),
+                        ("checkedBy".to_string(), Json::s(check.clone())),
+                    ]));
+                }
+                Some(check) => unresolved.push(Json::s(format!("{unit}:{step} -> {check}"))),
+                None if all_judgment => u_judgment += 1,
+                None => u_undeclared += 1,
+            }
+        }
+        judgment += u_judgment;
+        undeclared += u_undeclared;
+        per_unit.push(Json::Obj(vec![
+            ("unit".to_string(), Json::s(unit)),
+            ("steps".to_string(), count(u_steps)),
+            ("checked".to_string(), count(u_checked)),
+            ("declaredJudgment".to_string(), count(u_judgment)),
+            ("undeclared".to_string(), count(u_undeclared)),
+        ]));
+    }
+    let total = checked.len() + judgment + undeclared + unresolved.len();
+    Json::Obj(vec![
+        (
+            "note".to_string(),
+            Json::s(
+                "Per STEP, where processEnforcement is per process: a process checked at one step reads \
+                 ENFORCED there and says nothing about its other steps (D0321). CHECKED names the guard or \
+                 declared rule the step's `checkedBy` resolves to - how far that check reaches is the \
+                 guard's own tier. DECLARED JUDGMENT is unbound in a unit whose processes are all \
+                 `checkable = false`. UNDECLARED is the gap. An INDICATOR, never a gate (D0254).",
+            ),
+        ),
+        ("steps".to_string(), count(total)),
+        ("checkedCount".to_string(), count(checked.len())),
+        ("declaredJudgment".to_string(), count(judgment)),
+        ("undeclared".to_string(), count(undeclared)),
+        ("checkedPct".to_string(), measured(pct(checked.len(), total), "no steps declared")),
+        ("checked".to_string(), Json::Arr(checked)),
+        ("unresolved".to_string(), Json::Arr(unresolved)),
+        ("perUnit".to_string(), Json::Arr(per_unit)),
     ])
 }
 
@@ -579,6 +680,45 @@ fn enforcement_points(root: &Path) -> Json {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// D0434: the step lens's counts equal a hand count over the process files - every
+    /// `action <x> : ProcessStep` is one step, every `:>> checkedBy` that names a guard is one checked
+    /// step - and the classes partition the steps (no step counted twice, none dropped).
+    #[test]
+    fn step_enforcement_counts_equal_a_hand_count() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut steps = 0usize;
+        let mut bound = 0usize;
+        for f in crate::collect_sysml(&root.join(".engine/processes")) {
+            let text = std::fs::read_to_string(&f).unwrap();
+            for line in text.lines() {
+                let t = line.trim_start();
+                if t.starts_with("//") {
+                    continue;
+                }
+                if t.starts_with("action ") && t.split_once(':').is_some_and(|(_, a)| a.trim_start().starts_with("ProcessStep")) {
+                    steps += 1;
+                }
+                if t.contains(":>> checkedBy") {
+                    bound += 1;
+                }
+            }
+        }
+        let json = step_enforcement(&root).dump();
+        let field = |k: &str| -> usize {
+            let key = format!("\"{k}\": ");
+            let at = json.find(&key).unwrap_or_else(|| panic!("{k} missing in {json}")) + key.len();
+            json[at..].chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap()
+        };
+        assert_eq!(field("steps"), steps, "the lens counts every ProcessStep");
+        assert_eq!(field("checkedCount"), bound, "on this tree every binding resolves (the guard holds it)");
+        assert!(bound >= 7, "the seven D0434 bindings are present, found {bound}");
+        assert_eq!(
+            field("checkedCount") + field("declaredJudgment") + field("undeclared"),
+            steps,
+            "the classes partition the steps"
+        );
+    }
 
     /// `: ProcessStep` must NOT be counted as a process. This is the single worst number the
     /// hand-written audit produced — 131 where there are 24 — and it is one character of regex.

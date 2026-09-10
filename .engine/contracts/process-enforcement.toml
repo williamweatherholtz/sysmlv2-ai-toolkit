@@ -50,7 +50,7 @@ reason = "Traversal and recall of the model as a graph. Whether the right thing 
 
 [migration]
 checkable = true
-reason = "UNDER-GUARDED. D0067's gated expand/migrate/contract with a committed transform and a dry run reconciling control totals is a sequence of artifacts, all of which exist or do not. `marker-census` computes exactly the control total the process requires and is not bound to it."
+reason = "UNDER-GUARDED. D0067's gated expand/migrate/contract with a committed transform and a dry run reconciling control totals is a sequence of artifacts, all of which exist or do not. `marker-census` computes a control total the process requires, but it is a LENS, not a guard - `step-check-resolves` refused it as mig2DryRunReconcile's checkedBy on 2026-09-10 (issue465); the guard that would bind the step is dcMigrationReconcileIsAGuard."
 
 [diagramView]
 checkable = false

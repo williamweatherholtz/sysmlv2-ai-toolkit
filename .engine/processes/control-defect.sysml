@@ -78,6 +78,7 @@ package ProcessControlDefect {
         :>> actionText = "Record the Issue with a resolver, exactly as any Issue - and then add a section to `.engine/contracts/control-defects.toml` keyed by the CONTROL's name, carrying the issue id, the direction, the effect and the invalidation. The registry is not bookkeeping: it is what makes the next step work. Do both in the same act. The failure this prevents is the one that produced this process - three true findings written into retro prose, where they were unfindable, uncounted and unresolved.";
         :>> producedArtifact = "A tracked Issue with a resolver, plus its registry entry.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "control-defect-registry";
     }
 
     action cd5Announce : ProcessStep {

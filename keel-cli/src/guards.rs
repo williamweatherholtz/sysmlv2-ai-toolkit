@@ -3405,8 +3405,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 69] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid"];
+pub const GUARD_NAMES: [&str; 70] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -5516,6 +5516,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "wrapper-pin-checksummed" => Some(wrapper_pin_checksummed(root)), // WARNING-tier (D0385/issue418) - the pin moved, the wrapper table did not
         "plan-covers-step" => Some(plan_covers_step(root)), // hard (D0396) - a PLAN-COVERED acceptance whose plan no longer holds
         "id-is-a-uuid" => Some(id_is_a_uuid(root)), // hard (D0430/issue454) - an id from the cutoff on, or added in the tree, is v4
+        "step-check-resolves" => Some(step_check_resolves(root)), // hard (D0434) - a step naming a check nothing runs is EHZ5
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
@@ -7508,3 +7509,191 @@ mod accept_transform_tests {
     }
 }
 
+
+// ── step-check-resolves guard (D0321 option A / D0434) ──────────────────────────────────────────
+
+/// The names a `checkedBy` may resolve to.
+///
+/// Every guard in [`GUARD_NAMES`] plus every rule DECLARED under `.engine/rules/` as
+/// `part <name> : EdgeRule|ElementRule`. Shared with `hardening::step_enforcement` so the lens and
+/// the guard read one vocabulary.
+#[must_use]
+pub fn declared_check_names(root: &Path) -> HashSet<String> {
+    let mut names: HashSet<String> = GUARD_NAMES.iter().map(std::string::ToString::to_string).collect();
+    for path in crate::collect_sysml(&root.join(".engine/rules")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        for raw in text.lines() {
+            let t = raw.trim_start();
+            if t.starts_with("//") {
+                continue;
+            }
+            let Some(rest) = t.strip_prefix("part ") else { continue };
+            let Some((name, ty)) = rest.split_once(':') else { continue };
+            let ty = ty.trim_start();
+            if ty.starts_with("EdgeRule") || ty.starts_with("ElementRule") {
+                names.insert(name.trim().to_string());
+            }
+        }
+    }
+    names
+}
+
+/// Every `:>> checkedBy = "<name>";` in a process file.
+///
+/// As (path, 1-based line, step name, check name). The step is the nearest enclosing
+/// `action <step> : ProcessStep {` - the same one-line-or-block walk `attribute_vocabulary` does,
+/// narrowed to the one attribute.
+#[must_use]
+pub fn step_check_bindings(root: &Path) -> Vec<(PathBuf, usize, String, String)> {
+    let mut out = Vec::new();
+    for path in crate::collect_sysml(&root.join(".engine/processes")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        let mut step = String::new();
+        for (i, raw) in text.lines().enumerate() {
+            let t = raw.trim_start();
+            if t.starts_with("//") {
+                continue;
+            }
+            if let Some(rest) = t.strip_prefix("action ") {
+                if let Some((name, ty)) = rest.split_once(':') {
+                    if ty.trim_start().starts_with("ProcessStep") {
+                        step = name.trim().to_string();
+                    }
+                }
+            }
+            let Some(pos) = t.find(":>> checkedBy") else { continue };
+            let after = t[pos + ":>> checkedBy".len()..].trim_start();
+            let Some(after) = after.strip_prefix('=') else { continue };
+            let value = after.trim_start();
+            let name = value
+                .strip_prefix('"')
+                .and_then(|v| v.split_once('"'))
+                .map(|(n, _)| n.to_string())
+                .unwrap_or_default();
+            out.push((path.clone(), i + 1, step.clone(), name));
+        }
+    }
+    out
+}
+
+/// A `ProcessStep` that names its check names one that RUNS.
+///
+/// # Why a guard and not a comment
+///
+/// D0321 measured 37 processes of which only agile-workflow's ceremony steps carried a per-step check;
+/// seven processes had a guard that checks one of their steps and nowhere to write that fact. D0434
+/// gives the step an attribute, `checkedBy : String [0..1]`, and this guard is what makes the attribute a
+/// FACT a control can read rather than a comment: a step that names a guard nothing runs - a rename, a
+/// retirement, a typo - would otherwise claim enforcement forever, which is EHZ5 (an enforcement point
+/// silently dead) in its purest shape. The vocabulary is [`declared_check_names`]: the binary's own
+/// `GUARD_NAMES` and the rules `.engine/rules/` declares; an empty string fails too, since a binding that
+/// names nothing is a binding to nothing.
+///
+/// HARD. What it does NOT check: whether the named guard's predicate actually covers the step's
+/// `actionText` - that is a judgment, reported per step by `keel show hardening` (`stepEnforcement`) and
+/// judged in the sitting review (D0254). An unbound step is not scanned: optional multiplicity is the
+/// EXPAND step of the migration, and nothing here contracts.
+#[must_use]
+pub fn step_check_resolves(root: &Path) -> GuardReport {
+    let names = declared_check_names(root);
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    for (path, line, step, name) in step_check_bindings(root) {
+        scanned += 1;
+        if names.contains(&name) {
+            continue;
+        }
+        let rel = relpath(root, &path);
+        let hint = if name.is_empty() {
+            "the value is empty - a binding to nothing".to_string()
+        } else {
+            nearest_attr(&name, &names).map_or_else(
+                || "no guard in GUARD_NAMES and no `part <name> : EdgeRule|ElementRule` under .engine/rules/ has that name".to_string(),
+                |n| format!("did you mean `{n}`?"),
+            )
+        };
+        violations.push(format!(
+            "{rel}:{line}: step `{step}` sets checkedBy = \"{name}\" and nothing of that name runs - {hint}. A step claiming a check that does not exist is an enforcement point that is silently dead (EHZ5, D0434): bind it to a live guard or rule, or remove the attribute so `keel show hardening` reports the step as judgment."
+        ));
+    }
+    GuardReport { name: "step-check-resolves", scanned, warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod step_check_resolves_tests {
+    use std::path::Path;
+
+    struct Fixture(std::path::PathBuf);
+    impl Fixture {
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn fixture(binding: &str) -> Fixture {
+        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let dir = Fixture(std::env::temp_dir().join(format!("keel-stepcheck-{}-{n}", std::process::id())));
+        let _ = std::fs::remove_dir_all(dir.path());
+        std::fs::create_dir_all(dir.path().join(".engine/processes")).expect("mkdir");
+        std::fs::create_dir_all(dir.path().join(".engine/rules")).expect("mkdir");
+        std::fs::write(
+            dir.path().join(".engine/rules/rules.sysml"),
+            "package Rules {\n    part issuesTriagedRule : EdgeRule { :>> id = \"r\"; }\n}\n",
+        )
+        .expect("write");
+        std::fs::write(
+            dir.path().join(".engine/processes/probe.sysml"),
+            format!(
+                "package ProcessProbe {{\n    action probe : Process {{ :>> purpose = \"p\"; }}\n    action p1 : ProcessStep {{\n        :>> actionText = \"do\";\n        :>> owner = Owner::ai;\n{binding}    }}\n    action p2 : ProcessStep {{\n        :>> actionText = \"judge\";\n        :>> owner = Owner::human;\n    }}\n}}\n"
+            ),
+        )
+        .expect("write");
+        dir
+    }
+
+    /// Known-positive: a step naming a guard that does not exist FAILS, and the report names the step.
+    #[test]
+    fn a_ghost_guard_name_fails() {
+        let dir = fixture("        :>> checkedBy = \"marker-vocabularyy\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!(r.scanned, 1);
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+        assert!(r.violations[0].contains("step `p1`"), "{}", r.violations[0]);
+        assert!(r.violations[0].contains("did you mean `marker-vocabulary`?"), "{}", r.violations[0]);
+    }
+
+    /// Known-negative: a guard name and a declared rule name both resolve; an unbound step is not scanned.
+    #[test]
+    fn a_guard_or_a_declared_rule_resolves() {
+        let dir = fixture("        :>> checkedBy = \"marker-vocabulary\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!((r.scanned, r.violations.len()), (1, 0), "{:?}", r.violations);
+        let dir = fixture("        :>> checkedBy = \"issuesTriagedRule\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!((r.scanned, r.violations.len()), (1, 0), "{:?}", r.violations);
+    }
+
+    /// An empty binding is a binding to nothing.
+    #[test]
+    fn an_empty_binding_fails() {
+        let dir = fixture("        :>> checkedBy = \"\";\n");
+        let r = super::step_check_resolves(dir.path());
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+        assert!(r.violations[0].contains("empty"), "{}", r.violations[0]);
+    }
+
+    /// The live tree: the seven D0434 bindings resolve, and every name is a guard this binary runs.
+    #[test]
+    fn the_live_bindings_resolve() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let r = super::step_check_resolves(&root);
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
+        assert!(r.scanned >= 7, "expected the seven D0434 bindings, scanned {}", r.scanned);
+    }
+}

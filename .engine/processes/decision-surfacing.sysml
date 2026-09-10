@@ -46,6 +46,7 @@ package ProcessDecisionSurfacing {
         :>> actionText = "THE FAILURE THIS EXISTS TO END, in the human's words: 'I get some semblance of we need Need1 and Need2 judged, WHAT DECIDES IT: picking which ones are good.' That is circular - it restates the question as its own answer and leaves them to go find the item. A tab must carry, INLINE: (1) THE ITEM ITSELF - the actual statement, quoted or excerpted, never just its name, because a decision that requires opening another file to understand has not been surfaced; (2) WHAT ACCEPTING BINDS - what future work it legitimises and what it forecloses, since a Need is a contract future work will cite; (3) THE SPECIFIC FORK - the contested clause set against its alternative in their own words, not 'good versus bad'; (4) THE EVIDENCE - what is already TRUE in the model versus what is my assumption, labelled apart; (5) WHAT I DO WITH EACH ANSWER - the concrete next action per option, so the cost of each is visible before choosing. THE TEST FOR 'What decides it': it must name an OBSERVABLE, or a value only they hold. If it can be answered by reading the model, I have not finished my work and must answer it myself instead of asking.";
         :>> producedArtifact = "A tab someone could adjudicate without opening the repository.";
         :>> owner = Owner::ai;
+        :>> checkedBy = "judgment-request-quality";
     }
 
     action dsLead : ProcessStep {

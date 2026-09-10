@@ -50,6 +50,7 @@ package ProcessLibraryStewardship {
         :>> actionText = "The issue245 test: if it has no process definition, it appears in no catalogue and travels nowhere. Author the process file, the engine-side skill + registry, and unit-extras naming what it needs to RUN (repo files only - never a machine environment); then publish. The control-defect kit is the worked example: skill + template + browser suite existed for weeks, transferable only after its process file made it a unit.";
         :>> producedArtifact = "A new unit in the library, importable whole.";
         :>> owner = Owner::either;
+        :>> checkedBy = "unit-extras-present";
     }
 
     first lsPublish then lsConsume;

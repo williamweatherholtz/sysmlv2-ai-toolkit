@@ -213,24 +213,28 @@ mod tests {
     }
 
     /// dcOneCorpusPerProcess: a second read of an unchanged file does not open it; a rewritten one does.
+    ///
+    /// The witness is the cached body itself: a read served from the cache hands back the SAME
+    /// `Arc<str>` allocation, a read that opened the file a new one. `FILE_OPENS` is process-global,
+    /// and cargo runs the lib's tests in parallel, so a counter equality across two calls fails
+    /// whenever an unrelated test opens a file in the gap - which it did on 2026-09-10 once two
+    /// more tests walked `.engine/processes` (issue466).
     #[test]
     fn a_second_read_of_an_unchanged_file_does_not_open_it_and_a_rewrite_does() {
         let d = fresh_dir("reads");
         let f = d.join("a.sysml");
         std::fs::write(&f, "package A;").expect("write");
         age(&f);
-        let opens0 = FILE_OPENS.load(Ordering::Relaxed);
-        assert_eq!(read_to_string(&f).expect("read"), "package A;");
-        let opens1 = FILE_OPENS.load(Ordering::Relaxed);
-        assert_eq!(read_to_string(&f).expect("read"), "package A;");
-        let opens2 = FILE_OPENS.load(Ordering::Relaxed);
-        assert!(opens1 > opens0, "the first read opens the file");
-        assert_eq!(opens2, opens1, "the second read of an unchanged settled file must not open it");
+        let (_, _, first) = read_keyed(&f).expect("read");
+        assert_eq!(&*first, "package A;");
+        let (_, _, second) = read_keyed(&f).expect("read");
+        assert!(Arc::ptr_eq(&first, &second), "the second read of an unchanged settled file must be served from the cache");
         // Rewritten: different length, and a fresh mtime that is also inside the racy window - both
         // roads lead to a re-read.
         std::fs::write(&f, "package A; part x;").expect("rewrite");
-        assert_eq!(read_to_string(&f).expect("read"), "package A; part x;");
-        assert!(FILE_OPENS.load(Ordering::Relaxed) > opens2, "a rewritten file is re-read");
+        let (_, _, third) = read_keyed(&f).expect("read");
+        assert_eq!(&*third, "package A; part x;");
+        assert!(!Arc::ptr_eq(&second, &third), "a rewritten file is re-read");
         // Rewritten to the SAME length with an aged mtime: the (len, mtime) test alone would be fooled
         // by an equal mtime, so the entry's mtime must differ from the aged one - it does, because we
         // age to a different instant than the cached read saw.

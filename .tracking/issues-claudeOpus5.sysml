@@ -1952,4 +1952,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcGuardReadsTheWorkingTreeOutsideTheHook to issue464;
+
+    part issue465 : Issue {
+        :>> id = "a996dab7-244c-4109-9677-47a976a2a11d";
+        :>> title = "A lens (marker-census) was named as the migration process's check by D0321, the DoD and D0434; step-check-resolves refused it on its first live run";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A lens was named as a guard three times in a row and nothing caught it until the guard that binds steps to checks ran for the first time. D0321's RESEARCH line (2026-09-05) read migration as checkable because 'the control totals marker-census computes are exactly what the process requires'; dcProcessStepDeclaresItsCheck's DoD copied the pair `migration (marker-census)` into its list of eight bindings; D0434's decision text copied it again; the migration transform 2026-09-10-step-checked-by.py bound mig2DryRunReconcile to it and its dry run reconciled 8 of 8. Then `keel guard step-check-resolves .` on the applied tree: `.engine/processes/migration.sysml:42: step mig2DryRunReconcile sets checkedBy = 'marker-census' and nothing of that name runs - no guard in GUARD_NAMES and no part <name> : EdgeRule|ElementRule under .engine/rules/ has that name`. `keel marker-census` is `cliMarkerCensus` in `.engine/cli/commands.sysml:115`, family `lens`, effect `reads`: a computed view a reader may consult, not a predicate that runs on the step. The same session's unit tests were written with the same wrong name and failed the same way, which is what the guard is for and also why the mistake propagated - the author of the check was the author of the claim (D0388's shape). Corrected in place: the binding removed, seven bindings authored, D0434 and the DoD re-read to say seven and name this issue; the migration process stays `checkable = true` with no guard at any step - the admitted gap since D0173, now with a resolver. Found in the field: the guard's first live run against the tree its own migration had just written.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcMigrationReconcileIsAGuard to issue465;
+
+    part issue466 : Issue {
+        :>> id = "399b5adb-9586-4c71-8a44-87b49fcaad2e";
+        :>> title = "corpus test asserted equality on a process-global open counter and failed under the parallel lib run when two new tests opened files in the gap";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The verifier's full lib run for sprint 660 failed corpus::tests::a_second_read_of_an_unchanged_file_does_not_open_it_and_a_rewrite_does while the same test passed alone. Its witness was FILE_OPENS, a process-global counter in perf.rs, read before and after a second read_to_string and asserted EQUAL - 'the second read of an unchanged settled file must not open it'. cargo runs the lib's tests in parallel, so any other test that opens a file through corpus::read_to_string in that gap increments the counter and the equality fails; the two tests this sprint added (the_live_bindings_resolve, step_enforcement_counts_equal_a_hand_count) both walk .engine/processes through the corpus, which is what made the gap observable. The claim under test was never false - the cache served the second read - and the check was measuring the process, not the path. Corrected: the test now reads through read_keyed and asserts Arc::ptr_eq on the served body, which is the cached allocation exactly when the cache served it and a new one exactly when the file was opened; the counter is left to keel perf. Found in the field: the D0425 verifier subagent's keel suite --touched run, which the primary's six-test filter had not covered (the issue459 shape again, caught this time by the split).";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcProcessStepDeclaresItsCheck to issue466;
 }
