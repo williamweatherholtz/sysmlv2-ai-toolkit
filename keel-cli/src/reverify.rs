@@ -61,7 +61,9 @@ pub fn demo_prefixes(root: &Path) -> Vec<String> {
 /// English function words no command line carries as a bare token. The receipt census that sized this
 /// rule (2026-09-11, 283 prefixed `// RAN:` receipts in this tree) found exactly one prose receipt the
 /// character alphabet alone let through - `keel validate . 762 clean and keel check-engine . clean at
-/// 829e0f0 per VERIFIER_RECEIPT ...` - and every one of its joints is a word from this list.
+/// 829e0f0 per VERIFIER_RECEIPT ...` - and every one of its joints is a word from this list. That census is
+/// committed as `scripts/probes/receipt_shape_census.py`; it reads this list VERBATIM from this file, so
+/// re-run it before changing the list (dcReceiptShapeCensusIsASensor).
 const PROSE_WORDS: [&str; 16] = ["a", "an", "and", "at", "for", "from", "in", "is", "of", "on", "per", "the", "then", "to", "was", "with"];
 
 /// D0444: is a `// RAN:` receipt a command a machine can re-run?

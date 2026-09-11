@@ -100,23 +100,28 @@ one count, exactly one tab starts selected, and the copy digest walks every pane
 Answer first, always. A reader who reads only the title has the recommendation; one who reads only the
 exhibit titles has the argument.
 
-| # | Section | What it must carry | Budget |
-|---|---|---|---|
-| 0 | **Title** | The recommendation itself, verb-led. Never the topic. | ≤ 18 words |
-| 1 | **The ask** | The verdict, then one line per ask with its response options and its reversibility | ≤ 70 words |
-| 2 | **Why now** | Situation, then the one thing that changed and put a clock on it. If nothing has a clock, say so. | ≤ 60 words |
-| 3 | **The decision rule** | The criteria, ranked, stated BEFORE any option is defended | ≤ 40 words |
-| 4 | **Per ask, in its own tab: today → changed → downstream** | Two logic exhibits minimum (§2.3), then the courses table | — |
-| 5 | **Courses** | 2–4 including a do-nothing, each with its places-to-change and what breaks, as named countable things — never a duration (D0405) | table |
-| 6 | **Why this wins / when the runner-up wins** | Beats the named alternative on the stated criterion; the runner-up as a conditional, not a rival | ≤ 90 words |
-| 7 | **What would change my mind** | One falsifiable condition per ask | ≤ 30 words each |
-| 8 | **Provenance strip** | How every number was measured, by whom, when, against which tree | ≤ 60 words |
+| # | Section | What it must carry | Budget | Held by |
+|---|---|---|---|---|
+| 0 | **Title** | The recommendation itself, verb-led. Never the topic. | ≤ 18 words | `check_templates.py --brief` |
+| 1 | **The ask** | The verdict, then one line per ask with its response options and its reversibility | ≤ 70 words | `check_templates.py --brief` |
+| 2 | **Why now** | Situation, then the one thing that changed and put a clock on it. If nothing has a clock, say so. | ≤ 60 words | `tests/exec_summary` |
+| 3 | **The decision rule** | The criteria, ranked, stated BEFORE any option is defended | ≤ 40 words | `tests/exec_summary` |
+| 4 | **Per ask, in its own tab: today → changed → downstream** | Two logic exhibits minimum (§2.3), then the courses table | — | `check_templates.py --brief` (figure count) |
+| 5 | **Courses** | 2–4 including a do-nothing, each with its places-to-change and what breaks, as named countable things — never a duration (D0405) | table | unheld |
+| 6 | **Why this wins / when the runner-up wins** | Beats the named alternative on the stated criterion; the runner-up as a conditional, not a rival | ≤ 90 words | `tests/exec_summary` |
+| 7 | **What would change my mind** | One falsifiable condition per ask | ≤ 30 words each | `tests/exec_summary` |
+| 8 | **Provenance strip** | How every number was measured, by whom, when, against which tree | ≤ 60 words | `check_templates.py --brief` |
 
 **The budgets are held, not hoped (issue413, 2026-09-08).** `python scripts/check_templates.py --brief
 <page>` refuses a page whose headline, ask or provenance strip is over budget, naming the count. Three
 published pages had passed "clean" at 26 / 133 / 71 words against 18 / 70 / 60, and the author's verdict
 on the third was *"the decision brief is still far too verbose."* The remaining rows are measured by the
-exec-summary suite (§4). **Register (their words: *"make it use caveman?"*):** write the reader prose
+exec-summary suite (§4). **Every budget names its holder, in the row (D0047).** The `Held by` column is
+read by `python scripts/check_templates.py --budgets`, which walks every deployed skill's tables with a
+Budget column and refuses a row whose budget carries a number and names neither a check it can find (a
+`check_templates.py --<flag>` the script dispatches, a guard in the catalogue, a pytest path that exists)
+nor the word `unheld` - a budget with no reader is the issue413 shape, and saying `unheld` is honest where
+saying nothing is a hope. **Register (their words: *"make it use caveman?"*):** write the reader prose
 terse — no filler, no hedging, one idea per sentence, short words where a short word exists, articles
 and full sentences kept, every number and term exact. The ceiling (450 reader words, figure titles and
 chips included) is `TERSE_CEILING` in the checker (D0377). **It is measured per tab once D0407 is
@@ -244,6 +249,18 @@ template's own wording — an unreplaced placeholder is caught, not shipped. It 
 adjudication provenance: the project badge, the project in the `<title>`, and a digest that emits a
 `**Source project:**` line. `tests/exec_summary`
 calls the same module rather than restating its rules, so the gate and the suite cannot drift.
+
+**Budget census, over the skill set (issue413):**
+
+```
+python scripts/check_templates.py --budgets     # every Budget-table row names its check or says unheld
+python scripts/check_templates.py --probe       # its known-positive / known-negative pair first (D0388)
+```
+
+The census prints every row of every `.engine/skills/*/SKILL.md` table with a Budget column - held (and
+by what), declared `unheld`, or failing - and exits non-zero on a numeric budget that names no check the
+script can find. `--self-test`, which CI runs on every push, runs the fixture pair AND the live census, so a
+table row that stops naming its check is refused by a run that already exists.
 
 **Exec-summary suite** — real browsers, because one-click copy, tab wiring, 44px targets and
 one-tap at iPhone scale are *behavioral* claims that must be verified rather than asserted:

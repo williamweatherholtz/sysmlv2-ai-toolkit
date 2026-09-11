@@ -20,6 +20,10 @@ What it proves, per family under templates/<family>/:
     links open a new tab (sandboxed-iframe hosts block same-frame navigation)
 
 Usage:  python scripts/check_templates.py [path ...]      (default: templates/)
+        python scripts/check_templates.py --brief PAGE ...  (the executive-brief contract, D0355)
+        python scripts/check_templates.py --budgets         (every skill Budget table row names its check, issue413)
+        python scripts/check_templates.py --probe           (the --budgets known-positive / known-negative pair, D0388)
+        python scripts/check_templates.py --self-test       (every fixture case, brief and budgets; CI runs this)
 Exit 0 = clean, 1 = violations (each named with its file), 2 = usage error.
 """
 from __future__ import annotations
@@ -426,6 +430,196 @@ def check_tree(root: Path) -> list[str]:
     return problems
 
 
+# ── DECLARED BUDGETS NAME THEIR CHECK (issue413, D0047) ──────────────────────────────────────────
+# A skill's contract table declares numeric budgets. A budget nobody measures is a reminder, and D0047
+# says a reminder is not a control: three briefs went out over the 2.1 word budgets while the prose under
+# the table said a checker held them. So every row of a table whose header names a Budget column, when
+# its budget carries a number, names IN THE ROW the check that measures it - a `check_templates.py --<flag>`
+# this script dispatches, a guard from the catalogue (.engine/docs/guards.md), or a pytest path that exists
+# - or carries the literal word `unheld`, which is an honest declaration and passes. A section-level
+# mention is not accepted: it cannot say which row it holds, and that is the shape that failed. A named
+# check that does not exist fails too - a pointer to nothing is the same hope with a filename.
+SKILLS_DIR = ROOT / ".engine" / "skills"
+GUARDS_DOC = ROOT / ".engine" / "docs" / "guards.md"
+BUDGET_HEADER = re.compile(r"\bbudget\b", re.I)
+TABLE_SEP = re.compile(r"^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
+HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$")
+CT_FLAG = re.compile(r"check_templates\.py\s+(--[a-z][a-z-]*)")
+PYTEST_PATH = re.compile(r"(?<![\w/])(tests/[\w./-]*[\w/])")
+GUARD_TICK = re.compile(r"`([a-z][a-z0-9-]*)`")
+GUARD_CMD = re.compile(r"keel guard\s+([a-z][a-z0-9-]*)")
+UNHELD = re.compile(r"\bunheld\b", re.I)
+
+
+def own_flags() -> set[str]:
+    """The flags this script dispatches on, read from its own source: the `argv[1:2] ==` list literals."""
+    return set(re.findall(r'\["(--[a-z][a-z-]*)"\]', Path(__file__).read_text(encoding="utf-8")))
+
+
+def catalogue_guards(doc: Path = GUARDS_DOC) -> set[str]:
+    """Every guard the catalogue lists: the backticked first cell of a table row."""
+    try:
+        text = doc.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return set(re.findall(r"^\|\s*`([a-z][a-z0-9-]*)`\s*\|", text, re.M))
+
+
+def _cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def budget_tables(text: str) -> list[tuple[str, list[str], list[tuple[int, list[str]]]]]:
+    """(section heading, header cells, [(line number, row cells)]) for every table with a Budget column."""
+    out: list[tuple[str, list[str], list[tuple[int, list[str]]]]] = []
+    lines = text.splitlines()
+    section = "(top)"
+    i = 0
+    while i < len(lines):
+        h = HEADING.match(lines[i])
+        if h:
+            section = h.group(1)
+            i += 1
+            continue
+        if lines[i].lstrip().startswith("|"):
+            block_start = i
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                i += 1
+            block = lines[block_start:i]
+            if len(block) >= 2 and TABLE_SEP.match(block[1]):
+                header = _cells(block[0])
+                if any(BUDGET_HEADER.search(re.sub(r"[*`]", "", c)) for c in header):
+                    rows = [(block_start + k + 1, _cells(block[k])) for k in range(2, len(block))]
+                    out.append((section, header, rows))
+            continue
+        i += 1
+    return out
+
+
+def check_budgets_text(skill: str, text: str, guards: set[str], flags: set[str],
+                       exists=None) -> tuple[list[str], list[tuple[str, str, str, str, str]]]:
+    """One skill's text. Returns (violations, census); census rows are (skill, section, label, budget, status)
+    where status is `held -> <check>`, `unheld`, `no number` or `FAIL`. `exists` decides whether a pytest
+    path is real (default: the repo tree), so a fixture can be judged without reading the tree (D0388)."""
+    exists = (lambda rel: (ROOT / rel).exists()) if exists is None else exists
+    bad: list[str] = []
+    census: list[tuple[str, str, str, str, str]] = []
+    for section, header, rows in budget_tables(text):
+        bcol = next(i for i, c in enumerate(header) if BUDGET_HEADER.search(re.sub(r"[*`]", "", c)))
+        for lineno, cells in rows:
+            if len(cells) <= bcol:
+                continue
+            budget = cells[bcol]
+            label_cells = [re.sub(r"[*`]", "", c).strip() for j, c in enumerate(cells) if j != bcol]
+            label = next((c for c in label_cells if c and not re.fullmatch(r"\d+", c)), f"line {lineno}")
+            where = f"{skill} §{section} row \"{label}\" (line {lineno}) budget \"{budget}\""
+            row_text = " | ".join(cells)
+            held: list[str] = []
+            broken: list[str] = []
+            for flag in CT_FLAG.findall(row_text):
+                (held if flag in flags else broken).append(f"check_templates.py {flag}" +
+                                                           ("" if flag in flags else " (this script does not dispatch it)"))
+            for path in PYTEST_PATH.findall(row_text):
+                (held if exists(path) else broken).append(path + ("" if exists(path) else " (no such path)"))
+            for name in GUARD_CMD.findall(row_text):
+                (held if name in guards else broken).append(f"guard {name}" +
+                                                            ("" if name in guards else " (not in the catalogue)"))
+            for name in GUARD_TICK.findall(row_text):
+                if name in guards and f"guard {name}" not in held:
+                    held.append(f"guard {name}")
+            numeric = re.search(r"\d", budget) is not None
+            for b in broken:
+                bad.append(f"{where} names a check that does not exist: {b}")
+            if broken:
+                status = "FAIL"          # already reported above, once per broken name
+            elif held:
+                status = "held -> " + ", ".join(held)
+            elif UNHELD.search(row_text):
+                status = "unheld"
+            elif not numeric:
+                status = "no number"
+            else:
+                status = "FAIL"
+                bad.append(f"{where} names no check and does not say unheld")
+            census.append((skill, section, label, budget, status))
+    return bad, census
+
+
+def check_budgets(skills_dir: Path = SKILLS_DIR) -> tuple[list[str], list[tuple[str, str, str, str, str]]]:
+    """Every .engine/skills/*/SKILL.md, in name order."""
+    guards, flags = catalogue_guards(), own_flags()
+    bad: list[str] = []
+    census: list[tuple[str, str, str, str, str]] = []
+    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+        b, c = check_budgets_text(skill_md.parent.name, skill_md.read_text(encoding="utf-8"), guards, flags)
+        bad += b
+        census += c
+    return bad, census
+
+
+def print_census(census: list[tuple[str, str, str, str, str]], out=None) -> None:
+    out = sys.stdout if out is None else out
+    for skill, section, label, budget, status in census:
+        print(f"  {status:<9} {skill} §{section} | {label} | {budget}" if status in ("unheld", "no number", "FAIL")
+              else f"  {'held':<9} {skill} §{section} | {label} | {budget} -> {status[len('held -> '):]}", file=out)
+
+
+# The D0388 pair, written before the live skill set was read. The positive table holds every row shape the
+# check accepts (a dispatched flag, a pytest path, a catalogue guard, an honest `unheld`, a budget with no
+# number); the negative is the SAME table with the Title row's check removed, so the one difference is
+# the one the check must see.
+_BUDGET_TABLE = (
+    "## 2.1 The section order\n\n"
+    "| # | Section | What it must carry | Budget | Held by |\n"
+    "|---|---|---|---|---|\n"
+    "| 0 | **Title** | The recommendation | ≤ 18 words | {title_check} |\n"
+    "| 1 | **Why now** | The clock | ≤ 60 words | `tests/exec_summary` |\n"
+    "| 2 | **Courses** | 2–4 with a do-nothing | table | unheld |\n"
+    "| 3 | **Falsifier** | One per ask | ≤ 30 words each | unheld |\n"
+    "| 4 | **Exhibits** | Two per ask | — | `check_templates.py --brief` |\n"
+    "| 5 | **Verdict** | One line | ≤ 12 words | guard `doc-sync` |\n"
+)
+_NO_BUDGET_TABLE = "## 3. Forms\n\n| The claim says | Form |\n|---|---|\n| costs 3 times more | bars, 12 max |\n"
+_PROBE_GUARDS = {"doc-sync"}
+_PROBE_FLAGS = {"--brief", "--budgets"}
+_PROBE_EXISTS = lambda rel: rel == "tests/exec_summary"  # noqa: E731
+
+
+def budgets_probe() -> int:
+    """Known-positive and known-negative, judged against fixed guards/flags/paths so the verdict is about the
+    check and not about the tree it happens to run in. Returns the number of disagreeing cases."""
+    args = (_PROBE_GUARDS, _PROBE_FLAGS, _PROBE_EXISTS)
+    good = _BUDGET_TABLE.format(title_check="`check_templates.py --brief`") + _NO_BUDGET_TABLE
+    bad = _BUDGET_TABLE.format(title_check="") + _NO_BUDGET_TABLE
+    missing = _BUDGET_TABLE.format(title_check="`tests/no_such_suite`")
+    unknown_flag = _BUDGET_TABLE.format(title_check="`check_templates.py --nowhere`")
+    cases = [
+        ("known-positive: every numeric row names an existing check or says unheld", check_budgets_text("fx", good, *args)[0], []),
+        ("known-negative: the Title row with no check and no unheld is refused, naming the row and the number",
+         check_budgets_text("fx", bad, *args)[0], ['row "Title"', '"≤ 18 words"', "names no check"]),
+        ("a named pytest path that does not exist is refused", check_budgets_text("fx", missing, *args)[0], ["tests/no_such_suite (no such path)"]),
+        ("a check_templates flag this script does not dispatch is refused", check_budgets_text("fx", unknown_flag, *args)[0], ["--nowhere (this script does not dispatch it)"]),
+        ("a table with no Budget column is not a budget table", check_budgets_text("fx", _NO_BUDGET_TABLE, *args)[1], None),
+    ]
+    failed = 0
+    for name, got, want in cases:
+        if want is None:
+            ok = got == []
+        elif not want:
+            ok = got == []
+        else:
+            ok = len(got) == 1 and all(w in got[0] for w in want)
+        print(f"  {'ok  ' if ok else 'FAIL'} {name}" + ("" if ok else f": {got}"))
+        failed += not ok
+    census = check_budgets_text("fx", good, *args)[1]
+    statuses = [s.split(" -> ")[0] for *_, s in census]
+    ok = statuses == ["held", "held", "unheld", "unheld", "held", "held"]
+    print(f"  {'ok  ' if ok else 'FAIL'} the census reads held/held/unheld/unheld/held/held" + ("" if ok else f": {statuses}"))
+    failed += not ok
+    print(f"check_templates --probe (budgets): {'pass' if not failed else f'{failed} failed'}")
+    return failed
+
+
 def _brief_fixture(title: str, ask: str, filler_words: int = 0, panels: int = 1, tabs: int | None = None,
                    selected: int = 1, panel_words: int = 0, extra: str = "", charset: bool = True) -> str:
     """A minimal tabbed page that satisfies every brief clause, for the self-test to vary: `panels` asks each
@@ -500,6 +694,16 @@ def self_test() -> int:
         ok = (not got) if not want else all(any(w in g for g in got) for w in want) and len(got) == len(want)
         print(f"  {'ok  ' if ok else 'FAIL'} {name}" + ("" if ok else f": {got}"))
         failed += not ok
+    # the budget-table pair rides the same CI marker, so a skill table that stops naming its checks is
+    # caught by the run that already exists rather than by a second marker nobody added
+    failed += budgets_probe()
+    # and the LIVE census, so the skill set is judged by the run CI already makes - fixtures alone would
+    # prove the check works while nothing ran it over the table it exists for
+    live, census = check_budgets()
+    ok = not live
+    print(f"  {'ok  ' if ok else 'FAIL'} live skill set: every numeric budget row names its check or says unheld"
+          + ("" if ok else ": " + "; ".join(live)))
+    failed += not ok
     print(f"check_templates --self-test: {'pass' if not failed else f'{failed} failed'}")
     return 1 if failed else 0
 
@@ -507,6 +711,25 @@ def self_test() -> int:
 def main(argv: list[str]) -> int:
     if argv[1:2] == ["--self-test"]:
         return self_test()
+    if argv[1:2] == ["--probe"]:
+        return 1 if budgets_probe() else 0
+    # `--budgets` walks every deployed skill's contract tables (issue413): the census is printed in full
+    # because the list of what is held, unheld and failing IS the answer, not only the verdict line.
+    if argv[1:2] == ["--budgets"]:
+        problems, census = check_budgets()
+        numeric = [c for c in census if re.search(r"\d", c[3])]
+        held = sum(1 for c in numeric if c[4].startswith("held"))
+        unheld = sum(1 for c in numeric if c[4] == "unheld")
+        skills = len({c[0] for c in census})
+        print_census(census, out=sys.stderr if problems else sys.stdout)
+        if problems:
+            print(f"budget contract: {len(problems)} violation(s)", file=sys.stderr)
+            for pr in problems:
+                print(f"  {pr}", file=sys.stderr)
+            return 1
+        print(f"budget contract: clean - {len(numeric)} budget row(s) with a number across {skills} skill(s): "
+              f"{held} held, {unheld} declared unheld")
+        return 0
     # `--brief FILE ...` applies the executive-brief contract (D0355) instead of the template-family
     # checks: a brief is a rendered deliverable, not a member of a template family.
     if argv[1:2] == ["--brief"]:

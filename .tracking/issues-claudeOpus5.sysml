@@ -2184,4 +2184,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcCycleTimeReadsFromGit to issue485;
+
+    part issue486 : Issue {
+        :>> id = "3d34a76c-c000-428c-98e2-2de013f4381f";
+        :>> title = "Four brief budget rows are held in name only: tests/exec_summary does not measure them on a brief page";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Four rows of the asi-templates section 2.1 Budget table (Why now 60, The decision rule 40, Why this wins 90, What would change my mind 30 words) name tests/exec_summary as the check that holds them. That suite's word caps live in check_templates.BUDGETS (driver 20, why 32, flip 20, conf 16) and run over the exec-summary template family, not over a brief page, and the brief markup carries no anchor for those four sections. The named check exists and runs; nothing measures THESE numbers on THIS surface. Found by the per-row census D0446 introduced (python scripts/check_templates.py --budgets), which is what made the gap askable. Fix: a brief-markup contract under scripts/exec_brief that anchors the four sections, and check_templates.py --brief measures them; until then the four rows are held in name only.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcBriefRowsAreMeasuredOnTheBriefPage to issue486;
 }
