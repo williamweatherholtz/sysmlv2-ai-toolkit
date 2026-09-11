@@ -5291,6 +5291,13 @@ fn cmd_version(args: &[String]) -> i32 {
 const WARNING_ONLY_GUARDS: [&str; 9] =
     ["decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "doc-sync", "hook-config-integrity", "sequence-multiplicity", "parser-coverage", "base-first-justification"];
 
+/// `keel show flow [ROOT] [--json]` - the git-derived flow series (dcCycleTimeReadsFromGit). The lens
+/// answers in JSON like every lens; `--json` is accepted as the explicit spelling the Definition of Done names.
+fn cmd_flow(args: &[String]) -> i32 {
+    let rest: Vec<String> = args.iter().filter(|a| *a != "--json").cloned().collect();
+    cmd_view0(&rest, "show flow", keel_cli::view::flow::flow)
+}
+
 #[allow(clippy::too_many_lines)] // one dispatch table = one place a subcommand can be reached from;
 // splitting it by arbitrary length would hide half the surface from anyone reading for what exists
 /// `keel show <lens> [ROOT] ...` — the ONE read-only lens surface (D0273).
@@ -5342,6 +5349,7 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("decision-follow-through") => cmd_decision_follow_through(rest),
             Some("decisions") => cmd_decisions(rest),
             Some("dispositions") => cmd_dispositions(rest),
+            Some("flow") => cmd_flow(rest),
             Some("hardening") => cmd_hardening(rest),
             Some("indicators") => cmd_indicators(rest),
             Some("intake") => cmd_intake(rest),
@@ -5369,12 +5377,12 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
         Some(other) => {
             eprintln!("keel show: unknown lens `{other}`.");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, flow, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
             2
         }
         None => {
             eprintln!("usage: keel show <lens> [ROOT] [flags]");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, flow, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
             2
         }
     }

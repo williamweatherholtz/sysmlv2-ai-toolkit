@@ -3571,8 +3571,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 71] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves", "consent-scope"];
+pub const GUARD_NAMES: [&str; 72] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves", "consent-scope", "working-tree-eol"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -5691,6 +5691,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "id-is-a-uuid" => Some(id_is_a_uuid(root)), // hard (D0430/issue454) - an id from the cutoff on, or added in the tree, is v4
         "step-check-resolves" => Some(step_check_resolves(root)), // hard (D0434) - a step naming a check nothing runs is EHZ5
         "consent-scope" => Some(consent_scope(root)), // hard (D0439/issue460) - standing consent accepted nothing its text put outside it
+        "working-tree-eol" => Some(working_tree_eol(root)), // hard (issue478) - a working copy holds the ending .gitattributes declares for it
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
@@ -8070,6 +8071,92 @@ mod consent_scope_tests {
         assert!(r.scanned >= 100, "scanned {} auto-accepted Decisions", r.scanned);
         assert_eq!(r.warnings.len(), 1, "one counted-history line: {:?}", r.warnings);
         assert!(r.warnings[0].contains("marker Decisions auto-accepted before"));
+    }
+}
+
+// ── working-tree-eol guard (issue478: the working tree's line endings decided the touched run's verdict) ──
+
+/// Guard: a tracked path holds the line ending its `.gitattributes` declares (issue478).
+///
+/// Every path whose attribute declares an ending (`eol=lf` / `eol=crlf`) is judged in its WORKING
+/// COPY - read from `git ls-files --eol`, one call, the `w/` column against the `attr/` column
+/// (`crate::eol`).
+///
+/// Git normalises a declared file at the add, so a CRLF working copy of an `eol=lf` file is clean
+/// to `git status` and invisible to every diff - and is exactly what `keel suite --touched` and `keel
+/// land` compile and test (issue477: they test the working tree). On 2026-09-11 that turned one
+/// session's tool choice (a Python `write_text`, the harness Write tool) into five test failures nothing
+/// in the change could reach, and a census found 140 more silent CRLF paths in the clone. This guard
+/// names every such path; the touched run and `land` refuse on the same census before cargo starts.
+///
+/// HARD. A path whose attribute declares no ending (`text=auto`, `-text`, none) is outside the check:
+/// its ending is whatever `core.autocrlf` chose, which the repository chose not to pin. A tree git
+/// cannot list (not a repository) has nothing to judge and reports zero scanned.
+#[must_use]
+pub fn working_tree_eol(root: &Path) -> GuardReport {
+    let Ok(c) = crate::eol::census(root) else {
+        return GuardReport { name: "working-tree-eol", scanned: 0, warnings: Vec::new(), violations: Vec::new() };
+    };
+    let violations: Vec<String> = c
+        .mismatches
+        .iter()
+        .map(|m| format!("{}: the working copy is {} while .gitattributes declares eol={} (issue478) - a writer that translates newlines produced it; git would normalise it at the commit, but every run over the working tree reads these bytes. {}", m.path, m.worktree, m.declared, crate::eol::REMEDY))
+        .collect();
+    GuardReport { name: "working-tree-eol", scanned: c.scanned, warnings: Vec::new(), violations }
+}
+
+#[cfg(test)]
+mod working_tree_eol_tests {
+    use std::path::{Path, PathBuf};
+
+    fn git(dir: &Path, args: &[&str]) {
+        let o = crate::gitx::git().arg("-C").arg(dir).args(args).output().unwrap();
+        assert!(o.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&o.stderr));
+    }
+
+    /// A repository declaring `*.sysml text eol=lf` and `*.bat text eol=crlf`, autocrlf OFF so the
+    /// fixture's bytes are what git sees on every host (CI is Linux; this host is Windows).
+    fn fixture(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("keel-eol-{tag}-{}", crate::write::gen_uuid()));
+        std::fs::create_dir_all(dir.join(".tracking")).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "core.autocrlf", "false"]);
+        std::fs::write(dir.join(".gitattributes"), "* text=auto\n*.sysml text eol=lf\n*.bat text eol=crlf\n").unwrap();
+        std::fs::write(dir.join(".tracking").join("a.sysml"), "package A {\n}\n").unwrap();
+        std::fs::write(dir.join("run.bat"), "@echo off\r\necho hi\r\n").unwrap();
+        std::fs::write(dir.join("notes"), "no attribute here\r\n").unwrap();
+        git(&dir, &["add", "-A"]);
+        git(&dir, &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "seed"]);
+        dir
+    }
+
+    /// D0388 known-positive: one `eol=lf` file rewritten CRLF - the guard fails naming that one path.
+    #[test]
+    fn a_crlf_copy_of_an_eol_lf_file_fails_naming_the_path() {
+        let dir = fixture("pos");
+        std::fs::write(dir.join(".tracking").join("a.sysml"), "package A {\r\n}\r\n").unwrap();
+        let r = super::working_tree_eol(&dir);
+        assert_eq!(r.violations.len(), 1, "{:?}", r.violations);
+        assert!(r.violations[0].starts_with(".tracking/a.sysml: the working copy is crlf while .gitattributes declares eol=lf"), "{}", r.violations[0]);
+        assert_eq!(r.scanned, 2, "a.sysml and run.bat declare an ending; `notes` does not");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// D0388 known-negative: the same repository with the file LF passes; the `eol=crlf` file that IS
+    /// CRLF is not named; the file with no declared ending is not judged whatever it holds.
+    #[test]
+    fn a_conforming_tree_passes_and_an_undeclared_ending_is_not_judged() {
+        let dir = fixture("neg");
+        let r = super::working_tree_eol(&dir);
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
+        assert_eq!(r.scanned, 2);
+        // and a tree git cannot list has nothing to judge
+        let plain = std::env::temp_dir().join(format!("keel-eol-plain-{}", crate::write::gen_uuid()));
+        std::fs::create_dir_all(&plain).unwrap();
+        let none = super::working_tree_eol(&plain);
+        assert_eq!((none.scanned, none.violations.len()), (0, 0));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&plain);
     }
 }
 

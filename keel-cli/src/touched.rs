@@ -157,6 +157,16 @@ pub struct Touched {
     /// synopsis and hardcoded which Decisions it may cite, and CI went red on cab7cac when the
     /// synopsis gained a citation the set never ran (issue438). ~15 s on this host.
     pub lib: bool,
+    /// Every path the working tree changed since the base (tracked edits and untracked crate files),
+    /// repo-relative - what the eol refusal names first (issue478).
+    pub changed: Vec<String>,
+    /// The working tree's line endings against the attribute (issue478): every tracked path whose
+    /// `.gitattributes` entry declares an ending and whose working copy holds another. Read ONCE, with
+    /// the set, so `land` and `suite --touched` refuse on the same census before cargo compiles the
+    /// bytes; `eol_scanned` / `eol_millis` are the census's population and cost.
+    pub eol: Vec<crate::eol::Mismatch>,
+    pub eol_scanned: usize,
+    pub eol_millis: u64,
 }
 
 impl Touched {
@@ -164,6 +174,22 @@ impl Touched {
     #[must_use]
     pub const fn nothing_to_run(&self) -> bool {
         self.tests.is_empty() && !self.lib
+    }
+
+    /// The eol refusal line, or `None` when every declared path holds its ending: the changed paths by
+    /// name first, then the count of the rest (`eol::describe`).
+    #[must_use]
+    pub fn eol_refusal(&self) -> Option<String> {
+        if self.eol.is_empty() {
+            return None;
+        }
+        Some(crate::eol::describe(&self.eol, &self.changed))
+    }
+
+    /// The one line that says the census ran and what it cost.
+    #[must_use]
+    pub fn eol_line(&self) -> String {
+        format!("working-tree eol: {} declared paths hold their ending ({} ms, git ls-files --eol)", self.eol_scanned, self.eol_millis)
     }
 }
 
@@ -230,7 +256,10 @@ pub fn compute(repo: &Path) -> Result<Touched, String> {
     }
     let tests = touched_tests(&tests, &stems, &changed_tests);
     let lib = !stems.is_empty() || !unattributed.is_empty();
-    Ok(Touched { base, stems, unattributed, tests, lib })
+    // issue478: the endings are read with the set, before any decision to run - the receipt this
+    // computation writes must be able to say `eol-mismatch` in place of a verdict cargo never reached.
+    let census = crate::eol::census(repo)?;
+    Ok(Touched { base, stems, unattributed, tests, lib, changed, eol: census.mismatches, eol_scanned: census.scanned, eol_millis: census.millis })
 }
 
 /// Is the land refusal ARMED - has the human accepted D0421? The D0338 pattern: the decision file
@@ -286,22 +315,31 @@ pub enum Phase<'a> {
     NotRun,
     Running { started: u64, log: &'a Path },
     Done(&'a Run),
+    /// The working tree's line endings disagree with the attribute (issue478): cargo never started,
+    /// and the receipt names the paths in place of a verdict.
+    EolMismatch,
 }
 
 fn render_receipt(t: &Touched, head: &str, at: u64, phase: Phase<'_>) -> String {
     use std::fmt::Write as _;
     let list = |v: &[String]| v.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ");
     let mut s = format!(
-        "# touched receipt (D0421): the integration tests that NAME a module changed since the base, and what\n# running exactly those cost. An empty set is a receipt too. Beside the suite's receipt, never in it.\nhead = \"{}\"\nat = {}\nbase = \"{}\"\nstems = [{}]\nunattributed = [{}]\ntests = [{}]\nlib = {}\n",
+        "# touched receipt (D0421): the integration tests that NAME a module changed since the base, and what\n# running exactly those cost. An empty set is a receipt too. Beside the suite's receipt, never in it.\n# `eol_scanned` / `eol_ms`: the working tree's line endings against .gitattributes, read with the set\n# (issue478); `outcome = \"eol-mismatch\"` names the paths that broke it and means cargo never started.\nhead = \"{}\"\nat = {}\nbase = \"{}\"\nstems = [{}]\nunattributed = [{}]\ntests = [{}]\nlib = {}\neol_scanned = {}\neol_ms = {}\n",
         head,
         at,
         t.base,
         list(&t.stems),
         list(&t.unattributed),
         list(&t.tests),
-        t.lib
+        t.lib,
+        t.eol_scanned,
+        t.eol_millis
     );
     match phase {
+        Phase::EolMismatch => {
+            let paths: Vec<String> = t.eol.iter().map(|m| m.path.clone()).collect();
+            let _ = write!(s, "outcome = \"eol-mismatch\"\npassed = 0\nfailed = 0\nfailing = []\neol_mismatch = [{}]\nseconds = 0\n", list(&paths));
+        }
         // The previous receipt is REPLACED before cargo starts (issue468, the D0387/issue399 class on
         // this receipt): a reader during the run - or after a killed one - sees `running` with THIS
         // run's set and log, never the last run's pass over a different change set. The verifier of
@@ -399,10 +437,17 @@ fn describe(t: &Touched) -> String {
     s
 }
 
-/// `land`'s call, after the tree gate and before the first push. `None` = continue to push;
-/// `Some(code)` = refuse with that exit code. Self-build only; a downstream tree is untouched.
+/// `land`'s first call, BEFORE the tree gate: compute the set and judge the line endings (issue478).
+///
+/// Self-build only. `None` = a downstream tree, or one whose set could not be computed - `land` gates
+/// and pushes without a touched run. `Some(Err(code))` = refuse with that exit code; `Some(Ok(t))` =
+/// the set to hand to [`after_gate`] once the tree gate is green.
+///
+/// WHY BEFORE THE GATE: guard `working-tree-eol` reads the same census, so a mismatch would otherwise
+/// surface as one of N gate problems and this line - the changed paths first, the count of the rest,
+/// the receipt - would never be reached. The census is one `git ls-files --eol` per run either way.
 #[must_use]
-pub fn before_push(repo: &Path) -> Option<i32> {
+pub fn before_gate(repo: &Path) -> Option<Result<Touched, i32>> {
     if !crate::suite::is_self_build(repo) {
         return None;
     }
@@ -414,13 +459,32 @@ pub fn before_push(repo: &Path) -> Option<i32> {
         }
     };
     println!("keel land: {}", describe(&t));
+    // issue478: the bytes cargo would compile are judged BEFORE the run and before the empty-set
+    // shortcut - a CRLF `.sysml` under `eol=lf` names no module, and it is still a tree this push
+    // must not carry to a machine whose tests read it exactly. Not behind the D0421 arming: the
+    // touched run's verdict depended on the tree's endings, and a verdict that depends on which tool
+    // last wrote a file is not the verdict D0421 armed.
+    if let Some(line) = t.eol_refusal() {
+        write_receipt(repo, &t, Phase::EolMismatch);
+        eprintln!("keel land: {line}");
+        eprintln!("  REFUSING to push: the touched tests would read these bytes, not the ones git normalises at the commit (issue478). Receipt {RECEIPT} says eol-mismatch. Nothing was pushed.");
+        return Some(Err(1));
+    }
+    println!("keel land: {}", t.eol_line());
+    Some(Ok(t))
+}
+
+/// `land`'s call after the tree gate and before the first push, with the set [`before_gate`]
+/// computed. `None` = continue to push; `Some(code)` = refuse with that exit code.
+#[must_use]
+pub fn after_gate(repo: &Path, t: &Touched) -> Option<i32> {
     if t.nothing_to_run() {
-        write_receipt(repo, &t, Phase::NotRun);
+        write_receipt(repo, t, Phase::NotRun);
         return None;
     }
     if !gate_accepted(repo) {
         println!("keel land: not run - D0421 is proposed; the touched-test refusal is declared but INERT until the human's word (D0337); the set is in the receipt ({RECEIPT}).");
-        write_receipt(repo, &t, Phase::NotRun);
+        write_receipt(repo, t, Phase::NotRun);
         return None;
     }
     if let Some(reason) = crate::suite::own_image_refusal(repo, "keel land") {
@@ -428,7 +492,7 @@ pub fn before_push(repo: &Path) -> Option<i32> {
         return Some(2);
     }
     println!("keel land: running {} touched test binar{} before the push (cargo test --release --test ...)", t.tests.len(), if t.tests.len() == 1 { "y" } else { "ies" });
-    match run(repo, &t) {
+    match run(repo, t) {
         Ok(r) if r.cargo_ok && r.failed == 0 => {
             println!("keel land: touched tests pass - {} passed in {}s (receipt {RECEIPT})", r.passed, r.seconds);
             None
@@ -460,6 +524,13 @@ pub fn cmd(repo: &Path) -> i32 {
         }
     };
     println!("keel suite --touched: {}", describe(&t));
+    if let Some(line) = t.eol_refusal() {
+        write_receipt(repo, &t, Phase::EolMismatch);
+        eprintln!("keel suite --touched: {line}");
+        eprintln!("  REFUSING to run: cargo would compile and test these bytes, not the ones git normalises at the commit (issue478). Receipt {RECEIPT} says eol-mismatch; nothing was measured.");
+        return 1;
+    }
+    println!("keel suite --touched: {}", t.eol_line());
     if t.nothing_to_run() {
         write_receipt(repo, &t, Phase::NotRun);
         println!("keel suite --touched: empty set recorded in {RECEIPT}");
@@ -494,7 +565,34 @@ mod tests {
             unattributed: vec![],
             tests: vec!["orient_bdd".into()],
             lib: true,
+            changed: vec!["keel-cli/src/scaffold.rs".into()],
+            eol: vec![],
+            eol_scanned: 3,
+            eol_millis: 7,
         }
+    }
+
+    /// issue478 known-positive: a set whose tree holds a CRLF `eol=lf` path renders `eol-mismatch` with
+    /// the paths, no verdict and no run; the refusal line names the changed path first and counts the
+    /// rest. Known-negative: a clean census renders no refusal and the header carries its population.
+    #[test]
+    fn an_eol_mismatch_is_a_receipt_in_place_of_a_verdict() {
+        let mut t = fixture();
+        assert!(t.eol_refusal().is_none(), "a clean census refuses nothing");
+        let clean = render_receipt(&t, "1234567", 100, Phase::NotRun);
+        assert!(clean.contains("eol_scanned = 3\n") && clean.contains("eol_ms = 7\n"), "{clean}");
+        t.eol = vec![
+            crate::eol::Mismatch { path: "keel-cli/src/scaffold.rs".into(), declared: "lf".into(), worktree: "crlf".into() },
+            crate::eol::Mismatch { path: ".tracking/backlog.sysml".into(), declared: "lf".into(), worktree: "crlf".into() },
+        ];
+        let line = t.eol_refusal().expect("a mismatch refuses");
+        assert!(line.contains("changed by this push: [keel-cli/src/scaffold.rs (w/crlf where eol=lf)]"), "{line}");
+        assert!(line.contains("and 1 unchanged path (first: .tracking/backlog.sysml)"), "{line}");
+        let text = render_receipt(&t, "1234567", 100, Phase::EolMismatch);
+        assert!(text.contains("outcome = \"eol-mismatch\""), "{text}");
+        assert!(text.contains("eol_mismatch = [\"keel-cli/src/scaffold.rs\", \".tracking/backlog.sysml\"]"), "{text}");
+        assert!(text.contains("passed = 0\nfailed = 0\n"), "{text}");
+        assert!(!text.contains("\"pass\"") && !text.contains("\"running\""), "{text}");
     }
 
     /// issue468, known-negative: a finished run's receipt carries its verdict and counts.

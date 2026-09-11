@@ -223,6 +223,16 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     //
     // `gate_passes` is workspace-wide because a push carries the WHOLE repository, so gating the
     // project you happen to stand in and pushing the rest is exactly the hole (D0234).
+    //
+    // THE WORKING TREE'S LINE ENDINGS ARE JUDGED FIRST (issue478). `touched::before_gate` computes the
+    // touched set on a self-build tree and refuses when a tracked path holds an ending its
+    // `.gitattributes` does not declare, naming the changed paths first and counting the rest, with
+    // the touched receipt saying `eol-mismatch`. Before the gate, because guard `working-tree-eol`
+    // reads the same census and would otherwise bury this line among N gate problems.
+    let touched = match crate::touched::before_gate(repo).transpose() {
+        Ok(t) => t,
+        Err(code) => return code,
+    };
     if let Err(problems) = gate_passes(repo) {
         eprintln!("keel land: the tree does not pass the gate ({} problem(s)) — REFUSING to push:", problems.len());
         for p in problems.iter().take(10) {
@@ -244,11 +254,12 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
     // cost that decided this - it simply no longer blocks the push.
     //
     // THE TOUCHED SET IS NOT THAT GATE (D0421, issue416). The next CI red after D0356 was a test whose
-    // text named the very module the commit changed. `touched::before_push` computes the integration
-    // tests that name a changed module and prints the set on every self-build push; it RUNS them and
-    // refuses only once D0421 carries the human's acceptance (D0337: a refusal on this path is outside
-    // standing consent), and an empty set runs nothing and says so. A downstream tree is untouched.
-    if let Some(code) = crate::touched::before_push(repo) {
+    // text named the very module the commit changed. `touched::before_gate` computed the integration
+    // tests that name a changed module and printed the set on every self-build push; `after_gate`
+    // RUNS them and refuses only once D0421 carries the human's acceptance (D0337: a refusal on this
+    // path is outside standing consent), and an empty set runs nothing and says so. A downstream tree
+    // is untouched.
+    if let Some(code) = touched.as_ref().and_then(|t| crate::touched::after_gate(repo, t)) {
         return code;
     }
     for attempt in 1..=max_attempts {

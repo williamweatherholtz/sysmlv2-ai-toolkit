@@ -2217,4 +2217,59 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcReadOnlySubagentsCannotWriteRecords to issue488;
+
+    part issue489 : Issue {
+        :>> id = "7c61b5ff-9ec0-4d51-bce4-373b64d57e98";
+        :>> title = "A shipped doc named a dev-only tool: tool-reference green on the engine tree, red in every scaffold, found by four tests fifteen minutes later";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A shipped doc row (.engine/docs/usage.md:108, the controls lens) named .engine/tools/guard_proof_census.py by path. On the engine's own tree the file exists, so guard tool-reference passed at edit time and in the agent's worktree. keel-cli/src/migrate.rs:289 drops every .engine/tools/ file but PORTABLE_TOOLS from the scaffold, so in every freshly scaffolded project the same guard went red, and four integration tests (init_smoke, push_gate_is_withdrawn, remaining_controls_actually_fire, federation F9) failed in the verifier's touched run fifteen minutes after the edit - all on that one line (.keel/metrics/touched-1789131848.log:604,689,890,920). The defect is not the row; it is that the guard that owns the rule answers differently on the tree that ships and the trees that receive, and only the slow control knows. Fixed this commit by rewording the row to name no dev-only path; the control is dcToolReferenceKnowsWhatShips. Related: dcCliSurfaceGuardNamesAStaleBinary (issue487), the other guard whose answer depends on which tree or binary reads it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcToolReferenceKnowsWhatShips to issue489;
+
+    part issue490 : Issue {
+        :>> id = "8a6214b9-4bba-4379-982b-78bef37561f7";
+        :>> title = "Verifier receipt read DISCREPANCIES: NONE over a touched run that failed four tests";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The D0425 VERIFIER for batch 2 (haiku, skill test-verify) wrote a receipt whose DISCREPANCIES line read NONE while the touched run it cited had FAILED: .keel/metrics/touched-1789131848.log ends 596 passed, 4 failed, and the receipt file beside it carried outcome = fail. The verifier read the log, typed its own summary, and its summary disagreed with the file. A receipt is meant to be the thing the recorder trusts without reading the log (D0425), so a typed verdict that can differ from the recorded one defeats the split: the recorder would have closed sprint 674 on a green word over a red run. Caught because the manager read the log directly, which is manual vigilance (D0047). The same session's batch-1 verifier, re-woken by its SubagentStop hook, went further and made two commits on main (7fdf11a, 40190c5) with a message claiming a Decision it had recorded; that is issue488's class, tracked there. Control: dcVerifierReceiptOutcomeIsRenderedNotTyped.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVerifierReceiptOutcomeIsRenderedNotTyped to issue490;
+
+    part issue491 : Issue {
+        :>> id = "78d05629-74ec-42ac-94b5-45a6adc2ef94";
+        :>> title = "SubagentStop hook in a worktree ran the main tree's binary and reported the worktree red for lenses it was built without";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The SubagentStop hook, firing for an implementer working in .claude/worktrees/agent-a07bdae9582060942, resolved the MAIN tree's binary (.keel/metrics/hooks.jsonl: bin = .keel/bin/keel.exe, build aede1d6+dirty) and ran guard cli-surface-declared against the worktree's files: RED, naming a lens (flow) the main binary was built without and a controls synopsis another agent's in-flight change had put into the main binary. The worktree's own binary (b8fab64+dirty) answered PASS, 111 scanned. Same class as issue487 - the guard compares authored facts against whichever compiled table happens to answer, and does not say which binary that was or that it is not this tree's - with the worktree adding a second way to pick the wrong one. The agent spent its closing minutes proving the red was not its own. Resolver: dcCliSurfaceGuardNamesAStaleBinary, whose verdict must name the binary's build stamp and its tree.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCliSurfaceGuardNamesAStaleBinary to issue491;
+
+    part issue492 : Issue {
+        :>> id = "ead72295-8713-4b73-ad3f-8570c448fe45";
+        :>> title = "The recorder stopped short: a sprint written by --fill is red until its results land, and the window is nobody's fault";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "On 2026-09-11 at 08:12 the D0425 RECORDER (haiku) was dispatched with a five-step ceremony for sprints 674-676: create the sprints, record the three task DoD results, record the story and gate results, read the guards back, report git status. It executed steps 1 and 2, then stopped and reported the stop hook text (sprint-closure red on the half-written sprints) as issue488 - the very red its own unfinished step 3 had caused. The primary's turn gate then yielded twice while the ceremony sat half-written (obligation49a88b5c, obligation6c6f452b). The defect is structural: keel new sprint --fill writes a sprint with six gates and a story DoD and no result (D0301), so between that write and the append-gate-result calls there is always a window in which sprint-closure is red, and any agent or turn boundary that observes the tree in that window sees a dishonest state that is nobody's fault. CONTROL: one command records a sprint's story result and its six gate results from a receipt file in one serialized write, so the window does not exist. The recorder skill names that command as its single write.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSprintCeremonyIsOneWrite to issue492;
+
+    part issue493 : Issue {
+        :>> id = "86339a4c-8546-43e3-a478-ca788ff2d05f";
+        :>> title = "append-result doubles the RAN: prefix when the evidence already carries it";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel append-result --evidence and append-gate-result --evidence prepend RAN: to the evidence line they write. On 2026-09-11 nineteen results for sprints 674-676 were recorded with evidence that already began RAN:, and the delivery files carried // RAN: RAN: ... until a sed collapsed the prefix by hand - a direct edit of a fact surface. The write path should strip a leading RAN: (any case, any whitespace) before it prepends its own, and the recorder skill should say that the prefix is the API's, not the caller's.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcEvidencePrefixIsTheApis to issue493;
 }

@@ -7,8 +7,10 @@
 //! question.
 //!
 //! WHAT MAKES THE SHORTCUT HONEST is the KEY: a digest of every input a guard can read. HEAD's full id
-//! covers every tracked file that is unmodified; `git status --porcelain -z -uall` names every path that
+//! covers every tracked file's committed content; `git status --porcelain -z -uall` names every path that
 //! is modified, staged, deleted or untracked, and each such path contributes its `(len, mtime)`; every
+//! tracked path (`git ls-files -z`) contributes its `(len, mtime)` too, because a file rewritten with the
+//! other line ending is clean to status while `working-tree-eol` reads its bytes (issue478); every
 //! file under `.keel/` outside `metrics/` and `bin/` contributes the same (a guard reads `.keel/actor`
 //! and orient reads `.keel/cache/`; `metrics/` is written by the hooks themselves at every fire and
 //! `bin/` holds binaries no guard opens); and the binary contributes its build commit, length and mtime,
@@ -216,6 +218,20 @@ pub fn key(root: &Path) -> Option<Key> {
             rel.hash(&mut h);
             settled &= hash_path(&root.join(&rel), &mut h);
         }
+        // issue478: a tracked file rewritten with the other line ending is CLEAN to `git status` - git
+        // would normalise it at the commit - yet `working-tree-eol` (and every run over the working
+        // tree) reads those bytes. Every tracked path's `(len, mtime)` therefore enters the key, about a
+        // tenth of a second over this tree, so a receipt never vouches for bytes no guard saw.
+        let tracked = crate::gitx::git()
+            .args(["-C", &root_s, "ls-files", "-z"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())?;
+        for rel in tracked.stdout.split(|b| *b == 0).filter(|f| !f.is_empty()) {
+            let rel = String::from_utf8_lossy(rel);
+            rel.hash(&mut h);
+            settled &= hash_path(&root.join(rel.as_ref()), &mut h);
+        }
         let keel = root.join(".keel");
         if let Ok(rd) = std::fs::read_dir(&keel) {
             let mut tops: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
@@ -387,7 +403,10 @@ mod tests {
         std::fs::write(d.join("tracked.txt"), "one").expect("w");
         git(&d, &["add", "tracked.txt"]);
         git(&d, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "tracked"]);
+        // Every tracked path's mtime is in the key (issue478), so the fresh file is aged past the window.
+        age(&d.join("tracked.txt"));
         let k0 = key(&d).expect("key");
+        assert!(k0.settled, "an aged tracked file settles the key");
         assert!(record_green(&d, &k0, &[GUARDS], &green(), &[]));
         assert!(read(&d, &k0).is_some());
 
@@ -416,6 +435,41 @@ mod tests {
         std::fs::create_dir_all(d.join(".keel").join("metrics")).expect("mk");
         std::fs::write(d.join(".keel").join("metrics").join("hooks.jsonl"), "{}").expect("w");
         assert_eq!(key(&d).expect("key").digest, k3.digest, "a metrics write leaves the key alone");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// issue478: a tracked `eol=lf` file rewritten CRLF is clean to `git status` (git normalises it at
+    /// the commit) yet the bytes a guard reads changed - the key moves and the old receipt does not
+    /// answer. Known-negative first: the same file rewritten with the bytes it had keeps the key once
+    /// its mtime is restored, so the movement is the rewrite's and not the test's.
+    #[test]
+    fn an_eol_only_rewrite_that_status_calls_clean_still_moves_the_key() {
+        let d = repo("eol");
+        std::fs::write(d.join(".gitattributes"), "* text eol=lf\n").expect("w");
+        std::fs::write(d.join("tracked.txt"), "one\ntwo\n").expect("w");
+        git(&d, &["add", ".gitattributes", "tracked.txt"]);
+        git(&d, &["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "tracked"]);
+        let stamp = SystemTime::now() - Duration::from_mins(10);
+        for n in [".gitattributes", "tracked.txt"] {
+            std::fs::OpenOptions::new().write(true).open(d.join(n)).expect("open").set_modified(stamp).expect("mtime");
+        }
+        let k0 = key(&d).expect("key");
+        assert!(k0.settled);
+        assert!(record_green(&d, &k0, &[GUARDS], &green(), &[]));
+        std::fs::write(d.join("tracked.txt"), "one\ntwo\n").expect("w");
+        std::fs::OpenOptions::new().write(true).open(d.join("tracked.txt")).expect("open").set_modified(stamp).expect("mtime");
+        assert_eq!(key(&d).expect("key").digest, k0.digest, "the same bytes at the same mtime are the same key");
+        std::fs::write(d.join("tracked.txt"), "one\r\ntwo\r\n").expect("w");
+        std::fs::OpenOptions::new().write(true).open(d.join("tracked.txt")).expect("open").set_modified(stamp).expect("mtime");
+        // The `git add` every commit does: the blob normalises to the one already in the index and
+        // the index takes the file's stat, so status is clean - and the working copy is still CRLF
+        // (issue478's shape). Aged first so the index holds the aged stat and the key stays settled.
+        git(&d, &["add", "tracked.txt"]);
+        let status = crate::gitx::git().args(["-C", &d.to_string_lossy(), "status", "--porcelain", "--", "tracked.txt"]).output().expect("git");
+        assert!(status.stdout.is_empty(), "git status calls the CRLF copy clean: {}", String::from_utf8_lossy(&status.stdout));
+        let k1 = key(&d).expect("key");
+        assert_ne!(k0.digest, k1.digest, "the rewritten bytes move the key");
+        assert!(read(&d, &k1).is_none(), "and the green receipt does not answer for them");
         let _ = std::fs::remove_dir_all(&d);
     }
 

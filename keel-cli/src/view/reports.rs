@@ -181,7 +181,7 @@ pub(super) fn cov_tone_of(n: usize, d: usize) -> &'static str {
 }
 
 /// One scorecard metric card.
-fn card(label: &str, value: String, detail: String, tone: &str) -> Json {
+pub(super) fn card(label: &str, value: String, detail: String, tone: &str) -> Json {
     Json::Obj(vec![
         ("label".to_string(), Json::s(label.to_string())),
         ("value".to_string(), Json::s(value)),
@@ -632,12 +632,10 @@ fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec
     let total_points: i64 = flows.iter().map(|f| f.points).sum();
     // Canonical velocity from the shared formula (D0090) — same number the velocity Indicator shows.
     let velocity = velocity_of(&flows);
-    // Cycle time (refine→retro) + lead time (created→retro), in days, over sprints with both dates.
-    let cycles: Vec<i64> = flows.iter().filter_map(|f| Some(f.retro? - f.refine?)).collect();
-    let cycle_mean = if cycles.is_empty() { 0 } else { cycles.iter().sum::<i64>() / i64::try_from(cycles.len()).unwrap_or(1) };
-    let cycle_pts: i64 = flows.iter().filter(|f| f.retro.is_some() && f.refine.is_some()).map(|f| f.points).sum();
-    let cycle_days_total: i64 = cycles.iter().sum();
-    let per_point = if cycle_pts == 0 { 0.0 } else { f64::from(i32::try_from(cycle_days_total).unwrap_or(0)) / f64::from(i32::try_from(cycle_pts).unwrap_or(1)) };
+    // Cycle time, time per point, the inter-commit gap and the point calibration come from GIT in
+    // minutes (dcCycleTimeReadsFromGit; issue483/issue485): judgedAt is a date, and a day is coarser
+    // than the work. Lead time and aging WIP still read the dates - they are day-scale questions.
+    let git_cards = super::flow::facts(root).map_or_else(|e| super::flow::unavailable_cards(&e), |f| super::flow::cards(&f));
     let leads: Vec<i64> = flows.iter().filter_map(|f| Some(f.retro? - f.created?)).collect();
     let lead_mean = if leads.is_empty() { 0 } else { leads.iter().sum::<i64>() / i64::try_from(leads.len()).unwrap_or(1) };
     // Predictability: spread of per-sprint points.
@@ -646,18 +644,19 @@ fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec
     // Aging WIP: as-of (latest recorded date) minus the refine date of any started-but-unfinished sprint.
     let as_of = flows.iter().filter_map(|f| f.retro.or(f.refine)).max().unwrap_or(0);
     let aging = flows.iter().filter(|f| f.refine.is_some() && f.retro.is_none()).filter_map(|f| Some(as_of - f.refine?)).max().unwrap_or(0);
-    vec![
+    let mut cards = vec![
         card("Ready frontier", ready.to_string(), format!("{ready} task(s) ready to start now"), if ready == 0 { "warn" } else { "good" }),
         card("Work in progress", wip.to_string(), format!("{wip} sprint(s) with ceremony in progress (low WIP is healthy)"), if wip <= 2 { "good" } else { "warn" }),
         card("Velocity", format!("{velocity:.2}"), format!("~{velocity:.1} points/sprint (mean across {sprints} sprints, {total_points} pts total)"), "good"),
-        card("Cycle time", format!("{cycle_mean}d"), format!("mean refine→retro across {} sprints (same-day autonomous = ~0)", cycles.len()), "good"),
-        card("Time / story point", format!("{per_point:.2}d"), format!("{cycle_days_total} cycle-days / {cycle_pts} points (lower = faster delivery)"), "good"),
         card("Lead time", format!("{lead_mean}d"), format!("mean created→retro across {} sprints (DORA-style lead time)", leads.len()), "good"),
         card("Predictability", format!("{pmin}–{pmax} pts"), format!("per-sprint point spread (velocity {})", if pmax - pmin <= 4 { "consistent" } else { "variable" }), if pmax - pmin <= 4 { "good" } else { "warn" }),
         card("Throughput", sprints.to_string(), format!("{sprints} delivery sprints recorded"), "good"),
         card("Aging WIP", format!("{aging}d"), format!("oldest unfinished sprint age (as-of latest recorded date); {wip} in progress"), if aging <= 7 { "good" } else { "warn" }),
         card("Open issues", open_issues.to_string(), format!("{open_issues} open issue(s) on the board"), if open_issues == 0 { "good" } else { "warn" }),
-    ]
+    ];
+    // The git cards sit where the day-resolution cycle cards sat: after velocity, before lead time.
+    cards.splice(3..3, git_cards);
+    cards
 }
 
 /// Authoring-friction benchmark (D0054/issue029): record one canonical fact (a passing test result)

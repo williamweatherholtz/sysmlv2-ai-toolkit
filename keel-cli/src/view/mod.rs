@@ -24,6 +24,7 @@ use crate::json::Json;
 mod checks;
 pub mod census;
 pub mod delta;
+pub mod flow;
 pub mod control_structure;
 pub mod stpa_diagram;
 
