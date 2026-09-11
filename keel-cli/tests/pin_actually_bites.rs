@@ -142,7 +142,7 @@ fn a_gate_under_skew_refuses() {
 #[test]
 fn a_read_view_under_skew_warns_and_proceeds() {
     let root = project("skew-read", Some("0.0.1"));
-    let (ok, text) = keel(&root, &["orient", "."]);
+    let (ok, text) = keel(&root, &["show", "orient", "."]);
     assert!(ok, "orient must PROCEED under skew — diagnosing a skew must not require it gone: {text}");
     assert!(
         text.contains("SKEW") || text.contains("skew"),

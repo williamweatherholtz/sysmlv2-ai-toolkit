@@ -28,7 +28,7 @@ package EngineDoR {
     action dorTests : ProcessStep {
         :>> id = "4aba2383-2c35-47ea-a173-db53762a95b1";
         :>> title = "Acceptance criteria exist as Tests";
-        :>> actionText = "[computed: keel item] The task has a method-tagged DoD criterion; no bare text blobs.";
+        :>> actionText = "[computed: keel show item] The task has a method-tagged DoD criterion; no bare text blobs.";
         :>> owner = Owner::ai;
     }
     action dorDeps : ProcessStep {

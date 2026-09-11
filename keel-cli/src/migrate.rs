@@ -1334,7 +1334,7 @@ fn finish_applied(root: &Path, p: &MigrationPlan, pre_sha: Option<&String>, writ
                 record_attempt(root, "reverted", &gate, &gate_failure_lines(&output).join("\n"));
                 eprintln!("  REVERTING: verified-green or byte-for-byte as before - there is no third state (srUpdateIsVerifiedOrReverted).");
                 let code = rollback_after_failure(root, pre_sha, written);
-                eprintln!("  RECORDED in .keel/update-attempts.toml (`keel status` shows it): version {}, gate {gate}. A re-run will say this version was reverted here.", env!("CARGO_PKG_VERSION"));
+                eprintln!("  RECORDED in .keel/update-attempts.toml (`keel show status` shows it): version {}, gate {gate}. A re-run will say this version was reverted here.", env!("CARGO_PKG_VERSION"));
                 code
             }
         }
@@ -1405,7 +1405,7 @@ fn attempts_path(root: &Path) -> PathBuf {
 }
 
 /// Append an attempt: the durable artefact srUnprovenUpdateAsksRatherThanActs requires, read back by
-/// `keel status` and by the next `keel migrate`.
+/// `keel show status` and by the next `keel migrate`.
 fn record_attempt(root: &Path, outcome: &str, gate: &str, output: &str) {
     use std::fmt::Write as _;
     let path = attempts_path(root);
@@ -1413,7 +1413,7 @@ fn record_attempt(root: &Path, outcome: &str, gate: &str, output: &str) {
         let _ = std::fs::create_dir_all(parent);
     }
     let mut text = std::fs::read_to_string(&path).unwrap_or_else(|_| {
-        "# Engine update attempts on this machine (D0336): version, outcome, the gate that decided, its output.\n# `keel status` shows the latest; `keel migrate` names a version that was reverted here before retrying it.\n".to_string()
+        "# Engine update attempts on this machine (D0336): version, outcome, the gate that decided, its output.\n# `keel show status` shows the latest; `keel migrate` names a version that was reverted here before retrying it.\n".to_string()
     });
     let clean = |s: &str| s.replace('"', "'").replace('\r', "").lines().take(40).collect::<Vec<_>>().join("\\n");
     let _ = write!(

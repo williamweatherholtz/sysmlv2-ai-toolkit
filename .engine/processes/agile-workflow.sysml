@@ -107,7 +107,7 @@ package EngineAgileProcess {
         :>> id = "f3fa7b01-4c55-4541-84dc-400bd6825f44";
         :>> title = "Pull & triage";
         :>> triggerCondition = "Goal set.";
-        :>> actionText = "Pull `keel orient` ready tasks into a coherent batch "
+        :>> actionText = "Pull `keel show orient` ready tasks into a coherent batch "
                   + "(points budget when Stories exist). Triage priority and "
                   + "antagonistically question scope.";
         :>> producedArtifact = "Populated batch/Sprint.";

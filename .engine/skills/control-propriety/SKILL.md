@@ -24,7 +24,7 @@ the human named (st032), one `ProprietyFinding` per target × lens, each with a 
    A finding whose defeater cannot be named goes back to step 2.
 4. **Route**: `unsound` → an Issue with a resolver (a defect in a control outranks a defect in
    code); actionable `conditional` → work; accepted `conditional` → a disposition (D0092).
-   View: `keel view propriety`.
+   View: `keel show view propriety`.
 5. **State independence**: where the assessor authored the target, say so. An author may always
    convict their own work; a self-judged `sound` on a Critical control is a testimony and is named
    as one (D0080).

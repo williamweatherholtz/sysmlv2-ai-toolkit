@@ -59,7 +59,7 @@ command** (the friction win, lower than a spreadsheet, D0054).
    (DoD as a verifiable Test) via `keel add-task` + typed edges. Show: recording = one command.
 4. **First sprint** — run the agile-workflow ceremony (autonomous, D0049) to the artifact + a recorded
    passing DoD TestResult. The loop closes once, on their own work.
-5. **Show value + hand off** — `keel orient` (+ `orient --html` / `report` / `render` review) over
+5. **Show value + hand off** — `keel show orient` (+ `orient --html` / `report` / `render` review) over
    their one chain; then transition to the steady-state loop (CLAUDE.md §3). Onboarding done = one
    closed item + can read orient.
 

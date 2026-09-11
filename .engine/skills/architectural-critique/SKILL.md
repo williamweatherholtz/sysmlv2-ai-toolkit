@@ -39,9 +39,9 @@ A claim with no evidence, or with refuting evidence, is a finding.
 
 | Goal                                   | Question                                  | Metric (how to compute)                              |
 |----------------------------------------|-------------------------------------------|------------------------------------------------------|
-| Ceremonies are actually run            | % sprints with all gates, in order?       | `keel guard ceremony` + `keel orient` in_progress |
+| Ceremonies are actually run            | % sprints with all gates, in order?       | `keel guard ceremony` + `keel show orient` in_progress |
 | Needs are covered                      | % Needs with a satisfy edge?              | `traceability-audit` skill                            |
-| Done means verified                    | any done task with stale/invalid evidence?| `keel orient` suspect + invalidEvidence            |
+| Done means verified                    | any done task with stale/invalid evidence?| `keel show orient` suspect + invalidEvidence            |
 | Deliverable matches its claims         | Rust orient == structural truth?          | inherent — Rust is the sole authority (D0048/M4)      |
 | Decisions are recorded                 | any CR commit without a Decision file?    | git log `CR:` vs `.engine/decisions/`                 |
 | Docs match reality                     | any doc claim contradicted by the model?  | grep doc claims vs schema/registry/tooling            |

@@ -1,4 +1,4 @@
-//! `keel arch` — computed views over an authored `CodeElement` registry (D0148/keelArchViews).
+//! `keel show arch` — computed views over an authored `CodeElement` registry (D0148/keelArchViews).
 //!
 //! # keel does not read your code to decide what exists
 //!
@@ -136,7 +136,7 @@ fn load(root: &Path) -> Result<ArchModel, i32> {
     // exist, which is exactly the failure this engine's premise cannot survive.
     if !root.join(".tracking").is_dir() {
         eprintln!("error: {} has no .tracking/ — not a keel repo root.", root.display());
-        eprintln!("  usage: keel arch <subcommand> [ROOT]   (the ROOT goes AFTER the subcommand)");
+        eprintln!("  usage: keel show arch <subcommand> [ROOT]   (the ROOT goes AFTER the subcommand)");
         return Err(2);
     }
     match crate::view::arch_model(root) {
@@ -390,11 +390,11 @@ fn cmd_coverage(m: &ArchModel, root: &Path) -> i32 {
     0
 }
 
-/// `keel arch <subcommand>`.
+/// `keel show arch <subcommand>`.
 #[must_use]
 pub fn cmd(args: &[String], root: &Path) -> i32 {
     let Some(sub) = args.first().map(String::as_str) else {
-        eprintln!("usage: keel arch <elements|criticality|coupling|drift|stpa-inputs|coverage> [ROOT] [flags]");
+        eprintln!("usage: keel show arch <elements|criticality|coupling|drift|stpa-inputs|coverage> [ROOT] [flags]");
         return 2;
     };
     let m = match load(root) {

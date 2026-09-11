@@ -3,7 +3,7 @@
 //! `outstanding`, `item`, `trace` (up + downstream), `trace-need`, `workflows` — query.py
 //! subcommands dropped at M4, re-implemented over the Rust authority: the indexer's action DAG,
 //! the parser's satisfy/allocate edges, and the workflow action defs. The `viewpoints` listing
-//! is a TOML view (`keel view viewpoints`), not here.
+//! is a TOML view (`keel show view viewpoints`), not here.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
@@ -27,7 +27,7 @@ pub fn outstanding(root: &Path) -> String {
     Json::Obj(vec![("outstanding".to_string(), Json::Arr(out.into_iter().map(Json::s).collect()))]).dump()
 }
 
-/// `keel item <name>` — one task's detail (done, deps, `DoD` text, results).
+/// `keel show item <name>` — one task's detail (done, deps, `DoD` text, results).
 #[must_use]
 pub fn item(root: &Path, name: &str) -> String {
     let index = idx(root);
@@ -111,7 +111,7 @@ fn parse_dir(dir: &Path) -> Vec<keel_parser::ast::Package> {
 ///
 /// D0194: the June Component layer this closure walks is SUPERSEDED - the output says so, because
 /// serving it unlabeled as current truth was the panel's EHZ8 finding. Live allocation is the
-/// charter chain + the SR->CodeElement edges (see `keel arch` and allocations.sysml).
+/// charter chain + the SR->CodeElement edges (see `keel show arch` and allocations.sysml).
 #[must_use]
 pub fn trace_need(root: &Path, name: &str) -> String {
     let mut adj: HashMap<String, Vec<String>> = HashMap::new();
@@ -126,7 +126,7 @@ pub fn trace_need(root: &Path, name: &str) -> String {
     }
     Json::Obj(vec![
         ("need".to_string(), Json::s(name)),
-        ("componentLayer".to_string(), Json::s("HISTORICAL - the June Component set this closure reaches is superseded by D0194; live allocation is the charter chain + SR->CodeElement edges (keel arch, allocations.sysml)")),
+        ("componentLayer".to_string(), Json::s("HISTORICAL - the June Component set this closure reaches is superseded by D0194; live allocation is the charter chain + SR->CodeElement edges (keel show arch, allocations.sysml)")),
         ("trace".to_string(), Json::Arr(reach(name, &adj).into_iter().map(Json::s).collect())),
     ])
     .dump()
@@ -194,7 +194,7 @@ fn workflow_json(package: &str, name: &str, nodes: &[String], edges: &[(String, 
 /// Is `name` DECLARED anywhere in the model? A cheap text scan, no model build (issue177).
 ///
 /// WHY THIS EXISTS. Every name-taking read command used to answer for a name that does not exist:
-/// `keel trace .` returned `{upstream: [], downstream: []}` with EXIT 0, and `keel governing-version .`
+/// `keel trace .` returned `{upstream: [], downstream: []}` with EXIT 0, and `keel show governing-version .`
 /// reported a process and a process definition for it. D0093 makes the CLI the automation substrate, so
 /// a consumer reads an empty relation set as "this item has no relations" rather than "there is no such
 /// item" - and a typo in a script becomes a silent wrong answer, the reassuring kind.
@@ -222,7 +222,7 @@ pub fn is_declared(root: &Path, name: &str) -> bool {
                     if let Some(rest) = after_marker.strip_prefix(kw) {
                         // A declaration may be bare (`action foo;` in a delivery run) or typed
                         // (`part foo : Story {`). Stopping only at `:` kept the `;` and made every
-                        // bare action look undeclared - which broke `keel item <a backlog action>`.
+                        // bare action look undeclared - which broke `keel show item <a backlog action>`.
                         let decl =
                             rest.split([':', ';', '{']).next().unwrap_or("").trim();
                         if decl == name {
@@ -243,7 +243,7 @@ mod declared_tests {
 
     /// THE CONTROL for issue177. Both directions, because the interesting failure is the FALSE NEGATIVE:
     /// my first scanner stopped at `:` and so kept the `;` from a bare `action foo;`, which made every
-    /// backlog action look undeclared and broke `keel item` for the most common item in this model.
+    /// backlog action look undeclared and broke `keel show item` for the most common item in this model.
     #[test]
     fn a_bare_action_and_a_typed_part_are_both_declared() {
         // `..`, not `.`: a unit test's cwd is the CRATE dir, so `.` is `keel-cli/` and has no

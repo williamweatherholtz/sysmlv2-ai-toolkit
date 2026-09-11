@@ -43,7 +43,7 @@ fn the_corpus_lens_finishes_and_answers_something() {
     }
     let bin = bin.join(if cfg!(windows) { "keel.exe" } else { "keel" });
     let out = Command::new(&bin)
-        .args(["reprocess-candidates", "."])
+        .args(["show", "reprocess-candidates", "."])
         .current_dir(repo())
         .output()
         .expect("keel");

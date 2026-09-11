@@ -195,7 +195,7 @@ pub fn cmd_sync(repo: &Path) -> i32 {
         println!("      These re-enter the frontier as outstanding: a passing result whose anchor is gone is not evidence (issue071).");
     }
     println!();
-    println!("  now run `keel orient .` — its answers are computed against this tree.");
+    println!("  now run `keel show orient .` — its answers are computed against this tree.");
     0
 }
 

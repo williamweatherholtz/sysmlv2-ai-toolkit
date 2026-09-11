@@ -22,7 +22,7 @@ package EngineIntroduction {
         :>> id = "63940516-2c7d-4e8f-c093-516273849371";
         :>> title = "Orient the newcomer — the 1-minute mental model";
         :>> triggerCondition = "A freshly `keel init`-ed project, or a human asks how to start / 'introduce me to the engine'.";
-        :>> actionText = "In ~1 minute, give the working mental model (do NOT recite the decision log): (1) TEXT IS TRUTH — author only irreducible facts (atomic items + typed edges); everything else (status, matrices, reports) is COMPUTED, never stored. (2) THE LOOP — every request is triaged to CHANGE / EXECUTE / RECORD / VIEW / ORIENT (CLAUDE.md section 3). (3) DUAL SURFACE (D0093) — the AI drives the CLI/JSON (the authority); you supervise via HTML views + by accepting decisions. (4) Where to look: `keel orient` for where-things-stand, CLAUDE.md for how-to-work. Point at the deeper reading (CLAUDE.md -> .engine/decisions) for LATER, not now.";
+        :>> actionText = "In ~1 minute, give the working mental model (do NOT recite the decision log): (1) TEXT IS TRUTH — author only irreducible facts (atomic items + typed edges); everything else (status, matrices, reports) is COMPUTED, never stored. (2) THE LOOP — every request is triaged to CHANGE / EXECUTE / RECORD / VIEW / ORIENT (CLAUDE.md section 3). (3) DUAL SURFACE (D0093) — the AI drives the CLI/JSON (the authority); you supervise via HTML views + by accepting decisions. (4) Where to look: `keel show orient` for where-things-stand, CLAUDE.md for how-to-work. Point at the deeper reading (CLAUDE.md -> .engine/decisions) for LATER, not now.";
         :>> producedArtifact = "Shared understanding of the loop; nothing authored yet.";
         :>> owner = Owner::ai;
     }
@@ -54,7 +54,7 @@ package EngineIntroduction {
         :>> id = "63940516-2c7d-4e8f-c093-516273849375";
         :>> title = "Show value + hand off to the loop";
         :>> triggerCondition = "The first sprint closed.";
-        :>> actionText = "Show the computed payoff: `keel orient` (where things stand + what's ready next), and the human-facing lenses (`keel orient --html` dashboard, `keel render report`, `keel render` review) — proving status/trace/coverage are COMPUTED from the one need->requirement->work->verification chain just authored. Then hand off to the normal interaction loop (CLAUDE.md section 3): from here the AI drives, the human supervises + decides. Onboarding is COMPLETE when the newcomer has one closed item and can read orient.";
+        :>> actionText = "Show the computed payoff: `keel show orient` (where things stand + what's ready next), and the human-facing lenses (`keel show orient --html` dashboard, `keel render report`, `keel render` review) — proving status/trace/coverage are COMPUTED from the one need->requirement->work->verification chain just authored. Then hand off to the normal interaction loop (CLAUDE.md section 3): from here the AI drives, the human supervises + decides. Onboarding is COMPLETE when the newcomer has one closed item and can read orient.";
         :>> producedArtifact = "A demonstrated computed view over the newcomer's own first item; transition to the steady-state loop.";
         :>> owner = Owner::human;
     }

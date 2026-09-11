@@ -45,7 +45,7 @@ dependency unresolved; DoD criteria exist or are authored during refine.
 
 ## Behavioral Instructions
 
-1. **Orient first.** Run `keel whats-next [root]` (or query orient) to get the
+1. **Orient first.** Run `keel show whats-next [root]` (or query orient) to get the
    current ready frontier. Identify which items are unblocked and available.
 
 2. **Select scope.** Prefer a single focused story. Multiple items in one sprint

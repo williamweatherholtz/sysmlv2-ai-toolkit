@@ -15,7 +15,7 @@
 //! seconds, so a link in progress is never copied) it copies it beside itself through
 //! `.next` -> rename, which Windows permits on a running image, and writes the stamp. The refresh rides
 //! the build path because the first hook after a build is the build path's next event - no human
-//! remembers anything. The cost this trades for is a copy that can lag the tree, so `keel status` names
+//! remembers anything. The cost this trades for is a copy that can lag the tree, so `keel show status` names
 //! the hook binary's build beside HEAD, and `keel sync-claude` says which binary the hooks will run.
 //!
 //! A non-self-build project has no `target/release/keel` and is untouched by every function here.

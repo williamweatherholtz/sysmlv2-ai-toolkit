@@ -1,4 +1,4 @@
-//! `keel attestation` — how much of this model's "pass" is a receipt, and how much is testimony.
+//! `keel show attestation` — how much of this model's "pass" is a receipt, and how much is testimony.
 //!
 //! WHY A REPORT AND NOT A GATE (D0232). Three attempts were made to gate the WORDING of a verdict,
 //! and all three failed calibration against the real corpus:
@@ -320,7 +320,7 @@ pub fn uncited_coverage_claims(root: &Path) -> usize {
     n
 }
 
-/// `keel attestation [ROOT] [--json]`.
+/// `keel show attestation [ROOT] [--json]`.
 #[must_use]
 pub fn cmd(args: &[String]) -> i32 {
     let root = args
@@ -330,7 +330,7 @@ pub fn cmd(args: &[String]) -> i32 {
     // issue281: refuse rather than answer over nothing. At a workspace root this printed a census of
     // ZERO attestations and exited 0 - the same false green the issue269 refusal closed for
     // `validate` alone.
-    if let Err(code) = crate::workspace::require_project(&root, "keel attestation [ROOT] [--json]") {
+    if let Err(code) = crate::workspace::require_project(&root, "keel show attestation [ROOT] [--json]") {
         return code;
     }
     let c = census(&root);

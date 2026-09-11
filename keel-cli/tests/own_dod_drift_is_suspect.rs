@@ -26,7 +26,7 @@ fn git(root: &Path, args: &[&str]) -> String {
 }
 
 fn suspects(root: &Path) -> Vec<String> {
-    let out = Command::new(keel_bin()).args(["orient", "."]).current_dir(root).env("KEEL_OFFLINE", "1").env("KEEL_ACTOR", "claudeOpus5").output().expect("orient");
+    let out = Command::new(keel_bin()).args(["show", "orient", "."]).current_dir(root).env("KEEL_OFFLINE", "1").env("KEEL_ACTOR", "claudeOpus5").output().expect("orient");
     let text = String::from_utf8_lossy(&out.stdout).to_string();
     let v: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("orient JSON: {e}\n{text}"));
     v["suspect"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()

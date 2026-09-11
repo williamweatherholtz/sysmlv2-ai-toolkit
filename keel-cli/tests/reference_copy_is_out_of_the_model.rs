@@ -67,14 +67,14 @@ fn a_downstream_model_holds_no_foreign_attestation_after_a_fact_is_recorded() {
     assert_eq!(code, 0, "append-result: {out}");
 
     // THE MODEL'S ATTESTATIONS: exactly the one recorded here, and none judged by keel's own human.
-    let (_, census) = keel(&root, &["attestation", "."]);
+    let (_, census) = keel(&root, &["show", "attestation", "."]);
     assert!(!census.contains("wweatherholtz"), "keel's own acceptances leaked into the downstream verification surface:\n{census}");
     let judge_rows: Vec<&str> = census.lines().filter(|l| l.trim_start().starts_with("unregistered") || l.trim_start().starts_with("claudeOpus5")).collect();
     assert_eq!(judge_rows.len(), 1, "one judge row, the probe's own:\n{census}");
     assert!(judge_rows[0].split_whitespace().nth(1) == Some("1"), "that judge has exactly one result:\n{census}");
 
     // THE MODEL'S EVIDENCE: every SHA resolves in THIS repository.
-    let (_, orient) = keel(&root, &["orient", "."]);
+    let (_, orient) = keel(&root, &["show", "orient", "."]);
     assert!(orient.contains("\"invalidEvidence\": []"), "an evidence SHA that does not resolve here means a foreign result is in the model:\n{orient}");
 
     // THE RULES' EDGES: the shipped `#JustifiedBy` edges to reference decisions still resolve.

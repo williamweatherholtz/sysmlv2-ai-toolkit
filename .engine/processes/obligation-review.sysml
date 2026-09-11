@@ -18,7 +18,7 @@ package ProcessObligationReview {
         :>> id = "8f21c4d0-6b53-4e97-a018-000000000o01";
         :>> title = "Compute the obligation set — never enumerate it";
         :>> triggerCondition = "The human asks what needs them, or a sitting opens, or the turn-boundary hook reports obligations with no console up.";
-        :>> actionText = "Run the generator, which reads the COMPUTED views (`keel orient`, `authority-queue`, `dispositions`, `sitting-coverage`) through the binary. Never hand-list obligations: a hand-listed queue is a second truth that drifts, and the whole point of the deck is that a new obligation class appears because a viewpoint declared it, not because someone remembered to add it.";
+        :>> actionText = "Run the generator, which reads the COMPUTED views (`keel show orient`, `authority-queue`, `dispositions`, `sitting-coverage`) through the binary. Never hand-list obligations: a hand-listed queue is a second truth that drifts, and the whole point of the deck is that a new obligation class appears because a viewpoint declared it, not because someone remembered to add it.";
         :>> producedArtifact = "One self-contained HTML file, generated.";
         :>> owner = Owner::ai;
     }

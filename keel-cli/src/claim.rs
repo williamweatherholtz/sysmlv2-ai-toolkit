@@ -165,7 +165,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         Ok(held) => {
             if let Some((_, holder)) = held.iter().find(|(i, _)| i == item) {
                 eprintln!("error: '{item}' is held LIVE by {holder}.");
-                eprintln!("  Choose different work — `keel whats-next` excludes what others hold. A claim held past");
+                eprintln!("  Choose different work — `keel show whats-next` excludes what others hold. A claim held past");
                 eprintln!("  {CLAIM_EXPIRY_DAYS} days without progress computes as STALE and is fair to take (D0129).");
                 return 1;
             }

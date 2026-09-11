@@ -9,7 +9,7 @@
 //!
 //! So the published unit CHANGED CONTENT, CHANGED IDENTITY, and KEPT ITS VERSION NUMBER. That is worse
 //! than a numbering bug: a consumer comparing versions to decide whether it is behind — exactly what
-//! `keel status`'s drift section does against `srDriftIsReportedPerUnit` — reads "v1 installed, v1
+//! `keel show status`'s drift section does against `srDriftIsReportedPerUnit` — reads "v1 installed, v1
 //! available" and is told it is CURRENT. The report does not miss the update; it affirms there is none.
 //!
 //! WHY THESE CASES. `identity_survives_a_republish_from_an_importing_project` is the round trip

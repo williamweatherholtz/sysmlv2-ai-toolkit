@@ -1,7 +1,7 @@
 //! Content-addressed cache of the facts orient asks git about a commit (dcGitFactsAreContentAddressed,
 //! rank 2 of D0367, the spawn term of issue409).
 //!
-//! WHY. On the spike's host `keel orient` spent 3.1 of its 5.2 s in 23 git spawns, and 14 of those asked
+//! WHY. On the spike's host `keel show orient` spent 3.1 of its 5.2 s in 23 git spawns, and 14 of those asked
 //! questions whose answers are facts about an IMMUTABLE commit: is `<sha>` a commit, what did a task's
 //! `DoD` say in a given file at `<sha>`, what does `git grep` find for it at `<sha>`, which paths differ
 //! between `<sha>` and `<head>`. The same tree asked the same questions at every turn boundary and paid a
@@ -21,7 +21,7 @@
 //!
 //! WHERE. `.keel/cache/git-facts.toml`, machine-local and gitignored with the rest of `.keel/`, written
 //! temp-then-rename. It is a cache, not truth (§1): delete it and every answer is recomputed identically -
-//! the `DoD`'s check is `keel orient` byte-identical with the file absent, cold and warm.
+//! the `DoD`'s check is `keel show orient` byte-identical with the file absent, cold and warm.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

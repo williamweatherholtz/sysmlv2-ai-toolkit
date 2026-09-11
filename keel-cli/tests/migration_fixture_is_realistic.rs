@@ -182,7 +182,7 @@ fn a_lived_in_projects_own_ci_survives_migration_and_installs_the_pin() {
 /// (6) VERIFIED OR REVERTED (D0336; srUpdateIsVerifiedOrReverted, srUnprovenUpdateAsksRatherThanActs).
 /// Both outcomes, because a boundary exercised only on the happy path is a claim: a green update is
 /// RETAINED and recorded; a project whose gate goes red after the update is REVERTED - `git status
-/// --porcelain` over .engine and .tracking is EMPTY - and the attempt is recorded where `keel status`
+/// --porcelain` over .engine and .tracking is EMPTY - and the attempt is recorded where `keel show status`
 /// shows it, and a re-run says the version was reverted here. The red case is a committed
 /// duplicate-identity violation the resync does not touch: the gate under the new engine refuses it.
 #[test]
@@ -219,8 +219,8 @@ fn a_green_update_is_retained_and_a_red_one_is_reverted_and_recorded() {
     let attempts = std::fs::read_to_string(root.join(".keel/update-attempts.toml")).expect("the attempt is recorded even though the tree was reverted");
     assert!(attempts.contains("outcome = \"reverted\"") && attempts.contains("gate = \"guard\""), "{attempts}");
     // status shows it where the human looks; a re-run says so before trying again
-    let (_, st) = run(&root, &["status", "."]);
-    assert!(st.contains("REVERTED"), "keel status names the reverted attempt:\n{st}");
+    let (_, st) = run(&root, &["show", "status", "."]);
+    assert!(st.contains("REVERTED"), "keel show status names the reverted attempt:\n{st}");
     let (_, again) = run(&root, &["migrate", "--dry-run", "."]);
     assert!(again.contains("was applied here on") && again.contains("REVERTED"), "a re-run says this version was reverted here:\n{again}");
     cleanup(&root);

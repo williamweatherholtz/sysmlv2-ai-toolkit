@@ -32,7 +32,7 @@ Deploys `.engine/processes/library-stewardship.sysml` (D0259). The mechanics (`k
    `keel process retire <name> --why TEXT [--replaced-by TEXT]` writes `retired`/`retiredAt`/
    `retiredWhy`/`replacedBy` into the library unit.toml and commits in the clone; push deliberately, as
    for publish. The unit stays as the history its consumers installed against; `import --from-library`
-   refuses it naming the why and the replacement, `library list` and `keel status` mark it, and the
+   refuses it naming the why and the replacement, `library list` and `keel show status` mark it, and the
    currency pass carries the mark. Use it when rule 1 cannot: the upstream deleted the unit (no landed
    tree to publish from) or the published version carries a defect a consumer must be protected from —
    decision-channel v6 was both (GH#57: a script recording acceptances in a hardcoded human's name;

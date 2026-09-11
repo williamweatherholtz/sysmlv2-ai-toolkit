@@ -1,4 +1,4 @@
-//! `keel status` — one command that checks all bases (D0270, from st062).
+//! `keel show status` — one command that checks all bases (D0270, from st062).
 //!
 //! The human asked for "a full status output for state of everything including versioning, library
 //! update new processes, etc. a command I can run to check all bases". Before this, answering that
@@ -436,7 +436,7 @@ pub fn ci_verdict(root: &Path, sha: &str) -> (CiVerdict, String) {
     }
 }
 
-/// `keel status [ROOT]` — every base, in one screen.
+/// `keel show status [ROOT]` — every base, in one screen.
 #[must_use]
 pub fn cmd(root: &Path) -> i32 {
     let sections = [
@@ -447,7 +447,7 @@ pub fn cmd(root: &Path) -> i32 {
         hooks_section(root),
         ci_section(root),
     ];
-    println!("keel status — {}", root.display());
+    println!("keel show status — {}", root.display());
     println!();
     for s in &sections {
         println!("  {:<9} {} {}", s.label, s.state.painted(), s.lines.first().map_or("", String::as_str));

@@ -137,7 +137,7 @@ fn init_scaffolds_a_working_project() {
     assert!(out.status.success(), "fresh scaffold failed guard: {}", String::from_utf8_lossy(&out.stdout));
 
     // 4. it orients (computable state, no crash).
-    let out = keel().args(["orient", proj]).output().expect("run keel orient");
+    let out = keel().args(["show", "orient", proj]).output().expect("run keel show orient");
     assert!(out.status.success(), "fresh scaffold failed orient");
     assert!(String::from_utf8_lossy(&out.stdout).contains("\"ready\""), "orient output missing ready[]");
 

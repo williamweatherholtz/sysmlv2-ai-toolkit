@@ -6,7 +6,7 @@
 //!   2. delegation declared + no quote     -> refused, nothing written, a `judge-set:no-quote` ledger line;
 //!   3. delegation absent                  -> refused as `no recording delegation`.
 //!
-//! `keel attestation --json` reports proposed / sampled / judged / awaiting from the same tree.
+//! `keel show attestation --json` reports proposed / sampled / judged / awaiting from the same tree.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -86,7 +86,7 @@ fn file_text(root: &Path) -> String {
 #[test]
 fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     let root = project_with_proposals("q", true);
-    let (ok, text) = agent(&root, &["attestation", ".", "--json"]);
+    let (ok, text) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(ok, "{text}");
     assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":0,\"awaiting\":4,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "the census computes the set before anyone judges it: {text}");
 
@@ -105,7 +105,7 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     assert_eq!(t.matches("VerdictKind::proposed").count(), 4, "the proposals stand; the judgment is appended, never rewritten");
 
     // the census now reads 2 judged; the sample is the judged two; two await --all
-    let (_, text) = agent(&root, &["attestation", ".", "--json"]);
+    let (_, text) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":2,\"awaiting\":2,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "{text}");
     // the sample is judged: a second plain judge-set finds nothing and writes nothing
     let before = file_text(&root);
@@ -116,7 +116,7 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     let (ok, text) = agent(&root, &["judge-set", FILE, "--words", "and the rest pass too, the whole probe file", "--by", "you", "--date", "2026-09-11", "--all"]);
     assert!(ok, "{text}");
     assert!(text.contains("t3GateR2: pass") && text.contains("t1GateR2: pass"), "{text}");
-    let (_, text) = agent(&root, &["attestation", ".", "--json"]);
+    let (_, text) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":4,\"judged\":4,\"awaiting\":0,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "{text}");
 
     // what was written is a tree the authority and the confirmation rules accept

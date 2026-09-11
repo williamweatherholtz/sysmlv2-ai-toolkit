@@ -1429,7 +1429,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
     println!("updated '{name}' to v{version}: {updated} file(s) from upstream, {kept_local} kept local additions.");
     println!("  SUPERSESSION RECORD: commit this under the D0070 keystone (a marked Decision) — that commit is");
     println!("  what governing-version/reprocess-candidates resolve prior work against (K9/K10).");
-    println!("  Then `keel validate . && keel guard .` and re-check `keel reprocess-candidates`.");
+    println!("  Then `keel validate . && keel guard .` and re-check `keel show reprocess-candidates`.");
     0
 }
 

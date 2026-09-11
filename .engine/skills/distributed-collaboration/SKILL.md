@@ -63,7 +63,7 @@ git fetch
 git status -sb                 # divergence: ahead / behind / diverged
 git merge --ff-only origin/main    # or a merge commit if you have local work — NEVER rebase
 keel guard . && keel validate .    # gate parity: does my gate actually run?
-keel orient .
+keel show orient .
 ```
 
 Then read the orientation *knowing how stale it was*. Evidence whose anchor is absent from this clone

@@ -37,7 +37,7 @@ D0388 - the known cases, run BEFORE the tree is read, under the rule as configur
     python scripts/probes/receipt_shape_census.py --json           # the same census as one JSON object
 
 The last line of the census, `demo latest-pass under the full rule`, is the count under attestation's semantics
-(`keel attestation . --json` -> `demoReplayable`: demo Tests whose LATEST result is a pass carrying a replayable
+(`keel show attestation . --json` -> `demoReplayable`: demo Tests whose LATEST result is a pass carrying a replayable
 receipt, ci-run excluded) so the two instruments can be held against each other.
 """
 from __future__ import annotations
@@ -238,7 +238,7 @@ def report(c: dict) -> None:
             print(f"    {r['at']}: {r['text']}")
     else:
         print("  admitted under the full rule: none")
-    print(f"  demo latest-pass under the full rule: {c['demoLatestPassUnderFullRule']}   (compare `keel attestation . --json` -> demoReplayable)")
+    print(f"  demo latest-pass under the full rule: {c['demoLatestPassUnderFullRule']}   (compare `keel show attestation . --json` -> demoReplayable)")
 
 
 def main() -> None:

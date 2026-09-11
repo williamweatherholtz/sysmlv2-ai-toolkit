@@ -40,7 +40,7 @@ fn scaffold(tag: &str) -> PathBuf {
 }
 
 fn burndown(root: &Path) -> serde_json::Value {
-    let out = Command::new(keel_bin()).args(["orient", "."]).current_dir(root).env("KEEL_ACTOR", "ai").output().expect("keel runs");
+    let out = Command::new(keel_bin()).args(["show", "orient", "."]).current_dir(root).env("KEEL_ACTOR", "ai").output().expect("keel runs");
     assert!(out.status.success(), "orient: {}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
     // orient's JSON is followed by advisory lines; the JSON object ends at the last closing brace

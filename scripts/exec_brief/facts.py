@@ -516,10 +516,10 @@ fact("perfGuardFullMs", _timed_ms([KEEL, "guard", "--no-receipt"], runs=2),
      "wall time of `keel guard --no-receipt` in this tree, median of 2 - every enforced guard runs, "
      "the receipt is neither read nor written")
 fact("perfOrientMs", _timed_ms([KEEL, "orient", "."], runs=3),
-     "milliseconds", "wall time of `keel orient .` in this tree, median of 3")
+     "milliseconds", "wall time of `keel show orient .` in this tree, median of 3")
 
-# ================================================================ 4. keel orient (one call)
-# `keel orient .` already emits JSON on stdout - there is no `--json` flag (it errors), so the
+# ================================================================ 4. keel show orient (one call)
+# `keel show orient .` already emits JSON on stdout - there is no `--json` flag (it errors), so the
 # plain invocation IS the JSON lens.
 
 ok, out = run([KEEL, "orient", "."], timeout=90)
@@ -551,8 +551,8 @@ else:
     fact("openIssues", len(orient.get("open_issues", [])), "open Issues",
          O_HOW + "len(.open_issues) - equals `keel show open-issues .` .open, verified by hand.")
     fact("readyItems", len(orient.get("ready", [])), "items on the ready frontier",
-         O_HOW + "len(.ready) - equals the line count of `keel whats-next .` and the 'N ready' in "
-                 "`keel status .`, verified by hand.")
+         O_HOW + "len(.ready) - equals the line count of `keel show whats-next .` and the 'N ready' in "
+                 "`keel show status .`, verified by hand.")
 
     # the triggered indicator lives in orient's burndown AND in `show indicators .`
     trig = None
@@ -624,7 +624,7 @@ else:
          "live SystemRequirements neither examined nor exercised",
          V_HOW + "line 'neither'.")
 
-# ================================================================ 7. keel status (guards)
+# ================================================================ 7. keel show status (guards)
 ok, out = run([KEEL, "status", "."], timeout=120)
 S_HOW = "`./target/release/keel.exe status .` - TEXT; parsed from its `model` section. "
 if not ok:
@@ -994,10 +994,10 @@ fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed contro
      ". sprint610 added agentEditsDeliverable to the action set, which is the designed re-run trigger (D0313).")
 
 # ================================================================ 13. the recall cap (D0389 / D0390)
-# The hook latency distribution keel enforcement-report computes from the fire-ledger, and the over-cap
+# The hook latency distribution keel show enforcement-report computes from the fire-ledger, and the over-cap
 # proxy for skips before recall-skipped existed. Every number is read from the report or the ledger.
 _er_ok, _er_raw = run([KEEL, "enforcement-report", REPO])
-ER_HOW = "keel enforcement-report (D0389): per-event nearest-rank latency over .keel/metrics/hooks.jsonl, machine-local; "
+ER_HOW = "keel show enforcement-report (D0389): per-event nearest-rank latency over .keel/metrics/hooks.jsonl, machine-local; "
 try:
     _er = json.loads(_er_raw) if _er_ok and _er_raw else {}
 except ValueError:

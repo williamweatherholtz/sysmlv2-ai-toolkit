@@ -46,7 +46,7 @@ use keel_cli::write as w;
 // A DOWNSTREAM CLAUDE.md template (issue057): a fresh project is TRACKED BY keel, not keel itself.
 // The self-build repo's own CLAUDE.md (about building the engine) is NEVER shipped to init'd projects.
 const CLAUDE_MD: &str = include_str!("../assets/claude-md-template.md");
-const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `keel orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
+const TRACKING_STARTER: &str = "# .tracking/ — your project's instance data\n\nThis directory holds THIS project's authored facts (needs, requirements, work items, issues,\ndecisions, test results) — the per-project INSTANCE. The reusable engine lives in `.engine/`.\n\nGetting started: run the `introduction` skill (guided onboarding), or author your first `Need`\nfollowing `.engine/docs/tracking-template.sysml`. State is COMPUTED — run `keel show orient .` to\nsee where things stand. The engine's design rationale is read-only in `.engine/reference/decisions/`;\nyour project authors its OWN decisions fresh in `.engine/decisions/`.\n";
 /// A fresh project's deliverable-suspicion manifest is EMPTY — the shipped one lists the ENGINE's own
 /// deliverable tasks (instance-specific), which would fail manifest-coverage on a new project (D0093
 /// engine/instance boundary). The new project adds entries as it builds source-dependent verifications.
@@ -489,7 +489,7 @@ fn ledger_line(root: &Path, session: &str, event: &str, exit: i32, ms: u128, ver
     };
     let ms = u64::try_from(ms).unwrap_or(u64::MAX);
     // issue378 / GH#55: WHICH binary ran this hook, and which build - the turn-boundary surface's
-    // answer to "did the pinned engine gate this", readable from `keel status`.
+    // answer to "did the pinned engine gate this", readable from `keel show status`.
     let mut record = serde_json::json!({"ts": ts, "session": session, "event": event, "decision": decision, "exit": exit, "ms": ms,
         "bin": std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(), "build": env!("KEEL_BUILD_COMMIT")});
     if let Some(obj) = record.as_object_mut() {
@@ -1276,7 +1276,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         // it stopped being read: a per-turn restatement of an unchanged fact trains the reader past
         // it. Their instruction, 2026-09-06: "I don't want stop says text anymore. remove."
         //
-        // Nothing is lost to automation - `keel orient` still answers pendingAcceptances - and
+        // Nothing is lost to automation - `keel show orient` still answers pendingAcceptances - and
         // nothing is lost to the human, PROVIDED the page is genuinely refreshed: the queue is
         // surfaced as the published decision brief by the decision-surfacing post-analysis, which
         // republishes on a CHANGE in the pending set and is silent otherwise. That the post-analysis
@@ -1567,7 +1567,7 @@ fn cmd_serve(args: &[String]) -> i32 {
 
 fn cmd_orient(args: &[String]) -> i32 {
     let html = args.iter().any(|a| a == "--html");
-    let root = match root_arg(args, "keel orient [ROOT] [--html]", &["html"], 0) {
+    let root = match root_arg(args, "keel show orient [ROOT] [--html]", &["html"], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -2336,10 +2336,10 @@ fn cmd_override(args: &[String]) -> i32 {
 }
 
 
-/// `keel enforcement-report [ROOT]` (D0180/K14) — fires, blocks, overrides, red-yields, and the
+/// `keel show enforcement-report [ROOT]` (D0180/K14) — fires, blocks, overrides, red-yields, and the
 /// adherence trend, computed from the machine-local fire-ledger. Promotion decisions cite this.
 fn cmd_enforcement_report(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel enforcement-report [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel show enforcement-report [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -2349,7 +2349,7 @@ fn cmd_enforcement_report(args: &[String]) -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("keel enforcement-report: {e}");
+            eprintln!("keel show enforcement-report: {e}");
             1
         }
     }
@@ -2563,21 +2563,21 @@ fn cmd_critique_policy(args: &[String]) -> i32 {
 fn cmd_governing_version(args: &[String]) -> i32 {
     let item = match positional_arg(
         args,
-        "keel governing-version <delivery Story name> [ROOT]",
+        "keel show governing-version <delivery Story name> [ROOT]",
         "an item name",
     ) {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let root = match root_arg(args, "keel governing-version <delivery Story name> [ROOT]", &[], 1) {
+    let root = match root_arg(args, "keel show governing-version <delivery Story name> [ROOT]", &[], 1) {
         Ok(r) => r,
         Err(code) => return code,
     };
     // Same rule as `cmd_query1` (issue177). This command has its own wrapper, which is exactly how it
-    // escaped the first fix: `keel governing-version .` reported a process AND a process definition for
+    // escaped the first fix: `keel show governing-version .` reported a process AND a process definition for
     // a name that does not exist, which is the most confidently wrong answer of the six.
     if !keel_cli::queries::is_declared(&root, item) {
-        eprintln!("keel governing-version: no item named `{item}` is declared in this model.");
+        eprintln!("keel show governing-version: no item named `{item}` is declared in this model.");
         return 1;
     }
     println!("{}", keel_cli::govern::governing_version(&root, item));
@@ -2585,7 +2585,7 @@ fn cmd_governing_version(args: &[String]) -> i32 {
 }
 
 fn cmd_reprocess_candidates(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel reprocess-candidates [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel show reprocess-candidates [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -2610,10 +2610,10 @@ fn cmd_view(args: &[String]) -> i32 {
         return 2;
     }
     let Some(name) = args.first() else {
-        eprintln!("usage: keel view <name> [ROOT]");
+        eprintln!("usage: keel show view <name> [ROOT]");
         return 2;
     };
-    let root = match root_arg(args, "keel view <name> [ROOT]", &[], 1) {
+    let root = match root_arg(args, "keel show view <name> [ROOT]", &[], 1) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -2630,7 +2630,7 @@ fn cmd_view(args: &[String]) -> i32 {
 }
 
 fn cmd_whats_next(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel whats-next [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel show whats-next [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -3919,7 +3919,7 @@ fn print_init_next_steps(dir: &Path, count: u32, profile: &str) {
     println!("  4. Run the `project-onboarding` skill — it asks what you are building and charters the");
     println!("     process set on that basis. `keel onboard` reports NOT CHARTERED until you do.");
     println!("  5. Then the `introduction` skill — capture your first need + run your first sprint.");
-    println!("     Or: keel orient .   (where things stand)");
+    println!("     Or: keel show orient .   (where things stand)");
     println!();
     println!("The pre-commit gate at the REPOSITORY ROOT runs `keel gate --workspace` — validate + guard +");
     println!("declared rules, for every project the commit touches (Rust-only, no kernel).");
@@ -4463,12 +4463,12 @@ viewpoints ({} declared):", vps.len());
 /// the self-build repo would point this at the engine SOURCE. `migrate` refuses the self-build repo
 /// anyway, but a command that rewrites authored facts should take its target explicitly.
 /// `keel currency [ROOT] ...` (D0338): a trailing ROOT is honoured only when it is a keel project.
-/// `keel status [ROOT]`: a mistyped flag is never a root (issue133).
+/// `keel show status [ROOT]`: a mistyped flag is never a root (issue133).
 fn cmd_status(rest: &[String]) -> i32 {
     refuse_flag_as_path(rest.first(), "status").unwrap_or_else(|| {
         resolve_guard_root(rest.first()).map_or_else(
             || {
-                eprintln!("error: no .engine/ directory found. usage: keel status [ROOT]");
+                eprintln!("error: no .engine/ directory found. usage: keel show status [ROOT]");
                 2
             },
             |root| keel_cli::status::cmd(&root),
@@ -5016,7 +5016,7 @@ fn cmd_judge_set(args: &[String]) -> i32 {
         eprintln!();
         eprintln!("Records a HUMAN's judgment of the SAMPLED proposed results in one file (D0443 on D0312 B): one TestResult");
         eprintln!("and one <test>Attest<N> quote receipt PER ITEM, never a count. The sample is computed from attestation-policy.toml");
-        eprintln!("[proposedJudgment] sampling over the results' uuid order (`keel attestation` shows proposed / sampled / judged);");
+        eprintln!("[proposedJudgment] sampling over the results' uuid order (`keel show attestation` shows proposed / sampled / judged);");
         eprintln!("--all judges every unjudged proposal in the file instead. --verdict applies to every item; --fail names the items");
         eprintln!("that fail while the rest pass.");
         return 2;
@@ -5321,7 +5321,12 @@ fn cmd_flow(args: &[String]) -> i32 {
 fn cmd_show(args: &[String]) -> i32 {
     let rest: &[String] = args.get(1..).unwrap_or(&[]);
     match args.first().map(String::as_str) {
+            Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            // `repo_arg(rest)` would take the SUBCOMMAND as the path — `arch elements .` resolved the
+            // root to `./elements`, whose empty model then printed "no CodeElement instances authored".
+            Some("arch") => keel_cli::arch::cmd(rest, &repo_arg(rest.get(1..).unwrap_or(&[]))),
             Some("assumptions") => cmd_view0(rest, "assumptions", keel_cli::view::assumptions),
+            Some("attestation") => keel_cli::attestation::cmd(rest),
             Some("attestation-coverage") => cmd_attestation_coverage(rest),
             Some("authority-queue") => cmd_view0(rest, "authority-queue", keel_cli::view::authority_queue),
             Some("boundary") => cmd_query1(rest, "boundary", |r, need| keel_cli::view::boundary_json(r, need).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
@@ -5349,21 +5354,27 @@ fn cmd_show(args: &[String]) -> i32 {
             Some("decision-follow-through") => cmd_decision_follow_through(rest),
             Some("decisions") => cmd_decisions(rest),
             Some("dispositions") => cmd_dispositions(rest),
+            Some("enforcement-report") => cmd_enforcement_report(rest),
             Some("flow") => cmd_flow(rest),
+            Some("governing-version") => cmd_governing_version(rest),
             Some("hardening") => cmd_hardening(rest),
             Some("indicators") => cmd_indicators(rest),
             Some("intake") => cmd_intake(rest),
+            Some("item") => cmd_query1(rest, "item", keel_cli::queries::item),
             Some("knowledge") => cmd_knowledge(rest),
             Some("launchables") => cmd_launchables(rest),
             Some("ls") => cmd_ls(rest),
             Some("marker-census") => cmd_view0(rest, "marker-census", keel_cli::view::marker_census),
             Some("open-issues") => cmd_open_issues(rest),
+            Some("orient") => cmd_orient(rest),
             Some("priority") => cmd_priority(rest),
             Some("orphans") => cmd_orphans(rest),
             Some("outstanding") => cmd_query0(rest, "outstanding", keel_cli::queries::outstanding),
             Some("recent") => cmd_query0(rest, "keel recent [ROOT]", |r| keel_cli::view::recent(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
+            Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
             Some("rootedness") => cmd_query0(rest, "keel rootedness [ROOT]", |r| keel_cli::view::rootedness(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
             Some("sitting-coverage") => cmd_sitting_coverage(rest),
+            Some("status") => cmd_status(rest),
             Some("suspect") => cmd_suspect(rest),
             Some("tier-satisfaction") => cmd_query0(rest, "keel tier-satisfaction [ROOT]", |r| keel_cli::view::tier_satisfaction(r).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
             Some("trace") => cmd_query1(rest, "trace", keel_cli::queries::trace),
@@ -5373,16 +5384,18 @@ fn cmd_show(args: &[String]) -> i32 {
                 keel_cli::workspace::require_project(&root, "keel verification [ROOT] [--pending]")
                     .map_or_else(|code| code, |()| keel_cli::verification::cmd(rest, &root))
             }
+            Some("view") => cmd_view(rest),
+            Some("whats-next") => cmd_whats_next(rest),
             Some("why") => cmd_why(rest),
             Some("workflows") => cmd_query0(rest, "workflows", keel_cli::queries::workflows),
         Some(other) => {
             eprintln!("keel show: unknown lens `{other}`.");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, flow, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: {}", keel_cli::cli_surface::LENS_NAMES.join(", "));
             2
         }
         None => {
             eprintln!("usage: keel show <lens> [ROOT] [flags]");
-            eprintln!("  Lenses: assumptions, attestation-coverage, authority-queue, boundary, boundary-sweep, business, commit-delta, concern-coverage, contentions, controls, coverage, critique-coverage, critique-policy, decision-follow-through, decisions, dispositions, flow, hardening, indicators, intake, knowledge, launchables, ls, marker-census, open-issues, orphans, outstanding, recent, rootedness, sitting-coverage, suspect, tier-satisfaction, trace, trace-need, verification, why, workflows");
+            eprintln!("  Lenses: {}", keel_cli::cli_surface::LENS_NAMES.join(", "));
             2
         }
     }
@@ -5403,7 +5416,6 @@ fn main() {
         Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("onboard") => keel_cli::onboard::cmd(rest),
         Some("adoption-check") => keel_cli::adoption_check::cmd(rest),
-        Some("attestation") => keel_cli::attestation::cmd(rest),
         Some("projects") => keel_cli::workspace::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
@@ -5417,9 +5429,6 @@ fn main() {
         Some("rules") => cmd_rules(rest),
         Some("library") => keel_cli::library::run(rest),
         Some("show") => cmd_show(rest),
-        Some("orient") => cmd_orient(rest),
-        Some("whats-next") => cmd_whats_next(rest),
-        Some("view") => cmd_view(rest),
         Some("audit") => cmd_audit(rest),
         Some("deck") => cmd_deck(rest),
         Some("mint") => cmd_mint(rest),
@@ -5427,19 +5436,12 @@ fn main() {
         Some("sync-claude") => cmd_sync_claude(rest),
         Some("claude") => cmd_claude(rest),
         Some("override") => cmd_override(rest),
-        Some("enforcement-report") => cmd_enforcement_report(rest),
         Some("guard") => cmd_guard(rest),
-        Some("governing-version") => cmd_governing_version(rest),
-        Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
-        Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
         Some("recall") => cmd_recall(rest),
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        // `repo_arg(rest)` would take the SUBCOMMAND as the path — `arch elements .` resolved the
-        // root to `./elements`, whose empty model then printed "no CodeElement instances authored".
-        Some("arch") => keel_cli::arch::cmd(rest, &repo_arg(rest.get(1..).unwrap_or(&[]))),
         // issue281: `verification` reads a MODEL, so it must not answer over nothing — but it takes
         // its root via `repo_arg`, which is the repository-scoped resolver `sync`/`land` use and which
         // therefore carries no project precondition. Found by sweeping every command at a workspace
@@ -5453,7 +5455,6 @@ fn main() {
             keel_cli::ci_runs::cmd(rest, &root)
         }),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
-        Some("status") => cmd_status(rest),
         Some("currency") => cmd_currency(rest), // D0338: the unattended pass - pull, library, drift
         Some("suite") => cmd_suite(rest), // D0353: the full suite, with the receipt land demands
         Some("github-pull") => {
@@ -5482,7 +5483,6 @@ fn main() {
         Some("record-measurement") => cmd_record_measurement(rest),
         Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
         Some("apply-review") => cmd_apply_review(rest),
-        Some("item") => cmd_query1(rest, "item", keel_cli::queries::item),
         Some("append-result") => cmd_append_result(rest),
         Some("append-gate-result") => cmd_append_gate_result(rest),
         Some("add-task") => cmd_add_task(rest),
@@ -5560,7 +5560,7 @@ mod tests {
         };
         assert_eq!(found(&["--explain", &r], 0), Some(r.clone()));
         assert_eq!(found(&[&r, "--explain"], 0), Some(r.clone()));
-        // `positionals` skips the subcommand's own leading argument (`keel view <name> [ROOT]`)
+        // `positionals` skips the subcommand's own leading argument (`keel show view <name> [ROOT]`)
         assert_eq!(found(&["decisions", &r], 1), Some(r.clone()));
         // and a leading positional alone leaves ROOT to repo discovery, not to the positional
         assert_ne!(root_arg(&a(&["decisions"]), "u", &[], 1).map(|p| p.to_string_lossy().to_string()), Ok("decisions".to_string()));

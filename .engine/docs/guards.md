@@ -9,7 +9,7 @@ verdict words are coloured (PASS green, FAIL/ERROR red, WARN yellow, DEFECT mage
 bare text, `NO_COLOR` disables, `KEEL_COLOR=1|0` forces.
 
 A warning is one of TWO classes, and the runner states them apart (D0413/issue404). An ACTIONABLE warning names a
-condition an edit can discharge; the runner's verdict line counts them and the guards carrying them, and `keel orient`
+condition an edit can discharge; the runner's verdict line counts them and the guards carrying them, and `keel show orient`
 lists them in its burndown (`guard_warnings`, read from the guard receipt for this tree). A COUNTED-HISTORY line -
 printed `HISTORY`, built by the guard with `guards::history_line` - reports immutable history no edit can discharge
 (legacy actors in records predating the convention, resolutions before the naming cutoff, grandfathered attestations

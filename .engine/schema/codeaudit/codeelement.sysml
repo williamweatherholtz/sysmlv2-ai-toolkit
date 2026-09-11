@@ -8,7 +8,7 @@
 //
 // WHAT THIS IS NOT: it is not a parse of your source. keel never reads the deliverable's code to
 // decide what exists — a `CodeElement` is an AUTHORED fact about a unit someone took responsibility
-// for, and the `keel arch` views compute over those facts plus the Needs graph. The one place source
+// for, and the `keel show arch` views compute over those facts plus the Needs graph. The one place source
 // is touched is `arch drift`, which compares the recorded `codeHash` against the live `@audit-hash`
 // marker; that is a staleness check on the record, not a discovery mechanism. An element nobody
 // authored is invisible here, and `arch coverage` exists to say so out loud rather than let the

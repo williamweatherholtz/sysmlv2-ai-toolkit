@@ -5,7 +5,7 @@
 //! In the pass that produced this module, FOUR probes were wrong before they were right:
 //!
 //!   - a regex matching `: Process` also matched `: ProcessStep` — 131 processes reported, 24 exist;
-//!   - help extraction reported `keel orient` and `keel assured` as nonexistent, minutes after both had
+//!   - help extraction reported `keel show orient` and `keel assured` as nonexistent, minutes after both had
 //!     been run in the same session;
 //!   - a second attempt at the same question reported 0 of 72 subcommands documented;
 //!   - a registry probe reported 0 registered skills against 35 real declarations, which would have

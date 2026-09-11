@@ -38,7 +38,7 @@ process** so it is *carried out*, not just hoped (D0059). Bound by D0058 (ADR fi
 2. **Verdict is a discrete TestResult — never prose.** Acceptance = a `method=confirmation` verification +
    a passing TestResult (who/when/commit), **judged by a human `Person`** (guard:confirmation-authenticity).
    Never write an `(ACCEPTED <date> by <who>)` comment or field sentence — the TestResult is the sole source.
-3. **State is computed.** Acceptance/coverage/suspicion/resolution are `#View`s (`keel orient`/`decisions`/
+3. **State is computed.** Acceptance/coverage/suspicion/resolution are `#View`s (`keel show orient`/`decisions`/
    `coverage`). Only the guarded `status` flag is materialized; everything else derivable is not authored.
 4. **Backstop.** Before commit, `keel rules` → `decisionNoVerdictProseRule` must be 0; any flag is a defect to fix.
 

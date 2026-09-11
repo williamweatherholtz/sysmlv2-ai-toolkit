@@ -182,7 +182,7 @@ pub fn warning_population(reports: &[GuardReport]) -> String {
     if actionable > 0 {
         let _ = write!(
             out,
-            " — {actionable} actionable warning(s) across {} guard(s), NOT violations and NOT blocking, each naming a condition an edit can discharge (keel orient lists them in its burndown): {}",
+            " — {actionable} actionable warning(s) across {} guard(s), NOT violations and NOT blocking, each naming a condition an edit can discharge (keel show orient lists them in its burndown): {}",
             reports.iter().filter(|r| r.actionable().count() > 0).count(),
             names(|r| r.actionable().count() > 0)
         );
@@ -5797,7 +5797,7 @@ pub fn run_all_timed(root: &Path) -> (Vec<GuardReport>, Durations) {
 /// WHY A POOL AND NOT ONE THREAD PER GUARD: 65 guards on a 20-core host would oversubscribe the model
 /// cache lock on a cold start; a pool the size of the host's parallelism does one parse and shares it.
 /// WHY SLOTS: the reports come back in `GUARD_NAMES` order exactly as the serial loop returned them -
-/// every consumer (the hook, `keel status`, the workspace gate, the history audit) prints or compares
+/// every consumer (the hook, `keel show status`, the workspace gate, the history audit) prints or compares
 /// them positionally, and a thread finishing order is not a fact about the tree. Each guard is a
 /// `perf::phase("guard:<name>")` so `KEEL_PERF=2` attributes the run per guard in-process without the
 /// measurement patch the spike needed (docs/reviews/perf-spike-2026-09-07/phase_patch.py).
@@ -7634,7 +7634,7 @@ mod viewpoint_enumeration_tests {
         };
         // one in the registry file with a real renderer, one in ANOTHER file with a command that does
         // not exist — the exact shape that used to pass.
-        std::fs::write(dir.join(".engine/views/viewpoint-registry.sysml"), vp("goodVP", "aaaaaaaa-1111-4111-8111-111111111111", "good", "keel orient")).unwrap();
+        std::fs::write(dir.join(".engine/views/viewpoint-registry.sysml"), vp("goodVP", "aaaaaaaa-1111-4111-8111-111111111111", "good", "keel show orient")).unwrap();
         std::fs::write(dir.join(".engine/views/other.sysml"), vp("strayVP", "bbbbbbbb-2222-4222-8222-222222222222", "stray", "keel no-such-command")).unwrap();
 
         let r = viewpoint_renderer(&dir);

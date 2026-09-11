@@ -37,10 +37,10 @@ Every rule below names its Decision; the Decision holds the history. Don't resta
 ## 2. Orient — never from prose
 
 ```
-keel orient .                 # in-progress + ready/suspect frontier + burndown
-keel whats-next .             # ready list; declaration order IS priority (D0052)
+keel show orient .                 # in-progress + ready/suspect frontier + burndown
+keel show whats-next .             # ready list; declaration order IS priority (D0052)
 keel show priority .          # priority metric + inversions (D0311)
-keel status .                 # engine pin, drift, model, work, hooks, CI
+keel show status .                 # engine pin, drift, model, work, hooks, CI
 keel advance <sprint|process> [--to <step>]   # process cursor; refused while an earlier bound step is red (D0435/D0436)
 ```
 
@@ -68,7 +68,7 @@ D0333), `intake`, `control-structure [--svg]` (D0284/D0285; analyse with skill `
 | `EXECUTE` | produces the active phase's artifact | orient → act in phase → record items + edges + judgment → gate passes |
 | `RECORD` | one atomic fact (Decision / TestResult / Issue) | author + provenance. Never a blob |
 | `VIEW` | computed answer | compute, present. Never store |
-| `ORIENT` | where things stand | `keel orient` |
+| `ORIENT` | where things stand | `keel show orient` |
 | `TRIVIAL` | typo, one rename, one doc line | do it, label it |
 
 Split multi-part requests. No process fits → DEFINE the process (that is the output).
@@ -142,7 +142,7 @@ Change Request cross-cuts and is itself frozen.
 **Git**
 - `main` only, commit directly. Never rebase/squash/force-push (D0129): rewriting history orphans
   `judgedAgainst` evidence. Integrate by merge: `keel sync` / `keel land` (gates workspace-wide before push).
-- CI verdict = `conclusion` field (`gh run list --json conclusion` or `keel status`), never a wrapper's exit
+- CI verdict = `conclusion` field (`gh run list --json conclusion` or `keel show status`), never a wrapper's exit
   (D0420). CI runs `audit-adherence`, `audit-ci-runs`, `audit-history`.
 - `land` runs the touched test set before the first push (D0421) inside the post-commit hook from a copy
   `target/release/keel-land.exe` (D0422). It takes 7–15 min: run `git commit` DETACHED, then read
@@ -160,7 +160,7 @@ keel check-engine .        # .engine instance gate
 keel guard [--no-receipt]  # all forward guards; catalogue .engine/docs/guards.md; count from `keel version`
 keel gate --fast           # per-edit tier
 keel gate --workspace      # commit tier, multi-project
-keel enforcement-report    # hook fires, blocks, latency distribution, refusals (D0389/D0424)
+keel show enforcement-report    # hook fires, blocks, latency distribution, refusals (D0389/D0424)
 keel reverify --all-drift  # re-run gate at HEAD, fresh results on green (D0101)
 keel reverify --demos      # re-run replayable demo receipts (D0444)
 ```

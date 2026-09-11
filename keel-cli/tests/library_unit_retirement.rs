@@ -1,6 +1,6 @@
 //! issue381 / GH#57, GH#58 (D0345): a library unit its upstream has abandoned can be RETIRED in the
 //! library, and the retirement reaches every consumer - `import --from-library` refuses it naming the
-//! reason and the replacement, `library list` marks it, and `keel status` marks an INSTALLED retired
+//! reason and the replacement, `library list` marks it, and `keel show status` marks an INSTALLED retired
 //! unit. Every scenario runs the binary with an isolated HOME so the machine's real library is never
 //! touched.
 
@@ -112,7 +112,7 @@ fn status_marks_an_installed_unit_its_upstream_retired() {
     // Upstream retires it; this machine syncs.
     let (ok, text) = keel_home(&home, &base, &["process", "retire", "old-channel", "--why", WHY, "--at", "2026-09-06"]);
     assert!(ok, "{text}");
-    let (_, status) = keel_home(&home, &proj, &["status", "."]);
+    let (_, status) = keel_home(&home, &proj, &["show", "status", "."]);
     assert!(status.contains("old-channel v6 installed here is RETIRED 2026-09-06"), "status names the installed retired unit: {status}");
     assert!(!status.contains("available, not installed: old-channel"), "a retired unit is never offered: {status}");
     let _ = std::fs::remove_dir_all(&base);

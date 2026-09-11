@@ -157,7 +157,7 @@ fn a_decision_whose_prose_names_the_token_does_not_arm_the_gate() {
 /// The pure set: a known positive and a known negative (D0388), pinned outside the module's own tests.
 #[test]
 fn the_set_is_computed_from_text_by_whole_word() {
-    let tests = vec![("land_gate".to_string(), "use keel_cli::sync::cmd_land;".to_string()), ("orient_view".to_string(), "keel orient .".to_string())];
+    let tests = vec![("land_gate".to_string(), "use keel_cli::sync::cmd_land;".to_string()), ("orient_view".to_string(), "keel show orient .".to_string())];
     assert_eq!(keel_cli::touched::touched_tests(&tests, &["sync".to_string()], &[]), vec!["land_gate".to_string()]);
     assert!(keel_cli::touched::touched_tests(&tests, &["synced".to_string()], &[]).is_empty());
     assert_eq!(keel_cli::touched::module_stem("keel-cli/src/main.rs"), None, "main.rs names no module");

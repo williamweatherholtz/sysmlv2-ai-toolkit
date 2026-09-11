@@ -409,7 +409,7 @@ pub fn report_html(root: &Path, name: &str, trend: bool) -> Result<String, ViewE
 ///
 /// Cards: where things stand + what's ready + open issues + suspect/stale + assurance readiness,
 /// reusing the report card template. A computed #View (regenerate-don't-commit), drilling down to the
-/// `keel orient` JSON authority.
+/// `keel show orient` JSON authority.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
@@ -1018,7 +1018,7 @@ const TABLE_STYLE: &str = r"<style>
 </style>";
 
 const TABLE_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>keel view</title>
+<html lang="en"><head><meta charset="utf-8"><title>keel show view</title>
 <meta name="generator" content="keel render --mode table (computed #View; regenerate, do not commit as truth)">
 /*STYLE*/</head><body>
 <header><h1>keel · <span id="vn"></span></h1><p id="cn"></p></header>

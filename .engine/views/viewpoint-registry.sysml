@@ -18,7 +18,7 @@ package EngineViewpoints {
         :>> concernText = "Where do things stand and what is ready to work next?";
         :>> audience = "maintainer / lead";
         :>> sources = "backlog action defs + latest TestResults + succession DAG + delivery-file ceremony gates";
-        :>> renderer = "keel orient [--html] (JSON authority; --html = the human dashboard #View, D0093)";
+        :>> renderer = "keel show orient [--html] (JSON authority; --html = the human dashboard #View, D0093)";
         :>> surface = "work";
     }
     part whatsNextVP : Viewpoint {
@@ -28,7 +28,7 @@ package EngineViewpoints {
         :>> concernText = "Which outstanding items are unblocked, in priority order?";
         :>> audience = "maintainer / AI executor";
         :>> sources = "ready frontier (outstanding tasks with all deps done), ranked by backlog declaration order (D0052)";
-        :>> renderer = "keel whats-next";
+        :>> renderer = "keel show whats-next";
         :>> surface = "work";
     }
     part traceabilityVP : Viewpoint {
@@ -108,7 +108,7 @@ package EngineViewpoints {
         :>> concernText = "What was decided, by whom, when, and why (incl. alternatives)?";
         :>> audience = "lead / auditor / future maintainer";
         :>> sources = ".engine/decisions/*.sysml Decision items (context/decisionText/consequences; alternatives via decisionAnalysis/issue016)";
-        :>> renderer = "keel show decisions (+ the decisions TOML view: keel view decisions)";
+        :>> renderer = "keel show decisions (+ the decisions TOML view: keel show view decisions)";
         :>> surface = "record";
     }
     part baselinesVP : Viewpoint {
@@ -160,7 +160,7 @@ package EngineViewpoints {
         :>> concernText = "Which version of its governing process did a work item follow — i.e. what process was in force AS-OF the item's charter (charter-time freeze, D0068), so an output can be accepted against the process it actually satisfied (D0062) and audited / regenerated?";
         :>> audience = "maintainer / auditor / reviewer";
         :>> sources = "git ancestry (D0013): the process-def state at the latest change-commit that is an ancestor of the item's introduction commit; correlated with process-change Decisions (#ProspectiveChange/#SafetyChange markers, D0070) in force at vs. after the charter; work->process by convention (D0069)";
-        :>> renderer = "keel governing-version <item>";
+        :>> renderer = "keel show governing-version <item>";
         :>> surface = "record";
     }
 
@@ -171,7 +171,7 @@ package EngineViewpoints {
         :>> concernText = "Which items were chartered under a process version later superseded by a SAFETY change, and so must be re-processed against the new process (mandatory iff retroactivity=safety; prospective changes never flag — D0062)?";
         :>> audience = "maintainer / safety reviewer";
         :>> sources = "governing-version per item x process-change Decisions whose retroactivity=safety and whose effective commit post-dates the item's charter (git ancestry, D0070)";
-        :>> renderer = "keel reprocess-candidates";
+        :>> renderer = "keel show reprocess-candidates";
         :>> surface = "work";
     }
 
@@ -222,7 +222,7 @@ package EngineViewpoints {
         :>> concernText = "What code has someone taken responsibility for, and where does it live?";
         :>> audience = "maintainer / auditor";
         :>> sources = "authored CodeElement instances (EngineCodeAudit, D0148)";
-        :>> renderer = "keel arch elements [--kind K] [--file F]";
+        :>> renderer = "keel show arch elements [--kind K] [--file F]";
         :>> surface = "architecture";
     }
     part archCriticalityVP : Viewpoint {
@@ -232,7 +232,7 @@ package EngineViewpoints {
         :>> concernText = "Which code units should be audited first?";
         :>> audience = "maintainer / safety reviewer";
         :>> sources = "CodeElement.riskClass, ranked worst-first, bumped one tier where the element traces to a `must` Need";
-        :>> renderer = "keel arch criticality";
+        :>> renderer = "keel show arch criticality";
         :>> surface = "architecture";
     }
     part archCouplingVP : Viewpoint {
@@ -242,7 +242,7 @@ package EngineViewpoints {
         :>> concernText = "Which units are entangled, and which sit far from the main sequence?";
         :>> audience = "architect";
         :>> sources = "#DependsOn edges among catalogued elements; authored abstractness where present";
-        :>> renderer = "keel arch coupling";
+        :>> renderer = "keel show arch coupling";
         :>> surface = "architecture";
     }
     part archDriftVP : Viewpoint {
@@ -252,7 +252,7 @@ package EngineViewpoints {
         :>> concernText = "Which audited units have changed since they were audited?";
         :>> audience = "maintainer";
         :>> sources = "CodeElement.codeHash vs a re-hash of the block under the live // @audit-hash marker";
-        :>> renderer = "keel arch drift";
+        :>> renderer = "keel show arch drift";
         :>> surface = "architecture";
     }
     part archStpaInputsVP : Viewpoint {
@@ -262,7 +262,7 @@ package EngineViewpoints {
         :>> concernText = "What control structure has been captured for a later STPA analysis?";
         :>> audience = "safety analyst";
         :>> sources = "CodeElement.stpaRole + controlActions + #Controls/#Feedback edges. A HAND-OFF, not an analysis";
-        :>> renderer = "keel arch stpa-inputs";
+        :>> renderer = "keel show arch stpa-inputs";
         :>> surface = "architecture";
     }
     part archCoverageVP : Viewpoint {
@@ -272,7 +272,7 @@ package EngineViewpoints {
         :>> concernText = "How much of the codebase does the registry actually speak for?";
         :>> audience = "maintainer";
         :>> sources = "catalogued elements vs a HEURISTIC top-level-def scan of the files they name; non-blocking indicator, never a gate";
-        :>> renderer = "keel arch coverage";
+        :>> renderer = "keel show arch coverage";
         :>> surface = "architecture";
     }
     part verificationExaminedVP : Viewpoint {
@@ -302,7 +302,7 @@ package EngineViewpoints {
         :>> concernText = "Which proposed Decisions are waiting on MY acceptance before work can continue?";
         :>> audience = "asynchronous supervisor";
         :>> sources = "Decisions with status=proposed and no acceptance event; the items #DependsOn-blocked behind them";
-        :>> renderer = "keel orient (pendingAcceptances)";
+        :>> renderer = "keel show orient (pendingAcceptances)";
         :>> surface = "act";
     }
     part findingsAwaitingDispositionVP : Viewpoint {

@@ -20,18 +20,17 @@
 //! point. A unit declaring a name the post-collapse engine no longer has is exactly what must refuse.
 
 /// Every command this binary dispatches, sorted. Kept equal to `main.rs`'s dispatch by test.
-pub const COMMAND_NAMES: [&str; 68] = [
-    "accept", "activate", "activation", "actor", "actor-trace", "add-task",
-    "adoption-check", "advance", "append-gate-result", "append-result", "apply-review", "arch",
-    "assured", "attestation", "audit", "audit-adherence", "audit-ci-runs", "audit-history", "check", "currency",
-    "check-engine", "claim", "claude", "deactivate", "deck",
-    "enforcement-report", "enroll", "gate", "github-decider", "github-decision-id", "github-gesture",
-    "github-ingest", "github-pull", "governing-version", "guard", "hook", "init",
-    "item", "judge-set", "land", "library", "migrate", "mint", "new",
-    "onboard", "orient", "override", "process", "projects", "recall",
-    "record", "record-measurement", "reject", "render", "reprocess-candidates", "reverify",
-    "rules", "serve", "show", "snapshot-indicators", "status", "suite", "sync",
-    "sync-claude", "validate", "version", "view", "whats-next",
+pub const COMMAND_NAMES: [&str; 57] = [
+    "accept", "activate", "activation", "actor", "add-task", "adoption-check",
+    "advance", "append-gate-result", "append-result", "apply-review", "assured", "audit",
+    "audit-adherence", "audit-ci-runs", "audit-history", "check", "check-engine", "claim",
+    "claude", "currency", "deactivate", "deck", "enroll", "gate",
+    "github-decider", "github-decision-id", "github-gesture", "github-ingest", "github-pull", "guard",
+    "hook", "init", "judge-set", "land", "library", "migrate",
+    "mint", "new", "onboard", "override", "process", "projects",
+    "recall", "record", "record-measurement", "reject", "render", "reverify",
+    "rules", "serve", "show", "snapshot-indicators", "suite", "sync",
+    "sync-claude", "validate", "version",
 ];
 
 /// Does this binary dispatch `name`?
@@ -46,13 +45,16 @@ pub fn has_command(name: &str) -> bool {
 /// viewpoint-renderer guard diffed renderer strings against. Two inventories of the same fact is one
 /// too many — the guard's copy had already grown apologetic comments about names "never added here,
 /// so the first viewpoint naming it failed". Both now read this module.
-pub const LENS_NAMES: [&str; 40] = [
-    "assumptions", "attestation-coverage", "authority-queue", "boundary", "boundary-sweep", "business",
-    "commit-delta", "concern-coverage", "contentions", "control-census", "control-structure", "controls", "coverage", "critique-coverage", "critique-policy",
-    "decision-follow-through", "decisions", "dispositions", "flow", "hardening", "indicators", "intake",
-    "knowledge", "launchables", "ls", "marker-census", "open-issues", "orphans", "priority",
-    "outstanding", "recent", "rootedness", "sitting-coverage", "suspect", "tier-satisfaction",
-    "trace", "trace-need", "verification", "why", "workflows",
+pub const LENS_NAMES: [&str; 51] = [
+    "actor-trace", "arch", "assumptions", "attestation", "attestation-coverage", "authority-queue",
+    "boundary", "boundary-sweep", "business", "commit-delta", "concern-coverage", "contentions",
+    "control-census", "control-structure", "controls", "coverage", "critique-coverage", "critique-policy",
+    "decision-follow-through", "decisions", "dispositions", "enforcement-report", "flow", "governing-version",
+    "hardening", "indicators", "intake", "item", "knowledge", "launchables",
+    "ls", "marker-census", "open-issues", "orient", "orphans", "outstanding",
+    "priority", "recent", "reprocess-candidates", "rootedness", "sitting-coverage", "status",
+    "suspect", "tier-satisfaction", "trace", "trace-need", "verification", "view",
+    "whats-next", "why", "workflows",
 ];
 
 /// Is `name` a lens reachable through `keel show`?

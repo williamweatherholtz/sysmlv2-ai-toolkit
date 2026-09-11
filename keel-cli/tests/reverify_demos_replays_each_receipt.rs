@@ -6,7 +6,7 @@
 //!   3. a demo whose receipt is prose lands `proposed` and is never replayed;
 //!   4. with no `[demo]` section the flag is inert (exit 2) and every AI demo pass is a proposal.
 //!
-//! `keel attestation --json` reports the split as `demoReplayable` / `demoProposed` from the same tree.
+//! `keel show attestation --json` reports the split as `demoReplayable` / `demoProposed` from the same tree.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -122,7 +122,7 @@ fn a_replayable_demo_receipt_stays_a_pass_and_demos_replays_it_recording_each_ve
     assert_eq!(outcome_of(&t, "iGateR1"), "proposed", "a command on an inspect does not repeat the looking: {t}");
 
     // the census sees the split before anything is replayed: two replayable passes, one demo proposal
-    let (ok, json) = agent(&root, &["attestation", ".", "--json"]);
+    let (ok, json) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(ok, "{json}");
     assert!(json.contains("\"demoReplayable\":2,\"demoProposed\":1"), "{json}");
 
@@ -142,7 +142,7 @@ fn a_replayable_demo_receipt_stays_a_pass_and_demos_replays_it_recording_each_ve
     assert!(!t.contains("iGateR2"), "an inspect is never replayed: {t}");
 
     // after the replay the red demo's latest result is a fail, so it leaves the pool; the green one stays
-    let (ok, json) = agent(&root, &["attestation", ".", "--json"]);
+    let (ok, json) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(ok, "{json}");
     assert!(json.contains("\"demoReplayable\":1,\"demoProposed\":1"), "{json}");
     let _ = std::fs::remove_dir_all(&root);
@@ -167,7 +167,7 @@ fn without_a_demo_section_every_demo_pass_is_a_proposal_and_demos_is_inert() {
     assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(String::from_utf8_lossy(&out.stderr).contains("declares no [demo] replayable prefixes"));
     assert_eq!(file_text(&root), t, "an inert flag writes nothing");
-    let (ok, json) = agent(&root, &["attestation", ".", "--json"]);
+    let (ok, json) = agent(&root, &["show", "attestation", ".", "--json"]);
     assert!(ok, "{json}");
     assert!(json.contains("\"demoReplayable\":0,\"demoProposed\":1"), "{json}");
     let _ = std::fs::remove_dir_all(&root);

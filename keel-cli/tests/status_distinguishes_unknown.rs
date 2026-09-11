@@ -1,4 +1,4 @@
-//! `keel status` must never render "I cannot tell" as "nothing to report" (D0270).
+//! `keel show status` must never render "I cannot tell" as "nothing to report" (D0270).
 //!
 //! A status screen exists to be trusted at a glance, which makes it the worst possible place for the
 //! pass-at-zero hazard this codebase has already caught three times. A library that cannot be
@@ -29,7 +29,7 @@ fn project(tag: &str) -> (PathBuf, PathBuf) {
 
 fn status(root: &Path, home: &Path) -> String {
     let out = Command::new(keel_bin())
-        .args(["status", "."])
+        .args(["show", "status", "."])
         .current_dir(root)
         .env("USERPROFILE", home)
         .env("HOME", home)
@@ -89,7 +89,7 @@ fn the_summary_counts_attention_and_unknown_separately() {
 #[test]
 fn this_repository_reports_its_real_state() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("repo root");
-    let out = Command::new(keel_bin()).args(["status", "."]).current_dir(repo).output().expect("keel");
+    let out = Command::new(keel_bin()).args(["show", "status", "."]).current_dir(repo).output().expect("keel");
     let text = String::from_utf8_lossy(&out.stdout);
     for section in ["engine", "library", "model", "work", "ci"] {
         assert!(text.contains(section), "every base must appear; missing `{section}`: {text}");

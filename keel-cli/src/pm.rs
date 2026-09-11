@@ -1,4 +1,4 @@
-//! `keel enforcement-report` — the D0180 analysis over the fire-ledger.
+//! `keel show enforcement-report` — the D0180 analysis over the fire-ledger.
 //!
 //! K14: the effect of enforcement is MEASURED, not presumed — D0128's recorded-but-undelivered
 //! "prove the in-loop gate" step, delivered.

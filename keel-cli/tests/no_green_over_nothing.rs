@@ -36,8 +36,8 @@ impl Drop for Tmp {
 /// root before delegating would answer green over nothing for every lens at once, which is the
 /// failure this file exists to prevent made 35 times worse.
 const MODEL_READERS: &[&[&str]] = &[
-    &["orient"],          // root_arg — the AI's only legitimate state read
-    &["whats-next"],      // root_arg — the ranked frontier
+    &["show", "orient"],  // root_arg — the AI's only legitimate state read
+    &["show", "whats-next"], // root_arg — the ranked frontier
     &["check-engine"],    // root_arg — a BLOCKING step in the commit gate
     &["validate"],        // root_arg — already refused (issue269); pinned so it stays refused
     &["show", "coverage"],
@@ -47,7 +47,7 @@ const MODEL_READERS: &[&[&str]] = &[
     &["show", "indicators"],
     &["show", "verification"],    // repo_arg + an explicit check
     &["show", "controls"],        // cmd_view0 — resolves its own root
-    &["attestation"],             // resolves its own root inside its module
+    &["show", "attestation"],     // resolves its own root inside its module
 ];
 
 fn init_project(at: &Path) {
@@ -85,7 +85,7 @@ fn no_model_command_answers_green_at_a_workspace_root() {
 
     // And the refusal has to be USEFUL: name the projects the repository does hold, or the reader
     // cannot act on it.
-    let out = keel().arg("orient").arg(&base).output().expect("run keel orient");
+    let out = keel().args(["show", "orient"]).arg(&base).output().expect("run keel show orient");
     let said = String::from_utf8_lossy(&out.stderr).to_string();
     assert!(said.contains("alpha") && said.contains("beta"), "the refusal must name the projects: {said}");
 

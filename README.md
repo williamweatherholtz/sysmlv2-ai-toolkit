@@ -54,8 +54,8 @@ harness in real use, say so — that is the trigger.
 **3. Start working.** Read `CLAUDE.md`, then either run the guided **`introduction`** skill
 (captures your first need and runs your first sprint) or jump straight in:
 ```
-keel orient .        # where things stand (computed — never a prose status doc)
-keel whats-next .    # the ready frontier
+keel show orient .        # where things stand (computed — never a prose status doc)
+keel show whats-next .    # the ready frontier
 ```
 
 Your project authors its own facts in `.tracking/` and its own decisions in `.engine/decisions/`;
@@ -119,7 +119,7 @@ d0001–d0096), and verification here is tracked by the engine, so the `.trackin
 primary evidence that the process works (the self-build / dogfood). Future engine modifications
 happen here, under the same discipline.
 
-- **State is computed:** `keel orient .` — there is no status/roadmap/handoff doc (Decision 0018).
+- **State is computed:** `keel show orient .` — there is no status/roadmap/handoff doc (Decision 0018).
 - **Discipline:** `CLAUDE.md §1` is normative. Every schema/process change is a recorded `Decision`
   + acceptance + green validation; a pre-commit hook enforces it and the post-commit hook pushes to
   `main` (the only branch). CI (`.github/workflows/ci.yml`) runs `cargo test` + `clippy -D warnings`.

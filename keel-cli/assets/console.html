@@ -252,7 +252,7 @@ function linkList(arr,n){arr=arr||[];if(!arr.length)return '<span class=muted>â€
 // dead text even though `itemLink`/`openItem`/`/api/item/:name` have existed all along. So the console
 // had a working navigation mechanism and the generic panel simply did not use it.
 //
-// Item names are LINKED DYNAMICALLY: anything shaped like a keel item name becomes clickable, and
+// Item names are LINKED DYNAMICALLY: anything shaped like a keel show item name becomes clickable, and
 // `openItem` resolves it against the live model at click time â€” so a view gains working links with no
 // per-view code, and a name that is not an item simply opens a panel saying so.
 const ITEM_RE=/^(issue\d{3,}|d\d{4}|sprint\d+|us\d{3,}|st\d{3,}|obligation[0-9a-f]+|[a-z][A-Za-z0-9]*(Story|Gate|DoD|Accept|R\d+)|dc[A-Z][A-Za-z0-9]*|sr[A-Z][A-Za-z0-9]*)$/;

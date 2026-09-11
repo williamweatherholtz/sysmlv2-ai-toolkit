@@ -63,7 +63,7 @@ package EngineDecisionAuthoring {
         :>> id = "63940516-2c7d-4e8f-c108-516273849703";
         :>> title = "Let state be computed — don't author derived facts";
         :>> triggerCondition = "Any status/coverage/suspicion/resolution fact about the Decision is wanted.";
-        :>> actionText = "Read it, never store it: acceptance state, critique coverage, suspicion, and open/resolved are COMPUTED views (keel orient/decisions/coverage). The authored `status` field is the one materialized flag, guarded to match its acceptance event (proposed/accepted/rejected - retirement is the #Supersede edge, D0398); everything else derivable is a #View, not a field or a prose note (§2.1).";
+        :>> actionText = "Read it, never store it: acceptance state, critique coverage, suspicion, and open/resolved are COMPUTED views (keel show orient/decisions/coverage). The authored `status` field is the one materialized flag, guarded to match its acceptance event (proposed/accepted/rejected - retirement is the #Supersede edge, D0398); everything else derivable is a #View, not a field or a prose note (§2.1).";
         :>> producedArtifact = "Computed state surfaced by the views; no dual-truth stored.";
         :>> owner = Owner::ai;
     }

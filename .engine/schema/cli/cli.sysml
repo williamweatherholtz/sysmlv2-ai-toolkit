@@ -19,7 +19,7 @@ package EngineCli {
 
     // WHAT A COMMAND DOES TO THE MODEL. The distinction is load-bearing, not descriptive: a `reads`
     // command may be run to find out where you stand, and one that writes may not - which is
-    // precisely the property `keel status` had to be built to hold.
+    // precisely the property `keel show status` had to be built to hold.
     enum def CliEffect {
         reads;                  // computes and prints; mutates nothing
         writes;                 // authors facts, or changes the tree

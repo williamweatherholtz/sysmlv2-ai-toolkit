@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn an_absent_registry_claims_nothing() {
         // The honest default. An empty registry says "nothing is KNOWN to be broken", never
-        // "nothing is broken" — the same distinction `keel status` draws between OK and UNKNOWN.
+        // "nothing is broken" — the same distinction `keel show status` draws between OK and UNKNOWN.
         assert!(parse("").is_empty());
         assert!(load(Path::new("this-directory-does-not-exist")).is_empty());
     }

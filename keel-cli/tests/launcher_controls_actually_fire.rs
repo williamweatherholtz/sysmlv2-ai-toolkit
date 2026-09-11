@@ -2,7 +2,7 @@
 //!
 //! # Why this is the gap and not just a missing test
 //!
-//! `keel enforcement-report` reports `launcherFraction: unavailable: no run records yet` and
+//! `keel show enforcement-report` reports `launcherFraction: unavailable: no run records yet` and
 //! `dirtyTreeRefusals: unavailable`. `.keel/runs/` does not exist in this repository. The launcher is
 //! fully implemented — dirty-tree refusal, HEAD/fingerprint snapshot, post-run gate, machine-local
 //! record, tracked summary — and has **never once been invoked**. Every Need about bounded, approved

@@ -126,7 +126,7 @@ pub fn require_project(root: &Path, usage: &str) -> Result<(), i32> {
 
 /// Resolve a subcommand's optional `[ROOT]` positional, REFUSING an unrecognised flag (issue133).
 ///
-/// `positionals` is how many leading positional arguments the subcommand takes before ROOT (`keel view
+/// `positionals` is how many leading positional arguments the subcommand takes before ROOT (`keel show view
 /// <name> [ROOT]` passes 1). `known` lists the flag names the subcommand accepts, without `--`.
 ///
 /// THE DEFECT THIS EXISTS TO END: every parser used to take its first argument as ROOT, so `keel audit

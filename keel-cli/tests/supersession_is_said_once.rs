@@ -74,7 +74,7 @@ fn a_retired_decision_leaves_the_queue_and_a_clause_reversal_leaves_its_target_i
     let (_, queue) = run(&root, &["show", "authority-queue", "."]);
     assert!(!queue.contains("d0001"), "a retired Decision is not on the human's queue: {queue}");
     assert!(queue.contains("d0003") && queue.contains("d0004"), "its proposed siblings are: {queue}");
-    let (_, orient) = run(&root, &["orient", "."]);
+    let (_, orient) = run(&root, &["show", "orient", "."]);
     let pending = orient.split("\"pendingAcceptances\"").nth(1).and_then(|s| s.split(']').next()).expect("orient lists pendingAcceptances");
     assert!(!pending.contains("d0001") && pending.contains("d0003"), "orient's pendingAcceptances agrees: {pending}");
 

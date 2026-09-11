@@ -233,7 +233,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
         }
     }
     println!("  Recorded role: {role}.");
-    println!("  Next: `keel orient .` to see where things stand, then the `distributed-collaboration` skill.");
+    println!("  Next: `keel show orient .` to see where things stand, then the `distributed-collaboration` skill.");
     println!("  note: {} is machine-local and must never be committed.", crate::actor::BINDING_PATH);
     0
 }

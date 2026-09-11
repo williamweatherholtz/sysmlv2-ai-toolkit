@@ -32,7 +32,7 @@ that's **accepted**) is complete. The loop is record → triage → resolve → 
 relate to a done task yet still be open (issue014/025 were exactly this).
 
 **Resolution = computed (D0001/D0018):** `keel show open-issues` (the open set + each
-resolver + `untriaged`), `keel orient` (`open_issues`). There is **no** authored
+resolver + `untriaged`), `keel show orient` (`open_issues`). There is **no** authored
 `status` field; a prose "RESOLVED …" clause in a description is *informational only*.
 
 **Triage:** every Issue must carry a `#Resolves` edge — `keel guard issues` fails on an

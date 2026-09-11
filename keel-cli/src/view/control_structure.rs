@@ -1220,7 +1220,7 @@ mod tests {
     #[test]
     fn the_step_two_gate_fails_the_clause_the_structure_breaks() {
         let actions = vec![act("cmdAddTask", "agent", "model"), act("humanDirects", "human", "work")];
-        let feedback = vec![Fb { name: "readOrient".to_string(), title: "keel orient: where things stand".to_string(), sensed_from: "model", reports_to: "agent", data: "d".to_string(), source: "s".to_string() }];
+        let feedback = vec![Fb { name: "readOrient".to_string(), title: "keel show orient: where things stand".to_string(), sensed_from: "model", reports_to: "agent", data: "d".to_string(), source: "s".to_string() }];
         let pm = |n: &str, role: &'static str| Pm { name: n.to_string(), role, row: Json::Null };
         let pmodels = vec![pm("pmAgent", "agent"), pm("pmHuman", "human")];
         let oio = |role: &'static str, inbound: bool| Oio { role, inbound, row: Json::Null };

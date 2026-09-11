@@ -27,7 +27,7 @@ exemption is visible rather than silent.
 
 Status, priority, readiness, coverage, "what's next", "highest-leverage" — all COMPUTED. Never
 assert them in text. If you want to change priority, reorder the backlog (declaration order IS
-priority, D0052) and read `keel whats-next` back. If a successor would need it, it belongs in the
+priority, D0052) and read `keel show whats-next` back. If a successor would need it, it belongs in the
 model — never in a status doc, handoff note, or your memory (D0018).
 
 Corollary: follow the ranked frontier. Do not ask the human which ready item to work (D0052); pause

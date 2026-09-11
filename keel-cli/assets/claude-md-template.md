@@ -16,7 +16,7 @@ keel is the tooling (like `git`). Read this before doing anything.
   (decisions 0001+). Treat `.engine/` as infrastructure; **you don't edit it** (it's the tool).
   Consult `.engine/reference/` to understand *why* the engine works the way it does.
 - **The `keel` CLI is the authority.** State is never read from prose — it is **computed**:
-  `keel orient .` (where things stand / what's ready), `keel whats-next .`, `keel validate .`,
+  `keel show orient .` (where things stand / what's ready), `keel show whats-next .`, `keel validate .`,
   `keel guard .`. Author facts via the write API (`keel add-task`, `keel append-result`, …).
 
 New here? Run the guided **`introduction`** skill (`keel` deploys it) — it onboards you by
@@ -51,7 +51,7 @@ out** (in parallel where possible). **No action is taken that is not tied to a p
   *"Parsed: 1. RECORD — capture the login latency need. 2. EXECUTE — add the story to the sprint."*
 - **Route each part:** *CHANGE* a workflow/gate/schema → needs explicit human acceptance first;
   *EXECUTE* tracked work → through a sprint; *RECORD* one atomic fact; *VIEW* → compute and show;
-  *ORIENT* → `keel orient .`. When no process fits, define one — don't free-form.
+  *ORIENT* → `keel show orient .`. When no process fits, define one — don't free-form.
 - **Only strictly-trivial one-off edits** (a typo, a single rename) use a fast-path — and are
   still **labelled `TRIVIAL`** so the exemption is visible.
 - **Human sign-off is an explicit step** — a `method=confirmation` verification whose passing
@@ -78,7 +78,7 @@ out** (in parallel where possible). **No action is taken that is not tied to a p
 ```
 keel validate .    # your .tracking facts parse clean (no ERROR)
 keel guard .       # the honest-state guards pass (well-formed / traceable / truthful)
-keel orient .      # where things stand + what's ready + the burndown
+keel show orient .      # where things stand + what's ready + the burndown
 ```
 
 Run these before considering any change done. keel is kernel-free for these — fast, no JVM.
