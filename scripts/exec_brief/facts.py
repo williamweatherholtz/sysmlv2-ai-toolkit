@@ -1228,6 +1228,123 @@ else:
         fact("commitDeltaSuperseded", len(_delta.get("superseded", [])), "items retired since the last publish", _DELTA_HOW)
         fact("commitDeltaResolved", len(_delta.get("resolved", [])), "Issues resolved since the last publish", _DELTA_HOW)
 
+# ================================================================ 18. family call-site census (D0452 / D0453)
+# The two safety Decisions fold the gating and channel families into routers and rewrite every call site in
+# the SAME commit that removes the names. A page that says how many call sites move, and where, computes the
+# number here with the census method each Decision's research comment names: the family's MEMBERS come from
+# the CliCommand facts in .engine/cli/commands.sysml, the CALL SITES from the bounded regex of section 2
+# restricted to those members over `git ls-files` (target/ is untracked, so excluded), every occurrence
+# assigned to exactly ONE area by its path. Which members move and which stay is the Decision's text and
+# stays in the builder; this section only counts.
+_AREAS = [   # (area, predicate) - first match wins, so .engine/decisions is split out before .engine
+    ("hooksAndCi", lambda p: p.startswith(".githooks/") or p.startswith(".github/workflows/")),
+    ("decisions", lambda p: p.startswith(".engine/decisions/")),
+    ("engine", lambda p: p.startswith(".engine/")),
+    ("claude", lambda p: p.startswith(".claude/")),
+    ("rustSource", lambda p: p.startswith("keel-cli/src/")),
+    ("rustTests", lambda p: p.startswith("keel-cli/tests/")),
+    ("rootDocs", lambda p: "/" not in p and p.endswith(".md")),
+    ("tracking", lambda p: p.startswith(".tracking/")),
+    ("other", lambda p: True),
+]
+_NOT_REWRITTEN = ("decisions", "tracking")   # recorded history: never rewritten (D0129), reported apart
+_FAMILY_HOW = ("members: the `name` of EVERY non-lens CliCommand fact in .engine/cli/commands.sysml whose `family` "
+               "is \"%s\", deprecated ones included - cliLiveTopLevelByFamily (live only) would drop a deprecated "
+               "verb from a members table without a trace; memberFacts carries each name with its CliEffect and "
+               "CliStability. sites: git ls-files, then for each tracked TEXT file count regex "
+               r"`(?<![\w.-])(keel\.exe|keelw|keel)[ \t]+<member>(?![\w-])` (longest member first, so a hyphenated "
+               "name never collapses into its prefix; literal \\n/\\r/\\t normalised to a space, as in section 2), "
+               "OCCURRENCES not lines, each file assigned to ONE area by path, first match wins: hooksAndCi = "
+               ".githooks/ + .github/workflows/; decisions = .engine/decisions/; engine = the rest of .engine/; "
+               "claude = .claude/; rustSource = keel-cli/src/; rustTests = keel-cli/tests/; rootDocs = top-level "
+               "*.md; tracking = .tracking/; other = everything else tracked. `sites[area][member]` and "
+               "`files[area][member]` (distinct files) are the grid; `rewritten` sums every area except decisions "
+               "and tracking, which the Decision does not rewrite and `notRewritten` sums. target/ is untracked "
+               "and therefore absent. The verb-to-router mapping is NOT here: it is the Decision's text.")
+
+
+def _family_census(family, members, tracked):
+    verbs = sorted(members, key=len, reverse=True)
+    rx = re.compile(r"(?<![\w.-])(?:keel\.exe|keelw|keel)[ \t]+(" + "|".join(re.escape(v) for v in verbs) + r")(?![\w-])")
+    sites = {a: {v: 0 for v in members} for a, _ in _AREAS}
+    files = {a: {v: 0 for v in members} for a, _ in _AREAS}
+    for rel in tracked:
+        text = read(os.path.join(REPO, rel.replace("/", os.sep)))
+        if text is None or "\0" in text[:4096]:
+            continue
+        hits = rx.findall(ESCAPE_RE.sub(" ", text))
+        if not hits:
+            continue
+        area = next(a for a, pred in _AREAS if pred(rel))
+        for v in set(hits):
+            files[area][v] += 1
+        for v in hits:
+            sites[area][v] += 1
+    total_by_area = {a: sum(sites[a].values()) for a, _ in _AREAS}
+    return {
+        "family": family,
+        "members": sorted(members),
+        "sites": sites,
+        "files": files,
+        "totalByArea": total_by_area,
+        "rewritten": sum(n for a, n in total_by_area.items() if a not in _NOT_REWRITTEN),
+        "notRewritten": sum(n for a, n in total_by_area.items() if a in _NOT_REWRITTEN),
+    }
+
+
+# members are EVERY CliCommand fact of the family, deprecated ones included: the Decision moves the names
+# the facts file holds. Each member carries its effect and stability so the page can say which of the
+# moving names the surface already calls deprecated.
+_by_family = None
+if cli_src is not None:
+    _by_family = {}
+    for _b in re.finditer(r"part\s+cli\w*\s*:\s*CliCommand\s*\{([^\n]*)", cli_src):
+        _b = _b.group(1)
+        _nm = re.search(r'name\s*=\s*"([^"]+)"', _b)
+        _fm = re.search(r'family\s*=\s*"([^"]+)"', _b)
+        _ef = re.search(r"CliEffect::(\w+)", _b)
+        _st = re.search(r"CliStability::(\w+)", _b)
+        if _nm and _fm and _ef and _st and not re.search(r'invocation\s*=\s*"show\s', _b):
+            _by_family.setdefault(_fm.group(1), []).append(
+                {"name": _nm.group(1), "effect": _ef.group(1), "stability": _st.group(1)})
+ok, out = run(["git", "ls-files"])
+for _fam, _fact_name in (("gating", "familyCensusGating"), ("channel", "familyCensusChannel")):
+    if not ok:
+        fact(_fact_name, None, "call sites by area and member", _FAMILY_HOW % _fam + " `git ls-files` failed: " + out)
+    elif not _by_family or _fam not in _by_family:
+        fact(_fact_name, None, "call sites by area and member",
+             _FAMILY_HOW % _fam + " commands.sysml is unreadable or has no %s family, so the members are unknown" % _fam)
+    else:
+        _members = [r["name"] for r in _by_family[_fam]]
+        _c = _family_census(_fam, _members, [p for p in out.splitlines() if p.strip()])
+        _c["memberFacts"] = sorted(_by_family[_fam], key=lambda r: r["name"])
+        fact(_fact_name, _c, "call sites by area and member", _FAMILY_HOW % _fam)
+
+# the dispatch count the Decisions say falls (by ten, by four) and the implement gate reads back
+_HARD_HOW = ("`keel show hardening .` (D0169/D0434), field helpCoverage.dispatched: the number of match arms "
+             "in keel-cli/src/main.rs that dispatch a top-level command; the read-back the two Decisions' "
+             "implement gates name.")
+ok, out = run([KEEL, "show", "hardening", "."], timeout=120)
+_hard = as_json(out) if ok else None
+_hc = (_hard or {}).get("helpCoverage") or {}
+fact("cliDispatchArms", _hc.get("dispatched") if _hc.get("available") else None, "dispatch arms",
+     _HARD_HOW if _hc.get("available") else _HARD_HOW + " hardening did not answer: " + out[:200])
+
+
+# every fact above reads the WORKING TREE while `tree` names HEAD; when the two differ the page must say so
+_DIRTY_HOW = ("`git status --porcelain --untracked-files=all`: lines beginning with a change code other than `??` are "
+              "tracked files with uncommitted edits, `??` lines are untracked files. Every file-reading fact in this "
+              "run (the CLI surface, the censuses, hardening) reads the working tree, so when `modified` is not zero "
+              "the numbers describe HEAD plus these edits and the page's provenance names the count.")
+ok, out = run(["git", "status", "--porcelain", "--untracked-files=all"])
+if ok:
+    _lines = [l for l in out.splitlines() if l.strip()]
+    fact("treeUncommitted", {"modified": len([l for l in _lines if not l.startswith("??")]),
+                             "untracked": len([l for l in _lines if l.startswith("??")])},
+         "files differing from HEAD", _DIRTY_HOW)
+else:
+    fact("treeUncommitted", None, "files differing from HEAD", _DIRTY_HOW + " git status failed: " + out)
+
 # ================================================================ emit
 DOC = {
     "generatedAt": NOW.replace(microsecond=0).isoformat(),

@@ -1792,7 +1792,7 @@ pub fn record_decision_with_links(
     let s = sanitize_field;
     // D0207: a RESEARCH statement is a first-class part of reaching out for judgment. Emitted as a
     // structured comment (not a frozen-schema field, invariant 5) that BOTH judgment-request-quality
-    // (guard 48) and `keel decision-card` read — so the "what did you look at before asking" reaches
+    // (guard 48) and `keel render decision-card` read — so the "what did you look at before asking" reaches
     // the human's issue. A fork without one cannot pass the guard.
     let research_line = research
         .filter(|r| !r.trim().is_empty())

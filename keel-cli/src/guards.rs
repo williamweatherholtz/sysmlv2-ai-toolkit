@@ -7165,8 +7165,8 @@ mod tests {
         assert_eq!(classify_renderer("query.py governing-version <item>"), "retired");
         assert_eq!(classify_renderer("report.py:tab_decisions"), "retired");
         assert_eq!(classify_renderer("(planned) baselines view — not yet rendered"), "planned");
-        assert_eq!(classify_renderer("keel diagram (interactive HTML #View)"), "ok");
-        assert_eq!(classify_renderer("keel report <assurance|...> [--html]"), "ok");
+        assert_eq!(classify_renderer("keel render model (interactive HTML #View)"), "ok");
+        assert_eq!(classify_renderer("keel render report <assurance|...> [--html]"), "ok");
         assert_eq!(classify_renderer("keel frobnicate"), "unknown");
         assert_eq!(classify_renderer("some hand-wave"), "unknown");
     }

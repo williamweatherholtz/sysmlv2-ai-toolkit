@@ -18,7 +18,7 @@
 //!   `sitting-coverage [ROOT]` — which delivery sprints are covered by a per-sitting review (D0049)
 //!   `assured [ROOT]`           — composite assurance-readiness verdict + blockers (D0079 c)
 //!   `decisions [ROOT]`         — load-bearing decisions ranked by dependence + antiquation flags
-//!   `diagram [ROOT]`           — comprehensive interactive traceability diagram (HTML; computed #View)
+//!   `render model [--root ROOT]` — comprehensive interactive traceability diagram (HTML; computed #View, D0449)
 //!   `init DIR`                 — scaffold the engine into a new project (D0093 cold start)
 //!   `serve [--port N] [ROOT]`  — the interactive console: localhost read dashboard (D0094 m1)
 #![forbid(unsafe_code)]
@@ -2492,23 +2492,6 @@ fn cmd_coverage(args: &[String]) -> i32 {
     }
 }
 
-fn cmd_diagram(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel diagram [ROOT]  (redirect to a .html file)", &[], 0) {
-        Ok(r) => r,
-        Err(code) => return code,
-    };
-    match keel_cli::view::diagram_html(&root) {
-        Ok(html) => {
-            println!("{html}");
-            0
-        }
-        Err(e) => {
-            eprintln!("diagram error: {e}");
-            1
-        }
-    }
-}
-
 fn cmd_decisions(args: &[String]) -> i32 {
     let root = match root_arg(args, "keel decisions [ROOT]", &[], 0) {
         Ok(r) => r,
@@ -3294,12 +3277,28 @@ fn cmd_add_task(args: &[String]) -> i32 {
 
 /// `render <view> [--mode graph|table|review] [--root ROOT]` — modular interactive-artifact
 /// renderer over the view layer (D0086). Emits self-contained HTML to stdout (redirect to a file).
+/// `keel render <what>` — one verb for everything that draws (D0449). The first positional resolves
+/// in a FIXED order, held by `cli_surface::RENDER_RESERVED` and its test: the reserved words `model`
+/// | `all` | `whole` (the whole-model graph, once `keel diagram`), `report <kind>` (once `keel report`),
+/// `decision-card [NAME]` (once `keel decision-card`), then `control-structure`, then a declared
+/// `.view.toml`. The order is fixed because a declared view named `report` shadowing the sub-verb — or
+/// the reverse — is a silent wrong answer, the class sprint 512 met in the console's view binder.
 fn cmd_render(args: &[String]) -> i32 {
     let Some(view) = args.first().filter(|v| !v.starts_with('-')) else {
-        eprintln!("usage: keel render <view> [--mode graph|table|review] [--root ROOT]");
+        eprintln!("usage: keel render <view>|model [--mode graph|table|review] [--root ROOT]");
+        eprintln!("       keel render report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend] [--root ROOT]");
+        eprintln!("       keel render decision-card [NAME] [--proposed]");
         eprintln!("  <view> = a declared view name (e.g. decisions, issues), or 'model' for the whole-model graph");
         return 2;
     };
+    // The two sub-verbs with their own argument shapes: the arms are MOVED, not rewritten, so the
+    // output is byte-equal to the pre-fold verbs (D0449's criterion). `args[1..]` is what each saw.
+    let rest = args.get(1..).unwrap_or_default();
+    match view.as_str() {
+        "report" => return cmd_report(rest),
+        "decision-card" => return cmd_decision_card(rest),
+        _ => {}
+    }
     let mode = flag(args, "mode").unwrap_or_else(|| "graph".to_owned());
     let root = match flag(args, "root") {
         Some(p) => PathBuf::from(p),
@@ -3324,11 +3323,12 @@ fn cmd_render(args: &[String]) -> i32 {
     }
 }
 
-/// `report <name> [--html] [--root ROOT]` — computed aggregate scorecard (D0087): assurance |
+/// `render report <name> [--html] [--root ROOT]` — computed aggregate scorecard (D0087): assurance |
 /// traceability | quality-debt | flow. JSON by default; `--html` emits a human-digestible scorecard.
+/// Reached through `cmd_render` since D0449; the arm itself is unchanged.
 fn cmd_report(args: &[String]) -> i32 {
     let Some(name) = args.first().filter(|v| !v.starts_with('-')) else {
-        eprintln!("usage: keel report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] [--root ROOT]");
+        eprintln!("usage: keel render report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend] [--root ROOT]");
         return 2;
     };
     let root = match flag(args, "root") {
@@ -5110,7 +5110,7 @@ fn print_usage() -> i32 {
 }
 /// A read-only view subcommand: run `f` against the repo root and print its JSON, or the error as
 /// JSON so a consumer parsing stdout gets a parseable answer either way.
-/// `keel decision-card [NAME] [--proposed]` (D0205): machine-readable deciding context.
+/// `keel render decision-card [NAME] [--proposed]` (D0205; under `render` since D0449): machine-readable deciding context.
 fn cmd_decision_card(rest: &[String]) -> i32 {
     let name = rest.first().filter(|a| !a.starts_with('-')).map(String::as_str);
     let proposed = rest.iter().any(|a| a == "--proposed");
@@ -5432,7 +5432,6 @@ fn main() {
         Some("governing-version") => cmd_governing_version(rest),
         Some("reprocess-candidates") => cmd_reprocess_candidates(rest),
         Some("actor-trace") => cmd_query1(rest, "actor-trace", |r, a| keel_cli::view::actor_trace(r, a).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))),
-        Some("decision-card") => cmd_decision_card(rest),
         Some("recall") => cmd_recall(rest),
         Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
@@ -5479,9 +5478,7 @@ fn main() {
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
-        Some("diagram") => cmd_diagram(rest),
         Some("render") => cmd_render(rest),
-        Some("report") => cmd_report(rest),
         Some("record-measurement") => cmd_record_measurement(rest),
         Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
         Some("apply-review") => cmd_apply_review(rest),

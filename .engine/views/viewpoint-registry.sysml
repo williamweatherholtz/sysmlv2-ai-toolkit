@@ -38,7 +38,7 @@ package EngineViewpoints {
         :>> concernText = "Are needs->requirements->verification linked, and where are the gaps / subversions?";
         :>> audience = "reviewer / auditor";
         :>> sources = "satisfy + verify edges; sprint ceremony gate coverage; issue->decision links; process-evolution timeline";
-        :>> renderer = "keel diagram";
+        :>> renderer = "keel render model";
         :>> surface = "assurance";
     }
     part diagramVP : Viewpoint {
@@ -48,7 +48,7 @@ package EngineViewpoints {
         :>> concernText = "How does the WHOLE model connect — every element, typed edge, metadata, reliance, supersession, effects — as one navigable graph explored a part at a time?";
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "all elements + all typed edges + authored metadata (the full Model)";
-        :>> renderer = "keel diagram (interactive HTML #View, D0085; regenerate-don't-commit)";
+        :>> renderer = "keel render model (interactive HTML #View, D0085; regenerate-don't-commit)";
         :>> surface = "explore";
     }
     part renderVP : Viewpoint {
@@ -68,7 +68,7 @@ package EngineViewpoints {
         :>> concernText = "How are we doing, and where can we improve — aggregate HEALTH (verification coverage %, critique %, attestation %, findings, traceability completeness, readiness) and OPPORTUNITY (charter debt, requirements volatility, suspect+stale, flow/velocity) metrics rolled up from the per-element views, with git-derived trends?";
         :>> audience = "maintainer / reviewer / program lead";
         :>> sources = "aggregation of the per-element computed views (coverage 3-tier, critique-coverage, attestation, assured/readiness, decisions, orphans, open-issues, suspect) + delivery Stories (velocity) + git history (trends); grounded in the INCOSE DE Measurement Framework + SE Leading Indicators";
-        :>> renderer = "keel report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] (computed scorecard #View, D0087; regenerate-don't-commit)";
+        :>> renderer = "keel render report <assurance|traceability|quality-debt|flow|governance> [--html] [--trend] (computed scorecard #View, D0087; regenerate-don't-commit)";
         :>> surface = "explore";
     }
     part indicatorsVP : Viewpoint {

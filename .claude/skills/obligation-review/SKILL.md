@@ -7,7 +7,7 @@ description: Use when the human wants to review what is waiting on THEM, away fr
 
 **The human's board is GitHub**: `is:open label:blocks-work` on the project repo. An open issue is a
 decision blocking work or a critical finding; the empty list means nothing needs them (D0204). Each
-decision issue carries its own deciding context (rendered from `keel decision-card` — one parser,
+decision issue carries its own deciding context (rendered from `keel render decision-card` — one parser,
 never a second extraction) and its verdict channel is a one-letter comment; receipts and auto-close
 come from the `decision-channel` process (see `.engine/skills/decision-channel/SKILL.md` for the
 gesture grammar, the receipt ladder, auto-accept under standing consent, and the override path).

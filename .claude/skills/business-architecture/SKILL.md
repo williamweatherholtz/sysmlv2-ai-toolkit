@@ -77,7 +77,7 @@ The moment the human accepts a direction — scope, tech, a cut — record it **
 `Decision` (proposed until its sign-off gate), with the *why*. Do not let decisions accumulate in
 conversation "to be written up later" (issue054/issue055). The AI's creative output here is the
 *authored model* (items + typed edges + decisions), **never a prose design doc** (§2.1 — that would be
-an un-regenerable document; the model IS the spec, and `keel render`/`keel report` compute the
+an un-regenerable document; the model IS the spec, and `keel render`/`keel render report` compute the
 readable views).
 
 ## One source of truth (D0105 / issue058)

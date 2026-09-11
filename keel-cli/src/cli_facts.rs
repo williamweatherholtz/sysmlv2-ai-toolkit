@@ -16,7 +16,7 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 111] = [
+pub const CLI_FACTS: [CliFact; 108] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "reject", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> (--words TEXT | --note TEXT) --by <person> --date YYYY-MM-DD", synopsis: "record a human's rejection of a proposed Decision; the same channel rules as accept" },
     CliFact { name: "judge-set", family: "governance", effect: "writes", stability: "stable", invocation: "<.tracking file> (--words TEXT | --note TEXT) --by <person> --date YYYY-MM-DD [--verdict pass|fail] [--fail <test>,..] [--all]", synopsis: "record a human's verdict on the sampled proposed results of one file - one result and one quote receipt per item (D0443); accept's channel rules under confirmationRecord" },
@@ -60,10 +60,7 @@ pub const CLI_FACTS: [CliFact; 111] = [
     CliFact { name: "governing-version", family: "orientation", effect: "reads", stability: "stable", invocation: "<item> [ROOT]", synopsis: "which process version governs an item" },
     CliFact { name: "reprocess-candidates", family: "orientation", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "items whose governing process version has moved since they were judged" },
     CliFact { name: "enforcement-report", family: "orientation", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "fires, blocks, overrides and red-yields from the machine-local fire-ledger" },
-    CliFact { name: "render", family: "rendering", effect: "reads", stability: "stable", invocation: "<view> [--mode graph|table|review]", synopsis: "render any declared view as interactive HTML" },
-    CliFact { name: "diagram", family: "rendering", effect: "reads", stability: "stable", invocation: "[ROOT]", synopsis: "whole-model interactive graph as HTML on stdout" },
-    CliFact { name: "report", family: "rendering", effect: "reads", stability: "stable", invocation: "assurance|traceability|quality-debt|flow|governance|friction [--html] [--trend]", synopsis: "a human-facing scorecard" },
-    CliFact { name: "decision-card", family: "rendering", effect: "reads", stability: "stable", invocation: "[NAME] [--proposed]", synopsis: "a Decision's deciding context as JSON - the channel issue body" },
+    CliFact { name: "render", family: "rendering", effect: "reads", stability: "stable", invocation: "<view>|model [--mode graph|table|review] | report <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend] | decision-card [NAME] [--proposed]", synopsis: "everything that draws (D0449): a declared view or the whole-model graph as interactive HTML; a scorecard; a Decision's deciding context as JSON - the channel issue body" },
     CliFact { name: "deck", family: "rendering", effect: "both", stability: "stable", invocation: "[ROOT] [--out FILE]", synopsis: "the mobile obligation deck; saving writes through the API" },
     CliFact { name: "serve", family: "rendering", effect: "both", stability: "stable", invocation: "[--port N] [ROOT]", synopsis: "the interactive console: lenses, approve queue, deck; wraps the write API" },
     CliFact { name: "init", family: "integration", effect: "writes", stability: "stable", invocation: "DIR", synopsis: "scaffold the engine into a new project" },

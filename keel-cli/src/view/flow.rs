@@ -1,4 +1,4 @@
-//! `keel show flow` and the git-derived cards of `keel report flow` (dcCycleTimeReadsFromGit;
+//! `keel show flow` and the git-derived cards of `keel render report flow` (dcCycleTimeReadsFromGit;
 //! issue483, issue485).
 //!
 //! WHY GIT. Every `TestResult` carries `judgedAt` as a DATE, and nearly every sprint opens and closes on
@@ -461,7 +461,7 @@ impl Calibration {
 
 // ── the report's git-derived cards ─────────────────────────────────────────────────────────────
 
-/// The four cards `keel report flow` reads from git: cycle time, time per story point, the
+/// The four cards `keel render report flow` reads from git: cycle time, time per story point, the
 /// inter-commit gap and the point calibration.
 #[must_use]
 pub fn cards(facts: &FlowFacts) -> Vec<Json> {

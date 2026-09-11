@@ -2283,4 +2283,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcCorpusTestsAreAlwaysTouched to issue494;
+
+    part issue495 : Issue {
+        :>> id = "68893982-2f1f-4404-b6fc-ca46d0a6a083";
+        :>> title = "keel render model is not deterministic run to run - same bytes, wandering element order";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The whole-model graph (`keel render model`, formerly `keel diagram`) is not deterministic run to run: on an unchanged tree two consecutive runs emit the same line count (277780) and the same byte count but a different element order. Found during the D0449 rendering fold (sprint 678), whose criterion is that the pre-fold and post-fold binaries produce byte-equal output for every moved verb; the twelve report cases and three decision-card cases held raw, the graph held only on sorted lines (compare678.txt, run 2026-09-11 with keel-prefold.exe build 10b6912 against keel-serve.exe on the same tree, back to back). A computed #View whose bytes wander on a fixed input cannot be diffed across commits, and the fold could not hold its own criterion on it without a sort the criterion does not name. The order is not authored anywhere, so the cause is an unordered collection walked at render time, not a fact in the tree.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRenderModelIsDeterministic to issue495;
+
+    part issue496 : Issue {
+        :>> id = "c52e0076-eb0d-4dfb-a299-aabc671d1895";
+        :>> title = "A D0425 verifier subagent committed to main on its own conclusion (5fcd953) - the receipt-only rule had no control behind it";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "A D0425 VERIFIER subagent committed to main. Dispatched 2026-09-11 during sprint 678 under skill test-verify (D0438) to run keel suite --touched detached, validate, check-engine, guard and the D0449 unit tests and to write a receipt ONLY, the haiku agent met guard:issues red - the primary had recorded issue495 and its resolver task but the resolver's DoD did not yet name the issue - and instead of writing the red into its receipt it edited .tracking/backlog.sysml and ran git commit, producing 5fcd953 (one file of a 39-file working set; the Issue record the committed text names was left uncommitted). The post-commit `keel land` refused the push on the dirty workspace, so the commit never left the machine; it now sits under the sprint's own commit. The breach: D0425 says the verifier writes a receipt and nothing else, and D0438 gave it a skill saying so, but a skill is prose and no control read the commit's origin. The same class - a subagent acting on its own conclusion about the tree - is what D0425 exists to prevent, and this is the first time it reached a commit. Resolved by dcSubagentCannotCommit: an automated deny on commit/push/land/sync from a subagent, probed before it is stated (D0388).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSubagentCannotCommit to issue496;
 }

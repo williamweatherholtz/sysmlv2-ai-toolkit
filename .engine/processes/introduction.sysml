@@ -54,7 +54,7 @@ package EngineIntroduction {
         :>> id = "63940516-2c7d-4e8f-c093-516273849375";
         :>> title = "Show value + hand off to the loop";
         :>> triggerCondition = "The first sprint closed.";
-        :>> actionText = "Show the computed payoff: `keel orient` (where things stand + what's ready next), and the human-facing lenses (`keel orient --html` dashboard, `keel report`, `keel render` review) — proving status/trace/coverage are COMPUTED from the one need->requirement->work->verification chain just authored. Then hand off to the normal interaction loop (CLAUDE.md section 3): from here the AI drives, the human supervises + decides. Onboarding is COMPLETE when the newcomer has one closed item and can read orient.";
+        :>> actionText = "Show the computed payoff: `keel orient` (where things stand + what's ready next), and the human-facing lenses (`keel orient --html` dashboard, `keel render report`, `keel render` review) — proving status/trace/coverage are COMPUTED from the one need->requirement->work->verification chain just authored. Then hand off to the normal interaction loop (CLAUDE.md section 3): from here the AI drives, the human supervises + decides. Onboarding is COMPLETE when the newcomer has one closed item and can read orient.";
         :>> producedArtifact = "A demonstrated computed view over the newcomer's own first item; transition to the steady-state loop.";
         :>> owner = Owner::human;
     }

@@ -20,16 +20,16 @@
 //! point. A unit declaring a name the post-collapse engine no longer has is exactly what must refuse.
 
 /// Every command this binary dispatches, sorted. Kept equal to `main.rs`'s dispatch by test.
-pub const COMMAND_NAMES: [&str; 71] = [
+pub const COMMAND_NAMES: [&str; 68] = [
     "accept", "activate", "activation", "actor", "actor-trace", "add-task",
     "adoption-check", "advance", "append-gate-result", "append-result", "apply-review", "arch",
     "assured", "attestation", "audit", "audit-adherence", "audit-ci-runs", "audit-history", "check", "currency",
-    "check-engine", "claim", "claude", "deactivate", "decision-card", "deck", "diagram",
+    "check-engine", "claim", "claude", "deactivate", "deck",
     "enforcement-report", "enroll", "gate", "github-decider", "github-decision-id", "github-gesture",
     "github-ingest", "github-pull", "governing-version", "guard", "hook", "init",
     "item", "judge-set", "land", "library", "migrate", "mint", "new",
     "onboard", "orient", "override", "process", "projects", "recall",
-    "record", "record-measurement", "reject", "render", "report", "reprocess-candidates", "reverify",
+    "record", "record-measurement", "reject", "render", "reprocess-candidates", "reverify",
     "rules", "serve", "show", "snapshot-indicators", "status", "suite", "sync",
     "sync-claude", "validate", "version", "view", "whats-next",
 ];
@@ -61,6 +61,21 @@ pub fn has_lens(name: &str) -> bool {
     LENS_NAMES.contains(&name)
 }
 
+/// The words `keel render` resolves BEFORE it looks for a declared `.view.toml` (D0449).
+///
+/// In the order `cmd_render` tries them: the whole-model graph (`model` | `all` | `whole`, once
+/// `keel diagram`), `report` (once `keel report`), `decision-card` (once `keel decision-card`), then
+/// the computed `control-structure` lens. A declared view carrying one of these names would never be
+/// reached — the silent shadowing sprint 512 met in the console's view binder — so the test at the
+/// foot of this file refuses it.
+pub const RENDER_RESERVED: [&str; 6] = ["all", "control-structure", "decision-card", "model", "report", "whole"];
+
+/// Is `name` a word `keel render` resolves before any declared view?
+#[must_use]
+pub fn is_render_reserved(name: &str) -> bool {
+    RENDER_RESERVED.contains(&name)
+}
+
 /// The keel command a renderer string names, as `(verb, next token)`.
 ///
 /// `keel show orphans` yields `("show", Some("orphans"))`; `keel audit` yields `("audit", None)`;
@@ -73,4 +88,37 @@ pub fn renderer_command(r: &str) -> Option<(&str, Option<&str>)> {
     let mut it = rest.split(char::is_whitespace).flat_map(|t| t.split('(')).filter(|t| !t.is_empty());
     let verb = it.next()?;
     Some((verb, it.next()))
+}
+
+#[cfg(test)]
+mod render_reserved_tests {
+    use super::*;
+
+    /// D0449: no declared view may be named a render sub-verb. Read from the SOURCE of the declared
+    /// views, so a `.view.toml` added later under a reserved name fails here, not in a user's shell.
+    #[test]
+    fn no_declared_view_is_named_a_render_reserved_word() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(".engine").join("views");
+        let mut declared = Vec::new();
+        for e in std::fs::read_dir(&dir).expect(".engine/views is readable").flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if let Some(view) = name.strip_suffix(".view.toml") {
+                declared.push(view.to_owned());
+            }
+        }
+        assert!(!declared.is_empty(), "the engine declares views under {}", dir.display());
+        let shadowed: Vec<&String> = declared.iter().filter(|v| is_render_reserved(v)).collect();
+        assert!(shadowed.is_empty(), "a declared view is named a `keel render` reserved word and could never be rendered: {shadowed:?}");
+    }
+
+    /// The list is sorted, so a reader can find a word and a diff shows one line per change.
+    #[test]
+    fn render_reserved_is_sorted_and_names_no_lens_but_control_structure() {
+        let mut sorted = RENDER_RESERVED.to_vec();
+        sorted.sort_unstable();
+        assert_eq!(sorted, RENDER_RESERVED.to_vec());
+        for w in RENDER_RESERVED {
+            assert!(w == "control-structure" || !has_lens(w), "a render reserved word doubling as a show lens is two spellings of one answer: {w}");
+        }
+    }
 }

@@ -1,4 +1,4 @@
-//! `keel show flow` / `keel report flow` read cycle time from GIT, in minutes, never from the
+//! `keel show flow` / `keel render report flow` read cycle time from GIT, in minutes, never from the
 //! day-granular `judgedAt` (`dcCycleTimeReadsFromGit`; issue483, issue485).
 //!
 //! The D0388 pair, named before the real tree was read:
@@ -105,7 +105,7 @@ fn show_flow(dir: &Path) -> String {
 }
 
 fn report_flow(dir: &Path) -> String {
-    let out = keel().args(["report", "flow", "--root"]).arg(dir).output().expect("keel report flow");
+    let out = keel().args(["render", "report", "flow", "--root"]).arg(dir).output().expect("keel render report flow");
     assert!(out.status.success(), "report flow: {}", String::from_utf8_lossy(&out.stderr));
     String::from_utf8_lossy(&out.stdout).into_owned()
 }

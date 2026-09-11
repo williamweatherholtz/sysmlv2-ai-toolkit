@@ -79,7 +79,7 @@ fn a_retired_decision_leaves_the_queue_and_a_clause_reversal_leaves_its_target_i
     assert!(!pending.contains("d0001") && pending.contains("d0003"), "orient's pendingAcceptances agrees: {pending}");
 
     // The scorecard: d0002 stays counted accepted under its clause reversal; d0001 is the one retired.
-    let (_, gov) = run(&root, &["report", "governance", "."]);
+    let (_, gov) = run(&root, &["render", "report", "governance", "."]);
     assert!(gov.contains("1 accepted / 1 retired of 4 total"), "accepted-and-in-force vs retired, from the edges: {gov}");
     let _ = std::fs::remove_dir_all(&root);
 }

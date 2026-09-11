@@ -28,7 +28,7 @@ capturing this project's first real need and running the first sprint.
 
 1. **Text is truth; everything derivable is a view.** Author only *irreducible* facts — atomic
    items, typed edges, test results, recorded judgments. **Never author a document, matrix,
-   baseline, or report** — those are *computed views* (`keel report`, `keel render`). Test: can
+   baseline, or report** — those are *computed views* (`keel render report`, `keel render`). Test: can
    it be regenerated from other authored facts + git? Yes → it's a view; don't store it.
 2. **Atomic items, typed edges only** (`:>` specialize/derive, `satisfy`, `verify`, `allocate`,
    `dependency`, `supersede`). No checklist blobs inside items.

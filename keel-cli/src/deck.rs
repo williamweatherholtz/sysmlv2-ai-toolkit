@@ -240,7 +240,7 @@ mod marker_text_tests {
     }
 }
 
-/// `keel decision-card [NAME] [--proposed]` (D0205 githubChannel).
+/// `keel render decision-card [NAME] [--proposed]` (D0205 githubChannel; under `render` since D0449).
 ///
 /// The decision's own deciding context as machine-readable JSON, for the Action that opens
 /// GitHub issues. One

@@ -3039,8 +3039,8 @@ mod tests {
     fn every_advertised_computed_view_is_bound() {
         // A renderer names a command as `keel <cmd>`. These are WRITE or RENDER verbs, not computed
         // views — they take arguments and produce artifacts, so the console reaches them elsewhere.
-        const NOT_A_COMPUTED_VIEW: [&str; 9] = [
-            "apply-review", "record-measurement", "render", "view", "diagram", "report", "arch",
+        const NOT_A_COMPUTED_VIEW: [&str; 7] = [
+            "apply-review", "record-measurement", "render", "view", "arch",
             "governing-version",
             // A renderer that says "keel command" generically, not naming one.
             "command",

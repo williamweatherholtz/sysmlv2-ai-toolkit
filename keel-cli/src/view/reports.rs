@@ -920,8 +920,8 @@ fn governance_cards(model: &Model) -> Vec<Json> {
 }
 
 const REPORT_TEMPLATE: &str = r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>keel report</title>
-<meta name="generator" content="keel report (computed #View; regenerate, do not commit as truth)">
+<html lang="en"><head><meta charset="utf-8"><title>keel render report</title>
+<meta name="generator" content="keel render report (computed #View; regenerate, do not commit as truth)">
 /*STYLE*/
 <style>
  .cards{display:flex;flex-wrap:wrap;gap:12px;padding:14px}
@@ -955,7 +955,7 @@ const CYTOSCAPE_LIB: &str = include_str!("../../assets/cytoscape.min.js");
 
 const DIAGRAM_TEMPLATE: &str = r#"<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>keel traceability</title>
-<meta name="generator" content="keel diagram (computed #View; regenerate, do not commit as truth)">
+<meta name="generator" content="keel render model (computed #View; regenerate, do not commit as truth)">
 <script>/*CYTOSCAPE_LIB*/</script>
 <style>
  html,body{margin:0;height:100%;font:12px system-ui,sans-serif}
@@ -1085,7 +1085,7 @@ document.getElementById('q').addEventListener('input',function(e){filter=e.targe
 /// Emits the WHOLE model — every element (typed node + its authored metadata) and every typed edge
 /// (satisfy/verify/charteredby/supersede/resolves/dependency/allocate/succession/process-change/...) —
 /// into one cytoscape page with type/edge filters, search, click-to-focus, and fit. A computed
-/// `#View`: regenerate on demand (`keel diagram . > graph.html`), never commit it as truth.
+/// `#View`: regenerate on demand (`keel render model --root . > graph.html`), never commit it as truth.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
