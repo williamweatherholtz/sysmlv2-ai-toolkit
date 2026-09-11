@@ -173,6 +173,20 @@ const WRITE_PATH_CHECKS: &[(&str, Subject, &str, &str, &[&str])] = &[
         &["no-delegation", "delegatedRecording"],
     ),
     (
+        "judge-set:no-quote",
+        Subject::Ai,
+        "active",
+        "an unquoted delegated note on a judged set of proposed results (D0443): the act refused is the agent paraphrasing the human INTO a per-item confirmation (D0198)",
+        &["judge-set no-quote", "judge-set:no-quote"],
+    ),
+    (
+        "judge-set:no-delegation",
+        Subject::Ai,
+        "active",
+        "a `--by <human>` judge-set from a session with no confirmationRecord delegatedRecording grant: the act refused is the agent judging proposals for a person who did not delegate (D0443)",
+        &["judge-set no-delegation", "judge-set:no-delegation"],
+    ),
+    (
         "tap:unsigned",
         Subject::Human,
         "dissolved to a WARN line by D0426 (2026-09-10, issue447)",

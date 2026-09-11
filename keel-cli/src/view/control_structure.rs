@@ -207,7 +207,7 @@ fn actuator_for(a: &Action, channel_wired: bool) -> Result<&'static Actuator, St
 /// Commands whose WRITE the write layer refuses for an AI-kind actor, so the issuing authority is the
 /// human even though the agent's shell may type them. The claim is tested: see
 /// `human_authority_commands_refuse_an_ai_actor` in the tests module.
-const HUMAN_AUTHORITY_COMMANDS: [&str; 1] = ["accept"];
+const HUMAN_AUTHORITY_COMMANDS: [&str; 2] = ["accept", "judge-set"];
 
 /// Which process a write command acts on, by family. A judgment made once here rather than per
 /// command, and visible in the output as `actsOn` so it can be argued with.

@@ -89,6 +89,16 @@ roles = ["supervisor"]
 # confirmation flips then require the human's own gesture.
 delegatedRecording = "d0198"
 
+[proposedJudgment]
+# D0443 on D0312 B: an AI-examined pass (demo, analyze, inspect) lands as VerdictKind::proposed and counts
+# as done for NOTHING until a human judges it. `keel judge-set <file>` records the human's verdict on the
+# SAMPLED proposals of one file - one TestResult and one <test>Attest<N> quote receipt PER ITEM, never a
+# count (issue158). The sample is drawn in result-uuid order, so the reader can recompute it and the
+# writer cannot steer it. `sampling` is the human's load and theirs to set: a share of each file's
+# proposals ("50%", ceil) or a count per file (3); no line samples everything. The channel is
+# [confirmationRecord].delegatedRecording above - the quoted words are the receipt, as for accept.
+sampling = "50%"
+
 [contentionAdjudication]
 # Adjudicating a contributor conflict (D0108 clause 5). Human-only: no contributor may resolve a
 # contention in favour of its own conclusion, and an AI resolving one would be doing exactly that

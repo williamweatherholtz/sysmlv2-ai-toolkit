@@ -695,7 +695,7 @@ fn model_root_of(target: &Path) -> Option<std::path::PathBuf> {
 /// They are the HUMAN's control actions even when typed in the agent's shell. Read by the computed
 /// control structure (`view::control_structure`), whose test holds the two lists equal: a command
 /// listed there without a refusal here would be a label, not a fact.
-pub const HUMAN_ONLY_WRITE_COMMANDS: [&str; 1] = ["accept"];
+pub const HUMAN_ONLY_WRITE_COMMANDS: [&str; 2] = ["accept", "judge-set"];
 
 /// D0178/K6 write-layer check: refuse when `judged_by` is a registered AI-kind actor. An
 /// UNREGISTERED name is refused too — an attestation by nobody is not weaker than one by an AI.
@@ -1950,6 +1950,150 @@ fn accept_decision_locked(
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
     write_atomic(path, new_content)?;
     Ok(u1)
+}
+
+/// One item of a judged set (D0443): the Test whose proposed result a human judged, and their verdict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetJudgment {
+    pub test: String,
+    /// `"pass"` or `"fail"`.
+    pub verdict: String,
+}
+
+/// D0443: a human's verdict on the SAMPLED proposed results of one `.tracking` file.
+///
+/// Every item is recorded on its own line with its own quote receipt (D0312 B: a set in one sitting,
+/// one record per item, so a COUNT is never accepted as a card - issue158). For each item: `<test>R<n+1>` (the human's pass or
+/// fail, `judgedBy` the human, `createdBy` the recorder) and a companion `<test>Attest<k>`
+/// (`method=confirmation`, D0198) whose text is `note` - the human's words inside the declared pair -
+/// with its own passing result judged by the recorder, who transcribed them. Returns the result parts
+/// written, in order.
+///
+/// # Errors
+/// `WriteError::Parse` when `judged_by` is an AI-kind or unregistered actor (the write layer's refusal,
+/// D0178/K6), when an item's verdict is neither pass nor fail, or when the set is empty;
+/// `WriteError::TaskNotFound` when an item's Test is not declared in the file; `WriteError::Io` otherwise.
+pub fn judge_set(
+    path: &Path,
+    items: &[SetJudgment],
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    recorded_by: &str,
+    note: &str,
+) -> Result<Vec<String>, WriteError> {
+    with_file_lock(path, || judge_set_locked(path, items, sha, judged_at, judged_by, recorded_by, note))
+}
+
+fn judge_set_locked(
+    path: &Path,
+    items: &[SetJudgment],
+    sha: &str,
+    judged_at: &str,
+    judged_by: &str,
+    recorded_by: &str,
+    note: &str,
+) -> Result<Vec<String>, WriteError> {
+    refuse_ai_judgment(path, judged_by, "judging a set of proposed results")?;
+    if items.is_empty() {
+        return Err(WriteError::Parse("judge-set: the set is empty - nothing to record".to_owned()));
+    }
+    let content = std::fs::read_to_string(path)?;
+    let mut block = String::new();
+    let mut written = Vec::with_capacity(items.len());
+    let note_c = sanitize_field(note);
+    let recorder_c = sanitize_field(recorded_by);
+    let judge_c = sanitize_field(judged_by);
+    let file_name = path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+    for item in items {
+        if item.verdict != "pass" && item.verdict != "fail" {
+            return Err(WriteError::InvalidVerdict(item.verdict.clone()));
+        }
+        let test = item.test.as_str();
+        if !content.contains(&format!("verification {test} : Test")) && !content.contains(&format!("verification {test}: Test")) {
+            return Err(WriteError::TaskNotFound(format!("{test} (no such Test in {file_name})")));
+        }
+        let n = max_numbered(&content, &format!("part {test}R")) + 1;
+        let k = max_numbered(&content, &format!("verification {test}Attest")) + 1;
+        let (u1, u2, u3) = (gen_uuid(), gen_uuid(), gen_uuid());
+        let receipt = format!(
+            "Quote receipt for {test}R{n} (D0198/D0443): {judge_c} judged the proposed result {test}R{n_prev} {verdict} from the sampled set of {file_name}; {note_c}",
+            n_prev = n - 1,
+            verdict = item.verdict
+        );
+        let _ = std::fmt::Write::write_fmt(&mut block, format_args!(
+            "\n    // {test}: judged from the set by {judge_c} (D0443; D0312 B - one item, one record, one quote)\n\
+             \x20   part {test}R{n} : TestResult {{ :>> id = \"{u1}\"; :>> outcome = VerdictKind::{verdict}; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{judge_c}\"; :>> createdBy = \"{recorder_c}\"; }}\n\
+             \x20   verification {test}Attest{k} : Test {{ :>> id = \"{u2}\"; :>> title = \"Quote receipt for {test}R{n} (D0198)\"; :>> createdAt = \"{judged_at}\"; :>> createdBy = \"{recorder_c}\"; :>> method = VerificationMethod::confirmation; :>> procedureText = \"{receipt}\"; }}\n\
+             \x20   part {test}Attest{k}R1 : TestResult {{ :>> id = \"{u3}\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"{sha}\"; :>> judgedAt = \"{judged_at}\"; :>> judgedBy = \"{recorder_c}\"; :>> createdBy = \"{recorder_c}\"; }}\n",
+            verdict = item.verdict,
+        ));
+        written.push(format!("{test}R{n}"));
+    }
+    let close = content.rfind('}').ok_or_else(|| WriteError::InsertionPointNotFound(file_name.clone()))?;
+    let new_content = format!("{}{}{}", &content[..close], block, &content[close..]);
+    write_atomic(path, new_content)?;
+    Ok(written)
+}
+
+/// The highest `<prefix><digits>` declared in `content` (0 when none), for `part xR` / `verification xAttest`.
+fn max_numbered(content: &str, prefix: &str) -> u32 {
+    content
+        .match_indices(prefix)
+        .filter_map(|(i, _)| {
+            let rest = &content[i + prefix.len()..];
+            let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+            // the prefix must be a whole token: `part tGateR` must not read `part tGateRedR1`
+            let after = rest[digits.len()..].chars().next();
+            (!digits.is_empty() && matches!(after, Some(' ' | ':'))).then(|| digits.parse::<u32>().ok()).flatten()
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod judge_set_tests {
+    use super::{judge_set, max_numbered, SetJudgment};
+
+    #[test]
+    fn a_judged_set_writes_one_result_and_one_quote_receipt_per_item() {
+        let dir = std::env::temp_dir().join("keel-judge-set");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let f = dir.join("s.sysml");
+        std::fs::write(&f, "package S {\n    verification aGate : Test { :>> id = \"e2e00000-0000-4000-8000-000000000001\"; :>> method = VerificationMethod::inspect; }\n    part aGateR1 : TestResult { :>> id = \"e2e00000-0000-4000-8000-000000000002\"; :>> outcome = VerdictKind::proposed; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-10\"; :>> judgedBy = \"bot\"; }\n    verification bGate : Test { :>> id = \"e2e00000-0000-4000-8000-000000000003\"; :>> method = VerificationMethod::demo; }\n    part bGateR1 : TestResult { :>> id = \"e2e00000-0000-4000-8000-000000000004\"; :>> outcome = VerdictKind::proposed; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-10\"; :>> judgedBy = \"bot\"; }\n}\n").expect("write");
+        let items = [SetJudgment { test: "aGate".into(), verdict: "pass".into() }, SetJudgment { test: "bGate".into(), verdict: "fail".into() }];
+        let written = judge_set(&f, &items, "def5678", "2026-09-11", "you", "bot", "their words, verbatim: \u{201C}the set passes except bGate\u{201D}").expect("writes");
+        assert_eq!(written, ["aGateR2", "bGateR2"]);
+        let t = std::fs::read_to_string(&f).expect("read");
+        assert!(t.contains("part aGateR2 : TestResult") && t.contains("VerdictKind::pass; :>> judgedAgainst = \"def5678\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"you\"; :>> createdBy = \"bot\";"), "{t}");
+        assert!(t.contains("part bGateR2 : TestResult") && t.contains("outcome = VerdictKind::fail"), "{t}");
+        assert_eq!(t.matches("Attest1 : Test").count(), 2, "one companion per item");
+        assert!(t.contains("aGateAttest1R1") && t.contains("bGateAttest1R1"));
+        assert!(t.contains("the set passes except bGate"), "the human's words are in the receipt:\n{t}");
+        assert!(t.contains("VerdictKind::proposed"), "the proposal stays: the human's result is appended, history is not rewritten");
+        assert!(t.trim_end().ends_with('}'), "the package still closes");
+        // a second judgment numbers on: R3 and Attest2
+        let again = judge_set(&f, &items[..1], "def5679", "2026-09-12", "you", "bot", "\u{201C}again\u{201D}").expect("writes");
+        assert_eq!(again, ["aGateR3"]);
+        assert!(std::fs::read_to_string(&f).expect("read").contains("aGateAttest2 : Test"));
+        // an unknown Test or a bad verdict writes nothing
+        let before = std::fs::read_to_string(&f).expect("read");
+        assert!(judge_set(&f, &[SetJudgment { test: "zGate".into(), verdict: "pass".into() }], "d", "2026-09-12", "you", "bot", "w").is_err());
+        assert!(judge_set(&f, &[SetJudgment { test: "aGate".into(), verdict: "maybe".into() }], "d", "2026-09-12", "you", "bot", "w").is_err());
+        assert!(judge_set(&f, &[], "d", "2026-09-12", "you", "bot", "w").is_err());
+        assert_eq!(before, std::fs::read_to_string(&f).expect("read"), "a refused write leaves the file byte-for-byte");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn max_numbered_reads_whole_tokens_only() {
+        let c = "part tGateR1 : TestResult { } part tGateR12 : TestResult { } part tGateRedR3 : TestResult { } verification tGateAttest2 : Test { }";
+        assert_eq!(max_numbered(c, "part tGateR"), 12);
+        assert_eq!(max_numbered(c, "part tGateRedR"), 3);
+        assert_eq!(max_numbered(c, "verification tGateAttest"), 2);
+        assert_eq!(max_numbered(c, "part none"), 0);
+    }
 }
 
 /// RE-BIND an accepted Decision's acceptance to the text it carries NOW (D0308 / issue341).

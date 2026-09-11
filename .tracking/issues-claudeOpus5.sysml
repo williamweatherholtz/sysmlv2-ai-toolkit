@@ -2096,4 +2096,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcLandTestsTheCommitItPushes to issue477;
+
+    part issue478 : Issue {
+        :>> id = "ca40ecc8-eb9b-48ce-a06c-cc233a8cc89a";
+        :>> title = "The working tree's line endings decided the touched run's verdict";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 668's verifier ran the touched set (D0432) and reported 725 passed, 5 failed - capability_refusal_bites::the_lens_inventory_matches_the_router and four lib unit tests in guards.rs, knowledge.rs and view/mod.rs - none of which any changed line could reach. The cause was the working tree's LINE ENDINGS: every file the sprint's ad-hoc Python apply scripts wrote (pathlib.write_text, which translates a newline to CRLF on Windows) and every file the harness's Write tool created came out CRLF, and git ls-files --eol read them as i/lf w/crlf attr/text eol=lf - the .gitattributes says lf, git would have normalised them at the commit, but the touched run and keel land compile and test the WORKING TREE (issue477), so the router test's find of a newline-brace-newline anchor and four fixture scans read 0 where they expected 2, 2, 1 and a covered sitting. Stripping the CRs and rerunning the five tests passed all five; nothing in the change was wrong. scripts/textpatch.py already writes with newline='' and is unaffected - the class is any writer that is not it. No control reads the working tree's line endings against the attribute before a test run or a land, so the gate's verdict depended on which tool last wrote the file. Observed in the field by the verifier's receipt, not read from code. CENSUS after the fix (git ls-files --eol, 2026-09-11): 140 of 1733 tracked eol=lf paths are still w/crlf in this working tree while git status reads clean - 64 decisions, 36 sprint files, the ten validate tools, a test fixture svg - and core.autocrlf is true on this clone; those are files no test happens to read with an exact anchor today, and the resolver's check must name them too, not only the paths a commit changed.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcWorkingTreeEolMatchesTheAttribute to issue478;
+
+    part issue479 : Issue {
+        :>> id = "e993216f-f289-4a8d-a1f9-09beadea0bbf";
+        :>> title = "A live touched run was read as dead: the running stub names no process";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 668's second verifier dispatch (test-verify, D0438) returned a receipt reading TOUCHED RUN DID NOT COMPLETE - outcome remains running, no log file, process appeared to complete (no keel-serve suite process found). Every clause was wrong and the primary established it with one tasklist: two keel-serve.exe, two cargo.exe and a keel_cli test binary were alive, and the receipt on disk was a NEWER running stub (at 1789115573) than the one quoted (1789115022) - the verifier had launched the touched run twice, judged liveness by searching the process list for a name it guessed, and read the stub's at against its own launch epoch as staleness when at is the moment the stub was written. This is the third receipt-reading defect in three sprints (issue468 a stale pass, issue469 a foreground cap, now a live run read as dead), and the skill already says wait for exit: the instruction is not the control. The stub carries no fact a reader can check liveness against - no pid, no expected log path that exists yet (the log is created when cargo starts writing) - so a reader who wants to know whether the run is alive has only a process-name guess. Observed in the field by the verifier's own receipt against tasklist.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRunningReceiptNamesItsProcess to issue479;
+
+    part issue480 : Issue {
+        :>> id = "4592456c-9a55-486f-ab01-e8a24beddf72";
+        :>> title = "The recorder's receipt is bound to a path, not to its dispatch: a stale green would have been recorded";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Sprint 668's verifier returned its amended receipt (touched 730 passed, 0 failed) as its final message TWICE without writing it to the receipt path the dispatch named; the file on disk kept the first dispatch's receipt (mtime 02:08, clippy FAIL, 725 passed 5 failed). The recorder read that file, refused, and wrote nothing - which is the D0425 split doing its job - but it refused because the stale receipt happened to be RED. Had the file held a green receipt from an earlier sprint or an earlier tree, the recorder would have written eight results on it: the recorder's dispatch names the path and the sha, and nothing binds the receipt to THIS dispatch - no dispatch id, no epoch the header must be after, no sha the recorder compares. That is issue468's stale-receipt class one level up: the verifier's own receipt has no freshness check. The recorder's procedure also lives only in the primary's dispatch text (D0040) where D0438 gave the verifier's a skill, so the check has no home to land in. Observed in the field: the recorder's refusal text and the file's mtime against the dispatch time.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecorderRefusesAReceiptNotBoundToItsDispatch to issue480;
 }

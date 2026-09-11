@@ -78,6 +78,8 @@ const KEEL_API_WRITE_ENDPOINTS: &[&str] = &[
     "/api/project",
     // issue192: the deck records a sitting review as the HUMAN critique it is.
     "/api/deck/sitting",
+    // D0443: the deck's judgment card - one result and one quote receipt per sampled proposal.
+    "/api/judge-set",
     // D0181/D0182 (P5): the launch form, the headless-ask proxy queue, and the console commit action.
     "/api/launch/form", "/api/run/ask", "/api/run/asks", "/api/run/answer", "/api/commit",
 ];
@@ -312,6 +314,7 @@ async fn serve_async(root: PathBuf, port: u16) -> i32 {
         // THESE endpoints - the tested path. GET is uncached: it is an act surface, always current.
         .route("/deck", get(deck_page))
         .route("/api/deck/sitting", post(api_deck_sitting))
+        .route("/api/judge-set", post(api_judge_set))
         .route("/api/launch/form", get(api_launch_form))
         .route("/api/run/ask", post(api_run_ask))
         .route("/api/run/asks", get(api_run_asks))
@@ -849,6 +852,65 @@ async fn api_decision_accept(State(s): State<AppState>, axum::Json(b): axum::Jso
     // scope itself to genuinely delegated records (issue287).
     match crate::write::accept_decision(&path, &b.decision, &sha, &b.judged_at, judged_by, judged_by, &note) {
         Ok(_) => ok_json(format!("{{\"ok\":true,\"decision\":\"{}\",\"status\":\"accepted\"}}", b.decision)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct JudgeSetReq {
+    /// Repo-relative `.tracking` file whose sampled proposals are judged.
+    file: String,
+    /// `pass` or `fail`, applied to every item in the sampled set.
+    verdict: String,
+    note: String,
+    judged_at: String,
+    judged_by: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    hmac: Option<String>,
+}
+
+/// POST /api/judge-set (D0443): the deck's judgment card - the HUMAN's verdict on the SAMPLED proposed
+/// results of one file, recorded as one `TestResult` and one `<test>Attest<N>` quote receipt PER ITEM
+/// through `write::judge_set`. The set is computed here from the same proposals/sample the CLI uses;
+/// the tap never names items. The console gesture and the device receipt are appended exactly as for
+/// an acceptance tap (D0411/D0426); recorder == judge, so the record is not delegated.
+async fn api_judge_set(State(s): State<AppState>, axum::Json(b): axum::Json<JudgeSetReq>) -> Response {
+    let root = s.rootpath();
+    let Some(path) = safe_repo_path(&root, &b.file) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"file must be a repo-relative .sysml path\"}".to_string()).into_response();
+    };
+    let Some(judged_by) = b.judged_by.as_deref().map(str::trim).filter(|a| !a.is_empty()) else {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"judged_by is required: the judge is data the gesture carries, never ambient state the server resolves (issue199/D0178)\"}".to_string()).into_response();
+    };
+    if b.verdict != "pass" && b.verdict != "fail" {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"verdict must be pass or fail\"}".to_string()).into_response();
+    }
+    let proposals = crate::attestation::proposals_in(&root, &path);
+    let rule = crate::attestation::sampling_rule(&root);
+    let items: Vec<crate::write::SetJudgment> = crate::attestation::sample(&proposals, rule)
+        .into_iter()
+        .filter(|p| !p.judged)
+        .map(|p| crate::write::SetJudgment { test: p.test.clone(), verdict: b.verdict.clone() })
+        .collect();
+    if items.is_empty() {
+        return (StatusCode::BAD_REQUEST, "{\"error\":\"nothing in this file's sampled set awaits judgment\"}".to_string()).into_response();
+    }
+    let sha = git_head(&root);
+    let receipt = tap_receipt(&s, b.device_id.as_deref(), b.hmac.as_deref(), &crate::device::canonical(&format!("judge-set-{}", b.verdict), &b.file, &b.judged_at, judged_by, &b.note));
+    let note = if b.note.contains(CONSOLE_GESTURE.trim()) {
+        format!("{}{}", b.note, receipt.tag())
+    } else {
+        format!("{}{CONSOLE_GESTURE}{}", b.note, receipt.tag())
+    };
+    match crate::write::judge_set(&path, &items, &sha, &b.judged_at, judged_by, judged_by, &note) {
+        Ok(written) => ok_json(format!(
+            "{{\"ok\":true,\"file\":\"{}\",\"verdict\":\"{}\",\"written\":[{}]}}",
+            b.file.replace('"', "'"),
+            b.verdict,
+            written.iter().map(|w| format!("\"{w}\"")).collect::<Vec<_>>().join(",")
+        )),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{{\"error\":\"{}\"}}", e.to_string().replace('"', "'"))).into_response(),
     }
 }

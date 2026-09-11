@@ -458,7 +458,34 @@ fn collect(root: &Path) -> Vec<Item> {
             }
         }
     }
+    items.extend(judgment_cards(root));
     items
+}
+
+/// D0443: one card per `.tracking` file whose SAMPLED proposed results (D0312 B) await the human's
+/// judgment - the card is the set in one sitting; the tap records one result and one quote receipt
+/// per item through `/api/judge-set`. Computed from the same proposals/sample the CLI uses, so the
+/// deck and `keel judge-set` name the same set.
+fn judgment_cards(root: &Path) -> Vec<Item> {
+    let rule = crate::attestation::sampling_rule(root);
+    let mut out = Vec::new();
+    for f in crate::collect_sysml(&root.join(".tracking")) {
+        let proposals = crate::attestation::proposals_in(root, &f);
+        let pending: Vec<&crate::attestation::Proposal> = crate::attestation::sample(&proposals, rule).into_iter().filter(|p| !p.judged).collect();
+        let Some(first) = pending.first() else { continue };
+        let rel = f.strip_prefix(root).unwrap_or(&f).to_string_lossy().replace('\\', "/");
+        let stem = f.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        out.push(Item {
+            cls: "judgment",
+            name: stem,
+            uid: first.uuid.clone(),
+            title: format!("{} of {} proposed result(s) await your judgment", pending.len(), proposals.len()),
+            meta: pending.iter().map(|p| p.test.as_str()).collect::<Vec<_>>().join(", "),
+            file: rel,
+            options: Vec::new(),
+        });
+    }
+    out
 }
 
 
@@ -480,7 +507,11 @@ fn github_slug(root: &Path) -> Option<String> {
 
 /// One card's HTML. Extracted from [`html`]'s section loop (clippy line budget) — behavior identical.
 fn render_card(root: &Path, i: &Item, cls: &str) -> String {
-    let verb = if cls == "acceptance" { "Sign" } else { "Accept" };
+    let verb = match cls {
+        "acceptance" => "Sign",
+        "judgment" => "Pass the set",
+        _ => "Accept",
+    };
     let accept_buttons = if i.options.is_empty() {
         format!("<button data-v=accept>{verb}</button>")
     } else {
@@ -559,8 +590,9 @@ pub fn html(root: &Path) -> Result<String, crate::view::ViewError> {
     // D0204 (pullOversight): the deck shows what BLOCKS on the human and what is critical -
     // never their homework. The sitting section is deliberately gone; sittings stay reviewable on
     // demand (console, API) and `keel sitting-coverage` keeps the record.
-    let classes: [(&str, &str, &str); 2] = [
+    let classes: [(&str, &str, &str); 3] = [
         ("acceptance", "Decisions blocking work - your call", "#4c5fd7"),
+        ("judgment", "Proposed results - your judgment of the sampled set (D0443)", "#2e7d4f"),
         ("finding", "Critical findings", "#b5651d"),
     ];
     let mut sections = String::new();
@@ -744,6 +776,11 @@ function saveLocal(card,verdict,opt){
     url=(verdict==='accept')?'/api/decision/accept':'/api/decision/reject';
     body={decision:name,file:card.getAttribute('data-file'),judged_at:today,judged_by:HUMAN};
     if(verdict==='accept'){body.note=(note||'signed via deck');}else{body.rationale=(note||'rejected via deck');}
+  } else if(cls==='judgment'){
+    if(verdict==='maybe'){say(card,'noted - tell Claude what to look at via the note, then Pass the set or Reject');return;}
+    if(!HUMAN){say(card,'no registered human reviewer - a judgment may not be recorded as an AI');return;}
+    url='/api/judge-set';
+    body={file:card.getAttribute('data-file'),verdict:(verdict==='accept'?'pass':'fail'),note:(note||'judged via deck'),judged_at:today,judged_by:HUMAN};
   } else {
     if(!HUMAN){say(card,'no registered human reviewer - a sitting review may not be recorded as an AI');return;}
     url='/api/deck/sitting';
@@ -754,6 +791,7 @@ function saveLocal(card,verdict,opt){
   var kind, target, note2;
   if(cls==='finding'){kind='disposition-'+body.verdict;target=name;note2=body.rationale;}
   else if(cls==='acceptance'){kind=(verdict==='accept')?'accept':'reject';target=name;note2=(verdict==='accept')?body.note:body.rationale;}
+  else if(cls==='judgment'){kind='judge-set-'+body.verdict;target=body.file;note2=body.note;}
   else {kind='sitting-'+verdict;target=name;note2=note;}
   devSign(kind,target,today,HUMAN,note2).then(function(sig){
     body.device_id=sig.device_id;body.hmac=sig.hmac;

@@ -4612,7 +4612,7 @@ fn tty_gesture() -> Option<&'static str> {
 /// refusal) and the tree-derived audit are the real controls; this is the friction layer.
 /// `Some(exit)` refuses; `None` lets the accept proceed.
 fn accept_channel_refusal(args: &[String], tty_gesture: Option<&str>) -> Result<Vec<String>, i32> {
-    verdict_channel_refusal("accept", "accepting", args, tty_gesture)
+    verdict_channel_refusal("accept", "accepting", args, tty_gesture, "decisionAcceptance", true)
 }
 
 /// D0423: the checks that used to refuse a delegated record are written INTO it. Each WARN line names
@@ -4650,7 +4650,11 @@ fn fold_warnings_into_note(args: &[String], warnings: &[String]) -> Vec<String> 
 /// channel. What still refuses: no delegation declared, no quote at all (a paraphrase is the
 /// fabrication D0198 names), and a gesture word typed as the only evidence - that one binds the
 /// AGENT's act, not the human's, and D0427 keeps it out of D0423's dissolution.
-fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture: Option<&str>) -> Result<Vec<String>, i32> {
+/// `delegation_class` names the attestation-policy.toml section whose `delegatedRecording` lets an
+/// agent session record the human's verdict (`decisionAcceptance` for accept/reject, `confirmationRecord`
+/// for judge-set, D0443); `read_back` runs the D0201 B read-back against the first positional argument as a
+/// Decision id - false when the subject is not a Decision (judge-set's subject is a file).
+fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture: Option<&str>, delegation_class: &str, read_back: bool) -> Result<Vec<String>, i32> {
     let mut warnings: Vec<String> = Vec::new();
     {
         let agent_marked = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_BRIDGE_SESSION_ID"]
@@ -4665,7 +4669,7 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
             // non-local authoritative channel". Withdraw by deleting the delegation line; this arm
             // then refuses exactly as before.
             let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
-            let delegation = keel_cli::activation::recording_delegation(&root, "decisionAcceptance");
+            let delegation = keel_cli::activation::recording_delegation(&root, delegation_class);
             // D0411 / issue426: the receipt this session can record is the human's QUOTED WORDS. A
             // gesture citation - console, deck, TTY, GitHub - is written by the surface that observed
             // the gesture (the console appends a device receipt; the terminal path above cites its own
@@ -4681,7 +4685,7 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
                     // construction: it binds new records, never re-reads old ones. The note has a
                     // quoted span here (the arm above), so the read-back reads the span, never a
                     // gesture word.
-                    if let (Some(dec), Some(note)) = (args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
+                    if let (true, Some(dec), Some(note)) = (read_back, args.first().filter(|a| !a.starts_with('-')), flag(args, "note")) {
                         let (letters, title) = decision_options_and_title(&root, dec);
                         // D0423: computed the same way, written into the record instead of refusing.
                         if !keel_cli::view::read_back_names(&note, dec, &letters, &title) {
@@ -4707,7 +4711,7 @@ fn verdict_channel_refusal(verb: &str, doing: &str, args: &[String], tty_gesture
                     return Err(1);
                 }
                 (None, _) => {
-                    eprintln!("keel {verb}: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for decisionAcceptance.");
+                    eprintln!("keel {verb}: this session carries agent-environment markers and no interactive terminal (D0178/K6), and attestation-policy.toml declares no recording delegation for {delegation_class}.");
                     eprintln!("  The verdict is the human's own act: run `keel {verb}` from YOUR terminal, or give it from the console approve queue / the deck.");
                     ledger_refused(&root, verb, "no-delegation");
                     return Err(1);
@@ -4876,7 +4880,7 @@ fn cmd_accept(args: &[String]) -> i32 {
 fn cmd_reject(args: &[String]) -> i32 {
     let args = &fold_words_into_note(args);
     let tty_gesture = tty_gesture();
-    let args = &match verdict_channel_refusal("reject", "rejecting", args, tty_gesture) {
+    let args = &match verdict_channel_refusal("reject", "rejecting", args, tty_gesture, "decisionAcceptance", true) {
         Ok(warnings) => fold_warnings_into_note(args, &warnings),
         Err(exit) => return exit,
     };
@@ -4940,6 +4944,134 @@ fn cmd_reject(args: &[String]) -> i32 {
             println!("rejected {decision} (judged by {judged_by} at {date}, against {sha})");
             println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
             println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
+            0
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    }
+}
+
+/// `keel judge-set <file> --words "<verbatim>" --by <human> --date YYYY-MM-DD [--verdict pass|fail]
+/// [--fail <test>,..] [--all]` (D0443): a human's verdict on the SAMPLED proposed results of one
+/// `.tracking` file, in one sitting - every item recorded on its own line with its own quote receipt
+/// (D0312 B; issue158 is why a count is never one card). The channel rules are `keel accept`'s with
+/// the `confirmationRecord` delegation and no Decision read-back: the subject is a file, not a Decision.
+/// `judge-set` is in `HUMAN_ONLY_WRITE_COMMANDS`; the write layer refuses an AI-kind judge.
+/// THE SET IS COMPUTED, NEVER CHOSEN (D0443): the sample from the policy's rule over the uuid order, or
+/// with `--all` every proposal no human has judged; `--fail a,b` names the items that fail while the rest
+/// take `verdict`. Returns the items and the file's proposal total, or the exit code when nothing awaits
+/// or a `--fail` name is outside the set.
+fn judge_set_items(root: &Path, path: &Path, rel: &str, all: bool, verdict: &str, fail: Option<&str>) -> Result<(Vec<keel_cli::write::SetJudgment>, usize), i32> {
+    let fails: Vec<String> = fail.map(|f| f.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()).unwrap_or_default();
+    let proposals = keel_cli::attestation::proposals_in(root, path);
+    let rule = keel_cli::attestation::sampling_rule(root);
+    let pending: Vec<&keel_cli::attestation::Proposal> = if all {
+        proposals.iter().filter(|p| !p.judged).collect()
+    } else {
+        keel_cli::attestation::sample(&proposals, rule).into_iter().filter(|p| !p.judged).collect()
+    };
+    if pending.is_empty() {
+        eprintln!(
+            "keel judge-set: nothing awaits judgment in {rel} - {} proposed, {} judged{}. Nothing written.",
+            proposals.len(),
+            proposals.iter().filter(|p| p.judged).count(),
+            if all || rule.is_none() { "" } else { ", the sample is judged (--all judges the rest)" }
+        );
+        return Err(2);
+    }
+    for f in &fails {
+        if !pending.iter().any(|p| &p.test == f) {
+            eprintln!("error: --fail names '{f}', which is not in the set awaiting judgment: {}", pending.iter().map(|p| p.test.as_str()).collect::<Vec<_>>().join(", "));
+            return Err(2);
+        }
+    }
+    let items = pending
+        .iter()
+        .map(|p| keel_cli::write::SetJudgment {
+            test: p.test.clone(),
+            verdict: if fails.contains(&p.test) { "fail".to_string() } else { verdict.to_string() },
+        })
+        .collect();
+    Ok((items, proposals.len()))
+}
+
+fn cmd_judge_set(args: &[String]) -> i32 {
+    let args = &fold_words_into_note(args);
+    let tty_gesture = tty_gesture();
+    let args = &match verdict_channel_refusal("judge-set", "judging", args, tty_gesture, "confirmationRecord", false) {
+        Ok(warnings) => fold_warnings_into_note(args, &warnings),
+        Err(exit) => return exit,
+    };
+    let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    let Some(file) = args.first().filter(|a| !a.starts_with('-')) else {
+        eprintln!("usage: keel judge-set <.tracking file> --words \"<their words, verbatim>\" [--note \"<framing>\"] --by <humanActor> --date YYYY-MM-DD [--verdict pass|fail] [--fail <test>,..] [--all]");
+        eprintln!();
+        eprintln!("Records a HUMAN's judgment of the SAMPLED proposed results in one file (D0443 on D0312 B): one TestResult");
+        eprintln!("and one <test>Attest<N> quote receipt PER ITEM, never a count. The sample is computed from attestation-policy.toml");
+        eprintln!("[proposedJudgment] sampling over the results' uuid order (`keel attestation` shows proposed / sampled / judged);");
+        eprintln!("--all judges every unjudged proposal in the file instead. --verdict applies to every item; --fail names the items");
+        eprintln!("that fail while the rest pass.");
+        return 2;
+    };
+    let (Some(note), Some(date)) = (flag(args, "note"), flag(args, "date")) else {
+        eprintln!("error: --words (or --note) and --date are both required. The words are the attestation; the date is when they were given.");
+        return 2;
+    };
+    let judged_by = match keel_cli::actor::resolve(&root, flag(args, "by").as_deref()) {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return 2;
+        }
+    };
+    let recorded_by = if flag(args, "by").is_some() {
+        match keel_cli::actor::resolve(&root, None) {
+            Ok(a) => a,
+            Err(msg) => {
+                eprintln!("keel judge-set: --by names the judge, but WHO IS RECORDING is unbound - {msg}");
+                return 2;
+            }
+        }
+    } else {
+        judged_by.clone()
+    };
+    let path = root.join(file.replace('/', std::path::MAIN_SEPARATOR_STR));
+    let rel = path.strip_prefix(&root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+    if !rel.starts_with(".tracking/") || !path.is_file() {
+        eprintln!("error: judge-set records into one existing file under .tracking/ - got '{file}'.");
+        return 2;
+    }
+    let verdict = flag(args, "verdict").unwrap_or_else(|| "pass".to_string());
+    if verdict != "pass" && verdict != "fail" {
+        eprintln!("error: --verdict must be pass or fail (got '{verdict}').");
+        return 2;
+    }
+    let all = args.iter().any(|a| a == "--all");
+    let (items, total) = match judge_set_items(&root, &path, &rel, all, &verdict, flag(args, "fail").as_deref()) {
+        Ok(v) => v,
+        Err(exit) => return exit,
+    };
+    let sha = keel_cli::gitx::git()
+        .arg("-C")
+        .arg(&root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_owned())
+        .unwrap_or_default();
+    let note = match tty_gesture {
+        Some(gesture) => keel_cli::view::note_with_tty_gesture(&note, gesture, &judged_by, &date),
+        None => note,
+    };
+    match keel_cli::write::judge_set(&path, &items, &sha, &date, &judged_by, &recorded_by, &note) {
+        Ok(written) => {
+            println!("judged {} item(s) in {rel} (judged by {judged_by} at {date}, against {sha}; sample {} of {total} proposed{}):", written.len(), items.len(), if all { ", --all" } else { "" });
+            for (w, i) in written.iter().zip(&items) {
+                println!("  {w}: {} (+ quote receipt {}Attest)", i.verdict, i.test);
+            }
             0
         }
         Err(e) => {
@@ -5345,6 +5477,7 @@ fn main() {
         Some("add-task") => cmd_add_task(rest),
         Some("accept") => cmd_accept(rest),
         Some("reject") => cmd_reject(rest), // D0393/issue414: the human's rejection through the write API
+        Some("judge-set") => cmd_judge_set(rest), // D0443: the human's judgment of a sampled set of proposed results
         Some("record") => cmd_record(rest),
         _ => print_usage(),
     };

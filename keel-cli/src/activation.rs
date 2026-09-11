@@ -547,7 +547,7 @@ pub fn standing_words(root: &Path) -> Option<String> {
 /// intact and no grant is inherited - every fresh project used to inherit this repository's consent.
 #[must_use]
 pub fn without_grants(policy: &str) -> String {
-    const GRANTS: [&str; 3] = ["delegatedRecording", "standingConsent", "standingWords"];
+    const GRANTS: [&str; 4] = ["delegatedRecording", "standingConsent", "standingWords", "sampling"];
     let mut out = String::new();
     let mut noted = false;
     for line in policy.lines() {

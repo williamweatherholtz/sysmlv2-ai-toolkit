@@ -16,9 +16,10 @@ pub struct CliFact {
     pub synopsis: &'static str,
 }
 
-pub const CLI_FACTS: [CliFact; 109] = [
+pub const CLI_FACTS: [CliFact; 110] = [
     CliFact { name: "accept", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> --note TEXT --by <person> --date YYYY-MM-DD", synopsis: "record a human's acceptance of a proposed Decision; refused for an AI actor" },
     CliFact { name: "reject", family: "governance", effect: "writes", stability: "stable", invocation: "<decision> (--words TEXT | --note TEXT) --by <person> --date YYYY-MM-DD", synopsis: "record a human's rejection of a proposed Decision; the same channel rules as accept" },
+    CliFact { name: "judge-set", family: "governance", effect: "writes", stability: "stable", invocation: "<.tracking file> (--words TEXT | --note TEXT) --by <person> --date YYYY-MM-DD [--verdict pass|fail] [--fail <test>,..] [--all]", synopsis: "record a human's verdict on the sampled proposed results of one file - one result and one quote receipt per item (D0443); accept's channel rules under confirmationRecord" },
     CliFact { name: "override", family: "governance", effect: "writes", stability: "stable", invocation: "<path> --reason TEXT", synopsis: "arm a single-use, path-bound write unlock; consuming it records an obligation" },
     CliFact { name: "claim", family: "governance", effect: "both", stability: "stable", invocation: "<item> | --list | --mine", synopsis: "take or inspect a work claim; liveness is computed" },
     CliFact { name: "enroll", family: "governance", effect: "writes", stability: "stable", invocation: "--actor ID --name NAME --kind human|ai", synopsis: "enroll a contributor: register the actor, bind this machine, verify the gate" },
