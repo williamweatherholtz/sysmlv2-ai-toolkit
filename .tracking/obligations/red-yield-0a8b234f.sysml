@@ -15,5 +15,5 @@ package Obligation0a8b234f {
         :>> severity = Severity::Low;
     }
 
-    #Resolves dependency from d0447 to obligation0a8b234f;
+    #Resolves dependency from dcCliSurfaceGuardNamesAStaleBinary to obligation0a8b234f;
 }
