@@ -81,7 +81,7 @@ package EngineInstruments {
 
     // guardProofCensus: .engine/tools/guard_proof_census.py
     // KNOWN FAILURE MODES: its own first version returned a false 64/64 by matching its own registry; textual, so a guard exercised by a fixture that never names it counts as unnamed
-    // PUBLISHED TO: D0360's evidence, pending dcControlProofStateIsComputed moving it into the binary
+    // PUBLISHED TO: keel show controls -> controlProof (the binary computes it, sprint 674); the script stays as the independent cross-check the integration test compares against
     part fbGuardProofCensus : Feedback {
         :>> id = "eeee2910-63ba-5c4f-b3df-00d7d982438c";
         :>> title = "how many enforced guards have a test that constructs their defect and asserts they report it";

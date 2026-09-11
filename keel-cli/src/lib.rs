@@ -29,6 +29,7 @@ pub mod cli_facts;
 pub mod color;
 pub mod cli_surface;
 pub mod control_defects;
+pub mod control_proof;
 /// The declared-vs-binary version skew for the project owning `target`, if any (D0251).
 ///
 /// Root discovery mirrors `write::model_lock_path`: walk up to the `.tracking`/`.engine` parent. Returns

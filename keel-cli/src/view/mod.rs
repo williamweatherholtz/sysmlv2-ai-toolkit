@@ -3455,13 +3455,20 @@ pub fn controls(root: &Path) -> Result<String, ViewError> {
         .map(|h| Json::s((*h).clone()))
         .collect();
     let evidence = arming_evidence(&arming_rows);
+    // D0360: DECLARED and ARMED are not PROVEN. The third state - has a test ever constructed this
+    // guard's defect and asserted the guard reports it - is computed from the test corpus in the tree,
+    // per enforced guard, so a guard added to GUARD_NAMES with no such test appears in the list the
+    // moment it exists rather than at the next run of a script someone remembers. An indicator, not a
+    // gate (D0088): the unproven and undetermined LISTS are the actionable output; the share is context.
+    let proof = crate::control_proof::census(root).to_json();
     Ok(Json::Obj(vec![
-        ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side. DECLARED is not ARMED: `controlArming` reports whether each control can actually fire, because during issue240 this view truthfully reported no uncovered hazard while the commit gate could not run at all (D0217).".to_string())),
+        ("controls".to_string(), Json::s("the two-way hazard/control diff (D0195): every failure condition's standing controls as edges, computable - and the two honest gap classes on either side. DECLARED is not ARMED: `controlArming` reports whether each control can actually fire, because during issue240 this view truthfully reported no uncovered hazard while the commit gate could not run at all (D0217). ARMED is not PROVEN: `controlProof` reports, per enforced guard, whether any test has constructed its defect and asserted the guard reports it (D0360) - PROVEN, UNPROVEN or UNDETERMINED, three states kept apart because collapsing them is how a blind control earns credit.".to_string())),
         ("hazards".to_string(), Json::Arr(rows)),
         ("uncoveredHazards".to_string(), Json::Arr(uncovered.into_iter().map(Json::s).collect())),
         ("controlArming".to_string(), Json::Arr(arming_rows)),
         ("hazardsWithADisarmedControl".to_string(), Json::Arr(hazards_with_disarmed)),
         ("armingEvidence".to_string(), evidence),
+        ("controlProof".to_string(), proof),
         ("unanchoredConstraints".to_string(), Json::Arr(unanchored)),
         ("unlinkedHighIncidentsSinceD0195".to_string(), Json::Arr(unlinked_incidents)),
     ])

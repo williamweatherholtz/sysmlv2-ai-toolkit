@@ -330,6 +330,16 @@ pub fn metric_value(root: &Path, key: &str) -> Option<f64> {
             Some(f64::from(pct(overrides, reviews.max(1))))
         }
         "accepted_decisions" => Some(cnt(model.standing("accepted").len())),
+        // D0360: the proof census as bindable indicator series - COUNTS, never a share, because the
+        // list is the actionable output and a percentage invites the threshold D0088 forbids.
+        "guards_proven" | "guards_unproven" | "guards_undetermined" => {
+            let census = crate::control_proof::census(root);
+            Some(cnt(match key {
+                "guards_proven" => census.proven(),
+                "guards_unproven" => census.unproven(),
+                _ => census.undetermined(),
+            }))
+        }
         "open_findings" => {
             let done = crate::orient::done_names(root);
             let (undisp, crit) = finding_blockers(&compute_issue_resolution(&model, &done), &model);

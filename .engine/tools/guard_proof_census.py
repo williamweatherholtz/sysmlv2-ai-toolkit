@@ -18,9 +18,13 @@ a guard whose test asserts a clean tree counts as named-but-unproven - which is 
 for this question, since a demonstrated PASS is not a demonstrated CATCH.
 """
 import re
+import sys
 from pathlib import Path
 
-REPO = Path("C:/Users/WilliamWeatherholtz/claude_code/sysmlv2-ai-toolkit")
+# The tree to census: an explicit root argument, else this checkout. `keel show controls` computes the
+# same three states in the binary (dcControlProofStateIsComputed, D0360); this script is the independent
+# reference the binary is held against - run both on one tree and the counts must agree.
+REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[2]
 
 names_block = re.search(
     r"pub const GUARD_NAMES: \[&str; \d+\] =\s*(\[[^\]]*\]);",

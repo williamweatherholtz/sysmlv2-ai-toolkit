@@ -2195,4 +2195,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcBriefRowsAreMeasuredOnTheBriefPage to issue486;
+
+    part issue487 : Issue {
+        :>> id = "87406fcb-8d4c-4f9d-b6a6-396530cb80b1";
+        :>> title = "cli-surface-declared reports a stale binary as mirror drift";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Guard cli-surface-declared compares .engine/cli/commands.sysml against the RUNNING binary's compiled CliFact table (D0271). When both source homes are equal but the binary predates the edit, the guard reports 'synopsis differs ... regenerate the mirror' - a drift verdict for a staleness condition. Seen twice on 2026-09-11 within one hour: an implementer agent's worktree stop hook (its .keel/bin/keel.exe predated its cli_facts.rs edit) and the main checkout's stop hook after the same patch was applied while the verifier's cargo run held the build lock. In both cases keel-cli/src/cli_facts.rs and commands.sysml carried identical text; the only remedy was a rebuild the hook cannot run. The wrong verdict sends the reader to edit a mirror that is not wrong.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCliSurfaceGuardNamesAStaleBinary to issue487;
 }
