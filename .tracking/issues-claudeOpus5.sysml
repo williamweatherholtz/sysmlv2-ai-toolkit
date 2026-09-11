@@ -2129,4 +2129,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRecorderRefusesAReceiptNotBoundToItsDispatch to issue480;
+
+    part issue481 : Issue {
+        :>> id = "40eda321-5daa-42cc-b674-4f5b165b3b20";
+        :>> title = "an_output_still_linking_is_not_copied races the wall clock: a hook fire slower than the two-second grace copies the fixture, and land refused a push whose verifier run had passed";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "keel land refused the push of fe715c2 (sprint 669): touched tests FAIL, failing self_build_hooks_leave_the_build_tree, 730 passed 1 failed in 908 s (log .keel/metrics/touched-1789122462.log). The failing case, an_output_still_linking_is_not_copied, sets the build output's mtime to NOW and then spawns a hook fire, asserting the stable copy was not placed. hook_binary.rs copies any output at least two seconds old (min_age_secs = 2), so the assertion holds only if the hook process reaches its refresh check within two wall-clock seconds of the mtime write. Under the land's load (62 binaries; this file's five tests took 13.6 s) it did not, the fixture aged past the grace and was copied - a correct engine reading a stale fixture. The verifier's touched run on the same set and the same HEAD had passed 731 of 731 minutes earlier on an idle host. The push was refused for a test racing the wall clock, not for the change. FIX: the fixture's mtime is placed in the future, which the grace can never age past during a run (now - mtime saturates to 0), so the case asserts the engine's decision and not the host's speed; the grace boundary itself is covered by the pure needs_refresh unit test in hook_binary.rs.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSelfBuildHookTestDoesNotRaceTheClock to issue481;
 }

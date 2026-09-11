@@ -109,8 +109,11 @@ fn an_output_still_linking_is_not_copied() {
     let root = scaffold("young");
     make_self_build(&root, b"build-one");
     let out = root.join("target").join("release").join(BIN);
-    // fresh mtime: a link may still be in progress
-    std::fs::File::options().write(true).open(&out).expect("open").set_modified(std::time::SystemTime::now()).expect("mtime");
+    // a link may still be in progress: an mtime the two-second grace cannot age past while this test runs.
+    // Set to NOW it raced the wall clock - under land's load the hook fire took longer than the grace, the
+    // fixture aged into "settled" and was copied, and a push whose verifier run had passed was refused (issue481).
+    let linking = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
+    std::fs::File::options().write(true).open(&out).expect("open").set_modified(linking).expect("mtime");
     let _ = run_hook(&root, "pre-bash", PAYLOAD);
     assert!(!root.join(".keel").join("bin").join(BIN).exists(), "an output younger than the grace is left alone");
     let _ = std::fs::remove_dir_all(&root);
