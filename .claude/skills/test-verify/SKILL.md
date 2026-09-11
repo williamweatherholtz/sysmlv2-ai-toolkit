@@ -65,13 +65,13 @@ with a timeout; do NOT read the receipt yet.
 **No `keel-cli/src` change means an empty touched set** - the run takes seconds, its receipt says
 `stems = []`, and that IS the answer. When the dispatch also names **`keel suite .`** (the full
 suite, D0356: receipt `.keel/metrics/suite-receipt.toml` with `fingerprint`, `head`, `at`,
-`passed`, `failed`, `outcome`, `log`; ~11 minutes here), launch it the same way AFTER the touched
-run exits - the two would contend for cargo's lock - and read it under the same rules in step 5,
-minus the `stems`/`lib` rows, with ONE difference: the suite receipt's `at` is the run's START
-(`suite.rs` writes `at: started`, the same stamp as its stub), where the touched receipt's `at` is
-the END (issue472). So `at` > launch epoch proves the receipt is this run's, not that the run
-finished; the duration is the receipt file's mtime minus `at` (`stat -c %Y
-.keel/metrics/suite-receipt.toml`) and belongs in the `SUITE RECEIPT:` row as `ran=<n>s`.
+`passed`, `failed`, `outcome`, `seconds`, `log`; ~11 minutes here), launch it the same way AFTER the
+touched run exits - the two would contend for cargo's lock - and read it under the same rules in
+step 5, minus the `stems`/`lib` rows. The two receipts use the same two words the same way
+(issue472): `at` is when the file was WRITTEN - the end of a done run, the start of a running stub -
+and `seconds` is the run's wall clock, so `at` > launch epoch proves the run finished after you
+launched it and `at - seconds` is within two seconds of the launch epoch when it is this run's;
+`seconds` belongs in the `SUITE RECEIPT:` row as `ran=<n>s`.
 `keel suite` REFUSES to run from `target/release/keel.exe` (it cannot relink its own image); run
 it from the copy the dispatch names.
 

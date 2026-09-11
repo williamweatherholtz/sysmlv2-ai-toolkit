@@ -74,6 +74,8 @@ pub struct Receipt {
     pub passed: u64,
     pub failed: u64,
     pub outcome: String,
+    /// The run's wall clock; 0 on a running stub (issue472 - the touched receipt's word).
+    pub seconds: u64,
 }
 
 impl Receipt {
@@ -89,13 +91,13 @@ pub fn parse_receipt(text: &str) -> Option<Receipt> {
     let v = text.parse::<toml::Value>().ok()?;
     let s = |k: &str| v.get(k).and_then(toml::Value::as_str).map(str::to_owned);
     let n = |k: &str| v.get(k).and_then(toml::Value::as_integer).and_then(|i| u64::try_from(i).ok());
-    Some(Receipt { fingerprint: s("fingerprint")?, head: s("head").unwrap_or_default(), at: n("at").unwrap_or(0), passed: n("passed").unwrap_or(0), failed: n("failed").unwrap_or(0), outcome: s("outcome").unwrap_or_else(|| "fail".into()) })
+    Some(Receipt { fingerprint: s("fingerprint")?, head: s("head").unwrap_or_default(), at: n("at").unwrap_or(0), passed: n("passed").unwrap_or(0), failed: n("failed").unwrap_or(0), outcome: s("outcome").unwrap_or_else(|| "fail".into()), seconds: n("seconds").unwrap_or(0) })
 }
 
 fn render_receipt(r: &Receipt, log: &Path) -> String {
     format!(
-        "# suite receipt: the deliverable as the full suite last saw it ON THIS MACHINE, and what that run\n# cost. Nothing refuses on it (D0356) - it is a measurement, not a gate. `outcome = \"running\"` is the\n# stub written before cargo starts (D0387): a run in progress, or one that was killed - not an answer.\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nlog = \"{}\"\n",
-        r.fingerprint, r.head, r.at, r.passed, r.failed, r.outcome, log.to_string_lossy().replace('\\', "/")
+        "# suite receipt: the deliverable as the full suite last saw it ON THIS MACHINE, and what that run\n# cost. Nothing refuses on it (D0356) - it is a measurement, not a gate. `outcome = \"running\"` is the\n# stub written before cargo starts (D0387): a run in progress, or one that was killed - not an answer.\n# `at` is when this file was WRITTEN - the end of a done run, the start of a stub - and `seconds` the\n# run's wall clock, the same two words the touched receipt uses (issue472).\nfingerprint = \"{}\"\nhead = \"{}\"\nat = {}\npassed = {}\nfailed = {}\noutcome = \"{}\"\nseconds = {}\nlog = \"{}\"\n",
+        r.fingerprint, r.head, r.at, r.passed, r.failed, r.outcome, r.seconds, log.to_string_lossy().replace('\\', "/")
     )
 }
 
@@ -250,7 +252,7 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     // will carry, so a reader comparing fingerprints is told the run is in progress, not stale.
     let head = crate::gitx::git().arg("-C").arg(repo).args(["rev-parse", "--short", "HEAD"]).output().ok().filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
     if let Ok(fp) = fingerprint(repo) {
-        let stub = Receipt { fingerprint: fp, head: head.clone(), at: started, passed: 0, failed: 0, outcome: "running".to_string() };
+        let stub = Receipt { fingerprint: fp, head: head.clone(), at: started, passed: 0, failed: 0, outcome: "running".to_string(), seconds: 0 };
         if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), render_receipt(&stub, &log)) {
             eprintln!("keel suite: running stub could not be written: {e}");
         }
@@ -298,7 +300,7 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
             return if outcome == "pass" { 1 } else { 101 };
         }
     };
-    let r = Receipt { fingerprint: fp, head, at: started, passed, failed, outcome: outcome.to_string() };
+    let r = done_receipt(fp, head, started, now_secs(), passed, failed, outcome);
     if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), render_receipt(&r, &log)) {
         eprintln!("keel suite: receipt could not be written: {e}");
     }
@@ -307,6 +309,13 @@ pub fn cmd(args: &[String], repo: &Path) -> i32 {
     }
     println!("keel suite: {outcome} - {passed} passed, {failed} failed; receipt {} (fingerprint {}...)", RECEIPT, &r.fingerprint[..12]);
     if outcome == "pass" { 0 } else { 101 }
+}
+
+/// The receipt a finished run writes: `at` is `finished` - the moment of the write, the touched
+/// receipt's meaning - and `seconds` the wall clock since `started` (issue472). Pure, tested.
+#[must_use]
+pub fn done_receipt(fingerprint: String, head: String, started: u64, finished: u64, passed: u64, failed: u64, outcome: &str) -> Receipt {
+    Receipt { fingerprint, head, at: finished, passed, failed, outcome: outcome.to_string(), seconds: finished.saturating_sub(started) }
 }
 
 /// Did cargo fail without a single `test result:` line - a build or tool failure, not a verdict?
@@ -324,7 +333,7 @@ pub fn receipt_path(repo: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{count_results, image_collides, never_ran, parse_receipt, render_receipt, Receipt};
+    use super::{count_results, done_receipt, image_collides, never_ran, parse_receipt, render_receipt, Receipt};
     use std::path::Path;
 
     /// THE CONTROL for issue386, meaningful on any host: the image cargo relinks collides, the
@@ -364,11 +373,35 @@ mod tests {
     fn a_running_stub_is_not_green_and_a_killed_run_leaves_it() {
         // D0387/issue399: the stub `cmd` writes before cargo starts is what a killed run leaves behind;
         // it must read as no verdict, never as the previous run's pass.
-        let stub = Receipt { fingerprint: "abc".into(), head: "1234567".into(), at: 7, passed: 0, failed: 0, outcome: "running".into() };
+        let stub = Receipt { fingerprint: "abc".into(), head: "1234567".into(), at: 7, passed: 0, failed: 0, outcome: "running".into(), seconds: 0 };
         let text = render_receipt(&stub, Path::new("x.log"));
         let back = parse_receipt(&text).expect("parses");
         assert_eq!(back, stub);
         assert!(!back.green(), "a run in progress has no verdict");
         assert!(text.contains("running"), "the file says so in its own text");
+    }
+
+    #[test]
+    fn a_done_receipt_is_stamped_when_written_and_carries_the_run_seconds() {
+        // issue472 known-positive: started=100, finished=700 -> at=700 (the write), seconds=600. Before
+        // this `at` was `started`, one second after launch on every run, so a reader told to check `at`
+        // against the launch epoch saw the run's identity and never its completion.
+        let r = done_receipt("abc".into(), "1234567".into(), 100, 700, 5, 0, "pass");
+        assert_eq!((r.at, r.seconds), (700, 600));
+        let text = render_receipt(&r, Path::new("x.log"));
+        assert!(text.contains("at = 700\n") && text.contains("seconds = 600\n"), "{text}");
+        assert_eq!(parse_receipt(&text).expect("parses"), r, "round-trips with the field");
+    }
+
+    #[test]
+    fn a_running_stub_is_stamped_at_its_start_with_no_seconds() {
+        // issue472 known-negative: the stub is written BEFORE cargo starts, so its `at` IS the start
+        // and it has run for no time - the only receipt whose `at` equals the launch.
+        let stub = Receipt { fingerprint: "abc".into(), head: "1234567".into(), at: 100, passed: 0, failed: 0, outcome: "running".into(), seconds: 0 };
+        let text = render_receipt(&stub, Path::new("x.log"));
+        assert!(text.contains("at = 100\n") && text.contains("seconds = 0\n"), "{text}");
+        // and a receipt from before the field existed still parses, reading 0
+        let old = parse_receipt("fingerprint = \"f\"\nhead = \"h\"\nat = 5\npassed = 1\nfailed = 0\noutcome = \"pass\"\n").expect("parses");
+        assert_eq!(old.seconds, 0);
     }
 }

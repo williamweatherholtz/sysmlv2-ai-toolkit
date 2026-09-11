@@ -781,16 +781,28 @@ else:
          RUNNING_HOW if running else RC_HOW + "`failed`.")
     fact("suiteHead", head, "short SHA the suite last ran against", RC_HOW + "`head`.")
 
-    # wall time: `at` is the run's START (suite.rs: `let started = now_secs(); ... at: started`)
-    # and the receipt names the log it streamed into, so the log's mtime is the finish.
+    # wall time: since issue472 the receipt carries `seconds` (the run's wall clock) and `at` is
+    # the moment the receipt was WRITTEN - the end of the run, the touched receipt's meaning. A
+    # receipt from before that has no `seconds` and its `at` was the START, so for it alone the log's
+    # mtime (written as the run streamed) minus `at` is the finish.
+    seconds = rget("seconds")
     logpath = os.path.join(REPO, (logrel or "").replace("./", "").replace("/", os.sep))
-    if at and logrel and os.path.exists(logpath):
+    if at and seconds is not None and not running:
+        wall = int(seconds)
+        fact("suiteWallMinutes", round(wall / 60.0, 1) if wall > 0 else None,
+             "wall minutes of the most recent suite run",
+             RC_HOW + "`seconds`, stamped by keel-cli/src/suite.rs as the write moment minus the launch "
+                      "(issue472). WALL time: compilation and the gaps between binaries included, not the "
+                      "sum of the per-binary 'finished in' values."
+             if wall > 0 else RC_HOW + "`seconds` is 0; nothing honest to derive.",
+             as_of=datetime.fromtimestamp(int(at)).date().isoformat())
+    elif at and logrel and os.path.exists(logpath):
         wall = os.path.getmtime(logpath) - int(at)
         fact("suiteWallMinutes", round(wall / 60.0, 1) if wall > 0 else None,
              "wall minutes of the most recent suite run",
-             RC_HOW + "mtime(%s) minus `at`. `at` is the run's START - keel-cli/src/suite.rs does "
-                      "`let started = now_secs(); let log = ...suite-{started}.log; ... at: started` "
-                      "- and the log is written as the run streams, so its mtime is the finish. This "
+             RC_HOW + "mtime(%s) minus `at` - a receipt from before issue472, whose `at` was the run's "
+                      "START and which carries no `seconds`; the log is written as the run streams, so "
+                      "its mtime is the finish. This "
                       "is WALL time. It is deliberately NOT the sum of the per-binary 'finished in' "
                       "values in the log, which is test time and excludes compilation and the gaps "
                       "between binaries." % logrel

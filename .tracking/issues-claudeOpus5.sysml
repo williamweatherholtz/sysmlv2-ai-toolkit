@@ -2085,4 +2085,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcEvidenceReceiptMarkerIsIdempotent to issue476;
+
+    part issue477 : Issue {
+        :>> id = "54d1ddc1-0f03-4657-8d2a-a71bacb79c8d";
+        :>> title = "The land's touched run compiles the working tree, not the commit it pushes";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The armed touched run inside keel land (D0421/D0422) compiles from the WORKING TREE, not from the commit it is about to push: the post-commit hook runs cargo test --release against keel-cli in the repository directory, and include_dir embeds .engine from that same directory at compile time (keel-cli/src/embedded.rs). So the 7-14 minutes the run takes are a window in which any edit to keel-cli/src or .engine - the next sprint's work, begun while the previous one lands - is compiled into some of the 61 binaries and tested as if it were the commit, and the receipt names the commit's head. On 2026-09-11 the primary held every source and .engine edit for the length of the sprint 666 land by discipline alone (sprint 667 standup); nothing refuses the edit, nothing detects that the tree moved under the run, and the touched receipt records stems and head but not the tree's fingerprint at start and end. An uncommitted change already present at commit time is the same defect without the timing: the land tests the tree, pushes the commit, and the two differ by exactly what was not staged.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcLandTestsTheCommitItPushes to issue477;
 }
