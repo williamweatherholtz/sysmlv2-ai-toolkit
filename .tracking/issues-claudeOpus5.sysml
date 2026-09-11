@@ -2162,4 +2162,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcCycleTimeReadsFromGit to issue483;
+
+    part issue484 : Issue {
+        :>> id = "c67c4cee-780b-4647-9deb-48f28acb8301";
+        :>> title = "Demo-replay test's unix negative sh -c exit 3 exits 0 - the pair was probed only on Windows";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CI run 34593093663 on df90e5d failed reverify_demos_replays_each_receipt: the unix negative case `sh -c exit 3` replayed as PASS. The receipt alphabet forbids quotes, so the argument after -c is one word and the trailing 3 binds to $0 - `sh -c exit 3` exits 0 on every sh (probed: exit 0 in git-bash). The D0388 pair had only ever been run on Windows, where `cmd /C exit 3` exits 3, so the negative was stated for a host it was never probed on. Fix in the same commit: the unix negative is `sh -c false` (exit 1), and the assertion reads the expected code per host. The control is CI's Linux run itself; the resolver's DoD result carries that run's ci-run receipt (D0323).";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcDemoReplayNegativeHoldsOnUnix to issue484;
 }

@@ -72,13 +72,20 @@ fn project(tag: &str, declare: bool) -> PathBuf {
     root
 }
 
-/// A shell-level `exit` runs as written by `reverify --demos` (no `keel ` prefix) and exits non-zero.
+/// A shell command that runs as written by `reverify --demos` (no `keel ` prefix) and exits non-zero.
+/// The receipt alphabet admits no quote, so on unix the argument after `-c` is ONE word: `sh -c exit 3`
+/// exits 0 because the `3` binds to `$0`, not to `exit` (issue484 - CI found it on the first Linux run,
+/// the pair had only ever been probed on Windows). `false` is one word and exits 1 on every sh.
 fn fail_prefix() -> &'static str {
-    if cfg!(windows) { "cmd /C exit" } else { "sh -c exit" }
+    if cfg!(windows) { "cmd /C exit" } else { "sh -c" }
 }
 
 fn fail_command() -> String {
-    format!("{} 3", fail_prefix())
+    if cfg!(windows) { format!("{} 3", fail_prefix()) } else { format!("{} false", fail_prefix()) }
+}
+
+fn fail_exit() -> &'static str {
+    if cfg!(windows) { "3" } else { "1" }
 }
 
 fn file_text(root: &Path) -> String {
@@ -96,7 +103,7 @@ fn gate(root: &Path, test: &str, evidence: &str) -> (bool, String) {
 }
 
 /// D0388 pair, named before the tree is read. Positive: `keel version` (this binary, exit 0) replays
-/// green. Negative: `cmd /C exit 3` replays red and the fail names the command and `exit 3`.
+/// green. Negative: `cmd /C exit 3` (unix: `sh -c false`) replays red and the fail names the command and its exit code.
 #[test]
 fn a_replayable_demo_receipt_stays_a_pass_and_demos_replays_it_recording_each_verdict() {
     let root = project("p", true);
@@ -130,7 +137,7 @@ fn a_replayable_demo_receipt_stays_a_pass_and_demos_replays_it_recording_each_ve
     assert_eq!(t.matches("// RAN: keel version").count(), 3, "the same receipt is written on the fresh pass (two on dGreen, one on iGate): {t}");
     assert_eq!(outcome_of(&t, "dRedR2"), "fail", "{t}");
     let fail_line = t.lines().find(|l| l.contains("// RAN: replay of")).unwrap_or_else(|| panic!("the fail names its command: {t}"));
-    assert!(fail_line.contains(&fail_command()) && fail_line.contains("-> exit 3"), "{fail_line}");
+    assert!(fail_line.contains(&fail_command()) && fail_line.contains(&format!("-> exit {}", fail_exit())), "{fail_line}");
     assert!(!t.contains("dToldR2"), "a prose demo is never replayed: {t}");
     assert!(!t.contains("iGateR2"), "an inspect is never replayed: {t}");
 
