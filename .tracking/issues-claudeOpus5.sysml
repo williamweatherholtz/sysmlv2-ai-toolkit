@@ -2140,4 +2140,26 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSelfBuildHookTestDoesNotRaceTheClock to issue481;
+
+    part issue482 : Issue {
+        :>> id = "ad3e26f7-6ed6-487a-8c42-e096527deebd";
+        :>> title = "CLAUDE.md grew 4.3x in four weeks by carrying each rule's history beside it";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CLAUDE.md grew from 12 KB (2026-08-14) to 53 KB (2026-09-11), 4.3x in four weeks, about 1.5 KB per day, because every correction appended its history to the rule it changed: the quote, the date, the issue numbers, the measured numbers. The file is injected into every turn, so the per-turn instruction load grew with it while the rules it carries did not. The Decisions already hold every one of those histories (D0105: one home per fact), so the growth was duplication. Measured from git: `git log --format=%H --since=2026-08-14 -- CLAUDE.md` and `git show <sha>:CLAUDE.md | wc -c` at each. Correction in this commit: rewritten to 13 KB as rules plus Decision pointers. Control owed: a guard that bounds the file so the next four weeks cannot regrow it.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcClaudeMdIsBounded to issue482;
+
+    part issue483 : Issue {
+        :>> id = "55acc779-a711-4b9c-ba6f-7e1032b57f33";
+        :>> title = "Flow report reads cycle time at day resolution, so every sprint is 0d and time per item is untracked";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "`keel report flow` answers cycle time, lead time and time per story point at DAY resolution because every TestResult's `judgedAt` is a date, and 563 of 564 sprints open and close on the same day, so the report reads 0d, 0d and 0.01d - a working instrument whose resolution is coarser than the work it measures. D0072 (accepted 2026-06-18) kept `actualHours` for AI time and it was populated on 15 lines in 6 of 671 delivery files, last at sprint 369: the authored field lapsed and nothing computed replaced it. The human asked on 2026-09-11 whether time spent on items is tracked (st118); the honest answer was no. Git carries the seconds: a sprint's wall time is the gap from the first commit naming its file to the commit carrying its retro result, and the inter-commit gap per sprint rose from a 4-minute median (2026-09-02) to 95 minutes (2026-09-11) while sprints per day rose 5 to 28 - the answer the report should have given. Reproduce: `keel report flow .` and read the Cycle time card.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCycleTimeReadsFromGit to issue483;
 }

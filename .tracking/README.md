@@ -13,7 +13,7 @@ choose their own policy.
 - **Canonical vocabulary = `schema/core` types** (`EngineNeeds`, `EngineWork`,
   `EngineVerification`, ...). Copy the idioms from
   `.engine/docs/tracking-template.sysml` (it parses green).
-- Author only **irreducible facts + recorded judgments** (CLAUDE.md §2). Status,
+- Author only **irreducible facts + recorded judgments** (CLAUDE.md §1). Status,
   coverage, trace are computed views — never write them down.
 - Every item carries an immutable `:>> id` (UUID), `title`, and provenance.
 - Subdirectories are fine (`business/`, `delivery/`, ...) — tooling scans recursively.

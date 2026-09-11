@@ -120,7 +120,7 @@ primary evidence that the process works (the self-build / dogfood). Future engin
 happen here, under the same discipline.
 
 - **State is computed:** `keel orient .` — there is no status/roadmap/handoff doc (Decision 0018).
-- **Discipline:** `CLAUDE.md §2` is normative. Every schema/process change is a recorded `Decision`
+- **Discipline:** `CLAUDE.md §1` is normative. Every schema/process change is a recorded `Decision`
   + acceptance + green validation; a pre-commit hook enforces it and the post-commit hook pushes to
   `main` (the only branch). CI (`.github/workflows/ci.yml`) runs `cargo test` + `clippy -D warnings`.
 - **Deep `.engine` SysML semantics** are checked by the OMG pilot Jupyter kernel (conda env `sysml`)
