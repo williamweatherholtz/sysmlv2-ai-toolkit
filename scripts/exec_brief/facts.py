@@ -447,6 +447,28 @@ IN_TREE_HOW = ("Union of pendingDeliveredList (structural: a finished sprint cha
 fact("pendingInTree", len(in_tree_slugs), "proposed Decisions whose change is already in the tree", IN_TREE_HOW)
 fact("pendingInTreeList", ", ".join(in_tree_slugs) or None, "decision slugs", IN_TREE_HOW + " Slugs listed in file order.")
 
+# --- the pending set itself, member by member (D0406: a page that asks for a word on a SET names its members).
+# name = the file's slug after the number (the Decision's own title token, not a record id); fork = the
+# decision text opens with an OPTION marker (D0322: a weighed alternative is a fork; a ratification is not).
+_name_re = re.compile(r"^\d{4}-(.+)\.sysml$")
+pending_members = []
+for d in proposed:
+    _nm = _name_re.match(d["file"])
+    _txt = read(os.path.join(DEC_DIR, d["file"])) or ""
+    _dec = re.search(r':>>\s*decision\s*=\s*"(.*?)"\s*;', _txt, re.DOTALL)
+    pending_members.append({
+        "slug": d["slug"],
+        "name": _nm.group(1) if _nm else d["file"],
+        "fork": bool(_dec and _dec.group(1).lstrip().startswith("OPTION")),
+        "inTree": d["slug"] in in_tree_slugs,
+    })
+PEND_HOW = (DEC_HOW + "every PROPOSED, non-retired Decision (the same set decisionsProposed counts), one row each: "
+            "name = the file name between the number and .sysml; fork = the `decision` field begins with the "
+            "literal OPTION (D0322's marker); inTree = the slug is in pendingInTreeList. File order.")
+fact("pendingMembers", pending_members or None, "one row per pending Decision", PEND_HOW)
+fact("pendingForks", sum(1 for p in pending_members if p["fork"]),
+     "pending Decisions whose text opens a weighed fork", PEND_HOW)
+
 # ================================================================ 3b. performance (D0367 asks)
 # The baseline is whatever D0367's context RECORDS - read by regex from the Decision file, so a
 # retyped number here cannot drift from the record. The current numbers are timed now, against the
