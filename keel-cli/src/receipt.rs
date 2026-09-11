@@ -234,6 +234,9 @@ pub fn key(root: &Path) -> Option<Key> {
             }
         }
         build_id().hash(&mut h);
+        // Which population the diff-reading guards judged (D0440): a green working-tree run must not
+        // answer for a hook's index read over the same paths, nor the reverse.
+        crate::guards::ChangeRead::current().label().hash(&mut h);
         Some(Key { digest: format!("{:016x}", h.finish()), head, settled })
     })
 }

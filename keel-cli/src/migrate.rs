@@ -138,6 +138,25 @@ fn stamp_declared_at(text: &str, today: &str) -> String {
     out.join("\n")
 }
 
+/// The text an engine resync WRITES at `mapped` (relative to `.engine/`).
+///
+/// Onto a project whose file currently reads `current` that is the shipped text, or for a sectioned contract the shipped text with the
+/// project's own sections merged in (issue349). `None` when the merge conflicts, which the resync
+/// reports as a blocker and writes nothing for.
+///
+/// The `process-change` guard asks this question of every locked path it sees change (D0441): a file
+/// whose new text is what the resync would have written is the engine arriving, not a hand edit. One
+/// function answers both so the guard cannot drift from the writer.
+#[must_use]
+pub fn resync_text(mapped: &Path, shipped: &str, current: Option<&str>) -> Option<String> {
+    if is_sectioned_contract(mapped) {
+        if let Some(cur) = current {
+            return merge_project_sections(shipped, cur).ok();
+        }
+    }
+    Some(shipped.to_owned())
+}
+
 /// Engine-shipped contracts whose `[section]`s a project may EXTEND with its own (issue349): the
 /// resync merges rather than overwrites them.
 fn is_sectioned_contract(mapped: &Path) -> bool {

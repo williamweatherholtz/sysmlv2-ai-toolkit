@@ -16,6 +16,18 @@ printed `HISTORY`, built by the guard with `guards::history_line` - reports immu
 and compound Decisions, a sprint closed before its ceremony existed); it is counted so it is never mistaken for
 silence and never merged into the actionable number. The class is the guard's declaration, not a reading of the prose.
 
+Five guards judge a DIFF rather than the tree - `process-change`, `doc-sync`, `decision-amends-process`, `retro-backlog`,
+`ownership` - and which population they read depends on where they run (D0440 / issue464). Inside a git hook
+(`GIT_INDEX_FILE`, set by git for every hook, or `KEEL_HOOK`, set by a caller that IS the commit gate) they read
+the staged index: the commit's population, a partially staged file as its index blob. Anywhere else - the
+turn-boundary stop hook, the D0425 verifier, a terminal - they read the working tree against HEAD, with every
+untracked file as an addition, so a locked-file edit is a violation the moment it exists rather than the moment
+it is staged: on 2026-09-10 the verifier reported ALL PASS over an empty index and the pre-commit hook then
+refused the same edits. Each of the five says which read it made in its summary line - `(read: index)` or
+`(read: working tree)` - the note is neither a warning nor history, and the guard receipt's key carries the
+mode, so a green working-tree run never answers for a hook's index read. The rows below say `staged` where the
+hook shape is meant.
+
 ## Hard-blocking
 
 | Guard | What it enforces |
@@ -31,7 +43,7 @@ silence and never merged into the actionable number. The class is the guard's de
 | `sprint-coverage` | Substantive work went through a sprint (D0064/issue020) |
 | `ceremony` | Sprint gates RECORDED in order (D0047/issue010+011) - a gate counts as recorded at `pass` OR `proposed` (D0437, proposed; issue470): the guard's question is sequence, and done-ness stays `orient::gate_passed`'s, which reads `pass` alone. The order is READ from the tree, not compiled in (D0435, proposed): `orient::gate_order` linearises the `first A then B;` chain of the workflow whose phases some `ProcessStep` binds as `checkedBy = "gate:<phase>"`; a tree binding no gate makes the guard WARN unenforceable-by-step rather than assume this project's six. |
 | `charter` | Work traces to a chartering item (D0068) |
-| `process-change` | A change to a process-def OR the enforcement surface co-commits a `#ProspectiveChange`/`#SafetyChange` Decision — the D0070 keystone, extended by D0209 clause 2 to guard source (`keel-cli/src/guards.rs`, `adherence.rs`), hook config (`.githooks/`), and CI workflows (`.github/workflows/*.yml`); a unit test re-derives the guard-source set so a new guard file cannot escape the lock |
+| `process-change` | A change to a process-def OR the enforcement surface co-commits a `#ProspectiveChange`/`#SafetyChange` Decision — the D0070 keystone, extended by D0209 clause 2 to guard source (`keel-cli/src/guards.rs`, `adherence.rs`), hook config (`.githooks/`), and CI workflows (`.github/workflows/*.yml`); a unit test re-derives the guard-source set so a new guard file cannot escape the lock. ONE exemption (D0441 / issue475): a locked path under `.engine/` whose text under the current read is what an engine RESYNC would write - the file the judging binary embeds at the same relative path, or for a sectioned contract that text with the project's own sections merged over HEAD's (`migrate::resync_text`), line endings normalised - is the engine arriving, not a control edited; it is dropped from the lock and announced in one warning line naming the paths. Decided by content, never by the pin. Inert in the self-build (the embedded engine IS the tree, so a rebuild would launder any edit) and never for a deleted file. `tests/resync_is_not_a_self_modification.rs` is the pair |
 | `issues` | Every Issue is triaged with a `#Resolves` resolver (D0077/D0078). Rule-sourced FORWARD from 2026-09-04 (D0304, issue333): an edge is not a triage - the resolver's text must name the issue, or the issue's text must name the resolver; a miss is a violation for issues created on/after the cutoff and one counted history line before it (111 on 2026-09-04). |
 | `viewpoint-renderer` | Every declared viewpoint names a real `keel` command (D0056/issue034) |
 | `manifest-coverage` | The deliverable-suspicion manifest has no dead entries (D0050/issue033) |

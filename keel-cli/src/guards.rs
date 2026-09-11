@@ -40,6 +40,61 @@ pub fn is_history(warning: &str) -> bool {
     warning.starts_with(HISTORY_PREFIX)
 }
 
+/// The mark a diff-reading guard puts on the note naming WHICH population it judged (D0440 / issue464).
+///
+/// Inside a git hook the guard reads the staged index - the population the commit carries; anywhere else
+/// it reads the working tree, so a locked-file edit is a violation the moment it exists and a verifier's
+/// verdict is the commit's. The note rides in `warnings` like a history line but is neither actionable
+/// nor history: the printer folds it into the summary line as `(read: working tree)` and nothing counts it.
+pub const READ_PREFIX: &str = "READ ";
+
+/// The read-mode note for `read` - see [`READ_PREFIX`].
+#[must_use]
+pub fn read_line(read: ChangeRead) -> String {
+    format!("{READ_PREFIX}{}", read.label())
+}
+
+/// Is `warning` a read-mode note?
+#[must_use]
+pub fn is_read(warning: &str) -> bool {
+    warning.starts_with(READ_PREFIX)
+}
+
+/// Which population a diff-reading guard judges (D0440 / issue464).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ChangeRead {
+    /// Inside a git hook: `GIT_INDEX_FILE` is set by git for every hook (pre-commit in both the plain
+    /// and the `-a` shape, and post-commit, probed 2026-09-10), or `KEEL_HOOK` by a caller that IS the
+    /// commit gate. The staged index is the population the commit carries.
+    Index,
+    /// Anywhere else - the turn-boundary stop hook, a verifier, a human at the terminal: the working
+    /// tree against HEAD, untracked files as additions. On 2026-09-10 the D0425 verifier read an empty
+    /// index over an unstaged sprint and reported ALL PASS; the pre-commit hook then refused the same
+    /// edits (issue464).
+    WorkingTree,
+}
+
+impl ChangeRead {
+    /// The mode this process runs in, from the environment git and the gate leave.
+    #[must_use]
+    pub fn current() -> Self {
+        if std::env::var_os("GIT_INDEX_FILE").is_some() || std::env::var_os("KEEL_HOOK").is_some() {
+            Self::Index
+        } else {
+            Self::WorkingTree
+        }
+    }
+
+    /// The words the summary line carries.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Index => "index",
+            Self::WorkingTree => "working tree",
+        }
+    }
+}
+
 impl GuardReport {
     /// True when there are no blocking violations.
     #[must_use]
@@ -66,7 +121,13 @@ impl GuardReport {
 
     /// The warnings a reader can act on - every warning that is not a counted-history line.
     pub fn actionable(&self) -> impl Iterator<Item = &String> {
-        self.warnings.iter().filter(|w| !is_history(w))
+        self.warnings.iter().filter(|w| !is_history(w) && !is_read(w))
+    }
+
+    /// The read-mode note, if this guard reads a diff (D0440): `Some("working tree")` / `Some("index")`.
+    #[must_use]
+    pub fn read_mode(&self) -> Option<&str> {
+        self.warnings.iter().find_map(|w| w.strip_prefix(READ_PREFIX))
     }
 
     /// The counted-history lines (issue404): immutable history, reported so it is never mistaken for silence.
@@ -76,7 +137,7 @@ impl GuardReport {
 
     /// Print the human report (warnings, then violations, then a summary line).
     pub fn print(&self) {
-        for w in &self.warnings {
+        for w in self.warnings.iter().filter(|w| !is_read(w)) {
             match w.strip_prefix(HISTORY_PREFIX) {
                 Some(h) => println!("  {}  {h}", crate::color::warn("HISTORY")),
                 None => println!("  {}  {w}", crate::color::warn("WARN")),
@@ -90,8 +151,9 @@ impl GuardReport {
         }
         let history = self.history().count();
         let counted = if history == 0 { String::new() } else { format!(" + {history} counted-history line(s)") };
+        let read = self.read_mode().map_or_else(String::new, |r| format!(" (read: {r})"));
         println!(
-            "[guard:{}] {} — {} scanned, {} warning(s){counted}, {} violation(s)",
+            "[guard:{}] {} — {} scanned{read}, {} warning(s){counted}, {} violation(s)",
             self.name,
             crate::color::verdict(self.ok()),
             self.scanned,
@@ -1157,10 +1219,11 @@ fn is_decision_file_at_any_depth(p: &str) -> bool {
 
 #[must_use]
 pub fn staged_marked_decision(root: &Path) -> bool {
-    staged_files(root)
+    let read = ChangeRead::current();
+    changed_files(root, read)
         .iter()
         .filter(|p| is_decision_file_at_any_depth(p))
-        .any(|p| has_process_marker(&git_stdout(root, &["show", &format!(":{p}")])))
+        .any(|p| has_process_marker(&changed_text(root, p, read)))
 }
 
 fn is_decision_file(p: &str) -> bool {
@@ -1179,6 +1242,34 @@ fn has_process_marker(text: &str) -> bool {
 }
 
 /// Pure core: a staged process-def change must be co-committed with a marked Decision.
+/// Is this locked path's text under `read` the engine's OWN published text - an engine RESYNC
+/// (D0441 / issue475), not a self-modification?
+///
+/// `keel migrate` writes `.engine/` from the engine embedded in the binary (D0275), and skills,
+/// contracts and rules under it are locked paths - so every resync wrote locked files no Decision
+/// authored. Under the staged read that refusal fell at the downstream project's post-migrate
+/// commit; under D0440's working-tree read it fell inside migrate's own D0336 gate and reverted the
+/// update (six fixture tests, 2026-09-10). Decided by CONTENT, never by the pin: a locked file whose
+/// text equals the embedded file at the same relative path (line endings normalised) is the engine
+/// arriving; one edited byte puts it back under the lock. Two exclusions: the self-build, where the
+/// embedded engine IS the tree and a rebuild after the edit would launder any change (`keel migrate`
+/// refuses the self-build for the same reason); and a deleted file, which has no text to compare.
+fn is_engine_resync(root: &Path, path: &str, read: ChangeRead) -> bool {
+    if crate::suite::is_self_build(root) {
+        return false;
+    }
+    let Some(rel) = path.replace('\\', "/").strip_prefix(".engine/").map(str::to_owned) else { return false };
+    let Some(shipped) = crate::embedded::engine_text(&rel) else { return false };
+    // What the resync would write onto THIS project: a sectioned contract keeps the project's own
+    // sections (issue349), so the expected text is the merge over the file as it was at HEAD.
+    let before = git_stdout(root, &["show", &format!("HEAD:{path}")]);
+    let Some(expected) = crate::migrate::resync_text(Path::new(&rel), shipped, (!before.is_empty()).then_some(before.as_str())) else {
+        return false;
+    };
+    let ours = changed_text(root, path, read);
+    !ours.is_empty() && expected.replace("\r\n", "\n") == ours.replace("\r\n", "\n")
+}
+
 fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) -> Vec<String> {
     // The keystone covers process DEFINITION (D0070) AND the ENFORCEMENT SURFACE (D0209 clause 2):
     // guard source, hook config, CI workflows. A change to either needs a co-committed marked Decision.
@@ -1201,12 +1292,28 @@ fn keystone_violations(changed: &[String], decision_texts: &[(String, String)]) 
     )]
 }
 
-fn staged_files(root: &Path) -> Vec<String> {
-    staged_changes(root, "ACMR")
+/// Added, copied, modified or renamed paths under `read` - the list a guard looks for an authorising
+/// Decision, a doc update or a sprint record in.
+fn changed_files(root: &Path, read: ChangeRead) -> Vec<String> {
+    changed_paths(root, "ACMR", read)
 }
 
-/// Staged paths for a given `--diff-filter`, scoped to this project, with BOTH sides of a rename
-/// and no C-quoting.
+/// A changed file's text under `read`: the index blob inside a hook, the file on disk outside it.
+fn changed_text(root: &Path, path: &str, read: ChangeRead) -> String {
+    match read {
+        ChangeRead::Index => git_stdout(root, &["show", &format!(":{path}")]),
+        ChangeRead::WorkingTree => crate::corpus::read_to_string(root.join(path)).unwrap_or_default(),
+    }
+}
+
+/// Changed paths for a given `--diff-filter` under `read`, scoped to this project, with BOTH sides of
+/// a rename and no C-quoting.
+///
+/// `Index` reads `git diff --cached` - the commit's population. `WorkingTree` (D0440 / issue464) reads
+/// `git diff HEAD` with the same filter and status letters, and every untracked file as an `A` when the
+/// filter admits additions - the authorising Decision is almost always a new file, and a read that could
+/// not see it would refuse every properly signed change. A repository with no HEAD yet reads the index
+/// either way: everything is an addition there, which is the shape issue272 exists to let through.
 ///
 /// TWO CORRECTIONS AN ADVERSARIAL PANEL FOUND, both of which let a locked file change unsigned:
 ///
@@ -1222,7 +1329,7 @@ fn staged_files(root: &Path) -> Vec<String> {
 ///    stripped nothing and a project named `prôj` was invisible to the workspace gate AND to its own
 ///    guards — a full rules downgrade there passed. `core.quotePath=false` with `-z` records makes
 ///    both sides of that comparison the same bytes.
-fn staged_changes(root: &Path, filter: &str) -> Vec<String> {
+fn changed_paths(root: &Path, filter: &str, read: ChangeRead) -> Vec<String> {
     // SCOPED TO THIS PROJECT (D0234/issue271). `git diff --cached` answers for the whole REPOSITORY
     // no matter which subdirectory you ask from, so in a repo holding several keel projects every
     // project's guards saw every other project's staged files — and the workspace-level ones too.
@@ -1232,10 +1339,20 @@ fn staged_changes(root: &Path, filter: &str) -> Vec<String> {
     let flag = format!("--diff-filter={filter}");
     // `-c core.quotePath=false` with `-z`: see (2) above. `--name-status -M` so a rename yields BOTH
     // of its paths: see (1). Records are NUL-separated; an `R`/`C` status is followed by TWO paths.
-    let raw = git_stdout(
-        root,
-        &["-c", "core.quotePath=false", "diff", "--cached", "--name-status", "-M", "-z", &flag],
-    );
+    let has_head = !git_stdout(root, &["rev-parse", "--verify", "-q", "HEAD"]).trim().is_empty();
+    let mut raw = if read == ChangeRead::WorkingTree && has_head {
+        git_stdout(root, &["-c", "core.quotePath=false", "diff", "HEAD", "--name-status", "-M", "-z", &flag])
+    } else {
+        git_stdout(root, &["-c", "core.quotePath=false", "diff", "--cached", "--name-status", "-M", "-z", &flag])
+    };
+    if read == ChangeRead::WorkingTree && filter.contains('A') {
+        // Untracked files are additions on disk. `--full-name` makes them repo-relative like the diff's.
+        for p in git_stdout(root, &["-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard", "--full-name", "-z"]).split('\0').filter(|p| !p.is_empty()) {
+            raw.push_str("A\0");
+            raw.push_str(p);
+            raw.push('\0');
+        }
+    }
     let mut fields = raw.split('\0').filter(|f| !f.is_empty());
     let mut repo_relative: Vec<String> = Vec::new();
     while let Some(status) = fields.next() {
@@ -1284,23 +1401,34 @@ pub fn process_change(root: &Path) -> GuardReport {
     // guard and so makes it switchable (the issue242 capture). That transition is caught by
     // `audit-adherence`'s guard-state monotonicity, which ranks CORE above ACTIVE and fails the
     // build on a downgrade (D0209 clause 1) — so the hole is covered, by the check built for it.
-    let changed = staged_changes(root, "MDR");
+    let read = ChangeRead::current();
+    let (resynced, changed): (Vec<String>, Vec<String>) = changed_paths(root, "MDR", read)
+        .into_iter()
+        .partition(|p| is_locked_path(p) && is_engine_resync(root, p, read));
     // TWO LISTS, and conflating them was a regression this very guard caught on its author within
     // the minute: what TRIGGERS the lock is a locked file being modified or deleted, but the
     // co-committed Decision that AUTHORISES it is almost always a NEW file — so searching for it in
     // the modify-only list found nothing and refused a properly signed change. The Decision is
     // looked for among all staged additions and modifications.
-    let decision_texts: Vec<(String, String)> = staged_files(root)
+    let decision_texts: Vec<(String, String)> = changed_files(root, read)
         .iter()
         .filter(|p| is_decision_file(p))
-        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        .map(|p| (p.clone(), changed_text(root, p, read)))
         .collect();
     let violations = keystone_violations(&changed, &decision_texts);
-    let scanned = changed.iter().filter(|p| is_process_def(p) || is_enforcement_surface(p)).count();
+    let scanned = changed.iter().filter(|p| is_locked_path(p)).count() + resynced.len();
+    let mut warnings = vec![read_line(read)];
+    if !resynced.is_empty() {
+        warnings.push(format!(
+            "engine resync: {} locked file(s) carry the text of the engine embedded in this binary and are outside the lock (D0441) - the engine arriving, not a control edited: {}",
+            resynced.len(),
+            resynced.join(", ")
+        ));
+    }
     // D0204 (pullOversight): the short-lived D0200 clause-5 throttle - refusing process-def commits
     // while the human's review queue aged - is deliberately ABSENT. Nothing gates the AI's work on
     // the human's attention cadence; the records stay auditable, the ask is gone.
-    GuardReport { name: "process-change", scanned, warnings: Vec::new(), violations }
+    GuardReport { name: "process-change", scanned, warnings, violations }
 }
 
 
@@ -1840,11 +1968,12 @@ fn amendment_warnings(decision_texts: &[(String, String)], staged: &[String], an
 /// unnamed shape is an `#Amends` edge a Decision must carry, which is a schema change and a fork.
 #[must_use]
 pub fn decision_amends_process(root: &Path) -> GuardReport {
-    let staged = staged_files(root);
+    let read = ChangeRead::current();
+    let staged = changed_files(root, read);
     let decision_texts: Vec<(String, String)> = staged
         .iter()
         .filter(|p| is_decision_file(p))
-        .map(|p| (p.clone(), git_stdout(root, &["show", &format!(":{p}")])))
+        .map(|p| (p.clone(), changed_text(root, p, read)))
         // A staged Decision whose PROSE is unchanged from HEAD - an appended acceptance result, a
         // re-binding (D0308) - amends nothing; the first re-bind of seventeen Decisions produced
         // twenty-five citation warnings, all noise. Only text that moved can amend.
@@ -1854,7 +1983,8 @@ pub fn decision_amends_process(root: &Path) -> GuardReport {
         })
         .collect();
     let anchors = process_anchors(root);
-    let warnings = amendment_warnings(&decision_texts, &staged, &anchors);
+    let mut warnings = amendment_warnings(&decision_texts, &staged, &anchors);
+    warnings.push(read_line(read));
     GuardReport { name: "decision-amends-process", scanned: decision_texts.len(), warnings, violations: Vec::new() }
 }
 
@@ -2151,9 +2281,12 @@ fn doc_sync_warnings(changed: &[String]) -> Vec<String> {
 /// low-noise. Shares the `staged_files` git mechanism with `process_change`.
 #[must_use]
 pub fn doc_sync(root: &Path) -> GuardReport {
-    let changed = staged_files(root);
+    let read = ChangeRead::current();
+    let changed = changed_files(root, read);
     let scanned = changed.iter().filter(|p| is_doc_governed_def(p)).count();
-    GuardReport { name: "doc-sync", scanned, warnings: doc_sync_warnings(&changed), violations: Vec::new() }
+    let mut warnings = doc_sync_warnings(&changed);
+    warnings.push(read_line(read));
+    GuardReport { name: "doc-sync", scanned, warnings, violations: Vec::new() }
 }
 
 /// D0304's date: an Issue created on or after it must be NAMED by its resolver's text.
@@ -2876,10 +3009,25 @@ fn retro_backlog_violations(added_items: &[String], known_items: &[String], spri
 }
 
 /// `part issueNNN` and `action dcX;` declarations ADDED by the staged diff.
-fn staged_added_items(root: &Path) -> Vec<String> {
-    let out = crate::gitx::git().arg("-C").arg(root).args(["diff", "--cached", "-U0", "--", ".tracking"]).output();
-    let Ok(out) = out else { return Vec::new() };
-    let text = String::from_utf8_lossy(&out.stdout);
+fn added_items(root: &Path, read: ChangeRead) -> Vec<String> {
+    let has_head = !git_stdout(root, &["rev-parse", "--verify", "-q", "HEAD"]).trim().is_empty();
+    let mut text = if read == ChangeRead::WorkingTree && has_head {
+        git_stdout(root, &["diff", "HEAD", "-U0", "--", ".tracking"])
+    } else {
+        git_stdout(root, &["diff", "--cached", "-U0", "--", ".tracking"])
+    };
+    if read == ChangeRead::WorkingTree {
+        // An untracked record under .tracking is added whole: every line of it is a `+` line.
+        for p in git_stdout(root, &["ls-files", "--others", "--exclude-standard", "--full-name", "-z", "--", ".tracking"]).split('\0').filter(|p| !p.is_empty()) {
+            if let Ok(body) = crate::corpus::read_to_string(root.join(p)) {
+                for l in body.lines() {
+                    text.push('+');
+                    text.push_str(l);
+                    text.push('\n');
+                }
+            }
+        }
+    }
     let mut items = Vec::new();
     for line in text.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")) {
         let l = line[1..].trim_start();
@@ -2917,7 +3065,8 @@ pub fn retro_backlog_violations_for_test(added_items: &[String], known_items: &[
 /// reason this warns rather than blocks.
 #[must_use]
 pub fn retro_backlog(root: &Path) -> GuardReport {
-    let changed = staged_files(root);
+    let read = ChangeRead::current();
+    let changed = changed_files(root, read);
     let sprint_texts: Vec<(String, String)> = changed
         .iter()
         .filter(|p| p.contains(".tracking/delivery/sprint") && std::path::Path::new(p).extension().is_some_and(|e| e.eq_ignore_ascii_case("sysml")))
@@ -2931,14 +3080,14 @@ pub fn retro_backlog(root: &Path) -> GuardReport {
         })
         .collect();
     let scanned = sprint_texts.len();
-    let added = staged_added_items(root);
+    let added = added_items(root, read);
     // What a justification may point at: every declared task, every Issue (open or done), every Decision.
     let mut known: Vec<String> = declared_task_names(root).into_iter().collect();
     known.extend(crate::view::all_issue_names(root, &HashSet::new()).unwrap_or_default());
     if let Ok(rd) = std::fs::read_dir(root.join(".engine").join("decisions")) {
         known.extend(rd.flatten().filter_map(|e| e.file_name().to_str().and_then(|f| f.get(..4)).filter(|n| n.chars().all(|c| c.is_ascii_digit())).map(|n| format!("d{n}"))));
     }
-    GuardReport { name: "retro-backlog", scanned, warnings: Vec::new(), violations: retro_backlog_violations(&added, &known, &sprint_texts) }
+    GuardReport { name: "retro-backlog", scanned, warnings: vec![read_line(read)], violations: retro_backlog_violations(&added, &known, &sprint_texts) }
 }
 
 // ── priority-inversion guard (recorded order disagreeing with recorded severity) ──────────────────
@@ -3757,7 +3906,8 @@ fn head_blob(root: &Path, path: &str) -> Option<String> {
 #[must_use]
 pub fn ownership(root: &Path) -> GuardReport {
     let actor = crate::actor::resolve(root, None).ok();
-    let all_staged = staged_files(root);
+    let read = ChangeRead::current();
+    let all_staged = changed_files(root, read);
     // A GOVERNED MIGRATION is the sanctioned exception, and it needs one because these two controls
     // genuinely collide: D0108 forbids a non-owner editing another actor's fields, while D0067
     // REQUIRES bulk transforms that cross every ownership boundary at once (repairing 26 duplicated
@@ -3775,6 +3925,7 @@ pub fn ownership(root: &Path) -> GuardReport {
             scanned: 0,
             warnings: vec![
                 "cross-owner edits ALLOWED: a migration transform under .engine/tools/migrations/ is co-committed (D0067). Ownership (D0108) is suspended for this commit and the transform is the record of why.".to_owned(),
+                read_line(read),
             ],
             violations: Vec::new(),
         };
@@ -3819,7 +3970,7 @@ pub fn ownership(root: &Path) -> GuardReport {
             }
         }
     }
-    GuardReport { name: "ownership", scanned, warnings: Vec::new(), violations }
+    GuardReport { name: "ownership", scanned, warnings: vec![read_line(read)], violations }
 }
 
 /// Guard (D0092/D0106/D0129): a human-only attestation must be judged by a HUMAN.
@@ -7919,5 +8070,45 @@ mod consent_scope_tests {
         assert!(r.scanned >= 100, "scanned {} auto-accepted Decisions", r.scanned);
         assert_eq!(r.warnings.len(), 1, "one counted-history line: {:?}", r.warnings);
         assert!(r.warnings[0].contains("marker Decisions auto-accepted before"));
+    }
+}
+
+#[cfg(test)]
+mod change_read_tests {
+    use super::{is_read, read_line, ChangeRead, GuardReport};
+
+    /// D0388 known-positive: the note is neither actionable nor history, and the report names it.
+    #[test]
+    fn the_read_note_is_folded_into_the_summary_not_counted_as_a_warning() {
+        let r = GuardReport { name: "process-change", scanned: 1, warnings: vec![read_line(ChangeRead::WorkingTree)], violations: Vec::new() };
+        assert!(is_read(&r.warnings[0]));
+        assert_eq!(r.actionable().count(), 0, "the note is not a warning a reader acts on");
+        assert_eq!(r.history().count(), 0, "nor counted history");
+        assert_eq!(r.read_mode(), Some("working tree"));
+        assert!(r.ok());
+    }
+
+    /// D0388 known-negative: a real warning beside the note still counts as one, and a report with no
+    /// note has no read mode - the guards that read no diff say nothing about one.
+    #[test]
+    fn a_real_warning_still_counts_and_a_noteless_report_has_no_read_mode() {
+        let r = GuardReport {
+            name: "doc-sync",
+            scanned: 0,
+            warnings: vec!["a doc claim moved".to_owned(), read_line(ChangeRead::Index)],
+            violations: Vec::new(),
+        };
+        assert_eq!(r.actionable().count(), 1);
+        assert_eq!(r.read_mode(), Some("index"));
+        let plain = GuardReport { name: "charter", scanned: 3, warnings: Vec::new(), violations: Vec::new() };
+        assert_eq!(plain.read_mode(), None);
+    }
+
+    /// The labels are the two words the summary line and the receipt key carry.
+    #[test]
+    fn the_two_labels_are_distinct_words() {
+        assert_eq!(ChangeRead::Index.label(), "index");
+        assert_eq!(ChangeRead::WorkingTree.label(), "working tree");
+        assert_ne!(read_line(ChangeRead::Index), read_line(ChangeRead::WorkingTree));
     }
 }

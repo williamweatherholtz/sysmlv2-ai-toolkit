@@ -2052,4 +2052,37 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcFormatterRunIsRefusedOrPinned to issue473;
+
+    part issue474 : Issue {
+        :>> id = "aa96ab7d-ffe5-4a0c-a4e4-36743dd4c674";
+        :>> title = "a touched run blocked by a held keel.exe image recorded 61 failing tests where none ran (sprint 666 verifier, os error 5)";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "On 2026-09-10, during sprint 666, the D0425 verifier launched `keel suite --touched` from target/release/keel-serve.exe; cargo tried to relink target/release/keel.exe and failed with `failed to remove file ... keel.exe - Access is denied (os error 5)`, because the primary agent was at that moment running `keel guard retro-backlog --no-receipt` and `keel validate` FROM target/release/keel.exe to clear a stop-hook block. The touched receipt recorded outcome fail, 0 passed, 0 failed, 75 s, with all 61 test binaries in the failing array - a red that no test produced. The class: the D0425 split puts the primary's keel commands and the verifier's cargo on the same target/release image at once; issue150 and issue386 met the same lock from the console (`keel serve`) and the remedy there was a served copy. dcSuiteSurvivesItsOwnImage refuses a suite launched FROM keel.exe but cannot see a second process holding it. The receipt should say a lock blocked the run and who held the image, not that 61 binaries failed; and the primary's rule is the console's - its own commands run from the copy while a verifier's cargo runs.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSuiteNamesTheImageLockThatBlockedIt to issue474;
+
+    part issue475 : Issue {
+        :>> id = "68f7d732-63c7-48d0-b080-a19b4da57481";
+        :>> title = "An engine resync is refused by process-change as an unsigned locked-file change; since D0440 migrate's own gate reverts the update";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "An engine resync writes locked files - .engine/skills/**/SKILL.md, most of .engine/contracts/, .engine/rules/ - and process-change (guards.rs keystone_violations, read 2026-09-10) has no exemption for them: a locked file modified with no co-committed marked Decision is a violation whatever wrote it. Under the staged read that refusal fell at a downstream project's post-migrate commit, in the pre-commit hook, and no test committed after a migration so none saw it. Under D0440's working-tree read it falls inside keel migrate's own D0336 gate: on 2026-09-10 the sprint 666 touched run went red in six migration_fixture_is_realistic tests - `keel migrate: the update was written but this project's own gate went RED under 0.4.1 - guard: ERROR locked file(s) changed (.engine/skills/actor-enrollment/SKILL.md) with NO co-committed process-change Decision ... [guard:process-change] FAIL - 1 scanned (read: working tree)` - and the update was reverted byte-for-byte. The class: a control written for an author changing a control by hand cannot tell the engine's own published text from an edit. Code-read, not observed in the field: the fixture is the evidence.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcResyncIsNotASelfModification to issue475;
+
+    part issue476 : Issue {
+        :>> id = "da0c4689-3c3e-4a73-a3ee-dd25724d2f2c";
+        :>> title = "A receipt marker passed in --evidence is written twice";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The write path prepends its own receipt marker to --evidence, and an evidence string that already carries one lands doubled: the sprint 666 recorder was dispatched with evidence beginning RAN: (the marker the documented shape shows the READER, not the writer) and four results in sprint666 and backlog.sysml read the marker twice, once as the writer's and once as a partial copy of the caller's - a receipt line that no longer matches the shape guard 52 evidence-cited documents and audit-ci-runs parses. Read at keel-cli/src/write.rs lines 815 and 1268: both builders format the marker unconditionally around sanitize_field(evidence) and neither strips a leading marker from what the caller passed. The dispatch instruction that caused it (CLAUDE.md names the receipt by its on-disk shape) will recur every time a recorder copies the shape it reads back from an earlier sprint.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcEvidenceReceiptMarkerIsIdempotent to issue476;
 }

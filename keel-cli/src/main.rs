@@ -36,14 +36,13 @@
 
 use std::{path::{Path, PathBuf}, process};
 
-use include_dir::{include_dir, Dir};
+use keel_cli::embedded::ENGINE_DIR;
 use keel_cli::{check_files, collect_sysml, validate_root};
 use keel_cli::orient;
 use keel_cli::write as w;
 
-// ── engine scaffold payload (D0093 `init`): the reusable engine tree + operating manual, embedded at
-//    compile time so `keel init` is self-contained (no external fetch — the cytoscape precedent). ──
-static ENGINE_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../.engine");
+// ── engine scaffold payload (D0093 `init`): `keel_cli::embedded::ENGINE_DIR`, embedded ONCE in the
+//    library so the process-change guard reads the same bytes `init` and `migrate` write (D0441). ──
 // A DOWNSTREAM CLAUDE.md template (issue057): a fresh project is TRACKED BY keel, not keel itself.
 // The self-build repo's own CLAUDE.md (about building the engine) is NEVER shipped to init'd projects.
 const CLAUDE_MD: &str = include_str!("../assets/claude-md-template.md");
@@ -3721,7 +3720,7 @@ fn write_engine_file(f: &include_dir::File, dst_engine: &Path, count: &mut u32) 
 
 /// Recursively scaffold the embedded engine tree into `dst_engine`. `include_dir`'s `File::path()` is
 /// root-relative, so the remap in `write_engine_file` sees the full path regardless of nesting.
-fn scaffold_engine(dir: &Dir, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
+fn scaffold_engine(dir: &include_dir::Dir, dst_engine: &Path, count: &mut u32) -> std::io::Result<()> {
     for f in dir.files() {
         write_engine_file(f, dst_engine, count)?;
     }

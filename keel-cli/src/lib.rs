@@ -78,6 +78,7 @@ pub mod proactive;
 pub mod claim;
 pub mod deck;
 pub mod device;
+pub mod embedded;
 pub mod launcher;
 pub mod library;
 pub mod enroll;

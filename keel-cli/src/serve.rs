@@ -1075,11 +1075,17 @@ async fn api_check(State(s): State<AppState>) -> Response {
                         ("violations".to_string(), Json::Arr(rep.violations.iter().map(|v| Json::s(v.clone())).collect())),
                     ]));
                 }
-                if !rep.warnings.is_empty() {
-                    warnings.push(Json::Obj(vec![
+                // The read-mode note (D0440) is reported as `read`, never as a warning.
+                let real: Vec<Json> = rep.warnings.iter().filter(|w| !crate::guards::is_read(w)).map(|v| Json::s(v.clone())).collect();
+                if !real.is_empty() {
+                    let mut row = vec![
                         ("guard".to_string(), Json::s(name.to_string())),
-                        ("warnings".to_string(), Json::Arr(rep.warnings.iter().map(|v| Json::s(v.clone())).collect())),
-                    ]));
+                        ("warnings".to_string(), Json::Arr(real)),
+                    ];
+                    if let Some(r) = rep.read_mode() {
+                        row.push(("read".to_string(), Json::s(r.to_string())));
+                    }
+                    warnings.push(Json::Obj(row));
                 }
             }
         }

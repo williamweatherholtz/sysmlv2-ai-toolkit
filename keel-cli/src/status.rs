@@ -339,7 +339,8 @@ fn library_section(root: &Path) -> Section {
 fn model_section(root: &Path) -> Section {
     let reports = crate::guards::run_all(root);
     let violations: usize = reports.iter().map(|r| r.violations.len()).sum();
-    let warnings: usize = reports.iter().map(|r| r.warnings.len()).sum();
+    // The read-mode note (D0440) rides in `warnings` and is not one.
+    let warnings: usize = reports.iter().map(|r| r.warnings.iter().filter(|w| !crate::guards::is_read(w)).count()).sum();
     let files = crate::collect_sysml(&root.join(".tracking")).len();
     let mut lines = vec![format!("{files} tracked file(s), {} guards", reports.len())];
     let state = if violations > 0 {

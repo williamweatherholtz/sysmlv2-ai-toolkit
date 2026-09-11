@@ -317,6 +317,8 @@ frozen (modify it only by out-of-band Decision).
 keel validate .        # .tracking semantic validation — the AUTHORITY (no kernel)
 keel check-engine .    # .engine instance reference resolution (kernel-free) — the ENFORCED instance gate
 keel guard             # every enforced forward guard (count: `keel version`) — see .engine/docs/guards.md
+                       # the five diff-reading guards read the WORKING TREE here and the staged index inside a git hook
+                       # (GIT_INDEX_FILE / KEEL_HOOK), and say which in their summary line (D0440/issue464)
 keel gate --fast       # the per-edit tier: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder
 keel enforcement-report # every hook event's fires, blocks and latency DISTRIBUTION from the fire-ledger, and the recall skip rate (D0389)
 keel gate --workspace  # the COMMIT tier for a repo holding several projects: every project the commit touches (D0234)
