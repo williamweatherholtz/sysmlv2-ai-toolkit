@@ -209,6 +209,13 @@ frozen (modify it only by out-of-band Decision).
   against the tree and reports every discrepancy naming the command and the touched receipt's counts; a
   RECORDER subagent writes the sprint ceremony through the keel write API from the verifier's receipt ONLY,
   never from the primary's description of what it did. Neither reads the other's conclusion as fact.
+  **The verifier's procedure IS the `test-verify` skill (D0438, proposed; issue469/471):** a dispatch names the
+  skill, the binary, the receipt path, the sprint's D0388 probe pair and any guard expected red - nothing else
+  about how to verify. The skill states the mandate first (reads and runs; writes nothing under `.tracking`,
+  `.engine`, `keel-cli`, `.claude` or this file; an owed write is an `OWED WRITES` line for the recorder) and then
+  the order: touched run DETACHED with the launch epoch recorded (a foreground call is capped at 600 s and the run
+  takes 7-12 minutes, issue469), the gate set while it runs, the receipt read only after exit with `outcome`, `at`,
+  `stems`, `lib` and `head` each checked (issue468), then the receipt in one fixed shape.
 - **`main` is canonical; commit directly to it.** No long-lived branches.
 - **`keel sync` / `keel land` are the integration path (D0129); CI additionally runs `keel audit-adherence` (D0209): guard-set/severity monotonicity re-derived from the tree, a GATE that fails the build if any control was weakened without a signed Decision - the issue236 self-modification class, caught independently of the commit hook - and `keel audit-ci-runs` (D0323): every TestResult whose receipt reads `// RAN: ci-run id=<run> workflow=<name>` is checked by CI against the run itself (exists here, concluded success, ran on the judgedAgainst SHA) - the external-fact gate an agent cannot talk past.** `sync` fetches, reports divergence,
   integrates by **merge**, and gates the result; `land` **gates before the first push** (workspace-wide —

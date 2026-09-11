@@ -12,9 +12,9 @@ package SkillsRegistryTestVerify {
     part testVerify : AISkill {
         :>> id = "b4d9f201-6c0e-4f3b-9a7d-2e8c4f0b3d61";
         :>> title = "test-verify";
-        :>> purpose = "Run the deliverable's verification gate: cargo test + clippy -D warnings + BDD scenarios + Python<->Rust orient parity; report per-layer pass/fail as evidence for a method=test DoD. Hands off to test-result for recording; does not commit.";
+        :>> purpose = "The D0425 verifier's procedure (D0438): launch keel suite --touched detached and read its receipt only after exit (outcome, at, stems, lib); run validate, check-engine, guard --no-receipt, sync-claude --check, clippy and the dispatch's D0388 probe pair; write a receipt naming every command and every discrepancy. Reads and runs only - writes nothing to the tree, records nothing; the recorder writes from the receipt.";
         :>> location = ".engine/skills/test-verify/SKILL.md";
-        :>> triggerCondition = "Asked to test/verify, check parity, or before recording a deliverable DoD TestResult.";
+        :>> triggerCondition = "Dispatched as the D0425 verifier subagent; asked to verify or run the touched set; before any deliverable DoD or gate TestResult is recorded.";
         :>> writePolicy = WritePolicy::readOnly;
     }
 }

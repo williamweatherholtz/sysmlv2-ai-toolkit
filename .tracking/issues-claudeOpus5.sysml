@@ -2030,4 +2030,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcVerifierProcedureIsASkill to issue471;
+
+    part issue472 : Issue {
+        :>> id = "171f3f44-6438-4a66-b631-d0d4a82beaa0";
+        :>> title = "the suite receipt's at is the run's start while the touched receipt's at is its end - the verifier read a one-second gap as proof the run finished";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Observed 2026-09-11 on the sprint 664 verifier's receipt, the first dispatch under the test-verify skill. The suite receipt (.keel/metrics/suite-receipt.toml) read at = 1789093346 against a launch epoch of 1789093345, and the verifier reported the row as '<at>launch: ok' - which under the skill's step-5 rule is the check that the receipt belongs to THIS run and that the run finished. It proved the first and not the second: suite.rs:301 writes `at: started`, the same stamp its running stub carries (suite.rs:253), so the suite receipt's at is one second after launch on every run however long it took. The touched receipt beside it (touched.rs:342) stamps now_secs() at write time - the END of a done run - and carries `seconds`; sprint 663's read '<at> 12 minutes after launch' from exactly that. One field name, two meanings, in two files the same reader is told to check by the same rule. No false record landed: outcome was pass with 720 passed, and the run's duration was recovered from the receipt file's mtime (1789094242 - 1789093346 = 896 s, past the 600 s cap the DoD asked to see exceeded). The skill now says which stamp each receipt carries and reads duration from the mtime; that is a workaround in prose, and the fix is the writer: the suite receipt stamps at at write time like the touched one and carries seconds, so one rule reads both. Resolved by dcReceiptAtMeansTheSameInBothReceipts.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcReceiptAtMeansTheSameInBothReceipts to issue472;
 }
