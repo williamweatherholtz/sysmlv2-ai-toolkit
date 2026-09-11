@@ -231,7 +231,11 @@ frozen (modify it only by out-of-band Decision).
   push and refuses on a failure, naming them from cargo's own `--test <name>` rerun hint (a capture reads
   stdout before stderr, so the `Running` header pairing does not hold there). While D0421 is proposed the set
   is printed and nothing runs. `keel suite --touched` is the same run by hand; either writes
-  `.keel/metrics/touched-receipt.toml` beside the suite's receipt, never in it.
+  `.keel/metrics/touched-receipt.toml` beside the suite's receipt, never in it. **Both receipts say `outcome = "running"` while
+  cargo runs (D0387; issue399 for the suite's, issue468 for the touched one):** the previous receipt is REPLACED by a stub
+  naming THIS run's set and log before cargo starts, so a reader during the run - or after a killed one - never sees the
+  last run's pass over a different change set. A subagent reads a receipt AFTER the process exits and checks its `at`
+  against its own launch and its `stems` against the change set; sprint 661 was recorded on a receipt 46 minutes stale.
 - **NEVER rebase, squash, or force-push (D0129/issue071).** A passing `TestResult` counts as done only
   while its `judgedAgainst` SHA resolves, so rewriting history orphans evidence and makes `orient`
   **machine-dependent** — green on one clone, not-done on every other. Enforced by the local hooks

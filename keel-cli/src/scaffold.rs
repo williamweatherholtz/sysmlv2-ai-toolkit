@@ -231,6 +231,43 @@ pub fn today() -> String {
 mod tests {
     use super::{sprint, sprint_filled, PLACEHOLDER};
 
+    /// Since D0435 the scaffold reads the ceremony order from the tree: the workflow's `first A then B;`
+    /// chain, for the workflow whose phases some `ProcessStep` binds as `checkedBy = "gate:<phase>"`.
+    /// A fixture that declares neither scaffolds a Story and `DoD` and NO gate - which is the D0435
+    /// unenforceable-by-step case, not a defect - so a test that expects six gates declares this.
+    fn declare_ceremony(root: &std::path::Path) {
+        std::fs::create_dir_all(root.join(".engine").join("workflows")).expect("mkdir workflows");
+        std::fs::create_dir_all(root.join(".engine").join("processes")).expect("mkdir processes");
+        std::fs::write(
+            root.join(".engine").join("workflows").join("delivery.sysml"),
+            concat!(
+                "package DeliveryWorkflow {\n",
+                "    action def Delivery {\n",
+                "        first refine then standup;\n",
+                "        first standup then implement;\n",
+                "        first implement then review;\n",
+                "        first review then closeOut;\n",
+                "        first closeOut then retro;\n",
+                "    }\n",
+                "}\n",
+            ),
+        )
+        .expect("write workflow");
+        std::fs::write(
+            root.join(".engine").join("processes").join("agile-workflow.sysml"),
+            concat!(
+                "package AgileWorkflow {\n",
+                "    action def Ceremony {\n",
+                "        action refine : ProcessStep {\n",
+                "            :>> checkedBy = \"gate:refine\";\n",
+                "        }\n",
+                "    }\n",
+                "}\n",
+            ),
+        )
+        .expect("write process");
+    }
+
     /// issue267: the filled scaffold carries every section's prose, no placeholder, and ZERO
     /// `TestResult`s - verdicts come from the write API alone; a missing section is refused by name.
     #[test]
@@ -239,6 +276,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join(".engine").join("decisions")).expect("mkdir");
         std::fs::write(root.join(".engine").join("decisions").join("0001-x.sysml"), "package D1 {\n    part d0001 : Decision { }\n}\n").expect("decision");
+        declare_ceremony(&root);
         let mut fill: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
         for k in super::FILL_KEYS {
             fill.insert(k.to_string(), format!("{k} prose with a \"quote\" inside"));
@@ -270,7 +308,22 @@ mod tests {
             "package D9997 { part d9997 : Decision { :>> id = \"e2e00000-0000-4000-8000-000000009997\"; } }\n",
         )
         .expect("write charter");
+        declare_ceremony(&root);
         root
+    }
+
+    /// D0435, known-negative: a tree that binds no `gate:<phase>` has no ceremony order, so the scaffold
+    /// writes the Story and its `DoD` and NO gate Test - it does not hand the tree this project's six.
+    #[test]
+    fn a_tree_binding_no_gate_scaffolds_no_gate() {
+        let root = temp_root("nogate");
+        let _ = std::fs::remove_dir_all(root.join(".engine").join("processes"));
+        let path = sprint(&root, 998, "bare", "d9997", 1, "claudeOpus5").expect("scaffold");
+        let text = std::fs::read_to_string(&path).expect("read back");
+        let ids = text.split(":>> id = \"").skip(1).count();
+        assert_eq!(ids, 2, "story + DoD only:\n{text}");
+        assert!(!text.contains("Gate"), "no gate is assumed for a tree that binds none:\n{text}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The `DoD` checks themselves: every minted id is guard-38-shaped and unique; all six ceremony gates

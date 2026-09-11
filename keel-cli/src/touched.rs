@@ -277,7 +277,18 @@ fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-fn render_receipt(t: &Touched, head: &str, at: u64, run: Option<&Run>) -> String {
+/// What the receipt records about the run.
+///
+/// Nothing to record (`NotRun` - an empty or not-run set), a run in progress (`Running` - the
+/// stub written BEFORE cargo starts, D0387's sibling for this receipt), or a finished run.
+#[derive(Debug, Clone, Copy)]
+pub enum Phase<'a> {
+    NotRun,
+    Running { started: u64, log: &'a Path },
+    Done(&'a Run),
+}
+
+fn render_receipt(t: &Touched, head: &str, at: u64, phase: Phase<'_>) -> String {
     use std::fmt::Write as _;
     let list = |v: &[String]| v.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ");
     let mut s = format!(
@@ -290,8 +301,20 @@ fn render_receipt(t: &Touched, head: &str, at: u64, run: Option<&Run>) -> String
         list(&t.tests),
         t.lib
     );
-    match run {
-        Some(r) => {
+    match phase {
+        // The previous receipt is REPLACED before cargo starts (issue468, the D0387/issue399 class on
+        // this receipt): a reader during the run - or after a killed one - sees `running` with THIS
+        // run's set and log, never the last run's pass over a different change set. The verifier of
+        // sprint 661 read the prior run's 546/0 as its own while its own run was failing two lib tests.
+        Phase::Running { started, log } => {
+            let _ = write!(
+                s,
+                "outcome = \"running\"\npassed = 0\nfailed = 0\nfailing = []\nseconds = {}\nlog = \"{}\"\n",
+                at.saturating_sub(started),
+                log.to_string_lossy().replace('\\', "/")
+            );
+        }
+        Phase::Done(r) => {
             let outcome = if r.cargo_ok && r.failed == 0 { "pass" } else { "fail" };
             let _ = write!(
                 s,
@@ -305,18 +328,18 @@ fn render_receipt(t: &Touched, head: &str, at: u64, run: Option<&Run>) -> String
             );
         }
         // `empty`: nothing to run. `not-run`: a set exists and was not run (the refusal is inert, D0337).
-        None => {
+        Phase::NotRun => {
             let _ = write!(s, "outcome = \"{}\"\npassed = 0\nfailed = 0\nseconds = 0\n", if t.nothing_to_run() { "empty" } else { "not-run" });
         }
     }
     s
 }
 
-fn write_receipt(repo: &Path, t: &Touched, run: Option<&Run>) {
+fn write_receipt(repo: &Path, t: &Touched, phase: Phase<'_>) {
     let metrics = repo.join(".keel").join("metrics");
     let _ = std::fs::create_dir_all(&metrics);
     let head = git_out(repo, &["rev-parse", "--short", "HEAD"]).unwrap_or_default();
-    if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), render_receipt(t, &head, now_secs(), run)) {
+    if let Err(e) = crate::write::write_atomic(&repo.join(RECEIPT), render_receipt(t, &head, now_secs(), phase)) {
         eprintln!("touched: receipt could not be written: {e}");
     }
 }
@@ -328,13 +351,14 @@ fn write_receipt(repo: &Path, t: &Touched, run: Option<&Run>) {
 /// When the metrics directory cannot be created or cargo cannot be started at all.
 pub fn run(repo: &Path, t: &Touched) -> Result<Run, String> {
     if t.nothing_to_run() {
-        write_receipt(repo, t, None);
+        write_receipt(repo, t, Phase::NotRun);
         return Ok(Run { passed: 0, failed: 0, failing: vec![], seconds: 0, cargo_ok: true, log: PathBuf::new() });
     }
     let metrics = repo.join(".keel").join("metrics");
     std::fs::create_dir_all(&metrics).map_err(|e| format!("cannot create {}: {e}", metrics.display()))?;
     let started = now_secs();
     let log = metrics.join(format!("touched-{started}.log"));
+    write_receipt(repo, t, Phase::Running { started, log: &log });
     let mut cmd = std::process::Command::new("cargo");
     cmd.arg("test").arg("--release").arg("--manifest-path").arg(repo.join("keel-cli").join("Cargo.toml")).arg("--no-fail-fast");
     for name in &t.tests {
@@ -351,7 +375,7 @@ pub fn run(repo: &Path, t: &Touched) -> Result<Run, String> {
     // binaries CI will link do not link here either. Every named test is reported as not run.
     let failing = if crate::suite::never_ran(out.status.success(), passed, failed) { t.tests.clone() } else { failing_binaries(&text) };
     let r = Run { passed, failed, failing, seconds: now_secs().saturating_sub(started), cargo_ok: out.status.success(), log };
-    write_receipt(repo, t, Some(&r));
+    write_receipt(repo, t, Phase::Done(&r));
     Ok(r)
 }
 
@@ -391,12 +415,12 @@ pub fn before_push(repo: &Path) -> Option<i32> {
     };
     println!("keel land: {}", describe(&t));
     if t.nothing_to_run() {
-        write_receipt(repo, &t, None);
+        write_receipt(repo, &t, Phase::NotRun);
         return None;
     }
     if !gate_accepted(repo) {
         println!("keel land: not run - D0421 is proposed; the touched-test refusal is declared but INERT until the human's word (D0337); the set is in the receipt ({RECEIPT}).");
-        write_receipt(repo, &t, None);
+        write_receipt(repo, &t, Phase::NotRun);
         return None;
     }
     if let Some(reason) = crate::suite::own_image_refusal(repo, "keel land") {
@@ -437,7 +461,7 @@ pub fn cmd(repo: &Path) -> i32 {
     };
     println!("keel suite --touched: {}", describe(&t));
     if t.nothing_to_run() {
-        write_receipt(repo, &t, None);
+        write_receipt(repo, &t, Phase::NotRun);
         println!("keel suite --touched: empty set recorded in {RECEIPT}");
         return 0;
     }
@@ -463,7 +487,41 @@ pub fn cmd(repo: &Path) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute, failing_binaries, module_stem, names_stem, test_name, text_carries_acceptance, touched_tests};
+    fn fixture() -> Touched {
+        Touched {
+            base: "origin/main".into(),
+            stems: vec!["scaffold".into()],
+            unattributed: vec![],
+            tests: vec!["orient_bdd".into()],
+            lib: true,
+        }
+    }
+
+    /// issue468, known-negative: a finished run's receipt carries its verdict and counts.
+    #[test]
+    fn a_finished_run_renders_its_verdict() {
+        let run = Run { passed: 5, failed: 1, failing: vec!["lib".into()], seconds: 9, cargo_ok: false, log: std::path::PathBuf::from("x.log") };
+        let text = render_receipt(&fixture(), "1234567", 100, Phase::Done(&run));
+        assert!(text.contains("outcome = \"fail\""), "{text}");
+        assert!(text.contains("passed = 5") && text.contains("failed = 1"), "{text}");
+        assert!(!text.contains("outcome = \"running\""), "{text}");
+    }
+
+    /// issue468, known-positive: the stub written before cargo starts says `running`, counts nothing,
+    /// names THIS run's log and set - so a reader during the run, or after a killed one, never sees
+    /// the previous run's pass over a different change set.
+    #[test]
+    fn a_running_stub_is_not_a_verdict() {
+        let log = std::path::PathBuf::from(".keel/metrics/touched-100.log");
+        let text = render_receipt(&fixture(), "1234567", 103, Phase::Running { started: 100, log: &log });
+        assert!(text.contains("outcome = \"running\""), "{text}");
+        assert!(text.contains("passed = 0") && text.contains("failed = 0"), "{text}");
+        assert!(text.contains("seconds = 3"), "{text}");
+        assert!(text.contains("touched-100.log"), "{text}");
+        assert!(text.contains("\"scaffold\"") && text.contains("lib = true"), "the stub carries the set it is running:\n{text}");
+        assert!(!text.contains("\"pass\""), "{text}");
+    }
+    use super::{compute, failing_binaries, module_stem, names_stem, render_receipt, test_name, text_carries_acceptance, touched_tests, Phase, Run, Touched};
 
     #[test]
     fn a_stem_is_the_module_a_path_names() {

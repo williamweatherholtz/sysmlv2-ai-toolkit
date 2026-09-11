@@ -572,6 +572,13 @@ fn is_engine_instance_file(path: &Path) -> bool {
 /// [`PackageRegistry::validate`] used for `.tracking`. Schema/workflow files are registered but NOT
 /// validated (they reference the `ScalarValues` system namespace). Returns `(path, diagnostic)` pairs —
 /// empty when clean.
+///
+/// A file that does not PARSE is a diagnostic, not a skip (issue467): for one day a Decision file
+/// carrying an extra closing brace was reported "validated clean" here while `keel check` rejected it
+/// at 25:1, because both passes read `if let Ok(pkg)` and dropped the `Err` — an enforcement point
+/// that reports a pass it did not compute (EHZ5). Every `.engine` file's parse failure is reported,
+/// instance or schema: a schema file that fails to parse is silently absent from the registry, and
+/// every reference into it would then be misreported as unresolved.
 #[must_use]
 pub fn validate_engine_instances(root: &Path) -> Vec<(PathBuf, Diagnostic)> {
     let engine_dir = root.join(".engine");
@@ -580,23 +587,49 @@ pub fn validate_engine_instances(root: &Path) -> Vec<(PathBuf, Diagnostic)> {
     }
     let all = collect_sysml(&engine_dir);
     let mut registry = PackageRegistry::new();
-    for path in &all {
-        if let Ok(pkg) = parse_pkg(path) {
-            registry.register(&pkg);
-        }
-    }
+    let mut parsed = Vec::with_capacity(all.len());
     let mut out = Vec::new();
     for path in &all {
+        match parse_pkg(path) {
+            Ok(pkg) => {
+                registry.register(&pkg);
+                parsed.push((path, pkg));
+            }
+            Err(e) => out.push((path.clone(), parse_failure_diagnostic(path, &e))),
+        }
+    }
+    for (path, pkg) in &parsed {
         if !is_engine_instance_file(path) {
             continue;
         }
-        if let Ok(pkg) = parse_pkg(path) {
-            for d in registry.validate(&pkg, &path.to_string_lossy()) {
-                out.push((path.clone(), d));
-            }
+        for d in registry.validate(pkg, &path.to_string_lossy()) {
+            out.push(((*path).clone(), d));
         }
     }
     out
+}
+
+/// A [`CheckError`] from [`parse_pkg`] as the [`Diagnostic`] `check-engine` prints. The lexer and
+/// parser messages are `<file>:<line>:<col>: <what>`; the line is lifted from that prefix so the
+/// diagnostic points at the line, and is 0 when the message carries none (an unreadable file).
+fn parse_failure_diagnostic(path: &Path, e: &CheckError) -> Diagnostic {
+    let name = path.to_string_lossy();
+    let line = e
+        .message
+        .strip_prefix(name.as_ref())
+        .and_then(|rest| rest.strip_prefix(':'))
+        .and_then(|rest| rest.split(':').next())
+        .and_then(|n| n.parse::<u32>().ok())
+        .unwrap_or(0);
+    Diagnostic {
+        file: name.as_ref().into(),
+        line,
+        message: format!("does not parse — {}", e.message).into_boxed_str(),
+        suggestion: Some(
+            "the file was skipped by every reference check, not validated; `keel check <file>` names the construct (issue467)"
+                .into(),
+        ),
+    }
 }
 
 /// The character length of the longest path under `dir`, used by `keel init` to warn before a host
@@ -657,5 +690,68 @@ mod engine_instance_tests {
         assert!(!is_engine_instance_file(Path::new(".engine/schema/core.sysml")));
         assert!(!is_engine_instance_file(Path::new(".engine/workflows/delivery.sysml")));
         assert!(!is_engine_instance_file(Path::new(".engine/rules/rules.sysml")));
+    }
+
+    struct Tmp(std::path::PathBuf);
+    impl Drop for Tmp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    const DECISION: &str = concat!(
+        "package Fx467 {\n",
+        "    part d9999 : Decision {\n",
+        "        attribute :>> title = \"a well-formed decision\";\n",
+        "    }\n",
+        "}\n",
+    );
+
+    fn tree(tag: &str) -> Tmp {
+        let root = std::env::temp_dir().join(format!("keel-issue467-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine").join("decisions")).unwrap();
+        std::fs::create_dir_all(root.join(".engine").join("schema")).unwrap();
+        std::fs::write(
+            root.join(".engine").join("schema").join("core.sysml"),
+            concat!(
+                "package Core {\n",
+                "    part def Decision {\n",
+                "        attribute title : String;\n",
+                "    }\n",
+                "}\n",
+            ),
+        )
+        .unwrap();
+        std::fs::write(root.join(".engine").join("decisions").join("9999-fx.sysml"), DECISION).unwrap();
+        Tmp(root)
+    }
+
+    /// issue467, known-negative: a well-formed instance file yields no parse diagnostic.
+    #[test]
+    fn a_well_formed_instance_file_is_not_a_parse_diagnostic() {
+        let t = tree("neg");
+        let diags = super::validate_engine_instances(&t.0);
+        assert!(
+            diags.iter().all(|(_, d)| !d.message.contains("does not parse")),
+            "unexpected parse diagnostic: {diags:?}"
+        );
+    }
+
+    /// issue467, known-positive: the same file with one extra closing brace is reported with its line,
+    /// where both passes used to drop the `Err` and report the tree clean.
+    #[test]
+    fn an_unparseable_instance_file_is_a_diagnostic_naming_its_line() {
+        let t = tree("pos");
+        let f = t.0.join(".engine").join("decisions").join("9999-fx.sysml");
+        std::fs::write(&f, format!("{DECISION}}}\n")).unwrap();
+        let diags = super::validate_engine_instances(&t.0);
+        let hit = diags
+            .iter()
+            .find(|(p, d)| p == &f && d.message.contains("does not parse"))
+            .unwrap_or_else(|| panic!("no parse diagnostic for the broken file: {diags:?}"));
+        assert_eq!(hit.1.line, 6, "the extra brace is on line 6: {}", hit.1.message);
+        assert!(hit.1.message.contains("got RBrace"), "{}", hit.1.message);
+        assert!(hit.1.suggestion.as_deref().is_some_and(|s| s.contains("keel check")));
     }
 }
