@@ -2173,4 +2173,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcDemoReplayNegativeHoldsOnUnix to issue484;
+
+    part issue485 : Issue {
+        :>> id = "a18316c6-9e31-43aa-9254-24981d188588";
+        :>> title = "Story points do not predict effort: 1-pt and 3-pt sprints take the same wall time, so velocity measures nothing";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Story points carry no information about effort, so velocity is a count of ceremonies. Measured over the 80 most recent sprints from git (first commit of a sprint to the first commit of the next): 1 pt median 48 min (n=15), 2 pt 35 min (n=27), 3 pt 36 min (n=29), 5 pt 60 min (n=9) - the point buckets do not order the durations. Every one of the 155 sprint files since sprint 517 was written in a single commit (first->last commit of the file = 0 min), so estimatedPoints is assigned at close, not in planning. D0038 promised that actual efficiency would build the baseline over time; no baseline was ever computed, and `keel report flow` reports velocity 3.0 pts/sprint as if the unit meant something. The human named this on 2026-09-11: without effective sizing we cannot measure velocity (st119 pending). Reproduce: python over .tracking/delivery estimatedPoints joined to `git log --format=%ct -- <file>`; the script's output is quoted above.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcCycleTimeReadsFromGit to issue485;
 }
