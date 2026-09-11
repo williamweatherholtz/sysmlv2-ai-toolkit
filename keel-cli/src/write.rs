@@ -647,8 +647,9 @@ fn refuse_receiptless_ai_test(path: &Path, judged_by: &str, evidence: Option<&st
 /// human's judgment stands on their word (D0232); a `fail` is a fail whoever judged it. What an AI
 /// merely examines - `demo`, `analyze`, `inspect` - is a PROPOSAL until a human judges it, and counts
 /// as done for nothing meanwhile. The one receipt form CI re-runs today is D0323's `ci-run id=<id>
-/// workflow=<name>`, so that one stands; recognising a re-runnable command receipt on a demo is
-/// dcReplayableDemoStaysAPass. Forward-only: only the write changes, standing results are untouched.
+/// workflow=<name>`, so that one stands; a demo receipt that IS a command under a prefix the project's
+/// `reverify.toml [demo] replayable` declares stands too (D0444, `reverify::is_replayable`) - `keel
+/// reverify --demos` re-runs it. Forward-only: only the write changes, standing results are untouched.
 /// An unregistered judge is not a human, as `refuse_receiptless_ai_test` reads it.
 fn proposed_tier<'a>(path: &Path, pkg: &Package, verification: &str, verdict: &'a str, judged_by: &str, evidence: Option<&str>) -> &'a str {
     if verdict != "pass" {
@@ -663,6 +664,12 @@ fn proposed_tier<'a>(path: &Path, pkg: &Package, verification: &str, verdict: &'
     let Some(root) = model_root_of(path) else {
         return verdict;
     };
+    // D0444: a demo whose receipt IS a command the project's contract declares replayable is exercised
+    // in substance - `keel reverify --demos` re-runs it - so the pass stands. Demo only: an inspect or
+    // analyze names what was looked at, and re-running a command does not repeat the looking.
+    if verification_declares_method(pkg, verification, "demo") && evidence.is_some_and(|e| crate::reverify::is_replayable(&root, e)) {
+        return verdict;
+    }
     if !root.join(".tracking").join("actors.sysml").exists() {
         return verdict;
     }
@@ -2469,6 +2476,52 @@ mod tests {
         assert_eq!(outcome_of(&u), "pass", "a human's gate judgment stands");
         let text = std::fs::read_to_string(&f).expect("read");
         assert_eq!(text.matches("VerdictKind::proposed").count(), 3, "exactly the three AI-examined passes landed proposed:\n{text}");
+    }
+
+    /// D0444 (dcReplayableDemoStaysAPass), the D0388 pair named in the Decision before the tree was
+    /// read. Positive: an AI demo pass with evidence `keel show control-structure . --svg` lands PASS.
+    /// Negative: the same with `looked at the picture` lands proposed, and with `rm -rf target` (no
+    /// declared prefix) lands proposed. Around them: the rule is demo-only (the same command receipt on
+    /// an inspect stays proposed), and a project whose contract declares no `[demo]` section keeps every
+    /// AI demo pass proposed, receipt or not.
+    #[test]
+    fn a_demo_pass_whose_receipt_is_a_declared_command_stays_a_pass() {
+        let root = k6_root("replayable");
+        std::fs::create_dir_all(root.join(".engine").join("contracts")).expect("mkdir");
+        let contract = root.join(".engine").join("contracts").join("reverify.toml");
+        std::fs::write(&contract, "commands = []\n[demo]\nreplayable = [\"keel \", \"cargo test\"]\n").expect("contract");
+        let f = root.join(".tracking").join("delivery").join("r.sysml");
+        let body = "package R {\n    action def Run {\n        action tdemo;\n        verification tdemoDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000f201\"; :>> method = VerificationMethod::demo; :>> procedureText = \"draw it\"; }\n    }\n    verification gDemo : Test { :>> id = \"e2e00000-0000-4000-8000-00000000f202\"; :>> method = VerificationMethod::demo; :>> procedureText = \"the demo gate\"; }\n    verification gInsp : Test { :>> id = \"e2e00000-0000-4000-8000-00000000f203\"; :>> method = VerificationMethod::inspect; :>> procedureText = \"the inspect gate\"; }\n}\n";
+        std::fs::write(&f, body).expect("write");
+        let outcome_of = |uuid: &str| -> String {
+            let text = std::fs::read_to_string(&f).expect("read");
+            let line = text.lines().find(|l| l.contains(uuid)).expect("the written line");
+            let start = line.find("VerdictKind::").expect("an outcome") + "VerdictKind::".len();
+            line[start..].chars().take_while(char::is_ascii_alphabetic).collect()
+        };
+
+        // positive: the command alone, under a declared prefix -> pass, on both write paths
+        let u = super::append_result(&f, "tdemo", "abc1234", "pass", "2026-09-11", "bot", Some("keel show control-structure . --svg")).expect("lands");
+        assert_eq!(outcome_of(&u), "pass", "positive: a replayable demo receipt keeps the AI's pass");
+        let u = super::append_gate_result(&f, "gDemo", "abc1234", "pass", "2026-09-11", "bot", None, Some("keel show control-structure . --svg")).expect("lands");
+        assert_eq!(outcome_of(&u), "pass", "positive on the gate path");
+        // negative: prose, and a command under no declared prefix -> proposed
+        let u = super::append_result(&f, "tdemo", "abc1234", "pass", "2026-09-11", "bot", Some("looked at the picture")).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "negative: prose is testimony");
+        let u = super::append_gate_result(&f, "gDemo", "abc1234", "pass", "2026-09-11", "bot", None, Some("rm -rf target")).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "negative: a command the contract never declared");
+        // demo only: the same command receipt on an inspect gate is still a proposal
+        let u = super::append_gate_result(&f, "gInsp", "abc1234", "pass", "2026-09-11", "bot", None, Some("keel show control-structure . --svg")).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "an inspect names what was looked at; the command does not repeat the looking");
+        // the receipt is written as the RAN line, verbatim, so `reverify --demos` can read it back
+        let text = std::fs::read_to_string(&f).expect("read");
+        assert_eq!(text.matches("// RAN: keel show control-structure . --svg").count(), 3, "{text}");
+        assert_eq!(text.matches("VerdictKind::proposed").count(), 3, "{text}");
+
+        // no [demo] section -> nothing is replayable, as before D0444
+        std::fs::write(&contract, "commands = []\n").expect("contract");
+        let u = super::append_gate_result(&f, "gDemo", "abc1234", "pass", "2026-09-11", "bot", None, Some("keel show control-structure . --svg")).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "a project that never adopted the section has adopted nothing");
     }
 
     /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,

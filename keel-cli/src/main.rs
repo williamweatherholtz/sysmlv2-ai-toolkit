@@ -1831,16 +1831,19 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
     0
 }
 
-/// `keel reverify [--all-drift | --task NAME] [--by ACTOR] [ROOT]` (D0101) — re-run the configured gate
-/// at HEAD and stamp a fresh `TestResult` on each drift-suspect task on green.
+/// `keel reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]` (D0101) — re-run the configured
+/// gate at HEAD and stamp a fresh `TestResult` on each drift-suspect task on green; `--demos` (D0444)
+/// re-runs every replayable demo receipt instead and records each replay's own verdict.
 fn cmd_reverify(args: &[String]) -> i32 {
     let mut task: Option<String> = None;
     let mut by: Option<String> = None;
     let mut root: Option<PathBuf> = None;
+    let mut demos = false;
     let mut i = 0;
     while let Some(a) = args.get(i) {
         match a.as_str() {
             "--all-drift" => {}
+            "--demos" => demos = true,
             "--task" => {
                 i += 1;
                 task = args.get(i).cloned();
@@ -1859,7 +1862,7 @@ fn cmd_reverify(args: &[String]) -> i32 {
             // most-repeated defect shape.
             other if other.starts_with("--") => {
                 eprintln!("error: unknown flag `{other}`");
-                eprintln!("usage: keel reverify [--all-drift | --task NAME] [--by ACTOR] [ROOT]");
+                eprintln!("usage: keel reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]");
                 return 2;
             }
             other => root = Some(PathBuf::from(other)),
@@ -1875,6 +1878,9 @@ fn cmd_reverify(args: &[String]) -> i32 {
             return 2;
         }
     };
+    if demos {
+        return keel_cli::reverify::replay_demos(&root, &by);
+    }
     keel_cli::reverify::run(&root, task.as_deref(), &by)
 }
 

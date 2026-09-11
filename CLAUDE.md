@@ -323,6 +323,7 @@ keel gate --fast       # the per-edit tier: validate + duplicate-identity + mark
 keel enforcement-report # every hook event's fires, blocks and latency DISTRIBUTION from the fire-ledger, and the recall skip rate (D0389)
 keel gate --workspace  # the COMMIT tier for a repo holding several projects: every project the commit touches (D0234)
 keel reverify --all-drift   # re-run the declared gate at HEAD; stamp fresh TestResults on green (D0101)
+keel reverify --demos        # re-run every demo whose RAN receipt IS a command under a declared [demo] prefix; fresh pass with the same receipt, or a fail naming the exit code (D0444)
 ```
 
 **A hook's cost is a distribution, read from the ledger (D0389/issue402).** Never document a tier at its best

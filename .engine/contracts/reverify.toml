@@ -11,3 +11,16 @@ commands = [
     "cargo test --workspace --release",
     "cargo clippy --workspace --all-targets -- -D warnings",
 ]
+
+# D0444 (dcReplayableDemoStaysAPass): a `method=demo` result whose `// RAN:` receipt IS a command - one
+# line, the command alone, beginning with one of these prefixes - is REPLAYABLE: the write path keeps an
+# AI-judged pass on it a `pass` instead of `proposed` (D0312 B), and `keel reverify --demos` re-runs it at
+# HEAD, appending a fresh pass with the same receipt or a fail naming the command and its exit code. A
+# narrative that merely starts with `keel suite 571 passed ...` is testimony and stays a proposal. A
+# leading `keel ` runs THIS binary (D0230). No section => nothing is replayable, as before D0444.
+[demo]
+replayable = [
+    "keel ",
+    "cargo test",
+    "python scripts/probes/",
+]

@@ -88,7 +88,7 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     let root = project_with_proposals("q", true);
     let (ok, text) = agent(&root, &["attestation", ".", "--json"]);
     assert!(ok, "{text}");
-    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":0,\"awaiting\":4,\"sampling\":\"50%\"}"), "the census computes the set before anyone judges it: {text}");
+    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":0,\"awaiting\":4,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "the census computes the set before anyone judges it: {text}");
 
     // 50% of four = two, in result-uuid order: t2 (lead 1) and t0 (lead 4). t0 fails, t2 passes.
     let (ok, text) = agent(&root, &["judge-set", FILE, "--words", "the sampled set passes, except t0Gate which does not do what its title says", "--fail", "t0Gate", "--by", "you", "--date", "2026-09-11"]);
@@ -106,7 +106,7 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
 
     // the census now reads 2 judged; the sample is the judged two; two await --all
     let (_, text) = agent(&root, &["attestation", ".", "--json"]);
-    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":2,\"awaiting\":2,\"sampling\":\"50%\"}"), "{text}");
+    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":2,\"judged\":2,\"awaiting\":2,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "{text}");
     // the sample is judged: a second plain judge-set finds nothing and writes nothing
     let before = file_text(&root);
     let (ok, text) = agent(&root, &["judge-set", FILE, "--words", "and the rest pass too, the whole probe file", "--by", "you", "--date", "2026-09-11"]);
@@ -117,7 +117,7 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     assert!(ok, "{text}");
     assert!(text.contains("t3GateR2: pass") && text.contains("t1GateR2: pass"), "{text}");
     let (_, text) = agent(&root, &["attestation", ".", "--json"]);
-    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":4,\"judged\":4,\"awaiting\":0,\"sampling\":\"50%\"}"), "{text}");
+    assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":4,\"judged\":4,\"awaiting\":0,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "{text}");
 
     // what was written is a tree the authority and the confirmation rules accept
     let (ok, text) = agent(&root, &["validate", "."]);

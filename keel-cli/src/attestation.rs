@@ -114,7 +114,8 @@ pub fn proposed_count(root: &Path) -> usize {
 
 // ── D0443: the proposals, the sample and the human's judgment of it ─────────────────────────────
 
-/// One `proposed` result awaiting a human's judgment (D0312 B), as one file holds it.
+/// One result awaiting a human's judgment, as one file holds it: a `proposed` result (D0312 B), or a
+/// demo `pass` whose receipt replayed (D0444 - green for the wrong reason is what a reader catches).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proposal {
     /// The Test whose result is proposed (`sRefineGate`).
@@ -126,8 +127,29 @@ pub struct Proposal {
     pub uuid: String,
     /// A later `<test>R<m>` result judged pass or fail by a registered human exists.
     pub judged: bool,
+    /// What kind of claim this is (D0444).
+    pub kind: ProposalKind,
 }
 
+/// What awaits the human (D0444).
+///
+/// A proposal on an examined method, a proposal on a DEMO whose receipt was prose (counted apart, so
+/// the census can say how many demos are testimony), or a demo pass whose receipt is a command that
+/// replays - a pass, in the pool for a reader, never counted as `proposed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProposalKind {
+    Proposed,
+    ProposedDemo,
+    ReplayableDemo,
+}
+
+impl ProposalKind {
+    /// A `proposed` result (either kind), as against a replayable pass.
+    #[must_use]
+    pub const fn is_proposal(self) -> bool {
+        !matches!(self, Self::ReplayableDemo)
+    }
+}
 /// How many of a file's proposals a human is asked to judge: attestation-policy.toml
 /// `[proposedJudgment] sampling`, a share (`"50%"`) or a count (`3`). No rule samples everything.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,10 +189,15 @@ pub fn sampling_rule(root: &Path) -> Option<SamplingRule> {
     SamplingRule::parse(v.get("proposedJudgment")?.get("sampling")?)
 }
 
-/// Every proposal in one file's text, ordered by result uuid. `human` says whether a judge's name is a
-/// registered human - the caller binds it to the registry; a unit test passes its own.
+/// Every proposal in one file's text, ordered by result uuid.
+///
+/// `human` says whether a judge's name is a registered human - the caller binds it to the registry; a
+/// unit test passes its own. `prefixes` are
+/// the project's `[demo] replayable` prefixes (D0444): a demo Test whose latest result is a pass with a
+/// replayable receipt joins the pool as `ReplayableDemo`; none declared, none join.
 #[must_use]
-pub fn proposals_in_text(text: &str, human: &dyn Fn(&str) -> bool) -> Vec<Proposal> {
+pub fn proposals_in_text(text: &str, human: &dyn Fn(&str) -> bool, prefixes: &[String]) -> Vec<Proposal> {
+    let demos = crate::reverify::demo_tests_in_text(text);
     // every result line: (test, n, outcome, judgedBy, id)
     let mut results: Vec<(String, u32, String, String, String)> = Vec::new();
     for line in text.lines() {
@@ -188,18 +215,25 @@ pub fn proposals_in_text(text: &str, human: &dyn Fn(&str) -> bool) -> Vec<Propos
         .filter(|r| r.2 == "proposed")
         .map(|(base, n, _, _, uuid)| {
             let judged = results.iter().any(|(b, m, o, by, _)| b == base && m > n && (o == "pass" || o == "fail") && human(by));
-            Proposal { test: base.clone(), result: format!("{base}R{n}"), uuid: uuid.clone(), judged }
+            let kind = if demos.contains(base.as_str()) { ProposalKind::ProposedDemo } else { ProposalKind::Proposed };
+            Proposal { test: base.clone(), result: format!("{base}R{n}"), uuid: uuid.clone(), judged, kind }
         })
         .collect();
+    // D0444: a replayable demo pass is the LATEST result of its Test by construction, so a human's later
+    // verdict removes it from the pool rather than marking it judged.
+    for (test, _) in crate::reverify::demo_replays_in_text(text, prefixes) {
+        let Some((_, n, _, _, uuid)) = results.iter().filter(|r| r.0 == test).max_by_key(|r| r.1) else { continue };
+        out.push(Proposal { result: format!("{test}R{n}"), test, uuid: uuid.clone(), judged: false, kind: ProposalKind::ReplayableDemo });
+    }
     out.sort_by(|a, b| a.uuid.cmp(&b.uuid).then_with(|| a.result.cmp(&b.result)));
     out
 }
 
-/// The proposals of one file under the registry's notion of a human.
+/// The proposals of one file under the registry's notion of a human and the project's demo prefixes.
 #[must_use]
 pub fn proposals_in(root: &Path, file: &Path) -> Vec<Proposal> {
     let Ok(text) = std::fs::read_to_string(file) else { return Vec::new() };
-    proposals_in_text(&text, &|by| crate::actor::kind_of(root, by).as_deref() == Some("human"))
+    proposals_in_text(&text, &|by| crate::actor::kind_of(root, by).as_deref() == Some("human"), &crate::reverify::demo_prefixes(root))
 }
 
 /// The SAMPLE of one file's proposals: the ones a human is asked to judge. Every proposal already
@@ -217,12 +251,19 @@ pub fn sample(proposals: &[Proposal], rule: Option<SamplingRule>) -> Vec<&Propos
     out
 }
 
-/// proposed / sampled / judged across every `.tracking` file, each file sampled on its own.
+/// proposed / sampled / judged across every `.tracking` file, each file sampled on its own; and the
+/// D0444 split of the demos - how many demo proposals are testimony, how many demo passes replay.
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct ProposalCounts {
+    /// `proposed` results, either kind - never a replayable pass.
     pub proposed: usize,
+    /// The sample: judged first, then uuid order to the quota; replayable demo passes are in the pool.
     pub sampled: usize,
     pub judged: usize,
+    /// Demo passes whose receipt is a command that replays (D0444) - a pass, awaiting a reader.
+    pub demo_replayable: usize,
+    /// Demo results recorded `proposed` - a demo whose receipt was prose or absent.
+    pub demo_proposed: usize,
 }
 
 impl ProposalCounts {
@@ -239,7 +280,9 @@ pub fn proposal_counts(root: &Path) -> ProposalCounts {
     let mut c = ProposalCounts::default();
     for f in crate::collect_sysml(&root.join(".tracking")) {
         let ps = proposals_in(root, &f);
-        c.proposed += ps.len();
+        c.proposed += ps.iter().filter(|p| p.kind.is_proposal()).count();
+        c.demo_proposed += ps.iter().filter(|p| p.kind == ProposalKind::ProposedDemo).count();
+        c.demo_replayable += ps.iter().filter(|p| p.kind == ProposalKind::ReplayableDemo).count();
         c.judged += ps.iter().filter(|p| p.judged).count();
         c.sampled += sample(&ps, rule).len();
     }
@@ -313,12 +356,14 @@ pub fn cmd(args: &[String]) -> i32 {
             None => "null".to_owned(),
         };
         println!(
-            "{{\"byJudge\":[{}],\"uncitedCoverageClaims\":{claims},\"proposals\":{{\"proposed\":{},\"sampled\":{},\"judged\":{},\"awaiting\":{},\"sampling\":{rule_json}}}}}",
+            "{{\"byJudge\":[{}],\"uncitedCoverageClaims\":{claims},\"proposals\":{{\"proposed\":{},\"sampled\":{},\"judged\":{},\"awaiting\":{},\"demoReplayable\":{},\"demoProposed\":{},\"sampling\":{rule_json}}}}}",
             rows.join(","),
             pc.proposed,
             pc.sampled,
             pc.judged,
-            pc.awaiting()
+            pc.awaiting(),
+            pc.demo_replayable,
+            pc.demo_proposed
         );
         return 0;
     }
@@ -347,6 +392,10 @@ pub fn cmd(args: &[String]) -> i32 {
         pc.sampled,
         pc.judged,
         pc.awaiting()
+    );
+    println!(
+        "  demos (D0444): {} demo passes carry a receipt that REPLAYS (`keel reverify --demos` re-runs them; they sit in the sample pool as passes), {} demo results are proposals whose receipt was prose or absent.",
+        pc.demo_replayable, pc.demo_proposed
     );
     println!("  `keel judge-set <file> --words ... --by <human> --date ...` records one result and one quote receipt per item.");
     println!();
@@ -423,7 +472,7 @@ mod tests {
     #[test]
     fn six_proposals_under_a_half_rule_sample_three_by_uuid_and_judge_none() {
         let human = |by: &str| by == "you";
-        let ps = super::proposals_in_text(&six_proposals(), &human);
+        let ps = super::proposals_in_text(&six_proposals(), &human, &[]);
         assert_eq!(ps.len(), 6, "six proposed results, and the passes and the fail are not proposals");
         assert!(ps.iter().all(|p| !p.judged));
         let order: Vec<&str> = ps.iter().map(|p| p.test.as_str()).collect();
@@ -446,7 +495,7 @@ mod tests {
             "{}    part t0GateR2 : TestResult {{ :>> id = \"e2e00000-0000-4000-8000-0000000000b2\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"abc1237\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"you\"; :>> createdBy = \"bot\"; }}\n}}\n",
             six_proposals().as_str().strip_suffix("}\n").expect("the fixture closes its package")
         );
-        let ps = super::proposals_in_text(&judged, &human);
+        let ps = super::proposals_in_text(&judged, &human, &[]);
         assert_eq!(ps.len(), 6);
         assert_eq!(ps.iter().filter(|p| p.judged).count(), 1);
         let s = super::sample(&ps, Some(super::SamplingRule::Share(50)));
@@ -454,13 +503,61 @@ mod tests {
         assert_eq!(s[0].test, "t0Gate", "the judged proposal is in the sample first");
         // an AI's later result on a proposal is NOT a judgment
         let ai_later = judged.replace(":>> judgedBy = \"you\"; :>> createdBy = \"bot\";", ":>> judgedBy = \"bot\"; :>> createdBy = \"bot\";");
-        assert_eq!(super::proposals_in_text(&ai_later, &human).iter().filter(|p| p.judged).count(), 0);
+        assert_eq!(super::proposals_in_text(&ai_later, &human, &[]).iter().filter(|p| p.judged).count(), 0);
         // a tree of passes proposes nothing
         let passes = six_proposals().replace("VerdictKind::proposed", "VerdictKind::pass");
-        assert!(super::proposals_in_text(&passes, &human).is_empty());
+        assert!(super::proposals_in_text(&passes, &human, &[]).is_empty());
         // the rule parses a share and a count, and refuses a share past 100
         assert_eq!(super::SamplingRule::parse(&toml::Value::String("50%".into())), Some(super::SamplingRule::Share(50)));
         assert_eq!(super::SamplingRule::parse(&toml::Value::Integer(3)), Some(super::SamplingRule::Count(3)));
         assert_eq!(super::SamplingRule::parse(&toml::Value::String("150%".into())), None);
+    }
+
+    /// D0444 / D0388 pair on the pool. Positive: a demo whose latest result is a pass under a replayable
+    /// receipt enters the pool as `ReplayableDemo` - judged false, in the sample by uuid, NOT a proposal -
+    /// and a demo whose result is `proposed` is a `ProposedDemo`. Negative: with no prefixes declared the
+    /// same text yields the proposals alone, and a human's later fail on the replayable demo removes it
+    /// from the pool (the latest result is theirs, not a replayable pass).
+    #[test]
+    fn a_replayable_demo_pass_is_in_the_pool_as_a_pass_and_leaves_when_a_human_judges_it() {
+        let human = |by: &str| by == "you";
+        let prefixes = vec!["keel ".to_string()];
+        let text = concat!(
+            "package P {\n",
+            "    verification dRun : Test { :>> id = \"e2e00000-0000-4000-8000-0000000000d1\"; :>> method = VerificationMethod::demo; }\n",
+            "    // RAN: keel show control-structure . --svg\n",
+            "    part dRunR1 : TestResult { :>> id = \"02e00000-0000-4000-8000-0000000000d2\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"bot\"; }\n",
+            "    verification dTold : Test { :>> id = \"e2e00000-0000-4000-8000-0000000000e1\"; :>> method = VerificationMethod::demo; }\n",
+            "    // RAN: looked at the picture and it was fine\n",
+            "    part dToldR1 : TestResult { :>> id = \"92e00000-0000-4000-8000-0000000000e2\"; :>> outcome = VerdictKind::proposed; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"bot\"; }\n",
+            "    verification iGate : Test { :>> id = \"e2e00000-0000-4000-8000-0000000000f1\"; :>> method = VerificationMethod::inspect; }\n",
+            "    part iGateR1 : TestResult { :>> id = \"52e00000-0000-4000-8000-0000000000f2\"; :>> outcome = VerdictKind::proposed; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"bot\"; }\n",
+            "}\n"
+        );
+        let ps = super::proposals_in_text(text, &human, &prefixes);
+        let kinds: Vec<(&str, super::ProposalKind, bool)> = ps.iter().map(|p| (p.test.as_str(), p.kind, p.judged)).collect();
+        assert_eq!(
+            kinds,
+            [
+                ("dRun", super::ProposalKind::ReplayableDemo, false),
+                ("iGate", super::ProposalKind::Proposed, false),
+                ("dTold", super::ProposalKind::ProposedDemo, false),
+            ],
+            "uuid order; the replayable pass is in the pool, the prose demo is a demo proposal"
+        );
+        assert_eq!(ps.iter().filter(|p| p.kind.is_proposal()).count(), 2, "a replayable pass is never counted proposed");
+        assert_eq!(ps[0].result, "dRunR1");
+        let s = super::sample(&ps, Some(super::SamplingRule::Share(50)));
+        assert_eq!(s.iter().map(|p| p.test.as_str()).collect::<Vec<_>>(), ["dRun", "iGate"], "the pool samples across both kinds");
+        // negative: no declared prefix -> the two proposals only
+        let none = super::proposals_in_text(text, &human, &[]);
+        assert_eq!(none.iter().map(|p| p.test.as_str()).collect::<Vec<_>>(), ["iGate", "dTold"]);
+        // negative: a human's later fail is the latest result, so the replayable pass leaves the pool
+        let judged = format!(
+            "{}    part dRunR2 : TestResult {{ :>> id = \"12e00000-0000-4000-8000-0000000000d3\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"abc1235\"; :>> judgedAt = \"2026-09-12\"; :>> judgedBy = \"you\"; }}\n}}\n",
+            text.strip_suffix("}\n").expect("the fixture closes its package")
+        );
+        let after = super::proposals_in_text(&judged, &human, &prefixes);
+        assert!(after.iter().all(|p| p.test != "dRun"), "{after:?}");
     }
 }
