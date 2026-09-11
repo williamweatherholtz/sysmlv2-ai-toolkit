@@ -85,7 +85,14 @@ fn the_guard_passes_a_conforming_tree_and_names_the_one_path_rewritten_crlf() {
     let (ok, out) = run(&root, &["guard", "working-tree-eol", "."]);
     assert!(ok, "a conforming tree passes: {out}");
     assert!(out.contains("[guard:working-tree-eol] PASS"), "{out}");
-    assert!(!out.contains("0 scanned"), "the declared population is counted, not empty: {out}");
+    // Parse the count: `!contains("0 scanned")` is the substring form unknown_flag_is_refused.rs forbids
+    // (it breaks at 10, 20, ... - CI run 34610841088 caught this line by that test, not by the touched set).
+    let scanned: u64 = out
+        .split("] PASS")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().find_map(|w| w.trim_matches(|c: char| !c.is_ascii_digit()).parse().ok()))
+        .expect("the PASS line carries a scanned count");
+    assert!(scanned > 0, "the declared population is counted, not empty: {out}");
     assert!(!out.contains("run.bat"), "a CRLF file declared eol=crlf is never named: {out}");
 
     // Known-positive: the same bytes with CRLF endings under `eol=lf`. `git status` calls it clean.

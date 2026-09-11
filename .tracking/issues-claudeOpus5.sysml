@@ -2272,4 +2272,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcEvidencePrefixIsTheApis to issue493;
+
+    part issue494 : Issue {
+        :>> id = "2719fe37-cab4-4c64-9240-f5743edfb046";
+        :>> title = "The touched set is blind to corpus-scanning tests: CI red on 8857173 after a green land";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "CI run 34610841088 for 8857173 concluded failure: no_test_asserts_a_count_by_substring (keel-cli/tests/unknown_flag_is_refused.rs:110) flagged working_tree_eol.rs:88, a new test asserting a non-zero count with !contains('0 scanned'). Locally the land was green: keel suite --touched (D0421) and the D0425 verifier both selected 710 tests by the module stems the commit changed, and a meta-test that scans the tests directory names no module, so it was never in the touched set. The same holds for every corpus-scanning test - the touched set is blind to exactly the tests whose job is to hold the other tests to a rule. Fix commit follows; the test now parses the count.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcCorpusTestsAreAlwaysTouched to issue494;
 }
