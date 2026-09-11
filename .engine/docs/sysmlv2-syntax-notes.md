@@ -169,7 +169,8 @@ pipe and the shell hangs.
   (`orient::compute` in sysmlv2-cli) as a fallback. Sprint 7 extended done-detection to accept
   both `{task}DoDR{n}` (primary) and `{task}R{n}` (legacy fallback). New work should use the
   `DoDR` canonical form; existing legacy files are tolerated without migration.
-- **Outcome enum**: `outcome = VerdictKind::pass` (or `::fail`). The enum is `VerdictKind`,
+- **Outcome enum**: `outcome = VerdictKind::pass` (or `::fail`; `::proposed` is what the write path records
+  for an AI-judged pass on demo/analyze/inspect with no replayable receipt, D0312 B - never authored by hand). The enum is `VerdictKind`,
   **not** `TestOutcome`. Using the wrong name silently produces a non-pass result.
 - **Required TestResult fields**: `id` (UUID), `outcome` (VerdictKind), `judgedAgainst`
   (short git SHA), `judgedAt` (ISO-8601 date), `judgedBy` (actor name string).

@@ -908,20 +908,23 @@ fn gates_defined(text: &str, order: &[String]) -> HashSet<String> {
     out
 }
 
-/// Gate names (of `order`) with a passing `part <…{G}Gate…R\d+> : TestResult` (reuses `orient::gate_passed`).
-fn gates_passed(text: &str, order: &[String]) -> HashSet<String> {
-    order.iter().filter(|g| crate::orient::gate_passed(text, g)).cloned().collect()
+/// Gate names (of `order`) with a RECORDED `part <…{G}Gate…R\d+> : TestResult` - `pass` or `proposed`
+/// (reuses `orient::gate_recorded`, D0437). The guard checks SEQUENCE, not done-ness: an AI-judged
+/// inspect gate lands `VerdictKind::proposed` under D0312 B and was still recorded in its turn; reading
+/// only `pass` here made every AI-run sprint red at its Implement gate (issue470).
+fn gates_recorded(text: &str, order: &[String]) -> HashSet<String> {
+    order.iter().filter(|g| crate::orient::gate_recorded(text, g)).cloned().collect()
 }
 
-/// Ordering violations: a passed gate while an earlier DEFINED gate is unpassed.
-fn ordering_violations(order: &[String], defined: &HashSet<String>, passed: &HashSet<String>) -> Vec<(String, String)> {
+/// Ordering violations: a recorded gate while an earlier DEFINED gate is unrecorded.
+fn ordering_violations(order: &[String], defined: &HashSet<String>, recorded: &HashSet<String>) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for (i, g) in order.iter().enumerate() {
-        if !passed.contains(g) {
+        if !recorded.contains(g) {
             continue;
         }
         for earlier in order.iter().take(i) {
-            if defined.contains(earlier) && !passed.contains(earlier) {
+            if defined.contains(earlier) && !recorded.contains(earlier) {
                 out.push((g.clone(), earlier.clone()));
             }
         }
@@ -929,11 +932,11 @@ fn ordering_violations(order: &[String], defined: &HashSet<String>, passed: &Has
     out
 }
 
-/// True if Retro passed but its gate text records no avoidable-issue scan evidence (issue011).
+/// True if Retro is recorded but its gate text records no avoidable-issue scan evidence (issue011).
 /// Anchors on the `verification …RetroGate… : Test` declaration (not any `RetroGate` substring,
 /// which can appear in other gates' prose) — mirrors `_RETRO_TEXT`.
-fn retro_scan_missing(text: &str, passed: &HashSet<String>) -> bool {
-    if !passed.contains("Retro") {
+fn retro_scan_missing(text: &str, recorded: &HashSet<String>) -> bool {
+    if !recorded.contains("Retro") {
         return false;
     }
     for (idx, _) in text.match_indices("verification ") {
@@ -953,10 +956,11 @@ fn retro_scan_missing(text: &str, passed: &HashSet<String>) -> bool {
     false // no retro verification declaration found
 }
 
-/// Guard: ceremony gates pass in order, and a passing Retro carries its scan evidence.
+/// Guard: ceremony gates are recorded in order, and a recorded Retro carries its scan evidence.
 ///
-/// Within a delivery file, no ceremony gate passes while an earlier DEFINED gate is
-/// unpassed; a passing Retro records avoidable-issue scan evidence. Mirrors `validate_ceremony.py`.
+/// Within a delivery file, no ceremony gate is recorded (`pass` or `proposed`, D0437) while an earlier
+/// DEFINED gate is unrecorded; a recorded Retro records avoidable-issue scan evidence. Mirrors
+/// `validate_ceremony.py`. Whether a recorded gate is PASSED is orient's question, not this guard's.
 /// The order is the workflow chain the process steps bind (D0435); a tree that binds no gate has no
 /// ceremony order, and the guard WARNS that the delivery records are unenforceable-by-step rather
 /// than enforcing a sequence nobody declared.
@@ -977,19 +981,19 @@ pub fn ceremony(root: &Path) -> GuardReport {
     for path in &files {
         let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        let passed = gates_passed(&text, &order);
+        let recorded = gates_recorded(&text, &order);
         let mut defined = gates_defined(&text, &order);
-        defined.extend(passed.iter().cloned());
-        let viols = ordering_violations(&order, &defined, &passed);
+        defined.extend(recorded.iter().cloned());
+        let viols = ordering_violations(&order, &defined, &recorded);
         if !viols.is_empty() {
-            let detail = viols.iter().map(|(g, e)| format!("{g} passed but {e} (earlier) unpassed")).collect::<Vec<_>>().join("; ");
+            let detail = viols.iter().map(|(g, e)| format!("{g} recorded but {e} (earlier) unrecorded")).collect::<Vec<_>>().join("; ");
             if grandfathered.contains(stem.as_str()) {
                 warnings.push(history_line(&format!("{stem}: {detail} (grandfathered, pre-issue010)")));
             } else {
                 violations.push(format!("{stem}: {detail}"));
             }
         }
-        if retro_scan_missing(&text, &passed) && !grandfathered.contains(stem.as_str()) {
+        if retro_scan_missing(&text, &recorded) && !grandfathered.contains(stem.as_str()) {
             violations.push(format!("{stem}: Retro gate recorded without avoidable-issue scan evidence (issue011)"));
         }
     }
@@ -4198,6 +4202,11 @@ fn evidence_cited(root: &Path) -> GuardReport {
             if crate::actor::kind_of(root, &judged_by).as_deref() == Some("human") {
                 continue;
             }
+            // A PROPOSAL (D0312 B) claims nothing yet - it is what an AI records when it has no
+            // receipt - so it owes none; the claim is made when a human judges it.
+            if line.contains("VerdictKind::proposed") {
+                continue;
+            }
             let Some(part) =
                 line.split(" : TestResult").next().and_then(|s| s.split("part ").nth(1))
             else {
@@ -7052,6 +7061,48 @@ mod tests {
         let passed: HashSet<String> = strs(&["Refine", "Implement"]).into_iter().collect(); // Standup skipped
         let v = ordering_violations(&order, &defined, &passed);
         assert_eq!(v, vec![("Implement".to_owned(), "Standup".to_owned())]);
+    }
+
+    /// D0437 / issue470: a PROPOSED earlier gate is recorded in sequence (known positive: no violation);
+    /// an earlier gate with no result at all is not (known negative: violation). `gate_passed` keeps
+    /// reading the proposed gate as unpassed - the guard's reader changed, orient's did not.
+    #[test]
+    fn ceremony_order_reads_recorded_gates_not_passed_ones() {
+        let order = strs(&["Refine", "Standup", "Implement", "Review", "CloseOut", "Retro"]);
+        let proposed_then_pass = "verification xRefineGate : Test { }\n\
+            part xRefineGateR1 : TestResult { :>> outcome = VerdictKind::proposed; }\n\
+            verification xStandupGate : Test { }\n\
+            part xStandupGateR1 : TestResult { :>> outcome = VerdictKind::proposed; }\n\
+            verification xImplementGate : Test { }\n\
+            part xImplementGateR1 : TestResult { :>> outcome = VerdictKind::pass; }\n";
+        let recorded = gates_recorded(proposed_then_pass, &order);
+        assert_eq!(recorded.len(), 3, "{recorded:?}");
+        let mut defined = gates_defined(proposed_then_pass, &order);
+        defined.extend(recorded.iter().cloned());
+        assert!(ordering_violations(&order, &defined, &recorded).is_empty(), "a proposed gate is recorded in its turn");
+        assert!(!crate::orient::gate_passed(proposed_then_pass, "Refine"), "but it is still not PASSED");
+        assert!(crate::orient::gate_passed(proposed_then_pass, "Implement"));
+
+        let missing_then_pass = "verification xRefineGate : Test { }\n\
+            verification xStandupGate : Test { }\n\
+            part xStandupGateR1 : TestResult { :>> outcome = VerdictKind::proposed; }\n\
+            verification xImplementGate : Test { }\n\
+            part xImplementGateR1 : TestResult { :>> outcome = VerdictKind::pass; }\n";
+        let recorded = gates_recorded(missing_then_pass, &order);
+        let mut defined = gates_defined(missing_then_pass, &order);
+        defined.extend(recorded.iter().cloned());
+        let v = ordering_violations(&order, &defined, &recorded);
+        assert_eq!(
+            v,
+            vec![("Standup".to_owned(), "Refine".to_owned()), ("Implement".to_owned(), "Refine".to_owned())],
+            "a gate with NO result is unrecorded, whatever comes after it"
+        );
+
+        // A proposed Retro owes its scan evidence exactly as a passed one does.
+        let mut retro: HashSet<String> = HashSet::new();
+        retro.insert("Retro".to_owned());
+        let without = "verification xRetroGate : Test { :>> procedureText = \"rubber stamp\"; }";
+        assert!(retro_scan_missing(without, &retro));
     }
 
     /// The live tree's order is the delivery chain, and the guard's per-file helpers read it (D0435).

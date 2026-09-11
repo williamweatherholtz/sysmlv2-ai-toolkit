@@ -24,7 +24,7 @@ package EngineElement {
     attribute def Timestamp :> String;     // ISO-8601 date/time
 
     enum def ActorKind { human; ai; }
-    enum def VerdictKind { pass; fail; inconclusive; error; }                    // native verification verdict
+    enum def VerdictKind { pass; fail; inconclusive; error; proposed; }          // native verification verdict + proposed (D0312 B): an AI-examined claim awaiting a human's judgment
     enum def VerificationMethod { inspect; analyze; demo; test; confirmation; critique; }  // native set + engine confirmation + antagonistic critique (D0080)
     // Antagonistic critique (D0080): critique IS a lens-tagged verification.
     enum def Severity { Critical; High; Medium; Low; }                          // finding/issue severity (D0079); human-disposition gate at >= Medium

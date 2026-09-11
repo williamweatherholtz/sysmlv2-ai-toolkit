@@ -36,6 +36,9 @@ pub struct Census {
     pub examined: usize,
     /// Verdicts recorded as `fail` — a population that never fails is not being tested.
     pub failed: usize,
+    /// Verdicts recorded as `proposed` (D0312 B): an AI-examined claim no human has judged yet -
+    /// done for nothing, never folded into pass or fail.
+    pub proposed: usize,
     /// Total results counted.
     pub total: usize,
 }
@@ -72,6 +75,9 @@ pub fn census(root: &Path) -> BTreeMap<String, Census> {
             if line.contains("VerdictKind::fail") {
                 e.failed += 1;
             }
+            if line.contains("VerdictKind::proposed") {
+                e.proposed += 1;
+            }
             let Some(part) = line.split(" : TestResult").next().and_then(|s| s.split("part ").nth(1)) else { continue };
             let base = part.trim().rsplit_once('R').map_or_else(|| part.trim(), |(b, _)| b);
             if method_of.get(base).map(String::as_str) == Some("test") {
@@ -94,6 +100,17 @@ pub fn census(root: &Path) -> BTreeMap<String, Census> {
 fn quoted(line: &str, name: &str) -> Option<String> {
     let needle = format!(":>> {name} = \"");
     Some(line.split(&needle).nth(1)?.split('"').next()?.to_string())
+}
+
+/// Every `TestResult` under `.tracking` recorded `proposed` (D0312 B) - the burndown's count of what
+/// awaits a human's judgment. Textual, like the census: a proposal is a line, not a computed state.
+#[must_use]
+pub fn proposed_count(root: &Path) -> usize {
+    crate::collect_sysml(&root.join(".tracking"))
+        .iter()
+        .filter_map(|f| std::fs::read_to_string(f).ok())
+        .map(|t| t.lines().filter(|l| l.contains(" : TestResult {") && l.contains("VerdictKind::proposed")).count())
+        .sum()
 }
 
 /// Coverage claims that name a tracked item but cite nothing re-runnable — REPORTED, never gated,
@@ -149,8 +166,8 @@ pub fn cmd(args: &[String]) -> i32 {
             .iter()
             .map(|(k, v)| {
                 format!(
-                    "{{\"judge\":\"{k}\",\"total\":{},\"exercised\":{},\"exercisedWithReceipt\":{},\"examined\":{},\"failed\":{},\"receiptPct\":{},\"failPct\":{}}}",
-                    v.total, v.exercised, v.exercised_with_receipt, v.examined, v.failed,
+                    "{{\"judge\":\"{k}\",\"total\":{},\"exercised\":{},\"exercisedWithReceipt\":{},\"examined\":{},\"failed\":{},\"proposed\":{},\"receiptPct\":{},\"failPct\":{}}}",
+                    v.total, v.exercised, v.exercised_with_receipt, v.examined, v.failed, v.proposed,
                     pct(v.exercised_with_receipt, v.exercised), pct(v.failed, v.total)
                 )
             })
@@ -161,13 +178,16 @@ pub fn cmd(args: &[String]) -> i32 {
 
     println!("attestation census — is a `pass` a RECEIPT or a TESTIMONY?");
     println!();
-    println!("  {:<14} {:>7} {:>10} {:>9} {:>9} {:>8}", "JUDGE", "results", "exercised", "w/receipt", "examined", "failed");
+    println!("  {:<14} {:>7} {:>10} {:>9} {:>9} {:>8} {:>8}", "JUDGE", "results", "exercised", "w/receipt", "examined", "failed", "proposed");
     for (k, v) in &c {
         println!(
-            "  {:<14} {:>7} {:>10} {:>8}% {:>9} {:>7}%",
-            k, v.total, v.exercised, pct(v.exercised_with_receipt, v.exercised), v.examined, pct(v.failed, v.total)
+            "  {:<14} {:>7} {:>10} {:>8}% {:>9} {:>7}% {:>8}",
+            k, v.total, v.exercised, pct(v.exercised_with_receipt, v.exercised), v.examined, pct(v.failed, v.total), v.proposed
         );
     }
+    println!();
+    println!("  proposed is the third tier (D0312 B): an AI-examined pass no human has judged - done for");
+    println!("  nothing until one does, and never folded into pass or fail.");
     println!();
     println!("  w/receipt is the honest number: an EXERCISED claim that records what produced it, so a");
     println!("  third party can re-derive the verdict instead of taking the judge's word (guard 52,");
@@ -185,6 +205,26 @@ pub fn cmd(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::census;
+
+    /// D0312 B: `proposed_count` is the burndown's number. Positive: a tree holding one `TestResult`
+    /// with `VerdictKind::proposed` counts 1. Negative: the same tree with that line at pass counts 0.
+    /// And orient's `gate_passed` - the reader that decides done-ness - does not read a proposed gate
+    /// as passed, so a proposed sprint is not done by construction (no reader was taught the word).
+    #[test]
+    fn a_proposed_result_is_counted_and_is_not_a_passed_gate() {
+        let root = std::env::temp_dir().join("keel-attest-proposed");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".tracking").join("delivery")).expect("mkdir");
+        let f = root.join(".tracking").join("delivery").join("s.sysml");
+        let proposed = "package S {\n    verification sRefineGate : Test { :>> id = \"e2e00000-0000-4000-8000-00000000f101\"; :>> method = VerificationMethod::inspect; }\n    part sRefineGateR1 : TestResult { :>> id = \"e2e00000-0000-4000-8000-00000000f102\"; :>> outcome = VerdictKind::proposed; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-10\"; :>> judgedBy = \"bot\"; }\n}\n";
+        std::fs::write(&f, proposed).expect("write");
+        assert_eq!(super::proposed_count(&root), 1, "one proposed result is counted");
+        assert!(!crate::orient::gate_passed(proposed, "sRefine"), "a proposed gate is NOT passed");
+        let passed = proposed.replace("VerdictKind::proposed", "VerdictKind::pass");
+        std::fs::write(&f, &passed).expect("write");
+        assert_eq!(super::proposed_count(&root), 0, "a pass is not proposed");
+        assert!(crate::orient::gate_passed(&passed, "sRefine"), "the same gate at pass IS passed");
+    }
 
     #[test]
     fn the_census_separates_human_testimony_from_ai_claims() {

@@ -744,14 +744,27 @@ fn in_progress_sprints(repo: &Path) -> Vec<SprintCeremony> {
 /// True if a `part <...><Gate>Gate<...>R<n> : TestResult` with `outcome = pass`
 /// exists for the given canonical gate name in `text`.
 pub(crate) fn gate_passed(text: &str, gate: &str) -> bool {
+    gate_outcome_in(text, gate, &["VerdictKind::pass"])
+}
+
+/// True if `<gate>Gate` has a RECORDED `TestResult` - `pass` OR `proposed` (D0312 B). This is the
+/// ceremony guard's ORDER reader (D0437): a gate an AI judged without a replayable receipt has been
+/// recorded in sequence even though it is not yet passed. Sequence is the guard's concern; done-ness
+/// stays [`gate_passed`]'s, so `advance`, orient and the suspect algebra still read a proposed gate as
+/// not passed.
+pub(crate) fn gate_recorded(text: &str, gate: &str) -> bool {
+    gate_outcome_in(text, gate, &["VerdictKind::pass", "VerdictKind::proposed"])
+}
+
+/// A `part ...<gate>Gate...R<n> : TestResult { ... outcome = <one of `outcomes`> }` declaration exists.
+fn gate_outcome_in(text: &str, gate: &str, outcomes: &[&str]) -> bool {
     let needle = format!("{gate}Gate");
     for (idx, _) in text.match_indices(&needle) {
-        // Must be a `part ...R<n> : TestResult ... outcome = ...::pass` declaration.
         let line_start = text[..idx].rfind('\n').map_or(0, |n| n + 1);
         let stmt_end = text[idx..].find('}').map_or(text.len(), |e| idx + e);
         let stmt = &text[line_start..stmt_end];
         if stmt.contains("part ") && stmt.contains(": TestResult")
-            && stmt.contains("VerdictKind::pass")
+            && outcomes.iter().any(|o| stmt.contains(o))
         {
             return true;
         }

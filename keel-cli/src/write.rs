@@ -640,6 +640,44 @@ fn refuse_receiptless_ai_test(path: &Path, judged_by: &str, evidence: Option<&st
     }
 }
 
+/// D0312 option B (dcProposedOutcomeTier): the outcome an AI-judged `pass` on an EXAMINED method is
+/// recorded with when nothing re-runnable stands behind it.
+///
+/// A `method=test` pass with its receipt is MACHINE and stands (issue448 refuses it receiptless); a
+/// human's judgment stands on their word (D0232); a `fail` is a fail whoever judged it. What an AI
+/// merely examines - `demo`, `analyze`, `inspect` - is a PROPOSAL until a human judges it, and counts
+/// as done for nothing meanwhile. The one receipt form CI re-runs today is D0323's `ci-run id=<id>
+/// workflow=<name>`, so that one stands; recognising a re-runnable command receipt on a demo is
+/// dcReplayableDemoStaysAPass. Forward-only: only the write changes, standing results are untouched.
+/// An unregistered judge is not a human, as `refuse_receiptless_ai_test` reads it.
+fn proposed_tier<'a>(path: &Path, pkg: &Package, verification: &str, verdict: &'a str, judged_by: &str, evidence: Option<&str>) -> &'a str {
+    if verdict != "pass" {
+        return verdict;
+    }
+    if !EXAMINED_METHODS.iter().any(|m| verification_declares_method(pkg, verification, m)) {
+        return verdict;
+    }
+    if evidence.map(str::trim).is_some_and(|e| e.starts_with("ci-run id=")) {
+        return verdict;
+    }
+    let Some(root) = model_root_of(path) else {
+        return verdict;
+    };
+    if !root.join(".tracking").join("actors.sysml").exists() {
+        return verdict;
+    }
+    match crate::actor::kind_of(&root, judged_by).as_deref() {
+        Some("human") => verdict,
+        _ => PROPOSED,
+    }
+}
+
+/// The methods whose AI-judged pass is a proposal (D0312 B): examined, not exercised.
+pub const EXAMINED_METHODS: [&str; 3] = ["demo", "analyze", "inspect"];
+
+/// The `VerdictKind` member a proposal is recorded with.
+pub const PROPOSED: &str = "proposed";
+
 /// The model root above `target` (the directory holding `.tracking`/`.engine`), when any.
 fn model_root_of(target: &Path) -> Option<std::path::PathBuf> {
     let mut cur = target;
@@ -750,6 +788,8 @@ fn append_result_locked(
     if verification_declares_method(&pkg, &format!("{task_name}DoD"), "test") {
         refuse_receiptless_ai_test(path, judged_by, evidence, &format!("the method=test result on {task_name}DoD"))?;
     }
+    // D0312 B: an AI's pass on an examined method is recorded as a proposal, not a pass.
+    let verdict = proposed_tier(path, &pkg, &format!("{task_name}DoD"), verdict, judged_by, evidence);
 
     let n = max_result_n(&pkg, task_name) + 1;
     let uuid = gen_uuid();
@@ -1201,6 +1241,8 @@ fn append_gate_result_locked(
     if verification_declares_method(&pkg, gate_name, "test") {
         refuse_receiptless_ai_test(path, judged_by, evidence, &format!("the method=test gate result on {gate_name}"))?;
     }
+    // D0312 B: a ceremony gate an AI inspects or analyses lands as a proposal until a human judges it.
+    let verdict = proposed_tier(path, &pkg, gate_name, verdict, judged_by, evidence);
 
     let n = max_gate_result_n(&pkg, gate_name) + 1;
     let uuid = gen_uuid();
@@ -2159,6 +2201,53 @@ mod tests {
         super::append_gate_result(&f, "gRefine", "abc1234", "pass", "2026-09-10", "bot", None, None).expect("method=inspect gate owes no receipt");
         let written = std::fs::read_to_string(&f).expect("read");
         assert_eq!(written.matches("gImplR").count(), 2, "exactly the two permitted gImpl results landed:\n{written}");
+    }
+
+    /// D0312 option B, the PROPOSED tier - the issue400/D0388 probe pair named BEFORE the live tree
+    /// is read. Positive: an AI-kind judge passing a method=inspect result with no replayable receipt
+    /// lands `VerdictKind::proposed`, not pass. Negative: the same call judged by a Person lands
+    /// `pass`. Around them: a `ci-run id=` receipt (D0323, the one replayable form) keeps an AI
+    /// inspect at pass; an AI `fail` is never softened to proposed; and an AI method=test result
+    /// with no receipt is still REFUSED (issue448) - the tier sits behind that check, not in place
+    /// of it. Both write paths, since the gate path is where the sprint ceremony lands.
+    #[test]
+    fn ai_examined_passes_without_a_replayable_receipt_land_proposed() {
+        let root = k6_root("proposed");
+        let f = root.join(".tracking").join("delivery").join("p.sysml");
+        let body = "package P {\n    action def Run {\n        action tinsp;\n        verification tinspDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000e101\"; :>> method = VerificationMethod::inspect; :>> procedureText = \"eyes\"; }\n        action ttest;\n        verification ttestDoD : Test { :>> id = \"e2e00000-0000-4000-8000-00000000e102\"; :>> method = VerificationMethod::test; :>> procedureText = \"machine verifies\"; }\n    }\n    verification gRetro : Test { :>> id = \"e2e00000-0000-4000-8000-00000000e103\"; :>> method = VerificationMethod::analyze; :>> procedureText = \"the retro gate\"; }\n    verification gDemo : Test { :>> id = \"e2e00000-0000-4000-8000-00000000e104\"; :>> method = VerificationMethod::demo; :>> procedureText = \"the demo gate\"; }\n}\n";
+        std::fs::write(&f, body).expect("write");
+        let outcome_of = |uuid: &str| -> String {
+            let text = std::fs::read_to_string(&f).expect("read");
+            let line = text.lines().find(|l| l.contains(uuid)).expect("the written line");
+            let start = line.find("VerdictKind::").expect("an outcome") + "VerdictKind::".len();
+            line[start..].chars().take_while(char::is_ascii_alphabetic).collect()
+        };
+
+        // positive: AI + inspect + no receipt -> proposed
+        let u = super::append_result(&f, "tinsp", "abc1234", "pass", "2026-09-10", "bot", None).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "an AI-examined pass with no replayable receipt is PROPOSED");
+        // negative: the same call by a Person -> pass
+        let u = super::append_result(&f, "tinsp", "abc1234", "pass", "2026-09-10", "hum", None).expect("lands");
+        assert_eq!(outcome_of(&u), "pass", "a human's judgment is the HUMAN tier and stands as pass");
+        // a replayable receipt keeps the AI's pass (dcReplayableDemoStaysAPass)
+        let u = super::append_result(&f, "tinsp", "abc1234", "pass", "2026-09-10", "bot", Some("ci-run id=1 workflow=ci")).expect("lands");
+        assert_eq!(outcome_of(&u), "pass", "a ci-run receipt is replayable, so the pass stands");
+        // fail is never softened
+        let u = super::append_result(&f, "tinsp", "abc1234", "fail", "2026-09-10", "bot", None).expect("lands");
+        assert_eq!(outcome_of(&u), "fail", "only a pass is downgraded");
+        // the issue448 refusal is untouched
+        let r = super::append_result(&f, "ttest", "abc1234", "pass", "2026-09-10", "bot", None);
+        assert!(matches!(r, Err(WriteError::ReceiptOwed(..))), "AI + method=test + no receipt is still refused: {r:?}");
+
+        // the gate path: analyze and demo are examined methods too
+        let u = super::append_gate_result(&f, "gRetro", "abc1234", "pass", "2026-09-10", "bot", None, None).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "an AI analyze gate with no receipt is PROPOSED");
+        let u = super::append_gate_result(&f, "gDemo", "abc1234", "pass", "2026-09-10", "bot", None, None).expect("lands");
+        assert_eq!(outcome_of(&u), "proposed", "an AI demo gate with no receipt is PROPOSED");
+        let u = super::append_gate_result(&f, "gRetro", "abc1234", "pass", "2026-09-10", "hum", None, None).expect("lands");
+        assert_eq!(outcome_of(&u), "pass", "a human's gate judgment stands");
+        let text = std::fs::read_to_string(&f).expect("read");
+        assert_eq!(text.matches("VerdictKind::proposed").count(), 3, "exactly the three AI-examined passes landed proposed:\n{text}");
     }
 
     /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,

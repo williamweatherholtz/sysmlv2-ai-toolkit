@@ -3606,6 +3606,8 @@ pub fn burndown_summary_json(root: &Path) -> Result<String, ViewError> {
         ("unrooted_capabilities".to_string(), n(unrooted_caps)),
         ("orphan_stories".to_string(), n(orphan_stories)),
         ("ungrounded_ratio_pct".to_string(), Json::Int(i64::from(pct(ungrounded, stories.len())))),
+        // D0312 B: what an AI examined and no human has judged - its own count, never folded into done.
+        ("proposed_results".to_string(), n(crate::attestation::proposed_count(root))),
         ("triggers".to_string(), Json::Arr(triggered)),
         ("detail".to_string(), Json::s("keel tier-satisfaction | rootedness | assured | critique-coverage | show indicators (triggers)")),
     ])

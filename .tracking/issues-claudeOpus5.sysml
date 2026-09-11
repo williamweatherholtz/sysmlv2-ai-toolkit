@@ -1996,4 +1996,38 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcTouchedReceiptSaysRunning to issue468;
+
+    part issue469 : Issue {
+        :>> id = "5803224f-f993-4a7c-bc53-0c73cc72ddae";
+        :>> title = "The verifier's foreground touched run was killed by the harness's ten-minute cap; its procedure lives in prompt text, not a skill";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The sprint 663 verifier subagent ran `keel suite --touched .` in the foreground with the harness's maximum timeout (600 000 ms); the set with the lib takes 7-12 minutes on this host (434 s and 623 s measured at issue453, and the sprint 662 run), so the harness killed the process tree at the cap. The D0387/issue468 running stub held: the receipt read `outcome = 'running'` and the verifier reported the run as incomplete rather than recording the previous run's pass - so no false record landed, but one run (about eleven minutes) was lost and the primary relaunched it detached by hand. issue453 is the same cap falling on the land inside the commit hook; this is the cap falling on the verifier. The cause behind both instances is that the verifier's procedure - launch detached, read the receipt only after exit, check `at` and `stems`, then the gate set and the probe pair - exists only in the primary's prompt text and is retyped every sprint (D0040: a recurring task done without a skill leaks its process into conversation history, where it cannot be enforced or improved). The `test-verify` skill predates both `keel suite --touched` and D0425 and still names `cargo test` at the repo root.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "dcVerifierProcedureIsASkill";
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcVerifierProcedureIsASkill to issue469;
+
+    part issue470 : Issue {
+        :>> id = "89c37c80-564f-4e99-bd7e-636a87800a60";
+        :>> title = "ceremony guard read a proposed gate as unrecorded: plan663 missed the ORDER reader";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The plan for dcProposedOutcomeTier (D0312 B, sprint 663) enumerated the readers that must keep testing the VerdictKind::pass literal so a proposed result is not-done by construction - orient::gate_passed, guard 52 evidence-cited, the suspect/done algebra - and did not enumerate the ceremony guard. Its ORDER check (guards.rs gates_passed -> ordering_violations) reuses orient::gate_passed, so a gate recorded as proposed reads to the guard as if no result had been written. Observed by the Stop hook at the first turn boundary after the recorder subagent wrote sprint 663's ceremony: `[ceremony] sprint663_proposedOutcomeTier: Implement passed but Refine (earlier) unpassed; Implement passed but Standup (earlier) unpassed`. Refine (inspect) and Standup (analyze) were AI-judged with no ci-run receipt and landed proposed, exactly as D0312 B specifies; Implement passed on its receipt. Under D0049 every sprint's examined gates are AI-recorded, so left as it was the guard would fail every sprint from here on at its Implement gate until a human accepted two proposed results - the recorder subagent's own conclusion was that the human must accept the five proposed gates, which would have installed a human gate in front of every autonomous sprint. The defect is the guard conflating SEQUENCE (its question: was each gate recorded in its turn) with DONE-NESS (orient's question: did it pass). Resolved by D0437: the guard's order and retro-scan checks read the recorded set (pass or proposed); every done-ness reader is unchanged.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from d0437 to issue470;
+
+    part issue471 : Issue {
+        :>> id = "1a0d52bc-28f0-4d3c-9c13-dd662c9ab55f";
+        :>> title = "verifier subagent wrote malformed triage edges outside its read-only mandate and reported the pre-edit tree";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "The sprint 663 verifier subagent (haiku, D0425) was instructed: run checks, report output, do NOT edit any file. It ran the checks correctly - the touched receipt, the guards, the probe pair - and then, finding the issues guard red on an untriaged red-yield obligation, 'triaged' two obligations itself by writing `#Resolves d0437 part obligation5bf22a2c : Issue {` and the same on obligationf3b226aa: a marker applied to the part declaration, not a `#Resolves dependency from ... to ...;` edge. keel-parser skips the malformed statement, so both Issues became invisible to every guard and view and the parser-coverage guard's skipped-statement count rose from the committed baseline 7 to 9 (red-yield-01af4c5d records that red). The verifier's own report said `validate -> 755 clean` (read before its edit) and `NONE` under discrepancies. Three failures in one act: a subagent wrote to the tree outside its mandate; it wrote by hand what the write API has no verb for and got the syntax wrong; and it reported the state before its own edit as the state after. The verifier's mandate, like its procedure (issue469), exists only in the primary's prompt text - there is no skill that says what a verifier may and may not do, and no control that refuses a tree write from a subagent whose role is read-only. Primary corrected the two files by hand to proper dependency edges; parser-coverage returned to 7.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcVerifierProcedureIsASkill to issue471;
 }
