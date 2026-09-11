@@ -3422,8 +3422,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 70] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves"];
+pub const GUARD_NAMES: [&str; 71] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves", "consent-scope"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -5539,6 +5539,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "plan-covers-step" => Some(plan_covers_step(root)), // hard (D0396) - a PLAN-COVERED acceptance whose plan no longer holds
         "id-is-a-uuid" => Some(id_is_a_uuid(root)), // hard (D0430/issue454) - an id from the cutoff on, or added in the tree, is v4
         "step-check-resolves" => Some(step_check_resolves(root)), // hard (D0434) - a step naming a check nothing runs is EHZ5
+        "consent-scope" => Some(consent_scope(root)), // hard (D0439/issue460) - standing consent accepted nothing its text put outside it
         "process-applicability" => Some(process_applicability(root)),
         "tool-reference" => Some(tool_reference(root)), // hard (issue196) — a doc naming a deleted tool strands its follower
         "scaffold-placeholder" => Some(scaffold_placeholder(root)), // hard (dcSprintScaffold) — an unfilled skeleton is not a record
@@ -7775,5 +7776,148 @@ mod step_check_resolves_tests {
         let r = super::step_check_resolves(&root);
         assert!(r.violations.is_empty(), "{:?}", r.violations);
         assert!(r.scanned >= 13, "expected the 7 D0434 + 6 D0435 bindings, scanned {}", r.scanned);
+    }
+}
+
+// ── consent-scope guard (D0439 / issue460: consent accepted nothing its own text put outside it) ──
+
+/// What `consent_scope` found in ONE auto-accepted Decision's text.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ConsentScope {
+    /// Inside the consent: no marker part, and the prose names none of the marker vocabulary (or
+    /// declares `NOT A PROCESS CHANGE`).
+    Inside,
+    /// A `#ProspectiveChange` / `#SafetyChange` part auto-accepted - D0337's own rule, defeated.
+    MarkerPart(&'static str),
+    /// No marker, but the prose names the vocabulary - the issue460 shape.
+    MarkerWords(Vec<&'static str>),
+}
+
+/// Read a one-line `:>> <name> = "..."` Decision field out of a whole file. The write path emits every
+/// field on one line (`sanitize_field` collapses whitespace), so the first `"` after the needle ends it.
+fn decision_field(text: &str, name: &str) -> Option<String> {
+    let needle = format!(":>> {name} = \"");
+    let rest = text.split(&needle).nth(1)?;
+    Some(rest.split('"').next()?.to_string())
+}
+
+/// Classify one Decision file against the consent's scope, with the write path's own vocabulary
+/// (`deck::marker_words`) - the hold in `record decision` and this guard cannot disagree on a word.
+pub(crate) fn consent_scope_of(text: &str, dname: &str) -> ConsentScope {
+    for m in ["ProspectiveChange", "SafetyChange"] {
+        if text.contains(&format!("#{m} part {dname} : Decision")) {
+            return ConsentScope::MarkerPart(m);
+        }
+    }
+    let fields: Vec<String> = ["context", "decision", "rationale", "consequences"].iter().filter_map(|f| decision_field(text, f)).collect();
+    let refs: Vec<&str> = fields.iter().map(String::as_str).collect();
+    crate::deck::marker_text_without_marker(&refs, false).map_or(ConsentScope::Inside, ConsentScope::MarkerWords)
+}
+
+/// Guard: standing consent accepted nothing outside its scope (D0337) - read from the RECORDED files,
+/// not the write path's intent.
+///
+/// D0337 scoped the consent to the existing processes: a marker Decision stays proposed. The write path
+/// applies that rule, and on 2026-09-10 a Decision whose consequences said `Process-change (D0337)` in
+/// so many words auto-accepted because its draft had no `marker:` line and only the marker was read
+/// (issue460). This guard reads every AUTO-ACCEPTED Decision (`acceptance_kind` == Auto - the human's
+/// own acceptances are theirs to give) and fails one that (a) carries a marker part, or (b) names the
+/// marker vocabulary in its prose without `NOT A PROCESS CHANGE`; both dated forward of their cutoff.
+/// Same classifier as the `record decision` hold, so a hand-edited or hand-accepted file cannot pass a
+/// test the write path would have failed.
+///
+/// HARD, forward-only. 104 marker Decisions auto-accepted before D0337 existed (d0206..d0336, all dated
+/// 2026-09-05 or earlier) and one earlier unmarked prose mention (d0367) are immutable history, counted
+/// (D0261).
+#[must_use]
+pub fn consent_scope(root: &Path) -> GuardReport {
+    /// D0337's date: from the day after, a marker Decision reached acceptance only by a human's word.
+    const MARKER_CUTOFF: &str = "2026-09-06";
+    /// This control's date (D0439): from here on the text is read too.
+    const WORDS_CUTOFF: &str = "2026-09-10";
+    let mut scanned = 0usize;
+    let mut violations = Vec::new();
+    let (mut history_parts, mut history_words) = (0usize, 0usize);
+    for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let Some(nnnn) = stem.get(..4).filter(|s| s.chars().all(|c| c.is_ascii_digit())) else { continue };
+        let dname = format!("d{nnnn}");
+        if acceptance_kind(&text, &dname) != Some(Acceptance::Auto) {
+            continue;
+        }
+        scanned += 1;
+        let created = decision_field(&text, "createdAt").unwrap_or_default();
+        let rel = relpath(root, &path);
+        match consent_scope_of(&text, &dname) {
+            ConsentScope::Inside => {}
+            ConsentScope::MarkerPart(m) => {
+                if created.as_str() >= MARKER_CUTOFF {
+                    violations.push(format!(
+                        "{rel}: {dname} carries #{m} and its acceptance is AUTO-ACCEPTED under standing consent - a process or enforcement change the consent does not reach (D0337); it is the human's to accept in their own words (D0289), or stays proposed"
+                    ));
+                } else {
+                    history_parts += 1;
+                }
+            }
+            ConsentScope::MarkerWords(words) => {
+                if created.as_str() >= WORDS_CUTOFF {
+                    violations.push(format!(
+                        "{rel}: {dname} names {} in its own text, carries no marker and is AUTO-ACCEPTED under standing consent - the text put it outside the consent and nothing read the text (issue460/D0439); re-record it with `marker: process-change`, state `{}: <why>` in the text, or a human accepts it in their own words (D0289)",
+                        words.join(", "),
+                        crate::deck::NOT_A_PROCESS_CHANGE
+                    ));
+                } else {
+                    history_words += 1;
+                }
+            }
+        }
+    }
+    let mut warnings = Vec::new();
+    if history_parts + history_words > 0 {
+        warnings.push(history_line(&format!(
+            "{history_parts} marker Decisions auto-accepted before {MARKER_CUTOFF} (D0337 did not exist) and {history_words} texts naming the marker vocabulary auto-accepted before {WORDS_CUTOFF} (nothing read the text) - immutable history, counted not enumerated (D0261)"
+        )));
+    }
+    GuardReport { name: "consent-scope", scanned, warnings, violations }
+}
+
+#[cfg(test)]
+mod consent_scope_tests {
+    use super::{consent_scope_of, ConsentScope};
+
+    fn decision(dname: &str, marker: &str, consequences: &str) -> String {
+        format!(
+            "package X {{\n    {marker}part {dname} : Decision {{\n        :>> createdAt = \"2026-09-10\";\n        :>> context = \"ctx\";\n        :>> decision = \"dec\";\n        :>> rationale = \"why\";\n        :>> consequences = \"{consequences}\";\n    }}\n    verification {dname}Accept : Test {{ :>> procedureText = \"AUTO-ACCEPTED under standing consent\"; }}\n    part {dname}AcceptR1 : TestResult {{ :>> verdict = VerdictKind::pass; }}\n}}\n"
+        )
+    }
+
+    /// D0388 known-positive: the issue460 record - `Process-change (D0337)` in the consequences, no marker.
+    #[test]
+    fn a_text_naming_the_vocabulary_with_no_marker_is_outside_the_consent() {
+        let t = decision("d0432", "", "Process-change (D0337): it waits for the human's word.");
+        assert_eq!(consent_scope_of(&t, "d0432"), ConsentScope::MarkerWords(vec!["process-change"]));
+        let t = decision("d0500", "#SafetyChange ", "changes the hook set");
+        assert_eq!(consent_scope_of(&t, "d0500"), ConsentScope::MarkerPart("SafetyChange"));
+    }
+
+    /// D0388 known-negative: a plain Decision, and one that names the vocabulary in passing and says so.
+    #[test]
+    fn a_plain_text_and_a_declared_mention_are_inside_the_consent() {
+        let t = decision("d0501", "", "Adopt the merge; the processes changed nothing.");
+        assert_eq!(consent_scope_of(&t, "d0501"), ConsentScope::Inside);
+        let t = decision("d0502", "", "Rank 1 lands with its own #ProspectiveChange Decision. NOT A PROCESS CHANGE: this ranks, it changes no process.");
+        assert_eq!(consent_scope_of(&t, "d0502"), ConsentScope::Inside);
+    }
+
+    /// The real tree: nothing forward of the cutoffs, and the pre-cutoff history is counted, not enumerated.
+    #[test]
+    fn the_self_build_holds_and_counts_its_history() {
+        let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/.."));
+        let r = super::consent_scope(root);
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
+        assert!(r.scanned >= 100, "scanned {} auto-accepted Decisions", r.scanned);
+        assert_eq!(r.warnings.len(), 1, "one counted-history line: {:?}", r.warnings);
+        assert!(r.warnings[0].contains("marker Decisions auto-accepted before"));
     }
 }

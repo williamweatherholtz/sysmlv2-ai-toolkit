@@ -114,5 +114,6 @@ package EngineGuardConstraints {
     constraint def planCoversStep;          // guard 68 (D0396): a PLAN-COVERED acceptance still holds its plan's three clauses against the tree
     constraint def idIsAUuid;               // guard 69 (D0430/issue454): an id dated on/after 2026-09-10, or on a line added in the working tree, is an RFC 4122 v4 UUID; earlier failures are history, counted by class
     constraint def stepCheckResolves;       // guard 70 (D0434, D0321 option A): a ProcessStep's checkedBy names a guard or declared rule that runs; a ghost or empty name is EHZ5
+    constraint def consentScope;            // guard 71 (D0439/issue460): an AUTO-ACCEPTED Decision carries no marker part (from 2026-09-06) and its text names no marker word without NOT A PROCESS CHANGE (from 2026-09-10); earlier hits are history, counted
 
 }

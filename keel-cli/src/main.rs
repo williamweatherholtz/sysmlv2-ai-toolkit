@@ -2912,6 +2912,38 @@ fn outside_standing_consent(marker: &str) -> i32 {
     0
 }
 
+/// The consent-scope gate at record time (D0337, and issue460 / D0439). A MARKED Decision is outside
+/// standing consent (`outside_standing_consent`). An UNMARKED one whose own text names the marker
+/// vocabulary is held proposed exactly the same way - the text declared itself a process change, the
+/// draft did not, and the consent covers neither; the mismatch is written into the record's header line,
+/// the one acceptance rewrites, so the file says why it waited and the hold dies with the human's word.
+/// One classifier (`deck::marker_words`) serves this hold and guard `consent-scope`, so a hand-edited
+/// file cannot pass what the write path holds. `Some(0)` when the record stays proposed for the human (the
+/// record itself succeeded); `None` when the text names nothing or no consent is declared - an unmarked
+/// text then gets an advisory and the caller continues.
+fn consent_scope_gate(root: &Path, path: &Path, nnnn: &str, marker: Option<&str>, fields: &[&str]) -> Option<i32> {
+    let consent = keel_cli::activation::standing_consent(root);
+    let Some(words) = keel_cli::deck::marker_text_without_marker(fields, marker.is_some()) else {
+        return marker.filter(|_| consent.is_some()).map(outside_standing_consent);
+    };
+    let list = words.join(", ");
+    if consent.is_none() {
+        println!(
+            "note: the text names {list} and the draft carries no marker line; with no standing consent declared it is proposed either way, but add `marker: process-change` (or `safety-change`) if it changes the process so the process-change guard can see it, or state `{}: <why>` (issue460)",
+            keel_cli::deck::NOT_A_PROCESS_CHANGE
+        );
+        return None;
+    }
+    if let Err(e) = keel_cli::write::note_marker_hold(path, &list) {
+        eprintln!("the hold could not be written into D{nnnn}'s header: {e} - it is proposed regardless");
+    }
+    println!(
+        "HELD proposed (D0337/issue460): the text names {list} and the draft carries no marker line, so standing consent did not accept it - a Decision that says it changes the process is outside the consent whether or not it says so with a marker. Add `marker: process-change` (or `safety-change`) and re-record so the process-change guard sees it, state `{}: <why it changes no process>` in the text, or a human accepts it with their quoted word (D0289).",
+        keel_cli::deck::NOT_A_PROCESS_CHANGE
+    );
+    Some(0)
+}
+
 /// The record-time acceptance under standing consent (D0291), for a NON-FORK with one declared
 /// decider. issue376 / GH#57: the words quoted are the PROJECT's declared `standingWords`, never a
 /// literal in the engine - with consent declared and no words the Decision stays proposed and says so.
@@ -3047,9 +3079,12 @@ fn cmd_record(args: &[String]) -> i32 {
             if let (Some(_m), Some(plan_id), Some(step)) = (marker, req("plan"), req("step")) {
                 return try_plan_cover(&root, &path, &dname, &nnnn, &date, &author, &plan_id, &step);
             }
-            // D0337: a marker Decision is outside standing consent (see outside_standing_consent).
-            if let Some(m) = marker.filter(|_| keel_cli::activation::standing_consent(&root).is_some()) {
-                return outside_standing_consent(m);
+            // issue460 / D0439: the TEXT says what the draft did not - `process-change`, `#ProspectiveChange`
+            // - and no marker line was given. D0432's consequences read 'Process-change (D0337)' and it
+            // AUTO-ACCEPTED, because nothing read the text.
+            // D0337: a marker Decision is outside standing consent either way (consent_scope_gate).
+            if let Some(code) = consent_scope_gate(&root, Path::new(&path), &nnnn, marker, &[&context, &decision, &rationale, &consequences]) {
+                return code;
             }
             match (keel_cli::activation::standing_consent(&root), keel_cli::deck::fork_options(&root, &rel).is_empty(), disguised) {
                 (Some(consent), true, Some(signals)) => {

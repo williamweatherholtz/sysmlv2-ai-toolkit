@@ -166,6 +166,80 @@ mod fork_shape_tests {
     }
 }
 
+/// The marker vocabulary as WORDS in prose (issue460 / D0337).
+///
+/// `process-change`, `safety-change`, and the two edge names the markers emit. Matched whole-word and
+/// case-insensitively, so `#ProspectiveChange`, `Process-change (D0337)` and `safety-change` all read;
+/// `processes changed` does not.
+pub const MARKER_WORDS: [&str; 4] = ["process-change", "safety-change", "prospectivechange", "safetychange"];
+
+/// The author's stated way out, on the `NOT A FORK` pattern.
+///
+/// A Decision that mentions the marker vocabulary in passing - describing another Decision's marker, a
+/// guard's name - and changes no process says so in these words, and the record carries the assertion.
+pub const NOT_A_PROCESS_CHANGE: &str = "NOT A PROCESS CHANGE";
+
+/// Which marker words a Decision's prose fields carry, by name - distinct, in vocabulary order.
+///
+/// One classifier for two readers (issue460): the write path holds an unmarked draft whose text names
+/// the vocabulary, and guard `consent-scope` reads the recorded file with the same function, so a
+/// hand-edited Decision cannot pass a test the write path would have failed.
+#[must_use]
+pub fn marker_words(fields: &[&str]) -> Vec<&'static str> {
+    let lower = format!(" {} ", fields.join(" ").to_lowercase());
+    MARKER_WORDS
+        .iter()
+        .copied()
+        .filter(|w| {
+            lower.match_indices(w).any(|(i, _)| {
+                let before = lower[..i].chars().last().is_none_or(|c| !c.is_alphanumeric());
+                let after = lower[i + w.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric());
+                before && after
+            })
+        })
+        .collect()
+}
+
+/// Does this Decision's text say in words what its draft did not say with a marker - and not declare
+/// otherwise?
+///
+/// `Some(words)` when the fields name the vocabulary, no marker was given and no field carries
+/// [`NOT_A_PROCESS_CHANGE`]. On 2026-09-10 D0432's consequences read 'Process-change (D0337)' while its
+/// draft had no `marker:` line, and it AUTO-ACCEPTED under standing consent - the text declared itself
+/// outside the consent and nothing read the text (issue460).
+#[must_use]
+pub fn marker_text_without_marker(fields: &[&str], has_marker: bool) -> Option<Vec<&'static str>> {
+    if has_marker || fields.iter().any(|f| f.contains(NOT_A_PROCESS_CHANGE)) {
+        return None;
+    }
+    let w = marker_words(fields);
+    (!w.is_empty()).then_some(w)
+}
+
+#[cfg(test)]
+mod marker_text_tests {
+    use super::{marker_text_without_marker, marker_words};
+
+    /// The issue460 shape: the consequences say `Process-change (D0337)`, the draft has no marker - held.
+    #[test]
+    fn prose_naming_the_vocabulary_without_a_marker_is_a_mismatch() {
+        let c = "CLAUDE.md names the run. Process-change (D0337): proposed until the human's word.";
+        assert_eq!(marker_text_without_marker(&["ctx", "dec", "why", c], false), Some(vec!["process-change"]));
+        assert_eq!(marker_words(&["each lands with its own #ProspectiveChange Decision", "a SafetyChange edge"]), vec!["prospectivechange", "safetychange"]);
+    }
+
+    /// The same text WITH the marker is the D0337 path's business, not this one's; a text naming neither
+    /// is a plain Decision; and the author's `NOT A PROCESS CHANGE` clears a mention in passing.
+    #[test]
+    fn a_marked_draft_a_plain_text_and_a_declared_mention_are_not_mismatches() {
+        let c = "Process-change (D0337): proposed until the human's word.";
+        assert!(marker_text_without_marker(&[c], true).is_none());
+        assert!(marker_text_without_marker(&["Adopt the merge; the processes changed nothing here."], false).is_none());
+        assert!(marker_text_without_marker(&["Rank 1 lands with its own #ProspectiveChange Decision. NOT A PROCESS CHANGE: this Decision ranks, it changes no process."], false).is_none());
+        assert!(marker_words(&["safety-changes", "reprocess-change"]).is_empty(), "whole words only");
+    }
+}
+
 /// `keel decision-card [NAME] [--proposed]` (D0205 githubChannel).
 ///
 /// The decision's own deciding context as machine-readable JSON, for the Action that opens

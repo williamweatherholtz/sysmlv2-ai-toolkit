@@ -1840,11 +1840,51 @@ pub fn record_decision_with_links(
 fn rewrite_proposed_header(path: &Path) -> Result<(), WriteError> {
     let text = std::fs::read_to_string(path)?;
     let stale = "(PROPOSED \u{2014} NOT YET ACCEPTED)";
-    if text.contains(stale) {
-        let fixed = text.replace(stale, "(status: the `status` field below is the truth)");
+    let held = text.lines().any(|l| l.starts_with(MARKER_HOLD_PREFIX));
+    if text.contains(stale) || held {
+        // The issue460 hold line goes with the header it annotated: an accepted Decision that still
+        // says HELD is the same dual truth.
+        let kept: Vec<&str> = text.lines().filter(|l| !l.starts_with(MARKER_HOLD_PREFIX)).collect();
+        let mut fixed = kept.join("\n");
+        if text.ends_with('\n') {
+            fixed.push('\n');
+        }
+        let fixed = fixed.replace(stale, "(status: the `status` field below is the truth)");
         write_atomic(path, fixed)?;
     }
     Ok(())
+}
+
+/// The first characters of the issue460 hold line `note_marker_hold` writes under the proposed header.
+pub const MARKER_HOLD_PREFIX: &str = "// HELD (D0337/issue460):";
+
+/// issue460 / D0439: write WHY standing consent left a Decision proposed into its header.
+///
+/// The text named the marker vocabulary (`words`) and the draft carried no marker line. One line,
+/// directly under the scaffolded header; `rewrite_proposed_header` removes it on acceptance. Under the
+/// file lock like every write; a file with no scaffolded header (hand-authored) gets no line and no
+/// error.
+///
+/// # Errors
+/// `WriteError::Io` when the file cannot be read or atomically rewritten.
+pub fn note_marker_hold(path: &Path, words: &str) -> Result<(), WriteError> {
+    // issue185: the WHOLE read-modify-write runs under the lock, not just the write.
+    with_file_lock(path, || note_marker_hold_locked(path, words))
+}
+
+fn note_marker_hold_locked(path: &Path, words: &str) -> Result<(), WriteError> {
+        let text = std::fs::read_to_string(path)?;
+        if text.lines().any(|l| l.starts_with(MARKER_HOLD_PREFIX)) {
+            return Ok(());
+        }
+        let Some(i) = text.find("(PROPOSED \u{2014} NOT YET ACCEPTED)") else { return Ok(()) };
+        let line_end = text[i..].find('\n').map_or(text.len(), |n| i + n);
+        let note = format!(
+            "\n{MARKER_HOLD_PREFIX} the text names {words} and the draft carried no marker line, so standing consent did not accept it - marked or not, a Decision that says it changes the process is outside the consent (D0439). Fix: `marker: process-change` and re-record, `NOT A PROCESS CHANGE: <why>` in the text, or the human's quoted word."
+        );
+        let fixed = format!("{}{}{}", &text[..line_end], note, &text[line_end..]);
+        write_atomic(path, fixed)?;
+        Ok(())
 }
 
 /// Accept a PROPOSED Decision (D0121 human review loop).
@@ -2025,6 +2065,43 @@ fn reject_decision_locked(
     let new_content = format!("{}{}{}", &flipped[..close], block, &flipped[close..]);
     write_atomic(path, new_content)?;
     Ok(u1)
+}
+
+#[cfg(test)]
+mod marker_hold_tests {
+    use super::{note_marker_hold, rewrite_proposed_header, MARKER_HOLD_PREFIX};
+
+    /// D0439 / issue460: the hold line lands directly under the scaffolded header, is written once
+    /// however many times it is asked for, and leaves with the header it annotated when the Decision is
+    /// accepted - an accepted record that still says HELD is the D0105 dual truth.
+    #[test]
+    fn the_hold_line_is_written_once_under_the_header_and_leaves_at_acceptance() {
+        let dir = std::env::temp_dir().join(format!("keel-hold-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("0001-probe.sysml");
+        let seed = "// D0001 (PROPOSED \u{2014} NOT YET ACCEPTED) \u{2014} probe\n// Recorded via `keel record decision`.\npackage Decision0001 {\n}\n";
+        std::fs::write(&path, seed).expect("seed");
+        note_marker_hold(&path, "process-change").expect("hold");
+        note_marker_hold(&path, "process-change").expect("hold again");
+        let held = std::fs::read_to_string(&path).expect("read");
+        let lines: Vec<&str> = held.lines().collect();
+        assert!(lines[0].starts_with("// D0001 (PROPOSED"), "{held}");
+        assert!(lines[1].starts_with(MARKER_HOLD_PREFIX) && lines[1].contains("process-change"), "{held}");
+        assert_eq!(held.matches(MARKER_HOLD_PREFIX).count(), 1, "idempotent: {held}");
+        assert!(lines[2].starts_with("// Recorded via"), "the rest of the file is untouched: {held}");
+        rewrite_proposed_header(&path).expect("accept rewrites the header");
+        let accepted = std::fs::read_to_string(&path).expect("read");
+        assert!(!accepted.contains(MARKER_HOLD_PREFIX), "the hold leaves with the header: {accepted}");
+        assert!(accepted.starts_with("// D0001 (status: the `status` field below is the truth)"), "{accepted}");
+        assert!(accepted.ends_with("package Decision0001 {\n}\n"), "{accepted}");
+        // a hand-authored file with no scaffolded header gets no line and no error
+        let bare = dir.join("bare.sysml");
+        std::fs::write(&bare, "package X {\n}\n").expect("bare");
+        note_marker_hold(&bare, "safety-change").expect("no header, no error");
+        assert_eq!(std::fs::read_to_string(&bare).expect("read"), "package X {\n}\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 #[cfg(test)]

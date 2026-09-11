@@ -2041,4 +2041,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcReceiptAtMeansTheSameInBothReceipts to issue472;
+
+    part issue473 : Issue {
+        :>> id = "b9706a59-2156-4c99-abf5-57b4b38d7c53";
+        :>> title = "cargo fmt rewrites the whole crate - no config pins the style and nothing refuses the run";
+        :>> createdAt = "2026-09-10";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "On 2026-09-10, fixing five clippy doc-comment lints in sprint 665, the primary agent ran `cargo fmt -p keel-cli`. The crate is not rustfmt-formatted and no rustfmt.toml exists, so the formatter rewrote 137 files (+28937 / -6442 lines) - every source and test file it visited - on top of the sprint's eight-file change set. Nothing landed: `git status` showed the damage before any commit. The 133 files the sprint had not touched were restored with `git checkout --`; the four sprint files (deck.rs, guards.rs, main.rs, write.rs) were restored from HEAD and the sprint's textpatch scripts replayed in order, with `rustfmt(replayed) == the formatted copy` byte-for-byte (cmp) as the check that every edit - including two made with the Edit tool - had been recovered; the untracked integration test was rewritten from its copy in context and checked the same way. Cost: ~20 minutes and a second verifier run. Class: a routine tool invocation that is destructive in THIS repository and harmless in most others; nothing names it. The pre-bash hook already denies one such shape (a heredoc with a backslash, D0309) and is the natural home; a committed rustfmt.toml that reproduces the existing style is the alternative.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcFormatterRunIsRefusedOrPinned to issue473;
 }
