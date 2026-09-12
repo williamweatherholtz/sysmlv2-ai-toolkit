@@ -5,7 +5,7 @@
 //! pass-at-zero. Together they produce A GREEN RUN OVER NOTHING, which is worse than an error
 //! because it is indistinguishable from a clean tree.
 //!
-//! The same shape recurred while building `github-ingest`, where a trailing `--at` value was read as
+//! The same shape recurred while building `github ingest`, where a trailing `--at` value was read as
 //! the root — which is why this is a shared refusal rather than a fix in one command.
 
 use std::path::{Path, PathBuf};

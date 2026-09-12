@@ -151,7 +151,7 @@ fig2 = downstream(
 fig3 = logic_lanes(
     "The trust boundary moves with the arm, or the bytes say it did not",
     ("today", [
-        ("keel github-pull, public repo", "", "accent", ""),
+        ("keel github pull, public repo", "", "accent", ""),
         ("untrusted: plan only", "fails closed if undetermined", "ok", ""),
     ], ["", ""]),
     ("changed", [

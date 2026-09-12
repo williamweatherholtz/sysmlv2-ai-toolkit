@@ -173,12 +173,13 @@ fn the_record_sub_verbs_match_the_fact() {
 /// `gate_subverb` and `audit_subverb` route must be exactly the ones the two facts' invocations
 /// declare, so a routed word missing from `--help` or a documented word that prints the usage fails here.
 #[test]
-fn the_gate_and_audit_sub_verbs_match_their_facts() {
+fn the_gate_audit_and_github_sub_verbs_match_their_facts() {
     let src = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("main.rs"))
         .expect("main.rs is readable");
     for (router, head, floor) in [
         ("gate", "fn gate_subverb(args: &[String]) -> Option<i32> {", 7),
         ("audit", "fn audit_subverb(args: &[String]) -> Option<i32> {", 3),
+        ("github", "fn github_subverb(args: &[String]) -> Option<i32> {", 5),
     ] {
         let start = src.find(head).expect("the router exists");
         let block = &src[start..start + src[start..].find("\n}\n").expect("the router closes")];
@@ -223,6 +224,28 @@ fn a_retired_gating_verb_is_no_longer_a_command() {
     for sub in ["history", "adherence", "ci-runs"] {
         assert!(audit.contains(sub), "`keel audit` bare must name its sub-verb {sub}: {audit}");
     }
+    let _ = std::fs::remove_dir_all(&base);
+}
+
+/// D0453: the five channel spellings are GONE, not aliased; each is reached only through `keel github`,
+/// and the router bare names its five sub-verbs and refuses.
+#[test]
+fn a_retired_channel_verb_is_no_longer_a_command() {
+    let base = std::env::temp_dir().join(format!("keel-retired-channel-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).expect("mkdir");
+    for retired in ["github-pull", "github-ingest", "github-decider", "github-gesture", "github-decision-id"] {
+        let (ok, text) = run(&base, &[retired]);
+        assert!(!ok, "`keel {retired}` must no longer be a command — no alias window: {text}");
+        assert!(text.contains("usage: keel"), "and an unknown verb falls through to the usage banner: {text}");
+    }
+    let (ok, github) = run(&base, &["github"]);
+    assert!(!ok, "`keel github` bare has no meaning to default to and must refuse: {github}");
+    for sub in ["pull", "ingest", "decider", "gesture", "decision-id"] {
+        assert!(github.contains(sub), "`keel github` bare must name its sub-verb {sub}: {github}");
+    }
+    let (ok, wrong) = run(&base, &["github", "pulls"]);
+    assert!(!ok && wrong.contains("`pulls` is not a sub-verb"), "a near-miss is named, not guessed: {wrong}");
     let _ = std::fs::remove_dir_all(&base);
 }
 

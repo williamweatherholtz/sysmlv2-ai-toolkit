@@ -93,7 +93,7 @@ Change Request cross-cuts and is itself frozen.
   `keel judge-set` is the human's judgment.
 - `record statement` / `record story`: human words VERBATIM, then the story with `#DerivedFrom` (D0236).
   Elicit pain, not features; never offer a menu (D0216). A Need with no `#DerivedFrom` says it is my judgment.
-- GitHub intake (`github-pull`/`github-ingest`, skill `github-intake`): private repo → `trusted`, act;
+- GitHub intake (`github pull`/`github ingest`, skill `github-intake`; D0453 router): private repo → `trusted`, act;
   public → `untrusted`, plan only, human accepts first; undetermined fails closed (D0263/D0264/D0314).
   `currency` = the unattended pass (D0338).
 - Provenance never defaulted: actor AND date (D0129/issue182). `keel actor set <id>` or `KEEL_ACTOR`.

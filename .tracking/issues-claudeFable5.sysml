@@ -972,4 +972,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcSubVerbEffectIsDeclared to issue506;
+
+    part issue507 : Issue {
+        :>> id = "63743e9f-6e62-47af-8077-04060281f384";
+        :>> title = "d0399 option A's landing figure (roughly 20) does not follow from its own counts: the five folds land at 35 and D0273's under-25 clause is still false";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "After the fifth and last fold d0399 option A named (D0453, sprint 683) keel show hardening reads helpCoverage.dispatched 35 (hardening683.json, read back 2026-09-12 from the post-fold build). D0273's consequences promised the visible verb count falls under 25, and d0399 option A stated that the five folds land the count at roughly 20 and make D0273's clause true as written - but option A's own counts do not reach that number: 70 top-level verbs at 649b433, minus the ten gating verbs that became gate and audit, the eleven orientation verbs that joined show, the three rendering verbs that became render, the eight authoring verbs that became record and the three channel verbs that vanished into github, is 35, and 35 is what the tree reads. The same Decision's context had already said so in other words (folding every read-only verb into a router still leaves 36 verbs plus the routers, so under 25 is reachable only by also collapsing the writers and the read-write set), so the landing figure was written without deriving it from the counts beside it - the class D0273's under-25 clause itself belongs to (issue338), one Decision later. Each fold's own Decision states its delta (D0453: falls by four) and the tree reads that delta back, so dcRemainingCliFamilies' per-fold VERIFY holds five times over while the clause the task exists to make honest is still false. What remains at 35 by family (cli_facts.rs census): governance 8 (accept, reject, judge-set, override, claim, enroll, actor, advance), integration 8 (init, sync, land, migrate, claude, sync-claude, projects, version), distribution 6 (process, library, onboard, activation, activate, deactivate), gating 4 (gate, audit, hook, suite), rendering 3 (render, deck, serve), channel 2 (github, currency), and the single-verb families record, show, recall; by effect 10 write, 12 read-and-write, 9 read, 3 tooling. Under 25 needs eleven more names gone. The choice between folding further and amending the clause is the fork dcRemainingCliFamilies' DoD said to put to the human with the counts; d0457 carries it.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRemainingCliFamilies to issue507;
+
+    part issue508 : Issue {
+        :>> id = "b72139d1-f1d9-4b61-9616-82f5463396cf";
+        :>> title = "facts.py ran the build image keel.exe during a cargo build and the touched suite of sprint 683 could not relink";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "scripts/exec_brief/facts.py ran target/release/keel.exe (its KEEL constant, the build image) while the VERIFIER of sprint 683 ran keel suite --touched; cargo failed the relink with 'failed to remove file target/release/keel.exe: Access is denied (os error 5)' and the touched suite did not run (verifier receipt, 2026-09-12). issue150 established the rule - commands run from a COPY, the build image is for cargo - and CLAUDE.md section 6 states it, but the brief-facts script was the one caller that still opened the build image, so the control lived in a reminder, not in the code (D0047). Fix in the same commit: facts.py resolves the binary as KEEL_BIN, then target/release/keel-serve.exe, then the build image only when no copy exists; every `how` string that names ./target/release/keel.exe is the command as a reader re-runs it, and stays.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from storyChannelFamilyFold to issue508;
 }

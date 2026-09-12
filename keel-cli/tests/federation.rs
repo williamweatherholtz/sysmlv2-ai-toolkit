@@ -371,7 +371,7 @@ fn f7_an_ingested_issue_is_verbatim_idempotent_and_leaves_the_judgment_open() {
     let root = scaffold("ingest", "proj");
     let fx = root.join("issue.json");
     std::fs::write(&fx, FIXTURE).expect("write");
-    let args = ["github-ingest", "--from", fx.to_str().expect("p"), "--by", "claudeOpus5", "--at", "2026-08-30"];
+    let args = ["github", "ingest", "--from", fx.to_str().expect("p"), "--by", "claudeOpus5", "--at", "2026-08-30"];
     let first = run_in(&root, &args);
     assert!(first.ok, "F7: ingestion must record the utterance: {}", first.text);
 

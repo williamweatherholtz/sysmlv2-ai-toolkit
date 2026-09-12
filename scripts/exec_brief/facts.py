@@ -24,10 +24,22 @@ from datetime import date, datetime, timedelta, timezone
 # ---------------------------------------------------------------- infrastructure
 
 REPO = os.getcwd()
-KEEL = os.path.join(REPO, "target", "release", "keel.exe")
-if not os.path.exists(KEEL):
-    alt = os.path.join(REPO, "target", "release", "keel")
-    KEEL = alt if os.path.exists(alt) else KEEL
+# The binary is a COPY, never the build image: a running target/release/keel.exe blocks its own relink
+# (issue150), and this script ran it under a cargo build once (issue508). KEEL_BIN wins; then the
+# serve copy; the build image only when nothing else exists.
+def _keel_bin():
+    env = os.environ.get("KEEL_BIN")
+    if env and os.path.exists(env):
+        return env
+    rel = os.path.join(REPO, "target", "release")
+    for name in ("keel-serve.exe", "keel-serve", "keel.exe", "keel"):
+        cand = os.path.join(rel, name)
+        if os.path.exists(cand):
+            return cand
+    return os.path.join(rel, "keel.exe")
+
+
+KEEL = _keel_bin()
 
 TODAY = date.today()
 NOW = datetime.now(timezone.utc)
@@ -1327,6 +1339,56 @@ _hard = as_json(out) if ok else None
 _hc = (_hard or {}).get("helpCoverage") or {}
 fact("cliDispatchArms", _hc.get("dispatched") if _hc.get("available") else None, "dispatch arms",
      _HARD_HOW if _hc.get("available") else _HARD_HOW + " hardening did not answer: " + out[:200])
+
+
+# the count d0457 puts to the human: every remaining top-level family by member, effect and stability, the
+# distance to D0273's under-25 clause, and the fold arithmetic against d0399's baseline commit - each from the
+# facts file at the two commits, none typed from a Decision.
+_D0399_BASE = "649b433"
+_CENSUS_HOW = ("keel-cli/src/cli_facts.rs, every `CliFact {{ name, family, effect, stability }}` whose family is not "
+               "`lens` (the 51 lenses sit under show), grouped by family with the member list; byEffect counts the "
+               "same set; topLevel is the set's size and namesToUnder25 = topLevel - 24, the names that must go (armsToUnder25 the same from the help count, which has `help`) "
+               "for D0273's clause to hold; baseline* comes from `git show {base}:keel-cli/src/cli_facts.rs` read the "
+               "same way (d0399's counts were taken at {base}), removed = baseline - current, added = current - "
+               "baseline; dispatchArms is cliDispatchArms (hardening), which is topLevel + `help`.")
+_FACT_RX = re.compile(r'CliFact \{ name: "([^"]+)", family: "([^"]+)", effect: "([^"]+)", stability: "([^"]+)"')
+
+
+def _top_level_facts(src):
+    return [(n, f, e, s) for n, f, e, s in _FACT_RX.findall(src) if f != "lens"]
+
+
+try:
+    _cur_src = open(os.path.join(REPO, "keel-cli", "src", "cli_facts.rs"), encoding="utf-8").read()
+except OSError as _e:
+    _cur_src = None
+    fact("cliFamilyCensus", None, "top-level verbs by family", _CENSUS_HOW.format(base=_D0399_BASE) +
+         " cli_facts.rs unreadable: %s" % _e)
+if _cur_src is not None:
+    _cur = _top_level_facts(_cur_src)
+    _fams = {}
+    _eff = {}
+    for _n, _f, _e, _s in _cur:
+        _fams.setdefault(_f, []).append({"name": _n, "effect": _e, "stability": _s})
+        _eff[_e] = _eff.get(_e, 0) + 1
+    ok, _base_src = run(["git", "show", "%s:keel-cli/src/cli_facts.rs" % _D0399_BASE])
+    _base = _top_level_facts(_base_src) if ok else None
+    _cur_names = {n for n, _, _, _ in _cur}
+    _base_names = {n for n, _, _, _ in _base} if _base is not None else None
+    fact("cliFamilyCensus", {
+        "topLevel": len(_cur),
+        "namesToUnder25": len(_cur) - 24,
+        "armsToUnder25": (_hc.get("dispatched") - 24) if _hc.get("available") else None,
+        "dispatchArms": _hc.get("dispatched") if _hc.get("available") else None,
+        "families": [{"family": f, "count": len(ms), "members": sorted(ms, key=lambda r: r["name"])}
+                     for f, ms in sorted(_fams.items(), key=lambda kv: (-len(kv[1]), kv[0]))],
+        "byEffect": _eff,
+        "baselineCommit": _D0399_BASE,
+        "baselineTopLevel": len(_base) if _base is not None else None,
+        "removedSinceBaseline": sorted(_base_names - _cur_names) if _base_names is not None else None,
+        "addedSinceBaseline": sorted(_cur_names - _base_names) if _base_names is not None else None,
+    }, "top-level verbs by family", _CENSUS_HOW.format(base=_D0399_BASE) +
+        ("" if ok else " (`git show` failed, baseline rows null: %s)" % _base_src[:120]))
 
 
 # ================================================================ 19. sub-verb control actions (D0454 / sprint681)

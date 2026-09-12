@@ -100,7 +100,7 @@ fn find_repo_root() -> Option<PathBuf> {
 ///
 /// THE CLASS THIS ENDS, third instance in one session: `root_arg` takes the first bare token as ROOT
 /// and cannot know which flags consume the token after them, so every command that adds a
-/// value-taking flag re-creates the bug. `keel github-decider --root X` read X as a login,
+/// value-taking flag re-creates the bug. `keel github decider --root X` read X as a login,
 /// `keel recall --prompt -` read `-` as a root, and `keel why t --budget 1500` read 1500 as a root —
 /// each silently answering about the wrong thing until the issue281 project precondition started
 /// refusing outright, which is the only reason the last two were visible at all.
@@ -1713,13 +1713,57 @@ fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
     arg.map_or_else(find_repo_root, |p| Some(PathBuf::from(p)))
 }
 
+/// D0453: the five channel verbs route under `keel github`, each arm MOVED verbatim from the top-level
+/// dispatch - its function and its trust classification untouched, its arguments the same. `None`
+/// when the first argument is not one of the five, so the router can print its own usage.
+fn github_subverb(args: &[String]) -> Option<i32> {
+    let rest = args.get(1..).unwrap_or(&[]);
+    Some(match args.first().map(String::as_str)? {
+        "gesture" => keel_cli::github::gesture_cmd(),
+        "pull" => {
+            let root = resolve_guard_root(
+                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
+            )
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+            keel_cli::github_ingest::pull_cmd(rest, &root)
+        }
+        "ingest" => {
+            // ROOT is an explicit --root, never a trailing positional: the trailing argument here is
+            // the value of --at, and guessing it as a path made the command fail with an opaque
+            // filesystem error on its very first live run.
+            let root = resolve_guard_root(
+                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
+            )
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+            keel_cli::github_ingest::cmd(rest, &root)
+        }
+        "decision-id" => keel_cli::github::decision_id_cmd(rest),
+        "decider" => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
+        _ => return None,
+    })
+}
+
+/// `keel github <sub-verb> ...` - the channel family under one router (D0453). Bare, or with a word
+/// that is not a sub-verb, it prints the five and refuses: there is no bare meaning to default to.
+fn cmd_github(args: &[String]) -> i32 {
+    if let Some(code) = github_subverb(args) {
+        return code;
+    }
+    // a word that is not a sub-verb is named; a flag (`--help`) falls through to the usage alone
+    if let Some(a) = args.first().filter(|a| !a.starts_with('-')) {
+        eprintln!("keel github: `{a}` is not a sub-verb.");
+    }
+    eprintln!("usage: keel github pull|ingest|decider|gesture|decision-id ...   (D0453: the five channel verbs under one router, each keeping its arguments - `keel github <sub-verb>` with none is its own usage)");
+    2
+}
+
 /// Refuse an argument that LOOKS like a flag where a path or a name is expected (GH#14).
 ///
 /// A mistyped or unsupported `--flag` used to be accepted as the ROOT: `keel gate guard --read` gated a
 /// directory named `--read`, found nothing, and reported every guard PASS with 0 scanned. Silent
 /// mis-parsing plus pass-at-zero produces a GREEN RUN OVER NOTHING, which is worse than an error
 /// because it is indistinguishable from a clean tree. The same shape was hit again while building
-/// `github-ingest`, where a trailing `--at` value was read as the root.
+/// `github ingest`, where a trailing `--at` value was read as the root.
 ///
 /// Returns the exit code to use, or `None` when the argument is fine. `cmd_activation` already did
 /// this for process names (issue179); this generalises it to every path-taking entry point.
@@ -3735,7 +3779,7 @@ fn starter_for(rel: &Path) -> &'static str {
 # layer. The repo OWNER is not automatically a decider, and an ORG can never be one - an org is not\n\
 # a person and cannot hold judgment.\n\
 #\n\
-# Check yours with `keel github-decider <login>`.\n\
+# Check yours with `keel github decider <login>`.\n\
 \n\
 [logins]\n\
 # yourGithubLogin = \"yourKeelActor\"\n";
@@ -5515,28 +5559,9 @@ fn main() {
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        Some("github-gesture") => keel_cli::github::gesture_cmd(),
+        Some("github") => cmd_github(rest), // D0453: pull, ingest, decider, gesture and decision-id route under it
         Some("currency") => cmd_currency(rest), // D0338: the unattended pass - pull, library, drift
         Some("suite") => cmd_suite(rest), // D0353: the full suite, with the receipt land demands
-        Some("github-pull") => {
-            let root = resolve_guard_root(
-                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
-            )
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-            keel_cli::github_ingest::pull_cmd(rest, &root)
-        }
-        Some("github-ingest") => {
-            // ROOT is an explicit --root, never a trailing positional: the trailing argument here is
-            // the value of --at, and guessing it as a path made the command fail with an opaque
-            // filesystem error on its very first live run.
-            let root = resolve_guard_root(
-                rest.iter().position(|a| a == "--root").and_then(|i| rest.get(i + 1)),
-            )
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-            keel_cli::github_ingest::cmd(rest, &root)
-        }
-        Some("github-decision-id") => keel_cli::github::decision_id_cmd(rest),
-        Some("github-decider") => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
         Some("render") => cmd_render(rest),

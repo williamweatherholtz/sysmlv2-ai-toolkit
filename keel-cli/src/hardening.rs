@@ -752,7 +752,7 @@ mod tests {
     fn every_dispatched_subcommand_is_documented() {
         let main = std::fs::read_to_string("src/main.rs").expect("main.rs is readable");
         let dispatched = dispatch_arms(&main);
-        // 39 after the D0452 fold (58 before the d0399 folds); a scan under 30 has lost the match.
+        // 35 after the D0453 fold (58 before the d0399 folds); a scan under 30 has lost the match.
         assert!(dispatched.len() > 30, "the dispatch scan found {} arms - the lens is mis-aimed", dispatched.len());
         let help = usage_text(&main);
         assert!(!help.is_empty(), "the rendered help is empty - the facts table is empty");

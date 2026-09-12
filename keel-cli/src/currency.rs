@@ -57,7 +57,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
     let skip_pull = args.iter().any(|a| a == "--skip-pull");
     let mut passes = Vec::new();
 
-    println!("== 1/3 github-pull (verbatim Statements, never triaged; D0264) ==");
+    println!("== 1/3 github pull (verbatim Statements, never triaged; D0264) ==");
     if skip_pull {
         passes.push(PassOutcome { name: "pull", code: 0, note: "skipped by --skip-pull".to_string() });
     } else {

@@ -1,4 +1,4 @@
-//! `keel github-ingest` — a GitHub issue becomes a recorded utterance (D0263).
+//! `keel github ingest` — a GitHub issue becomes a recorded utterance (D0263).
 //!
 //! # Why this records a Statement and not an Issue
 //!
@@ -183,7 +183,7 @@ fn ingest_one(json: &str, root: &Path, args: &[String], trust: &str) -> Result<S
     .map_err(|e| e.to_string())
 }
 
-/// `keel github-pull --repo OWNER/NAME --by ACTOR --at DATE [--limit N] [--trust T] [--root R]`
+/// `keel github pull --repo OWNER/NAME --by ACTOR --at DATE [--limit N] [--trust T] [--root R]`
 ///
 /// Enumerate open issues and ingest the ones no Statement already cites. Idempotency is the
 /// ingestion path's own — a re-ingest REFUSES on the URL — so a pull is safe to repeat and REPORTS
@@ -192,7 +192,7 @@ fn ingest_one(json: &str, root: &Path, args: &[String], trust: &str) -> Result<S
 pub fn pull_cmd(args: &[String], root: &Path) -> i32 {
     let Some(repo) = flag(args, "repo") else {
         eprintln!(
-            "usage: keel github-pull --repo OWNER/NAME --by ACTOR --at YYYY-MM-DD [--limit N] [--trust trusted|untrusted]"
+            "usage: keel github pull --repo OWNER/NAME --by ACTOR --at YYYY-MM-DD [--limit N] [--trust trusted|untrusted]"
         );
         return 2;
     };
@@ -204,15 +204,15 @@ pub fn pull_cmd(args: &[String], root: &Path) -> i32 {
         .args(["api", &format!("repos/{repo}/issues?state=open&per_page={limit}")])
         .output()
     else {
-        eprintln!("github-pull: could not run `gh` — install the GitHub CLI");
+        eprintln!("github pull: could not run `gh` — install the GitHub CLI");
         return 1;
     };
     if !o.status.success() {
-        eprintln!("github-pull: gh api failed: {}", String::from_utf8_lossy(&o.stderr).trim());
+        eprintln!("github pull: gh api failed: {}", String::from_utf8_lossy(&o.stderr).trim());
         return 1;
     }
     let Ok(items) = serde_json::from_slice::<Vec<serde_json::Value>>(&o.stdout) else {
-        eprintln!("github-pull: the issue list was not a JSON array");
+        eprintln!("github pull: the issue list was not a JSON array");
         return 1;
     };
     let (mut ingested, mut skipped, mut failed) = (0u32, 0u32, 0u32);
@@ -242,27 +242,27 @@ pub fn pull_cmd(args: &[String], root: &Path) -> i32 {
     i32::from(failed > 0)
 }
 
-/// `keel github-ingest --repo OWNER/NAME --issue N [--from FILE] --by ACTOR --at DATE [ROOT]`
+/// `keel github ingest --repo OWNER/NAME --issue N [--from FILE] --by ACTOR --at DATE [ROOT]`
 #[must_use]
 pub fn cmd(args: &[String], root: &Path) -> i32 {
     let json = match (flag(args, "from"), flag(args, "repo"), flag(args, "issue")) {
         (Some(f), _, _) => match std::fs::read_to_string(&f) {
             Ok(t) => t,
             Err(e) => {
-                eprintln!("github-ingest: cannot read {f}: {e}");
+                eprintln!("github ingest: cannot read {f}: {e}");
                 return 2;
             }
         },
         (None, Some(repo), Some(n)) => match fetch(&repo, &n) {
             Ok(t) => t,
             Err(e) => {
-                eprintln!("github-ingest: {e}");
+                eprintln!("github ingest: {e}");
                 return 1;
             }
         },
         _ => {
             eprintln!(
-                "usage: keel github-ingest --repo OWNER/NAME --issue N [--from FILE] --by ACTOR --at YYYY-MM-DD [ROOT]"
+                "usage: keel github ingest --repo OWNER/NAME --issue N [--from FILE] --by ACTOR --at YYYY-MM-DD [ROOT]"
             );
             return 2;
         }
@@ -270,17 +270,17 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
     let issue = match parse_issue(&json) {
         Ok(i) => i,
         Err(e) => {
-            eprintln!("github-ingest: {e}");
+            eprintln!("github ingest: {e}");
             return 1;
         }
     };
     // The RECORDER and the recording date are keel's own provenance, never defaulted (D0129).
     let Some(author) = flag(args, "by").or_else(|| std::env::var("KEEL_ACTOR").ok()) else {
-        eprintln!("github-ingest: --by ACTOR required (or KEEL_ACTOR) — who recorded this is its own fact");
+        eprintln!("github ingest: --by ACTOR required (or KEEL_ACTOR) — who recorded this is its own fact");
         return 2;
     };
     let Some(at) = flag(args, "at") else {
-        eprintln!("github-ingest: --at YYYY-MM-DD required — when it was recorded is its own fact");
+        eprintln!("github ingest: --at YYYY-MM-DD required — when it was recorded is its own fact");
         return 2;
     };
     let (trust, why) = resolve_trust(args);
@@ -310,7 +310,7 @@ pub fn cmd(args: &[String], root: &Path) -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("github-ingest: {e}");
+            eprintln!("github ingest: {e}");
             1
         }
     }

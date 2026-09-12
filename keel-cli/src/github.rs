@@ -1,4 +1,4 @@
-//! `keel github-decider` — who may decide on this project's GitHub decision channel (D0219).
+//! `keel github decider` — who may decide on this project's GitHub decision channel (D0219).
 //!
 //! WHY THIS EXISTS. The channel (D0205) shipped with the decider's LOGIN welded into
 //! `.github/workflows/decision-record.yml` in three places, and with issue assignment pointed at
@@ -55,7 +55,7 @@ pub fn deciders(root: &Path) -> BTreeMap<String, String> {
     out
 }
 
-/// `keel github-decider [<login>]`.
+/// `keel github decider [<login>]`.
 ///
 /// With no argument: print each declared decider as `login<TAB>actor`, one per line, for a workflow
 /// to consume (assignment, reporting). Exit 0 even when empty — a project may run the channel with no
@@ -101,7 +101,7 @@ pub fn decider_cmd(args: &[String], root: &Path) -> i32 {
         map.keys().cloned().collect::<Vec<_>>().join(", ")
     };
     eprintln!(
-        "github-decider: `{login}` is not a declared decider on this project. Add it to \
+        "github decider: `{login}` is not a declared decider on this project. Add it to \
          .engine/contracts/github-actors.toml [logins] as `{login} = \"<keelActor>\"` — an \
          unmapped login is REFUSED, never defaulted (issue182). Declared: {declared}"
     );
@@ -369,7 +369,7 @@ pub fn split_decision_id(id: &str) -> (Option<String>, String) {
     }
 }
 
-/// `keel github-decision-id <id>` — print `project<TAB>name` for the channel's shell to consume.
+/// `keel github decision-id <id>` — print `project<TAB>name` for the channel's shell to consume.
 ///
 /// In the binary rather than parsed in bash: the split decides which TREE a human's acceptance is
 /// written into, and getting it wrong records their judgment against the wrong project.
@@ -379,7 +379,7 @@ pub fn decision_id_cmd(args: &[String]) -> i32 {
     // implementation of the pair, because two disagreed (issue279).
     if args.first().map(String::as_str) == Some("--join") {
         let (Some(label), Some(name)) = (args.get(1), args.get(2)) else {
-            eprintln!("usage: keel github-decision-id --join <projectLabel> <dNNNN> [--multi]");
+            eprintln!("usage: keel github decision-id --join <projectLabel> <dNNNN> [--multi]");
             return 2;
         };
         let multi = args.iter().any(|a| a == "--multi");
@@ -387,8 +387,8 @@ pub fn decision_id_cmd(args: &[String]) -> i32 {
         return 0;
     }
     let Some(id) = args.first() else {
-        eprintln!("usage: keel github-decision-id <id>    (prints `project<TAB>name`; project is `.` when unqualified)");
-        eprintln!("       keel github-decision-id --join <projectLabel> <dNNNN> [--multi]");
+        eprintln!("usage: keel github decision-id <id>    (prints `project<TAB>name`; project is `.` when unqualified)");
+        eprintln!("       keel github decision-id --join <projectLabel> <dNNNN> [--multi]");
         return 2;
     };
     let (project, name) = split_decision_id(id);
@@ -421,7 +421,7 @@ fn json_escape(s: &str) -> String {
     out
 }
 
-/// `keel github-gesture` — parse the channel's inputs and print what they MEAN, as JSON.
+/// `keel github gesture` — parse the channel's inputs and print what they MEAN, as JSON.
 ///
 /// Inputs arrive by ENV, never argv: `COMMENT_BODY`, and optionally `ISSUE_BODY` and `COMMENT_ID`
 /// plus `COMMENT_BODIES`. The comment body is attacker-influenced text, so it is never interpolated
@@ -433,7 +433,7 @@ fn json_escape(s: &str) -> String {
 #[must_use]
 pub fn gesture_cmd() -> i32 {
     let Ok(body) = std::env::var("COMMENT_BODY") else {
-        eprintln!("usage: COMMENT_BODY=<text> keel github-gesture [ISSUE_BODY=.. COMMENT_ID=.. COMMENT_BODIES=..]");
+        eprintln!("usage: COMMENT_BODY=<text> keel github gesture [ISSUE_BODY=.. COMMENT_ID=.. COMMENT_BODIES=..]");
         eprintln!("  Inputs arrive by ENV, never argv: a comment body is attacker-influenced text.");
         return 2;
     };

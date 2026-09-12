@@ -6,7 +6,7 @@ issues come **in** as verbatim Statements. Before it, a defect found downstream 
 ## Procedure
 
 1. **Ingest verbatim.**
-   `keel github-ingest --repo O/N --issue N --by <you> --at <today>`
+   `keel github ingest --repo O/N --issue N --by <you> --at <today>`
    The body is stored character-for-character. `saidBy` is the **GitHub login**, not an enrolled
    actor — an outside reporter has no actor id here, and inventing one misattributes their words.
    `sourceUrl` makes a re-ingest **refuse** rather than store the same words twice.
@@ -31,13 +31,13 @@ ingest-to-Issue path would have to invent one.
 
 ## Removal path
 
-Delete this skill + registry + the process file, and the `github-ingest` dispatch arm. The
+Delete this skill + registry + the process file, and the `ingest` arm of `keel github`. The
 `github` channel member and `sourceUrl` attribute may stay — both are harmless and `sourceUrl` is
 `[0..1]`.
 
 ## Pulling, and how much autonomy an issue carries (D0264)
 
-`keel github-pull --repo O/N --by <you> --at <today>` ingests every open issue no Statement cites.
+`keel github pull --repo O/N --by <you> --at <today>` ingests every open issue no Statement cites.
 Safe to repeat — ingestion refuses on the URL.
 
 **The tier is derived from repository visibility and recorded on each utterance:**
