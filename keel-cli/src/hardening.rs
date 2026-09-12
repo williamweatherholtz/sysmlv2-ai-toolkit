@@ -5,7 +5,7 @@
 //! In the pass that produced this module, FOUR probes were wrong before they were right:
 //!
 //!   - a regex matching `: Process` also matched `: ProcessStep` — 131 processes reported, 24 exist;
-//!   - help extraction reported `keel show orient` and `keel assured` as nonexistent, minutes after both had
+//!   - help extraction reported `keel show orient` and `keel gate assured` as nonexistent, minutes after both had
 //!     been run in the same session;
 //!   - a second attempt at the same question reported 0 of 72 subcommands documented;
 //!   - a registry probe reported 0 registered skills against 35 real declarations, which would have
@@ -611,7 +611,7 @@ fn enforcement_points(root: &Path) -> Json {
     let ci = root.join(".github").join("workflows").exists()
         && std::fs::read_dir(root.join(".github").join("workflows")).is_ok_and(|rd| {
             rd.flatten().any(|e| {
-                std::fs::read_to_string(e.path()).is_ok_and(|t| t.contains("keel validate") || t.contains("keel guard"))
+                std::fs::read_to_string(e.path()).is_ok_and(|t| t.contains("keel gate validate") || t.contains("keel gate guard"))
             })
         });
     // D0195 clause 6 (panel R2, robotics finding 3): each point carries a one-word failure-mode
@@ -752,8 +752,8 @@ mod tests {
     fn every_dispatched_subcommand_is_documented() {
         let main = std::fs::read_to_string("src/main.rs").expect("main.rs is readable");
         let dispatched = dispatch_arms(&main);
-        // 49 after the D0451 fold (58 before the three d0399 folds); a scan under 40 has lost the match.
-        assert!(dispatched.len() > 40, "the dispatch scan found {} arms - the lens is mis-aimed", dispatched.len());
+        // 39 after the D0452 fold (58 before the d0399 folds); a scan under 30 has lost the match.
+        assert!(dispatched.len() > 30, "the dispatch scan found {} arms - the lens is mis-aimed", dispatched.len());
         let help = usage_text(&main);
         assert!(!help.is_empty(), "the rendered help is empty - the facts table is empty");
         let absent: Vec<&String> = dispatched.iter().filter(|c| !help_names(&help, c)).collect();

@@ -64,7 +64,7 @@ fn a_retired_decision_leaves_the_queue_and_a_clause_reversal_leaves_its_target_i
     assert!(out.contains("#SupersedeClause d0004 -> d0002") && out.contains("stays in force"), "{out}");
     let text = std::fs::read_to_string(root.join(".engine/decisions/0004-fourth.sysml")).expect("decision");
     assert!(text.contains("#SupersedeClause dependency from d0004 to d0002;"), "the clause edge is in the Decision's own file: {text}");
-    let (ok, out) = run(&root, &["check-engine", "."]);
+    let (ok, out) = run(&root, &["gate", "check-engine", "."]);
     assert!(ok, "both markers resolve: {out}");
 
     // The queue: d0001 still READS proposed, and is absent because the edge retired it; its proposed
@@ -91,7 +91,7 @@ fn the_retired_status_value_cannot_be_authored() {
     let p = root.join(".engine/decisions/0001-only.sysml");
     let text = std::fs::read_to_string(&p).expect("decision");
     std::fs::write(&p, text.replacen("DecisionStatus::proposed", "DecisionStatus::superseded", 1)).expect("write the old shape");
-    let (ok, out) = run(&root, &["check-engine", "."]);
+    let (ok, out) = run(&root, &["gate", "check-engine", "."]);
     assert!(!ok, "the engine-instance gate refuses the removed member: {out}");
     assert!(out.contains("unknown member `superseded`") && out.contains("DecisionStatus"), "and names it: {out}");
     let _ = std::fs::remove_dir_all(&root);

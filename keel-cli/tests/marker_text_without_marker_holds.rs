@@ -81,7 +81,7 @@ fn an_unmarked_text_naming_process_change_is_held_and_its_header_says_why() {
     assert!(held[0].contains("process-change") && held[0].contains("NOT A PROCESS CHANGE"), "{}", held[0]);
     assert!(text.lines().nth(1).is_some_and(|l| l.starts_with("// HELD")), "directly under the scaffolded header: {text}");
     // the guard that reads the file: a HELD Decision is proposed, so it is not an auto-acceptance to scan
-    let (_, out) = run(&root, &["guard", "."]);
+    let (_, out) = run(&root, &["gate", "guard", "."]);
     assert!(out.contains("[guard:consent-scope] PASS \u{2014} 0 scanned"), "{out}");
     let _ = std::fs::remove_dir_all(&root);
 }

@@ -16,8 +16,8 @@ keel is the tooling (like `git`). Read this before doing anything.
   (decisions 0001+). Treat `.engine/` as infrastructure; **you don't edit it** (it's the tool).
   Consult `.engine/reference/` to understand *why* the engine works the way it does.
 - **The `keel` CLI is the authority.** State is never read from prose — it is **computed**:
-  `keel show orient .` (where things stand / what's ready), `keel show whats-next .`, `keel validate .`,
-  `keel guard .`. Author facts via the write API (`keel record task`, `keel record result`, …).
+  `keel show orient .` (where things stand / what's ready), `keel show whats-next .`, `keel gate validate .`,
+  `keel gate guard .`. Author facts via the write API (`keel record task`, `keel record result`, …).
 
 New here? Run the guided **`introduction`** skill (`keel` deploys it) — it onboards you by
 capturing this project's first real need and running the first sprint.
@@ -36,8 +36,8 @@ capturing this project's first real need and running the first sprint.
    computed. Items never collide on name.
 4. **Capture decisions even when they cause no action.** "We won't do X" is a first-class
    `Decision`. Record the *why* (context + rationale) so it can be re-evaluated later.
-5. **Validate before done.** A change is not done until `keel validate .` is clean and
-   `keel guard .` passes.
+5. **Validate before done.** A change is not done until `keel gate validate .` is clean and
+   `keel gate guard .` passes.
 
 ---
 
@@ -76,8 +76,8 @@ out** (in parallel where possible). **No action is taken that is not tied to a p
 ## 5. Validation
 
 ```
-keel validate .    # your .tracking facts parse clean (no ERROR)
-keel guard .       # the honest-state guards pass (well-formed / traceable / truthful)
+keel gate validate .    # your .tracking facts parse clean (no ERROR)
+keel gate guard .       # the honest-state guards pass (well-formed / traceable / truthful)
 keel show orient .      # where things stand + what's ready + the burndown
 ```
 

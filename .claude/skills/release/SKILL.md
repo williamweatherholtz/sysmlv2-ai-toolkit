@@ -34,7 +34,7 @@ unstated (D0129) — that breaks scripts relying on a defaulted actor.
 **2. Gate the exact tree you will tag.**
 
 ```
-keel validate . && keel guard . && keel check-engine .
+keel gate validate . && keel gate guard . && keel gate check-engine .
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --release
 gh run list --limit 1          # CI green at THIS commit
@@ -78,7 +78,7 @@ matching gate by download, not by installing a Rust toolchain.
 `keel-wrapper.toml` under a `["X.Y.Z"]` table — `keelw` refuses to download a version with no entry (never
 trust-on-first-use), so a pin that moves before this step refuses every fresh clone, which is what happened
 for two days at 0.4.1 (issue418). Guard `wrapper-pin-checksummed` warns while the pinned version has no entry;
-read `keel guard wrapper-pin-checksummed .` clean before step 4.
+read `keel gate guard wrapper-pin-checksummed .` clean before step 4.
 
 **4. Record the `Release`.** Author it in `.tracking/baselines.sysml` with `tag` (the git tag, exact - this
 field is the binding guard `release-recorded` reads, D0400; the title is prose and may name any version it

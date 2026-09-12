@@ -1,6 +1,6 @@
 //! GH#14: a mistyped flag must not become the ROOT and turn a check green over nothing.
 //!
-//! `keel guard --read` used to gate a directory literally named `--read`, find no files, and report
+//! `keel gate guard --read` used to gate a directory literally named `--read`, find no files, and report
 //! every guard PASS with 0 scanned. Two defects compounding: silent argument mis-parsing, and
 //! pass-at-zero. Together they produce A GREEN RUN OVER NOTHING, which is worse than an error
 //! because it is indistinguishable from a clean tree.
@@ -34,9 +34,15 @@ fn run(args: &[&str]) -> (i32, String) {
 
 #[test]
 fn an_unknown_flag_is_refused_rather_than_treated_as_a_path() {
-    for cmd in ["guard", "validate", "check-engine"] {
-        let (code, text) = run(&[cmd, "--read"]);
-        assert_eq!(code, 2, "`keel {cmd} --read` must REFUSE (exit 2), not answer: {text}");
+    // three routed sub-verbs (D0452): `keel gate guard --read`, ... - the router bare answers with its own usage
+    for argv in [
+        vec!["gate", "guard", "--read"],
+        vec!["gate", "validate", "--read"],
+        vec!["gate", "check-engine", "--read"],
+    ] {
+        let cmd = argv.join(" ");
+        let (code, text) = run(&argv);
+        assert_eq!(code, 2, "`keel {cmd}` must REFUSE (exit 2), not answer: {text}");
         assert!(
             text.contains("looks like a flag"),
             "and it must say WHY, so the operator fixes the command rather than the tree: {text}"
@@ -52,7 +58,7 @@ fn an_unknown_flag_is_refused_rather_than_treated_as_a_path() {
 
 #[test]
 fn a_real_path_still_works_so_the_refusal_is_not_a_lockout() {
-    let (code, text) = run(&["guard", "identity-present", "."]);
+    let (code, text) = run(&["gate", "guard", "identity-present", "."]);
     assert_eq!(code, 0, "an ordinary ROOT argument must still be accepted: {text}");
     assert!(
         text.contains("PASS") && count_before(&text, " scanned").is_some_and(|n| n > 0),

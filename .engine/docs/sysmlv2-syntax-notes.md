@@ -20,7 +20,7 @@ These supersede guesses; treat them as ground truth for authoring `.sysml`.
 ### KERNEL-VERIFIED base constructs (`_spike_base_algebra.py`, 2026-08-14)
 
 **Read this before inventing a marker (D0139 base-first).** These verdicts come from the KERNEL, the only
-conformance oracle. Do **not** substitute `keel check`: the rust authority is PERMISSIVE and accepts
+conformance oracle. Do **not** substitute `keel gate check`: the rust authority is PERMISSIVE and accepts
 constructs real SysML v2 rejects — that error put an invalid migration target into an accepted Decision
 (issue097). Re-run the spike to re-measure; never assert from the rust parser alone.
 

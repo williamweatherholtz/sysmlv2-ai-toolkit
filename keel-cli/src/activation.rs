@@ -461,7 +461,7 @@ active = []
     fn a_typo_in_the_activation_manifest_fails_loud() {
         // A misspelled PROCESS name still fails loud. The other half of the old test — a misspelled
         // GUARD name in the units file — is now caught upstream as an unresolved constraint TYPE by
-        // `keel validate`, which is strictly stronger than a name-list check, so it is verified there
+        // `keel gate validate`, which is strictly stronger than a name-list check, so it is verified there
         // rather than duplicated here.
         let d = with_unit("typo");
         write(&d, ".engine/contracts/activation.toml", "[processes]

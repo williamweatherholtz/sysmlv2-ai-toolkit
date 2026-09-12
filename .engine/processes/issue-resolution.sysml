@@ -32,7 +32,7 @@ package EngineIssueResolution {
     action irTriage : ProcessStep {
         :>> id = "63940516-2c7d-4e8f-c078-516273849702";
         :>> title = "Triage — link to a resolver (#Resolves)";
-        :>> triggerCondition = "An Issue exists with no #Resolves edge (untriaged — `keel guard issues` fails).";
+        :>> triggerCondition = "An Issue exists with no #Resolves edge (untriaged — `keel gate guard issues` fails).";
         :>> actionText = "Give the Issue a resolver via `#Resolves dependency from <resolver> to <issueNNN>;` (import EngineRelationships::*). The resolver is EITHER a backlog ACTION that will fix it (create the action first if none exists) OR an accepted DECISION that moots/wontfixes it. Never leave an Issue untriaged.";
         :>> producedArtifact = "A #Resolves edge from a resolving action or Decision to the Issue.";
         :>> owner = Owner::ai;

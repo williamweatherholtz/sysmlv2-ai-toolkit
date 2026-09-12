@@ -68,7 +68,7 @@ dependency unresolved; DoD criteria exist or are authored during refine.
    `#CharteredBy` edge from the sprint Story to the originating backlog item / Decision / Need /
    Requirement that chartered the work: `#CharteredBy dependency from <story> to <dNNNN|need|req>;`
    (import `EngineRelationships::*`). This is the work→origin lineage the governing-process VERSION
-   is computed from (pglViews). The charter guard (`keel guard charter`) FAILS any newly-added
+   is computed from (pglViews). The charter guard (`keel gate guard charter`) FAILS any newly-added
    sprint whose Story has no `#CharteredBy` edge — so set it now.
 
 5. **Run the DoR checklist:**

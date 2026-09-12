@@ -6,7 +6,7 @@
 //!
 //!   1. `keel migrate` refuses a dirty tree — and its `git status --porcelain` sees UNTRACKED files,
 //!      so one brand-new file is enough.
-//!   2. Committing that file to clean the tree fails, because the pre-commit gate runs `keel validate`
+//!   2. Committing that file to clean the tree fails, because the pre-commit gate runs `keel gate validate`
 //!      and validate REFUSES under engine-version skew (D0251).
 //!   3. Skew clears by running the pinned binary or by migrating — and migrating is step 1.
 //!

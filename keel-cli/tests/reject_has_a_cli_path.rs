@@ -117,7 +117,7 @@ fn help_and_surface_carry_the_command() {
     let root = project_with_a_proposed_decision("help");
     let (_ok, text) = agent(&root, &["--help"]);
     assert!(text.contains("reject"), "keel --help renders the fact: {text}");
-    let (ok, text) = agent(&root, &["guard", "cli-surface-declared", "."]);
+    let (ok, text) = agent(&root, &["gate", "guard", "cli-surface-declared", "."]);
     assert!(ok && text.contains("0 violation(s)"), "facts, help and dispatch agree: {text}");
     let _ = std::fs::remove_dir_all(&root);
 }

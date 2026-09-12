@@ -55,7 +55,7 @@ const STARTER_MANIFEST: &str = "# deliverable-manifest.txt — declares which ve
 /// the newcomer's FIRST recorded fact (any `createdBy`/`judgedBy`) fails the actors guard (D0037) —
 /// there'd be no `ProjectActors` to reference. Ships placeholder actors (a human + the AI) the newcomer
 /// edits to their real identities; the declared part name is the id that `createdBy`/`judgedBy` reference.
-const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry (INSTANCE data). EDIT to your real actors.\n// The declared part name is the id that createdBy/judgedBy reference (enforced by `keel guard actors`).\npackage ProjectActors {\n    private import EngineElement::*;\n\n    part you : Person { :>> name = \"Your Name\"; :>> email = \"you@example.com\"; }\n    part ai : Actor { :>> name = \"AI assistant\"; :>> kind = ActorKind::ai; }\n}\n";
+const STARTER_ACTORS: &str = "// ProjectActors — this project's actor registry (INSTANCE data). EDIT to your real actors.\n// The declared part name is the id that createdBy/judgedBy reference (enforced by `keel gate guard actors`).\npackage ProjectActors {\n    private import EngineElement::*;\n\n    part you : Person { :>> name = \"Your Name\"; :>> email = \"you@example.com\"; }\n    part ai : Actor { :>> name = \"AI assistant\"; :>> kind = ActorKind::ai; }\n}\n";
 use keel_cli::precommit_hook;
 
 /// Scaffolded `.gitignore`. Machine-local state only — nothing here is a build artifact of the
@@ -83,7 +83,7 @@ fn find_repo_root() -> Option<PathBuf> {
             return Some(dir);
         }
         // STOP AT THE REPOSITORY BOUNDARY (issue281). This walk had none while workspace discovery
-        // did, so standing in a directory nested under an unrelated keel project, `keel validate`
+        // did, so standing in a directory nested under an unrelated keel project, `keel gate validate`
         // with no argument walked OUT of the repository and validated the OUTER repo's project —
         // reporting it clean. A command that answers about a repository the caller is not in is worse
         // than one that refuses: the answer looks right.
@@ -181,7 +181,7 @@ fn engine_version_skew(root: &Path) -> Option<String> {
 }
 
 fn cmd_validate(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel validate [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel gate validate [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -189,7 +189,7 @@ fn cmd_validate(args: &[String]) -> i32 {
     // REFUSE A NON-PROJECT (issue269/D0234). Pointed at a directory with no `.engine/`, validate used
     // to print "0 tracking file(s) validated clean" and exit 0 — a vacuous pass on the FIRST line of
     // every gate. A hook placed at a repo root holding several projects would therefore gate NOTHING
-    // while reporting success. `keel guard` already fails in that position; the two halves of the gate
+    // while reporting success. `keel gate guard` already fails in that position; the two halves of the gate
     // disagreed about whether an absent project is a clean tree or a usage error. It is a usage error.
     //
     // A real project holding zero tracking files still exits 0: that is a true statement about a
@@ -201,7 +201,7 @@ fn cmd_validate(args: &[String]) -> i32 {
         if ws.is_multi() {
             eprintln!("  This repository holds {} projects. validate takes ONE project root:", ws.projects.len());
             for p in &ws.projects {
-                eprintln!("    keel validate {}", ws.label(p));
+                eprintln!("    keel gate validate {}", ws.label(p));
             }
             // issue278: this used to advise `keel hook pre-commit`, which is not a hook event -
             // at a workspace root it prints nothing and exits 0, so anyone who wired it in
@@ -253,7 +253,7 @@ fn cmd_validate(args: &[String]) -> i32 {
     }
 }
 
-/// `keel check-engine [ROOT]` (D0112 phase 2, issue067) — semantically validate the `.engine` INSTANCE
+/// `keel gate check-engine [ROOT]` (D0112 phase 2, issue067) — semantically validate the `.engine` INSTANCE
 /// files (decisions/processes/views + registry + template) against the schema, KERNEL-FREE — the Rust
 /// backstop for the `unresolved` reference class the JVM `validate_instances.py` used to be the sole
 /// source of.
@@ -455,7 +455,7 @@ fn ledger_refused(root: &Path, verb: &str, control: &str) {
     ledger_line(root, &session, "refused", 1, 0, Some(("refused".to_string(), format!("{verb}:{control}"))));
 }
 /// The commit tier is in the ledger with the in-loop tiers (dcRefusalIsALedgerFact clause d): the
-/// scaffolded pre-commit hook runs `keel validate`, `keel guard` and `keel check-engine` as separate
+/// scaffolded pre-commit hook runs `keel gate validate`, `keel gate guard` and `keel gate check-engine` as separate
 /// processes, so each writes one `commit-gate-<tier>` line - `allow` when green, `block` naming the
 /// refusing controls (the failing guard names, or the tier itself) when red. A run by hand writes the same line; the ledger does not know who
 /// invoked it, and a rate over both is still a rate.
@@ -1218,7 +1218,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     let report = keel_cli::perf::phase("hook:validate", || keel_cli::validate_root(root));
     if !report.diagnostics.is_empty() || !report.errors.is_empty() {
         use std::fmt::Write as _;
-        let mut s = String::from("keel validate:\n");
+        let mut s = String::from("keel gate validate:\n");
         for (p, d) in report.diagnostics.iter().take(10) {
             let _ = writeln!(s, "  {}:{} — {}", p.display(), d.line, d.message);
         }
@@ -1238,10 +1238,10 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
         }
     }
     if !failing.is_empty() {
-        problems.push(format!("keel guard:\n{}", failing.join("\n")));
+        problems.push(format!("keel gate guard:\n{}", failing.join("\n")));
     }
     // Declared rules gate the turn (D0177/P1.5): blocking rules block; warning rules report only at
-    // their own surfaces (`keel rules`), not here — a turn boundary repeats no warning noise.
+    // their own surfaces (`keel gate rules`), not here — a turn boundary repeats no warning noise.
     match keel_cli::perf::phase("hook:rules", || keel_cli::view::check(root)) {
         Ok(json) => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
@@ -1255,11 +1255,11 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
                     }
                 }
                 if !broken.is_empty() {
-                    problems.push(format!("keel rules (blocking):\n{}", broken.join("\n")));
+                    problems.push(format!("keel gate rules (blocking):\n{}", broken.join("\n")));
                 }
             }
         }
-        Err(e) => problems.push(format!("keel rules: cannot evaluate declared rules: {e}")),
+        Err(e) => problems.push(format!("keel gate rules: cannot evaluate declared rules: {e}")),
     }
 
     // THE HUMAN MAY BE BLOCKED WHETHER OR NOT THE MODEL IS (issue150, answering their own question about
@@ -1322,7 +1322,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
             }
         };
         return hook_emit(&serde_json::json!({
-            "systemMessage": format!("[in-loop gate] Still red after a correction pass — allowing the stop to avoid a loop. Do NOT commit until keel validate + guard are green. {note}")
+            "systemMessage": format!("[in-loop gate] Still red after a correction pass — allowing the stop to avoid a loop. Do NOT commit until keel gate validate + guard are green. {note}")
         }));
     }
     let mut body = problems.join("\n\n");
@@ -1330,7 +1330,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     hook_refuse("in-loop-gate", &serde_json::json!({
         "decision": "block",
         "reason": format!(
-            "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (record result / record task / record decision); run `keel guard <name>` for detail. Then end the turn."
+            "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (record result / record task / record decision); run `keel gate guard <name>` for detail. Then end the turn."
         )
     }))
 }
@@ -1345,7 +1345,34 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
 /// Deliberately excludes every heuristic/warning-level guard: a per-edit gate that fires on a prose
 /// heuristic would block work mid-thought and train the actor to disable it — the issue076/issue081
 /// dynamic that cost eight bypassed commits this sitting.
+/// D0452: the gating family's seven verbs are sub-verbs of `gate`, each keeping its word and its
+/// arguments. A reserved word is resolved BEFORE a positional is read as a root, so a directory named
+/// `validate` is gated with `keel gate --fast validate`, never mistaken for the sub-verb's absence.
+fn gate_subverb(args: &[String]) -> Option<i32> {
+    let rest = args.get(1..).unwrap_or(&[]);
+    Some(match args.first().map(String::as_str)? {
+        "validate" => refuse_flag_as_path(rest.first(), "gate validate").unwrap_or_else(|| cmd_validate(rest)),
+        "check" => cmd_check(rest),
+        "check-engine" => refuse_flag_as_path(rest.first(), "gate check-engine").unwrap_or_else(|| cmd_check_engine(rest)),
+        "guard" => cmd_guard(rest),
+        "rules" => cmd_rules(rest),
+        "assured" => cmd_assured(rest),
+        "adoption-check" => keel_cli::adoption_check::cmd(rest),
+        _ => return None,
+    })
+}
+
+/// The `keel gate` usage: the two tiers, then one line per sub-verb the router resolves.
+fn print_gate_usage() {
+    eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder)");
+    eprintln!("       keel gate --workspace [ROOT]   (the COMMIT gate for a repo holding several projects: every project the commit touches, D0234)");
+    eprintln!("       keel gate validate|check|check-engine|guard|rules|assured|adoption-check ...   (D0452: the seven gating verbs under one router, each keeping its arguments - `keel gate <sub-verb> --help` is its own usage)");
+}
+
 fn cmd_gate(args: &[String]) -> i32 {
+    if let Some(code) = gate_subverb(args) {
+        return code;
+    }
     // D0234: `--workspace` is a SCOPE (every project in this git repo), `--fast` is a TIER (the
     // per-edit subset). A repo holding several projects can only have one core.hooksPath, so its
     // pre-commit hook calls this rather than a per-project gate that could cover just one of them.
@@ -1367,8 +1394,7 @@ fn cmd_gate(args: &[String]) -> i32 {
         return 2;
     }
     if !fast {
-        eprintln!("usage: keel gate --fast [ROOT]   (the per-edit in-loop gate: validate + duplicate-identity + marker-vocabulary + scaffold-placeholder)");
-        eprintln!("       keel gate --workspace [ROOT]   (the COMMIT gate for a repo holding several projects: every project the commit touches, D0234)");
+        print_gate_usage();
         return 2;
     }
 
@@ -1411,7 +1437,7 @@ fn cmd_gate(args: &[String]) -> i32 {
 }
 
 fn cmd_check_engine(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel check-engine [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel gate check-engine [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -1473,7 +1499,7 @@ fn cmd_check(args: &[String]) -> i32 {
         return cmd_spec_version(args);
     }
     if args.is_empty() {
-        eprintln!("usage: keel check FILE [FILE...]  |  keel check --spec-version [--no-fetch]");
+        eprintln!("usage: keel gate check FILE [FILE...]  |  keel gate check --spec-version [--no-fetch]");
         return 2;
     }
     let files: Vec<PathBuf> = args.iter().map(PathBuf::from).collect();
@@ -1642,8 +1668,32 @@ fn cmd_orphans(args: &[String]) -> i32 {
     }
 }
 
+/// D0452: the three audits are sub-verbs of `audit`, resolved before a positional is read as a root.
+///
+/// issue281: `history` and `adherence` read a MODEL, so they must not answer over nothing — they take
+/// their root from `find_repo_root`, the repository-scoped resolver `sync`/`land` use, which carries
+/// no project precondition. Found by sweeping every command at a workspace root rather than by
+/// trusting that one chokepoint covered them all: nine refused, one still exited 0.
+/// D0323 / issue374: `ci-runs` is the external-fact gate - a ci-run receipt is checked against the run itself.
+fn audit_subverb(args: &[String]) -> Option<i32> {
+    let rest = args.get(1..).unwrap_or(&[]);
+    let repo = || find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    Some(match args.first().map(String::as_str)? {
+        "history" => keel_cli::history::cmd(rest, &repo()),
+        "adherence" => keel_cli::adherence::cmd(rest, &repo()),
+        "ci-runs" => refuse_flag_as_path(rest.first(), "audit ci-runs").unwrap_or_else(|| {
+            let root = rest.first().filter(|a| !a.starts_with('-')).map_or_else(repo, PathBuf::from);
+            keel_cli::ci_runs::cmd(rest, &root)
+        }),
+        _ => return None,
+    })
+}
+
 fn cmd_audit(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel audit [ROOT]", &[], 0) {
+    if let Some(code) = audit_subverb(args) {
+        return code;
+    }
+    let root = match root_arg(args, "keel audit [ROOT] | keel audit history|adherence|ci-runs ...", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -1665,7 +1715,7 @@ fn resolve_guard_root(arg: Option<&String>) -> Option<PathBuf> {
 
 /// Refuse an argument that LOOKS like a flag where a path or a name is expected (GH#14).
 ///
-/// A mistyped or unsupported `--flag` used to be accepted as the ROOT: `keel guard --read` gated a
+/// A mistyped or unsupported `--flag` used to be accepted as the ROOT: `keel gate guard --read` gated a
 /// directory named `--read`, found nothing, and reported every guard PASS with 0 scanned. Silent
 /// mis-parsing plus pass-at-zero produces a GREEN RUN OVER NOTHING, which is worse than an error
 /// because it is indistinguishable from a clean tree. The same shape was hit again while building
@@ -1690,9 +1740,9 @@ fn is_guard_name(s: &str) -> bool {
     keel_cli::guards::GUARD_NAMES.contains(&s) || matches!(s, "assured" | "critique" | "critique-rigor" | "defect-guard-coverage")
 }
 
-/// Classify `keel guard` args into `(guard name to run, root arg)`. A first arg that is a known guard
+/// Classify `keel gate guard` args into `(guard name to run, root arg)`. A first arg that is a known guard
 /// name runs THAT guard; `all`, no arg, or a non-name first arg (a ROOT path like `.` or a dir) runs
-/// ALL guards on that root. This is what lets `keel guard <ROOT>` work like `keel validate <ROOT>`.
+/// ALL guards on that root. This is what lets `keel gate guard <ROOT>` work like `keel gate validate <ROOT>`.
 fn classify_guard_args(args: &[String]) -> (Option<&str>, Option<&str>) {
     match args.first().map(String::as_str) {
         None => (None, None),
@@ -1703,15 +1753,15 @@ fn classify_guard_args(args: &[String]) -> (Option<&str>, Option<&str>) {
 }
 
 fn cmd_guard(args: &[String]) -> i32 {
-    // `keel guard` / `guard [ROOT]` / `guard all [ROOT]` → run all; `guard <name> [ROOT]` → run one.
+    // `keel gate guard` / `guard [ROOT]` / `guard all [ROOT]` → run all; `guard <name> [ROOT]` → run one.
     let bare: Vec<String> = args.iter().filter(|a| *a != "--no-receipt").cloned().collect();
     let (name, root_arg) = classify_guard_args(&bare);
     // GH#14: a mistyped flag must not become the ROOT and turn every guard green over nothing.
-    if let Some(code) = refuse_flag_as_path(root_arg.map(String::from).as_ref(), "guard") {
+    if let Some(code) = refuse_flag_as_path(root_arg.map(String::from).as_ref(), "gate guard") {
         return code;
     }
     let Some(root) = resolve_guard_root(root_arg.map(String::from).as_ref()) else {
-        eprintln!("error: no .engine/ directory found. usage: keel guard [<name>] [ROOT]");
+        eprintln!("error: no .engine/ directory found. usage: keel gate guard [<name>] [ROOT]");
         return 2;
     };
     if let Some(w) = engine_version_skew(&root) {
@@ -1786,8 +1836,8 @@ fn cmd_guard(args: &[String]) -> i32 {
     };
     report.print();
     // Asking for ONE guard by name is a diagnostic, so the check still RUNS and its findings are still
-    // shown — but the exit code must agree with the enforced gate (D0138). Without this, `keel guard
-    // issues` exits 1 on a project that never adopted issue-resolution while `keel guard` exits 0, and a
+    // shown — but the exit code must agree with the enforced gate (D0138). Without this, `keel gate guard
+    // issues` exits 1 on a project that never adopted issue-resolution while `keel gate guard` exits 0, and a
     // script wired to the single-guard form would block on a control the project deliberately does not
     // enforce.
     if let keel_cli::activation::GuardState::Inactive(p) =
@@ -2395,11 +2445,11 @@ fn cmd_concern_coverage(args: &[String]) -> i32 {
     }
 }
 
-// `keel rules [ROOT]` (D0105 EXPAND step 2): evaluate the DECLARED rules (`keel check` is taken by the
+// `keel gate rules [ROOT]` (D0105 EXPAND step 2): evaluate the DECLARED rules (`keel gate check` is taken by the
 // spec-compat file checker; the D0105 name reconciliation is a tracked follow-up). Runs ALONGSIDE
-// `keel guard` until parity retires each guard (guardsToRulesMigration).
+// `keel gate guard` until parity retires each guard (guardsToRulesMigration).
 fn cmd_rules(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel rules [ROOT] [--enforce]", &["enforce"], 0) {
+    let root = match root_arg(args, "keel gate rules [ROOT] [--enforce]", &["enforce"], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -2516,7 +2566,7 @@ fn cmd_decisions(args: &[String]) -> i32 {
 }
 
 fn cmd_assured(args: &[String]) -> i32 {
-    let root = match root_arg(args, "keel assured [ROOT]", &[], 0) {
+    let root = match root_arg(args, "keel gate assured [ROOT]", &[], 0) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -4199,7 +4249,7 @@ const ACTIVATION_HEADER: &str = "\
 #
 # What activating a process does: turns on its whole unit (skill + declared rules + guards), as defined
 # by the engine from each process's own `assert constraint` declarations. Deactivating one stops its guards running,
-# and `keel guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
+# and `keel gate guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
 #
 # DELETE THIS FILE to return to \"everything is active\", which is also the behaviour when no file
 # exists — so an existing project that never declares one is unaffected.
@@ -4344,7 +4394,7 @@ fn switch_viewpoint(
         println!("effective state before applying this change.");
     }
     println!("{mode}d viewpoint `{target}`. Active viewpoints: {} of {}", set.len(), all.len());
-    println!("Read it back: keel activation | keel guard");
+    println!("Read it back: keel activation | keel gate guard");
     0
 }
 
@@ -4477,7 +4527,7 @@ viewpoints ({} declared):", vps.len());
             Err(e) => eprintln!("claude surface NOT regenerated ({e}) - run `keel sync-claude` so the deployed skills follow the active set"),
         }
     }
-    println!("Read it back: keel activation | keel guard");
+    println!("Read it back: keel activation | keel gate guard");
     0
 }
 
@@ -4609,7 +4659,7 @@ fn cmd_record_issue(args: &[String]) -> i32 {
         Ok((name, path)) => {
             println!("recorded {name} -> {path}");
             println!("  triaged on arrival: `#Resolves dependency from {resolver} to {name};`");
-            println!("  run `keel validate . && keel guard .` to confirm; nothing was committed.");
+            println!("  run `keel gate validate . && keel gate guard .` to confirm; nothing was committed.");
             0
         }
         Err(e) => { eprintln!("error: {e}"); 1 }
@@ -4900,7 +4950,7 @@ fn cmd_accept(args: &[String]) -> i32 {
         Ok(_) => {
             println!("accepted {decision} (judged by {judged_by} at {date}, against {sha})");
             println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
-            println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
+            println!("  run `keel gate validate . && keel gate guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
             0
         }
         Err(e) => {
@@ -4982,7 +5032,7 @@ fn cmd_reject(args: &[String]) -> i32 {
         Ok(_) => {
             println!("rejected {decision} (judged by {judged_by} at {date}, against {sha})");
             println!("  -> {}", path.strip_prefix(&root).unwrap_or(&path).display().to_string().replace('\\', "/"));
-            println!("  run `keel validate . && keel guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
+            println!("  run `keel gate validate . && keel gate guard .` — confirmation-authenticity checks that {judged_by} is a Person.");
             0
         }
         Err(e) => {
@@ -5448,42 +5498,23 @@ fn main() {
         // D0138: what has this project ADOPTED — declared, not inferred from file presence.
         Some("process") => keel_cli::process_cmd::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("onboard") => keel_cli::onboard::cmd(rest),
-        Some("adoption-check") => keel_cli::adoption_check::cmd(rest),
         Some("projects") => keel_cli::workspace::cmd(rest),
         Some(v @ ("activation" | "activate" | "deactivate")) => cmd_activation(v, rest),
         Some("serve") => cmd_serve(rest),
-        Some("validate") => refuse_flag_as_path(rest.first(), "validate")
-            .unwrap_or_else(|| cmd_validate(rest)),
         Some("hook") => cmd_hook(rest), // D0134: in-loop gates in the BINARY, no python runtime
-        Some("gate") => cmd_gate(rest), // D0128 Tier-2: the fast per-edit in-loop gate
-        Some("check-engine") => refuse_flag_as_path(rest.first(), "check-engine")
-            .unwrap_or_else(|| cmd_check_engine(rest)),
-        Some("check") => cmd_check(rest),
-        Some("rules") => cmd_rules(rest),
+        // D0128 Tier-2: the fast per-edit in-loop gate; D0452: the seven gating verbs route under it.
+        Some("gate") => cmd_gate(rest),
         Some("library") => keel_cli::library::run(rest),
         Some("show") => cmd_show(rest),
-        Some("audit") => cmd_audit(rest),
+        Some("audit") => cmd_audit(rest), // D0452: history, adherence and ci-runs route under it
         Some("deck") => cmd_deck(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
         Some("claude") => cmd_claude(rest),
         Some("override") => cmd_override(rest),
-        Some("guard") => cmd_guard(rest),
         Some("recall") => cmd_recall(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        // issue281: `verification` reads a MODEL, so it must not answer over nothing — but it takes
-        // its root via `repo_arg`, which is the repository-scoped resolver `sync`/`land` use and which
-        // therefore carries no project precondition. Found by sweeping every command at a workspace
-        // root rather than by trusting that one chokepoint covered them all: nine refused, this one
-        // still exited 0.
-        Some("audit-history") => keel_cli::history::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        Some("audit-adherence") => keel_cli::adherence::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
-        // D0323 / issue374: the external-fact gate - a ci-run receipt is checked against the run itself.
-        Some("audit-ci-runs") => refuse_flag_as_path(rest.first(), "audit-ci-runs").unwrap_or_else(|| {
-            let root = rest.first().filter(|a| !a.starts_with('-')).map_or_else(|| find_repo_root().unwrap_or_else(|| PathBuf::from(".")), PathBuf::from);
-            keel_cli::ci_runs::cmd(rest, &root)
-        }),
         Some("github-gesture") => keel_cli::github::gesture_cmd(),
         Some("currency") => cmd_currency(rest), // D0338: the unattended pass - pull, library, drift
         Some("suite") => cmd_suite(rest), // D0353: the full suite, with the receipt land demands
@@ -5508,7 +5539,6 @@ fn main() {
         Some("github-decider") => keel_cli::github::decider_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("advance") => keel_cli::cursor::advance_cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("enroll") => cmd_enroll(rest),
-        Some("assured") => cmd_assured(rest),
         Some("render") => cmd_render(rest),
         Some("accept") => cmd_accept(rest),
         Some("reject") => cmd_reject(rest), // D0393/issue414: the human's rejection through the write API
@@ -5551,7 +5581,7 @@ mod tests {
         assert!(matches!(bash_classify(&root, "sed -i s/a/b/ .tracking/backlog.sysml"), BashVerdict::Block(_)));
         assert!(matches!(bash_classify(&root, "git config core.hooksPath /dev/null"), BashVerdict::Block(_)));
         assert!(matches!(bash_classify(&root, "SKIP_VALIDATE=1 git commit -m x"), BashVerdict::Block(_)));
-        assert!(matches!(bash_classify(&root, "keel validate ."), BashVerdict::Clean), "ordinary keel is exempt");
+        assert!(matches!(bash_classify(&root, "keel gate validate ."), BashVerdict::Clean), "ordinary keel is exempt");
         assert!(matches!(bash_classify(&root, "keel accept d1 --by hum"), BashVerdict::Ask(_)), "accept is never exempt");
         assert!(matches!(bash_classify(&root, "keel actor set hum"), BashVerdict::Ask(_)), "actor mutation is never exempt");
         assert!(
@@ -5604,7 +5634,7 @@ mod tests {
 
     #[test]
     fn guard_args_distinguish_name_from_root() {
-        // Regression (v0.1.0 release smoke): `keel guard <ROOT>` must run all guards on ROOT, not read
+        // Regression (v0.1.0 release smoke): `keel gate guard <ROOT>` must run all guards on ROOT, not read
         // ROOT as a guard name. A known name runs that one guard; "all"/no-arg/a path runs all.
         let s = |v: &[&str]| v.iter().map(|x| (*x).to_string()).collect::<Vec<_>>();
         assert_eq!(classify_guard_args(&s(&[])), (None, None)); // run all, default root

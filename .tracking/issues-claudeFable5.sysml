@@ -939,4 +939,37 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcScriptCallersOfTheCliAreHeldToTheSurface to issue503;
+
+    part issue504 : Issue {
+        :>> id = "be39894f-f651-4ab4-bd76-c503807d1949";
+        :>> title = "audit history judges a pre-fold commit FAIL on a guard that compares the binary to a tree it was not built from";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Sprint 682's three-tree comparison (D0273 shape) ran `keel audit history --max 3` on the green tree with the pre-fold binary (keel-prefold682.exe, fc89e6a) and the post-fold binary (6821b5c+dirty): the old binary reported PASS, UNKNOWN, PASS over 6821b5c, 36715a2 and 9e4e791; the new binary reported FAIL on all three. Every failure is cli-surface-declared, which compares the binary's Rust fact mirror against the tree's .engine/cli/commands.sysml - at a pre-fold commit the tree declares 99 facts and the binary carries 89, so the guard cannot pass and the verdict says nothing about the commit. The same skew appears in reverse on the old binary against the post-fold tree (22 violations under gate guard, gate assured and gate --workspace, cmp_green.log). CI's audit history step runs --since github.event.before, so the pushed range starts at the fold commit and stays green; the `|| keel audit history --max 20` fallback in ci.yml line 82 would re-derive twenty pre-fold commits with the post-fold binary and go red. A verdict a binary cannot pass at any tree but its own is not a verdict about the tree; audit history should label it as the binary's skew, not the commit's failure.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcAuditHistoryLabelsTheBinarysSkew to issue504;
+
+    part issue505 : Issue {
+        :>> id = "f15614be-a3e2-4076-9c70-e23983e75a2d";
+        :>> title = "The README command table named retired verbs through three folds: no guard holds a document's command spellings to the surface";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "At fc89e6a, the commit before sprint 682, README.md line 85 still listed `orient` and `whats-next` as top-level commands in its command table and line 50 still named `keel audit-history` - spellings the D0450 orientation fold (sprint 679) had already moved under `keel show`. The table had drifted through three folds (D0449, D0450, D0451) because each fold's transform rewrote `keel <verb>` and the table names its verbs bare, in backticks, with no `keel` in front; the sprint 682 sweep found and rewrote it by hand. The cli-callers-declared guard proposed for issue503 scans scripts, tools and hooks for invocations; README.md, CLAUDE.md, .engine/docs and the skills carry the same spellings as prose and are on no guard's surface - cli-surface-declared holds the binary to the facts, tool-reference holds .engine/tools paths, nothing holds a document's command names to the surface. A reader who trusts the table is told to run commands the binary refuses.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcScriptCallersOfTheCliAreHeldToTheSurface to issue505;
+
+    part issue506 : Issue {
+        :>> id = "477203f5-020c-454e-9406-ef13d9d653c0";
+        :>> title = "A fact's sub-verbs are derived from its human-facing grammar: a router's own bare alternative must trail and render's sub-verbs are invisible";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The router-to-fact test (the_gate_and_audit_sub_verbs_match_their_facts, sprint 682) failed on the first audit invocation because the reader that derives a fact's sub-verbs from its invocation grammar (cli_facts.rs sub_verb_segments, line 19) cancels the whole list when the first alternative does not open with a bare verb: `[ROOT] | history ... | adherence ... | ci-runs ...` read as no sub-verbs at all, and the fix was to move the router's own bare form to the trailing segment in both homes (cli_facts.rs and .engine/cli/commands.sysml). The rule cannot be relaxed: a census over all 89 facts (subverb_census.py) showed that reading verbs after a non-verb opener would also turn `render`'s `<view>|model [--mode ...] | report <...>` into eight false sub-verbs. So today the grammar can express a router's sub-verbs OR its own bare alternatives first, not both in the natural order, and `render` - which does route (`render report`) - is invisible to the router test because its grammar opens with a placeholder. The sub-verb list is derived from prose meant for humans; it should be declared, as dcSubVerbEffectIsDeclared already proposes for the sub-verb's effect.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcSubVerbEffectIsDeclared to issue506;
 }

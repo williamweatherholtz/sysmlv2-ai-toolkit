@@ -31,7 +31,7 @@ git init && git config core.hooksPath .githooks   # enable the Rust-only keel pr
 ```
 `keel init` lays down the engine (`.engine/`, with the architecture decisions as read-only
 `reference/`), `CLAUDE.md` (how to work here), a starter `.tracking/`, a kernel-free
-`.githooks/pre-commit` (runs `keel validate` + `keel guard`; **fails loud when the binary is
+`.githooks/pre-commit` (runs `keel gate validate` + `keel gate guard`; **fails loud when the binary is
 absent**, naming this release page), **the full in-loop enforcement surface** (`.claude/`:
 five hook events, the keel output style, discoverable skills, and the protected-path check —
 regenerate any time with `keel sync-claude`, drift-checked by `keel sync-claude --check`), and an
@@ -47,7 +47,7 @@ package managers, no auto-update, no install scripts — deliberately, D0175).
 
 **Harness support:** in-loop enforcement (hooks, output style, protected paths) is
 **Claude-Code-bound** today. On any other harness you still get the CLI, the commit and CI gates,
-and `keel audit-history` — the layer that re-derives every verdict from the tree, hook-independent.
+and `keel audit history` — the layer that re-derives every verdict from the tree, hook-independent.
 An MCP surface is a recorded direction (D0186), trigger-gated: if you need keel on a second
 harness in real use, say so — that is the trigger.
 
@@ -80,14 +80,17 @@ the engine's design rationale stays read-only in `.engine/reference/decisions/`.
 
 A single Rust binary is the authority for the routine path — no kernel, conda, or Jupyter required.
 
-| Area | Commands |
+The surface is a family of routers, each resolving its sub-verbs (d0399 option A; D0273, D0449,
+D0451, D0452). `keel --help` renders the whole surface from the declared facts (D0271) - this table
+names only the routers, so it cannot drift from them.
+
+| Area | Router |
 |---|---|
-| Orient / flow | `orient` · `whats-next` · `suspect` · `outstanding` |
-| Author (write API) | `record result` · `record gate-result` · `record task` · `record review` · `record sprint` (D0451) |
-| Assurance | `assured` · `coverage` · `critique-coverage` · `critique-policy` · `attestation-coverage` · `concern-coverage` · `dispositions` · `open-issues` |
-| Views / reports | `view <name>` · `render <view>` · `diagram` · `report <kind> [--html]` · `indicators` |
-| Trace / govern | `trace` · `trace-need` · `rootedness` · `tier-satisfaction` · `governing-version` · `reprocess-candidates` · `audit` · `orphans` |
-| Gate | `validate` · `guard [name]` · `check` |
+| Orient / lenses | `show <lens>` (orient, whats-next, suspect, coverage, indicators, controls, ...) |
+| Author (write API) | `record <fact>` (decision, issue, statement, story, task, sprint, result, gate-result, review, ...) |
+| Views / reports | `render <view>` · `render report <kind> [--html]` · `render model` · `render decision-card` |
+| Gate | `gate validate` · `gate check` · `gate check-engine` · `gate guard [name]` · `gate rules` · `gate assured` · `gate adoption-check` · `gate --fast` · `gate --workspace` |
+| Audit | `audit [ROOT]` · `audit history` · `audit adherence` · `audit ci-runs` |
 | Console / spin-up | `init DIR` · `serve [--port N]` (localhost oversight console) |
 
 > **`serve` agent bridge is optional.** The read console, views, and reports work with the `keel`
@@ -125,7 +128,7 @@ happen here, under the same discipline.
   `main` (the only branch). CI (`.github/workflows/ci.yml`) runs `cargo test` + `clippy -D warnings`.
 - **Deep `.engine` SysML semantics** are checked by the OMG pilot Jupyter kernel (conda env `sysml`)
   on demand / in the pre-commit hook for `.engine` edits; the routine `.tracking` path is Rust-only
-  (`keel validate`/`guard`). This dev-only kernel toolchain is **not** shipped to `keel init` projects.
+  (`keel gate validate`/`guard`). This dev-only kernel toolchain is **not** shipped to `keel init` projects.
 
 ### Build from source
 

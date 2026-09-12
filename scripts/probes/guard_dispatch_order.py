@@ -13,7 +13,7 @@ states its two known cases before it reads the real set:
     python scripts/probes/guard_dispatch_order.py --probe
     python scripts/probes/guard_dispatch_order.py --real perf_run_1.txt [perf_run_2.txt ...] [--workers 20]
 
-`--real` takes the output of `KEEL_PERF=2 keel guard --no-receipt .` (its `phase guard:<name> <n>ms` lines);
+`--real` takes the output of `KEEL_PERF=2 keel gate guard --no-receipt .` (its `phase guard:<name> <n>ms` lines);
 several files are averaged per guard. Declaration order is read from GUARD_NAMES in guards.rs so the
 simulation dispatches exactly what the binary dispatches.
 

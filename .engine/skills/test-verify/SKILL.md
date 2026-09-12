@@ -92,7 +92,7 @@ git status --short                    # count and list; the recorder needs to kn
 The dispatch may name guards it EXPECTS red (a proposed Decision's known red); report them as red
 and cite the dispatch's expectation beside each.
 
-Note `keel guard` before staging reads NOTHING for the index-reading guards (`process-change` scans
+Note `keel gate guard` before staging reads NOTHING for the index-reading guards (`process-change` scans
 `git diff --cached`; issue464): say in the receipt that the commit tier was not exercised.
 
 ### 3. The D0388 probe pair

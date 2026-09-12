@@ -161,7 +161,7 @@ pub fn cmd_sync(repo: &Path) -> i32 {
             Ok(out) => println!("  {}", out.lines().next().unwrap_or("merged")),
             Err(e) => {
                 eprintln!("keel sync: merge could not complete automatically:\n{e}");
-                eprintln!("  Resolve keeping BOTH facts, then `keel validate . && keel guard .` and commit.");
+                eprintln!("  Resolve keeping BOTH facts, then `keel gate validate . && keel gate guard .` and commit.");
                 eprintln!("  For two conclusions that cannot both be true, record an Issue for HUMAN adjudication (D0108) —");
                 eprintln!("  never settle it by precedence. NEVER `git pull --rebase` here: it orphans evidence anchors.");
                 return 1;
@@ -278,7 +278,7 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
             eprintln!("keel land: MERGE COULD NOT BE COMPLETED AUTOMATICALLY.");
             eprintln!("  Either a textual conflict needs resolving, or the gate refused the merged tree");
             eprintln!("  (a semantic conflict: both sides green alone, red together).");
-            eprintln!("  DO: resolve keeping BOTH facts, run `keel validate . && keel guard .`, commit, and re-run.");
+            eprintln!("  DO: resolve keeping BOTH facts, run `keel gate validate . && keel gate guard .`, commit, and re-run.");
             eprintln!("  For two conclusions that cannot both be true, record an Issue for HUMAN adjudication (D0108).");
             eprintln!("  NEVER `git pull --rebase` here: it orphans evidence anchors (issue071).\n{e}");
             let _ = git(repo, &["merge", "--abort"]);
@@ -296,7 +296,7 @@ pub fn cmd_land(repo: &Path, max_attempts: u32) -> i32 {
             }
             eprintln!("  Both sides were green ALONE. This is the semantic conflict a merge queue exists to catch,");
             eprintln!("  and it is caught here rather than on the trunk. The merge is left in the working tree:");
-            eprintln!("  resolve keeping BOTH facts, run `keel validate . && keel guard .`, commit, and re-run.");
+            eprintln!("  resolve keeping BOTH facts, run `keel gate validate . && keel gate guard .`, commit, and re-run.");
             eprintln!("  Nothing was pushed and nothing was rewritten.");
             return 1;
         }

@@ -7,7 +7,7 @@ actions and gates — NOT only requirements. So the question the base-first migr
 If it cannot, then #Verify is not a relationship that base `verify`/`objective` can absorb for the
 majority of its uses, and clause (E) is under-scoped in a second, independent way beyond issue097.
 
-KERNEL ONLY — `keel check` is permissive and must not be used to answer this (issue097).
+KERNEL ONLY — `keel gate check` is permissive and must not be used to answer this (issue097).
 """
 import os
 import sys

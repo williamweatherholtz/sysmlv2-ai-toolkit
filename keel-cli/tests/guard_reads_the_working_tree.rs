@@ -1,7 +1,7 @@
 //! The DoD probe for `dcGuardReadsTheWorkingTreeOutsideTheHook` (issue464, D0440) — which
 //! population the keystone guards judge.
 //!
-//! The incident: on 2026-09-10 the D0425 verifier ran `keel guard --no-receipt` over a tree whose
+//! The incident: on 2026-09-10 the D0425 verifier ran `keel gate guard --no-receipt` over a tree whose
 //! sprint edits were not yet staged and reported ALL PASS; the pre-commit hook then refused the
 //! same edits on process-change once `git add` had run. The guards read `git diff --cached`, so
 //! outside a hook they judged an empty index and called it a clean tree.
@@ -67,10 +67,10 @@ fn marked_decision_unstaged(root: &Path) {
     .expect("decision");
 }
 
-/// `keel guard process-change` as a process OUTSIDE any hook: neither marker variable set.
+/// `keel gate guard process-change` as a process OUTSIDE any hook: neither marker variable set.
 fn guard_at_terminal(root: &Path) -> (bool, String) {
     let out = Command::new(keel_bin())
-        .args(["guard", "process-change"])
+        .args(["gate", "guard", "process-change"])
         .current_dir(root)
         .env_remove("GIT_INDEX_FILE")
         .env_remove("KEEL_HOOK")
@@ -80,10 +80,10 @@ fn guard_at_terminal(root: &Path) -> (bool, String) {
     (out.status.success(), text)
 }
 
-/// `keel guard process-change` as the commit gate runs it.
+/// `keel gate guard process-change` as the commit gate runs it.
 fn guard_in_hook(root: &Path) -> (bool, String) {
     let out = Command::new(keel_bin())
-        .args(["guard", "process-change"])
+        .args(["gate", "guard", "process-change"])
         .current_dir(root)
         .env_remove("GIT_INDEX_FILE")
         .env("KEEL_HOOK", "pre-commit")

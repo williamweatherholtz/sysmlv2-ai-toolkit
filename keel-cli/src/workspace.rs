@@ -9,7 +9,7 @@
 //! 2. **The channel cannot tell them apart** — its marker is `keel-decision: d0001` and its lookup is
 //!    repo-scoped in GitHub, so the second project's issue never opens and `reject d0001` is ambiguous.
 //! 3. **The gate cannot cover them** — git allows ONE `core.hooksPath` per repository, so at most one
-//!    project is gated; and `keel validate` at the parent printed "0 tracking file(s) validated clean"
+//!    project is gated; and `keel gate validate` at the parent printed "0 tracking file(s) validated clean"
 //!    and exited 0, so a hook there would gate NOTHING while reporting success (issue269).
 //! 4. **`land` gates one root and pushes the whole repo** — the other projects ride out ungated.
 //!

@@ -70,7 +70,7 @@ fn an_undeclared_instrument_in_the_tree_is_a_violation() {
     // one declared Sensor, so the guard is active, but it names something else
     declare_sensor(&root, "snOther", "scripts/other_measure.py");
     std::fs::write(root.join("scripts").join("other_measure.py"), "print(1)\n").expect("script");
-    let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "instruments-declared", "."]);
     assert!(
         out.contains("FAIL") && out.contains("coverage_number.py"),
         "the guard must NAME the undeclared measure: {out}"
@@ -83,7 +83,7 @@ fn a_sensor_whose_mechanism_is_gone_is_a_violation() {
     // The mirror defect: a stale measure claims something is watched when it is not.
     let root = scaffold("stale");
     declare_sensor(&root, "snGone", "scripts/deleted_probe.py");
-    let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "instruments-declared", "."]);
     assert!(
         out.contains("FAIL") && out.contains("deleted_probe.py"),
         "a Sensor's mechanism must exist, or the inventory lies in the other direction: {out}"
@@ -101,7 +101,7 @@ fn a_declared_measure_is_clean_and_an_exclusion_argued_in_the_file_is_clean() {
     )
     .expect("script");
     declare_sensor(&root, "snCoverage", "scripts/coverage_number.py");
-    let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "instruments-declared", "."]);
     assert!(
         out.contains("0 violation(s)"),
         "a declared measure and an exclusion argued in the file are both clean: {out}"
@@ -114,7 +114,7 @@ fn a_project_with_no_sensors_is_never_accused() {
     // The activation convention: a project that never adopted this control has not violated it.
     let root = scaffold("none");
     std::fs::write(root.join("scripts").join("coverage_number.py"), "print(42)\n").expect("script");
-    let (_ok, out) = run(&root, &["guard", "instruments-declared", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "instruments-declared", "."]);
     assert!(
         out.contains("0 violation(s)") && out.contains("0 scanned"),
         "no Sensor items means nothing declared and nothing accused: {out}"

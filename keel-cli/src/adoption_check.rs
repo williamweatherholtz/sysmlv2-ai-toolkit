@@ -1,4 +1,4 @@
-//! `keel adoption-check` — gate a FOREIGN tree, because that is where the defects actually are.
+//! `keel gate adoption-check` — gate a FOREIGN tree, because that is where the defects actually are.
 //!
 //! WHY THIS EXISTS (issue264/D0231). Measured over this project's own defect record: 39 of 51 guards
 //! read only the authored model, 11 cross some boundary, and **zero** read another project's tree —
@@ -141,9 +141,9 @@ fn gate(fixture: &Path) -> Result<(), String> {
 
 fn gate_with(exe: &Path, fixture: &Path) -> Result<(), String> {
     let f = fixture.to_string_lossy().to_string();
-    keel_with(exe, &["validate", &f], None).map_err(|e| format!("validate: {e}"))?;
-    keel_with(exe, &["guard", "all", &f], None).map_err(|e| format!("guard: {e}"))?;
-    keel_with(exe, &["check-engine", &f], None).map_err(|e| format!("check-engine: {e}"))?;
+    keel_with(exe, &["gate", "validate", &f], None).map_err(|e| format!("validate: {e}"))?;
+    keel_with(exe, &["gate", "guard", "all", &f], None).map_err(|e| format!("guard: {e}"))?;
+    keel_with(exe, &["gate", "check-engine", &f], None).map_err(|e| format!("check-engine: {e}"))?;
     Ok(())
 }
 
@@ -312,9 +312,9 @@ fn strip_unit(fixture: &Path, bundle: &Path) -> Vec<PathBuf> {
     gone
 }
 
-/// `keel adoption-check [ROOT] [--unit NAME] [--keep]`.
+/// `keel gate adoption-check [ROOT] [--unit NAME] [--keep]`.
 fn usage() {
-    println!("usage: keel adoption-check [ROOT] [--unit NAME] [--keep] [--vintage VERSION]");
+    println!("usage: keel gate adoption-check [ROOT] [--unit NAME] [--keep] [--vintage VERSION]");
     println!("  Gates a FOREIGN tree: scaffolds a fresh project, then per unit checks BOTH");
     println!("  directions - that the project gates clean WITHOUT the unit (a control must not");
     println!("  fire on a project that never adopted it), and that the unit lands clean when");
@@ -374,7 +374,7 @@ pub fn cmd(args: &[String]) -> i32 {
     };
     println!("adoption-check: scaffolding a FOREIGN project (nothing here has adopted anything)");
     println!("  SCOPE: this verifies what EXPORT produces, not what any real target received (issue290); a");
-    println!("  target's own `keel guard unit-extras-present` is what checks its mechanism files are there.");
+    println!("  target's own `keel gate guard unit-extras-present` is what checks its mechanism files are there.");
     if let Err(e) = keel(&["init", &fixture.to_string_lossy()], None) {
         eprintln!("error: the scaffold itself failed: {e}");
         return 1;

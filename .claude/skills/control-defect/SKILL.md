@@ -55,7 +55,7 @@ Stop there. That sentence is the only detector that exists; no gate can read sur
 
 ## What the registry buys
 
-`keel guard` prints each registered defect **beside the verdict of the control it belongs to**. A
+`keel gate guard` prints each registered defect **beside the verdict of the control it belongs to**. A
 green from a control known to under-report arrives already qualified, at the moment you are reading
 it, without anyone having to remember. That's the hook.
 
@@ -71,5 +71,5 @@ surprise — the same class as the response contract's verify-before-asserting c
 
 ## Removal path
 
-Delete this skill + registry + the process file + the contract. `keel guard` stops printing defect
+Delete this skill + registry + the process file + the contract. `keel gate guard` stops printing defect
 notes; the guards keep running.

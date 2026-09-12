@@ -30,7 +30,7 @@ The error set splits into two classes:
 
 | Class | Keywords | Already covered by Rust? |
 |---|---|---|
-| **Parse / grammar** | `unexpected`, `no viable`, `extraneous`, `mismatched`, `wasn't expected` | **YES** — the Rust parser (`keel validate`) parses every `.sysml`; a syntax error already fails it. |
+| **Parse / grammar** | `unexpected`, `no viable`, `extraneous`, `mismatched`, `wasn't expected` | **YES** — the Rust parser (`keel gate validate`) parses every `.sysml`; a syntax error already fails it. |
 | **Name / type resolution** | `unresolved`, `cannot`, `couldn't` | **NO** — the true kernel-only delta: a reference to an undefined type/name, an invalid specialization/redefinition/subsetting, a multiplicity/type-conformance violation. |
 
 So the **kernel's unique value on `.engine` is deep SysML-v2 name-and-type resolution** — not parsing
@@ -38,7 +38,7 @@ So the **kernel's unique value on `.engine` is deep SysML-v2 name-and-type resol
 
 ## What Rust covers today
 
-`keel validate` parses all `.sysml` and, for `.tracking`, resolves **cross-file references** (the D0048
+`keel gate validate` parses all `.sysml` and, for `.tracking`, resolves **cross-file references** (the D0048
 machinery — the kernel *cannot* do this because it loads files in per-file isolation, issue021/024).
 So Rust already has a working **cross-file reference-existence resolver** — just not aimed at `.engine`,
 and not a full SysML **type-conformance / specialization** checker.

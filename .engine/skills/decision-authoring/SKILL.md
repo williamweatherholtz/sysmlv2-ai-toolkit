@@ -6,7 +6,7 @@ description: |
   rationale/consequences fields, the acceptance verdict in a discrete human-judged method=confirmation
   TestResult, status/state COMPUTED — and NEVER restate a verdict/status/computed fact as prose in another
   field or a comment. Use whenever recording, accepting, or amending a Decision (CHANGE/RECORD, or
-  `keel record decision`). Backstopped by decisionNoVerdictProseRule (`keel rules`) +
+  `keel record decision`). Backstopped by decisionNoVerdictProseRule (`keel gate rules`) +
   guard:confirmation-authenticity (acceptance must be human-judged).
 metadata:
   version: 0.1.0
@@ -40,7 +40,7 @@ process** so it is *carried out*, not just hoped (D0059). Bound by D0058 (ADR fi
    Never write an `(ACCEPTED <date> by <who>)` comment or field sentence — the TestResult is the sole source.
 3. **State is computed.** Acceptance/coverage/suspicion/resolution are `#View`s (`keel show orient`/`decisions`/
    `coverage`). Only the guarded `status` flag is materialized; everything else derivable is not authored.
-4. **Backstop.** Before commit, `keel rules` → `decisionNoVerdictProseRule` must be 0; any flag is a defect to fix.
+4. **Backstop.** Before commit, `keel gate rules` → `decisionNoVerdictProseRule` must be 0; any flag is a defect to fix.
 
 ## Why enforceable (not just guidance)
 

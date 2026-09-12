@@ -85,7 +85,7 @@ package ProcessControlDefect {
         :>> id = "d0278a01-0901-4b2c-8e11-1f2a3b4c5d66";
         :>> title = "The defective control now says so beside its own verdict";
         :>> triggerCondition = "The registry entry exists.";
-        :>> actionText = "Nothing to do - this is what the registry BUYS, and it is stated as a step so the reader knows to expect it. `keel guard` prints each registered defect beside the verdict of the control it belongs to, so a green from a control known to under-report arrives already qualified. That is the hook: it fires at the moment of reading rather than depending on anyone remembering, and it keeps firing until the Issue is resolved and the entry removed. A control-defect entry whose Issue does not exist or is already closed fails `control-defect-registry`, so the announcement cannot rot into noise.";
+        :>> actionText = "Nothing to do - this is what the registry BUYS, and it is stated as a step so the reader knows to expect it. `keel gate guard` prints each registered defect beside the verdict of the control it belongs to, so a green from a control known to under-report arrives already qualified. That is the hook: it fires at the moment of reading rather than depending on anyone remembering, and it keeps firing until the Issue is resolved and the entry removed. A control-defect entry whose Issue does not exist or is already closed fails `control-defect-registry`, so the announcement cannot rot into noise.";
         :>> producedArtifact = "Every subsequent verdict from that control, qualified.";
         :>> owner = Owner::ai;
     }

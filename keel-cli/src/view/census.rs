@@ -242,7 +242,7 @@ fn names_control(text: &str, name: &str) -> bool {
         || text.contains(&format!("guard {n}"))
         || text.contains(&format!("`{n}` guard"))
         || text.contains(&format!("{n} guard"))
-        || text.contains(&format!("keel guard {n}"))
+        || text.contains(&format!("keel gate guard {n}"))
 }
 
 fn incident_for(decl: &ControlDecl, issue: &IssueFacts) -> Option<Incident> {

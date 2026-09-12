@@ -22,7 +22,7 @@
 //! A path whose mtime is younger than two seconds makes the key UNSETTLED (the same racy window `corpus`
 //! names) and an unsettled key is neither written nor honoured. And any red run DELETES the receipt.
 //!
-//! WHAT IS STORED beside the key: the guards' reports (name, scanned count, warnings) so `keel guard`
+//! WHAT IS STORED beside the key: the guards' reports (name, scanned count, warnings) so `keel gate guard`
 //! prints the population it printed before, plus one line naming the receipt's age. Violations are
 //! never stored - a receipt exists only for a green run. `--no-receipt` (or `KEEL_NO_RECEIPT=1`) forces
 //! the run.
@@ -39,7 +39,7 @@ use crate::guards::GuardReport;
 /// A file touched within this window may still be changing; its key is not trusted (see `corpus`).
 const RACY: Duration = Duration::from_secs(2);
 
-/// The layers a receipt may vouch for. `guards` alone comes from `keel guard`; all three from the
+/// The layers a receipt may vouch for. `guards` alone comes from `keel gate guard`; all three from the
 /// turn boundary and the commit gate.
 pub const VALIDATE: &str = "validate";
 pub const GUARDS: &str = "guards";
@@ -284,7 +284,7 @@ pub fn read(root: &Path, key: &Key) -> Option<Receipt> {
 ///
 /// `before` is the key computed before the run; it is recomputed now and the receipt is written only
 /// when the two agree. `reports` are the guards' reports (every one green); `covers` names the layers
-/// this run vouched for. An existing receipt with an EQUAL key keeps its layers - so a `keel guard`
+/// this run vouched for. An existing receipt with an EQUAL key keeps its layers - so a `keel gate guard`
 /// after a green turn boundary does not narrow what the boundary proved.
 #[must_use]
 pub fn record_green(root: &Path, before: &Key, covers: &[&str], reports: &[GuardReport], durations: &[(&str, u64)]) -> bool {

@@ -35,7 +35,7 @@ relate to a done task yet still be open (issue014/025 were exactly this).
 resolver + `untriaged`), `keel show orient` (`open_issues`). There is **no** authored
 `status` field; a prose "RESOLVED …" clause in a description is *informational only*.
 
-**Triage:** every Issue must carry a `#Resolves` edge — `keel guard issues` fails on an
+**Triage:** every Issue must carry a `#Resolves` edge — `keel gate guard issues` fails on an
 untriaged issue. **Decision-moots-item:** an Issue mooted by a Decision → `#Resolves` from
 the Decision; a Need/Requirement → the existing `supersede` edge (D0004). [Issue-scoped, D0078.]
 
@@ -68,7 +68,7 @@ the Decision; a Need/Requirement → the existing `supersede` edge (D0004). [Iss
 4. **Decision-moots-item:** when a Decision moots an item, record the typed edge in the SAME
    change as the Decision — `#Resolves` from the Decision (Issue) or `supersede`
    (Need/Requirement). Do not write "subsumed by DXXXX" as the only record.
-5. **Verify:** `keel guard issues` green (all triaged) and `keel show open-issues` shows the
+5. **Verify:** `keel gate guard issues` green (all triaged) and `keel show open-issues` shows the
    intended open set before committing.
 
 ## Output Format

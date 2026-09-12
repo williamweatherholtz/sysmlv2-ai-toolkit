@@ -82,7 +82,7 @@ fn the_guard_passes_a_conforming_tree_and_names_the_one_path_rewritten_crlf() {
     assert!(declared.contains("w/crlf") && declared.contains("eol=crlf"), "the negative half is in the tree: {declared}");
 
     // Known-negative FIRST: every declared path holds its ending; the CRLF `.bat` is declared CRLF.
-    let (ok, out) = run(&root, &["guard", "working-tree-eol", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "working-tree-eol", "."]);
     assert!(ok, "a conforming tree passes: {out}");
     assert!(out.contains("[guard:working-tree-eol] PASS"), "{out}");
     // Parse the count: `!contains("0 scanned")` is the substring form unknown_flag_is_refused.rs forbids
@@ -101,7 +101,7 @@ fn the_guard_passes_a_conforming_tree_and_names_the_one_path_rewritten_crlf() {
     // LF blob, status is clean, and the working copy is still CRLF.
     git(&root, &["add", "-A"]);
     assert_eq!(git(&root, &["status", "--porcelain"]), "", "git normalises at the add, so status is clean");
-    let (ok, out) = run(&root, &["guard", "working-tree-eol", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "working-tree-eol", "."]);
     assert!(!ok, "a CRLF copy of an eol=lf file fails: {out}");
     assert!(out.contains("keel-cli/src/widget.rs: the working copy is crlf while .gitattributes declares eol=lf"), "the path and both endings are named: {out}");
     assert_eq!(out.matches("ERROR").count(), 1, "exactly that one path, not the CRLF .bat and not the scaffold: {out}");
@@ -109,7 +109,7 @@ fn the_guard_passes_a_conforming_tree_and_names_the_one_path_rewritten_crlf() {
 
     // Restored, the tree passes again.
     write(&root, "keel-cli/src/widget.rs", "pub fn answer() -> u8 { 1 }\n");
-    let (ok, out) = run(&root, &["guard", "working-tree-eol", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "working-tree-eol", "."]);
     assert!(ok, "the restored tree passes: {out}");
     let _ = std::fs::remove_dir_all(root.parent().expect("base"));
 }

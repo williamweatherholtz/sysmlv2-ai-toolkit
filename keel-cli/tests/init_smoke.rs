@@ -106,7 +106,7 @@ fn init_scaffolds_a_working_project() {
     assert!(profile.contains("profile = \"strict\""), "empty-dir default is strict, DECLARED (P0.4)");
     assert!(dir.join(".github").join("workflows").join("keel-gate.yml").is_file(), "CI template not scaffolded");
 
-    // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel validate/guard; NO conda/kernel).
+    // scaffoldCommitGate: a Rust-only pre-commit gate is scaffolded (keel gate validate/guard; NO conda/kernel).
     let hook = std::fs::read_to_string(dir.join(".githooks").join("pre-commit")).expect(".githooks/pre-commit not scaffolded");
     // issue278: the body is now ONE workspace-scoped call. `gate --workspace` runs validate + guard +
     // declared rules per project it gates, so naming the sub-steps here would pin an implementation
@@ -129,11 +129,11 @@ fn init_scaffolds_a_working_project() {
     assert!(policy.contains("[lenses]") && policy.contains("Need"), "critique-policy.toml missing the [lenses] default");
 
     // 2. the fresh scaffold validates clean.
-    let out = keel().args(["validate", proj]).output().expect("run keel validate");
+    let out = keel().args(["gate", "validate", proj]).output().expect("run keel gate validate");
     assert!(out.status.success(), "fresh scaffold failed validate: {}", String::from_utf8_lossy(&out.stdout));
 
     // 3. the fresh scaffold passes EVERY guard (the D0093 promise: spin up green).
-    let out = keel().args(["guard", "all", proj]).output().expect("run keel guard");
+    let out = keel().args(["gate", "guard", "all", proj]).output().expect("run keel gate guard");
     assert!(out.status.success(), "fresh scaffold failed guard: {}", String::from_utf8_lossy(&out.stdout));
 
     // 4. it orients (computable state, no crash).
@@ -183,13 +183,13 @@ fn init_scaffolds_a_working_project() {
     // The gate must still be green with that fact in the tree — this is the assertion that fails on
     // the issue291 shape, and would fail on any future scaffold artifact that collides with an
     // authored one.
-    let out = keel().args(["guard", "all", proj]).output().expect("run keel guard after recording");
+    let out = keel().args(["gate", "guard", "all", proj]).output().expect("run keel gate guard after recording");
     assert!(
         out.status.success(),
         "the gate went red once the fresh project recorded a decision: {}",
         String::from_utf8_lossy(&out.stdout)
     );
-    let out = keel().args(["validate", proj]).output().expect("run keel validate after recording");
+    let out = keel().args(["gate", "validate", proj]).output().expect("run keel gate validate after recording");
     assert!(
         out.status.success(),
         "validate went red once the fresh project recorded a decision: {}",
@@ -235,7 +235,7 @@ fn recording_an_obligation_keeps_the_tree_valid() {
     let out = keel().args(["init", proj]).output().expect("run keel init");
     assert!(out.status.success(), "init failed: {}", String::from_utf8_lossy(&out.stderr));
 
-    let out = keel().args(["validate", proj]).output().expect("run keel validate");
+    let out = keel().args(["gate", "validate", proj]).output().expect("run keel gate validate");
     assert!(out.status.success(), "fresh scaffold failed validate before the obligation");
 
     let written = keel_cli::write::record_obligation(
@@ -249,7 +249,7 @@ fn recording_an_obligation_keeps_the_tree_valid() {
     .expect("the recorder must be able to record");
     assert!(written.is_file(), "recorder reported a path it did not write: {}", written.display());
 
-    let out = keel().args(["validate", proj]).output().expect("run keel validate after recording");
+    let out = keel().args(["gate", "validate", proj]).output().expect("run keel gate validate after recording");
     assert!(
         out.status.success(),
         "recording an obligation invalidated the tree: {}{}",

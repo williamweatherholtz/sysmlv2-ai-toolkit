@@ -48,7 +48,7 @@ fn a_reversal_recorded_with_supersedes_carries_the_edge_and_why_reads_it_back() 
     assert!(out.contains("#Supersede d0002 -> d0001 authored with it"), "the record says what it authored: {out}");
     let text = std::fs::read_to_string(root.join(".engine/decisions/0002-second.sysml")).expect("decision");
     assert!(text.contains("#Supersede dependency from d0002 to d0001;"), "the edge is in the Decision's own file: {text}");
-    let (ok, out) = run(&root, &["validate", "."]);
+    let (ok, out) = run(&root, &["gate", "validate", "."]);
     assert!(ok, "the edge resolves: {out}");
     let (_, why) = run(&root, &["show", "why", "d0001", "."]);
     assert!(why.contains("d0002"), "keel why reads the supersession back from d0001's side: {why}");
@@ -77,7 +77,7 @@ fn a_from_draft_declares_its_links_and_derived_from_needs_a_recorded_utterance()
     assert!(ok, "{out}");
     let text = std::fs::read_to_string(root.join(".engine/decisions/0002-stricter.sysml")).expect("decision");
     assert!(text.contains("#Supersede dependency from d0002 to d0001;") && text.contains("#DerivedFrom dependency from d0002 to st001;"), "{text}");
-    assert!(run(&root, &["validate", "."]).0);
+    assert!(run(&root, &["gate", "validate", "."]).0);
     // derived-from must name a recorded utterance or story, not an arbitrary item
     let (ok, out) = record(&root, "loose", "looseRule: derives from a task", &["--derived-from", "d0001"]);
     assert!(!ok && out.contains("--derived-from d0001"), "{out}");

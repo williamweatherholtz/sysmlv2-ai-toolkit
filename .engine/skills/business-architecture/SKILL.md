@@ -91,7 +91,7 @@ narrated aside.
 
 - **Parse first** (D0106): open with the `Parsed:` block; route the design request here explicitly.
 - **Needs before architecture**, always (the ordering rule above).
-- **Output = authored facts**, validated green (`keel validate` / `keel guard`), not a document.
+- **Output = authored facts**, validated green (`keel gate validate` / `keel gate guard`), not a document.
 - **Human gates are explicit** `method=confirmation` steps: Needs accepted before architecture;
   architecture Decisions accepted before they are `status=accepted`.
 - Downstream projects: this is how "design" happens under keel — deploy the workflows, don't chat.

@@ -53,7 +53,7 @@ const PUBLISHES_WITH_HASH: &str = "name: release\non:\n  push:\n    tags: ['v*']
 fn a_workflow_that_publishes_a_binary_without_its_hash_is_a_violation() {
     let root = scaffold("nohash");
     write_workflow(&root, "release.yml", PUBLISHES_NO_HASH);
-    let out = run(&root, &["guard", "release-checksums-published", "."]);
+    let out = run(&root, &["gate", "guard", "release-checksums-published", "."]);
     assert!(
         out.contains("FAIL") && out.contains("release.yml") && out.contains("computes no SHA-256"),
         "the guard must NAME the workflow and what it lacks: {out}"
@@ -70,7 +70,7 @@ fn a_workflow_that_hashes_and_publishes_the_hash_is_clean_and_a_non_publishing_o
         "ci.yml",
         "name: ci\non: [push]\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: cargo test --release\n",
     );
-    let out = run(&root, &["guard", "release-checksums-published", "."]);
+    let out = run(&root, &["gate", "guard", "release-checksums-published", "."]);
     assert!(
         out.contains("1 scanned") && out.contains("0 violation(s)"),
         "one publishing workflow with its hash is clean; ci.yml publishes nothing and is not scanned: {out}"
@@ -84,7 +84,7 @@ fn a_hash_file_named_but_never_computed_is_a_violation() {
     let root = scaffold("named");
     let body = PUBLISHES_WITH_HASH.replace("      - run: sha256sum keel-linux-x86_64 > keel-linux-x86_64.sha256\n", "");
     write_workflow(&root, "release.yml", &body);
-    let out = run(&root, &["guard", "release-checksums-published", "."]);
+    let out = run(&root, &["gate", "guard", "release-checksums-published", "."]);
     assert!(
         out.contains("FAIL") && out.contains("comes from nowhere"),
         "a hash file with no computation behind it is the defect wearing the fix's name: {out}"
@@ -107,7 +107,7 @@ fn a_pin_with_no_wrapper_entries_is_a_warning_naming_every_missing_asset() {
         "0.4.1",
         "[\"0.3.1\"]\n\"keel-linux-x86_64\" = \"aa\"\n\"keel-macos-aarch64\" = \"bb\"\n\"keel-windows-x86_64.exe\" = \"cc\"\n",
     );
-    let out = run(&root, &["guard", "wrapper-pin-checksummed", "."]);
+    let out = run(&root, &["gate", "guard", "wrapper-pin-checksummed", "."]);
     assert!(
         out.contains("WARN")
             && out.contains("0.4.1")
@@ -126,11 +126,11 @@ fn a_pin_whose_table_carries_every_asset_is_clean_and_a_partial_table_names_the_
         "0.4.1",
         "[\"0.3.1\"]\n\"keel-linux-x86_64\" = \"aa\"\n[\"0.4.1\"]\n\"keel-linux-x86_64\" = \"11\"\n\"keel-macos-aarch64\" = \"22\"\n\"keel-windows-x86_64.exe\" = \"33\"\n",
     );
-    let out = run(&root, &["guard", "wrapper-pin-checksummed", "."]);
+    let out = run(&root, &["gate", "guard", "wrapper-pin-checksummed", "."]);
     assert!(out.contains("0 warning(s)"), "every asset present under the pin: {out}");
 
     write_pin_and_table(&root, "0.4.1", "[\"0.4.1\"]\n\"keel-linux-x86_64\" = \"11\"\n");
-    let out = run(&root, &["guard", "wrapper-pin-checksummed", "."]);
+    let out = run(&root, &["gate", "guard", "wrapper-pin-checksummed", "."]);
     assert!(
         out.contains("WARN") && out.contains("keel-macos-aarch64, keel-windows-x86_64.exe") && !out.contains("for keel-linux"),
         "a partial table names exactly the missing assets: {out}"
@@ -142,7 +142,7 @@ fn a_pin_whose_table_carries_every_asset_is_clean_and_a_partial_table_names_the_
 fn a_project_with_no_wrapper_table_claims_nothing() {
     let root = scaffold("notable");
     let _ = std::fs::remove_file(root.join("keel-wrapper.toml"));
-    let out = run(&root, &["guard", "wrapper-pin-checksummed", "."]);
+    let out = run(&root, &["gate", "guard", "wrapper-pin-checksummed", "."]);
     assert!(
         out.contains("0 scanned") && out.contains("0 warning(s)"),
         "absent keel-wrapper.toml: the activation convention, nothing is accused: {out}"

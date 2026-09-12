@@ -60,7 +60,7 @@ pub fn demo_prefixes(root: &Path) -> Vec<String> {
 
 /// English function words no command line carries as a bare token. The receipt census that sized this
 /// rule (2026-09-11, 283 prefixed `// RAN:` receipts in this tree) found exactly one prose receipt the
-/// character alphabet alone let through - `keel validate . 762 clean and keel check-engine . clean at
+/// character alphabet alone let through - `keel gate validate . 762 clean and keel gate check-engine . clean at
 /// 829e0f0 per VERIFIER_RECEIPT ...` - and every one of its joints is a word from this list. That census is
 /// committed as `scripts/probes/receipt_shape_census.py`; it reads this list VERBATIM from this file, so
 /// re-run it before changing the list (dcReceiptShapeCensusIsASensor).
@@ -427,8 +427,8 @@ mod tests {
         assert!(!is_replayable_with("looked at the picture", &p), "negative: prose with no prefix");
         assert!(!is_replayable_with("rm -rf target", &p), "negative: a command under no declared prefix");
         assert!(!is_replayable_with("keel suite 571 passed 0 failed (receipt 199146c397b7)", &p), "a parenthesis is narrative");
-        assert!(!is_replayable_with("keel guard judgment-request-quality . PASS; keel validate . clean", &p), "a semicolon is two things said, not one command");
-        assert!(!is_replayable_with("keel validate . 762 clean and keel check-engine . clean at 829e0f0 per VERIFIER_RECEIPT 2026-09-11", &p), "the census's one alphabet-clean prose receipt");
+        assert!(!is_replayable_with("keel gate guard judgment-request-quality . PASS; keel gate validate . clean", &p), "a semicolon is two things said, not one command");
+        assert!(!is_replayable_with("keel gate validate . 762 clean and keel gate check-engine . clean at 829e0f0 per VERIFIER_RECEIPT 2026-09-11", &p), "the census's one alphabet-clean prose receipt");
         assert!(!is_replayable_with("keel show priority .\nkeel whats-next .", &p), "two lines are two commands");
         assert!(!is_replayable_with("", &p));
         assert!(!is_replayable_with("keel show control-structure . --svg", &[]), "no declared prefix - nothing replays (a project that never adopted the section)");

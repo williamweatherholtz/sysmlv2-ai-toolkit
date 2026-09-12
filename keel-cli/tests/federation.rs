@@ -154,7 +154,7 @@ fn f2_the_first_decision_is_d0001_and_cannot_collide_with_reference_decisions() 
         "F2: the first decision must be numbered 0001 — numbering is per project, and a project \
          that continued the engine's series would collide on its own first write"
     );
-    let dup = run_in(&root, &["guard", "duplicate-identity"]);
+    let dup = run_in(&root, &["gate", "guard", "duplicate-identity"]);
     assert!(dup.ok, "F2: d0001 must not collide with ReferenceDecision0001: {}", dup.text);
     // PARSE the count rather than substring-matching it. The first version asserted
     // `!contains("0 scanned")`, which passed at 368 and broke at 370 — every count ending in zero
@@ -260,7 +260,7 @@ fn f4_a_units_guards_are_switchable_and_availability_is_not_activation() {
     let after = run_in(&root, &["activation", "."]);
     assert!(
         after.text.contains("[INACTIVE] render"),
-        "F4: AVAILABILITY IS NOT ACTIVATION - the unit is still present and its guards are off.          `keel guard` reports a deactivated unit as NOT ACTIVE rather than skipping it silently: {}",
+        "F4: AVAILABILITY IS NOT ACTIVATION - the unit is still present and its guards are off.          `keel gate guard` reports a deactivated unit as NOT ACTIVE rather than skipping it silently: {}",
         after.text
     );
     // And back: a switch that cannot be switched back is a trapdoor, not a switch.
@@ -437,7 +437,7 @@ fn f8_a_fresh_projects_controls_bite_rather_than_merely_exist() {
     let pin = std::fs::read_to_string(root.join(".engine/contracts/engine-version.toml")).expect("pin");
     assert!(pin.contains("engine = "), "F8: the pin must be stamped: {pin}");
     let skewed = Command::new(keel_bin())
-        .args(["validate", "."])
+        .args(["gate", "validate", "."])
         .current_dir(&root)
         .env("KEEL_FAKE_VERSION", "0.0.1-not-this-one")
         .output()

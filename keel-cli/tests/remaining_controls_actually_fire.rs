@@ -182,13 +182,13 @@ fn audit_adherence_fails_an_unsigned_downgrade_and_passes_a_signed_one() {
     let c1 = commit_all(&root, "a blocking rule");
 
     // ALLOW: nothing weakened over an unchanged range.
-    let (code, out) = keel(&root, &["audit-adherence", "--since", &c1]);
+    let (code, out) = keel(&root, &["audit", "adherence", "--since", &c1]);
     assert_eq!(code, 0, "an unchanged range passes: {out}");
 
     // REFUSE: downgrade to warning with no Decision.
     std::fs::write(&rule, rule_text("warning")).expect("downgrade");
     commit_all(&root, "quietly weaken");
-    let (code, out) = keel(&root, &["audit-adherence", "--since", &c1]);
+    let (code, out) = keel(&root, &["audit", "adherence", "--since", &c1]);
     assert_ne!(code, 0, "an unsigned severity downgrade must FAIL the audit: {out}");
     assert!(out.contains("probeRule") || out.to_lowercase().contains("weaken"), "the failure names the rule or the weakening: {out}");
 
@@ -202,7 +202,7 @@ fn audit_adherence_fails_an_unsigned_downgrade_and_passes_a_signed_one() {
     )
     .expect("decision");
     commit_all(&root, "weaken, signed");
-    let (code, out) = keel(&root, &["audit-adherence", "--since", &c3]);
+    let (code, out) = keel(&root, &["audit", "adherence", "--since", &c3]);
     assert_eq!(code, 0, "a downgrade co-committed with a marked Decision is the sanctioned path and must pass: {out}");
     let _ = std::fs::remove_dir_all(&root);
 }

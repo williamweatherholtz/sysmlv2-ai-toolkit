@@ -1,4 +1,4 @@
-//! `keel audit-ci-runs [ROOT] [--repo OWNER/NAME]` (D0323 / issue374, the external-fact gate).
+//! `keel audit ci-runs [ROOT] [--repo OWNER/NAME]` (D0323 / issue374, the external-fact gate).
 //!
 //! A `// RAN:` receipt (D0232) proves a sentence was typed. It does not prove a run happened: on
 //! 2026-09-04 a suite count was written into a receipt while the suite was still running, and only the
@@ -155,7 +155,7 @@ fn github_slug(root: &Path) -> Option<String> {
     Some(rest.trim_end_matches(".git").trim_end_matches('/').to_string())
 }
 
-/// `keel audit-ci-runs [ROOT] [--repo OWNER/NAME]`: exit 0 when every ci-run receipt is vouched for
+/// `keel audit ci-runs [ROOT] [--repo OWNER/NAME]`: exit 0 when every ci-run receipt is vouched for
 /// (or there are none - stated), 1 on any violation, 2 when the check cannot run.
 #[must_use]
 pub fn cmd(args: &[String], root: &Path) -> i32 {

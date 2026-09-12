@@ -56,7 +56,7 @@ So: **identity is never defaulted, and kind is never inferred.** Refusing is a c
 3. **Register — without duplicating.** Add the correctly-typed part to `.tracking/actors.sysml`: a
    `Person` for a human, an `Actor` with `kind = ActorKind::ai` for an AI. If already registered,
    confirm and move on — a second entry is its own corruption class (issue074). Registration is what
-   makes the actor referenceable by `createdBy` / `authoredBy` / `judgedBy`, which `keel guard
+   makes the actor referenceable by `createdBy` / `authoredBy` / `judgedBy`, which `keel gate guard
    actors` already enforces referentially.
 
 4. **Bind the machine.** Write the machine-local binding that makes this actor the acting identity
@@ -69,9 +69,9 @@ So: **identity is never defaulted, and kind is never inferred.** Refusing is a c
 5. **Prove the gate runs.** Run the gate and confirm it *executes* rather than skipping:
 
    ```
-   keel validate .        # .tracking semantic validation
-   keel guard .           # all enforced honest-state guards
-   keel check-engine .    # .engine reference resolution (kernel-free)
+   keel gate validate .        # .tracking semantic validation
+   keel gate guard .           # all enforced honest-state guards
+   keel gate check-engine .    # .engine reference resolution (kernel-free)
    ```
 
    Confirm the engine version matches what the project declares. A check that cannot run must report

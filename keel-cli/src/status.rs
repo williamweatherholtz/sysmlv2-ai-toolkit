@@ -344,7 +344,7 @@ fn model_section(root: &Path) -> Section {
     let files = crate::collect_sysml(&root.join(".tracking")).len();
     let mut lines = vec![format!("{files} tracked file(s), {} guards", reports.len())];
     let state = if violations > 0 {
-        lines.push(format!("  {violations} VIOLATION(s) — `keel guard` for detail"));
+        lines.push(format!("  {violations} VIOLATION(s) — `keel gate guard` for detail"));
         State::Attention
     } else {
         lines.push(format!("  0 violations, {warnings} warning(s)"));

@@ -39,8 +39,8 @@ package EngineRelationships {
     // #Supersede RETIRES its target whole (D0384 option A / D0398, 2026-09-09): the target leaves
     // every in-force scope - the acceptance queue, the frontier, the decisions scorecard - and its
     // `status` keeps the standing it had when retired. The edge is the ONLY authored mark of
-    // retirement; `DecisionStatus` has no `superseded` member and the instance gate (`keel check-engine`
-    // under .engine, `keel validate` under .tracking) refuses one as an unknown enum member.
+    // retirement; `DecisionStatus` has no `superseded` member and the instance gate (`keel gate check-engine`
+    // under .engine, `keel gate validate` under .tracking) refuses one as an unknown enum member.
     metadata def Supersede;
     // #SupersedeClause reverses ONE clause of its target, named in the source's text, and leaves the
     // target in force. Seven Decision reversals carry this scope (d0149 -> d0129 leaves never-rebase
@@ -87,7 +87,7 @@ package EngineRelationships {
     // exposure was not theoretical: `#Verify` alone carries 456 edges and is what
     // tier-satisfaction/sr_verified_pct and the verification-trace guard key on, so one typo would
     // report a DELIVERED requirement as unverified. Declared here under the §2.5 frozen-schema
-    // sign-off (declaredMarkersSchemaSignOff, 2026-08-13), and `keel validate`/`check-engine` now
+    // sign-off (declaredMarkersSchemaSignOff, 2026-08-13), and `keel gate validate`/`check-engine` now
     // REJECT an undeclared marker, so a typo fails loudly instead of blinding a control.
 
     // #Verify: a Test -> the element it verifies. `#Verify dependency from <test> to <element>;`

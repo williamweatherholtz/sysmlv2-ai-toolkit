@@ -29,7 +29,7 @@ fn commit_all(root: &Path, msg: &str) -> String {
 }
 
 fn guard(root: &Path) -> (i32, String) {
-    let out = Command::new(keel_bin()).args(["guard", "acceptance-binds-to-text", "."]).current_dir(root).env("KEEL_ACTOR", "claudeOpus5").output().expect("guard");
+    let out = Command::new(keel_bin()).args(["gate", "guard", "acceptance-binds-to-text", "."]).current_dir(root).env("KEEL_ACTOR", "claudeOpus5").output().expect("guard");
     (out.status.code().unwrap_or(-1), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)))
 }
 

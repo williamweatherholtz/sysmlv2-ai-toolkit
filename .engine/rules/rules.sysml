@@ -1,7 +1,7 @@
 // =====================================================================
-// EngineRuleSet — the engine's DECLARED controls (D0105 migration). These run via `keel check`
+// EngineRuleSet — the engine's DECLARED controls (D0105 migration). These run via `keel gate check`
 // ALONGSIDE the Rust guards during EXPAND; a guard retires only once its rule reaches PARITY
-// (`keel check` == `keel guard` on the live repo — guardsToRulesMigration). Each rule carries its
+// (`keel gate check` == `keel gate guard` on the live repo — guardsToRulesMigration). Each rule carries its
 // WHY as a typed #JustifiedBy edge to the Decision that justifies it (provenance, not prose).
 // =====================================================================
 package EngineRuleSet {
@@ -91,7 +91,7 @@ package EngineRuleSet {
 
     // issue058 detecting rule: a Decision must NOT restate its acceptance verdict as PROSE (the dual-truth
     // the human caught — "ACCEPTED <date> by <who>" belongs in the discrete AcceptR1 TestResult, not a
-    // field). Diagnostic (surfaced by `keel rules`, not gating); heuristic like decision-requirement-link.
+    // field). Diagnostic (surfaced by `keel gate rules`, not gating); heuristic like decision-requirement-link.
     part decisionNoVerdictProseRule : ElementRule {
         :>> id = "d0105r006-0006-4006-9006-516273841006";
         :>> title = "A Decision must not restate its acceptance verdict as prose (one source of truth)";

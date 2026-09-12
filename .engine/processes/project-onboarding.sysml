@@ -84,7 +84,7 @@ package ProcessProjectOnboarding {
         :>> id = "b4f19a27-6c53-4e18-9d70-000000000c06";
         :>> title = "Read the result back, including what the chosen set does not cover";
         :>> triggerCondition = "The charter has been recorded.";
-        :>> actionText = "`keel onboard` reports CHARTERED by that Decision; `keel activation` reports the declared set; `keel guard` is green. Then state the RESIDUAL out loud: the conditions that were met but whose process the author declined, and any researched practice the engine still has no process for. A project should know what it chose not to do — that is the difference between a scoped adoption and an unexamined one.";
+        :>> actionText = "`keel onboard` reports CHARTERED by that Decision; `keel activation` reports the declared set; `keel gate guard` is green. Then state the RESIDUAL out loud: the conditions that were met but whose process the author declined, and any researched practice the engine still has no process for. A project should know what it chose not to do — that is the difference between a scoped adoption and an unexamined one.";
         :>> producedArtifact = "A read-back confirming the charter, and a stated list of what the chosen set does not cover.";
         :>> owner = Owner::ai;
     }

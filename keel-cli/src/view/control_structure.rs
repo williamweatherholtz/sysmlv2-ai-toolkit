@@ -226,16 +226,30 @@ fn process_for_family(family: &str, name: &str) -> &'static str {
     }
 }
 
-/// Every `keel <token>` invocation in a text, where the token is a dispatched command.
+/// Every `keel <token>` invocation in a text, where the token is a dispatched command. D0452: when the
+/// command's fact declares sub-verbs and the next word is one of them, the pair is the invocation - a
+/// hook that runs `keel gate validate` names `gate validate`, not `gate`, so the fold cannot collapse
+/// what the hook does into what its router is called.
 fn keel_commands_in(text: &str) -> Vec<String> {
+    let word = |s: &str| -> String { s.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-').collect() };
     let mut out = Vec::new();
     for line in text.lines() {
         let mut rest = line;
         while let Some(i) = rest.find("keel ") {
             let after = &rest[i + 5..];
-            let token: String = after.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
-            if crate::cli_surface::has_command(&token) && !out.contains(&token) {
-                out.push(token.clone());
+            let mut token = word(after);
+            if crate::cli_surface::has_command(&token) {
+                let next = word(after[token.len()..].trim_start_matches(' '));
+                let routed = crate::cli_facts::CLI_FACTS
+                    .iter()
+                    .find(|f| f.name == token)
+                    .is_some_and(|f| crate::cli_facts::sub_verbs_of(f.invocation).contains(&next));
+                if routed {
+                    token = format!("{token} {next}");
+                }
+                if !out.contains(&token) {
+                    out.push(token);
+                }
             }
             rest = after;
         }
@@ -1134,8 +1148,11 @@ mod tests {
 
     #[test]
     fn keel_commands_are_found_in_a_hook_body_and_unknown_tokens_are_not() {
-        let text = "#!/bin/sh\nkeel validate . && keel guard\nkeel frobnicate\necho keel";
-        assert_eq!(keel_commands_in(text), vec!["validate".to_string(), "guard".to_string()]);
+        let text = "#!/bin/sh\nkeel gate validate . && keel gate guard\nkeel frobnicate\necho keel\nkeel gate --fast .\nkeel audit history";
+        assert_eq!(
+            keel_commands_in(text),
+            vec!["gate validate".to_string(), "gate guard".to_string(), "gate".to_string(), "audit history".to_string()]
+        );
     }
 
     fn act(name: &str, issued_by: &'static str, acts_on: &'static str) -> Action {

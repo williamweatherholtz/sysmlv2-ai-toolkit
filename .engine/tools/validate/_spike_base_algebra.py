@@ -1,9 +1,9 @@
 """Settle, against the KERNEL, which base SysML v2 constructs are actually valid — the authoritative
 table the base-first programme (D0139) depends on.
 
-WHY THIS EXISTS (issue097): the rust authority (`keel check`) is PERMISSIVE. It accepted
+WHY THIS EXISTS (issue097): the rust authority (`keel gate check`) is PERMISSIVE. It accepted
 `verify X by Y` and `refine X by Y`, which the kernel REJECTS, and that false positive reached an
-accepted Decision as a migration target for 613 edges. `keel validate` being green does not mean a file
+accepted Decision as a migration target for 613 edges. `keel gate validate` being green does not mean a file
 is valid SysML v2, so any claim about what base SysML v2 offers MUST be measured here, not there.
 
 One JVM, many cells — kernel startup dominates, so batching is the difference between minutes and hours.

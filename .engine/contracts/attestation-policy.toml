@@ -3,7 +3,7 @@
 # WHY DECLARED RATHER THAN HARDCODED. srDcAuthorityFromRegistry requires the acting actor's recorded
 # KIND AND ROLE to be checked "against the declared policy for that class". A policy compiled into
 # the binary is not declared — a project could not see it, could not tighten it, and could not tell
-# which of its own actors satisfy it. This file is the policy; `keel guard attestation-authority`
+# which of its own actors satisfy it. This file is the policy; `keel gate guard attestation-authority`
 # reads it. Same precedent as `.engine/contracts/critique-policy.toml` (D0097).
 #
 # ABSENT FILE = the built-in floor, never "no policy". A missing contract must not silently disable

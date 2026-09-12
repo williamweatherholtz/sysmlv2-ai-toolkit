@@ -408,13 +408,13 @@ jobs:
           chmod +x keel && sudo mv keel /usr/local/bin/keel
           keel version
       - name: validate
-        run: keel validate .
+        run: keel gate validate .
       - name: guards
-        run: keel guard .
+        run: keel gate guard .
       - name: rules
-        run: keel rules . --enforce
+        run: keel gate rules . --enforce
       - name: audit-history
-        run: keel audit-history --since origin/main || true
+        run: keel audit history --since origin/main || true
 "#;
 
 /// Report from [`sync_claude`].
@@ -798,7 +798,7 @@ mod tests {
         assert!(t.contains("releases/download/v${PIN}/keel-linux-x86_64"), "and fetch that exact release asset");
         assert!(t.contains("keel version"), "and prove the binary runs before any gate step trusts it");
         // The gate steps that follow still name the binary they now actually have.
-        for step in ["keel validate .", "keel guard .", "keel rules . --enforce"] {
+        for step in ["keel gate validate .", "keel gate guard .", "keel gate rules . --enforce"] {
             assert!(t.contains(step), "gate step present: {step}");
         }
     }

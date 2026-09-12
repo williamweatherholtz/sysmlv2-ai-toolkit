@@ -62,7 +62,7 @@ same second. Read the holder with `keel claim --list`; a rejected push tells you
 git fetch
 git status -sb                 # divergence: ahead / behind / diverged
 git merge --ff-only origin/main    # or a merge commit if you have local work — NEVER rebase
-keel guard . && keel validate .    # gate parity: does my gate actually run?
+keel gate guard . && keel gate validate .    # gate parity: does my gate actually run?
 keel show orient .
 ```
 
@@ -99,7 +99,7 @@ progress is computed stale and is fair to take.
 loop:
   git fetch
   git merge origin/main          # ancestry-preserving; never rebase
-  keel validate . && keel guard . && keel check-engine .   # on the MERGED tree
+  keel gate validate . && keel gate guard . && keel gate check-engine .   # on the MERGED tree
   git push                        # rejected? loop again (bounded retries, then back off)
 ```
 

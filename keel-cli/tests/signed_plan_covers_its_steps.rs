@@ -160,14 +160,14 @@ fn the_guard_fails_when_the_plan_stops_naming_the_step() {
     let (ok, _out) = record_marker_covered(&root, "stepg", &plan, "stepGamma");
     assert!(ok);
     // clean now
-    let (ok, out) = agent(&root, &["guard", "plan-covers-step", "."]);
+    let (ok, out) = agent(&root, &["gate", "guard", "plan-covers-step", "."]);
     assert!(ok && out.contains("0 violation(s)"), "the cover holds: {out}");
     // edit the plan's decision text to drop the step name
     let dir = root.join(".engine").join("decisions");
     let planfile = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).find(|p| p.to_string_lossy().contains("theplan")).unwrap();
     let t = std::fs::read_to_string(&planfile).unwrap();
     std::fs::write(&planfile, t.replace("stepGamma", "stepDelta")).unwrap();
-    let (_ok, out) = agent(&root, &["guard", "plan-covers-step", "."]);
+    let (_ok, out) = agent(&root, &["gate", "guard", "plan-covers-step", "."]);
     assert!(out.contains("FAIL") && out.contains("clause (c)"), "the guard fails when the plan no longer names the step: {out}");
     let _ = std::fs::remove_dir_all(&root);
 }

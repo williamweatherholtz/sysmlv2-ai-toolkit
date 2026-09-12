@@ -71,7 +71,7 @@ fn a_gating_workflow_missing_its_siblings_variable_is_a_violation() {
     let root = scaffold("bites");
     workflow(&root, "ci", true);
     workflow(&root, "release", false); // the defect: same command, different world
-    let (_ok, out) = run(&root, &["guard", "gate-environment-parity", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "gate-environment-parity", "."]);
     assert!(
         out.contains("FAIL") && out.contains("release.yml"),
         "the guard must NAME the workflow that runs the suite without its sibling's variable: {out}"
@@ -90,7 +90,7 @@ fn two_workflows_that_agree_are_not_a_violation() {
     let root = scaffold("clean");
     workflow(&root, "ci", true);
     workflow(&root, "release", true);
-    let (_ok, out) = run(&root, &["guard", "gate-environment-parity", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "gate-environment-parity", "."]);
     assert!(
         out.contains("0 violation(s)"),
         "agreeing workflows are clean: {out}"
@@ -105,7 +105,7 @@ fn a_project_whose_gate_declares_nothing_is_never_accused() {
     let root = scaffold("silent");
     workflow(&root, "ci", false);
     workflow(&root, "release", false);
-    let (_ok, out) = run(&root, &["guard", "gate-environment-parity", "."]);
+    let (_ok, out) = run(&root, &["gate", "guard", "gate-environment-parity", "."]);
     assert!(
         out.contains("0 violation(s)"),
         "nothing declared means nothing missing: {out}"

@@ -174,9 +174,9 @@ fn a_projects_gate_is_byte_identical_with_and_without_the_library() {
     // The differential compares the WHOLE outcome — exit status and every byte of output — and
     // deliberately does NOT require the gate to be green: identical-on-red is the same property,
     // and demanding green would couple this scenario to every guard's fixture appetite.
-    let (ok_before, before) = keel_home(&home, &proj, &["guard"]);
+    let (ok_before, before) = keel_home(&home, &proj, &["gate", "guard"]);
     keel_home(&home, &base, &["library", "init", &bare.to_string_lossy()]);
-    let (ok_after, after) = keel_home(&home, &proj, &["guard"]);
+    let (ok_after, after) = keel_home(&home, &proj, &["gate", "guard"]);
     assert_eq!(ok_before, ok_after, "the gate VERDICT moved when the library appeared");
     assert_eq!(
         before, after,

@@ -136,14 +136,14 @@ Change Request cross-cuts and is itself frozen.
 
 **Subagents (D0425)**
 - Primary does substance. VERIFIER (haiku, skill `test-verify`, D0438) runs `keel suite --touched` DETACHED,
-  `validate`, `check-engine`, `guard --no-receipt`, the D0388 pair; writes a receipt only. RECORDER (haiku)
+  `gate validate`, `gate check-engine`, `gate guard --no-receipt`, the D0388 pair; writes a receipt only. RECORDER (haiku)
   writes ceremony from that receipt ONLY. Neither reads the other's conclusion as fact.
 
 **Git**
 - `main` only, commit directly. Never rebase/squash/force-push (D0129): rewriting history orphans
   `judgedAgainst` evidence. Integrate by merge: `keel sync` / `keel land` (gates workspace-wide before push).
 - CI verdict = `conclusion` field (`gh run list --json conclusion` or `keel show status`), never a wrapper's exit
-  (D0420). CI runs `audit-adherence`, `audit-ci-runs`, `audit-history`.
+  (D0420). CI runs `audit adherence`, `audit ci-runs`, `audit history`.
 - `land` runs the touched test set before the first push (D0421) inside the post-commit hook from a copy
   `target/release/keel-land.exe` (D0422). It takes 7–15 min: run `git commit` DETACHED, then read
   `git status -sb` and the CI conclusion (issue453). Receipts (`.keel/metrics/*-receipt.toml`) say `running`
@@ -155,9 +155,9 @@ Change Request cross-cuts and is itself frozen.
 ## 5. Validate — every `.sysml` change
 
 ```
-keel validate .            # .tracking authority (kernel-free)
-keel check-engine .        # .engine instance gate
-keel guard [--no-receipt]  # all forward guards; catalogue .engine/docs/guards.md; count from `keel version`
+keel gate validate .            # .tracking authority (kernel-free)
+keel gate check-engine .        # .engine instance gate
+keel gate guard [--no-receipt]  # all forward guards; catalogue .engine/docs/guards.md; count from `keel version`
 keel gate --fast           # per-edit tier
 keel gate --workspace      # commit tier, multi-project
 keel show enforcement-report    # hook fires, blocks, latency distribution, refusals (D0389/D0424)
@@ -167,7 +167,7 @@ keel record reverify --demos      # re-run replayable demo receipts (D0444)
 
 - Green guard answers from `.keel/metrics/guard-receipt.toml` when inputs are equal (D0371); red deletes it.
 - Honest-state gates, not completeness gates (D0098). Never fake a pass; never block true state.
-- `validate` is NOT SysML conformance (issue097). Kernel-check a new construct first:
+- `gate validate` is NOT SysML conformance (issue097). Kernel-check a new construct first:
   `conda run -n sysml --no-capture-output python .engine/tools/validate/conformance_lane.py --construct f.sysml > out.txt 2>&1`
   Same tool bare = conformance lane; tracked as `conformanceIndicator`, never gated (D0132).
 - Schema/workflow changes: `.engine/tools/validate/validate_schema.py` / `validate_workflows.py` via conda.

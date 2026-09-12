@@ -81,7 +81,7 @@ was that a Need had been written wider than the demand, not that it was wrong).
 ## 6. Read it back — including what it does not cover
 
 - `keel onboard` → CHARTERED by that Decision.
-- `keel activation` → the declared set. `keel guard` → green.
+- `keel activation` → the declared set. `keel gate guard` → green.
 - **State the residual out loud**: conditions that were met but whose process the author declined, and
   any researched practice the engine still has no process for.
 

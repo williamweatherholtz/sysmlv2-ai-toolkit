@@ -42,7 +42,7 @@ fn charter(root: &Path, decision: &str) {
 fn a_charter_naming_a_decision_the_project_does_not_hold_is_a_violation_and_onboard_says_so() {
     let root = scaffold("dangling");
     charter(&root, "d0226");
-    let (ok, out) = run(&root, &["guard", "activation-manifest", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "activation-manifest", "."]);
     assert!(!ok, "a dangling charteredBy fails the guard: {out}");
     assert!(out.contains("charteredBy = \"d0226\" does not resolve") && out.contains("0226-*.sysml"), "the violation names the Decision and where it was looked for: {out}");
     let (_, onboard) = run(&root, &["onboard", "."]);
@@ -62,7 +62,7 @@ fn a_charter_the_project_holds_still_reads_chartered() {
     );
     assert!(ok, "D0001 exists: {out}");
     charter(&root, "d0001");
-    let (ok, out) = run(&root, &["guard", "activation-manifest", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "activation-manifest", "."]);
     assert!(ok && out.contains("0 violation(s)"), "a resolving charter is not a violation: {out}");
     let (_, onboard) = run(&root, &["onboard", "."]);
     assert!(onboard.contains("CHARTERED by d0001"), "{onboard}");

@@ -171,10 +171,8 @@ else:
 # .tracking/ is excluded from the headline: it is recorded history and must never be rewritten,
 # so a call site there is not a maintenance surface. Its count is reported separately.
 
-GATING_VERBS = ["validate", "check-engine", "check", "guard", "gate", "rules",
-                "audit-history", "audit-adherence", "audit-ci-runs", "audit",
-                "assured", "adoption-check", "suite"]
-# longest-first so `check-engine` never matches as `check`, `audit-history` never as `audit`
+# D0452: the gating family is three routers; `keel gate validate` is ONE site, counted at `gate`.
+GATING_VERBS = ["gate", "audit", "suite"]
 GATING_RE = re.compile(r"(?<![\w.-])(?:keel\.exe|keelw|keel)[ \t]+(?:" +
                        "|".join(GATING_VERBS) + r")(?![\w-])")
 ESCAPE_RE = re.compile(r"\\[nrt]")   # a literal \n in a source string is a line break, not a letter
@@ -183,11 +181,11 @@ NAIVE_RE = re.compile(r"(?:keel\.exe|keelw|keel)[ \t]+(?:" + "|".join(GATING_VER
 
 GATING_HOW = ("git ls-files, then for each tracked TEXT file count regex "
               r"`(?<![\w.-])(keel\.exe|keelw|keel)[ \t]+<verb>(?![\w-])` over the gating verbs "
-              "(" + ", ".join(sorted(GATING_VERBS)) + "); alternation is longest-first so "
-              "check-engine/audit-history/audit-adherence/audit-ci-runs never collapse into "
-              "check/audit. Counts OCCURRENCES, not lines - a line with two invocations is two "
+              "(" + ", ".join(sorted(GATING_VERBS)) + "); since D0452 the family is routed, so "
+              "`keel gate validate` and `keel audit history` each count once, at the router. "
+              "Counts OCCURRENCES, not lines - a line with two invocations is two "
               r"call sites. Literal \n/\r/\t escapes are normalised to a space first, so a call "
-              r"site embedded in a source string (`\nkeel validate` in view/control_structure.rs) "
+              r"site embedded in a source string (`\nkeel gate validate` in view/control_structure.rs) "
               "is counted. ")
 
 ok, out = run(["git", "ls-files"])
@@ -477,8 +475,8 @@ _d0367 = ""
 for _fn in os.listdir(os.path.join(REPO, ".engine", "decisions")):
     if _fn.startswith("0367-"):
         _d0367 = read(os.path.join(REPO, ".engine", "decisions", _fn))
-_base = re.search(r"`keel orient` costs ([0-9.]+) s and `keel guard` ([0-9.]+) s", _d0367)
-BASE_HOW = ("regex `keel orient` costs N s and `keel guard` N s over the context string of "
+_base = re.search(r"`keel orient` costs ([0-9.]+) s and `keel gate guard` ([0-9.]+) s", _d0367)
+BASE_HOW = ("regex `keel orient` costs N s and `keel gate guard` N s over the context string of "
             ".engine/decisions/0367-*.sysml - the spike's own measured baseline (2026-09-07, this host), "
             "quoted from the record, never retyped.")
 fact("perfBaselineOrientSec", float(_base.group(1)) if _base else None, "seconds", BASE_HOW)
@@ -511,9 +509,9 @@ fact("perfTurnBoundaryIdleMs",
      "milliseconds",
      "wall time of `echo {hook json} | keel hook stop` in this tree, median of 3 after one untimed "
      "warm-up run (the warm-up writes the receipt when the build changed)" + _env_note)
-fact("perfGuardFullMs", _timed_ms([KEEL, "guard", "--no-receipt"], runs=2),
+fact("perfGuardFullMs", _timed_ms([KEEL, "gate", "guard", "--no-receipt"], runs=2),
      "milliseconds",
-     "wall time of `keel guard --no-receipt` in this tree, median of 2 - every enforced guard runs, "
+     "wall time of `keel gate guard --no-receipt` in this tree, median of 2 - every enforced guard runs, "
      "the receipt is neither read nor written")
 fact("perfOrientMs", _timed_ms([KEEL, "show", "orient", "."], runs=3),
      "milliseconds", "wall time of `keel show orient .` in this tree, median of 3")
@@ -638,7 +636,7 @@ else:
                  "that it is zero.")
     fact("guardWarnings", int(mv.group(2)) if mv else None,
          "guard warnings (non-blocking, unread until someone reads them)",
-         S_HOW + "'N violations, M warning(s)'. Same numbers `keel guard .` prints in its ALL PASS "
+         S_HOW + "'N violations, M warning(s)'. Same numbers `keel gate guard .` prints in its ALL PASS "
                  "line; status is used because one process start yields both.")
     mg = re.search(r"(\d+)\s+guards", out)
     fact("guardsEnforced", int(mg.group(1)) if mg else None, "enforced forward guards",
@@ -987,10 +985,10 @@ fact("otherInputsOutputs", len(cs.get("otherInputsOutputs") or []) or None,
 fact("responsibilitiesComputed", len(cs.get("responsibilities") or []) or None,
      "controller -> hazard responsibilities, one hierarchical level deep",
      "`keel show control-structure`: length of the responsibilities array (actions x hazardsByProcess).")
-_ok, _gd = run([KEEL, "guard", "."], timeout=180)
+_ok, _gd = run([KEEL, "gate", "guard", "."], timeout=180)
 _m = re.search(r"stpa-currency: (\d+) of (\d+) computed control action", _gd or "")
 fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed control actions no stpa-self run has analysed",
-     "`keel guard .`: the stpa-currency WARN line's first number" + (" of %s" % _m.group(2) if _m else " - line not found") +
+     "`keel gate guard .`: the stpa-currency WARN line's first number" + (" of %s" % _m.group(2) if _m else " - line not found") +
      ". sprint610 added agentEditsDeliverable to the action set, which is the designed re-run trigger (D0313).")
 
 # ================================================================ 13. the recall cap (D0389 / D0390)
@@ -1086,12 +1084,12 @@ fact("tagsWithSeveralTitleMatches", len(_title_multi), "tags whose string occurs
      "re-running the pre-D0400 rule (title contains tag) over the same records: " + (", ".join(f"{t} -> {', '.join(_title_hits[t])}" for t in _title_multi) or "none") + ".")
 fact("tagsMisboundByTitle", len(_title_wrong), "tags the title rule would bind to a record whose `tag` field says otherwise",
      "for each tag, the FIRST title hit compared with the record whose `tag` field equals it: " + (", ".join(f"{t} -> first title hit {_title_hits[t][0]}" for t in _title_wrong) or "none") + ".")
-fact("releaseGuardWarnings", None, "release-recorded warnings on this tree", "not run here; keel guard release-recorded . prints it.")
-_rr_ok, _rr_raw = run([KEEL, "guard", "release-recorded", REPO, "--no-receipt"])
+fact("releaseGuardWarnings", None, "release-recorded warnings on this tree", "not run here; keel gate guard release-recorded . prints it.")
+_rr_ok, _rr_raw = run([KEEL, "gate", "guard", "release-recorded", REPO, "--no-receipt"])
 _m = re.search(r"release-recorded\] \w+ [^0-9]*(\d+) scanned, (\d+) warning", _rr_raw or "")
 if _m:
     fact("releaseGuardWarnings", int(_m.group(2)), "release-recorded warnings on this tree",
-         "`keel guard release-recorded . --no-receipt` summary line: %s scanned, %s warning(s)." % (_m.group(1), _m.group(2)))
+         "`keel gate guard release-recorded . --no-receipt` summary line: %s scanned, %s warning(s)." % (_m.group(1), _m.group(2)))
 
 # ================================================================ 16. tests bound to source (D0401)
 # Which tests in keel-cli read program source, and how many assert a code-shaped literal is PRESENT in

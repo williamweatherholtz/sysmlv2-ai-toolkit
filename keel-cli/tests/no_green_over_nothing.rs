@@ -38,8 +38,8 @@ impl Drop for Tmp {
 const MODEL_READERS: &[&[&str]] = &[
     &["show", "orient"],  // root_arg — the AI's only legitimate state read
     &["show", "whats-next"], // root_arg — the ranked frontier
-    &["check-engine"],    // root_arg — a BLOCKING step in the commit gate
-    &["validate"],        // root_arg — already refused (issue269); pinned so it stays refused
+    &["gate", "check-engine"],    // root_arg — a BLOCKING step in the commit gate
+    &["gate", "validate"],        // root_arg — already refused (issue269); pinned so it stays refused
     &["show", "coverage"],
     &["show", "suspect"],
     &["audit"],
@@ -115,7 +115,7 @@ fn the_root_search_does_not_leave_the_repository() {
     let nested = base.join("unrelated");
     std::fs::create_dir_all(&nested).expect("mkdir");
     Command::new("git").args(["init", "-q"]).arg(&nested).output().expect("git init nested");
-    let out = keel().arg("validate").current_dir(&nested).output().expect("run keel validate");
+    let out = keel().args(["gate", "validate"]).current_dir(&nested).output().expect("run keel gate validate");
     assert!(
         !out.status.success(),
         "validate answered for the OUTER repository from inside a different one: {}",
@@ -125,7 +125,7 @@ fn the_root_search_does_not_leave_the_repository() {
     // But a PLAIN subdirectory of the project must still resolve to it — that is ordinary use.
     let docs = base.join("docs");
     std::fs::create_dir_all(&docs).expect("mkdir");
-    let out = keel().arg("validate").current_dir(&docs).output().expect("run keel validate");
+    let out = keel().args(["gate", "validate"]).current_dir(&docs).output().expect("run keel gate validate");
     assert!(
         out.status.success(),
         "validate from a plain subdirectory must still find its own project: {}{}",

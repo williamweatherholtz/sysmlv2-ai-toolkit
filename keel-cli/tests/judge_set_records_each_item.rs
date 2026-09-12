@@ -120,11 +120,11 @@ fn quoted_words_record_one_result_and_one_receipt_per_sampled_item() {
     assert!(text.contains("\"proposals\":{\"proposed\":4,\"sampled\":4,\"judged\":4,\"awaiting\":0,\"demoReplayable\":0,\"demoProposed\":0,\"sampling\":\"50%\"}"), "{text}");
 
     // what was written is a tree the authority and the confirmation rules accept
-    let (ok, text) = agent(&root, &["validate", "."]);
+    let (ok, text) = agent(&root, &["gate", "validate", "."]);
     assert!(ok, "the written lines validate: {text}");
-    let (ok, text) = agent(&root, &["guard", "confirmation-authenticity", "."]);
+    let (ok, text) = agent(&root, &["gate", "guard", "confirmation-authenticity", "."]);
     assert!(ok, "each item's receipt is a confirmation the substance rule accepts: {text}");
-    let (ok, text) = agent(&root, &["guard", "attestation-substance", "."]);
+    let (ok, text) = agent(&root, &["gate", "guard", "attestation-substance", "."]);
     assert!(ok, "{text}");
     let _ = std::fs::remove_dir_all(&root);
 }

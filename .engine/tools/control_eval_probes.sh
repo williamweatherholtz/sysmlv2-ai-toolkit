@@ -6,7 +6,7 @@ cd "$WT" || exit 2
 
 gate_red() {
   local v g
-  v=$("$KEEL" validate . 2>&1); g=$("$KEEL" guard 2>&1)
+  v=$("$KEEL" gate validate . 2>&1); g=$("$KEEL" gate guard 2>&1)
   if echo "$v" | grep -q "ERROR" || echo "$g" | grep -q "FAIL"; then return 0; else return 1; fi
 }
 restore() { git checkout -- . >/dev/null 2>&1; git clean -fdq >/dev/null 2>&1; }

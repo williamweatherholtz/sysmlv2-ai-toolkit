@@ -1,6 +1,6 @@
 //! A check that has never failed is not a check — it is a claim (issue264/D0231).
 //!
-//! `keel adoption-check` reported 25 of 25 units clean on its first run. That is exactly the shape of
+//! `keel gate adoption-check` reported 25 of 25 units clean on its first run. That is exactly the shape of
 //! a control that is aimed at nothing: this project has shipped a guard passing on an empty
 //! population twice (issue250, and claude-surface-drift over zero skills), and printed
 //! `process audit: every unit travels whole` while a schema symbol did not travel (issue263).
@@ -46,7 +46,7 @@ fn a_unit_that_leaves_its_binding_behind_turns_the_foreign_gate_red() {
 
     // A FOREIGN project, and it must start clean or nothing below means anything.
     assert!(run(&["init", &fixture.to_string_lossy()], None).0, "scaffold failed");
-    let (ok, out) = run(&["guard", "all", &fixture.to_string_lossy()], None);
+    let (ok, out) = run(&["gate", "guard", "all", &fixture.to_string_lossy()], None);
     assert!(ok, "a fresh scaffold must gate clean, else this test proves nothing: {out}");
 
     // Export a unit, then MUTILATE the bundle the way the engine really did before D0222: the
@@ -70,7 +70,7 @@ fn a_unit_that_leaves_its_binding_behind_turns_the_foreign_gate_red() {
     run(&["process", "import", &bundle.to_string_lossy()], Some(&fixture));
 
     // THE ASSERTION THAT MATTERS: the foreign gate must go RED.
-    let (ok, out) = run(&["guard", "all", &fixture.to_string_lossy()], None);
+    let (ok, out) = run(&["gate", "guard", "all", &fixture.to_string_lossy()], None);
     assert!(
         !ok,
         "a unit that left its skill->process binding behind was accepted by the foreign gate. \

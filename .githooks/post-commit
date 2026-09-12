@@ -90,7 +90,7 @@ while [ "$attempt" -lt "$max" ]; do
     echo "post-commit: MERGE COULD NOT BE COMPLETED AUTOMATICALLY."
     echo "post-commit:   Either a textual conflict needs resolving, or pre-merge-commit refused the"
     echo "post-commit:   merged tree (a semantic conflict: both sides green alone, red together)."
-    echo "post-commit:   DO: resolve keeping BOTH facts, run 'keel validate . && keel guard .', commit, push."
+    echo "post-commit:   DO: resolve keeping BOTH facts, run 'keel gate validate . && keel gate guard .', commit, push."
     echo "post-commit:   For two conclusions that cannot both be true, record an Issue for HUMAN"
     echo "post-commit:   adjudication (D0108) — do not settle it by precedence."
     echo "post-commit:   NEVER 'git pull --rebase' here: it orphans evidence anchors (issue071)."

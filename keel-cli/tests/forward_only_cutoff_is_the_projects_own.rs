@@ -56,7 +56,7 @@ fn scaffold(tag: &str) -> PathBuf {
 fn an_acceptance_recorded_before_the_project_adopted_the_rule_is_not_retro_failed() {
     let root = scaffold("before");
     std::fs::write(root.join(".engine/decisions/0001-probe.sysml"), decision("2026-08-30")).expect("decision");
-    let (ok, out) = run(&root, &["guard", "confirmation-authenticity", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "confirmation-authenticity", "."]);
     assert!(
         ok && out.contains("0 violation(s)"),
         "judged 2026-08-30, after the ENGINE's 2026-08-22 cutoff but before THIS project adopted the rule today - the cutoff is the project's, so this is history, not a violation:\n{out}"
@@ -69,7 +69,7 @@ fn an_unquoted_acceptance_after_adoption_still_fails() {
     let root = scaffold("after");
     let today = std::fs::read_to_string(root.join(".engine/contracts/adoption-profile.toml")).expect("profile").lines().find_map(|l| l.trim().strip_prefix("declaredAt")).and_then(|r| r.split('"').nth(1).map(str::to_string)).expect("declaredAt");
     std::fs::write(root.join(".engine/decisions/0001-probe.sysml"), decision(&today)).expect("decision");
-    let (ok, out) = run(&root, &["guard", "confirmation-authenticity", "."]);
+    let (ok, out) = run(&root, &["gate", "guard", "confirmation-authenticity", "."]);
     assert!(!ok && out.contains("d0001") && out.contains("quote"), "judged on the adoption day with no quote receipt: the rule bites as before:\n{out}");
     let _ = std::fs::remove_dir_all(&root);
 }

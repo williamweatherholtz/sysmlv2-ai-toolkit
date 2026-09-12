@@ -62,12 +62,12 @@ fn stale_project(tag: &str) -> PathBuf {
 
 fn guard_at_terminal(root: &Path) -> (bool, String) {
     let out = Command::new(keel_bin())
-        .args(["guard", "process-change", "--no-receipt"])
+        .args(["gate", "guard", "process-change", "--no-receipt"])
         .arg(root)
         .env_remove("GIT_INDEX_FILE")
         .env_remove("KEEL_HOOK")
         .output()
-        .expect("run keel guard");
+        .expect("run keel gate guard");
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     (out.status.success(), text)
 }

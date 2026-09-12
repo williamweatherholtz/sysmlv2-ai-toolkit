@@ -101,11 +101,11 @@ fn a_declared_rule_violation_fails_the_commit_gate_and_sync_and_land() {
 
     // ISOLATION, asserted rather than assumed: validate is clean and every guard is clean, so the
     // ONLY thing that can fail a caller is the declared-rule layer.
-    let out = keel().args(["validate", proj.to_str().unwrap()]).output().expect("validate");
+    let out = keel().args(["gate", "validate", proj.to_str().unwrap()]).output().expect("validate");
     assert!(out.status.success(), "fixture must leave validate CLEAN: {}", String::from_utf8_lossy(&out.stdout));
-    let out = keel().args(["guard", "all", proj.to_str().unwrap()]).output().expect("guard");
+    let out = keel().args(["gate", "guard", "all", proj.to_str().unwrap()]).output().expect("guard");
     assert!(out.status.success(), "fixture must leave the guards CLEAN: {}", String::from_utf8_lossy(&out.stdout));
-    let out = keel().args(["rules", proj.to_str().unwrap()]).output().expect("rules");
+    let out = keel().args(["gate", "rules", proj.to_str().unwrap()]).output().expect("rules");
     let rules = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(rules.contains("storyNoOwner"), "the declared rule must actually be violated: {rules}");
 

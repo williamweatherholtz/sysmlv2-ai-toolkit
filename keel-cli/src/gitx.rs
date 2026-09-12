@@ -16,7 +16,7 @@
 //! command it builds.
 //!
 //! TIME as well as COUNT (dcGuardsRunInParallelAndTimed, issue410). For a year the constructor counted
-//! and only the two rich helpers timed, so `keel guard` reported `git x56 in 100ms` over 4.4 s of spawns
+//! and only the two rich helpers timed, so `keel gate guard` reported `git x56 in 100ms` over 4.4 s of spawns
 //! and a reader trusting the line concluded git was free. The constructor now returns [`Git`], a thin
 //! wrapper whose `output()`, `status()` and `spawn()` add their wall time to `GIT_NANOS` and note the argv
 //! shape at `KEEL_PERF=2` - so every site that builds a command through here is timed by construction,

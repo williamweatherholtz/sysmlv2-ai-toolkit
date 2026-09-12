@@ -246,7 +246,7 @@ fn every_hook_fire_leaves_a_counted_ledger_line() {
 }
 
 /// dcRefusalIsALedgerFact clause (d): the commit tier's separate processes each leave a
-/// `commit-gate-<tier>` line - a red `keel validate` is a block naming the tier, a green one an allow -
+/// `commit-gate-<tier>` line - a red `keel gate validate` is a block naming the tier, a green one an allow -
 /// so the commit gate's refusals sit in the ledger with the in-loop tiers' (known positive: a tracking
 /// file that does not parse; known negative: the same fixture with the file removed).
 #[test]
@@ -254,10 +254,10 @@ fn the_commit_tier_leaves_a_commit_gate_line() {
     let root = strict_project("commit-gate");
     let ledger = root.join(".keel").join("metrics").join("hooks.jsonl");
     std::fs::write(root.join(".tracking").join("broken.sysml"), "package Broken { part x : Nope { :>> id = \"z\"; } }\n").expect("broken");
-    let red = Command::new(keel_bin()).args(["validate", "."]).current_dir(&root).output().expect("validate");
+    let red = Command::new(keel_bin()).args(["gate", "validate", "."]).current_dir(&root).output().expect("validate");
     assert!(!red.status.success(), "the broken file fails validate");
     std::fs::remove_file(root.join(".tracking").join("broken.sysml")).expect("rm");
-    let green = Command::new(keel_bin()).args(["validate", "."]).current_dir(&root).output().expect("validate");
+    let green = Command::new(keel_bin()).args(["gate", "validate", "."]).current_dir(&root).output().expect("validate");
     assert!(green.status.success(), "{}", String::from_utf8_lossy(&green.stdout));
     let text = std::fs::read_to_string(&ledger).expect("the commit tier writes the ledger");
     let lines: Vec<serde_json::Value> = text.lines().filter(|l| l.contains("commit-gate-validate")).map(|l| serde_json::from_str(l).expect("json")).collect();

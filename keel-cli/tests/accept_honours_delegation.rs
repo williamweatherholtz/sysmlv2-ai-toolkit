@@ -103,7 +103,7 @@ fn words_that_name_nothing_or_are_short_record_with_a_warn_line() {
     let d = decision_text(&root2);
     assert!(d.contains("\u{201C}A\u{201D}") && d.contains("WARN: short words"), "the declared pair holds the letter and the record says it was short:\n{d}");
     // and the recorded tree passes the delegated-substance rule: a declared pair is exact at any length
-    let (ok, text) = agent(&root2, &["guard", "confirmation-authenticity", "."]);
+    let (ok, text) = agent(&root2, &["gate", "guard", "confirmation-authenticity", "."]);
     assert!(ok, "the short declared quote satisfies the substance rule: {text}");
     let _ = std::fs::remove_dir_all(&root);
     let _ = std::fs::remove_dir_all(&root2);

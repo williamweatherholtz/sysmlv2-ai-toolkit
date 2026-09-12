@@ -20,15 +20,14 @@
 //! point. A unit declaring a name the post-collapse engine no longer has is exactly what must refuse.
 
 /// Every command this binary dispatches, sorted. Kept equal to `main.rs`'s dispatch by test.
-pub const COMMAND_NAMES: [&str; 48] = [
-    "accept", "activate", "activation", "actor", "adoption-check", "advance",
-    "assured", "audit", "audit-adherence", "audit-ci-runs", "audit-history", "check",
-    "check-engine", "claim", "claude", "currency", "deactivate", "deck",
-    "enroll", "gate", "github-decider", "github-decision-id", "github-gesture", "github-ingest",
-    "github-pull", "guard", "hook", "init", "judge-set", "land",
-    "library", "migrate", "onboard", "override", "process", "projects",
-    "recall", "record", "reject", "render", "rules", "serve",
-    "show", "suite", "sync", "sync-claude", "validate", "version",
+pub const COMMAND_NAMES: [&str; 38] = [
+    "accept", "activate", "activation", "actor", "advance", "audit",
+    "claim", "claude", "currency", "deactivate", "deck", "enroll",
+    "gate", "github-decider", "github-decision-id", "github-gesture", "github-ingest", "github-pull",
+    "hook", "init", "judge-set", "land", "library", "migrate",
+    "onboard", "override", "process", "projects", "recall", "record",
+    "reject", "render", "serve", "show", "suite", "sync",
+    "sync-claude", "version",
 ];
 
 /// Does this binary dispatch `name`?

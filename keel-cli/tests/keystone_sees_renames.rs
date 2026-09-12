@@ -51,7 +51,7 @@ fn locked_project(tag: &str) -> PathBuf {
 }
 
 fn staged_guard(root: &Path) -> (bool, String) {
-    let out = Command::new(keel_bin()).args(["guard", "process-change"]).current_dir(root).output().expect("keel");
+    let out = Command::new(keel_bin()).args(["gate", "guard", "process-change"]).current_dir(root).output().expect("keel");
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     (out.status.success(), text)
 }

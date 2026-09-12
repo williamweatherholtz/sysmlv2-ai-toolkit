@@ -2268,7 +2268,7 @@ pub fn marker_census(root: &Path) -> Result<String, ViewError> {
 /// relationship that does not exist, and it is worse than a missing edge because every consumer
 /// treats it as present: `issue060` read as TRIAGED by a resolver that had never been declared, and
 /// sprint171's Story read as CHARTERED by an origin no commit ever contained. Both passed
-/// `keel validate`, `keel check-engine` and all 28 guards, because each of those checks that the
+/// `keel gate validate`, `keel gate check-engine` and all 28 guards, because each of those checks that the
 /// EDGE is present and none checked that its endpoints resolve.
 ///
 /// Found by the conformance lane rather than by any Rust check — the kernel resolves references and
@@ -3420,7 +3420,7 @@ pub fn controls(root: &Path) -> Result<String, ViewError> {
     let mut disarmed: Vec<String> = Vec::new();
     for c in &constraints {
         if !c.starts_with("ctl") {
-            continue; // guard-mirroring constraints (gXxx) are covered by `keel guard` itself
+            continue; // guard-mirroring constraints (gXxx) are covered by `keel gate guard` itself
         }
         let (state, detail) = match arming_decl.get(c.as_str()) {
             None => ("UNDECLARED".to_string(), "no entry in control-arming.toml - silence is a gap, not consent".to_string()),
@@ -3568,7 +3568,7 @@ pub fn tier_satisfaction(root: &Path) -> Result<String, ViewError> {
 ///
 /// The always-visible "what's incomplete" headline. Cheap (graph-only, no git): tier-satisfaction
 /// structural pcts + rootedness counts. Detail lives in `keel tier-satisfaction` / `keel rootedness` /
-/// `keel assured` / `keel critique-coverage`.
+/// `keel gate assured` / `keel critique-coverage`.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance file fails to parse.
@@ -3636,7 +3636,7 @@ fn actionable_guard_warnings(root: &Path) -> Json {
     let Some(receipt) = receipt else {
         return Json::Obj(vec![
             ("actionable".to_string(), Json::Null),
-            ("how".to_string(), Json::s("no green guard receipt for this tree - `keel guard .` runs the set and writes one; its summary states the actionable count".to_string())),
+            ("how".to_string(), Json::s("no green guard receipt for this tree - `keel gate guard .` runs the set and writes one; its summary states the actionable count".to_string())),
         ]);
     };
     let n = |c: usize| Json::Int(i64::try_from(c).unwrap_or(i64::MAX));
@@ -3651,7 +3651,7 @@ fn actionable_guard_warnings(root: &Path) -> Json {
             ("guard".to_string(), Json::s(r.name.to_string())),
             ("count".to_string(), n(count)),
             ("first".to_string(), Json::s(first.clone())),
-            ("detail".to_string(), Json::s(format!("keel guard {} .", r.name))),
+            ("detail".to_string(), Json::s(format!("keel gate guard {} .", r.name))),
         ]));
     }
     Json::Obj(vec![
@@ -4066,7 +4066,7 @@ fn compute_readiness(root: &Path) -> Result<ReadinessBlockers, ViewError> {
     // Base invariant guards only — EXCLUDE `assured` (would recurse) and `critique` (composed
     // separately as critique_gaps). This is what "invariants green" means for readiness.
     // THE WHOLE GUARD SUITE, INSIDE A VIEW. Legitimate - readiness means invariants hold - but it makes
-    // `keel assured` cost `keel guard` PLUS every composed view, which is the single largest term and was
+    // `keel gate assured` cost `keel gate guard` PLUS every composed view, which is the single largest term and was
     // invisible until it was named.
     let invariant_violations: Vec<String> = crate::perf::phase("allGuards", || {
         crate::guards::GUARD_NAMES

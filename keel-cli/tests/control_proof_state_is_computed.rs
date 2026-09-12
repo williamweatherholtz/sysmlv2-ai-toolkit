@@ -87,14 +87,14 @@ fn scaffold(tag: &str) -> PathBuf {
 #[test]
 fn a_malformed_id_is_a_violation_the_guard_names() {
     let root = scaffold("idwf");
-    let clean = run(&root, &["guard", "identity-well-formed", "."]);
+    let clean = run(&root, &["gate", "guard", "identity-well-formed", "."]);
     assert!(clean.contains("PASS") && !clean.contains("FAIL"), "a fresh scaffold must pass: {clean}");
     std::fs::write(
         root.join(".tracking").join("probe.sysml"),
         "package ProbeIds {\n    private import EngineElement::*;\n    part probeItem : Decision { :>> id = \"not-a-uuid-at-all\"; :>> title = \"probe\"; :>> createdAt = \"2026-09-11\"; :>> createdBy = \"ai\"; }\n}\n",
     )
     .expect("write probe");
-    let dirty = run(&root, &["guard", "identity-well-formed", "."]);
+    let dirty = run(&root, &["gate", "guard", "identity-well-formed", "."]);
     assert!(
         dirty.contains("FAIL") && dirty.contains("not-a-uuid-at-all") && dirty.contains("probe.sysml"),
         "the guard must FAIL naming the id and the file: {dirty}"

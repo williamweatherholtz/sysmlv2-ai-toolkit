@@ -1346,7 +1346,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
             eprintln!("warning: install record not written ({e}) — the next --update will need --assume-local-base");
         }
         println!("imported '{name}' v{version}: {copied} file(s) (engine files under .engine/, declared extras at the project root; install record written)");
-        println!("  NOT YET ENFORCED. Run `keel activate {name}` to turn its guards on, then `keel validate . && keel guard .`.");
+        println!("  NOT YET ENFORCED. Run `keel activate {name}` to turn its guards on, then `keel gate validate . && keel gate guard .`.");
         return 0;
     }
 
@@ -1429,7 +1429,7 @@ fn cmd_import(args: &[String], root: &Path) -> i32 {
     println!("updated '{name}' to v{version}: {updated} file(s) from upstream, {kept_local} kept local additions.");
     println!("  SUPERSESSION RECORD: commit this under the D0070 keystone (a marked Decision) — that commit is");
     println!("  what governing-version/reprocess-candidates resolve prior work against (K9/K10).");
-    println!("  Then `keel validate . && keel guard .` and re-check `keel show reprocess-candidates`.");
+    println!("  Then `keel gate validate . && keel gate guard .` and re-check `keel show reprocess-candidates`.");
     0
 }
 

@@ -9,7 +9,7 @@
 //!
 //! # What this module is for
 //!
-//! `keel guard` prints a registered defect BESIDE the verdict of the control it belongs to, so a
+//! `keel gate guard` prints a registered defect BESIDE the verdict of the control it belongs to, so a
 //! green from a control known to under-report arrives already qualified — at the moment someone is
 //! reading it, without anyone having to remember. That is the hook the process rests on, and it is
 //! the reason the registry is an authored contract rather than a note in a retro: three true control

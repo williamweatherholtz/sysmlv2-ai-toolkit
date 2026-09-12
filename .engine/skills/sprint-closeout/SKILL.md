@@ -26,7 +26,7 @@ human's acceptance happens once per sitting at the sprint review, not here.
    - The `DoDR1` is appended to the backlog (`DeliveryRun`/`NextWork`).
    - All earlier phase gates (refine/standup/implement/review) are recorded — the
      ceremony-ordering guard (D0047) enforces no out-of-order closeOut.
-   - The `.tracking` validator (`keel validate .`, D0048) is green.
+   - The `.tracking` validator (`keel gate validate .`, D0048) is green.
 2. **Record `actualHours`** on the sprint Story if known (it feeds efficiency metrics, D0072).
    It holds the **AI time spent** (wall-clock minutes); AI-vs-human effort is never conflated —
    analysis splits it by the Story's `owner` (e.g. `claudeOpus` vs a human). If genuinely unknown
@@ -46,7 +46,7 @@ human's acceptance happens once per sitting at the sprint review, not here.
   is the per-sitting review. Don't block the sprint on a confirmation.
 - **Closing out of order** — closeOut requires the earlier gates recorded (the guard
   enforces it). refine→standup→implement→review→closeOut→retro.
-- **Committing before validation** — run `keel validate .` after adding the result.
+- **Committing before validation** — run `keel gate validate .` after adding the result.
 - **Skipping the retro hand-off** — closeOut is followed by the autonomous retro.
 
 ## Output Format
@@ -56,7 +56,7 @@ CLOSEOUT — Sprint N (autonomous)
 [ ] DoDR1 in story: pass
 [ ] DoDR1 in backlog: pass
 [ ] refine/standup/implement/review recorded: pass
-[ ] keel validate .: green
+[ ] keel gate validate .: green
 [ ] actualHours: <N> h | unset
 Gate: PASS (inspect, AI, <date>)  → hand off to sprint-retro
 ```

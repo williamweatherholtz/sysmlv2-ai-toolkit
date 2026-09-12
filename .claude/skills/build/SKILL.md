@@ -52,7 +52,7 @@ no longer match the schema it parses).
    mode when network access is genuinely unavailable, and say so.
 3. **Confirm the binary exists:** `target/release/keel.exe`. Report its path.
 4. **Validate the model still parses** with the no-kernel path:
-   `./target/release/keel.exe validate .` (fast, no JVM). If the Rust
+   `./target/release/keel.exe gate validate .` (fast, no JVM). If the Rust
    validator is not yet trustworthy (see issue005 / `rustToolchainFix`), fall
    back to the kernel validators (CLAUDE.md §5) and SAY which path you used.
 5. **Report actual output** — compile result + binary path + validation verdict.

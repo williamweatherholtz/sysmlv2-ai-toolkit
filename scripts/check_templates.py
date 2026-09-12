@@ -447,7 +447,7 @@ HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$")
 CT_FLAG = re.compile(r"check_templates\.py\s+(--[a-z][a-z-]*)")
 PYTEST_PATH = re.compile(r"(?<![\w/])(tests/[\w./-]*[\w/])")
 GUARD_TICK = re.compile(r"`([a-z][a-z0-9-]*)`")
-GUARD_CMD = re.compile(r"keel guard\s+([a-z][a-z0-9-]*)")
+GUARD_CMD = re.compile(r"keel gate guard\s+([a-z][a-z0-9-]*)")
 UNHELD = re.compile(r"\bunheld\b", re.I)
 
 

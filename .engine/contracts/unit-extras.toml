@@ -13,7 +13,7 @@
 # (the elicitation skill was in no catalogue): a unit whose teeth stay behind.
 #
 # Paths are repo-relative and travel VERBATIM. A declared path is REQUIRED in every project that
-# installs the unit (D0300, issue290): `keel guard unit-extras-present` fails when one is absent, because
+# installs the unit (D0300, issue290): `keel gate guard unit-extras-present` fails when one is absent, because
 # a definition and a skill referencing machinery that is not there is exactly how penumbra received the
 # channel - four mechanism files hand-staged out of the PR, nothing catching it. Declare only what the
 # unit actually carries; an optional file is not a mechanism.

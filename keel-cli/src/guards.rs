@@ -2344,7 +2344,7 @@ Err(e) => GuardReport { name: "issues", scanned: 0, warnings: Vec::new(), violat
 /// An element missing a required-lens critique (per the declared critique policy, D0097 — default
 /// Core-3) is reported here. This is critique-COVERAGE — a COMPLETENESS measure, so under the honest-
 /// state doctrine (D0098) it is NOT in the enforced `GUARD_NAMES`: it is a non-blocking burndown,
-/// RUNNABLE via `keel guard critique` / `keel critique-coverage` and surfaced in orient, never a hard
+/// RUNNABLE via `keel gate guard critique` / `keel critique-coverage` and surfaced in orient, never a hard
 /// commit gate (an un-critiqued element is honest incomplete state, not a lie). Critique INDEPENDENCE
 /// (`critic-independence`) stays enforced — that is honesty, not completeness.
 #[must_use]
@@ -2484,8 +2484,8 @@ pub fn resolver_kind(root: &Path) -> GuardReport {
 /// Reports the exact blockers when the deliverable is not assured (coverage/critique gaps, stale
 /// verification, undispositioned >= Medium findings, open Critical, invariant violations). This is the
 /// SELF-ASSURANCE composite (completeness/readiness), so under the honest-state doctrine (D0098) it is
-/// NOT in the enforced `GUARD_NAMES`: a NON-BLOCKING burndown verdict, RUNNABLE via `keel guard
-/// assured` / `keel assured` and surfaced in orient, never a hard commit gate. Incompleteness flagged
+/// NOT in the enforced `GUARD_NAMES`: a NON-BLOCKING burndown verdict, RUNNABLE via `keel gate guard
+/// assured` / `keel gate assured` and surfaced in orient, never a hard commit gate. Incompleteness flagged
 /// AS incomplete is honest state; suppressing it or blocking on it both destroy the honest picture.
 #[must_use]
 pub fn assured(root: &Path) -> GuardReport {
@@ -2677,7 +2677,7 @@ pub fn critic_independence(root: &Path) -> GuardReport {
 
 /// Diagnostic (D0080/issue030): low-rigor critiques + affirming-only critics, as WARNINGS.
 ///
-/// RUNNABLE via `keel guard critique-rigor` but NOT in the enforced `GUARD_NAMES` — rigor is a
+/// RUNNABLE via `keel gate guard critique-rigor` but NOT in the enforced `GUARD_NAMES` — rigor is a
 /// heuristic signal for human attention, not a hard gate (a shallow-but-honest critique is not a
 /// commit-blocker). Surfaces critiques lacking adversarial structure / substance and never-find critics.
 #[must_use]
@@ -3294,7 +3294,7 @@ pub fn process_skill(root: &Path) -> GuardReport {
 
 /// Diagnostic (D0047/issue039): a `#ProcessDefect` finding must resolve to a guard-producing action.
 ///
-/// RUNNABLE via `keel guard defect-guard-coverage` but NOT in the enforced `GUARD_NAMES` — whether
+/// RUNNABLE via `keel gate guard defect-guard-coverage` but NOT in the enforced `GUARD_NAMES` — whether
 /// a defect class "needs a guard" is judgment-bound (a shallow heuristic on the resolver name), so it
 /// is a WARN for human attention, not a commit gate. Closes issue039: the "corrections become guards"
 /// rule (D0047) now has an audit instead of relying purely on vigilance.
@@ -3566,7 +3566,7 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// `issues` joined the enforced set at IRL-d (D0077). HONEST-STATE doctrine (D0098): the enforced set
 /// holds only INTEGRITY guards — the recorded model must not lie, be malformed, or be untraceable.
 /// COMPLETENESS / self-assurance (`assured` composite readiness + `critique`-COVERAGE) was DEMOTED
-/// from this set: it is computed as a NON-BLOCKING burndown (`keel guard assured` / `keel critique-
+/// from this set: it is computed as a NON-BLOCKING burndown (`keel gate guard assured` / `keel critique-
 /// coverage` stay runnable, surfaced in orient), never a hard commit gate — incomplete implementation
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
@@ -4038,7 +4038,7 @@ pub fn impossible_evidence_dates(root: &Path) -> GuardReport {
 /// Guard (issue166): every id-bearing declaration actually carries an `:>> id`.
 ///
 /// HARD, and it closes an invariant that was unguarded. §1.3 makes identity an immutable UUID so items
-/// never collide on name — and `keel validate` passed with an `Issue` missing its `id` entirely. The only
+/// never collide on name — and `keel gate validate` passed with an `Issue` missing its `id` entirely. The only
 /// existing coverage was `engine-lint`, which is `.engine`-scoped by design, and the demoted python
 /// tracking validator (D0132), which fails correct files and so cannot be relied on. `duplicate-identity`
 /// catches two items SHARING an id and says nothing about an item having none.
@@ -4077,7 +4077,7 @@ pub fn identity_present(root: &Path) -> GuardReport {
 ///
 /// Guard 37 checks an id is PRESENT and `duplicate-identity` checks two items do not SHARE one. The
 /// middle property — that the string is an identifier at all — was enforced by nothing, and an id of
-/// literally `not-a-uuid-at-all` passed `keel validate` and all 37 guards. A malformed id is still
+/// literally `not-a-uuid-at-all` passed `keel gate validate` and all 37 guards. A malformed id is still
 /// UNIQUE, so it collides with nothing and every view resolves it happily; the damage is silent and
 /// surfaces only when something outside this repo tries to join on it.
 ///
@@ -4419,7 +4419,8 @@ fn gating_workflow_history(root: &Path) -> GuardReport {
     for path in &files {
         let Ok(text) = crate::corpus::read_to_string(path) else { continue };
         // "Runs the gate" is judged by what the workflow actually invokes, not by its name.
-        let gates = ["cargo test", "keel guard", "keel validate", "audit-history", "audit-adherence"]
+        // D0452: the gating verbs are sub-verbs of `gate` and `audit`; a needle reads the routed spelling.
+        let gates = ["cargo test", "keel gate guard", "keel gate validate", "audit history", "audit adherence"]
             .iter()
             .any(|needle| text.contains(needle));
         if !gates || !text.contains("actions/checkout") {
@@ -5596,7 +5597,7 @@ const HOOK_SCRIPT_EXTS: [&str; 6] = ["py", "sh", "ps1", "js", "mjs", "rb"];
 ///
 /// WARNING, not hard-blocking, and the level is the point: this config is machine-local and partly
 /// gitignored, so CI cannot see it and one contributor's personal hook must never block another's
-/// commit. A warning still surfaces on every `keel guard` — including inside the Stop hook itself,
+/// commit. A warning still surfaces on every `keel gate guard` — including inside the Stop hook itself,
 /// which is what makes a sibling hook's breakage self-reporting rather than something the human has to
 /// notice in scrollback.
 fn hook_config_integrity(root: &Path) -> GuardReport {
@@ -5775,7 +5776,7 @@ pub fn run_all_timed(root: &Path) -> (Vec<GuardReport>, Durations) {
     }
     // DISPATCH ORDER IS DECLARATION ORDER, on measurement (dcGuardPoolDispatchesLongestFirst, issue455,
     // 2026-09-10). Longest-first from the receipt's per-guard durations was built and A/B-timed on this
-    // host (14 cores / 20 threads), six interleaved pairs of `KEEL_PERF=2 keel guard --no-receipt`:
+    // host (14 cores / 20 threads), six interleaved pairs of `KEEL_PERF=2 keel gate guard --no-receipt`:
     // list-scheduling simulation over three measured runs had promised 1849 -> 1314 ms
     // (scripts/probes/guard_dispatch_order.py); the binary measured wall medians 2567 (declared) vs
     // 2544 ms (longest-first) - one percent, inside the run-to-run spread - while the guard sum rose

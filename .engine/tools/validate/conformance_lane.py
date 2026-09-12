@@ -2,7 +2,7 @@
 
 WHY THIS IS A SEPARATE LANE AND NOT A GATE (issue097, D0048, D0132).
 
-`keel validate` / `keel check` are the ENGINE's semantic authority: reference resolution, identity,
+`keel gate validate` / `keel gate check` are the ENGINE's semantic authority: reference resolution, identity,
 provenance, edge algebra. They are NOT a SysML v2 conformance check, and nothing said so — so
 "validate is green" read as "this is valid SysML v2". It is not the same claim. The Rust parser
 accepts `verify X by Y` at package level; the kernel rejects it. That divergence is how a
@@ -100,7 +100,7 @@ def declared_names():
     "Couldn't resolve reference" — which says nothing about SysML v2 conformance and everything
     about the order this script happened to iterate in. Without this split the lane reported 190/470
     and would have published a 40% conformance rate that is entirely its own artifact. Whether a
-    reference actually resolves is `keel validate`'s job and it already answers it.
+    reference actually resolves is `keel gate validate`'s job and it already answers it.
     """
     names = set()
     for f in instance_files() + PRELOAD:
@@ -195,7 +195,7 @@ def main():
     print("  have published a 40% conformance rate that is entirely this script's own doing.")
     if unresolved:
         print(f"  {len(unresolved)} file(s) reference a name declared NOWHERE — a real defect, but")
-        print("  `keel validate` is the authority on that and already reports it:")
+        print("  `keel gate validate` is the authority on that and already reports it:")
         for r in unresolved[:10]:
             print(f"      {r['file']}: {r['diagnostic'][:140]}")
     print()

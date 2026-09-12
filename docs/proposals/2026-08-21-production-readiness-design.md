@@ -39,7 +39,7 @@ Keel's discipline machinery is real but has three production-blocking properties
    an LLM one paragraph (`serve.rs:1049`); ceremony order is a Rust constant
    (`GATE_ORDER`, `guards.rs:279`) duplicating the workflow topology the parser reads.
 3. **The teeth are monolithic while the prose is modular.** `GUARD_NAMES` is compiled
-   (`guards.rs:1604`); `keel rules` is wired to no gate; process units export with
+   (`guards.rs:1604`); `keel gate rules` is wired to no gate; process units export with
    `rules = []` always (`activation.rs:97`) and import refuses collisions
    (`process_cmd.rs:153`) — install-once, no update path.
 
@@ -76,10 +76,10 @@ The guarantee therefore lives in layers, weakest-to-strongest:
 | **4 Instruction** | judgment the machine can't check is stated where the agent reliably receives it | output style, skills, CLAUDE.md | advisory |
 | **1 Boundary** | enforced work enters as a declared, approved process instance in fresh bounded context | console launch + `claude -p --max-turns` | shapes what starts |
 | **2 Action space** | invalid writes are refused with the sanctioned path named; refusals and overrides leave durable records | permission rules + blocking PreToolUse + the typed write API | friction + audit |
-| **3 Verification** | no persisted state survives that is untruthful/malformed/untraceable; verdicts are re-derivable from the tree independent of any hook having run | validate + guards + rules at edit/turn/commit/CI + `keel audit-history` | **the guarantee** |
+| **3 Verification** | no persisted state survives that is untruthful/malformed/untraceable; verdicts are re-derivable from the tree independent of any hook having run | validate + guards + rules at edit/turn/commit/CI + `keel audit history` | **the guarantee** |
 
 Layer 3 is the only layer the record shows working unconditionally (the issue log is
-substantially guard-discovered; `keel audit-history` — built as the D0047 control for
+substantially guard-discovered; `keel audit history` — built as the D0047 control for
 issue116 — re-derives every commit's verdict from the tree, hook-independent). Layers 1–2
 exist to make drift rare and visible, not to be the proof. Building any one layer
 "instead of" the others repeats the category error D0128 warned about.
@@ -133,7 +133,7 @@ skeleton. Each maps to committed scope (WP in parentheses); none is orphaned.
   evidence (PM; D0128's own "prove the in-loop gate (measure)" step, recorded as
   undelivered by D0130).
 - **K15** Every enforcement verdict is re-derivable from committed truth alone,
-  hook-independent (validate/guards over the tree + `keel audit-history`, P1.6) — this is
+  hook-independent (validate/guards over the tree + `keel audit history`, P1.6) — this is
   §2's layer-3 guarantee stated as an invariant so no future cut can orphan its carrier.
 
 ## 4. Direction ruling — "mostly web-based"?
@@ -284,10 +284,10 @@ and recorded (K7)".
    `.githooks/**`, the output style, and Bash `git config core.hooksPath` /
    `keel deactivate` / exemption writes / **actor-identity mutation (`keel actor set`,
    Person-enrollment, `KEEL_ACTOR`)** → "ask" + an auto-recorded, orient-visible fact.
-5. **Wire `keel rules` into `hook stop`, pre-commit, and CI** (blocking rules gate;
+5. **Wire `keel gate rules` into `hook stop`, pre-commit, and CI** (blocking rules gate;
    warning rules report). Fix `hook_stop` bypassing the activation filter
    (`guards.rs:2270-2288`).
-6. **Tree-derived audit in CI (K15):** add `keel audit-history` over the pushed range to
+6. **Tree-derived audit in CI (K15):** add `keel audit history` over the pushed range to
    CI (hook-independent verification, the issue116 control); soften CLAUDE.md:136's
    "enforced by remote config and hooks" to what is actually enforced — no new pre-push
    hook (one honesty edit beats permanent surface).

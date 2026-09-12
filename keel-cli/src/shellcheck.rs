@@ -253,7 +253,7 @@ mod tests {
     fn ordinary_commands_are_not_flagged() {
         for ok in [
             "cargo build --release",
-            "./target/release/keel.exe guard .",
+            "./target/release/keel.exe gate guard .",
             "git add -A && git commit -F msg.txt",
             "grep -rn foo .tracking/ | head -5",
             "python -c \"import json; print(1)\"",

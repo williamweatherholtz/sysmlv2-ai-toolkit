@@ -1,8 +1,8 @@
 // =====================================================================
-// EngineRules — declarative controls (D0105). The `keel check` evaluator reads DECLARED Rule elements
+// EngineRules — declarative controls (D0105). The `keel gate check` evaluator reads DECLARED Rule elements
 // instead of bespoke Rust guards. Two rule kinds (EdgeRule + ElementRule) + a bounded SCOPE sub-language + an exemption
 // mechanism (per the sprint172 spike: predicates stay small, complexity lives in SCOPE). This is the
-// EXPAND phase of the D0067 guards->rules migration — the 28 guards still run until `keel check`
+// EXPAND phase of the D0067 guards->rules migration — the 28 guards still run until `keel gate check`
 // reaches PARITY on each (guardsToRulesMigration); nothing is retired by adding this schema.
 //
 // Each Rule carries its WHY as a typed edge (#JustifiedBy rule -> Decision), authored separately —

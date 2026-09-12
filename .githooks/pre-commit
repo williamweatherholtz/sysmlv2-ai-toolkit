@@ -15,7 +15,7 @@
 #
 # Forward GUARDS are the Rust authority (D0074 M3/M4). The .engine SysML SEMANTIC validators
 # (schema/workflows/instances) remain kernel-based (deep semantics the Rust validator does not
-# cover) and are OPTIONAL — `keel check-engine` is the kernel-free backstop that always runs.
+# cover) and are OPTIONAL — `keel gate check-engine` is the kernel-free backstop that always runs.
 # Escape hatch: SKIP_VALIDATE=1.
 [ "$SKIP_VALIDATE" = "1" ] && { echo "pre-commit: SKIP_VALIDATE=1 — validation skipped"; exit 0; }
 
@@ -42,7 +42,7 @@ V=".engine/tools/validate"
 sysml_run() {
     if [ -z "$CONDA" ]; then
         echo "pre-commit: NOTICE — kernel validator '$1' SKIPPED (no conda found; set KEEL_CONDA to enable)."
-        echo "pre-commit:          keel check-engine is the kernel-free backstop and still runs below."
+        echo "pre-commit:          keel gate check-engine is the kernel-free backstop and still runs below."
         return 0
     fi
     echo "pre-commit: $1"
@@ -65,7 +65,7 @@ if [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -q '^\.engine/workflows/' && sysml_run validate_workflows.py
 fi
 
-# .engine INSTANCE files: `keel check-engine` (below) is the ENFORCED gate. The kernel's
+# .engine INSTANCE files: `keel gate check-engine` (below) is the ENFORCED gate. The kernel's
 # validate_instances.py is OPT-IN (KEEL_KERNEL_VALIDATE=1) — D0132/issue081.
 #
 # It validates each instance file IN ISOLATION, so ANY cross-file reference fails to resolve. It
@@ -75,7 +75,7 @@ fi
 # 100% of the time was also destroying the assurance of validate, guard, check-engine and clippy each
 # time it was bypassed. Removing it from the blocking path strictly INCREASES total enforcement.
 #
-# `keel check-engine` is kernel-free, resolves references ACROSS files (which the kernel cannot here),
+# `keel gate check-engine` is kernel-free, resolves references ACROSS files (which the kernel cannot here),
 # and exits non-zero on a genuine unresolved reference — verified by negative test at D0132.
 if [ "$KEEL_KERNEL_VALIDATE" = "1" ] && [ -n "$sysml_staged" ]; then
     echo "$sysml_staged" | grep -qE '^\.engine/(decisions|processes|skills|docs|views)/.*\.sysml$' && sysml_run validate_instances.py
@@ -85,8 +85,8 @@ fi
 # (issue026/safeTrackingFallback): kernel validate_tracking validates per-file and FALSE-FAILS the
 # #CharteredBy charter edges (.tracking -> .engine Decisions) + baselines -> schema.
 if echo "$sysml_staged" | grep -q '^\.tracking/'; then
-    echo "pre-commit: keel validate . (rust authority)"
-    "$KEEL" validate . || {
+    echo "pre-commit: keel gate validate . (rust authority)"
+    "$KEEL" gate validate . || {
         echo "pre-commit: RUST VALIDATE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 
@@ -95,18 +95,18 @@ fi
 # hook and fail only in CI). Kernel-free + fast (<1s). (Assurance — critique-COVERAGE + `assured`
 # readiness — is a NON-BLOCKING burndown, D0098, and is deliberately NOT in this enforced set.)
 if [ -n "$sysml_staged" ]; then
-    echo "pre-commit: keel guard (all enforced honest-state guards)"
-    "$KEEL" guard || {
+    echo "pre-commit: keel gate guard (all enforced honest-state guards)"
+    "$KEEL" gate guard || {
         echo "pre-commit: GUARD FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     # .engine reference resolution, KERNEL-FREE (D0112 phase 2/issue067): catches unresolved type
     # refs + unknown imports on .engine instances even when conda/kernel is unavailable.
-    echo "pre-commit: keel check-engine ."
-    "$KEEL" check-engine . || {
+    echo "pre-commit: keel gate check-engine ."
+    "$KEEL" gate check-engine . || {
         echo "pre-commit: CHECK-ENGINE FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
     # Declared rules gate the commit (D0177/P1.5): blocking rules fail; warnings print. This is the
     # modularity keystone - a project adds a blocking control by DECLARING a rule, no Rust, no fork.
-    echo "pre-commit: keel rules --enforce"
-    "$KEEL" rules --enforce || {
+    echo "pre-commit: keel gate rules --enforce"
+    "$KEEL" gate rules --enforce || {
         echo "pre-commit: DECLARED RULES FAILED — commit aborted (SKIP_VALIDATE=1 to bypass)"; exit 1; }
 fi
 

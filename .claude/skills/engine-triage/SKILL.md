@@ -66,7 +66,7 @@ hook (`keel hook user-prompt`, in the binary; D0064).
      done. Capture provenance: who, when (ISO-8601 `*At`), and `verifiedAtCommit`.
    - **VIEW** computes from authored facts + git and **never** stores or mutates.
    - **substantive work goes through a sprint** — no raw backlog execution; the no-sprint
-     guard (`keel guard sprint-coverage`) enforces it.
+     guard (`keel gate guard sprint-coverage`) enforces it.
    - **bulk migration** (rename/split/drop/add a field across many instances/files) → invoke the
      `migration` skill (D0067): committed transform script, dry-run+reconcile control totals,
      expand/migrate/contract green at every step, backfill-before-tighten, never fabricate provenance.
@@ -120,7 +120,7 @@ hook (`keel hook user-prompt`, in the binary; D0064).
    *precedes* the Decision it produces, so it has no accepted charter source — and left un-routed it
    leaks into chat, uncaptured (the issue054 defect, recursed into the engine's own process). Quick
    VIEW/ORIENT answers stay conversational; sustained design gets a spike. The artifact side of this
-   is now a declared control: `researchSpikeCharterRule` (D0111/issue055, warning-level in `keel rules`)
+   is now a declared control: `researchSpikeCharterRule` (D0111/issue055, warning-level in `keel gate rules`)
    flags a `WorkKind::research` spike that charters to something other than a legitimate governing source
    (Decision/Need/SystemRequirement/Issue). The "did this analysis skip the spike?" judgment stays with
    you — a commit gate cannot see a conversation — but a spike that DOES exist must be well-formed.

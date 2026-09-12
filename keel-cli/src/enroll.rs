@@ -109,7 +109,7 @@ fn gate_report(root: &Path) -> Result<String, Refusal> {
     if !report.is_clean() {
         return Err(Refusal {
             what: format!("the local gate RUNS but the project does not pass it ({} problem(s))", report.errors.len() + report.diagnostics.len()),
-            remedy: "run `keel validate .` and fix what it reports. Enrolling onto a red gate would record you as ready when you are not.".to_string(),
+            remedy: "run `keel gate validate .` and fix what it reports. Enrolling onto a red gate would record you as ready when you are not.".to_string(),
         });
     }
     Ok(format!("validate executed over {} file(s), clean", report.validated))

@@ -1344,7 +1344,7 @@ fn finish_applied(root: &Path, p: &MigrationPlan, pre_sha: Option<&String>, writ
         report_written(p, root);
         println!();
         println!("  --no-verify: the project's own gate was NOT run. This tree is written and UNVERIFIED (D0336).");
-        println!("  Run `keel validate . && keel guard && keel check-engine .` yourself, then commit.");
+        println!("  Run `keel gate validate . && keel gate guard && keel gate check-engine .` yourself, then commit.");
         0
     }
 }
@@ -1380,7 +1380,7 @@ fn gate_failure_lines(output: &str) -> Vec<String> {
 fn project_gate(root: &Path) -> Result<(), (String, String)> {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("keel"));
     let r = root.to_string_lossy().to_string();
-    for (gate, args) in [("validate", vec!["validate", r.as_str()]), ("guard", vec!["guard", "all", r.as_str()]), ("check-engine", vec!["check-engine", r.as_str()])] {
+    for (gate, args) in [("validate", vec!["gate", "validate", r.as_str()]), ("guard", vec!["gate", "guard", "all", r.as_str()]), ("check-engine", vec!["gate", "check-engine", r.as_str()])] {
         let out = std::process::Command::new(&exe).args(&args).output().map_err(|e| (gate.to_string(), format!("could not run keel {gate}: {e}")))?;
         if !out.status.success() {
             let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));

@@ -1,4 +1,4 @@
-//! `keel audit-adherence [--since REF]` (D0209 clause 1, the process-adherence audit).
+//! `keel audit adherence [--since REF]` (D0209 clause 1, the process-adherence audit).
 //!
 //! The sound floor the manager-inversion panel endorsed unanimously: re-derive from the git tree
 //! ALONE — on CI infra the agent cannot touch — that the AGENT FOLLOWED THE PROCESS, not merely that
@@ -270,7 +270,7 @@ fn commit_is_signed_change(repo: &Path, sha: &str) -> bool {
         })
 }
 
-/// `keel audit-adherence [--since REF] [--max N]` — the guard-set monotonicity gate.
+/// `keel audit adherence [--since REF] [--max N]` — the guard-set monotonicity gate.
 ///
 /// # Returns
 /// Exit code: 0 if the enforcement signature never weakened unsigned across the range; 1 on any

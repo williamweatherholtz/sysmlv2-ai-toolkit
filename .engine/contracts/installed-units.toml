@@ -2,9 +2,9 @@
 # import records - the three-way base `import --update` merges against. Committed (a tracked fact).
 [aec6f856-abcc-47be-9806-0d28bbf461e8]
 process = "actor-enrollment"
-version = 3
+version = 4
 file.processes__SL__actor-enrollment.sysml = "4ef11a27f5d1c4a2"
-file.skills__SL__actor-enrollment__SL__SKILL.md = "784c5c4e009c66ff"
+file.skills__SL__actor-enrollment__SL__SKILL.md = "109dc093657574dd"
 file.skills__SL__actor-enrollment__SL__registry.sysml = "721fc849cefd0693"
 [87ed7c53-5894-4917-ab6c-3f6c864ea8d2]
 process = "adversarial-panel-review"
@@ -14,59 +14,83 @@ file.skills__SL__adversarial-panel-review__SL__SKILL.md = "3701a86f25365ba6"
 file.skills__SL__adversarial-panel-review__SL__registry.sysml = "3918772c38918183"
 [41e6457a-b7d8-4653-a65a-c6291e2e6ebf]
 process = "agile-workflow"
-version = 3
-file.processes__SL__agile-workflow.sysml = "3b29a5acfffa3c3e"
-file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
+version = 4
+file.processes__SL__agile-workflow.sysml = "4872288c42516447"
+file.skills__SL__sprint-retro__SL__SKILL.md = "c0f313dd0d3d44d2"
 file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
-file.skills__SL__sprint-standup__SL__SKILL.md = "8d81d13b7405d2d4"
+file.skills__SL__sprint-standup__SL__SKILL.md = "1e28526bf20c865d"
 file.skills__SL__sprint-standup__SL__registry.sysml = "e2ca9e5ddd6b9d29"
 [b4ea2aaf-f046-4828-91e4-21bb781e1bdb]
 process = "architectural-critique"
-version = 3
+version = 4
 file.processes__SL__architectural-critique.sysml = "5fe1ce2918a57923"
-file.skills__SL__architectural-critique__SL__SKILL.md = "0214c75139f3249c"
+file.skills__SL__architectural-critique__SL__SKILL.md = "28b2f03de01719eb"
 file.skills__SL__architectural-critique__SL__registry.sysml = "4784971e274908e6"
+[cb1ed9ad-1e88-4dab-900a-bf4b923b168e]
+process = "asi-templates"
+version = 4
+file.processes__SL__asi-templates.sysml = "b5f43848ba73ab66"
+file.skills__SL__asi-templates__SL__SKILL.md = "58b92163a24f8cff"
+file.skills__SL__asi-templates__SL__registry.sysml = "11613cc582e66d28"
 [b951ffe0-0a3f-44c9-be7e-17a1a0df10f4]
 process = "business-elicitation"
-version = 3
+version = 4
 file.processes__SL__business-elicitation.sysml = "ffb97dd2e8d505b4"
-file.skills__SL__business-architecture__SL__SKILL.md = "7f2f1d5609876e9f"
+file.skills__SL__business-architecture__SL__SKILL.md = "d3323a0aa3891c4d"
 file.skills__SL__business-architecture__SL__registry.sysml = "978b629e158f4f45"
+[b367c045-d7e5-4c48-a60a-0e82e28bc178]
+process = "control-defect"
+version = 1
+file.processes__SL__control-defect.sysml = "5ac06f90b9733dbb"
+file.skills__SL__control-defect__SL__SKILL.md = "5ea2eff215eebc1d"
+file.skills__SL__control-defect__SL__registry.sysml = "9020f9963edd5513"
+[4e625dfb-3276-499e-b032-795341335984]
+process = "control-propriety"
+version = 2
+file.processes__SL__control-propriety.sysml = "1db15420fdb572f1"
+file.skills__SL__control-propriety__SL__SKILL.md = "06237860dad8ed2d"
+file.skills__SL__control-propriety__SL__registry.sysml = "01974da487a7b33e"
 [ee8778a7-d0f8-4d4f-aa43-dd4820d43a43]
 process = "decision-authoring"
-version = 3
-file.processes__SL__decision-authoring.sysml = "ffbc77879dffa3cf"
-file.skills__SL__decision-authoring__SL__SKILL.md = "57bec36d9b1a02ac"
+version = 4
+file.processes__SL__decision-authoring.sysml = "76755d02ad7d7258"
+file.skills__SL__decision-authoring__SL__SKILL.md = "64dcf6d3889bf203"
 file.skills__SL__decision-authoring__SL__registry.sysml = "18cad3f36c76f4d9"
+[a94a36b8-27d5-4afe-8489-9b52b71fa47f]
+process = "decision-surfacing"
+version = 1
+file.processes__SL__decision-surfacing.sysml = "a997db0a6b084727"
+file.skills__SL__decision-surfacing__SL__SKILL.md = "964ee1591f524931"
+file.skills__SL__decision-surfacing__SL__registry.sysml = "39162269326d62d9"
 [8f5bd2a4-5852-48ff-939c-557a64b22299]
 process = "definition-of-done"
-version = 3
-file.processes__SL__definition-of-done.sysml = "53ebbfbee9a94d02"
-file.skills__SL__sprint-closeout__SL__SKILL.md = "0f69753792b36723"
+version = 4
+file.processes__SL__definition-of-done.sysml = "274b90458be8441d"
+file.skills__SL__sprint-closeout__SL__SKILL.md = "c6d6d8d74ae25ebc"
 file.skills__SL__sprint-closeout__SL__registry.sysml = "5cbcd9fef6c26e66"
 [61b4ac5e-6f6c-4522-b176-596704e3cfbb]
 process = "definition-of-ready"
-version = 3
-file.processes__SL__definition-of-ready.sysml = "876547c0da90f9fc"
-file.skills__SL__sprint-planning__SL__SKILL.md = "b103b488ccab4f02"
+version = 4
+file.processes__SL__definition-of-ready.sysml = "07e678ab64677f8c"
+file.skills__SL__sprint-planning__SL__SKILL.md = "4a4032e593a4881c"
 file.skills__SL__sprint-planning__SL__registry.sysml = "9d3e6798e2b24c0e"
 [4ad11865-caa6-428d-83a9-fe2b42114003]
 process = "deploy"
-version = 3
-file.processes__SL__deploy.sysml = "0b97bbd26f92e952"
-file.skills__SL__release__SL__SKILL.md = "3aed7bc283205002"
+version = 4
+file.processes__SL__deploy.sysml = "a785964218937f37"
+file.skills__SL__release__SL__SKILL.md = "316fc0327a68784d"
 file.skills__SL__release__SL__registry.sysml = "439ed4185826b242"
 [79c2529d-63c0-4f43-b796-491f3ecf29ba]
 process = "diagram"
-version = 3
-file.processes__SL__diagram.sysml = "fa83ba186c072710"
-file.skills__SL__diagram__SL__SKILL.md = "f8ed425e43338e09"
-file.skills__SL__diagram__SL__registry.sysml = "092bd62f7aca3df7"
+version = 4
+file.processes__SL__diagram.sysml = "b017822390021d8e"
+file.skills__SL__diagram__SL__SKILL.md = "657547cfa7fe06c3"
+file.skills__SL__diagram__SL__registry.sysml = "343e64ac185dc8e3"
 [4e1b4c19-70e6-493e-aadc-90f78b776166]
 process = "distributed-collaboration"
-version = 3
+version = 4
 file.processes__SL__distributed-collaboration.sysml = "703a3aaddf47e6c6"
-file.skills__SL__distributed-collaboration__SL__SKILL.md = "5293a35c9e1a4954"
+file.skills__SL__distributed-collaboration__SL__SKILL.md = "d86a1372e5fe0d9c"
 file.skills__SL__distributed-collaboration__SL__registry.sysml = "8a11eaee55c557c3"
 [d5a2803c-d29c-4c1a-b754-c9961ff1b029]
 process = "doc-sync"
@@ -74,18 +98,54 @@ version = 3
 file.processes__SL__doc-sync.sysml = "a5092bcfc5d97060"
 file.skills__SL__doc-sync__SL__SKILL.md = "fea54abda9e73367"
 file.skills__SL__doc-sync__SL__registry.sysml = "4f66c09feb5ba512"
+[ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
+process = "element-critique"
+version = 5
+file.processes__SL__element-critique.sysml = "5398f88eb3c14fdd"
+file.skills__SL__element-critique__SL__SKILL.md = "62fa62a2bd58684e"
+file.skills__SL__element-critique__SL__registry.sysml = "77d6ae2675d1bd7a"
+[7c98cf16-a702-41b3-99d2-84ad712f282f]
+process = "github-intake"
+version = 2
+file.processes__SL__github-intake.sysml = "5c03dd21bcb984f2"
+file.skills__SL__github-intake__SL__SKILL.md = "a4b0d9928f892e8a"
+file.skills__SL__github-intake__SL__registry.sysml = "3b4ea6c3ab6b945a"
+[dc4b3507-7a33-4b58-b2fc-77f439b8421a]
+process = "indicator"
+version = 5
+file.processes__SL__indicator.sysml = "675359c773a5af2a"
+file.skills__SL__indicator__SL__SKILL.md = "241061de6f12accd"
+file.skills__SL__indicator__SL__registry.sysml = "151fec287e40a340"
+[79f2d321-7c55-41fb-86fa-7d549202caf7]
+process = "intake"
+version = 51
+file.processes__SL__intake.sysml = "7b1626cbe15b99f1"
+file.skills__SL__intake__SL__SKILL.md = "f58c93354678262b"
+file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
 [e93dfbda-8844-49c4-a4b6-a874c6774eab]
 process = "introduction"
-version = 3
-file.processes__SL__introduction.sysml = "a416337d33a0a1d2"
-file.skills__SL__introduction__SL__SKILL.md = "0d4538a3429878ad"
+version = 4
+file.processes__SL__introduction.sysml = "c4c97ee5398c8c78"
+file.skills__SL__introduction__SL__SKILL.md = "74e0cd38e0820683"
 file.skills__SL__introduction__SL__registry.sysml = "33dd76f65dd2a415"
+[560d74d4-9184-46e6-afcc-83226b891dd4]
+process = "issue-resolution"
+version = 5
+file.processes__SL__issue-resolution.sysml = "687c2d10fb88cb68"
+file.skills__SL__issue-resolution__SL__SKILL.md = "189dd15e80dcec2d"
+file.skills__SL__issue-resolution__SL__registry.sysml = "de888f7fe2805679"
 [8477f7e8-becf-40fb-a7f3-9bd521a258d7]
 process = "knowledge-graph-memory"
-version = 3
-file.processes__SL__knowledge-graph-memory.sysml = "0f47b303369e71ac"
-file.skills__SL__knowledge-graph-memory__SL__SKILL.md = "8cdcf49d23d0cdf4"
+version = 4
+file.processes__SL__knowledge-graph-memory.sysml = "8f9c9f8e8071b8c4"
+file.skills__SL__knowledge-graph-memory__SL__SKILL.md = "0911aa06656cc0a0"
 file.skills__SL__knowledge-graph-memory__SL__registry.sysml = "79e26852ad7b7e70"
+[63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
+process = "library-stewardship"
+version = 3
+file.processes__SL__library-stewardship.sysml = "7cc0b8e3fc46d5ff"
+file.skills__SL__library-stewardship__SL__SKILL.md = "5034bc04484ec24e"
+file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
 [bddaf6f6-0d40-4348-884d-9d0d7e8b6d12]
 process = "migration"
 version = 3
@@ -94,117 +154,51 @@ file.skills__SL__migration__SL__SKILL.md = "8826725b361e05ac"
 file.skills__SL__migration__SL__registry.sysml = "f3bee6c72fb33648"
 [57918a53-b596-4313-bffe-226da7e371b4]
 process = "obligation-review"
-version = 3
-file.processes__SL__obligation-review.sysml = "ec64cc7450d65990"
-file.skills__SL__obligation-review__SL__SKILL.md = "d79e40f31bd6215b"
+version = 4
+file.processes__SL__obligation-review.sysml = "4f2897e3ba925ee9"
+file.skills__SL__obligation-review__SL__SKILL.md = "074e6c62ca9e8ac3"
 file.skills__SL__obligation-review__SL__registry.sysml = "f4d394143a9f6fef"
+[099c0d31-6a8c-4057-914a-07b7170469f2]
+process = "project-migration"
+version = 1
+file.processes__SL__project-migration.sysml = "ecf3b9dc20145148"
+file.skills__SL__project-migration__SL__SKILL.md = "d71273c4a5bc5ff9"
+file.skills__SL__project-migration__SL__registry.sysml = "068d5dea509eae60"
 [810f1982-b0bf-4486-98ce-530265b132e2]
 process = "project-onboarding"
-version = 3
-file.processes__SL__project-onboarding.sysml = "d05ea1f572d17698"
-file.skills__SL__project-onboarding__SL__SKILL.md = "8d890aa201ffb817"
+version = 4
+file.processes__SL__project-onboarding.sysml = "3c802a9624a27549"
+file.skills__SL__project-onboarding__SL__SKILL.md = "365ce36c363d1a16"
 file.skills__SL__project-onboarding__SL__registry.sysml = "bcfdc1daaade0498"
-[f5756101-8c80-4afe-ae52-7b33cd653d99]
-process = "report"
-version = 3
-file.processes__SL__report.sysml = "2b53827c6e734fb9"
-file.skills__SL__report__SL__SKILL.md = "f4ebb32fc5e0f00b"
-file.skills__SL__report__SL__registry.sysml = "87099885e2fa8b6c"
-[a8186835-5d23-4642-b905-3ade20437499]
-process = "review-critique"
-version = 3
-file.processes__SL__review-critique.sysml = "f94188a9ff7cfa67"
-file.skills__SL__sprint-retro__SL__SKILL.md = "98f93725456a3e3a"
-file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
-file.skills__SL__sprint-review__SL__SKILL.md = "24decefc637944f8"
-file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
-[ebd7fbb1-3a8c-4985-ab0d-18ff3d067fd9]
-process = "element-critique"
-version = 4
-file.processes__SL__element-critique.sysml = "d42437f9f292b597"
-file.skills__SL__element-critique__SL__SKILL.md = "1d696e62350a0b4a"
-file.skills__SL__element-critique__SL__registry.sysml = "77d6ae2675d1bd7a"
-[dc4b3507-7a33-4b58-b2fc-77f439b8421a]
-process = "indicator"
-version = 4
-file.processes__SL__indicator.sysml = "cd07734b6358ba05"
-file.skills__SL__indicator__SL__SKILL.md = "e88effc5a3adb534"
-file.skills__SL__indicator__SL__registry.sysml = "32408566b1dc3109"
-[560d74d4-9184-46e6-afcc-83226b891dd4]
-process = "issue-resolution"
-version = 4
-file.processes__SL__issue-resolution.sysml = "03bce904a33c3d38"
-file.skills__SL__issue-resolution__SL__SKILL.md = "ade6cf1823200b20"
-file.skills__SL__issue-resolution__SL__registry.sysml = "de888f7fe2805679"
 [ac8fb70e-91dd-4765-b832-a41e45267c44]
 process = "render"
+version = 5
+file.processes__SL__render.sysml = "bc6e891855af8aef"
+file.skills__SL__render__SL__SKILL.md = "42b37c0543622a01"
+file.skills__SL__render__SL__registry.sysml = "3e3f01f116e01913"
+[f5756101-8c80-4afe-ae52-7b33cd653d99]
+process = "report"
 version = 4
-file.processes__SL__render.sysml = "be4d5490fde454cb"
-file.skills__SL__render__SL__SKILL.md = "57d12d336da8c2ff"
-file.skills__SL__render__SL__registry.sysml = "f842d5bdbaccf7ef"
-[63973f1e-8a03-4907-aaff-4b3ff4e9db2f]
-process = "library-stewardship"
-version = 2
-file.processes__SL__library-stewardship.sysml = "796db6cf4bd0155a"
-file.skills__SL__library-stewardship__SL__SKILL.md = "53cb953f96647b95"
-file.skills__SL__library-stewardship__SL__registry.sysml = "e3e6569b6c1f603d"
-[4e625dfb-3276-499e-b032-795341335984]
-process = "control-propriety"
+file.processes__SL__report.sysml = "74dcf0a28ecf10fb"
+file.skills__SL__report__SL__SKILL.md = "8f61139ddbd318c0"
+file.skills__SL__report__SL__registry.sysml = "7007795368038d7c"
+[a8186835-5d23-4642-b905-3ade20437499]
+process = "review-critique"
+version = 4
+file.processes__SL__review-critique.sysml = "f94188a9ff7cfa67"
+file.skills__SL__sprint-retro__SL__SKILL.md = "c0f313dd0d3d44d2"
+file.skills__SL__sprint-retro__SL__registry.sysml = "13032cb1ebd9d1cd"
+file.skills__SL__sprint-review__SL__SKILL.md = "9fabcf98142e0052"
+file.skills__SL__sprint-review__SL__registry.sysml = "39e9b0f8ee0da976"
+[127f6657-1672-4043-86a8-31b6a9214bc2]
+process = "stpa-diagram"
 version = 1
-file.processes__SL__control-propriety.sysml = "1db15420fdb572f1"
-file.skills__SL__control-propriety__SL__SKILL.md = "7c32e76b7c93ab9e"
-file.skills__SL__control-propriety__SL__registry.sysml = "01974da487a7b33e"
-[7c98cf16-a702-41b3-99d2-84ad712f282f]
-process = "github-intake"
+file.processes__SL__stpa-diagram.sysml = "6a4981a986b86743"
+file.skills__SL__stpa-diagram__SL__SKILL.md = "3d5ef14f68ec7fed"
+file.skills__SL__stpa-diagram__SL__registry.sysml = "e64e7ab153ba10a0"
+[68c1c570-24ab-41a5-aae8-f43cb12d2b3b]
+process = "stpa-self"
 version = 1
-file.processes__SL__github-intake.sysml = "0656702345d30db2"
-file.skills__SL__github-intake__SL__SKILL.md = "e38cc4d2db1449b6"
-file.skills__SL__github-intake__SL__registry.sysml = "43f955f619a10a80"
-[79f2d321-7c55-41fb-86fa-7d549202caf7]
-process = "intake"
-version = 50
-file.processes__SL__intake.sysml = "8df46b86e524597b"
-file.skills__SL__intake__SL__SKILL.md = "f58c93354678262b"
-file.skills__SL__intake__SL__registry.sysml = "04388f1bf728a29d"
-[cb1ed9ad-1e88-4dab-900a-bf4b923b168e]
-process = "asi-templates"
-version = 3
-file..claude__SL__agents__SL__cmos-format-critic.md = "714788854183f648"
-file..claude__SL__skills__SL__brand-watch__SL__check_manifest.py = "f4acf6c7c33d911d"
-file.brand__SL__manifest.json = "ad39dac512097974"
-file.brand__SL__style-tokens.json = "523418a87f463784"
-file.fonts__SL__NotoEmoji-var.ttf = "unreadable"
-file.fonts__SL__NotoSansMath-Regular.ttf = "unreadable"
-file.fonts__SL__NotoSansSymbols-var.ttf = "unreadable"
-file.fonts__SL__NotoSansSymbols2-Regular.ttf = "unreadable"
-file.fonts__SL__OFL-Noto.txt = "3467f8d6065bcd71"
-file.fonts__SL__OFL.txt = "47beac06298df249"
-file.fonts__SL__README.md = "82e8633063d26214"
-file.fonts__SL__Roboto-Bold.ttf = "unreadable"
-file.fonts__SL__Roboto-BoldItalic.ttf = "unreadable"
-file.fonts__SL__Roboto-Italic.ttf = "unreadable"
-file.fonts__SL__Roboto-Light.ttf = "unreadable"
-file.fonts__SL__Roboto-LightItalic.ttf = "unreadable"
-file.fonts__SL__Roboto-Medium.ttf = "unreadable"
-file.fonts__SL__Roboto-MediumItalic.ttf = "unreadable"
-file.fonts__SL__Roboto-Regular.ttf = "unreadable"
-file.fonts__SL__Roboto-Thin.ttf = "unreadable"
-file.fonts__SL__RobotoCondensed-Light.ttf = "unreadable"
-file.fonts__SL__RobotoCondensed-Regular.ttf = "unreadable"
-file.processes__SL__asi-templates.sysml = "b5f43848ba73ab66"
-file.requirements.lock = "a6c4b64d3e0e9334"
-file.scripts__SL__check_templates.py = "7621da75e375a868"
-file.scripts__SL__render.py = "17ff23c9a804853c"
-file.skills__SL__asi-templates__SL__registry.sysml = "11613cc582e66d28"
-file.skills__SL__asi-templates__SL__SKILL.md = "95feb1114f7d0d63"
-file.templates__SL__base__SL__asi-base.typ = "c519f0c9110bede1"
-file.templates__SL__CONTENT-FORMAT.md = "3ec1604eaad94191"
-file.templates__SL__exec-summary__SL__example-icd-panel.html = "1759a637985a0e09"
-file.templates__SL__exec-summary__SL__exec-summary.html = "33d872072caa512b"
-file.templates__SL__requirements-doc__SL__example-awkward.json = "92176711fbc0cd75"
-file.templates__SL__requirements-doc__SL__example-data.json = "5aa61462a162f5cc"
-file.templates__SL__requirements-doc__SL__example-fidelity.json = "1cdc094244b98379"
-file.templates__SL__requirements-doc__SL__outputs.json = "2d4c27795fbf27cc"
-file.templates__SL__requirements-doc__SL__requirements-doc.typ = "a92ffb8a078e263c"
-file.tests__SL__exec_summary__SL__test_exec_summary.py = "dc5102bc0399a8c0"
-file.toolchain-manifest.json = "bcb49548a78f11cb"
+file.processes__SL__stpa-self.sysml = "c7b2cd9641cd2e3a"
+file.skills__SL__stpa-self__SL__SKILL.md = "451777adb17ec53b"
+file.skills__SL__stpa-self__SL__registry.sysml = "c8cac908a46ea92e"

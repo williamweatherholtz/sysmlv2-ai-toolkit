@@ -1533,7 +1533,7 @@ fn looks_like_tool_output(v: &str) -> Option<String> {
         i += 1;
     }
     // The SECOND shape, and the one that had already landed: a console transcript. D0214's `context`
-    // held 13,136 characters of `keel guard` output, substituted mid-sentence exactly where the
+    // held 13,136 characters of `keel gate guard` output, substituted mid-sentence exactly where the
     // backticked command name stood - so the injection this control was written for had happened in
     // an EARLIER session and been accepted, undetected, because it carried no invalid escape.
     // Key-colon pairs do not appear in that output, so the JSON signature alone would have missed it.
@@ -2781,7 +2781,7 @@ mod tests {
 
     #[test]
     fn a_console_transcript_is_refused_too_because_one_already_landed() {
-        // The real D0214 text, shortened: a `keel guard` transcript substituted mid-sentence where
+        // The real D0214 text, shortened: a `keel gate guard` transcript substituted mid-sentence where
         // the backticked command name stood. It was ACCEPTED and committed; nothing flagged it,
         // because it carries no invalid escape and no key-colon pairs. This is the instance the
         // control exists for, so it is the instance the control is tested against.

@@ -36,7 +36,7 @@ fn project(tag: &str, declared: Option<&str>) -> PathBuf {
     std::fs::create_dir_all(root.join(".keel")).expect("mkdir");
     std::fs::write(root.join(".keel").join("actor"), "claudeOpus5\n").expect("actor");
     std::fs::write(root.join(".tracking").join("seed.sysml"), "package Seed {\n}\n").expect("seed");
-    // `keel validate` registers the schema from the PROJECT's disk, so the fixture carries the real
+    // `keel gate validate` registers the schema from the PROJECT's disk, so the fixture carries the real
     // one — copied from this workspace, the same schema `keel init` would lay down.
     let schema_src = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("ws").join(".engine").join("schema");
     copy_tree(&schema_src, &root.join(".engine").join("schema"));
@@ -91,7 +91,7 @@ fn a_matching_pin_allows_writes_and_gates() {
     let args = write_args(&root, "say.txt");
     let (ok, text) = keel(&root, &args.iter().map(String::as_str).collect::<Vec<_>>());
     assert!(ok, "a MATCHING pin must allow the write: {text}");
-    let (ok, text) = keel(&root, &["validate", "."]);
+    let (ok, text) = keel(&root, &["gate", "validate", "."]);
     assert!(ok, "a matching pin must allow the gate: {text}");
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -126,7 +126,7 @@ fn a_write_under_skew_refuses_naming_both_versions() {
 #[test]
 fn a_gate_under_skew_refuses() {
     let root = project("skew-gate", Some("0.0.1"));
-    for cmd in [&["validate", "."][..], &["guard"][..], &["gate", "--fast", "."][..]] {
+    for cmd in [&["gate", "validate", "."][..], &["gate", "guard"][..], &["gate", "--fast", "."][..]] {
         let (ok, text) = keel(&root, cmd);
         assert!(
             !ok,
@@ -178,7 +178,7 @@ fn an_absent_declaration_keeps_working() {
     let args = write_args(&root, "say.txt");
     let (ok, text) = keel(&root, &args.iter().map(String::as_str).collect::<Vec<_>>());
     assert!(ok, "a pre-D0190 tree with NO declaration must keep working: {text}");
-    let (ok, _) = keel(&root, &["validate", "."]);
+    let (ok, _) = keel(&root, &["gate", "validate", "."]);
     assert!(ok, "and its gates must keep running");
     let _ = std::fs::remove_dir_all(&root);
 }

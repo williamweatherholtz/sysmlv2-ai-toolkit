@@ -1,4 +1,4 @@
-//! the generic evaluator over DECLARED rules (D0105) - `keel check` - extracted from view.rs (sprint 418, dcViewRsRestructure: the panel's
+//! the generic evaluator over DECLARED rules (D0105) - `keel gate check` - extracted from view.rs (sprint 418, dcViewRsRestructure: the panel's
 //! god-module finding). Pure move, no behavior change; `view::` paths survive via the
 //! `pub use` re-exports in mod.rs.
 
@@ -11,7 +11,7 @@ use crate::json::Json;
 #[allow(clippy::wildcard_imports)] // a pure move-only split: the parent's vocabulary IS this file's vocabulary
 use super::*;
 
-// ── `keel check` (D0105 EXPAND step 2): the generic evaluator over DECLARED rules ────────────────
+// ── `keel gate check` (D0105 EXPAND step 2): the generic evaluator over DECLARED rules ────────────────
 
 /// Does `info` match an `EdgeRule` `subjectType` — a `#Marker` (marker match) or a bare type name?
 fn rc_matches_subject(info: &ItemInfo, subject: &str) -> bool {
@@ -627,12 +627,12 @@ pub fn rule_violations(root: &Path, rule_name: &str) -> Result<(usize, Vec<Strin
     }
 }
 
-/// `keel rules` (D0105 EXPAND step 2): evaluate DECLARED rules over the model.
+/// `keel gate rules` (D0105 EXPAND step 2): evaluate DECLARED rules over the model.
 ///
 /// The generic evaluator that replaces the bespoke guards once each reaches PARITY
 /// (guardsToRulesMigration). This walking skeleton evaluates `EdgeRule` with `appliesWhen="all"`;
 /// `ElementRule`/`OrderingRule` and the full scope sub-language are later EXPAND steps (reported
-/// `evaluated=false` meanwhile). Runs ALONGSIDE `keel guard` — nothing is retired here.
+/// `evaluated=false` meanwhile). Runs ALONGSIDE `keel gate guard` — nothing is retired here.
 ///
 /// # Errors
 /// Returns [`ViewError`] if a tracking/instance/rule file fails to parse.

@@ -142,7 +142,7 @@ Triage decomposes into two axes:
 Triage = `(verb × targetType) → process`; the process declares its required edges + gates.
 CLAUDE.md §3's prose routing table becomes a **declared `(verb × type) → process` map** the
 engine reads. The CLI collapses to:
-- **`keel check`** — evaluates whatever the model declares (replaces `guard <name>`, forever-growing).
+- **`keel gate check`** — evaluates whatever the model declares (replaces `guard <name>`, forever-growing).
 - **closed write verbs** — `record` / `modify` / `read` / `execute`, each generic over the
   model (replaces `add-task`/`add-decision`/`add-need`/…). The generic `record` verb is also
   what makes authoring a `Rule` as low-friction as a config edit.
@@ -173,14 +173,14 @@ contracts are reconciled, not extended.**
    hard-gate / warning / suspect trichotomy (do not invent a fourth state).
 4. **schema/core freeze** — `Rule`/`EdgeRule`/`ElementRule` additions need human sign-off.
 5. **Migration (D0067, expand/migrate/contract)** — build the evaluator alongside the 14
-   guards; express each guard as a rule; **prove parity** (`keel check` output == the 14
+   guards; express each guard as a rule; **prove parity** (`keel gate check` output == the 14
    guards' output on the current repo — precedent: the retired python/rust `parity_check`);
    *then* retire the Rust predicates. The parity gate is what makes the cutover safe.
 
 ## 7. Relationship to issue054
 
 This **redirects** `needsFirstOrderingGuard`:
-- **C2 `keel guard ordering` → dropped.** Ordering is a declared `EdgeRule` /
+- **C2 `keel gate guard ordering` → dropped.** Ordering is a declared `EdgeRule` /
   workflow-succession check the generic evaluator already runs (§4.1, §4.3).
 - **C1 `keel add-decision` → generalized** into the closed `record` verb (§4.4), not a
   type-specific command.
@@ -211,7 +211,7 @@ This **redirects** `needsFirstOrderingGuard`:
 - [ ] Forks 2–3 (vocabulary v1, violation semantics) decided.
 - [ ] Migration via expand/migrate/contract with a parity gate (§6.5).
 - [ ] Missing Business/Architecture deploying skill authored; `process-skill` extended to workflows.
-- [ ] doc-sync: CLAUDE.md §3 (triage axes) and §5 (guard enumeration → `keel check`).
+- [ ] doc-sync: CLAUDE.md §3 (triage axes) and §5 (guard enumeration → `keel gate check`).
 
 ## 10. De-risk spike (2026-07-01) — does the 8-of-14 collapse survive the messy guards?
 

@@ -169,6 +169,63 @@ fn the_record_sub_verbs_match_the_fact() {
     assert!(unrouted.is_empty(), "named in the record fact's invocation but NOT routed: {unrouted:?}");
 }
 
+/// D0452: the gating routers' arms are held to their facts the way `record`'s are - the sub-verbs
+/// `gate_subverb` and `audit_subverb` route must be exactly the ones the two facts' invocations
+/// declare, so a routed word missing from `--help` or a documented word that prints the usage fails here.
+#[test]
+fn the_gate_and_audit_sub_verbs_match_their_facts() {
+    let src = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("main.rs"))
+        .expect("main.rs is readable");
+    for (router, head, floor) in [
+        ("gate", "fn gate_subverb(args: &[String]) -> Option<i32> {", 7),
+        ("audit", "fn audit_subverb(args: &[String]) -> Option<i32> {", 3),
+    ] {
+        let start = src.find(head).expect("the router exists");
+        let block = &src[start..start + src[start..].find("\n}\n").expect("the router closes")];
+        let mut routed: Vec<String> = block
+            .lines()
+            .map(str::trim_start)
+            .filter(|l| l.starts_with('"') && l.contains("=>"))
+            .filter_map(|l| l.split('"').nth(1).map(str::to_string))
+            .filter(|tok| tok.chars().all(|c| c.is_ascii_lowercase() || c == '-'))
+            .collect();
+        routed.sort();
+        routed.dedup();
+        assert!(routed.len() >= floor, "the parser must find `{router}`'s arms, or this proves nothing: {routed:?}");
+        let fact = keel_cli::cli_facts::CLI_FACTS.iter().find(|f| f.name == router).expect("the router's fact");
+        let mut declared: Vec<String> = keel_cli::cli_facts::sub_verbs_of(fact.invocation);
+        declared.sort();
+        declared.dedup();
+        let undeclared: Vec<&String> = routed.iter().filter(|c| !declared.contains(c)).collect();
+        let unrouted: Vec<&String> = declared.iter().filter(|c| !routed.contains(c)).collect();
+        assert!(undeclared.is_empty(), "routed by `keel {router}` but absent from the fact's invocation (so from --help): {undeclared:?}");
+        assert!(unrouted.is_empty(), "named in the {router} fact's invocation but NOT routed: {unrouted:?}");
+    }
+}
+
+/// D0452: the ten gating spellings are GONE, not aliased; each is reached only through its router.
+#[test]
+fn a_retired_gating_verb_is_no_longer_a_command() {
+    let base = std::env::temp_dir().join(format!("keel-retired-gating-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).expect("mkdir");
+    for retired in ["validate", "check", "check-engine", "guard", "rules", "assured", "adoption-check", "audit-history", "audit-adherence", "audit-ci-runs"] {
+        let (ok, text) = run(&base, &[retired, "."]);
+        assert!(!ok, "`keel {retired}` must no longer be a command — no alias window: {text}");
+        assert!(text.contains("usage: keel"), "and an unknown verb falls through to the usage banner: {text}");
+    }
+    // ...while `keel gate` and `keel audit` bare print their own usage naming every sub-verb.
+    let (_, gate) = run(&base, &["gate"]);
+    for sub in ["validate", "check", "check-engine", "guard", "rules", "assured", "adoption-check"] {
+        assert!(gate.contains(sub), "`keel gate` bare must name its sub-verb {sub}: {gate}");
+    }
+    let (_, audit) = run(&base, &["audit"]);
+    for sub in ["history", "adherence", "ci-runs"] {
+        assert!(audit.contains(sub), "`keel audit` bare must name its sub-verb {sub}: {audit}");
+    }
+    let _ = std::fs::remove_dir_all(&base);
+}
+
 /// The old lens spellings are GONE, not aliased (D0273 — the human chose the clean break).
 #[test]
 fn a_retired_lens_verb_is_no_longer_a_command() {

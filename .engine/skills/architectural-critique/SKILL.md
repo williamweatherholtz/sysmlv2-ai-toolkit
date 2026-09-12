@@ -39,7 +39,7 @@ A claim with no evidence, or with refuting evidence, is a finding.
 
 | Goal                                   | Question                                  | Metric (how to compute)                              |
 |----------------------------------------|-------------------------------------------|------------------------------------------------------|
-| Ceremonies are actually run            | % sprints with all gates, in order?       | `keel guard ceremony` + `keel show orient` in_progress |
+| Ceremonies are actually run            | % sprints with all gates, in order?       | `keel gate guard ceremony` + `keel show orient` in_progress |
 | Needs are covered                      | % Needs with a satisfy edge?              | `traceability-audit` skill                            |
 | Done means verified                    | any done task with stale/invalid evidence?| `keel show orient` suspect + invalidEvidence            |
 | Deliverable matches its claims         | Rust orient == structural truth?          | inherent — Rust is the sole authority (D0048/M4)      |

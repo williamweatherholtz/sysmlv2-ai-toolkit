@@ -2,7 +2,7 @@
 //! clone terms of issue409).
 //!
 //! WHY. Forty guards each walked the tree and reopened every `.sysml` file - 39 walks and some 45,000
-//! opens per `keel guard` on a 1,160-file corpus whose bytes had not changed between one guard and the
+//! opens per `keel gate guard` on a 1,160-file corpus whose bytes had not changed between one guard and the
 //! next. On a Defender host the OPEN is the cost, not the bytes: real-time scanning runs on the open,
 //! a metadata query does not. So this module trades an open for a stat.
 //!

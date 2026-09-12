@@ -5,7 +5,7 @@
 # unverified, and nobody knows which. That blast radius is retroactive and unbounded until somebody
 # assesses it, which is why these are triaged immediately rather than at a retro.
 #
-# WHAT IT IS FOR, mechanically: `keel guard` reads this file and, beside the verdict of any control
+# WHAT IT IS FOR, mechanically: `keel gate guard` reads this file and, beside the verdict of any control
 # listed here, prints the defect. A green from a control you have been told under-reports is not a
 # green, and the moment you most need to know that is the moment you are reading its output.
 #

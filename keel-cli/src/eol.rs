@@ -146,7 +146,7 @@ pub fn describe(mismatches: &[Mismatch], changed: &[String]) -> String {
 }
 
 /// What to do about one: written once, printed by every caller.
-pub const REMEDY: &str = "Rewrite the bytes with the declared ending - a Python `open(p, 'w')` and the harness Write tool translate newlines on Windows; `newline=''` or a byte write does not - then `git ls-files --eol -- <path>` reads w/<declared>. `keel guard working-tree-eol` lists every path";
+pub const REMEDY: &str = "Rewrite the bytes with the declared ending - a Python `open(p, 'w')` and the harness Write tool translate newlines on Windows; `newline=''` or a byte write does not - then `git ls-files --eol -- <path>` reads w/<declared>. `keel gate guard working-tree-eol` lists every path";
 
 #[cfg(test)]
 mod tests {

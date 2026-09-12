@@ -71,7 +71,7 @@ package EngineDecisionAuthoring {
         :>> id = "63940516-2c7d-4e8f-c108-516273849704";
         :>> title = "Automated backstop — the detecting rule";
         :>> triggerCondition = "Before committing a Decision change.";
-        :>> actionText = "Run `keel rules` — decisionNoVerdictProseRule flags a Decision that restates its acceptance verdict as prose (case-insensitive, all prose fields). Treat any flag as a defect to fix, not to ignore. (Warning-level per D0102 warning->hard precedent; promotable once proven low-noise.)";
+        :>> actionText = "Run `keel gate rules` — decisionNoVerdictProseRule flags a Decision that restates its acceptance verdict as prose (case-insensitive, all prose fields). Treat any flag as a defect to fix, not to ignore. (Warning-level per D0102 warning->hard precedent; promotable once proven low-noise.)";
         :>> producedArtifact = "A clean decisionNoVerdictProseRule (0 flags) confirming one-source authoring held.";
         :>> owner = Owner::ai;
     }

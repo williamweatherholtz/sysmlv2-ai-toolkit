@@ -120,7 +120,7 @@ The single human touchpoint — but it confirms only what tests can't (D0051). S
 sitting into two buckets:
 
 1. **Test-backed work [NO confirmation].** Every `method=test/inspect/analyze` item is
-   self-evidencing — its automated run (cargo test, clippy, `keel validate`, `keel
+   self-evidencing — its automated run (cargo test, clippy, `keel gate validate`, `keel
    guard`) IS the evidence. Recap it; do not ask the human to confirm it.
    A human "yes" on a green test adds nothing.
 2. **Non-test-verifiable items [the only confirmation ask].** Decisions / direction /

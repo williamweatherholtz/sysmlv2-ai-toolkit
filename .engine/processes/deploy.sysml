@@ -30,7 +30,7 @@ package EngineDeploy {
         :>> id = "0d730003-0814-5303-9b3e-000000230003";
         :>> title = "Gate the exact tree that will be tagged";
         :>> triggerCondition = "The version is set.";
-        :>> actionText = "Run the FULL gate on the tree about to be tagged — `keel validate`, `keel guard` (all of them), `keel check-engine`, `cargo clippy -D warnings`, `cargo test` — and confirm CI is green on that same commit. A release is the one artifact that cannot be quietly re-verified later: downstream users have the binary. Never tag a tree whose gate you have not run at that commit, and never tag with a bypass in force.";
+        :>> actionText = "Run the FULL gate on the tree about to be tagged — `keel gate validate`, `keel gate guard` (all of them), `keel gate check-engine`, `cargo clippy -D warnings`, `cargo test` — and confirm CI is green on that same commit. A release is the one artifact that cannot be quietly re-verified later: downstream users have the binary. Never tag a tree whose gate you have not run at that commit, and never tag with a bypass in force.";
         :>> producedArtifact = "A green gate + green CI at the exact release commit.";
         :>> owner = Owner::ai;
     }

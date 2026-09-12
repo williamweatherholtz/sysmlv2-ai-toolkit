@@ -129,7 +129,7 @@ def courses(rows):
 fig1 = logic_lanes(
     "The word moves one slot right; the arm and its exit code do not move",
     ("today", [
-        ("hook runs keel validate", "", "accent", ""),
+        ("hook runs keel gate validate", "", "accent", ""),
         ("the arm answers", "exit code gates", "ok", ""),
     ], ["", ""]),
     ("changed", [

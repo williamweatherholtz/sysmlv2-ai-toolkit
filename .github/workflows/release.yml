@@ -49,8 +49,8 @@ jobs:
       - name: keel gate (validate + guards)
         run: |
           cargo build --release --bin keel
-          ./target/release/keel validate .
-          ./target/release/keel guard
+          ./target/release/keel gate validate .
+          ./target/release/keel gate guard
 
   build:
     needs: gate

@@ -2,7 +2,7 @@
 #
 # What activating a process does: turns on its whole unit (skill + declared rules + guards), as defined
 # by the engine from each process's own `assert constraint` declarations. Deactivating one stops its guards running,
-# and `keel guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
+# and `keel gate guard` then REPORTS each as NOT ACTIVE rather than skipping it silently.
 #
 # DELETE THIS FILE to return to "everything is active", which is also the behaviour when no file
 # exists — so an existing project that never declares one is unaffected.

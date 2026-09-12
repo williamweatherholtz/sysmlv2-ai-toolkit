@@ -78,9 +78,9 @@ fn a_downstream_model_holds_no_foreign_attestation_after_a_fact_is_recorded() {
     assert!(orient.contains("\"invalidEvidence\": []"), "an evidence SHA that does not resolve here means a foreign result is in the model:\n{orient}");
 
     // THE RULES' EDGES: the shipped `#JustifiedBy` edges to reference decisions still resolve.
-    let (code, out) = keel(&root, &["check-engine", "."]);
+    let (code, out) = keel(&root, &["gate", "check-engine", "."]);
     assert_eq!(code, 0, "check-engine must stay clean with the reference copy out of the model: {out}");
-    let (_, edges) = keel(&root, &["guard", "edge-endpoints", "."]);
+    let (_, edges) = keel(&root, &["gate", "guard", "edge-endpoints", "."]);
     assert!(edges.contains("0 violation"), "the JustifiedBy edges to reference decisions must resolve: {edges}");
     let _ = std::fs::remove_dir_all(&root);
 }

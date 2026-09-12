@@ -577,7 +577,7 @@ fn is_engine_instance_file(path: &Path) -> bool {
 /// empty when clean.
 ///
 /// A file that does not PARSE is a diagnostic, not a skip (issue467): for one day a Decision file
-/// carrying an extra closing brace was reported "validated clean" here while `keel check` rejected it
+/// carrying an extra closing brace was reported "validated clean" here while `keel gate check` rejected it
 /// at 25:1, because both passes read `if let Ok(pkg)` and dropped the `Err` — an enforcement point
 /// that reports a pass it did not compute (EHZ5). Every `.engine` file's parse failure is reported,
 /// instance or schema: a schema file that fails to parse is silently absent from the registry, and
@@ -629,7 +629,7 @@ fn parse_failure_diagnostic(path: &Path, e: &CheckError) -> Diagnostic {
         line,
         message: format!("does not parse — {}", e.message).into_boxed_str(),
         suggestion: Some(
-            "the file was skipped by every reference check, not validated; `keel check <file>` names the construct (issue467)"
+            "the file was skipped by every reference check, not validated; `keel gate check <file>` names the construct (issue467)"
                 .into(),
         ),
     }
@@ -657,7 +657,7 @@ pub fn walk_longest(dir: &std::path::Path) -> usize {
 ///
 /// In the library so `claude_surface` can hold the Claude hooks to the same binary-resolution order
 /// (issue348). Runs
-/// `keel validate` + `keel guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
+/// `keel gate validate` + `keel gate guard` — NO conda/JVM kernel (D0048: the Rust path is the authority).
 /// Enabled by the user with `git config core.hooksPath .githooks` (printed in the init Next steps).
 ///
 /// FAILS LOUD without the binary (K2/P0.3, D0174): the previous version skipped with a printed
@@ -755,6 +755,6 @@ mod engine_instance_tests {
             .unwrap_or_else(|| panic!("no parse diagnostic for the broken file: {diags:?}"));
         assert_eq!(hit.1.line, 6, "the extra brace is on line 6: {}", hit.1.message);
         assert!(hit.1.message.contains("got RBrace"), "{}", hit.1.message);
-        assert!(hit.1.suggestion.as_deref().is_some_and(|s| s.contains("keel check")));
+        assert!(hit.1.suggestion.as_deref().is_some_and(|s| s.contains("keel gate check")));
     }
 }

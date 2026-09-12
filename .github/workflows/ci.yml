@@ -1,6 +1,6 @@
 # CI gate (issue042 / n14TddBdd): enforce `cargo test` + `cargo clippy -D warnings` green on every
 # push and PR to main. This is the automated test-gate the critique campaign found MISSING — the
-# .githooks pre-commit hook runs clippy + keel validate/guard but NOT cargo test, and there was no CI,
+# .githooks pre-commit hook runs clippy + keel gate validate/guard but NOT cargo test, and there was no CI,
 # so a failing test could reach main (issue042). A CI job (vs the pre-commit hook) keeps the ~15s test
 # run off the per-commit path (n11/D0054 friction). Rust gates only — the KERNEL (JVM) validators still
 # stay in the pre-commit hook (they need the local conda kernel). But the kernel-FREE keel gates
@@ -37,12 +37,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: keel gates (kernel-free backstop — SKIP_VALIDATE can't bypass CI)
         run: |
-          ./target/release/keel validate .
-          ./target/release/keel guard
-          ./target/release/keel check-engine .
-          ./target/release/keel rules --enforce
-          ./target/release/keel check-engine .
-          ./target/release/keel rules --enforce
+          ./target/release/keel gate validate .
+          ./target/release/keel gate guard
+          ./target/release/keel gate check-engine .
+          ./target/release/keel gate rules --enforce
+          ./target/release/keel gate check-engine .
+          ./target/release/keel gate rules --enforce
       - name: script probes (every scripts/*.py that ships known cases, run as a gate; D0394)
         # Discovery from the tree, not a list (D0361): a script that DISPATCHES on --probe or
         # --self-test (the flag as a list literal, so a prose mention is not a false positive) is run
@@ -78,24 +78,24 @@ jobs:
           PY
       # Layer 3, hook-independent (K15/D0179): re-derive every pushed commit's verdict from the
       # tree alone — the issue116 control, now remote. No hook having run is assumed.
-      - name: keel audit-history (tree-derived verdicts over the pushed range)
-        run: ./target/release/keel audit-history --since "${{ github.event.before || 'HEAD~1' }}" || ./target/release/keel audit-history --max 20
+      - name: keel audit history (tree-derived verdicts over the pushed range)
+        run: ./target/release/keel audit history --since "${{ github.event.before || 'HEAD~1' }}" || ./target/release/keel audit history --max 20
       # Layer 4 (issue264/D0231): gate a FOREIGN tree. Measured over this project's own defect
       # record, 39 of 51 guards read only the authored model and ZERO read another project's tree,
       # while 11 of the last 20 issues were found in the field at exactly that boundary. This is the
       # manual act that found five of them, run every push instead of when someone remembers.
       # A GATE: a unit that cannot land in a project which lacks it is not transferable.
-      - name: keel adoption-check (a unit must land in a project that lacks it)
-        run: ./target/release/keel adoption-check .
-      - name: keel audit-adherence (guard-set monotonicity — a control cannot be disarmed unsigned, D0209)
+      - name: keel gate adoption-check (a unit must land in a project that lacks it)
+        run: ./target/release/keel gate adoption-check .
+      - name: keel audit adherence (guard-set monotonicity — a control cannot be disarmed unsigned, D0209)
         # A GATE, not a report: unlike audit-history this fails the build. Re-derives from the tree,
         # on infra the agent cannot touch, that no rule severity weakened / guard vanished across the
         # pushed range without a co-committed signed Decision (the issue236 self-modification class).
-        run: ./target/release/keel audit-adherence --since "${{ github.event.before || 'HEAD~50' }}"
-      - name: keel audit-ci-runs (the external-fact gate — a ci-run receipt names a real green run on the judged SHA, D0323)
+        run: ./target/release/keel audit adherence --since "${{ github.event.before || 'HEAD~50' }}"
+      - name: keel audit ci-runs (the external-fact gate — a ci-run receipt names a real green run on the judged SHA, D0323)
         # A GATE: a TestResult whose receipt cites a GitHub Actions run is checked HERE, by the party the
         # agent cannot write to - the run exists in this repository, concluded success, ran on the
         # result's judgedAgainst. A fabricated id or a run for another tree fails the build (issue374).
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./target/release/keel audit-ci-runs . --repo "${{ github.repository }}"
+        run: ./target/release/keel audit ci-runs . --repo "${{ github.repository }}"

@@ -1,4 +1,4 @@
-//! `keel audit-history` — re-derive the gate verdict for every commit in a range (issue116/D0047).
+//! `keel audit history` — re-derive the gate verdict for every commit in a range (issue116/D0047).
 //!
 //! # Why a self-asserted marker would be worthless
 //!
@@ -89,7 +89,7 @@ fn flag(args: &[String], name: &str) -> Option<String> {
     args.get(i + 1).filter(|v| !v.starts_with("--")).cloned()
 }
 
-/// `keel audit-history [--since REF] [--max N] [ROOT]`.
+/// `keel audit history [--since REF] [--max N] [ROOT]`.
 #[must_use]
 pub fn cmd(args: &[String], repo: &Path) -> i32 {
     let since = flag(args, "--since");
