@@ -928,4 +928,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcAnEditCannotNestAnItemByAccident to issue502;
+
+    part issue503 : Issue {
+        :>> id = "4de7a03e-d109-40af-b596-cb509eb86c46";
+        :>> title = "The orientation fold renamed three commands and the brief's fact reader kept the old spellings: nothing holds a script's keel invocations to the declared surface";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The D0450 orientation fold (sprint 679, ceaabdd) moved orient, status and enforcement-report under `keel show`; scripts/exec_brief/facts.py kept calling the old spellings at four sites (orient at lines 518 and 525, status at 628, enforcement-report at 999), each answered by the top-level usage text, so pendingAcceptances, guardViolations, guardWarnings and the hook-fire facts came back null with a `how` that quoted the failed command. VERIFIED before the claim: the build script refused on `fact pendingAcceptances is null - ... command failed: keel - text is truth, state is computed`, and each spelling run by hand printed the usage text while its `show` form answered. The `how` prose at line 519 already said `keel show orient` while the invocation beside it said `orient` - the fold's doc-sync reached the words and not the call. MECHANISM: no control holds a script's invocation of a keel command against the declared surface (.engine/cli/commands.sysml); cli-surface-declared holds facts = help = dispatch inside the binary, tool-reference holds .engine/tools paths on the doc surface, and the brief's build refuses a null fact - which is how this surfaced, two commits after the fold. Same class as dcFieldReadersOutsideRustAreEnumerated, for commands instead of fields. Fixed in this commit at the four sites; the sweep found no other caller under scripts/, .engine/tools, .claude/hooks or .githooks.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcScriptCallersOfTheCliAreHeldToTheSurface to issue503;
 }

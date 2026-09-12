@@ -191,7 +191,7 @@ fig4 = downstream(
     ],
 )
 fig5 = logic_lanes(
-    "A fold used to hide write paths from the analysis; under the rule it adds them",
+    "Before the rule a fold hid its write paths; under it each sub-verb is its own action",
     ("before the rule", [
         ("nine verbs fold under keel record", "", "accent", ""),
         ("structure: one action", "seven paths vanish", "bad", ""),
@@ -202,7 +202,7 @@ fig5 = logic_lanes(
     ], ["", ""]),
 )
 fig6 = downstream(
-    f"The rule adds {sv_added} actions; {len(SA['analysed'])} analysed, {len(SA['open'])} open and named",
+    f"The rule makes {sv_added} more actions; {len(SA['analysed'])} are analysed, {len(SA['open'])} wait, named by the guard",
     ("one action per sub-verb", "", ""),
     [(f"keel {r}", "analysed" if open_by_router[r] == 0 else "open, named by the guard",
       f"{routers[r]}", "ok" if open_by_router[r] == 0 else "warn") for r in sorted(routers, key=lambda k: -routers[k])]
@@ -248,7 +248,7 @@ panel_bodies = {
 <div class="opts" data-records="d0453"><label><input type="radio" name="ask-github" value="Accept: the five github verbs become sub-verbs of keel github, currency keeps its name; the CI workflow and every call site rewritten in the commit that removes the names (recommended)">Accept (recommended)</label><label><input type="radio" name="ask-github" value="Hold: the channel fold stays proposed; no channel verb moves">Hold</label><label><input type="radio" name="ask-github" value="Reject: the github verbs keep their names; the fold is recorded rejected">Reject</label></div>""",
     "subverbs": f"""<h2>One control action per sub-verb</h2>
 <p>The item: <q>a routed write command yields one computed control action per sub-verb, read from its own declared invocation, never from a hand list; a sub-verb that writes nothing still appears until it declares its own effect.</q></p>
-<p><strong>Accepting binds:</strong> the safety analysis works at the sub-verb, so a fold adds actions instead of hiding them. The structure lists {sv_after} actions where it listed {sv_before}; every open one is named by the guard. The rule is on trunk; your word governs it.</p>
+<p><strong>Accepting binds:</strong> the analysis works at the sub-verb, so a fold adds actions instead of hiding them: {sv_after} listed where {sv_before} were. The rule is on trunk; your word governs it.</p>
 {subverb_members}
 {fig5}
 {fig6}
@@ -257,8 +257,8 @@ panel_bodies = {
     ("Hold", "the rule stays proposed; the code stands", "the two folds wait on it"),
     ("Reject", f"the derivation is reverted; {sv_added} actions collapse to {len(routers)}", "the analysis already written stands as history"),
 ])}
-<p><strong>True in the model:</strong> {sv_total} sub-verb actions from {len(routers)} routers; {len(SA['analysed'])} analysed by a recorded run, {len(SA['open'])} open; {unanalysed} of {sv_after} actions unanalysed overall; {UC['total']} unsafe actions recorded, {UC['observed']} from an observed incident. <strong>My assumption:</strong> a sub-verb is the grain a hazard is written at. <strong>Wrong if</strong> you want each sub-verb declared as its own command fact, or the router kept as the unit.</p>
-<p><strong>Accept:</strong> nothing more moves; the folds proceed on this rule. <strong>Hold:</strong> the folds wait. <strong>Reject:</strong> revert in one commit, recorded quoting you.</p>
+<p><strong>True in the model:</strong> {sv_total} sub-verb actions from {len(routers)} routers; {len(SA['analysed'])} analysed by a recorded run, {len(SA['open'])} open; {UC['total']} unsafe actions recorded, {UC['observed']} from an observed incident. <strong>My assumption:</strong> a sub-verb is the grain a hazard is written at. <strong>Wrong if</strong> you want each sub-verb declared as its own command fact, or the router kept as the unit.</p>
+<p><strong>Accept:</strong> nothing more moves. <strong>Hold:</strong> the folds wait. <strong>Reject:</strong> one revert commit, recorded quoting you.</p>
 <div class="opts" data-records="d0454"><label><input type="radio" name="ask-subverbs" value="Accept: a routed write command yields one computed control action per sub-verb, read from its declared invocation; a sub-verb that writes nothing appears until it declares its own effect (recommended)">Accept (recommended)</label><label><input type="radio" name="ask-subverbs" value="Hold: the sub-verb rule stays proposed; the code stands; the two folds wait">Hold</label><label><input type="radio" name="ask-subverbs" value="Reject: the per-sub-verb derivation is reverted; a routed command is one control action">Reject</label></div>""",
 }
 
@@ -269,14 +269,14 @@ def frame(panels_html, tabs_html, title, sub):
 <h1 data-digest="title">{title}</h1>
 <div class="topbar"><p class="sub" data-digest="subtitle">{sub}</p><button class="copy" data-copy type="button" aria-label="Copy this brief for AI">&#8681; Copy for AI</button></div>
 
-<div class="ask"><p class="verdict"><strong>Three asks.</strong> <strong>Gating:</strong> ten names go behind gate and audit, hooks and CI in the same commit. <strong>Github:</strong> five names go behind github; currency stays. <strong>Sub-verbs:</strong> a routed write command counts one control action per sub-verb, so a fold adds actions rather than hiding them; the folds land on this rule. <strong>Accept all three</strong>, or hold any. <strong>Wrong if</strong> a hook must keep a bare name.</p></div>
+<div class="ask"><p class="verdict"><strong>Accept all three</strong>, or hold any: ten names fold under gate and audit; five under github; and a routed write command counts one control action per sub-verb, so a fold adds actions instead of hiding them. <strong>Wrong if</strong> a hook must keep a bare name.</p></div>
 <div class="chips"><span class="chip"><b>Waiting on you</b> {pending}</span><span class="chip"><b>Dispatch arms</b> {arms} &rarr; {arms_after}</span><span class="chip"><b>Control actions</b> {sv_before} &rarr; {sv_after}</span></div>
 
 <div class="tabs" role="tablist" aria-label="The asks">{tabs_html}</div>
 {panels_html}
 <label class="note-row">Anything to add<textarea data-d="note" rows="2" placeholder="optional"></textarea></label>
 <div class="copy-bottom"><button class="copy" data-copy type="button">&#8681; Copy for AI</button></div>
-<footer data-digest="provenance">Computed from the repository at {TREE} on {DATE}; {dirty} files carried uncommitted edits. Call sites: grep for keel plus a family verb over tracked files, by area; control actions from the computed structure. {tests} tests, {failing} failing. <a href="https://github.com/williamweatherholtz/sysmlv2-ai-toolkit" target="_blank" rel="noopener">repository</a>.</footer>
+<footer data-digest="provenance">Computed from the repository at {TREE} on {DATE}; {dirty} files carried uncommitted edits; {tests} tests, {failing} failing. <a href="https://github.com/williamweatherholtz/sysmlv2-ai-toolkit" target="_blank" rel="noopener">repository</a>.</footer>
 </div>
 """
 

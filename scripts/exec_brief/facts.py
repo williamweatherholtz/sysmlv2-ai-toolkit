@@ -515,17 +515,17 @@ fact("perfGuardFullMs", _timed_ms([KEEL, "guard", "--no-receipt"], runs=2),
      "milliseconds",
      "wall time of `keel guard --no-receipt` in this tree, median of 2 - every enforced guard runs, "
      "the receipt is neither read nor written")
-fact("perfOrientMs", _timed_ms([KEEL, "orient", "."], runs=3),
+fact("perfOrientMs", _timed_ms([KEEL, "show", "orient", "."], runs=3),
      "milliseconds", "wall time of `keel show orient .` in this tree, median of 3")
 
 # ================================================================ 4. keel show orient (one call)
 # `keel show orient .` already emits JSON on stdout - there is no `--json` flag (it errors), so the
 # plain invocation IS the JSON lens.
 
-ok, out = run([KEEL, "orient", "."], timeout=90)
+ok, out = run([KEEL, "show", "orient", "."], timeout=90)
 orient = as_json(out) if ok else None
-O_HOW = ("`./target/release/keel.exe orient .` - it prints JSON with no flag; `orient --json` is "
-         "rejected as an unknown flag, so the bare command is the JSON lens. ")
+O_HOW = ("`./target/release/keel.exe show orient .` (D0450: orientation folded under show) - it prints JSON "
+         "with no flag, so the bare command is the JSON lens. ")
 
 if orient is None:
     reason = O_HOW + ("command failed: " + (out if not ok else "stdout was not JSON"))
@@ -625,8 +625,8 @@ else:
          V_HOW + "line 'neither'.")
 
 # ================================================================ 7. keel show status (guards)
-ok, out = run([KEEL, "status", "."], timeout=120)
-S_HOW = "`./target/release/keel.exe status .` - TEXT; parsed from its `model` section. "
+ok, out = run([KEEL, "show", "status", "."], timeout=120)
+S_HOW = "`./target/release/keel.exe show status .` (D0450) - TEXT; parsed from its `model` section. "
 if not ok:
     for n in ("guardWarnings", "guardViolations"):
         fact(n, None, "guard findings", S_HOW + "command failed: " + out)
@@ -996,7 +996,7 @@ fact("stpaActionsUnanalysed", int(_m.group(1)) if _m else None, "computed contro
 # ================================================================ 13. the recall cap (D0389 / D0390)
 # The hook latency distribution keel show enforcement-report computes from the fire-ledger, and the over-cap
 # proxy for skips before recall-skipped existed. Every number is read from the report or the ledger.
-_er_ok, _er_raw = run([KEEL, "enforcement-report", REPO])
+_er_ok, _er_raw = run([KEEL, "show", "enforcement-report", REPO])
 ER_HOW = "keel show enforcement-report (D0389): per-event nearest-rank latency over .keel/metrics/hooks.jsonl, machine-local; "
 try:
     _er = json.loads(_er_raw) if _er_ok and _er_raw else {}
