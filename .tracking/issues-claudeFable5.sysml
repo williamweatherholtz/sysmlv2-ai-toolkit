@@ -917,4 +917,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcSubVerbEffectIsDeclared to issue501;
+
+    part issue502 : Issue {
+        :>> id = "5bdd96fc-f895-4896-8c5c-604356cbe800";
+        :>> title = "Run 4 of stpa-self landed nested inside a TestResult: a prefix anchor split a one-line part and five UCAs vanished from every item-based view";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Landed in fc89e6a: stpa-self run 4 (five UnsafeControlAction parts, five ControllerConstraints, stpaRun4 and its result) sat INSIDE the body of `part stpaRun3R1 : TestResult { ... }` in .tracking/architecture/engine-ucas.sysml. VERIFIED before the claim: keel show control-census . answered ucaSummary.ucas = 16 while grep counted 21 `: UnsafeControlAction` parts; the file read at lines 367 and 480 showed the one-line part's tail (`:>> outcome ... }`) 113 lines below its head. MECHANISM: the run was inserted with textpatch insert-after whose anchor was the first 60 characters of that one-line part - a prefix, not the line - so the insert split the line and everything after it nested inside the part. Legal SysML: keel validate passed (779 clean), and the text-based stpa-currency reader saw the ANALYSED names, so the sprint's own gates were green while the item-based census, the D0424 evidence classes and the ucas view could not see five UCAs. SECOND occurrence in the same sprint: FINDING 5 of the sprint 681 retro was the same anchor shape on control-map.sysml, caught by a count and repaired by hand, and the retro said no new item because the operator erred - manual vigilance, which D0047 says is not a control; this recurrence is what that judgment cost. Repaired in this commit by rejoining the line (census reads 21). Hazard EHZ2: a landed state the views under-report.";
+        :>> discoveredInField = true;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcAnEditCannotNestAnItemByAccident to issue502;
 }

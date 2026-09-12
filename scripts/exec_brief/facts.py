@@ -1331,6 +1331,72 @@ fact("cliDispatchArms", _hc.get("dispatched") if _hc.get("available") else None,
      _HARD_HOW if _hc.get("available") else _HARD_HOW + " hardening did not answer: " + out[:200])
 
 
+# ================================================================ 19. sub-verb control actions (D0454 / sprint681)
+# D0454 derives one control action per sub-verb of a routing write command from the fact's own invocation.
+# The page that asks for a word on it says how many actions the rule adds, which routers it opens, and how
+# much of the new set the analysis has covered - all read from `cs` (section 9, this binary's structure)
+# and the census view, never from the Decision's text. "Sub-verb of" is the data prefix the derivation
+# writes (control_structure.rs), so an action is a sub-verb action iff its data carries it; the router it
+# belongs to is the backticked command in that phrase.
+_SUB_HOW = ("`keel show control-structure .`: actions whose `data` contains `sub-verb of` are the D0454 sub-verb "
+            "actions; the router is the `keel <command>` inside the backticks of that phrase. subVerbActions = their "
+            "count; routers = distinct routers with their per-router counts; actionsTotal = every action; "
+            "actionsBeforeRule = actionsTotal - subVerbActions + len(routers), i.e. what the structure listed when "
+            "each router was one action (the sprint-680 read-back of 42 is the check); bareRoutersPresent = router "
+            "action names (cmd + CamelCase command) that still appear - the rule says none may.")
+_acts = cs.get("actions") or []
+_sub_rx = re.compile(r"sub-verb of `keel ([a-z][a-z-]*)`")
+_routers = {}
+for _a in _acts:
+    _mm = _sub_rx.search(_a.get("data") or "")
+    if _mm:
+        _routers[_mm.group(1)] = _routers.get(_mm.group(1), 0) + 1
+_sub_n = sum(_routers.values())
+_camel = lambda s: "cmd" + "".join(w[:1].upper() + w[1:] for w in s.split("-"))
+_bare = sorted(_camel(r) for r in _routers if any(_a.get("name") == _camel(r) for _a in _acts))
+fact("subVerbActions", {
+    "actionsTotal": len(_acts) or None,
+    "subVerbActions": _sub_n,
+    "routers": dict(sorted(_routers.items())),
+    "actionsBeforeRule": (len(_acts) - _sub_n + len(_routers)) if _acts else None,
+    "bareRoutersPresent": _bare,
+}, "control actions derived per sub-verb", _SUB_HOW)
+
+# how much of the sub-verb set the analysis has covered: the ANALYSED: lines of every recorded stpa-self run
+# hold the names; the stpa-currency guard's open count is section 11's stpaActionsUnanalysed.
+_UCAS_PATH = os.path.join(REPO, ".tracking", "architecture", "engine-ucas.sysml")
+_ucas_src = read(_UCAS_PATH) or ""
+_analysed = set()
+for _line in re.findall(r"ANALYSED:([^\"]*)", _ucas_src):
+    _analysed.update(re.findall(r"\bcmd[A-Z]\w*", _line))
+_sub_names = [_a.get("name") for _a in _acts if _sub_rx.search(_a.get("data") or "")]
+fact("subVerbActionsAnalysed", {
+    "runsRecorded": len(re.findall(r"verification stpaRun\d+ : Test", _ucas_src)),
+    "analysed": sorted(n for n in _sub_names if n in _analysed),
+    "open": sorted(n for n in _sub_names if n not in _analysed),
+}, "sub-verb actions a recorded stpa-self run names",
+     "engine-ucas.sysml: every `ANALYSED:` procedureText of a `verification stpaRunN : Test`, its cmd* names collected; "
+     "a sub-verb action (subVerbActions) is analysed iff one of those lines names it. runsRecorded counts the run "
+     "records. The guard stpa-currency computes the same set the other way round (section 11).")
+
+# the UCA census after the run, from the view that holds it (D0428): how many UCAs exist, how many stand on a
+# control, how many on an Issue that names the gap.
+ok, out = run([KEEL, "show", "control-census", "."], timeout=120)
+_cc = as_json(out) if ok else None
+_us = (_cc or {}).get("ucaSummary") or {}
+_ul = (_cc or {}).get("ucas") or []
+fact("ucaCensus", {
+    "total": _us.get("ucas"),
+    "observed": _us.get("observed"),
+    "codeRead": _us.get("codeRead"),
+    "onAnIssue": sum(1 for u in _ul if u.get("issues")),
+    "onAControl": sum(1 for u in _ul if u.get("boundControls")),
+} if _us else None, "UCAs and what each stands on",
+     "`keel show control-census .` (D0426/D0428): ucaSummary.ucas / observed / codeRead as the view computes them; "
+     "onAnIssue = ucas rows whose `issues` list is non-empty, onAControl = rows whose `boundControls` is non-empty "
+     "(a row can be both)." + ("" if _us else " The view did not answer: " + (out or "")[:200]))
+
+
 # every fact above reads the WORKING TREE while `tree` names HEAD; when the two differ the page must say so
 _DIRTY_HOW = ("`git status --porcelain --untracked-files=all`: lines beginning with a change code other than `??` are "
               "tracked files with uncommitted edits, `??` lines are untracked files. Every file-reading fact in this "

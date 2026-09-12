@@ -12,6 +12,9 @@ So here the assertion is the only available shape. Every operation:
 
   * refuses (SystemExit 1, nothing written) when the anchor occurs 0 times - a miss;
   * refuses when it occurs more than once - an ambiguity, never "the first one";
+  * refuses an insert whose anchor ends (insert-after) or starts (insert-before) in the MIDDLE of a line - the
+    insert would split that line, and when the line opens a block the whole insert lands inside it (issue502:
+    a run's UCAs sat inside a one-line TestResult, legal SysML that no item-based view could see);
   * writes through a temp file then rename, so a refusal leaves the target byte-for-byte as it was;
   * and `append` is a SEPARATE, named operation: a deliberate end-of-file addition reads as one in the
     caller's own text, and is never what a failed search falls through to.
@@ -92,17 +95,41 @@ def replace_once(path: str, old: str, new: str) -> None:
     _write_atomically(path, text[:i] + new + text[i + len(old):])
 
 
+def _at_line_end(text: str, i: int) -> bool:
+    return i >= len(text) or text[i] in "\r\n"
+
+
+def _at_line_start(text: str, i: int) -> bool:
+    return i == 0 or text[i - 1] == "\n"
+
+
+def _refuse_mid_line(path: str, text: str, i: int, side: str) -> None:
+    """issue502: the anchor was a PREFIX of a one-line `part X { ... }`; the insert split the line and the block
+    landed inside the part. An insert point that is not a line boundary is refused, naming the rest of the line."""
+    line_start = text.rfind("\n", 0, i) + 1
+    line_end = text.find("\n", i)
+    line_end = len(text) if line_end < 0 else line_end
+    rest = text[i:line_end].rstrip("\r") if side == "after" else text[line_start:i]
+    raise PatchRefused(f"{path}: the anchor {'ends' if side == 'after' else 'starts'} mid-line - the insert would "
+                       f"split the line {'before' if side == 'after' else 'after'} {rest.strip()[:70]!r}; anchor a "
+                       f"whole line (issue502)")
+
+
 def insert_after(path: str, anchor: str, new: str) -> None:
-    """Insert `new` immediately after the single occurrence of `anchor`."""
+    """Insert `new` immediately after the single occurrence of `anchor`, which must end at a line boundary."""
     text = _read(path)
     i = _locate(text, anchor, path, "anchor") + len(anchor)
+    if not (_at_line_end(text, i) or _at_line_start(text, i)):
+        _refuse_mid_line(path, text, i, "after")
     _write_atomically(path, text[:i] + new + text[i:])
 
 
 def insert_before(path: str, anchor: str, new: str) -> None:
-    """Insert `new` immediately before the single occurrence of `anchor`."""
+    """Insert `new` immediately before the single occurrence of `anchor`, which must start at a line boundary."""
     text = _read(path)
     i = _locate(text, anchor, path, "anchor")
+    if not _at_line_start(text, i):
+        _refuse_mid_line(path, text, i, "before")
     _write_atomically(path, text[:i] + new + text[i:])
 
 
@@ -174,6 +201,15 @@ def probe() -> int:
         case("an anchor that occurs twice is refused", r)
         case("...and neither occurrence was touched", _read(p) == "x\nSAME\ny\nSAME\nz\n")
 
+        # negative: issue502 - an anchor that is a PREFIX of its line would split the line; the block that follows
+        # `{ ... }` would land inside the part. Refused, file untouched; the whole line is the positive.
+        p = fresh("part x : T { :>> id = \"1\"; :>> outcome = pass; }\nnext\n")
+        r = refused(insert_after, p, "part x : T { :>> id = \"1\";", "part y : U {}\n")
+        case("an insert-after anchor ending mid-line is refused", r and _read(p).count("part y") == 0)
+        insert_after(p, "part x : T { :>> id = \"1\"; :>> outcome = pass; }\n", "part y : U {}\n")
+        case("the same anchor as a whole line is patched", _read(p) == "part x : T { :>> id = \"1\"; :>> outcome = pass; }\npart y : U {}\nnext\n")
+        p = fresh("alpha beta\n")
+        case("an insert-before anchor starting mid-line is refused", refused(insert_before, p, "beta", "x") and _read(p) == "alpha beta\n")
         # negative: an empty anchor
         p = fresh(body)
         case("an empty anchor is refused", refused(insert_after, p, "", "q"))
