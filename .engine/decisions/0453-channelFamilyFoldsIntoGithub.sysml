@@ -1,4 +1,4 @@
-// D0453 (PROPOSED — NOT YET ACCEPTED) — channelFamilyFoldsIntoGithub: the five github verbs become sub-verbs of keel github; currency keeps its name; the CI workflow and every call site are rewritten in the same commit that removes the names
+// D0453 (status: the `status` field below is the truth) — channelFamilyFoldsIntoGithub: the five github verbs become sub-verbs of keel github; currency keeps its name; the CI workflow and every call site are rewritten in the same commit that removes the names
 // Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
 // human gate (method=confirmation, D0106): flip status + add the d0453Accept event on sign-off.
 package Decision0453 {
@@ -15,7 +15,7 @@ package Decision0453 {
         :>> title = "channelFamilyFoldsIntoGithub: the five github verbs become sub-verbs of keel github; currency keeps its name; the CI workflow and every call site are rewritten in the same commit that removes the names";
         :>> createdAt = "2026-09-11";
         :>> createdBy = "claudeOpus5";
-        :>> status = DecisionStatus::proposed;
+        :>> status = DecisionStatus::accepted;
         :>> context = "d0399 option A, the human's own word on 2026-09-11, folds five CLI families into their routers in the sprint 512 shape (D0273): a D0067 transform, a byte-equality baseline captured from the pre-fold binary, call-site rewrites in the SAME commit, no alias window. d0399 also said that the gating and channel families each wait for the human's own word. This is that Decision for the channel: the verbs through which words from outside the repository become facts inside it.";
         :>> decision = "The five github verbs fold into one router, keel github, each keeping its word after the hyphen as the sub-verb and its arguments unchanged: keel github-pull becomes keel github pull; github-ingest becomes github ingest; github-decider becomes github decider; github-gesture becomes github gesture; github-decision-id becomes github decision-id. keel currency keeps its name: it is the unattended pass (D0338) that CI runs by name, it is not a github verb, and d0399 counted it as one of the two names that remain. The five top-level names are REMOVED from the dispatch, from COMMAND_NAMES, from the CliCommand facts and from cli_facts.rs, and one github fact carries the five sub-verbs in its invocation. Each arm is MOVED verbatim into the router, its function and its trust classification untouched, and the criterion is byte equality of stdout, stderr and exit code against outputs captured from the pre-fold binary for every sub-verb over the same fixtures the Rust tests use, including the fail-closed case of an undetermined trust. Every call site under .engine, .claude, the root docs, the Rust source and tests is rewritten by the committed transform or by hand in the ONE commit that removes the names; .engine/decisions and .tracking are not rewritten. NOT A FORK: d0399 option A chose the course; this Decision states the mapping that course lands on for one family and waits for the human's own word because of what the verbs decide.";
         :>> rationale = "Five verbs sharing a hyphenated prefix are a router spelled with hyphens; folding them changes the spelling and nothing about trust, and the byte comparison over the fail-closed fixture is what shows the trust boundary moved with the arm. currency stays because it is CI's name for the unattended pass and folding it would put a scheduled check behind a verb about GitHub. The marker is carried and the plan cover is NOT used because d0399's own text reserved this family for the human's word.";
@@ -24,4 +24,8 @@ package Decision0453 {
 
     // D0303 layering: the mapping for one family under the program d0399 option A chose
     #DependsOn dependency from d0453 to d0399;
+
+    // acceptance event (D0121 review-queue sign-off; D0066/D0106 — human-judged, not fabricated)
+    verification d0453Accept : Test { :>> id = "65fdba93-035e-4c8e-90d7-ab940f076585"; :>> method = VerificationMethod::confirmation; :>> procedureText = "Selected on the decision brief copy-out (seventeenth publish), pasted into chat 2026-09-12; the recommended course. - their words, verbatim: “Accept: the five github verbs become sub-verbs of keel github, currency keeps its name; the CI workflow and every call site rewritten in the commit that removes the names (recommended)”"; }
+    part d0453AcceptR1 : TestResult { :>> id = "9a3617c4-a328-4cdc-9493-9d9ec6ba5a91"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "36715a2"; :>> judgedAt = "2026-09-12"; :>> judgedBy = "wweatherholtz"; :>> createdBy = "claudeFable5"; }
 }
