@@ -994,4 +994,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from storyChannelFamilyFold to issue508;
+
+    part issue509 : Issue {
+        :>> id = "6cd31912-e9e7-4cf3-a10c-858c240d54bc";
+        :>> title = "textpatch dies with a traceback, not a one-line refusal, when --anchor or --new is a literal rather than a file";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "scripts/textpatch.py takes --anchor and --new as FILE paths holding the text (its help says so), but a literal string passed in their place dies with a Python FileNotFoundError traceback instead of a one-line refusal. Seen twice in sprint 684 (an insert-after of a #DependsOn edge). D0386 made the tool so that a patch that cannot find its anchor refuses in one line; the argument check is the one place it still fails as a traceback. Low: the misuse is caught, only badly.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Low;
+    }
+    #Resolves dependency from dcTextpatchRefusesANonFileArgumentInOneLine to issue509;
 }
