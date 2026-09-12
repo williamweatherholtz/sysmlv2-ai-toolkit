@@ -82,6 +82,8 @@ package ControlMap {
     part ctlFireLedger : SystemSafetyConstraint { :>> id = "b8c675a6-c8f7-4227-b5dd-e88708d02235"; :>> title = "control: ctlFireLedger"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Every enforcement fire leaves a counted machine-local line; the report computes over it (D0180)"; }
     part ctlReverify : SystemSafetyConstraint { :>> id = "e54d5849-5927-46f5-ba9a-b14aebf60c9b"; :>> title = "control: ctlReverify"; :>> createdAt = "2026-08-22"; :>> createdBy = "claudeFable5"; :>> statement = "Drift-suspect reproducible evidence re-runs at HEAD and re-stamps honestly (keel reverify, D0101)"; }
     part ctlHeredocBackslash : SystemSafetyConstraint { :>> id = "6f6f3ae8-ac0e-43b0-a650-25bbb012dffe"; :>> title = "hook-rule: heredoc-backslash"; :>> createdAt = "2026-09-10"; :>> createdBy = "claudeOpus5"; :>> statement = "A Bash heredoc whose body carries a backslash is DENIED before bash runs, in every profile - the harness collapses the pair and the source that lands is not the source authored (hook pre-bash, D0309/issue372). Declared here by stpa-self run 3 so the ledger's evidenced row and the control map name one control; the census reads a `hook-rule:` title as binding the agent's act alone."; }
+    part ctlResultBinding : SystemSafetyConstraint { :>> id = "ffc8df72-3dec-458a-9278-52da91f8129f"; :>> title = "control: ctlResultBinding"; :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5"; :>> statement = "A TestResult or acceptance whose judgedAgainst is an ancestor of the commit that introduced it binds to the introducing commit in every reader that dereferences it - orient's deliverable suspicion, reverify, attestation (binding.rs bind; D0308 for acceptances, dcResultBindsToItsLandingCommit for results); record result, gate-result and reverify print the dirty-tree note at the write (main.rs binding_note). Declared by stpa-self run 4 (CC-RV1)"; }
+    part ctlHumanJudgmentAsk : SystemSafetyConstraint { :>> id = "84c71ca7-3ef1-413c-8cec-68b08b9e47b0"; :>> title = "control: ctlHumanJudgmentAsk"; :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5"; :>> statement = "keel accept, record review, actor, enroll and deactivate are never agent-exempt: hook pre-bash classifies the argv by verb and by verb+sub-verb against write.rs WRITE_OPS / human_judgment_ops (main.rs bash_classify, D0178/D0451) and returns Ask, so the command runs only from a channel the human holds. Declared by stpa-self run 4 (CC-RR1)"; }
 
     // ---- constraint -> hazard discharge edges (plain base-SysML dependencies) ----
     dependency from gActors to ehz3;
@@ -156,4 +158,8 @@ package ControlMap {
     dependency from ctlFireLedger to ehz5;
     dependency from ctlReverify to ehz8;
     dependency from ctlHeredocBackslash to ehz4;
+    dependency from ctlResultBinding to ehz4;
+    dependency from ctlHumanJudgmentAsk to ehz3;
+    dependency from ctlHumanJudgmentAsk to ehz7;
+
 }

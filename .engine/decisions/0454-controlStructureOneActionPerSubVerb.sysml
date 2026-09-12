@@ -1,0 +1,27 @@
+// D0454 (PROPOSED — NOT YET ACCEPTED) — controlStructureOneActionPerSubVerb: a routing write command yields one computed control action per sub-verb, derived from its declared invocation, never from a hand list
+// Recorded via `keel record decision` (D0105 RMWX axis; issue054). Acceptance is a separate explicit
+// human gate (method=confirmation, D0106): flip status + add the d0454Accept event on sign-off.
+package Decision0454 {
+    private import EngineElement::*;
+    private import EngineWork::*;
+    private import EngineVerification::*;
+    private import EngineRelationships::*;
+
+    // #ProspectiveChange (D0070) - this Decision governs a process/schema change; the co-committed
+    // change rides the process-change guard's hard lock.
+    #ProspectiveChange part d0454 : Decision {
+        :>> id = "47ff0b42-e2ca-424b-b181-0492a4dfbb8e";
+        :>> title = "controlStructureOneActionPerSubVerb: a routing write command yields one computed control action per sub-verb, derived from its declared invocation, never from a hand list";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> status = DecisionStatus::proposed;
+        :>> context = "D0451 folded nine authoring writers under keel record. The control structure (D0284) computes one action per CliCommand fact with effect writes or both, so the fold collapsed seven never-analysed write paths into the single action cmdRecord and the stpa-currency guard's open set fell from 49/39 to 41/32 without one UCA being written - issue497, found by sprint 680's retro. D0452 and D0453 will fold nine more verbs the same way. The facts already hold what distinguishes the sub-verbs: the invocation attribute of the record fact reads `decision ... | issue ... | task ... | reverify [--all-drift | --task N | --demos] [--by A] | mint [N]`. NOT A FORK: this Decision weighs no alternatives - the one open question, whether mint (which writes nothing) should be excluded by name, is answered by D0271 (the CLI surface is an authored fact; a name in Rust is the literal vocabulary it forbids) and the residual is issue501.";
+        :>> decision = "The control-structure derivation gains one clause. A CliCommand fact whose effect writes or both and whose invocation is a routing invocation - it opens with a bare lowercase token and `|` separates two or more segments that each open with one - yields one Action per such segment, named cmd<Command><SubVerb> (camel-cased), titled `keel <command> <sub-verb>`, acting on the process the family maps to, with the whole segment as its data. A segment that opens with a flag, a placeholder or a bracket alternative continues the sub-verb before it, so `reverify [--all-drift | --task N | --demos] [--by A]` is one sub-verb. An invocation that opens with anything but a bare verb (`FILE... | --spec-version`, `<item> | --list | --mine`) declares no sub-verbs and the command stays one action. The reader is one function, keel_cli::cli_facts::sub_verb_segments, and the surface test that holds keel record's routed sub-verbs equal to its fact (the_record_sub_verbs_match_the_fact) reads the same function - the structure and the dispatch cannot disagree about what a sub-verb is. The stpa-currency guard's rule is unchanged; its input grows, and the run that analyses the new actions is stpa-self run 4 (sprint 681). The parse struct the guards read (guards.rs AuthoredCliFact) carries the invocation attribute so the reader has it; no guard predicate changes - the process-change marker rides this Decision because guards.rs is on the enforcement surface (D0209 clause 2), not because a control changed.";
+        :>> rationale = "Every fold since D0449 moved write paths under a router, and each one hid them from the analysis the structure exists to feed. Deriving actions from the invocation grammar keeps the structure honest about what an agent can do to the tree at the granularity a UCA is written at - a UCA about cmdRecordReverify stamping a dirty tree cannot be written against cmdRecord. The alternative shape (one CliCommand fact per sub-verb) would triple the fact count and separate a sub-verb's declaration from the usage line that renders it; the invocation already IS the declaration, so the derivation reads it. Excluding read-only sub-verbs by name in Rust would reintroduce the hand list D0271 removed; the honest consequence - four process reads and record mint appear as write actions until each sub-verb declares its own effect - is recorded as issue501 with its resolver rather than patched.";
+        :>> consequences = "keel show control-structure on this tree lists 63 actions (62 local) where the fold left 42: 13 cmdRecord*, 8 cmdProcess*, 3 cmdLibrary*, no bare cmdRecord, cmdProcess or cmdLibrary; stepTwoGate 8 of 8 hold. stpa-currency's open set moves to 41 of 62 after run 4 - the 13 record sub-verbs analysed, the 11 process and library ones open and named. The eight recorded UCA contexts that name cmdAppendResult and the three that name cmdRecord stay as written; run 4 binds them by name to cmdRecordResult / cmdRecordGateResult and cmdRecordDecision. Sub-verbs inherit their router's single declared effect until issue501's Change Request gives each its own. D0452 and D0453 land on this rule and their folds add actions, not hide them.";
+    }
+    // D0303 layering: one clause on the D0284 derivation, occasioned by the D0451 fold (issue497)
+    #DependsOn dependency from d0454 to d0284;
+    #DependsOn dependency from d0454 to d0451;
+
+}

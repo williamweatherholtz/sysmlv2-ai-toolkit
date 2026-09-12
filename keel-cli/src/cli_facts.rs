@@ -5,6 +5,45 @@
 //! one home and the help cannot go stale against the surface the way the hand-written block did
 //! after D0273.
 
+/// The sub-verbs a ROUTING command's invocation declares, each with its full segment, in declaration
+/// order (D0451/D0454).
+///
+/// An invocation is a sub-verb list when it OPENS with a bare lowercase token and a `|` separates two
+/// or more such segments (`decision|issue|... | task --file F | ...`). A segment opening with a flag, a
+/// placeholder or a bracket is an argument alternative, not a sub-verb: inside a list it continues the
+/// sub-verb it sits under (`reverify [--all-drift | --task N | --demos]` is ONE segment), and an
+/// invocation that opens with one declares no sub-verbs at all (`FILE... | --spec-version`,
+/// `<item> | --list | --mine`). This is the ONE reader: the control structure derives one action per
+/// sub-verb from it, and `the_record_sub_verbs_match_the_fact` holds the router's arms to it.
+#[must_use]
+pub fn sub_verb_segments(invocation: &str) -> Vec<(String, String)> {
+    let is_verb = |w: &str| w.starts_with(|c: char| c.is_ascii_lowercase()) && w.chars().all(|c| c.is_ascii_lowercase() || c == '-');
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (i, seg) in invocation.split('|').enumerate() {
+        match seg.split_whitespace().next() {
+            Some(h) if is_verb(h) && !out.iter().any(|(v, _)| v == h) => out.push((h.to_string(), seg.to_string())),
+            _ if i == 0 => return Vec::new(),
+            // a flag, placeholder or bracket alternative continues the sub-verb it sits under
+            _ => {
+                if let Some(last) = out.last_mut() {
+                    last.1.push('|');
+                    last.1.push_str(seg);
+                }
+            }
+        }
+    }
+    if out.len() < 2 {
+        return Vec::new();
+    }
+    out.into_iter().map(|(v, s)| (v, s.trim().to_string())).collect()
+}
+
+/// The sub-verb names alone, in declaration order.
+#[must_use]
+pub fn sub_verbs_of(invocation: &str) -> Vec<String> {
+    sub_verb_segments(invocation).into_iter().map(|(v, _)| v).collect()
+}
+
 /// One command or lens fact. `family == "lens"` means `keel show <name>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CliFact {
@@ -149,4 +188,34 @@ usage: keel <command> [args]
         let _ = writeln!(out, "    {:<24} {}", f.name, f.synopsis);
     }
     out
+}
+
+#[cfg(test)]
+mod sub_verb_tests {
+    use super::*;
+
+    #[test]
+    fn a_routing_invocation_yields_its_sub_verbs_with_inner_alternatives_kept_whole() {
+        let inv = "decision|issue ... | reverify [--all-drift | --task N | --demos] [--by A] | gate-result --file F [--verdict pass|fail] | mint [N]";
+        let segs = sub_verb_segments(inv);
+        assert_eq!(sub_verbs_of(inv), vec!["decision", "issue", "reverify", "gate-result", "mint"]);
+        assert_eq!(segs[2].1, "reverify [--all-drift | --task N | --demos] [--by A]");
+        assert_eq!(segs[3].1, "gate-result --file F [--verdict pass|fail]");
+    }
+
+    #[test]
+    fn argument_alternatives_and_plain_invocations_declare_no_sub_verbs() {
+        for inv in ["FILE... | --spec-version", "<item> | --list | --mine", "[--fast | --workspace] [ROOT]", "<decision> (--words TEXT | --note TEXT) --by <person>", "[ROOT]", "", "set <id>"] {
+            assert!(sub_verbs_of(inv).is_empty(), "{inv:?} is not a sub-verb list");
+        }
+    }
+
+    #[test]
+    fn the_live_record_fact_declares_thirteen_and_process_eight() {
+        let inv = |n: &str| CLI_FACTS.iter().find(|f| f.name == n).expect("fact").invocation;
+        assert_eq!(sub_verbs_of(inv("record")).len(), 13, "{:?}", sub_verbs_of(inv("record")));
+        assert_eq!(sub_verbs_of(inv("process")), vec!["list", "search", "show", "export", "import", "publish", "retire", "remove"]);
+        assert_eq!(sub_verbs_of(inv("library")), vec!["init", "sync", "list"]);
+        assert!(sub_verbs_of(inv("claim")).is_empty());
+    }
 }

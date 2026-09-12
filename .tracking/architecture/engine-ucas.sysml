@@ -364,5 +364,118 @@ package EngineUcas {
         :>> procedureText = "ANALYSED: agentEditsDeliverable. FRAME: EHZ1-EHZ9 as recorded in engine-safety.sysml; no hazard added; the tranche is the one edge agent->deliverable, an action keel mediates at no point (issue394) - the structure has of it only the feedback deliverableDrift. CENSUS READ FIRST (stpa2b, D0426/D0428): 76 controls, 2 friction (accept:delegated-words, tap:unsigned - both dissolved to WARN lines, both binding the human), 64 hypothetical, 10 evidenced; heredoc-backslash was an evidenced hook rule with 4 blocks on agent acts that no constraint could bind because the control map did not declare it - this run declares it (ctlHeredocBackslash). CONSIDERED SAFE: agentEditsDeliverable notProvided (undone work stays ready on the frontier - the honest default, D0098); provided on the generated .claude/ surface instead of .engine/skills (done in this very session on stpa-self/SKILL.md: the claude-surface-drift guard reports the drift at the turn boundary and at commit, and sync-claude regenerates - gClaudeSurfaceDrift, exercised today); provided on source a done task's pass verified (deliverableDrift makes the task suspect in orient and ctlReverify re-stamps at HEAD - feedback, not refusal, and the honest one); wrongTimingOrder as an edit landing AFTER the pass that claims it (the unsafe act is the record, not the edit - ucaResultBoundToTheWrongTree, run 1, observed via issue375); wrongTimingOrder as a rebuild of the binary a running command holds (issue150/issue386: cargo fails loudly, keel suite refuses before it starts, the post-commit hook lands from its own copy, D0422 - no hazard); appliedTooLong as an edit session spanning a context compaction (the tree is the truth the gates read; a patch re-applied from a summary is refused by textpatch on a zero-count anchor). THREE UCAs recorded, three constraints: one bound to two controls (gProcessChange, ctlAuditAdherence) and issue236; one bound to a control declared by this run (ctlHeredocBackslash) and issue372; one bound to an Issue alone naming the gap (issue398 - anchor discipline is a tool, not a boundary). EVIDENCE: 5 observed, 11 code-read (ucaSummary at this tree: observed = ucaLandWithoutSuite/issue360, ucaResultBoundToTheWrongTree/issue375, ucaResultReceiptIsTestimony/issue374, ucaDeliverableEditRewrittenInTransit/issue372, ucaDeliverableEditLandsPartially/issue398 - the last two flagged discoveredInField by this run because each title reports an act that happened eight and three times; the 11 code-read are every other UCA, this run's UCA-ED1 among them). REMOVAL CANDIDATES: (no constraint) accept:delegated-words (friction; refused a correct act in issue397); (no constraint) tap:unsigned (friction; refused a correct act in issue447); ucaAcceptThenTextEdited -> gAcceptanceBindsToText (hypothetical); ucaRecordAcceptedBeforeFinal -> gAcceptanceBindsToText (hypothetical); ucaLandBeforeGate -> ctlPrePushBehind (hypothetical); ucaLandMergedTreeUngated -> ctlPrePushBehind (hypothetical); ucaResultHumanWordRecordedByAi -> gAttestationAuthority, gConfirmationAuthenticity (hypothetical); ucaDeliverableEditWeakensControl -> ctlAuditAdherence (hypothetical). The two friction rows are the human's ask (st115, 2026-09-10: guards that gatekeep the human and have not been abused should be reconsidered or dissolved), and every constraint-level candidate stands on a hypothetical control - a control with no incident and no block, which is not the same as a control that gatekeeps a person. NOT ANALYSED: the remaining 38 computed actions, grouped by edge, named by the stpa-currency guard until a run covers them.";
     }
     // RAN: keel show control-structure . read 2026-09-10 (48 local actions; stpa-currency NEXT TRANCHE: agent->deliverable); keel show control-census . read before any UCA was written (76 controls / 2 friction / 64 hypothetical / 10 evidenced; heredoc-backslash undeclared) and again after the records landed (ucaSummary observed 5, codeRead 11, 9 removal candidates, copied above - ucaResultHumanWordRecordedByAi is two rows, one per control); agentEditsDeliverable walked through all four UCA types against keel-cli/src/guards.rs keystone_violations, keel-cli/src/view/control_structure.rs agentEditsDeliverable, scripts/textpatch.py, the pre-bash heredoc deny (D0309) and the claude-surface-drift guard; three UCAs, three constraints, every constraint edged to a control or an Issue; keel validate . clean
-    part stpaRun3R1 : TestResult { :>> id = "6a1c2e8f-9b4d-4f7a-8c3e-2d5b7a9f1c4e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7674e12e56a2886094d0849917d7e29bfc9e8627"; :>> judgedAt = "2026-09-10"; :>> judgedBy = "claudeOpus5"; }
+    part stpaRun3R1 : TestResult { :>> id = "6a1c2e8f-9b4d-4f7a-8c3e-2d5b7a9f1c4e";
+    // ---- stpa-self run 4 (2026-09-11, sprint 681 / D0454): the thirteen keel record sub-verbs ----
+    // The D0451 fold collapsed seven never-analysed writers into one action; D0454 derives one action
+    // per sub-verb, so this run analyses what the fold hid. Runs 1's UCA-R1..R3 (cmdRecord) and
+    // UCA-A1..A3 (cmdAppendResult) are facts and stay as written; they bind by name to
+    // cmdRecordDecision and to cmdRecordResult / cmdRecordGateResult (see stpaRun4).
+
+    part ucaStatementTypedAsVerbatim : UnsafeControlAction {
+        :>> id = "f5580c64-9574-4366-a1b9-331e1ae63c14";
+        :>> title = "UCA-RS1: cmdRecordStatement PROVIDED by an AI actor for a Person's words - the recorder's recollection lands as the speaker's verbatim text";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdRecordStatement --said-by <Person> --text ... (or --from FILE) run from an agent session; --channel absent so it defaults to chat (main.rs cmd_record_statement); the words come from the agent's context window, not from a surface keel observed.";
+        :>> statement = "The tree holds the human's exact words on the agent's say-so, under the verbatim contract (D0216/D0236), and a Decision that later links the Statement (issue428's fix) inherits a verbatim-ness nobody checked - EHZ3 in the form the H1 run named one layer up. Nothing at the write can compare the text with the chat, so the control has to be in the reading: the record's recorder (createdBy, an AI actor) is not its speaker (saidBy, a Person), and no lens today says so.";
+    }
+    dependency from ucaStatementTypedAsVerbatim to ehz3;
+
+    part ucaRecordUnderAStaleActorBinding : UnsafeControlAction {
+        :>> id = "4fd9feb3-725c-43a2-abc8-a4db3df95ff4";
+        :>> title = "UCA-RB1: cmdRecordDecision - and every cmdRecord* sub-verb - PROVIDED while the session's actor binding names a model that is not running";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdRecordDecision, cmdRecordIssue, cmdRecordTask, cmdRecordSprint, cmdRecordResult, cmdRecordGateResult, cmdRecordStatement, cmdRecordStory, cmdRecordReview, cmdRecordMeasurement, cmdRecordIndicatorSnapshot or cmdRecordReverify with no --by / --judged-by; actor.rs resolve falls to .keel/sessions/<id>/actor, written by a KEEL_ACTOR declaration under an earlier model of the same session; the harness has since switched the model.";
+        :>> statement = "Every record the session writes is attributed to an actor that did not act - EHZ3 in its quiet form. Observed, not hypothesised: git show ceaabdd and 76b106e -- .tracking carry 7 and 8 records createdBy/judgedBy claudeOpus5 under trailers Co-Authored-By: Claude Fable 5, and this run found the binding (declared 2026-09-08 16:21) still saying claudeOpus5 under a Fable 5 prompt before its first record. The ownership, critic-independence and retro guards read that attribution as true. Rebound for this session before any run-4 record; the landed records stay (D0129).";
+    }
+    dependency from ucaRecordUnderAStaleActorBinding to ehz3;
+
+    part ucaReverifyStampsADirtyTree : UnsafeControlAction {
+        :>> id = "578f9f3a-331e-40ba-b4d9-44605c97f4a5";
+        :>> title = "UCA-RV1: cmdRecordReverify PROVIDED on a working tree that differs from HEAD";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdRecordReverify --all-drift (or --task N) with uncommitted edits in the tree; reverify.rs run() executes reverify.toml's commands through run_shell on the WORKING tree and stamps pass with head = rev-parse --short HEAD (lines 358-375).";
+        :>> statement = "The declared gate passed on a tree HEAD does not contain and the result names HEAD - EHZ4, the A2 shape with a machine as the author. When the edits land with the result the binding rule (dcResultBindsToItsLandingCommit: a judgedAgainst that is an ancestor of the introducing commit binds to the introducing commit) makes the record true again; when they are discarded the pass stands on a tree nobody kept. The failing case is closed: a red command stamps nothing (line 361, honest). Only the advisory binding_note (main.rs 2765) tells the author.";
+    }
+    dependency from ucaReverifyStampsADirtyTree to ehz4;
+
+    part ucaReverifyDatedByTheCommit : UnsafeControlAction {
+        :>> id = "af5ff994-33a5-4ec8-b6db-b917ed8eee3d";
+        :>> title = "UCA-RV2: cmdRecordReverify WRONG TIMING - judgedAt is HEAD's commit date, not the day the gate re-ran";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> ucaType = UcaType::wrongTimingOrder;
+        :>> context = "cmdRecordReverify run on a day after HEAD was committed; reverify.rs run() takes date from git show -s --format=%cs HEAD (line 365) and passes it to write::append_result as judgedAt.";
+        :>> statement = "A pass judged today is recorded as judged when the commit landed - the evidence's own timestamp is false, and the impossible-evidence-date guard reads commit-versus-evidence ORDER, which this preserves - EHZ4 (invalid evidence) with no guard that can see it. Every other record sub-verb takes judgedAt from --judged-at or the clock. No landed reverify result is known wrong: the tree's passes ran on the day of their HEAD.";
+    }
+    dependency from ucaReverifyDatedByTheCommit to ehz4;
+
+    part ucaReviewAppliedByTheAgent : UnsafeControlAction {
+        :>> id = "e746006d-a965-4c1e-8d11-903dfc5954a8";
+        :>> title = "UCA-RR1: cmdRecordReview PROVIDED from an agent session - a review round-trip's dispositions land as the reviewer's judgment";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> ucaType = UcaType::provided;
+        :>> context = "cmdRecordReview over a review file the agent authored or edited (keel render <view> --mode review, then keel record review), from a shell the agent holds rather than the human's console.";
+        :>> statement = "The review's verdicts and dispositions are human judgment by declaration (write.rs WRITE_OPS: record review = true, K7); applied from the agent's channel they become the AI recording the human's word - EHZ3. The fold moved the verb under record (D0451), which is exactly where a one-token classifier would have gone silent (the K7 finding of sprint 680).";
+    }
+    dependency from ucaReviewAppliedByTheAgent to ehz3;
+
+    part ccStatementRecorderIsNotItsSpeaker : ControllerConstraint {
+        :>> id = "8e7af0d8-b362-4b39-b4e6-115cb7fba350";
+        :>> title = "CC-RS1: a Statement whose recorder is an AI and whose speaker is a Person reads as testimony until the speaker confirms it";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> statement = "A chat Statement typed by an AI actor for a Person lands as testimony awaiting the speaker (the D0312 B shape) in the attestation lens, and a Decision or Story deriving from it shows that; one the speaker recorded through a channel keel observed is a receipt. No control holds this today: bound to issue499 (the gap, resolver dcChatStatementsAwaitTheirSpeaker) and to issue428 (the Decision-side gap this sits under).";
+    }
+    dependency from ccStatementRecorderIsNotItsSpeaker to ucaStatementTypedAsVerbatim;
+    dependency from ccStatementRecorderIsNotItsSpeaker to issue499;
+    dependency from ccStatementRecorderIsNotItsSpeaker to issue428;
+
+    part ccActorBindingNamesTheRunningModel : ControllerConstraint {
+        :>> id = "0de527ac-469f-4e98-a925-3ad93fd971dd";
+        :>> title = "CC-RB1: an AI actor resolved from a binding is the model answering this turn, or the write refuses naming both";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> statement = "The session binding carries the model it was declared under; resolve compares it with the model the harness reports for the turn and refuses a mismatch; audit-history holds every AI createdBy/judgedBy a commit introduces equal to the model its trailer names, so a landed mismatch is a red CI verdict. No control holds this today - the binding is read as declared (actor.rs 159-175). Bound to issue498 (resolver dcSessionActorFollowsTheModel), the observed incident.";
+    }
+    dependency from ccActorBindingNamesTheRunningModel to ucaRecordUnderAStaleActorBinding;
+    dependency from ccActorBindingNamesTheRunningModel to issue498;
+
+    part ccReverifyResultBindsToTheLandingTree : ControllerConstraint {
+        :>> id = "70734711-c145-46c2-bcf7-2c8664bfdcb6";
+        :>> title = "CC-RV1: a re-verification pass binds to the tree that carries what it verified, and says when the tree it ran on was not HEAD";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> statement = "Every reader that dereferences judgedAgainst treats an ancestor-of-introducer sha as bound to the introducing commit (binding.rs bind; D0308's rule extended to results by dcResultBindsToItsLandingCommit) - declared in control-map.sysml by this run as ctlResultBinding so the constraint stands on a named control. The residual - edits discarded after the stamp - is closed only by the evidence naming the dirty state at the run, which is issue500's resolver (dcReverifyStampsTheRunDate, DO clause 3).";
+    }
+    dependency from ccReverifyResultBindsToTheLandingTree to ucaReverifyStampsADirtyTree;
+    dependency from ccReverifyResultBindsToTheLandingTree to ctlResultBinding;
+    dependency from ccReverifyResultBindsToTheLandingTree to issue500;
+
+    part ccReverifyJudgedAtIsTheRunDate : ControllerConstraint {
+        :>> id = "a650cee0-76fa-4c12-a1bf-ea435e1d8281";
+        :>> title = "CC-RV2: a result's judgedAt is the day it was judged";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> statement = "record reverify stamps the run's own date, as every other record sub-verb does, and keeps HEAD in the evidence string. No control holds this today - reverify.rs line 365 reads the commit date. Bound to issue500 (resolver dcReverifyStampsTheRunDate).";
+    }
+    dependency from ccReverifyJudgedAtIsTheRunDate to ucaReverifyDatedByTheCommit;
+    dependency from ccReverifyJudgedAtIsTheRunDate to issue500;
+
+    part ccReviewRunsFromTheHumansChannel : ControllerConstraint {
+        :>> id = "2325f4ab-1299-4bda-8115-1063a9d22e68";
+        :>> title = "CC-RR1: record review is never agent-exempt - the harness asks the human before the argv runs";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> statement = "hook pre-bash classifies the argv by verb and by verb+sub-verb against write.rs human_judgment_ops (main.rs bash_classify) and returns Ask for record review, accept, actor, enroll and deactivate (D0178/D0451) - declared in control-map.sysml by this run as ctlHumanJudgmentAsk so the census's row and the map name one control. Its D0388 pair is bash_matcher_is_argv_level_and_carves_out_human_judgment (main.rs 5536): record review Ask, record task Clean.";
+    }
+    dependency from ccReviewRunsFromTheHumansChannel to ucaReviewAppliedByTheAgent;
+    dependency from ccReviewRunsFromTheHumansChannel to ctlHumanJudgmentAsk;
+
+    verification stpaRun4 : Test {
+        :>> id = "dddc3393-e1a8-4fb4-8a87-2d014df79645";
+        :>> title = "stpa-self run 4 (2026-09-11) - the thirteen keel record sub-verbs as control actions (D0454, sprint 681, issue497)";
+        :>> createdAt = "2026-09-11"; :>> createdBy = "claudeFable5";
+        :>> method = VerificationMethod::analyze;
+        :>> procedureText = "ANALYSED: cmdRecordDecision, cmdRecordIssue, cmdRecordStatement, cmdRecordStory, cmdRecordTask, cmdRecordSprint, cmdRecordResult, cmdRecordGateResult, cmdRecordReview, cmdRecordMeasurement, cmdRecordIndicatorSnapshot, cmdRecordReverify, cmdRecordMint. FRAME: EHZ1-EHZ9 as recorded in engine-safety.sysml; no hazard added; every stepTwoGate row holds on the D0454 tree (63 actions, 13 of them cmdRecord*, no bare cmdRecord). CENSUS READ FIRST (stpa2b, D0426/D0428): 87 controls, 2 friction (accept:delegated-words, tap:unsigned), 60 hypothetical, 25 evidenced, 1 unattributed block; 16 UCAs (5 observed, 11 code-read); 9 removal candidates as listed by run 3 - unchanged, none dissolved by this run; evidenced controls no constraint stood on include append-result:ran-receipt, append-gate-result:ran-receipt and record:tool-output-prose, which this run's carried constraints stand on by name. CARRIED FORWARD BY NAME (the DoD's clause): UCA-R1..R3 and CC-R1..R3 (context cmdRecord, the pre-fold name) are the analysis of cmdRecordDecision; UCA-A1..A3 and CC-A1..A3 (context cmdAppendResult) are the analysis of cmdRecordResult AND cmdRecordGateResult - both paths refuse an AI method=test pass with no RAN receipt (main.rs 2739 and 2815, D0424) and both stamp through write.rs append_result / append_gate_result under the same binding rule; the eight recorded contexts stay as written. NEW: UCA-RS1, UCA-RB1, UCA-RV1, UCA-RV2, UCA-RR1; constraints CC-RS1 (issue499, issue428), CC-RB1 (issue498), CC-RV1 (ctlResultBinding, issue500), CC-RV2 (issue500), CC-RR1 (ctlHumanJudgmentAsk); two controls declared in control-map.sysml by this run. CONSIDERED SAFE: cmdRecordDecision notProvided / wrongTimingOrder / stoppedTooSoon - an enforcement edit with no Decision staged is CC-ED1's (gProcessChange, ctlAuditAdherence); prose that looks like captured tool output is refused at the write (record:tool-output-prose, evidenced); a fork or process-change recorded before the human's word is HELD proposed (D0322/D0337, gConsentScope). cmdRecordIssue provided without --resolver is refused at the write (main.rs cmd_record_issue, D0077) and gIssues fails an untriaged one; a finding never recorded is gRetroBacklog's; concurrent provided is ctlWriteLock's (issue130 was the incident); order carries nothing. cmdRecordStory requires --from-statement (main.rs cmd_record_story) so the #DerivedFrom edge is authored with the story (D0236) - it inherits UCA-RS1 through its Statement and adds nothing of its own. cmdRecordTask appends inside the named def (write.rs add_task, braces_in) and never edits a DoD, so D0307 suspicion is not its path; a DoD naming a step that does not resolve is gStepCheckResolves; identity is gIdIsAUuid / gDuplicateIdentity; a task recorded after the sprint began is not a hazard - order is priority and computed (D0052). cmdRecordSprint --fill writes no result (D0301); a Story with no #CharteredBy is gCharter; advance past a red step is refused (D0435/D0436); missing ceremony is gCeremony / gSprintCoverage. cmdRecordMeasurement and cmdRecordIndicatorSnapshot: indicators gate nothing (D0088/D0132) so no completion is computed from them and EHZ4 has no path; a date before the commit is gImpossibleEvidenceDate; snapshot values are computed from the tree at the run, not typed. cmdRecordMint writes nothing (write.rs WRITE_OPS false, D0451) - the id it prints becomes a fact only when another sub-verb writes it, where gIdIsAUuid and gDuplicateIdentity hold; that it appears as a write action at all is issue501. cmdRecordResult / cmdRecordGateResult beyond A1-A3: notProvided leaves the task not done (computed, D0098 honest state); stoppedTooSoon is closed by the atomic write under ctlWriteLock and by validate refusing a partial record (ctlPostEditGate). cmdRecordReview notProvided / wrongTimingOrder: dispositions stay pending in the review view, computed, no hazard. cmdRecordReverify notProvided: suspects stay suspect, honest; stoppedTooSoon: a failing command stamps nothing (reverify.rs 361). cmdRecordStatement notProvided: a Decision quoting the human with no Statement is UCA-H1 / issue428. NOT ANALYSED THIS RUN: the eight cmdProcess* and three cmdLibrary* sub-verb actions - four of the process ones are reads mislabelled as writes (issue501), which is settled before their analysis; stpa-currency names them.";
+    }
+    // RAN: keel show control-structure . read 2026-09-11 on the D0454 working tree (63 actions; cmdRecord* = Decision, Issue, Statement, Story, Task, Sprint, Result, GateResult, Review, Measurement, IndicatorSnapshot, Reverify, Mint; stepTwoGate 8 of 8 hold); keel show control-census . read before any UCA was written (census681.json: 87 / 2 / 60 / 25, ucas 16 observed 5 codeRead 11, 9 removal candidates); code read before each claim: main.rs cmd_record_statement 3137-3175, cmd_record_story 3208-3240, cmd_record_issue 4541-4600, bash_classify 860-882, binding_note 2765-2777; write.rs WRITE_OPS 526-544; reverify.rs run 334-371; actor.rs resolve 150-175 and session bindings 90-148; git show ceaabdd / 76b106e / e1de7c7 -- .tracking createdBy counts 7 / 8 / 9 against each trailer; keel actor show before (claudeOpus5) and after (claudeFable5) the rebind, .keel/sessions/<id>/actor dated 2026-09-08 16:21.
+    part stpaRun4R1 : TestResult { :>> id = "67027f3c-775b-43b5-ba3c-1e6c490696d2"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "76b106e60dbf174c9b2195acb2de6e10cd9c8290"; :>> judgedAt = "2026-09-11"; :>> judgedBy = "claudeFable5"; }
+ :>> outcome = VerdictKind::pass; :>> judgedAgainst = "7674e12e56a2886094d0849917d7e29bfc9e8627"; :>> judgedAt = "2026-09-10"; :>> judgedBy = "claudeOpus5"; }
 }

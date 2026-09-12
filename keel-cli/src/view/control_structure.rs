@@ -371,14 +371,31 @@ fn cli_actions(root: &Path, out: &mut Vec<Action>, fb: &mut Vec<Fb>) {
         match f.effect.as_str() {
             "writes" | "both" => {
                 let issued_by = if HUMAN_AUTHORITY_COMMANDS.contains(&f.name.as_str()) { "human" } else { "agent" };
-                out.push(Action {
-                    name: format!("cmd{}", camel(&f.name)),
-                    title: format!("keel {}: {}", f.name, f.synopsis),
-                    issued_by,
-                    acts_on: process_for_family(&f.family, &f.name),
-                    data: format!("effect {}; family {}", f.effect, f.family),
-                    source: src,
-                });
+                // D0454: a routing command (`record`, `process`, `library`) is one fact but several control
+                // actions - one per sub-verb its invocation declares - so folding writers under one verb
+                // (D0451) cannot collapse them out of the analysis (issue497). The segment is the data.
+                let subs = crate::cli_facts::sub_verb_segments(&f.invocation);
+                if subs.is_empty() {
+                    out.push(Action {
+                        name: format!("cmd{}", camel(&f.name)),
+                        title: format!("keel {}: {}", f.name, f.synopsis),
+                        issued_by,
+                        acts_on: process_for_family(&f.family, &f.name),
+                        data: format!("effect {}; family {}", f.effect, f.family),
+                        source: src,
+                    });
+                } else {
+                    for (sub, segment) in subs {
+                        out.push(Action {
+                            name: format!("cmd{}{}", camel(&f.name), camel(&sub)),
+                            title: format!("keel {} {}", f.name, sub),
+                            issued_by,
+                            acts_on: process_for_family(&f.family, &f.name),
+                            data: format!("effect {}; family {}; sub-verb of `keel {}`: {segment}", f.effect, f.family, f.name),
+                            source: src.clone(),
+                        });
+                    }
+                }
             }
             "reads" => {
                 fb.push(Fb {
@@ -1276,6 +1293,32 @@ mod tests {
         assert_eq!(accept.issued_by, "human", "accept is the human's authority even from the agent's shell");
         assert_eq!(acts.iter().find(|a| a.name == "cmdRecord").expect("record").issued_by, "agent");
         assert_eq!(fbs[0].reports_to, "agent");
+    }
+
+    /// D0454 (issue497): a routing write command yields one action PER SUB-VERB, named `cmd<Verb><SubVerb>` and
+    /// carrying its whole segment as data; a plain invocation yields the one action it always did; an argument
+    /// alternative list (`claim`) is not a router.
+    #[test]
+    fn a_routing_write_command_is_one_action_per_sub_verb() {
+        let dir = std::env::temp_dir().join(format!("keel-cs-sub-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".engine/cli")).expect("mkdir");
+        std::fs::write(
+            dir.join(".engine/cli/commands.sysml"),
+            "part a : CliCommand { :>> name = \"record\"; :>> family = \"authoring\"; :>> effect = CliEffect::writes; :>> stability = CliStability::stable; :>> invocation = \"decision|issue ... | gate-result --file F [--verdict pass|fail]\"; :>> synopsis = \"s\"; }\n\
+             part b : CliCommand { :>> name = \"override\"; :>> family = \"governance\"; :>> effect = CliEffect::writes; :>> stability = CliStability::stable; :>> invocation = \"<path> --reason TEXT\"; :>> synopsis = \"o\"; }\n\
+             part c : CliCommand { :>> name = \"claim\"; :>> family = \"governance\"; :>> effect = CliEffect::both; :>> stability = CliStability::stable; :>> invocation = \"<item> | --list | --mine\"; :>> synopsis = \"c\"; }\n",
+        )
+        .expect("write");
+        let (mut acts, mut fbs) = (Vec::new(), Vec::new());
+        cli_actions(&dir, &mut acts, &mut fbs);
+        let _ = std::fs::remove_dir_all(&dir);
+        let names: Vec<&str> = acts.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, vec!["cmdRecordDecision", "cmdRecordIssue", "cmdRecordGateResult", "cmdOverride", "cmdClaim"], "three sub-verbs, then the two plain commands: {names:?}");
+        let gr = acts.iter().find(|a| a.name == "cmdRecordGateResult").expect("gate-result");
+        assert!(gr.data.ends_with("sub-verb of `keel record`: gate-result --file F [--verdict pass|fail]"), "the whole segment is the data: {}", gr.data);
+        assert_eq!(gr.title, "keel record gate-result");
+        assert!(fbs.is_empty());
     }
 
     #[test]

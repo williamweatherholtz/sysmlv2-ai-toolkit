@@ -873,4 +873,48 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from fixDownstreamDecisionNumbering to issue291;
+
+    part issue498 : Issue {
+        :>> id = "b42029d8-a160-4a89-b58b-e7a8cde69e55";
+        :>> title = "Fifteen landed records name claudeOpus5 while the session's model was Fable 5 - the session actor binding does not follow the model";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Two landed commits carry records attributed to a model that was not running. VERIFIED before the claim: git show ceaabdd and 76b106e -- .tracking: 7 and 8 records with createdBy/judgedBy = claudeOpus5, each commit's trailer reading Co-Authored-By: Claude Fable 5; e1de7c7 (trailer Claude Opus 4.8) is the last commit where the two agree. MECHANISM: .keel/sessions/<id>/actor was written claudeOpus5 on 2026-09-08 16:21 by a KEEL_ACTOR declaration; the harness switched the same session's model afterwards and actor.rs resolve reads the session binding without asking what model is answering. Found by stpa-self run 4 while binding the run's own records: keel actor show printed claudeOpus5 under a Fable 5 system prompt. Corrected for this session by rebinding (machine and session files, 2026-09-11) before any run-4 record was written; the fifteen landed records stay as written (D0129: history is not rewritten). This is EHZ3 in its quiet form - no human was impersonated, but the attribution the ownership, critic-independence and retro guards read is false for two commits.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::High;
+    }
+    #Resolves dependency from dcSessionActorFollowsTheModel to issue498;
+
+    part issue499 : Issue {
+        :>> id = "04afbe20-660b-48c6-a336-1e008658d415";
+        :>> title = "A chat Statement typed by the AI reads with the same authority as one the speaker recorded";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel record statement records the human's words from the AI's typing and nothing marks the difference. READ: main.rs cmd_record_statement takes --text (or --from FILE), --said-by and --title from the caller, defaults --channel to chat, and binds createdBy to the resolved actor; the Statement schema (intake.sysml) holds text VERBATIM by comment, with no field or lens saying whether the speaker or a transcriber wrote it down. So every chat Statement in the tree reads with the same authority whether the human pasted it or the AI recalled it, and a Decision that dutifully links its Statement (issue428's fix) inherits a verbatim-ness nobody checked. Found by stpa-self run 4 as UCA-RS1 on cmdRecordStatement. Not the same gap as issue428: that one binds Decisions to Statements; this one is the Statement's own provenance.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcChatStatementsAwaitTheirSpeaker to issue499;
+
+    part issue500 : Issue {
+        :>> id = "c79f7781-e50b-48ae-b0e0-315e57b0fb7d";
+        :>> title = "keel record reverify stamps judgedAt with HEAD's commit date, not the run's date";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "keel record reverify dates its judgment by the commit, not by the run. READ: reverify.rs run() (lines 362-363) takes head from rev-parse --short HEAD and date from git show -s --format=%cs HEAD, then append_result(file, task, head, pass, date, ...) - so judgedAt is the day HEAD was committed. A drift re-verification run on a later day records a pass judged before it ran; the impossible-evidence-date guard reads commit-vs-evidence order and this order is not impossible, only false. Found by stpa-self run 4 analysing cmdRecordReverify (wrongTimingOrder). Every other record sub-verb takes judgedAt from --judged-at or the clock. No landed result is known wrong; the tree's reverify passes all ran on the day of their HEAD.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcReverifyStampsTheRunDate to issue500;
+
+    part issue501 : Issue {
+        :>> id = "698d0e9c-9879-480a-962f-28b2ca9ce998";
+        :>> title = "Sub-verbs inherit their router's effect: four process reads and record mint are write actions in the control structure";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeFable5";
+        :>> description = "A routing command's sub-verbs inherit the router's single effect in the computed control structure. READ BACK after D0454 landed in the working tree: keel show control-structure names cmdProcessList, cmdProcessSearch, cmdProcessShow and cmdProcessExport as write actions because the process fact's effect is writes (its publish, retire, remove and import sub-verbs do write), and cmdRecordMint as a write action though record mint writes nothing (write.rs WRITE_OPS lists it false; D0451). The CliCommand fact (cli.sysml) declares one effect per command and no effect per sub-verb; D0454 derives one action per sub-verb, so the derivation is right and the declaration is too coarse. Consequence: stpa-currency asks for a UCA analysis of four read paths, and a hardcoded exclusion in control_structure.rs would be the literal vocabulary D0271 forbids. Found by stpa-self run 4 (sprint 681 retro). The fix touches engine schema, so it is a Change Request.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcSubVerbEffectIsDeclared to issue501;
 }

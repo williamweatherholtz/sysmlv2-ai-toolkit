@@ -6230,6 +6230,7 @@ pub struct AuthoredCliFact {
     pub effect: String,
     pub stability: String,
     pub synopsis: String,
+    pub invocation: String,
 }
 
 /// Read one `:>> key = "value"` or `:>> key = Enum::member` attribute out of a single-line part.
@@ -6259,6 +6260,7 @@ pub fn parse_cli_facts(text: &str) -> Vec<AuthoredCliFact> {
                 effect: cli_attr(l, "effect")?,
                 stability: cli_attr(l, "stability")?,
                 synopsis: cli_attr(l, "synopsis")?,
+                invocation: cli_attr(l, "invocation").unwrap_or_default(),
             })
         })
         .collect()

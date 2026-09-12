@@ -159,13 +159,8 @@ fn the_record_sub_verbs_match_the_fact() {
     assert!(routed.len() >= 13, "the parser must find the router's arms, or this proves nothing: {routed:?}");
 
     let fact = keel_cli::cli_facts::CLI_FACTS.iter().find(|f| f.name == "record").expect("the record fact");
-    let mut declared: Vec<String> = fact
-        .invocation
-        .split('|')
-        .filter_map(|seg| seg.split_whitespace().next())
-        .filter(|w| !w.starts_with('-') && w.chars().all(|c| c.is_ascii_lowercase() || c == '-'))
-        .map(str::to_string)
-        .collect();
+    // D0454: the SAME reader the control structure derives its actions from, so the two cannot disagree.
+    let mut declared: Vec<String> = keel_cli::cli_facts::sub_verbs_of(fact.invocation);
     declared.sort();
     declared.dedup();
     let undeclared: Vec<&String> = routed.iter().filter(|c| !declared.contains(c)).collect();
