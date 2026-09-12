@@ -5397,7 +5397,7 @@ mod tests {
         let t = render_html(root, "decisions", "table").expect("table");
         assert!(t.contains("<table") && !t.contains("/*ROWS*/") && !t.contains("/*STYLE*/"), "table rows + style injected");
         let r = render_html(root, "decisions", "review").expect("review");
-        assert!(r.contains("exportJSON") && r.contains("apply-review"), "review mode has capture/export");
+        assert!(r.contains("exportJSON") && r.contains("record review"), "review mode has capture/export");
         assert!(render_html(root, "decisions", "bogus").is_err(), "unknown mode errors");
     }
 

@@ -56,7 +56,7 @@ command** (the friction win, lower than a spreadsheet, D0054).
 2. **First Need** — elicit the project's single first business need; author ONE `Need` item (human
    states, AI records).
 3. **Refine** — derive ONE `SystemRequirement` (`satisfy` the Need) + one work item; refine to DoR
-   (DoD as a verifiable Test) via `keel add-task` + typed edges. Show: recording = one command.
+   (DoD as a verifiable Test) via `keel record task` + typed edges. Show: recording = one command.
 4. **First sprint** — run the agile-workflow ceremony (autonomous, D0049) to the artifact + a recorded
    passing DoD TestResult. The loop closes once, on their own work.
 5. **Show value + hand off** — `keel show orient` (+ `orient --html` / `report` / `render` review) over

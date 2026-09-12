@@ -394,7 +394,7 @@ pub fn cmd(args: &[String]) -> i32 {
         pc.awaiting()
     );
     println!(
-        "  demos (D0444): {} demo passes carry a receipt that REPLAYS (`keel reverify --demos` re-runs them; they sit in the sample pool as passes), {} demo results are proposals whose receipt was prose or absent.",
+        "  demos (D0444): {} demo passes carry a receipt that REPLAYS (`keel record reverify --demos` re-runs them; they sit in the sample pool as passes), {} demo results are proposals whose receipt was prose or absent.",
         pc.demo_replayable, pc.demo_proposed
     );
     println!("  `keel judge-set <file> --words ... --by <human> --date ...` records one result and one quote receipt per item.");

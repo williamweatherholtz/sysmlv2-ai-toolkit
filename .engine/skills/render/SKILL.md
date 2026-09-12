@@ -3,7 +3,7 @@ name: render
 description: |
   Deploys the Modular Render + Review process (D0086): render ANY declared view as a self-contained
   interactive HTML artifact via `keel render <view> --mode graph|table|review`, and round-trip a
-  human review back into the model via `keel apply-review`. Use when asked to render/tabulate/
+  human review back into the model via `keel record review`. Use when asked to render/tabulate/
   explore a specific view, build a table from a view, review or disposition elements (accept/reject +
   rationale), capture critique findings, export a review batch, or apply one. A rendered artifact is a
   computed #View (§2.1/D0015) — never author or commit it (git-ignored). The diagram (D0085) is the
@@ -35,7 +35,7 @@ to stdout (redirect to a file). `<view>` is a declared view name (a viewpoint �
 - **review** — that table + per-row **accept / finding** verdict, **lens**, **severity**,
   **actionable?**, and a **rationale** box, with an in-page **Export JSON** button.
 
-**`keel apply-review --batch <batch.json> --sha <commit> --judged-by <you> --judged-at <date>`** →
+**`keel record review --batch <batch.json> --sha <commit> --judged-by <you> --judged-at <date>`** →
 ingests an exported review batch and writes each disposition as a NEW LINKED critique into
 `.tracking/critiques.sysml`: a `method=critique` `verification <element>HRev<n>` + its `TestResult` +
 a `#Verify` edge to the element (the human is an independent critic, D0080).

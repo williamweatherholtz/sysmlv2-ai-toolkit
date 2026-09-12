@@ -518,7 +518,7 @@ For each accepted WP, under the normal discipline:
 1. CHANGE route: record the WP's named Decision(s) (§5) in `.engine/decisions/`; human
    acceptance via `keel accept` (human-only, K6). Commits staging process/workflow files
    additionally carry the D0070 keystone marker.
-2. Charter Stories per WP scope item (`keel add-task`, `#CharteredBy`; declaration order =
+2. Charter Stories per WP scope item (`keel record task`, `#CharteredBy`; declaration order =
    priority, D0052).
 3. RECORD route for atomic facts (the critique Issue, under D-P2).
 4. TRIVIAL for the doc-line hygiene items.

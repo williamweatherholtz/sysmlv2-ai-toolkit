@@ -58,7 +58,7 @@ package EngineViewpoints {
         :>> concernText = "How do I explore, tabulate, or REVIEW any declared view as an interactive artifact — and disposition elements (accept/finding + rationale) so the judgment lands back in the model as linked critiques that attest state and induce suspicion?";
         :>> audience = "maintainer / reviewer / auditor";
         :>> sources = "any declared view (D0056/D0057) over the Model — graph (elements + typed edges), table/review (selected rows + projected fields); review dispositions round-trip via apply-review into .tracking/critiques.sysml";
-        :>> renderer = "keel render <view> --mode graph|table|review (interactive HTML #View, D0086; regenerate-don't-commit) + keel apply-review";
+        :>> renderer = "keel render <view> --mode graph|table|review (interactive HTML #View, D0086; regenerate-don't-commit) + keel record review";
         :>> surface = "explore";
     }
     part reportVP : Viewpoint {
@@ -78,7 +78,7 @@ package EngineViewpoints {
         :>> concernText = "Which monitored measures (Indicators) inform our needs/decisions, and which way are they trending — improving, degrading, or flat — by their goal (D0089)?";
         :>> audience = "maintainer / lead / program";
         :>> sources = "Indicator items + their measurement method (computed series via the report/trend engine; pulled/manual series from recorded Measurement datapoints, #Measures edges); direction-aware status by goal (D0088 measure spectrum)";
-        :>> renderer = "keel show indicators [--trend] (+ keel record-measurement for pulled/manual datapoints, D0089)";
+        :>> renderer = "keel show indicators [--trend] (+ keel record measurement for pulled/manual datapoints, D0089)";
         :>> surface = "explore";
     }
     part safetyVP : Viewpoint {

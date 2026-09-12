@@ -1064,7 +1064,7 @@ mod tests {
         assert_eq!(esc("OVERRIDE 'reject <why>' & \"x\""), "OVERRIDE &#x27;reject &lt;why&gt;&#x27; &amp; &quot;x&quot;");
         assert_eq!(keel_verb("keel show orient", true), Some("show orient".to_string()));
         assert_eq!(keel_verb("keel show orient", false), Some("show".to_string()));
-        assert_eq!(keel_verb("keel append-result --file", false), Some("append-result".to_string()));
+        assert_eq!(keel_verb("keel record result --file", false), Some("record".to_string()));
         assert_eq!(keel_verb("git push", false), None);
         assert_eq!(wrap(&[], 46, "  "), vec![String::new()]);
         assert_eq!(wrap(&["aaaa".to_string(), "bbbb".to_string(), "cc".to_string()], 12, "  "), vec!["  aaaa", "  bbbb, cc"]);

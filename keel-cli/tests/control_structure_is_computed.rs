@@ -71,7 +71,7 @@ fn a_fresh_project_computes_its_structure_with_no_authored_anchors() {
     let fbs = names(&v, "feedback");
     assert!(acts.iter().any(|n| n == "hookStop"), "the Stop hook is a derived action: {acts:?}");
     assert!(acts.iter().any(|n| n == "githookPreCommit"), "pre-commit is a derived action: {acts:?}");
-    assert!(acts.iter().any(|n| n == "cmdAddTask") && fbs.iter().any(|n| n == "readOrient"), "CLI facts yield actions and feedback");
+    assert!(acts.iter().any(|n| n == "cmdRecord") && fbs.iter().any(|n| n == "readOrient"), "CLI facts yield actions and feedback (cmdRecord: the writer the D0451 fold left at the top level)");
     // and NOTHING authored: no anchors, no process models.
     assert!(anchors(&v).iter().all(Option::is_none), "a fresh project has no anchors: {:?}", anchors(&v));
     assert!(v["processModels"].as_array().expect("pm").is_empty(), "no process model was invented");

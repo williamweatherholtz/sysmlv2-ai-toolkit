@@ -22,7 +22,7 @@ human's acceptance happens once per sitting at the sprint review, not here.
 ## Behavioral Instructions
 
 1. **Verify DoD is complete:**
-   - The sprint story's `DoDR1` TestResult is recorded `outcome = pass` — by `keel append-result --file <sprint> --task story<Slug> --evidence "<what you ran>"`, never by a script writing the line (D0301/issue267); the record itself comes from `keel new sprint ... --fill FILE`.
+   - The sprint story's `DoDR1` TestResult is recorded `outcome = pass` — by `keel record result --file <sprint> --task story<Slug> --evidence "<what you ran>"`, never by a script writing the line (D0301/issue267); the record itself comes from `keel record sprint ... --fill FILE`.
    - The `DoDR1` is appended to the backlog (`DeliveryRun`/`NextWork`).
    - All earlier phase gates (refine/standup/implement/review) are recorded — the
      ceremony-ordering guard (D0047) enforces no out-of-order closeOut.
@@ -32,7 +32,7 @@ human's acceptance happens once per sitting at the sprint review, not here.
    analysis splits it by the Story's `owner` (e.g. `claudeOpus` vs a human). If genuinely unknown
    or not meaningfully measurable at closeOut (e.g. a sprint interleaved in a long session), leave
    it unset rather than guessing — **never fabricate a value** (D0067). Do not backfill past sprints.
-3. **Record the closeOut gate** TestResult via `keel append-gate-result --file <delivery
+3. **Record the closeOut gate** TestResult via `keel record gate-result --file <delivery
    file> --gate <sprintCloseOutGate> --sha <HEAD> --judged-by <AI actor> --judged-at <today>`
    (auto-UUID, append-only `{gate}R{n}`). The gate is `method = inspect`, AI-judged: no human
    confirmation (D0049) — do NOT write `judgedBy = wweatherholtz` and do NOT pause to ask

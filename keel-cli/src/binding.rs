@@ -1,6 +1,6 @@
 //! A passing result binds to the tree that CARRIES the work it judges (dcResultBindsToItsLandingCommit).
 //!
-//! WHY. The ordinary shape of a `DoD` pass is `append-result --sha HEAD` while the work sits uncommitted,
+//! WHY. The ordinary shape of a `DoD` pass is `record result --sha HEAD` while the work sits uncommitted,
 //! so `judgedAgainst` names the commit BEFORE the one that lands the work: a tree that does not contain
 //! what was verified. Every reader that dereferenced `judgedAgainst` - deliverable-drift suspicion,
 //! criterion drift, reverify - then measured from the wrong baseline (stpa-self run 1, UCA-A2).

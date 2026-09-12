@@ -38,7 +38,7 @@ package EngineIntroduction {
         :>> id = "63940516-2c7d-4e8f-c093-516273849373";
         :>> title = "Derive a first requirement + work item (refine to ready)";
         :>> triggerCondition = "The first Need exists.";
-        :>> actionText = "Derive ONE SystemRequirement that `satisfy`-links the Need, and one work item (Story/action) to deliver it; refine to DoR (acceptance criteria as a verifiable DoD Test). Use the write API (`keel add-task`) + typed edges — show that recording a fact is ONE command (the friction win, D0054), lower than a spreadsheet. Keep it minimal: one need -> one requirement -> one work item.";
+        :>> actionText = "Derive ONE SystemRequirement that `satisfy`-links the Need, and one work item (Story/action) to deliver it; refine to DoR (acceptance criteria as a verifiable DoD Test). Use the write API (`keel record task`) + typed edges — show that recording a fact is ONE command (the friction win, D0054), lower than a spreadsheet. Keep it minimal: one need -> one requirement -> one work item.";
         :>> producedArtifact = "A `SystemRequirement` (satisfy edge) + a refined work item with a DoD, ready to start.";
         :>> owner = Owner::ai;
     }

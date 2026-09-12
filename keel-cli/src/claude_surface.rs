@@ -79,9 +79,9 @@ pub const OUTPUT_STYLE: &str = include_str!("../../.claude/output-styles/keel.md
 /// both separators.
 pub const PROTECTED_PATHS: [(&str, &str); 5] = [
     (".tracking/issues", "keel record issue"), // prefix: covers issues.sysml AND per-actor issues-<actor>.sysml (issue210)
-    (".tracking/backlog.sysml", "keel add-task"),
-    (".tracking/critiques", "the disposition write API (POST /api/disposition) or keel apply-review"), // prefix: covers per-actor files too (issue210)
-    (".tracking/delivery/", "keel new sprint / keel append-gate-result / keel append-result"),
+    (".tracking/backlog.sysml", "keel record task"),
+    (".tracking/critiques", "the disposition write API (POST /api/disposition) or keel record review"), // prefix: covers per-actor files too (issue210)
+    (".tracking/delivery/", "keel record sprint / keel record gate-result / keel record result"),
     (".engine/decisions/", "keel record decision, accepted only via keel accept (human-only)"),
 ];
 

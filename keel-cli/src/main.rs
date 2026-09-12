@@ -7,9 +7,9 @@
 //!   `whats-next [ROOT]`       — print ready task names, one per line
 //!   `advance <sprint> [--to G]` — process cursor: the sprint's current ceremony step; `--to` is
 //!                               refused until every earlier step's verify-Test passes (D0209 clause 3)
-//!   `append-result [FLAGS]`   — append a `TestResult` to a tracking file
-//!   `append-gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
-//!   `add-task [FLAGS]`        — add a task + `DoD` verification to an action def
+//!   `record result [FLAGS]`   — append a `TestResult` to a tracking file (D0451)
+//!   `record gate-result [FLAGS]` — append a `TestResult` for a ceremony gate (`verification`)
+//!   `record task [FLAGS]`     — add a task + `DoD` verification to an action def
 //!   `coverage [ROOT]`         — assurance-coverage view (D0079 C): Need/Requirement/Decision evidence
 //!   `critique-coverage [ROOT]` — per-element x required-lens critique coverage (D0080)
 //!   `critique-policy [ROOT]`   — the active declared critique policy: required lenses per type (D0097)
@@ -862,9 +862,15 @@ fn bash_classify(root: &Path, cmd: &str) -> BashVerdict {
     });
     if let Some(i) = keel_idx {
         if let Some(sub) = toks.get(i + 1) {
-            if keel_cli::write::human_judgment_ops().contains(&sub.as_str()) {
+            // D0451 folded `apply-review` under `record`, so a protected op may be two tokens
+            // (`record review`); the check reads the verb and the verb with its sub-verb.
+            let two = toks.get(i + 2).map(|n| format!("{sub} {n}"));
+            let hit = keel_cli::write::human_judgment_ops()
+                .into_iter()
+                .find(|op| *op == sub.as_str() || two.as_deref() == Some(*op));
+            if let Some(op) = hit {
                 return BashVerdict::Ask(format!(
-                    "keel {sub} records human judgment or mutates actor identity (K6/K7) - it runs only from a channel the human holds"
+                    "keel {op} records human judgment or mutates actor identity (K6/K7) - it runs only from a channel the human holds"
                 ));
             }
         }
@@ -1324,7 +1330,7 @@ fn hook_stop(payload: &serde_json::Value, root: &Path) -> i32 {
     hook_refuse("in-loop-gate", &serde_json::json!({
         "decision": "block",
         "reason": format!(
-            "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (append-result / add-task / record decision); run `keel guard <name>` for detail. Then end the turn."
+            "[in-loop gate] The model is not in honest state — resolve before ending the turn:\n\n{body}\n\nFix through the keel write API (record result / record task / record decision); run `keel guard <name>` for detail. Then end the turn."
         )
     }))
 }
@@ -1831,7 +1837,7 @@ fn cmd_query1(args: &[String], usage: &str, f: fn(&std::path::Path, &str) -> Str
     0
 }
 
-/// `keel reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]` (D0101) — re-run the configured
+/// `keel record reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]` (D0101) — re-run the configured
 /// gate at HEAD and stamp a fresh `TestResult` on each drift-suspect task on green; `--demos` (D0444)
 /// re-runs every replayable demo receipt instead and records each replay's own verdict.
 fn cmd_reverify(args: &[String]) -> i32 {
@@ -1862,7 +1868,7 @@ fn cmd_reverify(args: &[String]) -> i32 {
             // most-repeated defect shape.
             other if other.starts_with("--") => {
                 eprintln!("error: unknown flag `{other}`");
-                eprintln!("usage: keel reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]");
+                eprintln!("usage: keel record reverify [--all-drift | --task NAME | --demos] [--by ACTOR] [ROOT]");
                 return 2;
             }
             other => root = Some(PathBuf::from(other)),
@@ -2023,14 +2029,14 @@ fn cmd_deck(args: &[String]) -> i32 {
     }
 }
 
-/// `keel mint [N]` (us019/issue170) — engine-minted v4 UUIDs, one per line, nothing else on stdout,
+/// `keel record mint [N]` (us019/issue170) — engine-minted v4 UUIDs, one per line, nothing else on stdout,
 /// composable into any authoring script.
 ///
 /// Exists so no authoring path depends on an AI generating identity by hand: two hand-minted ids
 /// were mangled before guard 38 existed, and manual diligence is not a control (D0047). What this
 /// prints is tested against guard 38's OWN shape predicate, so mint and guard stay one truth.
 fn cmd_mint(args: &[String]) -> i32 {
-    const USAGE: &str = "keel mint [N]   (N >= 1, default 1)";
+    const USAGE: &str = "keel record mint [N]   (N >= 1, default 1)";
     let n: u64 = match args {
         [] => 1,
         [a] => {
@@ -2063,11 +2069,11 @@ fn cmd_mint(args: &[String]) -> i32 {
     0
 }
 
-/// `keel new sprint <N> <slug> --charter <decision> [--points P]` (dcSprintScaffold/us019) — the
+/// `keel record sprint <N> <slug> --charter <decision> [--points P]` (dcSprintScaffold/us019) — the
 /// engine scaffolds the ceremony record: ids minted, provenance from the bound actor (refused when
 /// absent), placeholders the fast gate rejects. See [`keel_cli::scaffold`].
 fn cmd_new(args: &[String]) -> i32 {
-    const USAGE: &str = "keel new sprint <NUMBER> <slug> --charter <decision> [--points P] [--fill FILE]";
+    const USAGE: &str = "keel record sprint <NUMBER> <slug> --charter <decision> [--points P] [--fill FILE]";
     if args.first().map(String::as_str) != Some("sprint") {
         eprintln!("usage: {USAGE}");
         return 2;
@@ -2118,7 +2124,7 @@ fn cmd_new(args: &[String]) -> i32 {
     let actor = match keel_cli::actor::resolve(&root, None) {
         Ok(a) => a,
         Err(msg) => {
-            eprintln!("keel new sprint: {msg}");
+            eprintln!("keel record sprint: {msg}");
             return 1;
         }
     };
@@ -2130,18 +2136,18 @@ fn cmd_new(args: &[String]) -> i32 {
         let fill = match decision_fields_from_file(&fill_path) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("keel new sprint: {e}");
+                eprintln!("keel record sprint: {e}");
                 return 2;
             }
         };
         return match keel_cli::scaffold::sprint_filled(&root, number, slug, &charter, points, &actor, &fill) {
             Ok(path) => {
                 println!("scaffolded and filled -> {}", path.display());
-                println!("no result was written: record the DoD with `keel append-result --file {} --task story<Slug> ...` and gates with `append-gate-result`", path.display());
+                println!("no result was written: record the DoD with `keel record result --file {} --task story<Slug> ...` and gates with `keel record gate-result`", path.display());
                 0
             }
             Err(e) => {
-                eprintln!("keel new sprint: {e}");
+                eprintln!("keel record sprint: {e}");
                 1
             }
         };
@@ -2153,7 +2159,7 @@ fn cmd_new(args: &[String]) -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("keel new sprint: {e}");
+            eprintln!("keel record sprint: {e}");
             1
         }
     }
@@ -2701,7 +2707,7 @@ fn provenance_date(args: &[String], flag_name: &str, usage: &str) -> Result<Stri
 
 fn cmd_append_result(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: keel append-result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        eprintln!("usage: keel record result --file FILE --task TASK --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
         return 2;
     };
     let Some(task) = flag(args, "task") else {
@@ -2776,7 +2782,7 @@ fn binding_note(file: &std::path::Path, sha: &str, verdict: &str) {
 
 fn cmd_append_gate_result(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: keel append-gate-result --file FILE --gate GATE --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
+        eprintln!("usage: keel record gate-result --file FILE --gate GATE --sha SHA [--verdict pass|fail] [--judged-by ACTOR] [--judged-at DATE]");
         return 2;
     };
     let Some(gate) = flag(args, "gate") else {
@@ -2957,6 +2963,35 @@ fn auto_accept_under_consent(root: &Path, path: &str, dname: &str, nnnn: &str, c
     }
 }
 
+/// D0451: the authoring family's nine verbs are sub-verbs of `record`, each named for the fact it
+/// writes and each keeping its flags. `sprint` keeps its own word: `cmd_new` reads it.
+fn record_authoring_subverb(args: &[String]) -> Option<i32> {
+    let rest = args.get(1..).unwrap_or(&[]);
+    Some(match args.first().map(String::as_str)? {
+        "task" => cmd_add_task(rest),
+        "sprint" => cmd_new(args),
+        "result" => cmd_append_result(rest),
+        "gate-result" => cmd_append_gate_result(rest),
+        "review" => cmd_apply_review(rest),
+        "measurement" => cmd_record_measurement(rest),
+        "indicator-snapshot" => cmd_snapshot_indicators(rest),
+        "reverify" => cmd_reverify(rest),
+        "mint" => cmd_mint(rest),
+        _ => return None,
+    })
+}
+
+/// The `keel record` usage, one line per fact the router writes.
+fn print_record_usage() {
+    eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
+    eprintln!("       keel record decision --from DRAFT.md   (prose in a file - the sanctioned path, issue255; flags override)");
+    eprintln!("           [--supersedes dNNNN[,..]] retires each target whole | [--supersedes-clause dNNNN[,..]] reverses one clause, target stays in force (D0398); draft lines `supersedes:` / `supersedes-clause:`");
+    eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
+    eprintln!("       keel record statement --text \"<their exact words>\" | --from FILE --said-by A --said-at D --title T [--channel C]   (VERBATIM, D0216/D0236)");
+    eprintln!("       keel record story --from-statement stNNN --title T --as-a R --i-want C --implication K [--so-that O] [--triage-note W] --at D");
+    eprintln!("       keel record task|sprint|result|gate-result|review|measurement|indicator-snapshot|reverify|mint ...   (D0451: the nine authoring verbs under one router, each named for the fact it writes; flags unchanged - `keel record <sub-verb>` alone prints its usage)");
+}
+
 fn cmd_record(args: &[String]) -> i32 {
     // D0236: intake had NO write path. Every Statement in this repo was hand-edited into a file,
     // which is the one record type where that matters most - D0216 requires the human's words
@@ -2968,13 +3003,11 @@ fn cmd_record(args: &[String]) -> i32 {
         Some("story") => return cmd_record_story(args),
         _ => {}
     }
+    if let Some(code) = record_authoring_subverb(args) {
+        return code;
+    }
     if args.first().map(String::as_str) != Some("decision") {
-        eprintln!("usage: keel record decision --slug S --title T --context C --decision D --rationale R --consequences Q --date YYYY-MM-DD --author A [--root ROOT]");
-        eprintln!("       keel record decision --from DRAFT.md   (prose in a file - the sanctioned path, issue255; flags override)");
-        eprintln!("           [--supersedes dNNNN[,..]] retires each target whole | [--supersedes-clause dNNNN[,..]] reverses one clause, target stays in force (D0398); draft lines `supersedes:` / `supersedes-clause:`");
-        eprintln!("       keel record issue --title T --description D --severity Critical|High|Medium|Low --resolver R --date YYYY-MM-DD [--related-task T] [--marker M] [--in-field] [--by A] [--root ROOT]");
-        eprintln!("       keel record statement --text \"<their exact words>\" | --from FILE --said-by A --said-at D --title T [--channel C]   (VERBATIM, D0216/D0236)");
-        eprintln!("       keel record story --from-statement stNNN --title T --as-a R --i-want C --implication K [--so-that O] [--triage-note W] --at D");
+        print_record_usage();
         return 2;
     }
     let root = flag(args, "root").map_or_else(
@@ -3234,7 +3267,7 @@ fn cmd_record_story(args: &[String]) -> i32 {
 
 fn cmd_add_task(args: &[String]) -> i32 {
     let Some(file_str) = flag(args, "file") else {
-        eprintln!("usage: keel add-task --file FILE --def DEF --task TASK --method METHOD");
+        eprintln!("usage: keel record task --file FILE --def DEF --task TASK --method METHOD");
         eprintln!("       --dod-from FILE   the criterion, read from a file (PREFER THIS)");
         eprintln!("       --dod TEXT        the criterion inline — a shell EXECUTES backticks in it");
         return 2;
@@ -3257,7 +3290,7 @@ fn cmd_add_task(args: &[String]) -> i32 {
         .and_then(|f| match std::fs::read_to_string(&f) {
             Ok(t) => Some(t.trim().to_string()),
             Err(e) => {
-                eprintln!("add-task: cannot read {f}: {e}");
+                eprintln!("record task: cannot read {f}: {e}");
                 None
             }
         })
@@ -3392,7 +3425,7 @@ fn cmd_indicators(args: &[String]) -> i32 {
 /// record a Measurement datapoint (D0089) for a pulled/manual indicator (write path).
 fn cmd_record_measurement(args: &[String]) -> i32 {
     let Some(indicator) = flag(args, "indicator") else {
-        eprintln!("usage: keel record-measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]");
+        eprintln!("usage: keel record measurement --indicator I --value V [--at DATE] [--source S] [--by ACTOR] [--file F]");
         return 2;
     };
     let Some(value) = flag(args, "value") else {
@@ -3500,13 +3533,13 @@ struct ReviewDisp {
     actionable: bool,
 }
 
-/// `apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]` —
+/// `record review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]` —
 /// ingest a review batch exported by `render --mode review` and write each disposition back as a new
 /// linked critique (D0086) via the write path. `accept`->pass, `finding`/`reject`->fail (a finding,
 /// which induces computed suspicion). Writes into `.tracking/critiques.sysml`.
 fn cmd_apply_review(args: &[String]) -> i32 {
     let Some(batch_str) = flag(args, "batch") else {
-        eprintln!("usage: keel apply-review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]");
+        eprintln!("usage: keel record review --batch FILE [--sha SHA] [--judged-by ACTOR] [--judged-at DATE] [--root ROOT]");
         return 2;
     };
     let root = match flag(args, "root") {
@@ -5431,14 +5464,11 @@ fn main() {
         Some("show") => cmd_show(rest),
         Some("audit") => cmd_audit(rest),
         Some("deck") => cmd_deck(rest),
-        Some("mint") => cmd_mint(rest),
-        Some("new") => cmd_new(rest),
         Some("sync-claude") => cmd_sync_claude(rest),
         Some("claude") => cmd_claude(rest),
         Some("override") => cmd_override(rest),
         Some("guard") => cmd_guard(rest),
         Some("recall") => cmd_recall(rest),
-        Some("reverify") => cmd_reverify(rest),
         // D0129/issue072: inspect or bind this machine's acting identity (never defaulted).
         Some("actor") => keel_cli::actor::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
         Some("claim") => keel_cli::claim::cmd(rest, &find_repo_root().unwrap_or_else(|| PathBuf::from("."))),
@@ -5480,12 +5510,6 @@ fn main() {
         Some("enroll") => cmd_enroll(rest),
         Some("assured") => cmd_assured(rest),
         Some("render") => cmd_render(rest),
-        Some("record-measurement") => cmd_record_measurement(rest),
-        Some("snapshot-indicators") => cmd_snapshot_indicators(rest),
-        Some("apply-review") => cmd_apply_review(rest),
-        Some("append-result") => cmd_append_result(rest),
-        Some("append-gate-result") => cmd_append_gate_result(rest),
-        Some("add-task") => cmd_add_task(rest),
         Some("accept") => cmd_accept(rest),
         Some("reject") => cmd_reject(rest), // D0393/issue414: the human's rejection through the write API
         Some("judge-set") => cmd_judge_set(rest), // D0443: the human's judgment of a sampled set of proposed results
@@ -5531,11 +5555,19 @@ mod tests {
         assert!(matches!(bash_classify(&root, "keel accept d1 --by hum"), BashVerdict::Ask(_)), "accept is never exempt");
         assert!(matches!(bash_classify(&root, "keel actor set hum"), BashVerdict::Ask(_)), "actor mutation is never exempt");
         assert!(
-            matches!(bash_classify(&root, "KEEL_ACTOR=hum keel append-result --file f --task t --sha s"), BashVerdict::Ask(_)),
+            matches!(bash_classify(&root, "keel record review --batch f"), BashVerdict::Ask(_)),
+            "D0451: apply-review's K7 protection follows it to `record review`"
+        );
+        assert!(
+            matches!(bash_classify(&root, "keel record task --file f --def D --task T"), BashVerdict::Clean),
+            "a two-token spelling that is NOT protected stays the ordinary agent write"
+        );
+        assert!(
+            matches!(bash_classify(&root, "KEEL_ACTOR=hum keel record result --file f --task t --sha s"), BashVerdict::Ask(_)),
             "writing AS a Person routes to the human channel"
         );
         assert!(
-            matches!(bash_classify(&root, "KEEL_ACTOR=someAi keel append-result --file f --task t --sha s"), BashVerdict::Clean),
+            matches!(bash_classify(&root, "KEEL_ACTOR=someAi keel record result --file f --task t --sha s"), BashVerdict::Clean),
             "writing as a non-Person is the normal agent case"
         );
         assert_eq!(bash_tokens("a \"b c\" d"), vec!["a", "b c", "d"], "quoted text glues to one token");

@@ -1262,7 +1262,7 @@ mod tests {
         std::fs::create_dir_all(dir.join(".engine/cli")).expect("mkdir");
         std::fs::write(
             dir.join(".engine/cli/commands.sysml"),
-            "part a : CliCommand { :>> name = \"add-task\"; :>> family = \"authoring\"; :>> effect = CliEffect::writes; :>> stability = CliStability::stable; :>> synopsis = \"s\"; }\n\
+            "part a : CliCommand { :>> name = \"record\"; :>> family = \"authoring\"; :>> effect = CliEffect::writes; :>> stability = CliStability::stable; :>> synopsis = \"s\"; }\n\
              part b : CliCommand { :>> name = \"orient\"; :>> family = \"orientation\"; :>> effect = CliEffect::reads; :>> stability = CliStability::stable; :>> synopsis = \"o\"; }\n\
              part c : CliCommand { :>> name = \"accept\"; :>> family = \"governance\"; :>> effect = CliEffect::writes; :>> stability = CliStability::stable; :>> synopsis = \"h\"; }\n",
         )
@@ -1274,7 +1274,7 @@ mod tests {
         assert_eq!(fbs.len(), 1);
         let accept = acts.iter().find(|a| a.name == "cmdAccept").expect("accept");
         assert_eq!(accept.issued_by, "human", "accept is the human's authority even from the agent's shell");
-        assert_eq!(acts.iter().find(|a| a.name == "cmdAddTask").expect("add-task").issued_by, "agent");
+        assert_eq!(acts.iter().find(|a| a.name == "cmdRecord").expect("record").issued_by, "agent");
         assert_eq!(fbs[0].reports_to, "agent");
     }
 

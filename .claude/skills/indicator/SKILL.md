@@ -34,7 +34,7 @@ serves. **No verify/satisfy edges** — it's excluded from the assurance/orphan 
 - **computed** (objective, repo-derived): `collectionRef` = a report name; the series is computed on
   demand via the report/trend engine — **no stored Measurements** (compute-don't-store).
 - **pulled** (objective, external): a collection skill/command queries an API/scraper (web/MCP tools),
-  then `keel record-measurement --indicator I --value V --at DATE --source ...` records the
+  then `keel record measurement --indicator I --value V --at DATE --source ...` records the
   observation (external values can't be recomputed, so they're recorded with provenance).
 - **manual** (subjective): a human gathers the value (survey/assessment) and records it the same way.
 

@@ -8,7 +8,7 @@
 //! - **binds** — whose act the control refuses: `human`, `ai` or `either`. A Claude Code hook fires on
 //!   the agent's tool call, so a hook rule binds `ai`; a guard runs on whoever commits, so it binds
 //!   `either` and the ledger says who; a write-path check binds the actor whose act the verb records -
-//!   `keel accept --by <person>` under delegation is the HUMAN's acceptance, `append-result` is the
+//!   `keel accept --by <person>` under delegation is the HUMAN's acceptance, `record result` is the
 //!   agent's verdict. The write-path table is declared here because the code is the only place the
 //!   subject is knowable; every entry names the Decision that governs it.
 //! - **blocks by actor kind** — from the ledger's non-allow lines (`control`, `actorKind`, D0424). An

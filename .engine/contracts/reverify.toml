@@ -1,10 +1,10 @@
-# Reverify command contract (D0101) — the REPRODUCIBLE gate `keel reverify` re-runs at HEAD to
-# refresh stale deliverable-drift verifications. On ALL commands exiting 0, `keel reverify --all-drift`
+# Reverify command contract (D0101) — the REPRODUCIBLE gate `keel record reverify` re-runs at HEAD to
+# refresh stale deliverable-drift verifications. On ALL commands exiting 0, `keel record reverify --all-drift`
 # appends a fresh judged-at-HEAD TestResult to each drift-suspect deliverable task (honest: stamped only
 # after the real gate passed; never fabricated). On any non-zero exit, the tasks stay suspect.
 #
 # Downstream-overridable (like critique-policy.toml): a fresh `keel init` project edits these to its own
-# reproducible gate. Absent file => `keel reverify` is a no-op that reports "no reverify command configured".
+# reproducible gate. Absent file => `keel record reverify` is a no-op that reports "no reverify command configured".
 #
 # This project's gate (mirrors .github/workflows/ci.yml + the pre-commit Rust checks):
 commands = [
@@ -14,7 +14,7 @@ commands = [
 
 # D0444 (dcReplayableDemoStaysAPass): a `method=demo` result whose `// RAN:` receipt IS a command - one
 # line, the command alone, beginning with one of these prefixes - is REPLAYABLE: the write path keeps an
-# AI-judged pass on it a `pass` instead of `proposed` (D0312 B), and `keel reverify --demos` re-runs it at
+# AI-judged pass on it a `pass` instead of `proposed` (D0312 B), and `keel record reverify --demos` re-runs it at
 # HEAD, appending a fresh pass with the same receipt or a fail naming the command and its exit code. A
 # narrative that merely starts with `keel suite 571 passed ...` is testimony and stays a proposal. A
 # leading `keel ` runs THIS binary (D0230). No section => nothing is replayable, as before D0444.

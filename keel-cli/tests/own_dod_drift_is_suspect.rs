@@ -52,11 +52,11 @@ fn editing_a_done_tasks_own_criterion_makes_it_suspect_and_restoring_clears_it()
 
     // The pass, judged against the commit that holds the agreed criterion.
     let out = Command::new(keel_bin())
-        .args(["append-result", "--file", ".tracking/backlog.sysml", "--task", "dcThing", "--sha", &agreed_at, "--verdict", "pass", "--judged-by", "claudeOpus5", "--judged-at", "2026-09-04", "--evidence", "probe"])
+        .args(["record", "result", "--file", ".tracking/backlog.sysml", "--task", "dcThing", "--sha", &agreed_at, "--verdict", "pass", "--judged-by", "claudeOpus5", "--judged-at", "2026-09-04", "--evidence", "probe"])
         .current_dir(&root)
         .env("KEEL_ACTOR", "claudeOpus5")
         .output()
-        .expect("append-result");
+        .expect("record result");
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     git(&root, &["-c", "user.email=p@x", "-c", "user.name=p", "add", "-A"]);
     git(&root, &["-c", "user.email=p@x", "-c", "user.name=p", "commit", "-q", "-m", "the pass"]);

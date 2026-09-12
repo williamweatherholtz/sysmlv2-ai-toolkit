@@ -2305,4 +2305,15 @@ package IssuesClaudeOpus5 {
         :>> severity = Severity::High;
     }
     #Resolves dependency from dcSubagentCannotCommit to issue496;
+
+    part issue497 : Issue {
+        :>> id = "0f2d0fb1-fcf8-4448-aa00-233a0abe6d12";
+        :>> title = "The D0451 fold collapses seven never-analysed write actions into cmdRecord, so stpa-currency reads better by disappearance";
+        :>> createdAt = "2026-09-11";
+        :>> createdBy = "claudeOpus5";
+        :>> description = "Found in the sprint 680 retro (D0451, the authoring fold). The STPA control structure is computed one action per CliCommand fact with effect writes (D0284), so folding nine top-level writers under keel record turned nine computed control actions into one. Measured 2026-09-11 with keel guard stpa-currency --no-receipt: on the folded tree 41 actions, 32 open; on the same tree with the fold stashed, run by keel-prefold680.exe (ceaabdd), 49 actions, 39 open. The seven that vanished - cmdAddTask, cmdAppendGateResult, cmdApplyReview, cmdNew, cmdRecordMeasurement, cmdReverify, cmdSnapshotIndicators - had never been analysed by any stpa-self run, and cmdRecord, the action they collapsed into, was analysed in run 1 as `record decision` alone (engine-ucas.sysml, ANALYSED: cmdRecord, cmdLand, cmdAppendResult). So the currency guard reads better after the fold by disappearance, not by analysis: seven unanalysed write paths are now invisible to it. Separately, the 8 UCA contexts in engine-ucas.sysml that name cmdAppendResult (grep -c, 8) now name an action the structure no longer computes; they remain true as recorded facts about `record result`, but nothing computed points a reader from the old name to the new. The same collapse will recur for gate/audit (D0452) and github (D0453) if the structure keeps one action per fact.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecordSubVerbsAreControlActions to issue497;
 }

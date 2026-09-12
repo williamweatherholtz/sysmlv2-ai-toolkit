@@ -4375,7 +4375,7 @@ fn evidence_cited(root: &Path) -> GuardReport {
                     .is_some_and(|p| p.trim_start().starts_with("// RAN:"));
             if !has {
                 violations.push(format!(
-                    "{}:{}: {} is an AI-judged method=test result with no `// RAN:` receipt - a pass nobody else can re-derive is a testimony, not a test. Pass --evidence to append-result (D0232)",
+                    "{}:{}: {} is an AI-judged method=test result with no `// RAN:` receipt - a pass nobody else can re-derive is a testimony, not a test. Pass --evidence to record result (D0232)",
                     relpath(root, f),
                     i + 1,
                     part.trim()
@@ -4813,7 +4813,7 @@ fn process_applicability(root: &Path) -> GuardReport {
 
 /// Guard 40: no `.sysml` in the model carries the scaffold's FILL-ME token (dcSprintScaffold).
 ///
-/// `keel new sprint` writes every judgment-bearing text as [`crate::scaffold::PLACEHOLDER`] so the
+/// `keel record sprint` writes every judgment-bearing text as [`crate::scaffold::PLACEHOLDER`] so the
 /// skeleton is honest about being unfilled — and THIS guard is what makes that honesty enforceable:
 /// an unfilled scaffold cannot pass a gate or be committed, by construction rather than diligence.
 /// Also in the fast per-edit tier (`keel gate --fast`), so the rejection lands at edit time.

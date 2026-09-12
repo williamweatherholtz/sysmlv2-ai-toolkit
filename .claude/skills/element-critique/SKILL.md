@@ -77,7 +77,7 @@ at HEAD. Read state from tooling, not memory.
    link `#DependsOn dependency from <issueNNN> to <critiqueTest>;` (D0102) — so a later ACCEPT-RISK/DISMISS
    disposition clears the target's `critique_suspect` via a typed path (never prose).
 4. **Disposition (D0092):** for every >= Medium finding, get the human's TYPED verdict and record it
-   via `keel apply-review` (batch verdict `act`/`accept-risk`/`dismiss` on the finding Issue) — a
+   via `keel record review` (batch verdict `act`/`accept-risk`/`dismiss` on the finding Issue) — a
    `#Dispositions`-linked `method=confirmation` verification carrying `disposition : DispositionKind`,
    never prose. ACCEPT-RISK/DISMISS close the finding; ACT also needs a `#Resolves` resolver. Critical
    must be fixed or risk-accepted. Low is AI-dispositioned. Read state via `keel show dispositions`.

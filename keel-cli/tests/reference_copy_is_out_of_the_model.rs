@@ -60,11 +60,11 @@ fn a_downstream_model_holds_no_foreign_attestation_after_a_fact_is_recorded() {
         "package ProbeBacklog {\n    private import EngineElement::*;\n    private import EngineWork::*;\n    private import EngineVerification::*;\n    private import EngineRelationships::*;\n\n    action def ProbeBuild {\n    }\n}\n",
     )
     .expect("backlog");
-    let (code, out) = keel(&root, &["add-task", "--file", ".tracking/backlog.sysml", "--def", "ProbeBuild", "--task", "dcProbe", "--method", "test", "--dod", "a probe fact so the model holds one result of its own"]);
-    assert_eq!(code, 0, "add-task: {out}");
+    let (code, out) = keel(&root, &["record", "task", "--file", ".tracking/backlog.sysml", "--def", "ProbeBuild", "--task", "dcProbe", "--method", "test", "--dod", "a probe fact so the model holds one result of its own"]);
+    assert_eq!(code, 0, "record task: {out}");
     let head = String::from_utf8_lossy(&Command::new("git").arg("-C").arg(&root).args(["rev-parse", "--short", "HEAD"]).output().expect("git").stdout).trim().to_string();
-    let (code, out) = keel(&root, &["append-result", "--file", ".tracking/backlog.sysml", "--task", "dcProbe", "--sha", &head, "--verdict", "pass", "--judged-by", "claudeOpus5", "--judged-at", "2026-09-04", "--evidence", "probe"]);
-    assert_eq!(code, 0, "append-result: {out}");
+    let (code, out) = keel(&root, &["record", "result", "--file", ".tracking/backlog.sysml", "--task", "dcProbe", "--sha", &head, "--verdict", "pass", "--judged-by", "claudeOpus5", "--judged-at", "2026-09-04", "--evidence", "probe"]);
+    assert_eq!(code, 0, "record result: {out}");
 
     // THE MODEL'S ATTESTATIONS: exactly the one recorded here, and none judged by keel's own human.
     let (_, census) = keel(&root, &["show", "attestation", "."]);

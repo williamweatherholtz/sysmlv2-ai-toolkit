@@ -41,7 +41,7 @@ Stop there. That sentence is the only detector that exists; no gate can read sur
    predicate usually does both, on different inputs.
 
 4. **Ask what it PASSED while broken.** The step no ordinary defect has. Three honest answers, and
-   only these: **re-checked** (say how — usually `keel reverify`), **accepted as-is** (say why, and
+   only these: **re-checked** (say how — usually `keel record reverify`), **accepted as-is** (say why, and
    make it read like the judgment it is), or **not re-checked** (say so). Silence is the one
    unacceptable answer, because silence reads as *re-checked* to everyone who comes later.
 

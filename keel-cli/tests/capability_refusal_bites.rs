@@ -126,6 +126,54 @@ fn the_lens_inventory_matches_the_router() {
     );
 }
 
+/// Every sub-verb `keel record` routes must open a segment of the `record` fact's invocation, and
+/// vice versa (D0451).
+///
+/// The lens argument one level further down. Sprint 679's retro found `cmd_show`'s printed lens list
+/// three names behind its arms; D0451 then gave `record` nine more sub-verbs whose only declared
+/// inventory is the invocation string in `cli_facts.rs` - the text `--help` renders and the surface
+/// guard holds equal to `commands.sysml`. A sub-verb routed but not declared is invisible to help; one
+/// declared but not routed is a documented command that prints the usage. Both are read from source
+/// so the drift the 679 retro named cannot recur silently here.
+#[test]
+fn the_record_sub_verbs_match_the_fact() {
+    let src = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("main.rs"))
+        .expect("main.rs is readable");
+    let mut routed: Vec<String> = Vec::new();
+    for head in ["fn record_authoring_subverb(args: &[String]) -> Option<i32> {", "fn cmd_record(args: &[String]) -> i32 {"] {
+        let start = src.find(head).expect("the router exists");
+        let block = &src[start..start + src[start..].find("\n}\n").expect("the router closes")];
+        for line in block.lines().map(str::trim_start).filter(|l| (l.starts_with("Some(\"") || l.starts_with('"')) && l.contains("=>")) {
+            let Some(tok) = line.split('"').nth(1) else { continue };
+            if tok.chars().all(|c| c.is_ascii_lowercase() || c == '-') {
+                routed.push(tok.to_string());
+            }
+        }
+        // the `decision` arm is the fall-through after the usage check, not a `Some("decision")` line
+        if block.contains("!= Some(\"decision\")") {
+            routed.push("decision".to_string());
+        }
+    }
+    routed.sort();
+    routed.dedup();
+    assert!(routed.len() >= 13, "the parser must find the router's arms, or this proves nothing: {routed:?}");
+
+    let fact = keel_cli::cli_facts::CLI_FACTS.iter().find(|f| f.name == "record").expect("the record fact");
+    let mut declared: Vec<String> = fact
+        .invocation
+        .split('|')
+        .filter_map(|seg| seg.split_whitespace().next())
+        .filter(|w| !w.starts_with('-') && w.chars().all(|c| c.is_ascii_lowercase() || c == '-'))
+        .map(str::to_string)
+        .collect();
+    declared.sort();
+    declared.dedup();
+    let undeclared: Vec<&String> = routed.iter().filter(|c| !declared.contains(c)).collect();
+    let unrouted: Vec<&String> = declared.iter().filter(|c| !routed.contains(c)).collect();
+    assert!(undeclared.is_empty(), "routed by `keel record` but absent from the fact's invocation (so from --help): {undeclared:?}");
+    assert!(unrouted.is_empty(), "named in the record fact's invocation but NOT routed: {unrouted:?}");
+}
+
 /// The old lens spellings are GONE, not aliased (D0273 — the human chose the clean break).
 #[test]
 fn a_retired_lens_verb_is_no_longer_a_command() {

@@ -340,7 +340,7 @@ fn pre_push_refuses_a_main_push_that_is_not_a_fast_forward_of_the_trunk() {
 
 // ── ctlReverify ───────────────────────────────────────────────────────────────────────────────────
 
-/// `keel reverify` against a REAL drift-suspect task: a failing gate stamps NOTHING, a passing gate
+/// `keel record reverify` against a REAL drift-suspect task: a failing gate stamps NOTHING, a passing gate
 /// stamps exactly one fresh result. The first draft of this probe had no drift-suspect task, so its
 /// no-stamp assertion passed VACUOUSLY — reverify had nothing it could have stamped. A probe that
 /// cannot fail is a decoration, so the fixture manufactures real drift: a task verified at commit 1
@@ -384,7 +384,7 @@ fn reverify_stamps_nothing_on_a_red_gate_and_exactly_one_result_on_green() {
     )
     .expect("red contract");
     let before = count_results(&root);
-    let out = Command::new(keel_bin()).args(["reverify", "--all-drift"]).current_dir(&root).output().expect("reverify");
+    let out = Command::new(keel_bin()).args(["record", "reverify", "--all-drift"]).current_dir(&root).output().expect("reverify");
     assert_eq!(
         before,
         count_results(&root),
@@ -399,7 +399,7 @@ fn reverify_stamps_nothing_on_a_red_gate_and_exactly_one_result_on_green() {
         "commands = [\"git --version\"]\n",
     )
     .expect("green contract");
-    let out = Command::new(keel_bin()).args(["reverify", "--all-drift"]).current_dir(&root).output().expect("reverify");
+    let out = Command::new(keel_bin()).args(["record", "reverify", "--all-drift"]).current_dir(&root).output().expect("reverify");
     assert_eq!(
         before + 1,
         count_results(&root),

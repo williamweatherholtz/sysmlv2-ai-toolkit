@@ -1,4 +1,4 @@
-//! `keel reverify --demos` (D0444 on D0312 B): a `method=demo` pass whose `// RAN:` receipt IS a command
+//! `keel record reverify --demos` (D0444 on D0312 B): a `method=demo` pass whose `// RAN:` receipt IS a command
 //! under a prefix the project's `reverify.toml` declares replayable is a PASS at the write, not a
 //! proposal, and `--demos` re-runs every such receipt at HEAD:
 //!   1. a receipt whose replay exits 0 gets a fresh `pass` carrying the SAME receipt;
@@ -99,7 +99,7 @@ fn outcome_of(text: &str, part: &str) -> String {
 }
 
 fn gate(root: &Path, test: &str, evidence: &str) -> (bool, String) {
-    agent(root, &["append-gate-result", "--file", FILE, "--gate", test, "--sha", "abc1234", "--verdict", "pass", "--judged-by", "ai", "--judged-at", "2026-09-11", "--evidence", evidence])
+    agent(root, &["record", "gate-result", "--file", FILE, "--gate", test, "--sha", "abc1234", "--verdict", "pass", "--judged-by", "ai", "--judged-at", "2026-09-11", "--evidence", evidence])
 }
 
 /// D0388 pair, named before the tree is read. Positive: `keel version` (this binary, exit 0) replays
@@ -127,7 +127,7 @@ fn a_replayable_demo_receipt_stays_a_pass_and_demos_replays_it_recording_each_ve
     assert!(json.contains("\"demoReplayable\":2,\"demoProposed\":1"), "{json}");
 
     // --demos re-runs the two receipts and records each verdict at HEAD
-    let (ok, out) = agent(&root, &["reverify", "--demos", "--by", "ai", "."]);
+    let (ok, out) = agent(&root, &["record", "reverify", "--demos", "--by", "ai", "."]);
     assert!(!ok, "one replay fails, so the exit is 1: {out}");
     assert!(out.contains("re-running 2 replayable demo receipt(s)"), "{out}");
     assert!(out.contains("dGreen pass - `keel version`"), "{out}");
@@ -158,7 +158,7 @@ fn without_a_demo_section_every_demo_pass_is_a_proposal_and_demos_is_inert() {
     let t = file_text(&root);
     assert_eq!(outcome_of(&t, "dGreenR1"), "proposed", "{t}");
     let out = Command::new(keel_bin())
-        .args(["reverify", "--demos", "--by", "ai", "."])
+        .args(["record", "reverify", "--demos", "--by", "ai", "."])
         .current_dir(&root)
         .env("KEEL_ACTOR", "ai")
         .stdin(Stdio::null())

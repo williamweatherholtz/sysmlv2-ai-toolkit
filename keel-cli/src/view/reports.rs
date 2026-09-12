@@ -664,7 +664,7 @@ fn flow_cards(root: &Path, model: &Model, orient: &crate::orient::Output) -> Vec
 /// requirement VERIFIABLE — "the write path beats a spreadsheet" becomes a checkable claim.
 fn friction_cards() -> Vec<Json> {
     vec![
-        card("Write API: record a fact", "1 command".to_string(), "append-result / append-gate-result / add-task / apply-review — one invocation, with auto UUID + who/when/commit provenance + append-only enforcement".to_string(), "good"),
+        card("Write API: record a fact", "1 command".to_string(), "record result / record gate-result / record task / record review (D0451) — one invocation, with auto UUID + who/when/commit provenance + append-only enforcement".to_string(), "good"),
         card("Hand-edit .sysml", "~6 steps".to_string(), "open file, locate the DoD, author the TestResult line, generate a UUID, find the insertion point, save — error-prone, no enforcement".to_string(), "warn"),
         card("Spreadsheet (baseline)", "1 row".to_string(), "fast to type, but NO provenance, NO validation, NO computed resolution/suspicion — the JPL friction trap (D0054)".to_string(), "warn"),
         card("Verdict vs spreadsheet", "beats it".to_string(), "the write path ties the spreadsheet on steps (1 command) and dominates on provenance + validation + computed state — satisfies the D0054 first-class friction requirement".to_string(), "good"),
@@ -1040,7 +1040,7 @@ document.getElementById('q').addEventListener('input',function(e){filter=e.targe
 
 const REVIEW_TEMPLATE: &str = r#"<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>keel review</title>
-<meta name="generator" content="keel render --mode review (computed #View; capture is exported to JSON for apply-review)">
+<meta name="generator" content="keel render --mode review (computed #View; capture is exported to JSON for keel record review)">
 /*STYLE*/</head><body>
 <header><h1>keel review · <span id="vn"></span></h1><p id="cn"></p></header>
 <div id="bar">
@@ -1160,7 +1160,7 @@ fn graph_elements(model: &Model, only: Option<&HashSet<String>>) -> Vec<Json> {
 /// Renders a declared view as self-contained HTML in one of three modes — `graph` (cytoscape; the
 /// whole model when `view` is `model`/`all`, else the view's selected subgraph), `table`
 /// (sortable/searchable rows), or `review` (table + per-row accept/finding + rationale capture with
-/// a JSON export for `apply-review`). A computed `#View`: regenerate on demand, never commit as truth.
+/// a JSON export for `keel record review`). A computed `#View`: regenerate on demand, never commit as truth.
 ///
 /// # Errors
 /// Returns [`ViewError`] for an unknown mode, a missing/invalid view, or a parse failure.
@@ -1206,7 +1206,7 @@ fn view_columns(spec: &ViewSpec, model: &Model, result: &HashSet<String>) -> Vec
 }
 
 /// Render a view's rows as either a read-only table or a review surface (extra capture columns +
-/// an Export-JSON button that emits a batch consumable by `keel apply-review`).
+/// an Export-JSON button that emits a batch consumable by `keel record review`).
 fn table_or_review_html(spec: &ViewSpec, model: &Model, result: &HashSet<String>, review: bool) -> String {
     let cols = view_columns(spec, model, result);
     let mut names: Vec<&String> = result.iter().collect();

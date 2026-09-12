@@ -525,21 +525,21 @@ fn detect_indent(lines: &[&str], def_start: usize, def_close: usize) -> String {
 
 /// The write-API operation table with the DECLARED human-judgment attribute (D0178).
 ///
-/// The protected set is DERIVED from this, never hand-enumerated at call sites — `apply-review` is
-/// the case a hand list misses. `true` = records a HUMAN's judgment / mutates control state and is
+/// The protected set is DERIVED from this, never hand-enumerated at call sites — `record review` (once
+/// `apply-review`, D0451) is the case a hand list misses. `true` = records a HUMAN's judgment / mutates control state and is
 /// never agent-exempt.
 pub const WRITE_OPS: &[(&str, bool)] = &[
     ("accept", true),
-    ("apply-review", true),
+    ("record review", true), // D0451: the fold moved apply-review under record; the control follows the verb
     ("actor", true),  // actor-identity mutation (K7)
     ("enroll", true), // Person enrollment (K7)
     ("deactivate", true), // control weakening (K7)
     ("record", false),
-    ("add-task", false),
-    ("append-result", false),
-    ("append-gate-result", false),
-    ("new", false),
-    ("mint", false),
+    ("record task", false),
+    ("record result", false),
+    ("record gate-result", false),
+    ("record sprint", false),
+    ("record mint", false),
     ("override", false),
 ];
 
@@ -665,7 +665,7 @@ fn proposed_tier<'a>(path: &Path, pkg: &Package, verification: &str, verdict: &'
         return verdict;
     };
     // D0444: a demo whose receipt IS a command the project's contract declares replayable is exercised
-    // in substance - `keel reverify --demos` re-runs it - so the pass stands. Demo only: an inspect or
+    // in substance - `keel record reverify --demos` re-runs it - so the pass stands. Demo only: an inspect or
     // analyze names what was looked at, and re-running a command does not repeat the looking.
     if verification_declares_method(pkg, verification, "demo") && evidence.is_some_and(|e| crate::reverify::is_replayable(&root, e)) {
         return verdict;
@@ -2524,7 +2524,7 @@ mod tests {
         assert_eq!(outcome_of(&u), "proposed", "a project that never adopted the section has adopted nothing");
     }
 
-    /// dcMintCommand (us019): what `keel mint` prints must satisfy guard 38's OWN shape predicate,
+    /// dcMintCommand (us019): what `keel record mint` prints must satisfy guard 38's OWN shape predicate,
     /// and 10000 mints contain no duplicate. The command exists so identity is never hand-authored;
     /// checking against the guard's predicate (not a re-derivation) keeps mint and guard one truth.
     #[test]
@@ -2557,7 +2557,7 @@ mod tests {
         );
         for m in &members {
             super::add_task(&path, "Work", &format!("dc{m}"), "a criterion", m)
-                .unwrap_or_else(|e| panic!("VerificationMethod::{m} is declared in the schema but refused by add-task: {e}"));
+                .unwrap_or_else(|e| panic!("VerificationMethod::{m} is declared in the schema but refused by record task: {e}"));
         }
         let written = std::fs::read_to_string(&path).expect("read back");
         for m in &members {

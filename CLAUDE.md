@@ -56,7 +56,7 @@ D0333), `intake`, `control-structure [--svg]` (D0284/D0285; analyse with skill `
 = friction/hypothetical; `ucas` D0428), `why <term>`, `knowledge question-coverage` (D0161), `hardening`
 (D0169/D0434), `authority-queue` (what waits for the human). Reports: `keel render report
 <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any view:
-`keel render <view> --mode graph|table|review`; a review round-trips via `keel apply-review`.
+`keel render <view> --mode graph|table|review`; a review round-trips via `keel record review`.
 
 ---
 
@@ -84,12 +84,12 @@ Change Request cross-cuts and is itself frozen.
 - Write API only; direct edits for what it doesn't cover. Writes are atomic + serialised on
   `.keel-write-lock`; a lock miss fails loudly (issue184/185).
 - Prose goes through a FILE, never a double-quoted shell arg — the shell executes backticks into the record
-  (D0224, four times). `record decision --from F`, `record issue --description-from F`, `add-task --dod-from F`,
-  `new sprint N slug --charter dNNNN --points P --fill F` (D0301: writes no result).
-- Results: `append-result` / `append-gate-result --evidence "<what ran>"`. AI `method=test` with no `// RAN:`
+  (D0224, four times). `record decision --from F`, `record issue --description-from F`, `record task --dod-from F`,
+  `record sprint N slug --charter dNNNN --points P --fill F` (D0301: writes no result). Nine authoring verbs are `record` sub-verbs (D0451).
+- Results: `record result` / `record gate-result --evidence "<what ran>"`. AI `method=test` with no `// RAN:`
   receipt is refused at the write (D0232/D0424). `ci-run id=<id> workflow=<name>` is verified by CI (D0323).
   A demo receipt that IS a command under `[demo] replayable` (`.engine/contracts/reverify.toml`) stays a pass
-  and `keel reverify --demos` re-runs it (D0444). Other AI-examined passes land `proposed` (D0312 B);
+  and `keel record reverify --demos` re-runs it (D0444). Other AI-examined passes land `proposed` (D0312 B);
   `keel judge-set` is the human's judgment.
 - `record statement` / `record story`: human words VERBATIM, then the story with `#DerivedFrom` (D0236).
   Elicit pain, not features; never offer a menu (D0216). A Need with no `#DerivedFrom` says it is my judgment.
@@ -161,8 +161,8 @@ keel guard [--no-receipt]  # all forward guards; catalogue .engine/docs/guards.m
 keel gate --fast           # per-edit tier
 keel gate --workspace      # commit tier, multi-project
 keel show enforcement-report    # hook fires, blocks, latency distribution, refusals (D0389/D0424)
-keel reverify --all-drift  # re-run gate at HEAD, fresh results on green (D0101)
-keel reverify --demos      # re-run replayable demo receipts (D0444)
+keel record reverify --all-drift  # re-run gate at HEAD, fresh results on green (D0101)
+keel record reverify --demos      # re-run replayable demo receipts (D0444)
 ```
 
 - Green guard answers from `.keel/metrics/guard-receipt.toml` when inputs are equal (D0371); red deletes it.

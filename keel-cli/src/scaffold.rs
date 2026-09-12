@@ -1,4 +1,4 @@
-//! `keel new sprint` — the engine scaffolds the ceremony record, so identity and structure are never
+//! `keel record sprint` — the engine scaffolds the ceremony record, so identity and structure are never
 //! hand-authored (us019/st013: "we should be programatically creating UUIDs, not via AI diligence").
 //!
 //! WHAT IT REFUSES TO GUESS. Every id is minted (`write::gen_uuid`); dates come from the real clock;
@@ -9,7 +9,7 @@
 //! pass a gate or be committed, by construction rather than by diligence.
 //!
 //! No `TestResult`s are generated: results are appended when a gate is actually judged
-//! (`append-gate-result`), never pre-created.
+//! (`record gate-result`), never pre-created.
 
 use crate::write::gen_uuid;
 use std::fmt::Write as _;
@@ -54,7 +54,7 @@ pub const FILL_KEYS: [&str; 8] = ["purpose", "dod", "refine", "standup", "implem
 /// directly, bypassing actor validation, the write lock, the confirmation refusal and the evidence
 /// receipt, and double-stamping results the API wrote. This writes PROSE ONLY: the purpose, the `DoD`
 /// text and the six gates' text, sanitised like every other API field. It writes NO `TestResult` -
-/// every verdict comes later from `append-result` / `append-gate-result`, so there is one write path
+/// every verdict comes later from `record result` / `record gate-result`, so there is one write path
 /// and one result per test. A missing or empty section is REFUSED by name rather than left as a
 /// placeholder the fast gate would catch later.
 ///

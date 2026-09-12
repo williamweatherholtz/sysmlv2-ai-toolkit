@@ -233,7 +233,7 @@ def report(c: dict) -> None:
         for fp in c["alphabetFalsePositives"]:
             print(f"    {fp['at']}: {fp['text']}")
     if c["admittedUnderFullRule"]:
-        print("  admitted under the full rule (each IS a command `keel reverify --demos` may run):")
+        print("  admitted under the full rule (each IS a command `keel record reverify --demos` may run):")
         for r in c["admittedUnderFullRule"]:
             print(f"    {r['at']}: {r['text']}")
     else:

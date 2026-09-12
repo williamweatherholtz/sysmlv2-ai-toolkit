@@ -1,4 +1,4 @@
-//! `keel reverify` (D0101) — auto-re-verify drift-suspect REPRODUCIBLE `method=test` verifications by
+//! `keel record reverify` (D0101) — auto-re-verify drift-suspect REPRODUCIBLE `method=test` verifications by
 //! actually re-running the configured gate at HEAD and appending a fresh `TestResult` on green.
 //!
 //! Honest by construction: a fresh result is stamped ONLY after the real command passed at HEAD — it
@@ -6,7 +6,7 @@
 //! (confirmation/inspect/analyze) are out of scope; only reproducible deliverable-drift tasks are
 //! refreshed. The reverify gate is declared in `.engine/contracts/reverify.toml` (downstream-overridable).
 //!
-//! `keel reverify --demos` (D0444) is the one examined method that crosses over: a `method=demo` pass
+//! `keel record reverify --demos` (D0444) is the one examined method that crosses over: a `method=demo` pass
 //! whose `// RAN:` receipt IS a command beginning with a prefix the contract declares under
 //! `[demo] replayable` is exercised in substance, so the write path keeps it a `pass` (`is_replayable`,
 //! read by `write::proposed_tier`) and `--demos` re-runs it at HEAD - a fresh pass with the same receipt,
@@ -25,7 +25,7 @@ struct ReverifyConfig {
 }
 
 /// `[demo]` (D0444): the command prefixes a `method=demo` receipt may begin with to count as
-/// REPLAYABLE - a command the project declares safe for `keel reverify --demos` to run.
+/// REPLAYABLE - a command the project declares safe for `keel record reverify --demos` to run.
 #[derive(serde::Deserialize, Default)]
 struct DemoConfig {
     #[serde(default)]
@@ -221,7 +221,7 @@ fn replay_status(root: &Path, replay: &Replay) -> Option<i32> {
         .and_then(|s| s.code())
 }
 
-/// `keel reverify --demos` (D0444): re-run every replayable demo receipt at HEAD and record each verdict.
+/// `keel record reverify --demos` (D0444): re-run every replayable demo receipt at HEAD and record each verdict.
 ///
 /// A fresh `pass` carrying the SAME receipt on exit 0, a `fail` naming the command and its exit code
 /// otherwise. The verdict is a line the replay produced, never an assertion about it.
@@ -254,7 +254,7 @@ pub fn replay_demos(root: &Path, by: &str) -> i32 {
             other => {
                 failed += 1;
                 let code_text = other.map_or_else(|| "no exit code (killed or not started)".to_string(), |c| format!("exit {c}"));
-                ("fail", format!("replay of {} -> {code_text} (keel reverify --demos at {head})", r.command))
+                ("fail", format!("replay of {} -> {code_text} (keel record reverify --demos at {head})", r.command))
             }
         };
         let written = r.task.as_ref().map_or_else(
@@ -326,7 +326,7 @@ fn run_shell(root: &Path, cmd: &str) -> bool {
     c.current_dir(root).env("CARGO_TARGET_DIR", root.join("target").join("reverify")).status().is_ok_and(|s| s.success())
 }
 
-/// Run `keel reverify`: re-run the configured gate at HEAD and stamp a fresh result on green.
+/// Run `keel record reverify`: re-run the configured gate at HEAD and stamp a fresh result on green.
 ///
 /// On all commands exiting 0, appends a fresh `TestResult` to each drift-suspect task. Returns a process
 /// exit code (0 = ok/no-op, 1 = gate failed, 2 = config error).
@@ -368,7 +368,7 @@ pub fn run(root: &Path, task_filter: Option<&str>, by: &str) -> i32 {
         match find_task_file(root, task) {
             Some(file) => // reverify RE-RAN the declared gate, so unlike a hand-stamped result it can say exactly
                 // what produced the verdict (D0232).
-                match crate::write::append_result(&file, task, &head, "pass", &date, by, Some("keel reverify --all-drift (re-ran the declared gate at HEAD)")) {
+                match crate::write::append_result(&file, task, &head, "pass", &date, by, Some("keel record reverify --all-drift (re-ran the declared gate at HEAD)")) {
                 Ok(id) => {
                     stamped += 1;
                     println!("reverify: {task} re-verified pass @ {head} ({id})");
@@ -454,7 +454,7 @@ mod tests {
             verification bDemo : Test { :>> id = \"e2e00000-0000-4000-8000-0000000000b1\"; :>> method = VerificationMethod::demo; :>> procedureText = \"then broke\"; }\n\
             // RAN: keel show priority .\n\
             part bDemoR1 : TestResult { :>> id = \"e2e00000-0000-4000-8000-0000000000b2\"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = \"abc1234\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"bot\"; }\n\
-            // RAN: replay of keel show priority . -> exit 2 (keel reverify --demos at abc1235)\n\
+            // RAN: replay of keel show priority . -> exit 2 (keel record reverify --demos at abc1235)\n\
             part bDemoR2 : TestResult { :>> id = \"e2e00000-0000-4000-8000-0000000000b3\"; :>> outcome = VerdictKind::fail; :>> judgedAgainst = \"abc1235\"; :>> judgedAt = \"2026-09-11\"; :>> judgedBy = \"bot\"; }\n\
             verification cDemo : Test { :>> id = \"e2e00000-0000-4000-8000-0000000000c1\"; :>> method = VerificationMethod::demo; :>> procedureText = \"prose\"; }\n\
             // RAN: keel suite 571 passed 0 failed (receipt 199146c397b7)\n\

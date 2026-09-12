@@ -17,7 +17,7 @@ keel is the tooling (like `git`). Read this before doing anything.
   Consult `.engine/reference/` to understand *why* the engine works the way it does.
 - **The `keel` CLI is the authority.** State is never read from prose — it is **computed**:
   `keel show orient .` (where things stand / what's ready), `keel show whats-next .`, `keel validate .`,
-  `keel guard .`. Author facts via the write API (`keel add-task`, `keel append-result`, …).
+  `keel guard .`. Author facts via the write API (`keel record task`, `keel record result`, …).
 
 New here? Run the guided **`introduction`** skill (`keel` deploys it) — it onboards you by
 capturing this project's first real need and running the first sprint.
@@ -62,7 +62,7 @@ out** (in parallel where possible). **No action is taken that is not tied to a p
 
 ## 4. Working rules
 
-- **Use the write API** (`keel add-task` / `append-result` / …) — it enforces UUIDs and
+- **Use the write API** (`keel record task` / `keel record result` / …) — it enforces UUIDs and
   append-only semantics. Hand-edit `.sysml` only when the API doesn't cover the operation.
 - **Substantive work goes through a sprint** (refine → standup → implement → review → closeOut
   → retro); only trivial one-off edits are exempt.
