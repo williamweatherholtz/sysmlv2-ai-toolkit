@@ -54,7 +54,7 @@ D0333), `intake`, `control-structure [--svg]` (D0284/D0285; analyse with skill `
 `attestation` (D0232/D0312: receipt vs testimony; `proposed` = AI-examined pass awaiting a human),
 `controls` (D0195/D0298), `control-census` (D0426: every control by whose act it binds; `removalCandidates`
 = friction/hypothetical; `ucas` D0428), `why <term>`, `knowledge question-coverage` (D0161), `hardening`
-(D0169/D0434), `authority-queue` (what waits for the human). Reports: `keel render report
+(D0169/D0434; `stepTrigger` = each adopted step hook / gate / memory, us102), `authority-queue` (what waits for the human). Reports: `keel render report
 <assurance|traceability|quality-debt|flow|governance|friction> [--html] [--trend]`. Any view:
 `keel render <view> --mode graph|table|review`; a review round-trips via `keel record review`.
 

@@ -39,6 +39,7 @@ pub fn hardening(root: &Path) -> Result<String, crate::view::ViewError> {
         ("helpCoverage".to_string(), help_coverage(root)),
         ("processEnforcement".to_string(), process_enforcement(root)),
         ("stepEnforcement".to_string(), step_enforcement(root)),
+        ("stepTrigger".to_string(), step_trigger(root)),
         ("decisionFollowThrough".to_string(), decision_follow_through(root)),
         ("apiSurface".to_string(), api_surface(root)),
         ("enforcementPoints".to_string(), enforcement_points(root)),
@@ -353,6 +354,276 @@ fn step_enforcement(root: &Path) -> Json {
     ])
 }
 
+
+// ── lens 2c: what MAKES each adopted step happen? hook / gate / memory (us102) ───────────────────
+
+/// The hook events the harness fires, as the hook config declares them (`.claude/settings.json`
+/// `hooks` keys) plus the git hooks present under `.githooks/`. Read, never assumed: a step that names
+/// an event nothing is configured to fire is MEMORY with a note, not HOOK.
+fn configured_hook_events(root: &Path) -> Vec<String> {
+    let mut out: Vec<String> = std::fs::read_to_string(root.join(".claude").join("settings.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("hooks").and_then(|h| h.as_object().map(|o| o.keys().cloned().collect())))
+        .unwrap_or_default();
+    if let Ok(rd) = std::fs::read_dir(root.join(".githooks")) {
+        for e in rd.flatten() {
+            if e.path().is_file() {
+                out.push(e.file_name().to_string_lossy().to_string());
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Per ADOPTED `ProcessStep`: what makes it happen, in the three classes the human named (us102,
+/// st111: "Do they fire before the prompt? before work is done? after as a post-processing?").
+///
+/// * `hook` - the step's own `triggerCondition` names, verbatim, a hook event the config fires
+///   (`configured_hook_events`). The harness carries the step; nobody has to remember it.
+/// * `gate` - the step's `checkedBy` resolves: `gate:<phase>` is refused by `keel advance --to`
+///   while red (D0435/D0436); a guard is run by the Stop hook and the commit tier, which block on
+///   red (D0130/D0177); a declared rule blocks the turn when blocking and reports when warning. The
+///   step may be forgotten, but passage is refused until it is done.
+/// * `memory` - neither. An agent has to remember, which is the class the human named as the
+///   failure. Each carries the hook point that WOULD carry it, derived from the step's place in its
+///   process's `first A then B` succession: no predecessor -> before the work (the refine gate); no
+///   successor -> after it (the retro gate / Stop); both -> before the turn (a `UserPromptSubmit`
+///   checklist line, the form the route-first reminder already takes); no succession at all -> before
+///   the turn, because the process declares no work-relative point. A PROPOSAL, never a hook: this
+///   lens adds nothing to the config (the `DoD` of `dcProcessStepsAreHookGateOrMemory`).
+///
+/// Population is the units `activation.toml` names active (`Activation::is_process_active`); an absent
+/// manifest means every unit, the D0138 default. A bound name that resolves to nothing is `unresolved`
+/// (the `step-check-resolves` guard's violation), never hidden by a class. AN INDICATOR, NEVER A GATE:
+/// gating the memory count would make the cheapest fix a `triggerCondition` that names an event.
+fn step_trigger(root: &Path) -> Json {
+    let activation = crate::activation::Activation::load(root);
+    let events = configured_hook_events(root);
+    let names = crate::guards::declared_check_names(root);
+    let guard_names: std::collections::HashSet<&str> = crate::guards::GUARD_NAMES.iter().copied().collect();
+    let bound: std::collections::BTreeMap<(String, String), String> = crate::guards::step_check_bindings(root)
+        .into_iter()
+        .map(|(path, _, step, name)| {
+            let unit = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            ((unit, step), name)
+        })
+        .collect();
+    let (mut hook_rows, mut gate_rows, mut unresolved) = (Vec::new(), Vec::new(), Vec::new());
+    let mut memory_by_process: Vec<Json> = Vec::new();
+    let (mut memory, mut adopted_units, mut skipped_units) = (0usize, 0usize, 0usize);
+    for f in crate::collect_sysml(&root.join(".engine/processes")) {
+        let Ok(text) = std::fs::read_to_string(&f) else { continue };
+        let unit = f.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        if !activation.is_process_active(&unit) {
+            skipped_units += 1;
+            continue;
+        }
+        adopted_units += 1;
+        let steps = process_steps(&text);
+        let (preds, succs) = successions(&text);
+        // memory rows grouped by the enclosing process, in declaration order
+        let mut groups: Vec<(String, Vec<Json>)> = Vec::new();
+        for s in &steps {
+            if let Some(check) = bound.get(&(unit.clone(), s.name.clone())) {
+                if names.contains(check) {
+                    gate_rows.push(gate_row(&unit, s, check, guard_names.contains(check.as_str())));
+                } else {
+                    unresolved.push(Json::s(format!("{unit}:{}:{} -> {check}", s.process, s.name)));
+                }
+                continue;
+            }
+            if let Some(ev) = events.iter().find(|ev| s.trigger.contains(ev.as_str())) {
+                hook_rows.push(Json::Obj(vec![
+                    ("unit".to_string(), Json::s(unit.clone())),
+                    ("process".to_string(), Json::s(s.process.clone())),
+                    ("step".to_string(), Json::s(s.name.clone())),
+                    ("event".to_string(), Json::s(ev.clone())),
+                ]));
+                continue;
+            }
+            memory += 1;
+            let row = Json::Obj(vec![
+                ("step".to_string(), Json::s(s.name.clone())),
+                ("proposedHookPoint".to_string(), Json::s(proposed_point(preds.contains(&s.name), succs.contains(&s.name)))),
+            ]);
+            match groups.iter_mut().find(|(p, _)| *p == s.process) {
+                Some((_, rows)) => rows.push(row),
+                None => groups.push((s.process.clone(), vec![row])),
+            }
+        }
+        for (process, rows) in groups {
+            memory_by_process.push(Json::Obj(vec![
+                ("unit".to_string(), Json::s(unit.clone())),
+                ("process".to_string(), Json::s(process)),
+                ("steps".to_string(), Json::Arr(rows)),
+            ]));
+        }
+    }
+    let total = hook_rows.len() + gate_rows.len() + memory + unresolved.len();
+    let memory_note = memory_note(memory, total);
+    Json::Obj(vec![
+        (
+            "note".to_string(),
+            Json::s(
+                "What MAKES each adopted step happen (us102): HOOK - the step's triggerCondition names a \
+                 configured hook event verbatim, so the harness fires it; GATE - its checkedBy resolves, \
+                 so passage (keel advance, the Stop hook, the commit tier) is refused until it is done; \
+                 MEMORY - an agent has to remember. Every adopted step is in exactly one class or in \
+                 `unresolved` (the step-check-resolves guard's violation). The memory list's hook points \
+                 are PROPOSALS derived from `first A then B` order; this lens adds no hook.",
+            ),
+        ),
+        ("configuredEvents".to_string(), Json::Arr(events.iter().map(|e| Json::s(e.clone())).collect())),
+        ("adoptedUnits".to_string(), count(adopted_units)),
+        ("notAdoptedUnits".to_string(), count(skipped_units)),
+        ("steps".to_string(), count(total)),
+        ("hook".to_string(), count(hook_rows.len())),
+        ("gate".to_string(), count(gate_rows.len())),
+        ("memory".to_string(), count(memory)),
+        ("memoryPct".to_string(), measured(pct(memory, total), "no adopted steps")),
+        ("hookSteps".to_string(), Json::Arr(hook_rows)),
+        ("gateSteps".to_string(), Json::Arr(gate_rows)),
+        ("memoryByProcess".to_string(), Json::Arr(memory_by_process)),
+        ("memoryNote".to_string(), Json::s(memory_note)),
+        ("unresolved".to_string(), Json::Arr(unresolved)),
+    ])
+}
+
+/// A GATE row: where passage is refused until the step is done, by the kind of check it names.
+fn gate_row(unit: &str, s: &StepDecl, check: &str, is_guard: bool) -> Json {
+    let at = check.strip_prefix("gate:").map_or_else(
+        || {
+            if is_guard {
+                "guard: the Stop hook and the commit tier block on red (D0130/D0177)".to_string()
+            } else {
+                "declared rule: a blocking rule blocks the turn, a warning rule reports (D0177)".to_string()
+            }
+        },
+        |phase| format!("keel advance --to {phase} refuses passage while this step is red (D0435/D0436)"),
+    );
+    Json::Obj(vec![
+        ("unit".to_string(), Json::s(unit.to_string())),
+        ("process".to_string(), Json::s(s.process.clone())),
+        ("step".to_string(), Json::s(s.name.clone())),
+        ("checkedBy".to_string(), Json::s(check.to_string())),
+        ("at".to_string(), Json::s(at)),
+    ])
+}
+
+/// The hook point that WOULD carry a MEMORY step, from its place in the `first A then B` chain.
+const fn proposed_point(has_pred: bool, has_succ: bool) -> &'static str {
+    match (has_pred, has_succ) {
+        (false, true) => "beforeWork - the refine gate: the process's first step, done before the work starts",
+        (true, false) => "afterWork - the retro gate / Stop: the process's last step, done after the work",
+        (true, true) => "beforeTurn - a UserPromptSubmit checklist line, the form the route-first reminder takes",
+        (false, false) => "beforeTurn - the step is in no `first A then B` succession, so the process declares no work-relative point",
+    }
+}
+
+/// Why the memory list is empty, or how large it is - never a bare zero (issue183).
+fn memory_note(memory: usize, total: usize) -> String {
+    if memory > 0 {
+        format!("{memory} adopted step(s) rest on an agent remembering; each proposedHookPoint is derived from succession order and adds no hook")
+    } else if total == 0 {
+        "no adopted ProcessStep - activation.toml names no unit with steps, or .engine/processes/ is empty".to_string()
+    } else {
+        "every adopted step is carried by a hook or refused by a gate; nothing rests on an agent remembering".to_string()
+    }
+}
+
+/// One `action <name> : ProcessStep {` with the `action <process> : Process {` it belongs to and its
+/// `triggerCondition` text (concatenated string fragments, quotes stripped).
+struct StepDecl {
+    name: String,
+    process: String,
+    trigger: String,
+}
+
+/// Every `ProcessStep` in a process file, with the `Process` it belongs to and its `triggerCondition`.
+/// The schema ties a step to its process by no attribute (`process.sysml`, `ProcessStep`); the fact the
+/// files carry is DECLARATION ORDER - a step follows the Process it belongs to, as a sibling
+/// (`agile-workflow.sysml`: `refinement` then its steps, `planning` then its steps) or nested inside it.
+/// So a step's process is the nearest preceding `Process` declaration, `"-"` before the first one.
+/// Brace depth binds `triggerCondition` lines to their step; comments are skipped.
+fn process_steps(text: &str) -> Vec<StepDecl> {
+    let mut out = Vec::new();
+    let mut process = String::from("-");
+    let mut depth = 0usize;
+    let mut in_step: Option<usize> = None;
+    for raw in text.lines() {
+        let line = raw.trim_start();
+        if line.starts_with("//") {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("action ") {
+            if let Some((name, after)) = rest.split_once(':') {
+                let after = after.trim_start();
+                if after.starts_with("ProcessStep") {
+                    out.push(StepDecl { name: name.trim().to_string(), process: process.clone(), trigger: String::new() });
+                    in_step = Some(depth);
+                } else if after.starts_with("Process") {
+                    process = name.trim().to_string();
+                }
+            }
+        }
+        if in_step.is_some() && line.contains("triggerCondition") {
+            if let Some(last) = out.last_mut() {
+                last.trigger.push_str(&string_fragments(line));
+            }
+        }
+        for ch in line.chars() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth = depth.saturating_sub(1);
+                    if in_step == Some(depth) {
+                        in_step = None;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// The text inside every `"..."` on a line, concatenated - enough to read a `triggerCondition` whose
+/// value is one literal or several `+`-joined fragments.
+fn string_fragments(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(start) = rest.find('"') {
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('"') else { break };
+        out.push_str(&after[..end]);
+        rest = &after[end + 1..];
+    }
+    out
+}
+
+/// `(has a predecessor, has a successor)` name sets from every `first A then B;` line.
+fn successions(text: &str) -> (std::collections::HashSet<String>, std::collections::HashSet<String>) {
+    let (mut preds, mut succs) = (std::collections::HashSet::new(), std::collections::HashSet::new());
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.starts_with("//") {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("first ") else { continue };
+        let Some((a, b)) = rest.split_once(" then ") else { continue };
+        let b = b.trim_end_matches(';').trim();
+        let a = a.trim();
+        if a.is_empty() || b.is_empty() {
+            continue;
+        }
+        succs.insert(a.to_string());
+        preds.insert(b.to_string());
+    }
+    (preds, succs)
+}
 /// `process -> (checkable, reason)` from `.engine/contracts/process-enforcement.toml`.
 ///
 /// An absent file yields an empty map, so every unguarded process reports as undeclared - the
@@ -680,6 +951,109 @@ fn enforcement_points(root: &Path) -> Json {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// us102 / D0388 pair for the step-trigger lens, on a fixture root chosen before the real tree is
+    /// read. POSITIVE: a step bound to a real guard is GATE; a step whose triggerCondition names a
+    /// configured event is HOOK; the three unbound steps are MEMORY, and their proposed points follow
+    /// the `first A then B` chain (first -> beforeWork, middle -> beforeTurn, last -> afterWork).
+    /// NEGATIVE: a step naming an event the config does NOT fire is MEMORY, not HOOK - the lens reads
+    /// the config, never the step's word for it. The classes partition the steps.
+    #[test]
+    fn step_trigger_classifies_a_fixture_by_config_and_bindings() {
+        let root = std::env::temp_dir().join(format!("keel-steptrigger-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".engine/processes")).unwrap();
+        std::fs::create_dir_all(root.join(".claude")).unwrap();
+        std::fs::write(
+            root.join(".claude/settings.json"),
+            r#"{ "hooks": { "UserPromptSubmit": [] } }"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.join(".engine/processes/fx.sysml"),
+            concat!(
+                "package Fx {\n",
+                "    action fxProc : Process {\n",
+                "        action fxBound : ProcessStep {\n",
+                "            :>> triggerCondition = \"Sized.\";\n",
+                "            :>> checkedBy = \"step-check-resolves\";\n",
+                "        }\n",
+                "        action fxHooked : ProcessStep {\n",
+                "            :>> triggerCondition = \"The harness fires UserPromptSubmit before the model sees the prompt.\";\n",
+                "        }\n",
+                "        action fxNotHooked : ProcessStep {\n",
+                "            :>> triggerCondition = \"At Stop, which this fixture's config does not fire.\";\n",
+                "        }\n",
+                "        action fxFirst : ProcessStep { :>> triggerCondition = \"Begin.\"; }\n",
+                "        action fxLast : ProcessStep { :>> triggerCondition = \"End.\"; }\n",
+                "    }\n",
+                "    first fxFirst then fxNotHooked;\n",
+                "    first fxNotHooked then fxLast;\n",
+                "}\n",
+            ),
+        )
+        .unwrap();
+        let json = step_trigger(&root).dump();
+        let _ = std::fs::remove_dir_all(&root);
+        let field = |k: &str| -> usize {
+            let key = format!("\"{k}\": ");
+            let at = json.find(&key).unwrap_or_else(|| panic!("{k} missing in {json}")) + key.len();
+            json[at..].chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap()
+        };
+        assert_eq!(field("steps"), 5, "every ProcessStep in the fixture is counted: {json}");
+        assert_eq!(field("gate"), 1, "the guard-bound step is GATE: {json}");
+        assert_eq!(field("hook"), 1, "the step naming a configured event is HOOK: {json}");
+        assert_eq!(field("memory"), 3, "the unbound steps, including the one naming an unconfigured event, are MEMORY: {json}");
+        assert_eq!(field("hook") + field("gate") + field("memory"), field("steps"), "the classes partition the steps");
+        let v: serde_json::Value = serde_json::from_str(&json).expect("the lens dumps valid JSON");
+        assert_eq!(v["hookSteps"][0]["step"], "fxHooked", "HOOK names the step: {json}");
+        assert_eq!(v["hookSteps"][0]["event"], "UserPromptSubmit", "HOOK names the event: {json}");
+        assert_eq!(v["gateSteps"][0]["step"], "fxBound", "GATE names the step: {json}");
+        assert_eq!(v["gateSteps"][0]["checkedBy"], "step-check-resolves", "GATE names the check: {json}");
+        assert_eq!(v["memoryByProcess"][0]["process"], "fxProc", "memory rows are grouped by the enclosing process: {json}");
+        let point = |step: &str| -> String {
+            v["memoryByProcess"][0]["steps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["step"] == step)
+                .unwrap_or_else(|| panic!("{step} has no proposal in {json}"))["proposedHookPoint"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        assert!(point("fxFirst").starts_with("beforeWork"), "no predecessor -> before the work: {}", point("fxFirst"));
+        assert!(point("fxNotHooked").starts_with("beforeTurn"), "predecessor and successor -> before the turn: {}", point("fxNotHooked"));
+        assert!(point("fxLast").starts_with("afterWork"), "no successor -> after the work: {}", point("fxLast"));
+    }
+
+    /// The lens on THIS tree: the six agile-workflow ceremony steps are GATE through `keel advance`, no
+    /// adopted step is `unresolved` (the step-check-resolves guard holds), and the classes partition
+    /// the adopted steps - the per-step lens and this one count the same population when every unit is
+    /// adopted, and this project adopts a subset, so this lens counts no more than that one.
+    #[test]
+    fn step_trigger_on_this_tree_partitions_the_adopted_steps() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let json = step_trigger(&root).dump();
+        let field = |k: &str| -> usize {
+            let key = format!("\"{k}\": ");
+            let at = json.find(&key).unwrap_or_else(|| panic!("{k} missing in {json}")) + key.len();
+            json[at..].chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap()
+        };
+        assert_eq!(field("hook") + field("gate") + field("memory"), field("steps"), "partition: {json}");
+        let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(v["unresolved"].as_array().map(Vec::len), Some(0), "no adopted binding is dead on this tree: {json}");
+        for phase in ["refine", "standup", "implement", "review", "closeOut", "retro"] {
+            assert!(json.contains(&format!("keel advance --to {phase} refuses")), "gate:{phase} reads as GATE: {json}");
+        }
+        let all = step_enforcement(&root).dump();
+        let all_steps = {
+            let key = "\"steps\": ";
+            let at = all.find(key).unwrap() + key.len();
+            all[at..].chars().take_while(char::is_ascii_digit).collect::<String>().parse::<usize>().unwrap()
+        };
+        assert!(field("steps") <= all_steps, "adopted steps are a subset of all steps");
+    }
 
     /// D0434: the step lens's counts equal a hand count over the process files - every
     /// `action <x> : ProcessStep` is one step, every `:>> checkedBy` that names a guard is one checked
