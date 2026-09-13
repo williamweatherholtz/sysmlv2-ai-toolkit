@@ -40,10 +40,24 @@ WHAT IT COSTS. Each sample is a real model call. The cost is read from the model
 and recorded beside the samples; the dry-run estimate quotes the last measured run, or the constant
 below with the date it was measured.
 
+THE SECOND JUDGING STEP: THE ROUTE RUBRIC (us103, D0381). The scorer above reads what the agent DID.
+`--rubric` reads what the request ASKED: a lower-capability model answers the six written questions of
+routing_rubric.md - is this a VIEW? a RECORD? a CHANGE? an EXECUTE? an ORIENT? a TRIVIAL? - yes or no,
+and every yes carries a verbatim quote from the request. The human's words (st111): "is the user
+asking for a view? if so, quote the text indicating so". `judge_route` is pure and REFUSES a verdict
+that cannot point at the text: a yes with no quote, a quote that is not a substring of the request, an
+answer that affirms no route, an answer missing a question. A refused verdict is listed, never
+counted as a route. When a re-run's verdict on the same request differs from the recorded one, the
+disagreement is written as a finding naming BOTH quotes so the rubric itself can be critiqued (D0381)
+- never as a rate. The model that answered and what the run cost are read from the CLI's own result
+and recorded beside the verdicts. The rubric runs from a scratch directory so the small model sees
+the rubric and the request and nothing of this repository.
+
 Usage:
   python .engine/tools/routing_probe.py --investigate NAME[,NAME...] [--samples N] [--turns N] [--model M]
   python .engine/tools/routing_probe.py --investigate NAME --dry-run     # what it would run, and the estimate
-  python .engine/tools/routing_probe.py --probe                          # the scorer on its known transcripts
+  python .engine/tools/routing_probe.py --rubric [NAME[,NAME...]|all] [--model haiku]   # route verdicts, quoted
+  python .engine/tools/routing_probe.py --probe                          # both judges on their known inputs
 """
 import argparse
 import concurrent.futures as cf
@@ -58,7 +72,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 PROMPTS = HERE / "routing_prompts.toml"
+RUBRIC = HERE / "routing_rubric.md"
 OUT = REPO / ".keel" / "metrics" / "routing-investigation.json"
+RUBRIC_OUT = REPO / ".keel" / "metrics" / "routing-rubric.json"
+
+# The six routes of the response contract (.claude/output-styles/keel.md section 1), in the order the
+# rubric asks them. A request may be several parts, so a verdict is the SET of routes affirmed.
+ROUTES = ("VIEW", "RECORD", "CHANGE", "EXECUTE", "ORIENT", "TRIVIAL")
+RUBRIC_MODEL = "haiku"   # the lower-capability model the DoD names; the CLI reports the exact id back
 
 # measured on this host, 2026-09-06: one probe run, one turn, no writes - superseded by the last
 # investigation's own receipt whenever one exists
@@ -117,7 +138,239 @@ def probe():
         ok &= held
         print(f"[probe] {'PASS' if held else 'FAIL'} {what}\n        -> {got}" + ("" if held else f" wanted {want}"))
     print(f"[probe] {'all %d cases hold' % len(cases) if ok else 'A CASE FAILED - the verdict is not trusted'}")
+    return ok and rubric_probe()
+
+
+def judge_route(answer, prompt):
+    """The rubric's verdict over one model answer -> ("verdict", [(route, quote), ...]) or ("refused", why).
+
+    Pure, so `--probe` reads it before a model is paid for (D0388). An answer is a dict keyed by the six
+    routes, each {"answer": yes|no, "quote": str}. REFUSED, never counted, when: a question is missing;
+    a yes carries no quote; a quote is not a verbatim substring of the request (the human's rule - the
+    verdict must point at the text); no route is affirmed. A no with a stray quote is ignored: the quote
+    only matters where it is the evidence.
+    """
+    if not isinstance(answer, dict):
+        return "refused", "the answer is not a JSON object"
+    missing = [r for r in ROUTES if r not in answer]
+    if missing:
+        return "refused", f"unanswered question(s): {', '.join(missing)}"
+    affirmed = []
+    for route in ROUTES:
+        cell = answer[route] if isinstance(answer[route], dict) else {}
+        said = str(cell.get("answer", "")).strip().lower()
+        if said not in ("yes", "no"):
+            return "refused", f"{route} answered {said!r}, not yes or no"
+        if said == "no":
+            continue
+        quote = str(cell.get("quote") or "")
+        if not quote.strip():
+            return "refused", f"{route} affirmed with no quote"
+        if quote not in prompt:
+            return "refused", f"{route} quote is not in the request: {quote!r}"
+        affirmed.append((route, quote))
+    if not affirmed:
+        return "refused", "no route affirmed - every request routes somewhere"
+    return "verdict", affirmed
+
+
+def rubric_probe():
+    """judge_route on the answers it must read correctly - a known positive and known negatives chosen
+    before any real request is read (D0388). The fabricated quote is the case the DoD names."""
+    prompt = "Show me which items are blocked and record that I accept the plan."
+    yes, no = {"answer": "yes"}, {"answer": "no", "quote": ""}
+
+    def full(**cells):
+        return {r: cells.get(r, no) for r in ROUTES}
+
+    cases = [
+        ("two yeses, both quotes verbatim = verdict VIEW+RECORD",
+         full(VIEW={**yes, "quote": "Show me which items are blocked"}, RECORD={**yes, "quote": "record that I accept the plan"}),
+         ("verdict", [("VIEW", "Show me which items are blocked"), ("RECORD", "record that I accept the plan")])),
+        ("a FABRICATED quote = refused, naming it",
+         full(VIEW={**yes, "quote": "list the blocked items"}),
+         ("refused", "VIEW quote is not in the request: 'list the blocked items'")),
+        ("a paraphrase that changes one character = refused (verbatim means verbatim)",
+         full(VIEW={**yes, "quote": "show me which items are blocked"}),
+         ("refused", "VIEW quote is not in the request: 'show me which items are blocked'")),
+        ("yes with no quote = refused",
+         full(RECORD={**yes, "quote": ""}),
+         ("refused", "RECORD affirmed with no quote")),
+        ("all six no = refused",
+         full(),
+         ("refused", "no route affirmed - every request routes somewhere")),
+        ("a question left out = refused",
+         {r: no for r in ROUTES if r != "TRIVIAL"},
+         ("refused", "unanswered question(s): TRIVIAL")),
+        ("a no carrying a stray quote is still a no",
+         full(VIEW={**yes, "quote": "Show me"}, ORIENT={"answer": "no", "quote": "not in the text"}),
+         ("verdict", [("VIEW", "Show me")])),
+        ("an answer that is not an object = refused",
+         "yes", ("refused", "the answer is not a JSON object")),
+    ]
+    ok = True
+    for what, answer, want in cases:
+        got = judge_route(answer, prompt)
+        held = got == want
+        ok &= held
+        print(f"[probe] {'PASS' if held else 'FAIL'} rubric: {what}\n        -> {got}" + ("" if held else f" wanted {want}"))
+    print(f"[probe] {'all %d rubric cases hold' % len(cases) if ok else 'A RUBRIC CASE FAILED - no verdict is trusted'}")
     return ok
+
+
+def parse_answer(text):
+    """The one JSON object in the model's reply, fence or no fence; None when there is none."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        return json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+
+
+def rubric_one(exe, prompt, model):
+    """One rubric run for one request. Returns (kind, payload, model_id, seconds, cost, note).
+
+    kind is verdict / refused / error. The run happens in an empty scratch directory with every hook
+    emptied and NO tools, so the model sees the rubric and the request and nothing of this repository -
+    a routing checklist injected by the UserPromptSubmit hook would be a second rubric, and a model
+    with a Read tool goes looking for a file instead of answering (the first run: 47 of 47 errored so).
+    The text goes in on stdin: the claude.cmd shim on Windows is run by cmd.exe, which cuts an
+    argument at its first newline, and the rubric is many lines.
+    """
+    import tempfile
+
+    text = RUBRIC.read_text(encoding="utf-8") + prompt + "\n=== REQUEST ENDS ===\n"
+    scratch = tempfile.mkdtemp(prefix="keel-rubric-")
+    settings = Path(scratch) / "settings.json"
+    settings.write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+    cmd = [
+        exe, "-p",
+        "--output-format", "json", "--max-turns", "1", "--tools", "",
+        "--no-session-persistence",
+        "--settings", str(settings), "--model", model,
+    ]
+    started = time.time()
+    try:
+        proc = subprocess.run(cmd, input=text, capture_output=True, text=True, encoding="utf-8",
+                              timeout=180, cwd=scratch)
+    except subprocess.TimeoutExpired:
+        return "error", None, "", time.time() - started, 0.0, "timed out after 180s"
+    seconds = time.time() - started
+    result = parse_answer(proc.stdout) if proc.stdout.strip().startswith("{") else None
+    if not isinstance(result, dict) or result.get("type") != "result":
+        return "error", None, "", seconds, 0.0, (proc.stderr or proc.stdout or "no result event")[:160]
+    cost = float(result.get("total_cost_usd") or 0.0)
+    model_id = ",".join(sorted((result.get("modelUsage") or {}).keys())) or model
+    if result.get("is_error"):
+        return "error", None, model_id, seconds, cost, str(result.get("result", ""))[:160]
+    reply = str(result.get("result", ""))
+    kind, payload = judge_route(parse_answer(reply), prompt)
+    # a refusal keeps the reply it refused, so the rubric can be critiqued from what the model said
+    return kind, payload, model_id, seconds, cost, ("" if kind == "verdict" else reply[:400])
+
+
+def rubric_finding(name, prev, now):
+    """What this run established for one request against the recorded verdict, if there was one.
+
+    Disagreement names BOTH quotes and is never a rate (D0381): the reader critiques the rubric from the
+    two spans, not from a count. A refusal is listed as such. A first run has nothing to compare.
+    """
+    def show(v):
+        return " + ".join(f"{r} '{q}'" for r, q in v)
+
+    if now["kind"] == "error":
+        return f"ERROR      {name}: {now['note']}"
+    if now["kind"] == "refused":
+        return (f"REFUSED    {name}: {now['refused']} - not counted; the rubric or the model is the defect; "
+                f"the reply refused: {now.get('note', '')[:120]!r}")
+    if not prev or prev.get("kind") != "verdict":
+        return f"VERDICT    {name}: {show(now['routes'])}" + ("" if not prev else f" (previous run {prev.get('kind')}, nothing to compare)")
+    then, here = [tuple(x) for x in prev["routes"]], [tuple(x) for x in now["routes"]]
+    if {r for r, _ in then} == {r for r, _ in here}:
+        return f"AGREES     {name}: {show(here)}"
+    return (f"DISAGREES  {name}: on {prev.get('ranAt', '?')[:10]} {show(then)} - now {show(here)} - "
+            f"the CHECK is the defect (D0381): critique the rubric's question, not the model")
+
+
+def last_rubric():
+    try:
+        return json.loads(RUBRIC_OUT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def run_rubric(names, cases, model, jobs, dry_run):
+    prev = last_rubric()
+    prev_cases = prev.get("cases") or {}
+    measured = prev.get("measured") or {}
+    per_usd, per_sec = measured.get("perRunUsd"), measured.get("perRunSeconds")
+    if dry_run:
+        est = (f"~${len(names) * per_usd:.2f}, ~{len(names) * per_sec / 60:.0f} min if run one at a time (per run ${per_usd}, "
+               f"{per_sec}s, measured {prev.get('ranAt', '')[:10]})" if per_usd else "no rubric run has been measured yet")
+        print(f"would ask {model} the six questions of {RUBRIC.relative_to(REPO)} about {len(names)} request(s); {est}")
+        return 0
+    if not probe():
+        sys.exit(2)
+    print(f"rubric: {len(names)} request(s) to {model}; "
+          f"{'estimate ~$%.2f from the last measured run' % (len(names) * per_usd) if per_usd else 'no prior measurement'}", flush=True)
+    rows, spend, wall_started, done = {}, 0.0, time.time(), 0
+    with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
+        # resolved ONCE, outside the workers: shutil.which raced the CLI's own updater mid-run and a
+        # worker's sys.exit took the whole run down with it
+        exe = claude_exe()
+        futures = {pool.submit(rubric_one, exe, cases[n]["prompt"], model): n for n in names}
+        for fut in cf.as_completed(futures):
+            n = futures[fut]
+            kind, payload, model_id, secs, cost, note = fut.result()
+            spend += cost
+            done += 1
+            row = {"kind": kind, "model": model_id, "seconds": round(secs, 1), "costUsd": round(cost, 4), "note": note,
+                   "ranAt": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            if kind == "verdict":
+                row["routes"] = [list(x) for x in payload]
+            elif kind == "refused":
+                row["refused"] = payload
+            rows[n] = row
+            mark = {"verdict": "VERDICT", "refused": "REFUSED", "error": "ERROR  "}[kind]
+            tail = (" + ".join(f"{r} '{q}'" for r, q in payload) if kind == "verdict" else (payload or note))
+            print(f"{done:>3}/{len(names)} {mark} {n:28s} {secs:5.1f}s ${cost:.3f}  {tail}", flush=True)
+    wall = time.time() - wall_started
+
+    print("-" * 78)
+    findings = {n: rubric_finding(n, prev_cases.get(n), rows[n]) for n in names}
+    for n in names:
+        print(findings[n])
+    paid = [r["costUsd"] for r in rows.values() if r["costUsd"] > 0]
+    per_run_usd = round(spend / len(paid), 4) if paid else None
+    per_run_sec = round(sum(r["seconds"] for r in rows.values()) / max(len(names), 1), 1)
+    models = sorted({r["model"] for r in rows.values() if r["model"]})
+    refused = [n for n in names if rows[n]["kind"] == "refused"]
+    disagreed = [n for n in names if findings[n].startswith("DISAGREES")]
+    print(f"model: {', '.join(models) or model} (read from the CLI's result); spend this run: ${spend:.2f} over "
+          f"{len(names)} request(s), {wall:.0f}s wall (measured per run: ${per_run_usd if per_run_usd is not None else 'n/a'}, {per_run_sec}s)")
+    print(f"refused: {', '.join(refused) or 'none'}; disagreements with the recorded run: {', '.join(disagreed) or 'none'}")
+    print("verdicts quote the request; a disagreement is a finding against the rubric (D0381), never a rate")
+
+    kept = dict(prev_cases)
+    kept.update(rows)
+    RUBRIC_OUT.parent.mkdir(parents=True, exist_ok=True)
+    RUBRIC_OUT.write_text(json.dumps({
+        "kind": "rubric",
+        "why": "us103 / D0381: each route verdict quotes the text that decided it; a refused verdict is listed, never counted; "
+               "disagreement between runs is a finding naming both quotes, never a rate",
+        "rubric": str(RUBRIC.relative_to(REPO)),
+        "ranAt": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "model": models or [model],
+        "requested": names,
+        "cases": kept,
+        "findings": findings,
+        "measured": {"spendUsd": round(spend, 2), "runs": len(names), "wallSeconds": round(wall),
+                     "perRunUsd": per_run_usd, "perRunSeconds": per_run_sec},
+    }, indent=2), encoding="utf-8")
+    print(f"wrote {RUBRIC_OUT.relative_to(REPO)}")
+    return 0
 
 
 # The Stop hook runs validate + every guard at each turn boundary - measured at 14-31s in the fire
@@ -134,17 +387,26 @@ def probe_settings():
     return str(PROBE_SETTINGS)
 
 
+_EXE = []
+
+
 def claude_exe():
-    """The Claude Code entry point this host can actually spawn.
+    """The Claude Code entry point this host can actually spawn - resolved ONCE per process.
 
     `claude` on PATH is a shell shim on Windows: git-bash runs it, CreateProcess does not (WinError 2
-    for a file that exists). Prefer the platform-executable form.
+    for a file that exists). Prefer the platform-executable form. Resolved once because a per-run
+    lookup raced the CLI's own updater replacing the shim (2026-09-12: "The batch file cannot be
+    found", then not-found from inside a worker, which took the whole run down); the first lookup
+    happens in the main thread, before any model is paid for.
     """
     import shutil
 
+    if _EXE:
+        return _EXE[0]
     for candidate in ("claude.cmd", "claude.exe", "claude"):
         found = shutil.which(candidate)
         if found:
+            _EXE.append(found)
             return found
     sys.exit("claude CLI not found on PATH - the probe measures a real model and cannot proceed")
 
@@ -283,10 +545,21 @@ def main():
     ap.add_argument("--model", default="", help="model to run (default: the CLI's own)")
     ap.add_argument("--jobs", type=int, default=4, help="probe sessions to run at once")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--probe", action="store_true", help="run the scorer on its known transcripts and exit (D0388)")
+    ap.add_argument("--probe", action="store_true", help="run both judges on their known inputs and exit (D0388)")
+    ap.add_argument("--rubric", default="",
+                    help="ask a lower-capability model the six route questions about NAME[,NAME...] or `all`; "
+                         "every yes quotes the request or the verdict is refused (us103)")
     args = ap.parse_args()
     if args.probe:
         return 0 if probe() else 1
+
+    if args.rubric:
+        cases = load_cases()
+        names = list(cases) if args.rubric == "all" else [n.strip() for n in args.rubric.split(",") if n.strip()]
+        unknown = [n for n in names if n not in cases]
+        if unknown:
+            sys.exit(f"no authored case named {', '.join(unknown)} in {PROMPTS.relative_to(REPO)}")
+        return run_rubric(names, cases, args.model or RUBRIC_MODEL, args.jobs, args.dry_run)
 
     if not args.investigate:
         sys.exit("refusing: name the case(s) to investigate with --investigate NAME[,NAME...]. "
@@ -329,6 +602,7 @@ def main():
         # every estimate fall back to the constant and every dry run erase the last receipt (issue431).
         OUT.unlink()
     probe_settings()  # written once, before any worker reads it
+    claude_exe()      # resolved once, in this thread, before any worker needs it
     rows, spend, wall_started, done = {n: [] for n in names}, 0.0, time.time(), 0
     with cf.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {}

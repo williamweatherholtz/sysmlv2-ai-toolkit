@@ -1005,4 +1005,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Low;
     }
     #Resolves dependency from dcTextpatchRefusesANonFileArgumentInOneLine to issue509;
+
+    part issue510 : Issue {
+        :>> id = "a00d21e9-f8b7-4892-9c2d-79bb00b9d66e";
+        :>> title = "The route rubric disagrees with itself across runs on the same requests and affirms no route for one or two - the six questions are the defect (D0381)";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The route rubric (.engine/tools/routing_rubric.md, D0459) disagrees with itself across runs on identical requests, and on every run affirms no route for one or two of them. Three paid runs of haiku over the 47 requests of routing_prompts.toml on 2026-09-12 (.keel/metrics/routing-rubric.json, $1.60 / $1.57 / $1.70 measured): run 2 against run 1 disagreed on 14 named requests, run 3 (under the fenced rubric) against run 2 on 19, each finding carrying both quotes - the same quoted span read as EXECUTE then ORIENT then VIEW then EXECUTE for actor-enrollment ('What do we need to do first so their entries are actually attributable to them?'), as EXECUTE then RECORD for control-defect, as VIEW then EXECUTE for test-verify. Refused as no-route-affirmed: element-critique (run 1), indicator and repo-push (run 3); refused as not-JSON in run 2 (intake, engine-triage) because the reader took a request about requests arriving as speech for its own task - the fence added to the rubric removed that class. D0381 says what this is: a check that disagrees with itself on identical inputs is a defect of the CHECK - here the six questions, whose ORIENT / VIEW / EXECUTE / RECORD boundaries do not separate on prompts that state a SITUATION ('Two of us are going to work the same records at the same time') rather than an ASK, which is how routing_prompts.toml deliberately phrases them for the skill-routing scorer. It is not averaged and no rate is stated. dcRoutingVerdictQuotesItsEvidence's DoD result records the VERIFY clause 'the 47 prompts each produce a verdict' as failed on this ground.";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRouteRubricQuestionsSeparateOnTheRequest to issue510;
 }
