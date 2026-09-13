@@ -1038,4 +1038,15 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcFiguresRefuseOccludedText to issue512;
+
+    part issue513 : Issue {
+        :>> id = "9463c461-6ad9-4fd2-9b70-7cbb451e3855";
+        :>> title = "keel record task stamps no createdAt or createdBy on the DoD Test it writes, so a forward-only guard cannot read a task's boundary";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "Found 2026-09-12 building guard direction-cited (issue428, sprint 690). keel record task writes the DoD Test with id, method and procedureText only (write.rs, the record-task emitter); it stamps no createdAt and no createdBy on the Test. Of 730 DoDs in backlog.sysml five carry createdAt, all hand-authored. A forward-only guard reads its boundary from createdAt, so for a task DoD the direction-cited clause can COUNT an undated citing DoD but cannot apply its rule forward to one - the boundary is not in the tree - and every other createdAt-cut guard has the same blind spot over DoDs. D0129 says provenance is never defaulted, actor AND date; the write path is the one place that rule is applied, and here it applies it to the action's owner but not to the Test beside it. Hazard EHZ3 (an actor is misattributed) at one remove: the Test has no actor at all. Resolver: record task stamps both fields on the DoD Test it writes (dcRecordedDoDsCarryTheirDate).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcRecordedDoDsCarryTheirDate to issue513;
 }

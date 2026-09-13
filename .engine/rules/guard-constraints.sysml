@@ -116,5 +116,6 @@ package EngineGuardConstraints {
     constraint def stepCheckResolves;       // guard 70 (D0434, D0321 option A): a ProcessStep's checkedBy names a guard or declared rule that runs; a ghost or empty name is EHZ5
     constraint def consentScope;            // guard 71 (D0439/issue460): an AUTO-ACCEPTED Decision carries no marker part (from 2026-09-06) and its text names no marker word without NOT A PROCESS CHANGE (from 2026-09-10); earlier hits are history, counted
     constraint def workingTreeEol;          // guard 72 (issue478): every tracked path whose .gitattributes declares eol=lf or eol=crlf holds that ending in the working copy (git ls-files --eol, w/ vs attr/); text=auto and undeclared paths are not judged; suite --touched and land refuse on the same census
+    constraint def directionCited;          // guard 73 (D0463/issue428): a Decision field or task DoD dated on/after 2026-09-12 that quotes the human (their words / the human's words / the human, YYYY-MM-DD, then a quoted span) reaches by DerivedFrom a Statement whose text holds the span verbatim; earlier citing Decisions and undated DoDs (issue513) are history, counted
 
 }

@@ -282,6 +282,7 @@ package EngineUcas {
     }
     dependency from ccDirectionLinksItsStatement to ucaDirectionRenderedNotRecorded;
     dependency from ccDirectionLinksItsStatement to issue428;
+    dependency from ccDirectionLinksItsStatement to gDirectionCited; // sprint 690 / D0463: the control now holds CC-H1; issue428 is resolved by dcDirectionDecisionsLinkTheirStatement
 
     verification stpaRun2 : Test {
         :>> id = "432b1153-2f8f-4932-9ce0-322accf471b0";

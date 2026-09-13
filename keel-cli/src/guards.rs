@@ -3580,8 +3580,8 @@ fn total_guard_count_claim(line: &str) -> Option<String> {
 /// flagged AS incomplete is honest state, not a failure. NOTE: critique INDEPENDENCE stays enforced
 /// (critic-independence — honesty); only critique COVERAGE demoted. The requirement-rootedness hard
 /// guard (D0098 honesty: a chartered capability with no driving Need) joins next (requirementRootednessGuard).
-pub const GUARD_NAMES: [&str; 72] =
-    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves", "consent-scope", "working-tree-eol"];
+pub const GUARD_NAMES: [&str; 73] =
+    ["evidence-cited", "gating-workflow-history", "process-applicability", "doc-guard-count", "actors", "acceptance-events", "sprint-coverage", "ceremony", "charter", "process-change", "issues", "viewpoint-renderer", "manifest-coverage", "critic-independence", "process-skill", "requirement-rootedness", "decision-rationale", "attestation-substance", "marker-vocabulary", "duplicate-identity", "decision-requirement-link", "verification-trace", "priority-inversion", "retro-backlog", "confirmation-authenticity", "engine-lint", "doc-sync", "hook-config-integrity", "activation-manifest", "sequence-multiplicity", "parser-coverage", "base-first-justification", "edge-endpoints", "ownership", "attestation-authority", "type-collision", "attribute-vocabulary", "resolver-kind", "stale-gate-prose", "impossible-evidence-date", "identity-present", "identity-well-formed", "tool-reference", "scaffold-placeholder", "claude-surface-drift", "decision-scaffolding", "release-recorded", "enrollment-binding", "control-event-coverage", "question-coverage", "claim-ancestry", "judgment-request-quality", "manifest-key-portability", "control-map-reconciled", "sprint-closure", "untrusted-routing", "control-defect-registry", "cli-surface-declared", "decision-amends-process", "unit-extras-present", "acceptance-binds-to-text", "stpa-currency", "untrusted-taint", "gate-environment-parity", "instruments-declared", "release-checksums-published", "wrapper-pin-checksummed", "plan-covers-step", "id-is-a-uuid", "step-check-resolves", "consent-scope", "working-tree-eol", "direction-cited"];
 
 
 // ── control-map-reconciled guard (issue304, chartered by D0255) ──────────────────────────────────
@@ -5715,6 +5715,7 @@ pub fn run_one(name: &str, root: &Path) -> Option<GuardReport> {
         "judgment-request-quality" => Some(judgment_request_quality(root)), // D0207: a fork must earn the ask
         "manifest-key-portability" => Some(manifest_key_portability(root)), // issue301/D0250 — a unit manifest key naming one machine
         "control-map-reconciled" => Some(control_map_reconciled(root)), // issue304/D0255 — a firing control absent from the map
+        "direction-cited" => Some(direction_cited(root)), // hard (D0463/issue428) - the human's quoted direction links the Statement holding it
 
         "critique" => Some(critique(root)),
         "assured" => Some(assured(root)),
@@ -8108,6 +8109,320 @@ mod consent_scope_tests {
         assert!(r.scanned >= 100, "scanned {} auto-accepted Decisions", r.scanned);
         assert_eq!(r.warnings.len(), 1, "one counted-history line: {:?}", r.warnings);
         assert!(r.warnings[0].contains("marker Decisions auto-accepted before"));
+    }
+}
+
+// ── direction-cited guard (D0463 / issue428: the human's direction is a Statement, not the agent's rendering) ──
+
+/// D0463's date: a Decision or dated `DoD` created on/after this day that quotes the human links the Statement.
+const DIRECTION_CUTOFF: &str = "2026-09-12";
+
+/// The phrases that attribute a quoted span to the human, matched without case. `the human, YYYY-MM-DD:`
+/// is read as a sixth form by [`human_spans`].
+const DIRECTION_ANCHORS: [&str; 5] = ["their words", "the human's words", "the human said", "human's own words", "the human's own words"];
+
+/// Fold the two escapes a `SysML` string field carries so a span compares as the human typed it: `''`
+/// (a quote inside a quoted field, the write path's own escape) and `\"`; whitespace runs become one space.
+fn fold_quoted(s: &str) -> String {
+    s.replace("''", "'").replace("\\\"", "\"").split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Every span `text` attributes to the human: after an anchor phrase (or `the human, YYYY-MM-DD`), an
+/// optional `verbatim`, at most a few of `:` `,` `-` and spaces, then a quoted span - `“...”` closed
+/// by the first `”`, or `'...'` closed by the first `'` NOT followed by a letter or digit, so `don't`
+/// and `it's` inside the quote do not close it (a possessive `s' ` does, and the shorter span is
+/// still a verbatim prefix). Under eight characters is not read as a quote; `their words>` or `their
+/// words' shape` (no quote follows) is a mention, not a citation. Returned folded ([`fold_quoted`]),
+/// which is also how a Statement's text is compared.
+pub(crate) fn human_spans(text: &str) -> Vec<String> {
+    let t = fold_quoted(text);
+    let lower = t.to_ascii_lowercase();
+    let mut starts: Vec<usize> = Vec::new();
+    for a in DIRECTION_ANCHORS {
+        let mut from = 0;
+        while let Some(i) = lower[from..].find(a) {
+            starts.push(from + i + a.len());
+            from += i + a.len();
+        }
+    }
+    let dated = "the human, ";
+    let mut from = 0;
+    while let Some(i) = lower[from..].find(dated) {
+        let p = from + i + dated.len();
+        let is_date = t.get(p..p + 10).is_some_and(|d| d.char_indices().all(|(k, c)| if k == 4 || k == 7 { c == '-' } else { c.is_ascii_digit() }));
+        if is_date {
+            starts.push(p + 10);
+        }
+        from = p;
+    }
+    starts.sort_unstable();
+    starts.dedup();
+    let mut spans = Vec::new();
+    for s in starts {
+        let rest = &t[s..];
+        let sep = [' ', ':', ',', '-'];
+        let skipped = rest.trim_start_matches(sep);
+        let skipped = skipped.strip_prefix("verbatim").map_or(skipped, |r| r.trim_start_matches(sep));
+        if rest.len() - skipped.len() > 16 {
+            continue;
+        }
+        let close = match (skipped.strip_prefix('“'), skipped.strip_prefix('\'')) {
+            (Some(body), _) => body.find('”').map(|i| &body[..i]),
+            (None, Some(body)) => body.char_indices().find(|&(i, c)| c == '\'' && !body[i + 1..].chars().next().is_some_and(char::is_alphanumeric)).map(|(i, _)| &body[..i]),
+            (None, None) => None,
+        };
+        let Some(span) = close else { continue };
+        if span.chars().count() >= 8 {
+            spans.push(span.to_string());
+        }
+    }
+    spans
+}
+
+/// A record that may cite the human: `(name, createdAt if the record carries one, the spans it quotes)`.
+pub(crate) type DirectionRecord = (String, Option<String>, Vec<String>);
+
+/// Pure core (issue428 / D0463): every record that quotes the human, split by its date against the
+/// cutoff. On/after: each span must appear (folded) in the `text` of a Statement the record reaches by
+/// a `#DerivedFrom` edge, else `(record, what is missing)` is a violation. Before: counted as
+/// grandfathered. Undated (a `DoD` the write path stamped no `createdAt` on): counted apart - the
+/// boundary cannot be read, so the clause cannot be applied forward to it.
+pub(crate) fn direction_violations<S: std::hash::BuildHasher>(
+    records: &[DirectionRecord],
+    edges: &[(String, String)],
+    statements: &std::collections::HashMap<String, String, S>,
+    cutoff: &str,
+) -> (Vec<(String, String)>, usize, usize) {
+    let mut forward = Vec::new();
+    let (mut grandfathered, mut undated) = (0usize, 0usize);
+    for (name, created, spans) in records {
+        if spans.is_empty() {
+            continue;
+        }
+        match created.as_deref() {
+            None => {
+                undated += 1;
+                continue;
+            }
+            Some(c) if c < cutoff => {
+                grandfathered += 1;
+                continue;
+            }
+            Some(_) => {}
+        }
+        let linked: Vec<&String> = edges.iter().filter(|(from, _)| from == name).filter_map(|(_, to)| statements.get(to)).collect();
+        if linked.is_empty() {
+            let first = spans.first().map_or_else(String::new, |s| excerpt(s));
+            forward.push((name.clone(), format!("no #DerivedFrom edge to a Statement, and it quotes the human: '{first}'")));
+            continue;
+        }
+        for span in spans {
+            if !linked.iter().any(|st| st.contains(span.as_str())) {
+                forward.push((name.clone(), format!("no linked Statement's text holds this span verbatim: '{}'", excerpt(span))));
+            }
+        }
+    }
+    (forward, grandfathered, undated)
+}
+
+/// The first sixty characters of a span, for a message.
+fn excerpt(span: &str) -> String {
+    let mut s: String = span.chars().take(60).collect();
+    if s.len() < span.len() {
+        s.push_str("...");
+    }
+    s
+}
+
+/// A `:>> key = "..."` field read from `block`, honouring `\"` inside the value (a Statement's text may
+/// carry one; `decision_field` stops at the first `"`, which the write path's one-line Decision fields allow).
+fn quoted_field(block: &str, key: &str) -> Option<String> {
+    let needle = format!(":>> {key} = \"");
+    let rest = &block[block.find(&needle)? + needle.len()..];
+    let mut out = String::new();
+    let mut escaped = false;
+    for c in rest.chars() {
+        match (escaped, c) {
+            (false, '\\') => {
+                escaped = true;
+                out.push(c);
+            }
+            (false, '"') => return Some(out),
+            _ => {
+                escaped = false;
+                out.push(c);
+            }
+        }
+    }
+    None
+}
+
+/// Guard: a Decision or task `DoD` that quotes the human links a Statement holding their words (issue428).
+///
+/// stpa-self run 2 (UCA-H1) found `humanDirects` to be a prose channel nothing parses: a Decision may say
+/// `the human's words: '...'` in its rationale with no Statement recorded and no `#DerivedFrom` edge, so
+/// the tree holds the AGENT's rendering of the direction and nothing to check it against (hazard EHZ3 -
+/// words attributed to the human without their record). `keel record statement` (D0216/D0236) is the
+/// channel; this guard binds the citing records to it. A record is READ AS CITING when a field carries
+/// one of the anchor phrases followed by a quoted span ([`human_spans`]); it HOLDS when every span is
+/// found, escapes folded, in the `text` of a Statement it reaches by `#DerivedFrom dependency from
+/// <record> to <stNNN>;`. Decisions are read from `.engine/decisions/` (context/decision/rationale/
+/// consequences); `DoDs` from every `verification <x>DoD : Test` under `.tracking/` (procedureText).
+///
+/// HARD, forward-only from D0463's date by `createdAt`. The citing Decisions before it are the agent's
+/// renderings already accepted on; they are counted once, not re-litigated (D0261). A `DoD` the write path
+/// stamped no date on is counted apart: its boundary cannot be read (issue513 names the missing stamp).
+#[must_use]
+pub fn direction_cited(root: &Path) -> GuardReport {
+    let mut records: Vec<DirectionRecord> = Vec::new();
+    let mut edges: Vec<(String, String)> = Vec::new();
+    let mut statements: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut scanned = 0usize;
+    let mut read_edges = |text: &str| {
+        for line in text.lines() {
+            if let Some(rest) = line.trim_start().strip_prefix("#DerivedFrom dependency from ") {
+                if let Some((from, to)) = rest.trim_end().trim_end_matches(';').split_once(" to ") {
+                    edges.push((from.trim().to_string(), to.trim().to_string()));
+                }
+            }
+        }
+    };
+    for path in crate::collect_sysml(&root.join(".engine").join("decisions")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        read_edges(&text);
+        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let Some(nnnn) = stem.get(..4).filter(|s| s.chars().all(|c| c.is_ascii_digit())) else { continue };
+        scanned += 1;
+        let mut spans = Vec::new();
+        for f in ["context", "decision", "rationale", "consequences"] {
+            if let Some(v) = quoted_field(&text, f) {
+                spans.extend(human_spans(&v));
+            }
+        }
+        records.push((format!("d{nnnn}"), decision_field(&text, "createdAt"), spans));
+    }
+    for path in crate::collect_sysml(&root.join(".tracking")) {
+        let Ok(text) = crate::corpus::read_to_string(&path) else { continue };
+        read_edges(&text);
+        let mut rest = text.as_str();
+        while let Some(i) = rest.find("part st") {
+            let block = &rest[i..];
+            let name: String = block[5..].chars().take_while(|c| c.is_alphanumeric()).collect();
+            let end = block.find("\n    }").map_or(block.len(), |e| e + 6);
+            if block[..end].contains(": Statement") {
+                if let Some(v) = quoted_field(&block[..end], "text") {
+                    statements.insert(name.clone(), fold_quoted(&v));
+                }
+            }
+            rest = &rest[i + 5 + name.len()..];
+        }
+        let mut rest = text.as_str();
+        while let Some(i) = rest.find("verification ") {
+            let block = &rest[i..];
+            let head: &str = block.lines().next().unwrap_or("");
+            rest = &rest[i + "verification ".len()..];
+            let Some((name, tail)) = head["verification ".len()..].split_once(':') else { continue };
+            let name = name.trim();
+            if !name.ends_with("DoD") || !tail.trim_start().starts_with("Test") {
+                continue;
+            }
+            // The block: from the head to the end of the line that closes procedureText (the write path
+            // emits a DoD on one line; a hand-authored multi-line DoD is read to that line too).
+            let Some(procedure) = quoted_field(block, "procedureText") else { continue };
+            let close = block.find(":>> procedureText = \"").map_or(0, |s| s + ":>> procedureText = \"".len() + procedure.len());
+            let block_end = block[close..].find('\n').map_or(block.len(), |e| close + e);
+            let block = &block[..block_end];
+            scanned += 1;
+            let spans = human_spans(&procedure);
+            if !spans.is_empty() {
+                records.push((name.to_string(), decision_field(block, "createdAt"), spans));
+            }
+        }
+    }
+    let (forward, grandfathered, undated) = direction_violations(&records, &edges, &statements, DIRECTION_CUTOFF);
+    let violations: Vec<String> = forward
+        .into_iter()
+        .map(|(name, what)| format!("{name}: quotes the human and {what} - the tree holds the agent's rendering of their direction with nothing to check it against (issue428/D0463, hazard EHZ3). Record their words with `keel record statement` and author `#DerivedFrom dependency from {name} to <stNNN>;`, or quote nobody."))
+        .collect();
+    let mut warnings = Vec::new();
+    if grandfathered + undated > 0 {
+        warnings.push(history_line(&format!(
+            "{grandfathered} citing Decision(s) recorded before {DIRECTION_CUTOFF} quote the human with no Statement to check against, and {undated} citing DoD(s) carry no createdAt so the boundary cannot be read for them - immutable history and an unstamped field (issue513), counted not enumerated (D0261)"
+        )));
+    }
+    GuardReport { name: "direction-cited", scanned, warnings, violations }
+}
+
+#[cfg(test)]
+mod direction_cited_tests {
+    use super::{direction_violations, human_spans, quoted_field};
+    use std::collections::HashMap;
+
+    fn statements(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(n, t)| ((*n).to_string(), super::fold_quoted(t))).collect()
+    }
+
+    /// The reader: each accepted form yields the span; a mention with no quote, a short span and an
+    /// apostrophe inside the quote do what the doc says.
+    #[test]
+    fn the_anchor_forms_yield_the_quoted_span_and_mentions_do_not() {
+        assert_eq!(human_spans("their words: 'why are we losing rigor? it feels wrong'"), vec!["why are we losing rigor? it feels wrong"]);
+        assert_eq!(human_spans("The human, 2026-09-09: 'don't stop for that' and then"), vec!["don't stop for that"]);
+        assert_eq!(human_spans("the human's words 'kind of seems like keel is still crazy slow'."), vec!["kind of seems like keel is still crazy slow"]);
+        assert_eq!(human_spans("Their words: ''I do like C the best'' (nested escape)"), vec!["I do like C the best"]);
+        assert_eq!(human_spans("their words, verbatim: “repeated sampling should be an option though” - so it stays"), vec!["repeated sampling should be an option though"]);
+        assert!(human_spans("their words, 2026-09-08, the copy-for-Claude text of the published brief").is_empty(), "a dated attribution with no quoted span is a mention");
+        assert!(human_spans("keel accept <d> --words '<their words>' --by <human>").is_empty(), "a usage line is not a citation");
+        assert!(human_spans("the sprint kept the 'their words' shape.").is_empty(), "a mention with no quote after it");
+        assert!(human_spans("their words: 'ok'").is_empty(), "under eight characters is not read as a quote");
+        assert!(human_spans("no citation here at all").is_empty());
+        assert_eq!(quoted_field(":>> text = \"say \\\"hi\\\" now\"; :>> x = \"y\";", "text").as_deref(), Some("say \\\"hi\\\" now"));
+    }
+
+    /// D0388 known-positive: a Decision after the cutoff quoting the human with no Statement is a
+    /// violation naming the span; one whose linked Statement holds different words is one too.
+    #[test]
+    fn a_citing_decision_with_no_statement_is_refused_forward_only() {
+        let recs = vec![
+            ("d0901".to_string(), Some("2026-09-12".to_string()), human_spans("their words: 'make the brief use caveman please'")),
+            ("d0902".to_string(), Some("2026-09-12".to_string()), human_spans("their words: 'something the statement never said'")),
+            ("d0903".to_string(), Some("2026-01-01".to_string()), human_spans("their words: 'an old rendering, before the rule'")),
+            ("dcOldDoD".to_string(), None, human_spans("The human, 2026-09-01: 'an undated DoD quoting them'")),
+        ];
+        let edges = vec![("d0902".to_string(), "st900".to_string())];
+        let sts = statements(&[("st900", "make it use caveman?")]);
+        let (forward, grandfathered, undated) = direction_violations(&recs, &edges, &sts, "2026-09-12");
+        assert_eq!(forward.len(), 2, "{forward:?}");
+        assert!(forward[0].0 == "d0901" && forward[0].1.contains("no #DerivedFrom edge") && forward[0].1.contains("make the brief use caveman"), "{forward:?}");
+        assert!(forward[1].0 == "d0902" && forward[1].1.contains("holds this span verbatim"), "{forward:?}");
+        assert_eq!((grandfathered, undated), (1, 1));
+    }
+
+    /// D0388 known-negative: the Statement holds the span (escapes folded) and the edge exists - it
+    /// passes; a Decision quoting nobody is untouched.
+    #[test]
+    fn a_citing_decision_linked_to_its_statement_passes_and_a_silent_one_is_untouched() {
+        let recs = vec![
+            ("d0904".to_string(), Some("2026-09-12".to_string()), human_spans("The human, 2026-09-08: 'make it use caveman?' - so the brief does.")),
+            ("d0905".to_string(), Some("2026-09-12".to_string()), human_spans("their words: 'user said ''X'' - is the user asking for a view?'")),
+            ("d0906".to_string(), Some("2026-09-12".to_string()), human_spans("no quotation of anyone; a plain rationale")),
+        ];
+        let edges = vec![("d0904".to_string(), "st110".to_string()), ("d0905".to_string(), "st111".to_string())];
+        let sts = statements(&[("st110", "make it use caveman?"), ("st111", "rubrics so lower-model agents can run them as necessary (e.g. user said ''X'' - is the user asking for a view?  if so, quote")]);
+        let (forward, grandfathered, undated) = direction_violations(&recs, &edges, &sts, "2026-09-12");
+        assert!(forward.is_empty(), "{forward:?}");
+        assert_eq!((grandfathered, undated), (0, 0));
+    }
+
+    /// The real tree: nothing forward of the cutoff, and the pre-cutoff citing Decisions are counted once.
+    #[test]
+    fn the_self_build_holds_and_counts_its_history() {
+        let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/.."));
+        let r = super::direction_cited(root);
+        assert!(r.violations.is_empty(), "{:?}", r.violations);
+        assert!(r.scanned >= 400, "scanned {} Decisions and DoDs", r.scanned);
+        assert_eq!(r.warnings.len(), 1, "one counted-history line: {:?}", r.warnings);
+        assert!(r.warnings[0].contains("citing Decision(s) recorded before"), "{}", r.warnings[0]);
     }
 }
 
