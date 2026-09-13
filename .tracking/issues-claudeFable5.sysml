@@ -1016,4 +1016,26 @@ package IssuesClaudeFable5 {
         :>> severity = Severity::Medium;
     }
     #Resolves dependency from dcRouteRubricQuestionsSeparateOnTheRequest to issue510;
+
+    part issue511 : Issue {
+        :>> id = "a0498064-3c6b-420f-8aeb-921ae8d7e7b1";
+        :>> title = "facts.py typed-figure control is fitted to the version shape; a false 37 stands in cliShowLenses provenance";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "The typed-figure control in scripts/exec_brief/facts.py is fitted to its specimen. issue389's class was a typed figure standing behind a provenance string that reads as authoritative; the control written for it, _no_version_is_typed_here (facts.py:667), matches only the version shape vN.N.N and lets every other typed figure through. Three members are in the shipped file at 584df9a: the `how` of cliShowLenses (facts.py:137-140) tells the reader that 37 is the number to publish while the fact's value on this tree is 51 - a false figure inside the provenance the human is told to trust; routingThreeSamplesMinutes is the literal 60 (facts.py:956) under a `how` that says it was read from issue392; scopeDaysSinceRule subtracts a typed date(2026, 9, 5) (facts.py:374) under a `how` naming D0337's createdAt, which nothing reads. Found by the propriety round over the instrument (pf56, ProprietyRound6): the shipped script was run over 584df9a and cliShowLenses read back value 51 with `how` ending 'so 37 is the number to publish'; mutating the issue389 specimen to a bare integer, a date or a short sha passed the control. A builder types numerals into page prose too (build_2026_09_11_two_safety_folds.py:185 'ten names leave the dispatch') and check_brief compares no page numeral with the facts file (pf57).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcFactsTypedFiguresAreRefused to issue511;
+
+    part issue512 : Issue {
+        :>> id = "84e29ed0-705b-4f4e-8c8f-aa6bcb96825f";
+        :>> title = "a figure's text painted over by a later shape is measured by no fit_check kind (bars label under its bar)";
+        :>> createdAt = "2026-09-12";
+        :>> createdBy = "claudeFable5";
+        :>> description = "A figure's text painted over by a later shape is measured by nothing. issue390's class is a figure whose numbers are right and whose text is hidden; its fix measured the stacked legend, and fit_check (D0402) measures four shapes of hiding - OVERFLOW past the canvas, OVERLAP of two texts, OVERRUN of a text past the box it starts in, SCROLL. charts.bars (charts.py:52-62) writes each row label at x=0 and then paints the row's rect from x=210 after it in document order, so a label wider than the 210px column is covered by its own bar, and that hiding is none of the four kinds: the text does not start inside the rect and text-under-shape is not a kind. Found by the propriety round over the instrument (pf61, ProprietyRound6): the shipped bars() with a 70-character label was measured by the shipped fit_check.measure_raw in headless Chromium across both font passes and reported CLEAN, while the same session's dots(), two_lane() and timeline() with long labels were caught (OVERLAP 7px, OVERRUN 101px, OVERLAP 12px). Also outside the measurer: a value of 0 is drawn as a 2px bar (charts.py:57) and reads as small-nonzero (pf62).";
+        :>> discoveredInField = false;
+        :>> severity = Severity::Medium;
+    }
+    #Resolves dependency from dcFiguresRefuseOccludedText to issue512;
 }
