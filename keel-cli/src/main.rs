@@ -616,6 +616,44 @@ fn override_path(root: &Path) -> PathBuf {
     root.join(".keel").join("override.json")
 }
 
+/// One file, named the way the filesystem names it (issue427/dcOverrideBindsToOneFile): absolute,
+/// short names and links resolved, forward slashes, no `\\?\` prefix. A file that does not exist yet
+/// is keyed by its existing parent's canonical form plus its own name, so an unlock armed for a file
+/// about to be created and the write that creates it agree. `None` when the path cannot be placed.
+fn override_key(root: &Path, path: &str) -> Option<String> {
+    let p = Path::new(path);
+    let abs = if p.is_absolute() { p.to_path_buf() } else { root.join(p) };
+    let canon = match std::fs::canonicalize(&abs) {
+        Ok(c) => c,
+        Err(_) => std::fs::canonicalize(abs.parent()?).ok()?.join(abs.file_name()?),
+    };
+    Some(canon.to_string_lossy().replace('\\', "/").trim_start_matches("//?/").to_string())
+}
+
+/// What `keel override` may arm (issue427, UCA-O1): exactly one file. Before this, the unlock matched
+/// by substring in either direction, so `keel override .tracking` armed an unlock the next write to
+/// ANY path containing `.tracking` consumed, and a one-character target covered every path holding
+/// that character. Now: an existing regular file, or a single new file under an API-owned surface
+/// (its parent exists and the path carries a `PROTECTED_PATHS` prefix - the one place the API owns
+/// the file's creation). A directory, a prefix, or a file nowhere is refused, and the refusal names
+/// the file-not-directory rule. Returns the canonical key the unlock stores.
+fn override_target(root: &Path, target: &str) -> Result<String, String> {
+    let p = Path::new(target);
+    let abs = if p.is_absolute() { p.to_path_buf() } else { root.join(p) };
+    if abs.is_dir() {
+        return Err(format!("`{target}` is a directory - an override unlocks ONE FILE, never a directory or a path prefix (issue427/D0176); name the file the write will touch"));
+    }
+    let key = override_key(root, target)
+        .ok_or_else(|| format!("`{target}` cannot be placed - its parent directory does not exist; an override unlocks ONE FILE, never a directory or a path prefix (issue427/D0176)"))?;
+    if abs.is_file() {
+        return Ok(key);
+    }
+    if keel_cli::claude_surface::PROTECTED_PATHS.iter().any(|(prefix, _)| key.contains(prefix)) {
+        return Ok(key); // a single new file the API would otherwise own the creation of
+    }
+    Err(format!("`{target}` does not exist - an override unlocks ONE FILE that exists, or one new file under an API-owned surface, never a directory or a path prefix (issue427/D0176)"))
+}
+
 /// Consume a matching unlock: returns the reason when `path` is covered. Deletes the unlock (single
 /// use) and records the tracked obligation naming the path ACTUALLY written (K7); on a failed
 /// tracked write, degrades to a local ledger entry with a sync obligation (charter note 1).
@@ -630,8 +668,10 @@ fn consume_override(root: &Path, written_path: &str, session: &str) -> Option<St
         eprintln!("[keel] override unlock EXPIRED ({OVERRIDE_TTL_SECS}s) — run `keel override` again if still needed");
         return None;
     }
-    if !written_path.contains(&target) && !target.contains(written_path) {
-        return None; // path-bound: an unlock for one file covers no other
+    // Path-bound by canonical EQUALITY (issue427): an unlock for one file covers no other - not a
+    // file whose name contains the target's, not a file under a directory the target named.
+    if override_key(root, &target)? != override_key(root, written_path)? {
+        return None;
     }
     let reason = v.get("reason").and_then(serde_json::Value::as_str).unwrap_or("(no reason recorded)").to_string();
     let actor = v.get("actor").and_then(serde_json::Value::as_str).unwrap_or("unknown").to_string();
@@ -2407,7 +2447,7 @@ fn cmd_sync_claude(args: &[String]) -> i32 {
 /// orient-visible obligation naming the path actually written (K7). Never a silent env var.
 fn cmd_override(args: &[String]) -> i32 {
     const USAGE: &str = "keel override <path> --reason \"why the API cannot express this write\"";
-    let target = match positional_arg(args, USAGE, "a file path") {
+    let given = match positional_arg(args, USAGE, "a file path") {
         Ok(a) => a.replace('\\', "/"),
         Err(code) => return code,
     };
@@ -2417,6 +2457,13 @@ fn cmd_override(args: &[String]) -> i32 {
         return 2;
     };
     let root = find_repo_root().unwrap_or_else(|| PathBuf::from("."));
+    let target = match override_target(&root, &given) {
+        Ok(key) => key,
+        Err(msg) => {
+            eprintln!("keel override: {msg}");
+            return 2;
+        }
+    };
     let actor = match keel_cli::actor::resolve(&root, None) {
         Ok(a) => a,
         Err(msg) => {
@@ -5581,7 +5628,57 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{bash_classify, bash_tokens, classify_guard_args, remap_engine_content, remap_engine_path, root_arg, BashVerdict, Path};
+    use super::{
+        bash_classify, bash_tokens, classify_guard_args, consume_override, override_path, override_target, remap_engine_content, remap_engine_path,
+        root_arg, BashVerdict, Path,
+    };
+
+    /// issue427 (stpa-self run 2, UCA-O1): an override unlock covers exactly one file. A directory is
+    /// refused by name; an unlock for file A is NOT consumed by a write to file B whose path contains
+    /// A's as a substring (the old either-direction match let it); the ordinary one-file override
+    /// still consumes once, records its obligation, and is gone for the second write.
+    #[test]
+    #[allow(clippy::expect_used)] // test setup: a failed mkdir or write should abort the test loudly
+    fn override_unlocks_exactly_one_file() {
+        let root = std::env::temp_dir().join(format!("keel-override-one-file-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".tracking")).expect("mkdir");
+        std::fs::create_dir_all(root.join(".keel")).expect("mkdir");
+        let a = root.join(".tracking").join("issues.sysml");
+        let b = root.join(".tracking").join("issues.sysml.bak");
+        std::fs::write(&a, "package A {\n}\n").expect("a");
+        std::fs::write(&b, "package B {\n}\n").expect("b");
+
+        // A directory is refused, and the refusal names the rule.
+        let refused = override_target(&root, ".tracking").expect_err("a directory must be refused");
+        assert!(refused.contains("directory") && refused.contains("ONE FILE"), "{refused}");
+        // A file nowhere, outside every API-owned surface, is refused too.
+        let missing = override_target(&root, ".tracking/nothing-here.sysml").expect_err("a missing file outside the API surfaces must be refused");
+        assert!(missing.contains("does not exist"), "{missing}");
+        // A single NEW file under an API-owned surface is allowed: the API would own its creation.
+        assert!(override_target(&root, ".tracking/issues-probe.sysml").is_ok(), "a new per-actor issues file is the sanctioned exception");
+        // The ordinary target: an existing file, stored canonically (forward slashes, no `//?/`).
+        let key = override_target(&root, ".tracking/issues.sysml").expect("an existing file arms");
+        assert!(key.ends_with("/.tracking/issues.sysml") && !key.contains('\\') && !key.starts_with("//?/"), "{key}");
+
+        // Arm A the way `keel override` does, then write B (contains A's path as a substring): NOT consumed.
+        let arm = || {
+            let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            std::fs::write(override_path(&root), serde_json::json!({"path": key, "reason": "probe reason of enough length", "actor": "probeAi", "ts": ts}).to_string()).expect("arm");
+        };
+        arm();
+        let b_written = b.to_string_lossy().replace('\\', "/");
+        assert!(consume_override(&root, &b_written, "s").is_none(), "a write to B must not consume A's unlock");
+        assert!(override_path(&root).exists(), "the unlock survives a non-matching write");
+        // The write to A itself consumes once and records the obligation; the second write finds no unlock.
+        let a_written = a.to_string_lossy().replace('\\', "/");
+        assert_eq!(consume_override(&root, &a_written, "s").as_deref(), Some("probe reason of enough length"));
+        assert!(!override_path(&root).exists(), "single-use: the unlock is gone");
+        let recorded = std::fs::read_dir(root.join(".tracking").join("obligations")).map_or(0, |rd| rd.flatten().count());
+        assert_eq!(recorded, 1, "consumption records exactly one obligation");
+        assert!(consume_override(&root, &a_written, "s").is_none(), "the second write after one unlock is locked again");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// D0176/P1.2: argv-level matching — operators as tokens, never substrings of prose. A commit
     /// message DESCRIBING --no-verify does not match; the real flag does; the keel carve-out

@@ -272,6 +272,7 @@ package EngineUcas {
     }
     dependency from ccOverrideNamesOneFile to ucaOverrideTargetIsWide;
     dependency from ccOverrideNamesOneFile to issue427;
+    dependency from ccOverrideNamesOneFile to ctlOverrideObligation; // sprint 689 / D0462: the control now holds CC-O1 (one file, canonical equality); issue427 is resolved by dcOverrideBindsToOneFile
 
     part ccDirectionLinksItsStatement : ControllerConstraint {
         :>> id = "0868826c-8427-4d23-9716-08338d4a0969";
