@@ -2902,15 +2902,24 @@ pub(crate) fn named_items(text: &str) -> Vec<String> {
         |i: usize| i.checked_sub(1).and_then(|j| bytes.get(j)).is_none_or(|b| !b.is_ascii_alphanumeric());
     let mut out = Vec::new();
     // A Decision (`d0289`) tracks a finding as legitimately as a task or an Issue does - a "won't do"
-    // IS a Decision (Invariant 4) - so a retro may name one to justify raising nothing else.
-    let pairs: [(&str, NextOk); 3] = [("dc", |c| c.is_ascii_uppercase()), ("issue", |c| c.is_ascii_digit()), ("d0", |c| c.is_ascii_digit())];
+    // IS a Decision (Invariant 4) - so a retro may name one to justify raising nothing else. The
+    // Decision is matched in BOTH cases - `d0388` as the file names it, `D0388` as CLAUDE.md, every
+    // commit message, every DoD and this guard's own refusal text write it - and returned as the
+    // item's real name (`d0388`) so the exists check still hits the tree (issue424: sprint 627's
+    // 'already tracked by D0388' was refused as naming no item at all). Only the Decision form is
+    // case-folded: `Issue` and `DC` in prose are words, not items, and stay unmatched.
+    let pairs: [(&str, NextOk); 4] =
+        [("dc", |c| c.is_ascii_uppercase()), ("issue", |c| c.is_ascii_digit()), ("d0", |c| c.is_ascii_digit()), ("D0", |c| c.is_ascii_digit())];
     for (needle, ok_next) in pairs {
         let mut from = 0;
         while let Some(rel) = text[from..].find(needle) {
             let st = from + rel;
             let rest = &text[st + needle.len()..];
             if boundary(st) && rest.starts_with(ok_next) {
-                let name: String = text[st..].chars().take_while(char::is_ascii_alphanumeric).collect();
+                let mut name: String = text[st..].chars().take_while(char::is_ascii_alphanumeric).collect();
+                if needle == "D0" {
+                    name.replace_range(..1, "d");
+                }
                 out.push(name);
             }
             from = st + needle.len();
@@ -2991,7 +3000,7 @@ fn retro_backlog_violations(added_items: &[String], known_items: &[String], spri
                     continue;
                 }
                 out.push(format!(
-                    "{path}: the retro says '{phrase}' but names no existing item that tracks the finding ({}) — a justification must point at something real: the issueNNN, dcTask or dNNNN that carries it (D0131/D0293; issue364: two retros claimed 'already tracked' about untracked findings and passed)",
+                    "{path}: the retro says '{phrase}' but names no existing item that tracks the finding ({}) — a justification must point at something real, written as the tree names it: `issueNNN`, `dcTaskName`, `d0NNN` (or `D0NNN`) - the item that carries it (D0131/D0293/issue424; issue364: two retros claimed 'already tracked' about untracked findings and passed)",
                     if named.is_empty() { "it names no item at all".to_string() } else { format!("it names {}, none of which exists", named.join(", ")) }
                 ));
                 continue;
@@ -6803,6 +6812,31 @@ verification storyXDoD : Test { :>> method = VerificationMethod::test; :>> proce
         assert_eq!(named_items("tracked as dcFooBar"), vec!["dcFooBar"]);
         assert_eq!(named_items("see issue123"), vec!["issue123"]);
         assert!(named_items("tissue42 is not an item").is_empty());
+    }
+
+    /// issue424: a Decision named the way every document in this repository names one - `D0388` - is
+    /// read as naming `d0388`, the item's real name, so the exists check hits the tree. Only the
+    /// Decision form folds: `Issue 42` and `DC` in prose are words, and `ID0388` is not a boundary.
+    #[test]
+    fn a_decision_named_in_uppercase_is_read_as_its_real_name() {
+        assert_eq!(named_items("already tracked by D0388 and its probe rule"), vec!["d0388"]);
+        assert_eq!(named_items("d0388 twice: D0388"), vec!["d0388", "d0388"]);
+        assert!(named_items("Issue 42 and the DC team and ID0388").is_empty());
+        assert_eq!(named_items("tracked in issue424 (D0131)"), vec!["issue424", "d0131"]);
+    }
+
+    /// The case the guard refused at sprint 627, constructed both ways (D0388 pair): the same retro,
+    /// whose only named item is written `D0388`, PASSES when d0388 exists and FAILS when it does not -
+    /// and the refusal quotes the forms it accepts in the case it accepts them.
+    #[test]
+    fn a_retro_justified_by_an_uppercase_decision_passes_when_it_exists_and_fails_when_it_does_not() {
+        let text = sprint_with_retro("no new item - already tracked by D0388 and its probe rule.");
+        let known = vec!["d0388".to_string()];
+        assert!(retro_backlog_violations_for_test(&[], &known, &[("s.sysml".to_string(), text.clone())]).is_empty(), "d0388 exists: the uppercase form names it");
+        let v = retro_backlog_violations_for_test(&[], &["d0387".to_string()], &[("s.sysml".to_string(), text)]);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("d0388") && v[0].contains("none of which exists"), "{v:?}");
+        assert!(v[0].contains("`d0NNN` (or `D0NNN`)") && v[0].contains("`issueNNN`") && v[0].contains("`dcTaskName`"), "the refusal quotes the accepted forms: {v:?}");
     }
 }
 
