@@ -1457,6 +1457,103 @@ fact("ucaCensus", {
      "(a row can be both)." + ("" if _us else " The view did not answer: " + (out or "")[:200]))
 
 
+# ================================================================ 20. the nineteenth publish's four asks
+# Three process-change ratifications and one fork. Each number here is read from the record or the tree
+# that holds it - the guard's own print, the skill files, the Decision's RESEARCH line - never retyped.
+
+# --- D0463: the direction-cited guard's own line at HEAD (scanned / violations / the counted history)
+ok, out = run([KEEL, "gate", "guard", "direction-cited", "."], timeout=120)
+_dc = re.search(r"\[guard:direction-cited\] (PASS|FAIL|WARN)[^\d]*(\d+) scanned, (\d+) warning\(s\) \+ (\d+) counted-history line\(s\), (\d+) violation\(s\)", out or "")
+_dh = re.search(r"HISTORY\s+(\d+) citing Decision\(s\) recorded before (\d{4}-\d{2}-\d{2})[^\d]*(\d+) citing DoD\(s\) carry no createdAt", out or "")
+DC_HOW = ("`keel gate guard direction-cited .` (D0463, guard 73): the verdict line's scanned / warning / counted-history / "
+          "violation counts, and the HISTORY line's two counts (citing Decisions before the cutoff, citing DoDs with no "
+          "createdAt) - the guard's own print, quoted." + ("" if _dc else " The guard did not print a verdict line: " + (out or "")[-200:]))
+fact("directionCited", {
+    "verdict": _dc.group(1), "scanned": int(_dc.group(2)), "violations": int(_dc.group(5)),
+    "historyDecisions": int(_dh.group(1)) if _dh else None, "cutoff": _dh.group(2) if _dh else None,
+    "historyDoDs": int(_dh.group(3)) if _dh else None,
+} if _dc else None, "the guard's counts at HEAD", DC_HOW)
+
+# --- D0460: what the two skills say today about judgedAgainst and HEAD - the lines the Decision rewrites
+_sk = {}
+for _rel in ("test-result", "sprint-standup"):
+    _t = read(os.path.join(REPO, ".engine", "skills", _rel, "SKILL.md")) or ""
+    _sk[_rel] = [ln.strip() for ln in _t.splitlines() if "judgedAgainst" in ln and ("HEAD" in ln or "≠" in ln or "!=" in ln)]
+fact("skillHeadEqualityLines", {k: len(v) for k, v in _sk.items()},
+     "skill lines that tie judgedAgainst to HEAD",
+     "lines of .engine/skills/test-result/SKILL.md and .engine/skills/sprint-standup/SKILL.md containing `judgedAgainst` "
+     "and one of `HEAD`, `≠`, `!=` - the wording D0460 replaces (the recording instruction, which keeps HEAD, is one of them).")
+
+# --- D0461: retros in the tree that name a Decision as written (D0NNN) - the class the widened needle reads
+_retro_upper = 0
+_retro_total = 0
+for _fn in os.listdir(os.path.join(REPO, ".tracking", "delivery")):
+    if not _fn.endswith(".sysml"):
+        continue
+    _t = read(os.path.join(REPO, ".tracking", "delivery", _fn)) or ""
+    # a record starts at a LINE beginning `verification` or `part` (the guard's own reading); the retro gates are
+    # the verifications whose name says Retro; the chunk runs to the next record's line
+    _chunks = re.split(r"\n(?=\s*(?:verification|part)\s)", _t)
+    for _c in _chunks:
+        if re.match(r"\s*verification\s+\w*Retro\w*\s*:\s*Test", _c):
+            _retro_total += 1
+            if re.search(r"(?<![A-Za-z0-9])D0\d{3}(?![A-Za-z0-9])", _c):
+                _retro_upper += 1
+fact("retrosNamingDecisionUpper", {"retros": _retro_total, "namingD0NNN": _retro_upper},
+     "retro gate Tests, and how many name a Decision as D0NNN",
+     "over .tracking/delivery/*.sysml: every record starting at a line `verification <name>Retro<...> : Test` (the "
+     "retro gate, read to the next `verification`/`part` line as guards.rs retro_texts does), and those whose text "
+     "carries `D0` + three digits at a word boundary - the form named_items did not read before D0461.")
+
+# --- D0464: the sweep the fork stands on, quoted from the Decision's own RESEARCH line; the constant from the source
+_d0464 = ""
+for _fn in os.listdir(DEC_DIR):
+    if _fn.startswith("0464-"):
+        _d0464 = read(os.path.join(DEC_DIR, _fn))
+_rl = re.search(r"// RESEARCH: (.*)", _d0464)
+_research = _rl.group(1) if _rl else ""
+_arm1 = re.search(r"One-hop arm, 50 cases: (.*?)\. Two-hop arm", _research)
+_arm2 = re.search(r"Two-hop arm, 50 cases: (.*?)\. Verdict lines", _research)
+
+
+def _arm(text):
+    rows = {}
+    if not text:
+        return rows
+    # "DOMINANCE=0 hits 45/50 median 2 top-3 28/45 mean rows 12; 1.1 45/50 median 4 top-3 21/45; ..."
+    for seg in text.split(";"):
+        m = re.search(r"(?:DOMINANCE=)?([0-9.]+) (?:hits )?(\d+)/50 median (\d+) top-3 (\d+)/(\d+)", seg.strip())
+        if m:
+            rows[m.group(1)] = {"hits": int(m.group(2)), "median": int(m.group(3)), "top3": int(m.group(4))}
+    # "1.3, 1.35, 1.4, 1.45 each 45/50 median 3 top-3 27/45"
+    for m in re.finditer(r"((?:[0-9.]+, )+[0-9.]+) each (\d+)/50 median (\d+) top-3 (\d+)/(\d+)", text):
+        for s in m.group(1).split(", "):
+            rows[s] = {"hits": int(m.group(2)), "median": int(m.group(3)), "top3": int(m.group(4))}
+    return rows
+
+
+_hop1, _hop2 = _arm(_arm1.group(1) if _arm1 else ""), _arm(_arm2.group(1) if _arm2 else "")
+_hand = {}
+for m in re.finditer(r"at ([0-9.]+)(?: and at ([0-9.]+))? (?:the rebase question's d0129 arrives at position (\d+), )?(?:it does not arrive, )?injection ON (\d)/8, bar (MET|NOT MET) \((\d)/7", _research):
+    for s in (m.group(1), m.group(2)):
+        if s:
+            _hand[s] = {"on": int(m.group(4)), "reachable": int(m.group(6)), "bar": m.group(5), "d0129Position": int(m.group(3)) if m.group(3) else None}
+_ties = len(re.findall(r"COULD NOT CHOOSE on KEEL_RECALL_DOMINANCE", _research))
+_kn = read(os.path.join(REPO, "keel-cli", "src", "view", "knowledge.rs")) or ""
+_const = re.search(r"const DOMINANCE: f64 = ([0-9.]+);", _kn)
+_bar = re.search(r'recallRanksLinkedRecordsAsWellAsGrepDoesDoD : Test \{[^}]*?procedureText = "(.*?)"', read(os.path.join(REPO, ".tracking", "backlog.sysml")) or "", re.DOTALL)
+SW_HOW = ("regex over the `// RESEARCH:` line of .engine/decisions/0464-*.sysml - the sweep that Decision records, one row per "
+          "DOMINANCE setting per arm (hits/50, median position, top-3), the hand-set readings (injection ON n/8, bar MET or "
+          "NOT MET, n/7 reachable, d0129's position where it arrived), and the count of COULD NOT CHOOSE tie lines; "
+          "`constant` = regex `const DOMINANCE: f64 = N;` over keel-cli/src/view/knowledge.rs (the value in force); "
+          "`barText` = the procedureText of recallRanksLinkedRecordsAsWellAsGrepDoesDoD in .tracking/backlog.sysml. "
+          "Quoted from the record and the source, never retyped; re-runnable with .engine/tools/recall_bench.py --sweep.")
+fact("dominanceSweep", {
+    "hop1": _hop1, "hop2": _hop2, "handSet": _hand, "tieLines": _ties,
+    "constant": float(_const.group(1)) if _const else None,
+    "barText": _bar.group(1) if _bar else None,
+} if _hop1 and _hop2 and _hand else None, "the D0464 sweep, the constant in force, the bar's text", SW_HOW)
+
 # every fact above reads the WORKING TREE while `tree` names HEAD; when the two differ the page must say so
 _DIRTY_HOW = ("`git status --porcelain --untracked-files=all`: lines beginning with a change code other than `??` are "
               "tracked files with uncommitted edits, `??` lines are untracked files. Every file-reading fact in this "
